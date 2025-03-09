@@ -1,0 +1,1 @@
+# obsidian-ollama-duet
