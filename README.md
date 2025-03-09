@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Obsidian Sample Plugin
 
 This is a sample plugin for Obsidian (https://obsidian.md).
@@ -92,3 +93,6 @@ If you have multiple URLs, you can also do:
 ## API Documentation
 
 See https://github.com/obsidianmd/obsidian-api
+=======
+# obsidian-ollama-duet
+>>>>>>> 72c64f947119075299ad5b80f136a02f413bc7cc
