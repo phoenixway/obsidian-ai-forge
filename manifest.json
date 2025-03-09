@@ -1,7 +1,7 @@
 {
     "id": "my-ollama-plugin",  
     "name": "My Ollama Plugin",         
-    "version": "1.0.0",              
+    "version": "0.0.1",              
     "minAppVersion": "0.15.0",       
     "description": "Integrate Ollama with Obsidian",
     "author": "Your Name",         
