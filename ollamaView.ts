@@ -48,19 +48,16 @@ export class OllamaView extends ItemView {
         placeholder: "Напишіть повідомлення...",
       },
     });
-
     // Create send button (moved before settings button)
     const sendButton = inputContainer.createEl("button", {
       cls: "send-button",
     });
     setIcon(sendButton, "send");
-
     // Create settings button (now after send button)
     const settingsButton = inputContainer.createEl("button", {
       cls: "settings-button",
     });
     setIcon(settingsButton, "settings");
-
     // Handle enter key to send message
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -68,7 +65,6 @@ export class OllamaView extends ItemView {
         this.sendMessage();
       }
     });
-
     // Handle settings button click
     settingsButton.addEventListener("click", () => {
       const setting = (this.app as any).setting;
@@ -95,7 +91,6 @@ export class OllamaView extends ItemView {
         // Clear existing messages
         this.messages = [];
         this.chatContainer.empty();
-
         // Add each message from history
         for (const msg of history) {
           // Convert string timestamp to Date object
@@ -128,7 +123,6 @@ export class OllamaView extends ItemView {
         content: msg.content,
         timestamp: msg.timestamp.toISOString()
       }));
-
       await this.plugin.saveMessageHistory(JSON.stringify(serializedMessages));
     } catch (error) {
       console.error("Error saving message history:", error);
@@ -291,7 +285,6 @@ export class OllamaView extends ItemView {
   isFirstMessageInGroup(message: Message): boolean {
     const index = this.messages.indexOf(message);
     if (index === 0) return true;
-
     const prevMessage = this.messages[index - 1];
     return prevMessage.role !== message.role;
   }
@@ -299,7 +292,6 @@ export class OllamaView extends ItemView {
   isLastMessageInGroup(message: Message): boolean {
     const index = this.messages.indexOf(message);
     if (index === this.messages.length - 1) return true;
-
     const nextMessage = this.messages[index + 1];
     return nextMessage.role !== message.role;
   }

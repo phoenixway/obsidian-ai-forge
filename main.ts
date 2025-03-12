@@ -138,6 +138,7 @@ export default class OllamaPlugin extends Plugin {
     
     try {
       const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
+
       const adapter = this.app.vault.adapter;
       
       if (await adapter.exists(logPath)) {
@@ -153,7 +154,11 @@ export default class OllamaPlugin extends Plugin {
 
   async clearMessageHistory() {
     try {
+<<<<<<< HEAD
         const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
+=======
+        const logPath = this.app.vault.configDir + "/plugins/my-ollama-plugin/chat_history.json";
+>>>>>>> 2ffb413f6b4c18d62c2b48fb227e865c412bfd7e
         const adapter = this.app.vault.adapter;
 
         if (await adapter.exists(logPath)) {
