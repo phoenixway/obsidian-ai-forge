@@ -1,0 +1,318 @@
+/* Main container to hold both chat and input */
+.ollama-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Chat container with scrollable content */
+.ollama-chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  box-sizing: border-box;
+  background-color: var(--background-secondary-alt);
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+/* Input container fixed at the bottom */
+.chat-input-container {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  border-top: 1px solid var(--divider-color);
+  background-color: var(--background-secondary-alt);
+  z-index: 10;
+  border-radius: 20px;
+  margin: 15px;
+  box-sizing: border-box;
+}
+
+.chat-input-container textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--divider-color);
+  border-radius: 20px;
+  padding: 12px 15px;
+  margin-right: 10px;
+  height: 48px;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+}
+
+.chat-input-container button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+}
+
+.chat-input-container button:hover {
+  background-color: var(--interactive-hover);
+}
+
+.chat-input-container .settings-button {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.chat-input-container .settings-button:hover {
+  background-color: var(--background-modifier-border-hover);
+}
+
+/* ---------------------------------------------*/
+
+.ollama-chat-container .message-group {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.ollama-chat-container .user-message-group {
+  align-items: flex-end;
+}
+
+.ollama-chat-container .message {
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  border-radius: 15px;
+  max-width: 75%;
+  word-wrap: break-word;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ollama-chat-container .user-message {
+  background-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+  align-self: flex-end;
+  border-top-right-radius: 5px;
+}
+
+.ollama-chat-container .ollama-message {
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  align-self: flex-start;
+  border-top-left-radius: 5px;
+}
+
+/* Додано хвостики для бульбашок */
+.ollama-chat-container .user-message-tail {
+  border-top-right-radius: 15px;
+}
+
+.ollama-chat-container .user-message-tail::after {
+  content: '';
+  position: absolute;
+  right: -10px;
+  bottom: 0;
+  border-width: 10px 0 0 10px;
+  border-color: transparent transparent transparent var(--interactive-accent-hover);
+}
+
+.ollama-chat-container .ollama-message-tail {
+  border-top-left-radius: 15px;
+}
+
+.ollama-chat-container .ollama-message-tail::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  bottom: 0;
+  border-width: 10px 10px 0 0;
+  border-color: transparent var(--background-primary) transparent transparent;
+}
+
+.message-content-container {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.message-content {
+  flex: 1;
+}
+
+.message-timestamp {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  align-self: flex-end;
+  opacity: 0.7;
+}
+
+.message-sender {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: var(--text-accent);
+}
+
+
+.copy-button {
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--text-muted) !important;
+  font-size: 10px !important;
+  cursor: pointer;
+  opacity: 0.5 !important;
+  transition: opacity 0.3s !important;
+  margin-left: 5px !important;
+  padding: 2px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.copy-button:hover {
+  opacity: 1 !important;
+  background-color: var(--background-modifier-hover) !important;
+  border-radius: 3px !important;
+}
+
+.loading-indicator {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--text-muted);
+  border-top-color: var(--interactive-accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: 10px;
+}
+
+@keyframes spin {
+  to {
+      transform: rotate(360deg);
+  }
+}
+
+.ollama-chat-container .user-message {
+  background-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+  align-self: flex-end;
+  border-top-right-radius: 5px;
+}
+
+.ollama-chat-container .user-message .message-timestamp {
+  color: var(--text-on-accent); /* Змінюємо колір тексту дати */
+  opacity: 0.8; /* Робимо трохи менш прозорим */
+}
+
+.ollama-chat-container .user-message .copy-button {
+  color: var(--text-on-accent) !important; /* Змінюємо колір іконки копіювання */
+  opacity: 0.4 !important; /* Робимо трохи менш прозорим */
+}
+
+.ollama-chat-container .user-message .copy-button:hover {
+  opacity: 1 !important; /* Робимо повністю непрозорим при наведенні */
+}
+
+/* Стилі для Markdown-контенту в повідомленнях */
+.ollama-message .message-content {
+  width: 100%;
+}
+
+.ollama-message .message-content p {
+  margin: 0.5em 0;
+}
+
+.ollama-message .message-content p:first-child {
+  margin-top: 0;
+}
+
+.ollama-message .message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.ollama-message .message-content ul,
+.ollama-message .message-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.ollama-message .message-content pre {
+  background-color: var(--background-secondary);
+  border-radius: 5px;
+  padding: 8px;
+  margin: 0.5em 0;
+  overflow-x: auto;
+}
+
+.ollama-message .message-content code {
+  font-family: var(--font-monospace);
+  font-size: 0.9em;
+  background-color: var(--background-secondary);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+.ollama-message .message-content pre code {
+  padding: 0;
+  background-color: transparent;
+}
+
+.ollama-message .message-content blockquote {
+  border-left: 3px solid var(--text-muted);
+  margin: 0.5em 0;
+  padding-left: 1em;
+  color: var(--text-muted);
+}
+
+/* Стилі для індикатора "думання" */
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.thinking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  margin: 0 3px;
+  opacity: 0.6;
+}
+
+.thinking-dot:nth-child(1) {
+  animation: dot-pulse 1.5s infinite ease-in-out;
+}
+
+.thinking-dot:nth-child(2) {
+  animation: dot-pulse 1.5s infinite ease-in-out 0.5s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation: dot-pulse 1.5s infinite ease-in-out 1s;
+}
+
+@keyframes dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 1;
+  }
+}
+
+
+

@@ -1,0 +1,13 @@
+{
+    "id": "obsidian-ollama-duet",  
+    "name": "Obsidian+Ollama duet",         
+    "version": "0.0.4",              
+    "minAppVersion": "0.15.0",       
+    "description": "Integrate Ollama with Obsidian",
+    "author": "Roman Kozak",         
+    "authorUrl": "https://github.com/phoenixway/",
+    "isDesktopOnly": false,         
+    "main": "main.js",              
+    "pluginApiVersion": 1         
+  }
+  

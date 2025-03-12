@@ -1,0 +1,6 @@
+{
+  "modelName": "gemma:2b",
+  "ollamaServerUrl": "http://localhost:11434",
+  "logFileSizeLimit": 4864,
+  "saveMessageHistory": true
+}
