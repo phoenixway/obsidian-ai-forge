@@ -147,24 +147,6 @@ export class OllamaView extends ItemView {
       this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     });
   }
-    
-// guaranteedScrollToBottom(): void {
-  // // Clear any pending scroll operation
-  // if (this.scrollTimeout) {
-  //   clearTimeout(this.scrollTimeout);
-  // }
-
-  // // Use requestAnimationFrame to ensure scroll happens after rendering
-  // requestAnimationFrame(() => {
-  //   if (!this.chatContainer) return;
-
-  //   // Scroll the last message into view
-  //   const lastMessage = this.chatContainer.lastElementChild;
-  //   if (lastMessage) {
-  //     lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  //   }
-  // });
-// }
 
   async sendMessage(): Promise<void> {
     if (this.isProcessing) return;
@@ -302,52 +284,58 @@ export class OllamaView extends ItemView {
 
   async processWithOllama(content: string): Promise<void> {
     this.isProcessing = true;
-  
+
     // Add a temporary "loading" message
     const loadingMessageEl = this.addLoadingMessage();
-  
-    try {
-      const serverUrl = this.plugin.getOllamaApiUrl();
-      const response = await fetch(`${serverUrl}/api/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.plugin.settings.modelName,
-          prompt: content,
-          stream: false,
-        }),
-      });
-  
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const data = await response.json();
-  
-      // Remove loading message
-      if (loadingMessageEl.parentNode) {
-        loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-      }
-  
-      // Add the response as a message
-      this.addMessage("assistant", data.response);
-  
-    } catch (error) {
-      console.error("Error processing with Ollama:", error);
-  
-      // Remove loading message
-      if (loadingMessageEl.parentNode) {
-        loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-      }
-  
-      // Add an error message
-      this.addMessage("assistant", "Помилка з'єднання з Ollama. Перевірте налаштування та переконайтеся, що сервер працює.");
-    } finally {
-      this.isProcessing = false;
-    }
-  }
+
+    // Execute the request in a background thread
+    setTimeout(async () => {
+        try {
+            const serverUrl = this.plugin.getOllamaApiUrl();
+            const response = await fetch(`${serverUrl}/api/generate`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    model: this.plugin.settings.modelName,
+                    prompt: content,
+                    stream: false,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Update the UI in requestAnimationFrame
+            requestAnimationFrame(() => {
+                if (loadingMessageEl.parentNode) {
+                    loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+                }
+                this.addMessage("assistant", data.response);
+            });
+        } catch (error) {
+            console.error("Error processing request with Ollama:", error);
+
+            requestAnimationFrame(() => {
+                if (loadingMessageEl.parentNode) {
+                    loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+                }
+                this.addMessage(
+                    "assistant",
+                    "Connection error with Ollama. Please check the settings and ensure the server is running."
+                );
+            });
+        } finally {
+            this.isProcessing = false;
+        }
+    }, 0);
+}
+
+
 
   addLoadingMessage(): HTMLElement {
     const messageGroup = this.chatContainer.createDiv({
