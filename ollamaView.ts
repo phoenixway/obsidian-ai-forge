@@ -1,8 +1,9 @@
-import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
+// import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, TFile } from "obsidian";
 import OllamaPlugin from "./main";
 
-import fetch from 'node-fetch';
-import * as fs from 'fs/promises';
+// import fetch from 'node-fetch';
+// import * as fs from 'fs/promises';
 import * as faiss from 'faiss-node';
 import { marked } from 'marked'; // Виправлений імпорт
 import pdf from 'pdf-parse'; // Декларації типів повинні бути додані
@@ -55,6 +56,8 @@ export class OllamaView extends ItemView {
   private historyLoaded: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
   static instance: OllamaView | null = null;
+  private embeddings: number[][] = [];
+
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -69,134 +72,65 @@ export class OllamaView extends ItemView {
   private index: faiss.IndexFlatL2 | undefined;
   private documents: string[] = [];
 
-  async loadFiles(files: string[]): Promise<void> {
-      this.documents = [];
-      for (const file of files) {
-          const text = await this.readFileContent(file);
-          this.documents.push(text);
-      }
-  }
 
   private async readFileContent(filePath: string): Promise<string> {
-      if (filePath.endsWith('.md')) {
-          return this.readMdFile(filePath);
-      } else if (filePath.endsWith('.pdf')) {
-          return this.readPdfFile(filePath);
-      } else {
-          return fs.readFile(filePath, 'utf-8');
-      }
-  }
-
-  private async readMdFile(filePath: string): Promise<string> {
-    const mdContent = await fs.readFile(filePath, 'utf-8');
-    const textContent = await marked.parse(mdContent); // Використовуємо await
-    return textContent.replace(/<[^>]*>?/gm, '');
-}
-
-  private async readPdfFile(filePath: string): Promise<string> {
-      const dataBuffer = await fs.readFile(filePath);
-      const data = await pdf(dataBuffer);
-      return data.text;
-  }
-
-
-  
-  private async createEmbeddings(texts: string[]): Promise<number[][]> {
-    const embeddings: number[][] = [];
-    for (const text of texts) {
-        const response = await fetch('http://localhost:11434/api/embeddings', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'llama2',
-                prompt: text
-            })
-        });
-        const data = await response.json();
-
-        if (isOllamaEmbeddingsResponse(data)) {
-            embeddings.push(data.embedding);
-        } else {
-            console.error('Invalid Ollama embeddings response:', data);
-            throw new Error('Invalid Ollama embeddings response');
-        }
+    // Отримуємо файл з Obsidian vault
+    const file = this.app?.vault.getAbstractFileByPath(filePath);
+    
+    if (!file || !(file instanceof TFile)) {
+        throw new Error(`File not found: ${filePath}`);
     }
-    return embeddings;
-}
-
-private async createIndex(embeddings: number[][]): Promise<void> {
-  const dimension = embeddings[0].length;
-  this.index = new faiss.IndexFlatL2(dimension);
-  this.index.add(embeddings.flat()); // Використовуємо flat()
-}
-private async findRelevantDocuments(questionEmbedding: number[][], k: number = 2): Promise<string[]> {
-  if (!this.index) {
-      throw new Error('Index not initialized. Call createIndex first.');
-  }
-
-  const searchResult = this.index.search(questionEmbedding.flat(), k);
-  console.log("Search labels:", searchResult.labels);
-
-  // Перевіряємо, чи labels є масивом, і конвертуємо його в масив, якщо потрібно
-  const indices = Array.isArray(searchResult.labels[0]) ? searchResult.labels[0] : [searchResult.labels[0]];
-
-  return indices.map(i => this.documents[i]);
-}
-
-async generateAnswer(question: string): Promise<string> {
-  const questionEmbeddingResponse = await fetch('http://localhost:11434/api/embeddings', {
-      method: 'POST',
-      headers: {
-          'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-          model: 'llama2',
-          prompt: question
-      })
-  });
-  const questionEmbeddingData = await questionEmbeddingResponse.json();
-
-  if (isOllamaEmbeddingsResponse(questionEmbeddingData)) {
-      const questionEmbedding = [questionEmbeddingData.embedding];
-
-      const relevantDocuments = await this.findRelevantDocuments(questionEmbedding);
-      const context = relevantDocuments.join('\n');
-
-      const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            model: 'llama2',
-            prompt: `Контекст: ${context}\nПитання: ${question}`,
-            stream: false
-        })
-    });
-    const ollamaData = await ollamaResponse.json();
-
-    if (isOllamaGenerateResponse(ollamaData)) {
-        return ollamaData.response;
+    
+    if (filePath.endsWith('.md')) {
+        return this.readMdFile(file);
+    } else if (filePath.endsWith('.pdf')) {
+        throw new Error("PDF reading not supported in browser environment");
+        // PDF обробка потребує іншого підходу
     } else {
-        console.error('Invalid Ollama generate response:', ollamaData);
-        throw new Error('Invalid Ollama generate response');
+        return this.app.vault.read(file);
     }
+}
+private async readMdFile(file: TFile): Promise<string> {
+  const mdContent = await this.app.vault.read(file);
+  const textContent = await marked.parse(mdContent);
+  return textContent.replace(/<[^>]*>?/gm, '');
+}
 
-  } else {
-      console.error('Invalid Ollama embeddings response:', questionEmbeddingData);
-      throw new Error('Invalid Ollama embeddings response');
-  }
+private async readPdfFile(file: TFile): Promise<string> {
+  throw new Error("PDF reading not supported in browser environment");
+  // Тут потрібно буде реалізувати інший підхід для читання PDF
 }
 
 
-  async initialize(files: string[]): Promise<void> {
-      await this.loadFiles(files);
-      const embeddings = await this.createEmbeddings(this.documents);
-      await this.createIndex(embeddings);
+
+private findTopK(array: number[], k: number): number[] {
+  return array
+      .map((value, index) => ({ value, index }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, k)
+      .map(item => item.index);
+}
+
+private cosineSimilarity(vecA: number[], vecB: number[]): number {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
   }
 
+  normA = Math.sqrt(normA);
+  normB = Math.sqrt(normB);
+
+  if (normA === 0 || normB === 0) {
+      return 0;
+  }
+
+  return dotProduct / (normA * normB);
+}
 
   getViewType(): string {
     return VIEW_TYPE_OLLAMA;
@@ -476,13 +410,14 @@ async generateAnswer(question: string): Promise<string> {
             
             if (this.plugin.settings.ragEnabled) {
                 // Make sure documents are indexed
-                if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
-                    await this.plugin.ragService.indexDocuments();
-                }
+                if (this.plugin.ragService && 
+                  this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+                  await this.plugin.ragService.indexDocuments();
+              }
                 
                 // Get context based on the query
                 const ragContext = this.plugin.ragService.prepareContext(content);
-                
+                console.log(ragContext)
                 if (ragContext) {
                     // Combine context with prompt
                     prompt = `${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;

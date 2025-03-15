@@ -28,8 +28,24 @@ export class RagService {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
       
+      console.log(`RAG folder path: "${folderPath}"`);
+      
+      // Отримуємо всі файли у vault для перевірки
+      const allFiles = vault.getFiles();
+      console.log(`Total files in vault: ${allFiles.length}`);
+      
+      // Друкуємо перші кілька файлів для перевірки
+      for (let i = 0; i < Math.min(5, allFiles.length); i++) {
+        console.log(`File ${i}: ${allFiles[i].path}`);
+      }
+      
       // Get all markdown files in the specified folder
       const files = await this.getMarkdownFiles(vault, folderPath);
+      
+      console.log(`Found ${files.length} markdown files from "${folderPath}"`);
+      for (const file of files) {
+        console.log(`Found file: ${file.path}`);
+      }
       
       console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
       this.documents = [];
@@ -66,21 +82,34 @@ export class RagService {
   private async getMarkdownFiles(vault: Vault, folderPath: string): Promise<TFile[]> {
     const files: TFile[] = [];
     
+    // Нормалізуємо шлях для порівняння
+    let normalizedFolderPath = folderPath;
+    if (normalizedFolderPath && !normalizedFolderPath.endsWith('/')) {
+        normalizedFolderPath += '/';
+    }
+    
+    // Спеціальна логіка для кореневого шляху
+    const isRootPath = !normalizedFolderPath || normalizedFolderPath === '/';
+    
+    console.log(`Normalized path: "${normalizedFolderPath}", isRoot: ${isRootPath}`);
+    
     // Get all files in the vault
     const allFiles = vault.getFiles();
     
     // Filter for markdown files in the specified folder
     for (const file of allFiles) {
-      if (
-        file.extension === "md" && 
-        file.path.startsWith(folderPath)
-      ) {
-        files.push(file);
+      if (file.extension === "md") {
+        if (isRootPath || file.path.startsWith(normalizedFolderPath)) {
+          console.log(`Adding file: ${file.path}`);
+          files.push(file);
+        } else {
+          console.log(`Skipping file as it doesn't match path: ${file.path}`);
+        }
       }
     }
     
     return files;
-  }
+}
 
   /**
    * Simple search implementation to find relevant documents for a query

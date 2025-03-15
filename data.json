@@ -1,6 +1,9 @@
 {
-  "modelName": "gemma3:12b",
+  "modelName": "gemma3:4b",
   "ollamaServerUrl": "http://localhost:11434",
   "logFileSizeLimit": 4864,
-  "saveMessageHistory": true
+  "saveMessageHistory": false,
+  "ragEnabled": true,
+  "ragFolderPath": "etc/data",
+  "contextWindowSize": 5
 }

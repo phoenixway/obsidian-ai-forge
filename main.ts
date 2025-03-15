@@ -2,7 +2,7 @@ import { Plugin, WorkspaceLeaf } from "obsidian";
 import { OllamaView, VIEW_TYPE_OLLAMA } from "./ollamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
 import { RagService } from "./ragService";
-import { ApiService } from "./apiService";
+import { ApiService } from "./apiServices";
 
 // Інтерфейс для документа у RAG
 interface RAGDocument {
@@ -71,13 +71,24 @@ export default class OllamaPlugin extends Plugin {
     this.addSettingTab(this.settingTab);
 
     // Activate the view when layout is ready, but don't send automatic greeting
+    // Activate the view when layout is ready, but don't send automatic greeting
     this.app.workspace.onLayoutReady(() => {
-      this.activateView();
+      // Перевіряємо, чи view вже існує
+      const existingLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
+
+      if (!existingLeaf) {
+        this.activateView();
+      } else {
+        console.log("Ollama view already exists, not creating a new one");
+      }
+
       // Start indexing if RAG is enabled
       if (this.settings.ragEnabled) {
         this.ragService.indexDocuments();
       }
     });
+
+
 
     // Register for vault changes to update index
     this.registerEvent(
@@ -107,13 +118,18 @@ export default class OllamaPlugin extends Plugin {
     }, 30000); // Reindex after 30 seconds of inactivity
   }
 
- async activateView() {
+  async activateView() {
     const { workspace } = this.app;
+
+    // Перевіряємо, чи view вже відкрита
     let leaf = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
 
     if (!leaf) {
+      console.log("Creating new Ollama view leaf");
       leaf = workspace.getRightLeaf(false) ?? workspace.getLeaf();
       await leaf.setViewState({ type: VIEW_TYPE_OLLAMA, active: true });
+    } else {
+      console.log("Ollama view leaf already exists");
     }
 
     workspace.revealLeaf(leaf);
@@ -128,85 +144,10 @@ export default class OllamaPlugin extends Plugin {
     await this.saveData(this.settings);
     this.updateApiService(); // Update API service URL when settings change
   }
-  
+
   getOllamaApiUrl() {
     return this.settings.ollamaServerUrl || DEFAULT_SETTINGS.ollamaServerUrl;
   }
-
-  // Розбиваємо текст на чанки
-  chunkText(text: string, chunkSize: number, overlap: number): string[] {
-    const chunks: string[] = [];
-    let start = 0;
-
-    while (start < text.length) {
-      const end = Math.min(start + chunkSize, text.length);
-      chunks.push(text.substring(start, end));
-      start = end - overlap;
-    }
-
-    return chunks;
-  }
-
-  // Зберігаємо індекс
-  async saveIndex() {
-    try {
-      const indexData = {
-        documents: this.documents,
-        embeddings: this.embeddings
-      };
-
-      const basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
-      const indexPath = basePath + "/rag_index.json";
-
-      const adapter = this.app.vault.adapter;
-      await adapter.write(indexPath, JSON.stringify(indexData));
-    } catch (error) {
-      console.error("Помилка збереження індексу:", error);
-    }
-  }
-
-  // Завантажуємо індекс
-  async loadIndex() {
-    try {
-      const indexPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/rag_index.json";
-      const adapter = this.app.vault.adapter;
-
-      if (await adapter.exists(indexPath)) {
-        const data = await adapter.read(indexPath);
-        const indexData = JSON.parse(data);
-
-        this.documents = indexData.documents || [];
-        this.embeddings = indexData.embeddings || [];
-
-        console.log(`Індекс завантажено: ${this.documents.length} документів, ${this.embeddings.length} ембедінгів`);
-      }
-    } catch (error) {
-      console.error("Помилка завантаження індексу:", error);
-    }
-  }
-
-  // Косинусна схожість векторів
-  cosineSimilarity(vecA: number[], vecB: number[]): number {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
-
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
-    }
-
-    normA = Math.sqrt(normA);
-    normB = Math.sqrt(normB);
-
-    if (normA === 0 || normB === 0) {
-      return 0;
-    }
-
-    return dotProduct / (normA * normB);
-  }
-
   // Функція для збереження історії повідомлень
   async saveMessageHistory(messages: string) {
     if (!this.settings.saveMessageHistory) return;
