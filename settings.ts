@@ -6,13 +6,20 @@ export interface OllamaPluginSettings {
   ollamaServerUrl: string;
   logFileSizeLimit: number; // Size in KB
   saveMessageHistory: boolean;
+  ragEnabled: boolean; // New setting for enabling RAG
+  ragFolderPath: string; // Path to the folder containing documents for RAG
+  contextWindowSize: number; // Number of relevant documents to include in context
 }
 
+// Update default settings
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   modelName: "mistral",
   ollamaServerUrl: "http://localhost:11434",
   logFileSizeLimit: 1024, // Default 1MB (1024 KB)
-  saveMessageHistory: true
+  saveMessageHistory: true,
+  ragEnabled: false,
+  ragFolderPath: "data",
+  contextWindowSize: 5
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -81,27 +88,16 @@ export class OllamaSettingTab extends PluginSettingTab {
     // Fetch available models
     let availableModels: string[] = [];
     try {
-      const response = await fetch(`${this.plugin.settings.ollamaServerUrl}/api/tags`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      });
-  
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data.models)) {
-          availableModels = data.models.map((model: any) =>
-            typeof model === 'object' ? model.name : model
-          );
-        }
-      }
+      availableModels = await this.plugin.apiService.getModels();
     } catch (error) {
       console.error("Error fetching available models:", error);
     }
-  
-    // Select the model
+    
+    // Pre-select the last selected model or the first available model
     const selectedModel = availableModels.includes(this.plugin.settings.modelName)
       ? this.plugin.settings.modelName
       : (availableModels.length > 0 ? availableModels[0] : "");
+      
   
     // Create model selection dropdown (fixed version)
     const modelSetting = new Setting(containerEl)
@@ -173,6 +169,38 @@ export class OllamaSettingTab extends PluginSettingTab {
           await this.plugin.clearMessageHistory();
           new Notice("Chat history cleared.");
         }));
+        new Setting(containerEl)
+        .setName("Enable RAG")
+        .setDesc("Use Retrieval Augmented Generation with your notes")
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.ragEnabled)
+          .onChange(async (value) => {
+            this.plugin.settings.ragEnabled = value;
+            await this.plugin.saveSettings();
+          }));
+      
+      new Setting(containerEl)
+        .setName("RAG Folder Path")
+        .setDesc("Path to the folder containing notes for RAG (relative to vault root)")
+        .addText(text => text
+          .setPlaceholder("data")
+          .setValue(this.plugin.settings.ragFolderPath)
+          .onChange(async (value) => {
+            this.plugin.settings.ragFolderPath = value;
+            await this.plugin.saveSettings();
+          }));
+      
+      new Setting(containerEl)
+        .setName("Context Window Size")
+        .setDesc("Number of relevant documents to include in context")
+        .addSlider(slider => slider
+          .setLimits(1, 10, 1)
+          .setValue(this.plugin.settings.contextWindowSize)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            this.plugin.settings.contextWindowSize = value;
+            await this.plugin.saveSettings();
+          }));
   }
   
 }

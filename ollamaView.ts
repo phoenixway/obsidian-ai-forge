@@ -1,12 +1,48 @@
 import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
 import OllamaPlugin from "./main";
 
+import fetch from 'node-fetch';
+import * as fs from 'fs/promises';
+import * as faiss from 'faiss-node';
+import { marked } from 'marked'; // Виправлений імпорт
+import pdf from 'pdf-parse'; // Декларації типів повинні бути додані
+
+
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+}
+
+interface OllamaEmbeddingsResponse {
+  embedding: number[];
+}
+
+interface OllamaGenerateResponse {
+  response: string;
+}
+
+interface OllamaResponse {
+  model: string;
+  response: string;
+  context?: number[];
+  total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_count?: number;
+  eval_duration?: number;
+}
+
+function isOllamaEmbeddingsResponse(obj: any): obj is OllamaEmbeddingsResponse {
+  return typeof obj === 'object' && obj !== null &&
+      Array.isArray(obj.embedding) && obj.embedding.every((item: number) => typeof item === 'number'); // Додаємо анотацію типу
+}
+
+function isOllamaGenerateResponse(obj: any): obj is OllamaGenerateResponse {
+  return typeof obj === 'object' && obj !== null && typeof obj.response === 'string';
 }
 
 export class OllamaView extends ItemView {
@@ -28,6 +64,137 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
+  }
+
+  private index: faiss.IndexFlatL2 | undefined;
+  private documents: string[] = [];
+
+  async loadFiles(files: string[]): Promise<void> {
+      this.documents = [];
+      for (const file of files) {
+          const text = await this.readFileContent(file);
+          this.documents.push(text);
+      }
+  }
+
+  private async readFileContent(filePath: string): Promise<string> {
+      if (filePath.endsWith('.md')) {
+          return this.readMdFile(filePath);
+      } else if (filePath.endsWith('.pdf')) {
+          return this.readPdfFile(filePath);
+      } else {
+          return fs.readFile(filePath, 'utf-8');
+      }
+  }
+
+  private async readMdFile(filePath: string): Promise<string> {
+    const mdContent = await fs.readFile(filePath, 'utf-8');
+    const textContent = await marked.parse(mdContent); // Використовуємо await
+    return textContent.replace(/<[^>]*>?/gm, '');
+}
+
+  private async readPdfFile(filePath: string): Promise<string> {
+      const dataBuffer = await fs.readFile(filePath);
+      const data = await pdf(dataBuffer);
+      return data.text;
+  }
+
+
+  
+  private async createEmbeddings(texts: string[]): Promise<number[][]> {
+    const embeddings: number[][] = [];
+    for (const text of texts) {
+        const response = await fetch('http://localhost:11434/api/embeddings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama2',
+                prompt: text
+            })
+        });
+        const data = await response.json();
+
+        if (isOllamaEmbeddingsResponse(data)) {
+            embeddings.push(data.embedding);
+        } else {
+            console.error('Invalid Ollama embeddings response:', data);
+            throw new Error('Invalid Ollama embeddings response');
+        }
+    }
+    return embeddings;
+}
+
+private async createIndex(embeddings: number[][]): Promise<void> {
+  const dimension = embeddings[0].length;
+  this.index = new faiss.IndexFlatL2(dimension);
+  this.index.add(embeddings.flat()); // Використовуємо flat()
+}
+private async findRelevantDocuments(questionEmbedding: number[][], k: number = 2): Promise<string[]> {
+  if (!this.index) {
+      throw new Error('Index not initialized. Call createIndex first.');
+  }
+
+  const searchResult = this.index.search(questionEmbedding.flat(), k);
+  console.log("Search labels:", searchResult.labels);
+
+  // Перевіряємо, чи labels є масивом, і конвертуємо його в масив, якщо потрібно
+  const indices = Array.isArray(searchResult.labels[0]) ? searchResult.labels[0] : [searchResult.labels[0]];
+
+  return indices.map(i => this.documents[i]);
+}
+
+async generateAnswer(question: string): Promise<string> {
+  const questionEmbeddingResponse = await fetch('http://localhost:11434/api/embeddings', {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+          model: 'llama2',
+          prompt: question
+      })
+  });
+  const questionEmbeddingData = await questionEmbeddingResponse.json();
+
+  if (isOllamaEmbeddingsResponse(questionEmbeddingData)) {
+      const questionEmbedding = [questionEmbeddingData.embedding];
+
+      const relevantDocuments = await this.findRelevantDocuments(questionEmbedding);
+      const context = relevantDocuments.join('\n');
+
+      const ollamaResponse = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            model: 'llama2',
+            prompt: `Контекст: ${context}\nПитання: ${question}`,
+            stream: false
+        })
+    });
+    const ollamaData = await ollamaResponse.json();
+
+    if (isOllamaGenerateResponse(ollamaData)) {
+        return ollamaData.response;
+    } else {
+        console.error('Invalid Ollama generate response:', ollamaData);
+        throw new Error('Invalid Ollama generate response');
+    }
+
+  } else {
+      console.error('Invalid Ollama embeddings response:', questionEmbeddingData);
+      throw new Error('Invalid Ollama embeddings response');
+  }
+}
+
+
+  async initialize(files: string[]): Promise<void> {
+      await this.loadFiles(files);
+      const embeddings = await this.createEmbeddings(this.documents);
+      await this.createIndex(embeddings);
   }
 
 
@@ -301,56 +468,58 @@ export class OllamaView extends ItemView {
     // Add a temporary "loading" message
     const loadingMessageEl = this.addLoadingMessage();
 
-    // Execute the request in a background thread
+    // Execute the request
     setTimeout(async () => {
-      try {
-        const serverUrl = this.plugin.getOllamaApiUrl();
-        const response = await fetch(`${serverUrl}/api/generate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: this.plugin.settings.modelName,
-            prompt: content,
-            stream: false,
-          }),
-        });
+        try {
+            // Get context from RAG if enabled
+            let prompt = content;
+            
+            if (this.plugin.settings.ragEnabled) {
+                // Make sure documents are indexed
+                if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+                    await this.plugin.ragService.indexDocuments();
+                }
+                
+                // Get context based on the query
+                const ragContext = this.plugin.ragService.prepareContext(content);
+                
+                if (ragContext) {
+                    // Combine context with prompt
+                    prompt = `${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
+                }
+            }
+            
+            // Use the API service instead of direct fetch
+            const data = await this.plugin.apiService.generateResponse(
+                this.plugin.settings.modelName, 
+                prompt
+            );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+            // Update the UI
+            if (loadingMessageEl && loadingMessageEl.parentNode) {
+                loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+            }
+            
+            this.addMessage("assistant", data.response);
+        } catch (error) {
+            console.error("Error processing request with Ollama:", error);
+
+            if (loadingMessageEl && loadingMessageEl.parentNode) {
+                loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+            }
+            
+            this.addMessage(
+                "assistant",
+                "Connection error with Ollama. Please check the settings and ensure the server is running."
+            );
+        } finally {
+            this.isProcessing = false;
         }
-
-        const data = await response.json();
-
-        // Update the UI in requestAnimationFrame
-        requestAnimationFrame(() => {
-          if (loadingMessageEl.parentNode) {
-            loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-          }
-          this.addMessage("assistant", data.response);
-        });
-      } catch (error) {
-        console.error("Error processing request with Ollama:", error);
-
-        requestAnimationFrame(() => {
-          if (loadingMessageEl.parentNode) {
-            loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-          }
-          this.addMessage(
-            "assistant",
-            "Connection error with Ollama. Please check the settings and ensure the server is running."
-          );
-        });
-      } finally {
-        this.isProcessing = false;
-      }
     }, 0);
-  }
+}
 
 
-
-  addLoadingMessage(): HTMLElement {
+    addLoadingMessage(): HTMLElement {
     const messageGroup = this.chatContainer.createDiv({
       cls: "message-group ollama-message-group"
     });
