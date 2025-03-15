@@ -1,7 +1,7 @@
 {
     "id": "obsidian-ollama-duet",  
     "name": "Obsidian+Ollama duet",         
-    "version": "0.0.4",              
+    "version": "0.0.5",              
     "minAppVersion": "0.15.0",       
     "description": "Integrate Ollama with Obsidian",
     "author": "Roman Kozak",         
