@@ -1,53 +1,135 @@
 import { Plugin, WorkspaceLeaf } from "obsidian";
 import { OllamaView, VIEW_TYPE_OLLAMA } from "./ollamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
+import { RagService } from "./ragService";
+import { ApiService } from "./apiServices";
+
+// Інтерфейс для документа у RAG
+interface RAGDocument {
+  id: string;
+  content: string;
+  metadata: {
+    source: string;
+    path: string;
+  };
+}
+
+// Інтерфейс для векторів ембедінгів
+interface Embedding {
+  documentId: string;
+  vector: number[];
+}
 
 export default class OllamaPlugin extends Plugin {
   settings: OllamaPluginSettings;
   settingTab: OllamaSettingTab;
   view: OllamaView | null = null;
+  ragService: RagService;
+  apiService: ApiService;
+
+  documents: RAGDocument[] = [];
+  embeddings: Embedding[] = [];
 
   async onload() {
     console.log("Ollama Plugin Loaded!");
 
     await this.loadSettings();
 
+    // Initialize API service
+    this.apiService = new ApiService(this.settings.ollamaServerUrl);
+
+    // Initialize RAG service
+    this.ragService = new RagService(this);
+
     this.registerView(VIEW_TYPE_OLLAMA, (leaf) => {
       this.view = new OllamaView(leaf, this);
       return this.view;
     });
 
-// With this:
-const ribbonIconEl = this.addRibbonIcon('brain', 'Open Ollama', () => {
-  this.activateView();
-});
-ribbonIconEl.addClass('ollama-ribbon-icon');
-
+    this.addRibbonIcon("message-square", "Відкрити Ollama", () => {
+      this.activateView();
+    });
 
     this.addCommand({
       id: "open-ollama-view",
-      name: "Open Ollama Chat",
+      name: "Відкрити Ollama Chat",
       callback: () => {
         this.activateView();
       },
     });
 
+    // Add command to index documents
+    this.addCommand({
+      id: "index-rag-documents",
+      name: "Індексувати документи для RAG",
+      callback: async () => {
+        await this.ragService.indexDocuments();
+      },
+    });
+
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
-    
+
+    // Activate the view when layout is ready, but don't send automatic greeting
     // Activate the view when layout is ready, but don't send automatic greeting
     this.app.workspace.onLayoutReady(() => {
-      this.activateView();
+      // Перевіряємо, чи view вже існує
+      const existingLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
+
+      if (!existingLeaf) {
+        this.activateView();
+      } else {
+        console.log("Ollama view already exists, not creating a new one");
+      }
+
+      // Start indexing if RAG is enabled
+      if (this.settings.ragEnabled) {
+        this.ragService.indexDocuments();
+      }
     });
+
+
+
+    // Register for vault changes to update index
+    this.registerEvent(
+      this.app.vault.on("modify", () => {
+        if (this.settings.ragEnabled) {
+          // Debounce index updates
+          this.debounceIndexUpdate();
+        }
+      })
+    );
+  }
+  // Update API service when settings change
+  updateApiService() {
+    this.apiService.setBaseUrl(this.settings.ollamaServerUrl);
+  }
+
+  // Add debouncing to prevent excessive indexing
+  private indexUpdateTimeout: NodeJS.Timeout | null = null;
+  private debounceIndexUpdate() {
+    if (this.indexUpdateTimeout) {
+      clearTimeout(this.indexUpdateTimeout);
+    }
+
+    this.indexUpdateTimeout = setTimeout(() => {
+      this.ragService.indexDocuments();
+      this.indexUpdateTimeout = null;
+    }, 30000); // Reindex after 30 seconds of inactivity
   }
 
   async activateView() {
     const { workspace } = this.app;
+
+    // Перевіряємо, чи view вже відкрита
     let leaf = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
 
     if (!leaf) {
+      console.log("Creating new Ollama view leaf");
       leaf = workspace.getRightLeaf(false) ?? workspace.getLeaf();
       await leaf.setViewState({ type: VIEW_TYPE_OLLAMA, active: true });
+    } else {
+      console.log("Ollama view leaf already exists");
     }
 
     workspace.revealLeaf(leaf);
@@ -60,32 +142,33 @@ ribbonIconEl.addClass('ollama-ribbon-icon');
 
   async saveSettings() {
     await this.saveData(this.settings);
+    this.updateApiService(); // Update API service URL when settings change
   }
-  
+
   getOllamaApiUrl() {
     return this.settings.ollamaServerUrl || DEFAULT_SETTINGS.ollamaServerUrl;
   }
-  
+  // Функція для збереження історії повідомлень
   async saveMessageHistory(messages: string) {
     if (!this.settings.saveMessageHistory) return;
-    
+
     try {
       // Get the path to the plugin folder
       const basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
       const logPath = basePath + "/chat_history.json";
       const adapter = this.app.vault.adapter;
-      
+
       // Check if file exists and its size
       let fileExists = await adapter.exists(logPath);
       let fileSize = 0;
-      
+
       if (fileExists) {
         // Check file size
         const stat = await adapter.stat(logPath);
         // Add null check or use optional chaining for stat
         fileSize = stat?.size ? stat.size / 1024 : 0; // Convert to KB
       }
-      
+
       // If the file is too large, create a backup and start fresh
       if (fileSize > this.settings.logFileSizeLimit) {
         if (fileExists) {
@@ -110,7 +193,7 @@ ribbonIconEl.addClass('ollama-ribbon-icon');
             const existingMessages = JSON.parse(existingData);
             const newMessages = JSON.parse(messages);
             const merged = JSON.stringify([...existingMessages, ...newMessages]);
-            
+
             // Check if merged would exceed size limit
             if ((merged.length / 1024) > this.settings.logFileSizeLimit) {
               // If it would exceed, trim the oldest messages
@@ -135,15 +218,15 @@ ribbonIconEl.addClass('ollama-ribbon-icon');
       console.error("Failed to save message history:", error);
     }
   }
-  
+
   async loadMessageHistory() {
     if (!this.settings.saveMessageHistory) return [];
-    
+
     try {
       const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
 
       const adapter = this.app.vault.adapter;
-      
+
       if (await adapter.exists(logPath)) {
         const data = await adapter.read(logPath);
         return JSON.parse(data);
@@ -151,25 +234,24 @@ ribbonIconEl.addClass('ollama-ribbon-icon');
     } catch (error) {
       console.error("Failed to load message history:", error);
     }
-    
+
     return [];
   }
 
   async clearMessageHistory() {
     try {
-        const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
-        const adapter = this.app.vault.adapter;
+      const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
+      const adapter = this.app.vault.adapter;
 
-        if (await adapter.exists(logPath)) {
-            await adapter.remove(logPath);
-            // Очистити історію з view
-            if (this.view) {
-                this.view.clearChatMessages();
-            }
+      if (await adapter.exists(logPath)) {
+        await adapter.remove(logPath);
+        // Очистити історію з view
+        if (this.view) {
+          this.view.clearChatMessages();
         }
+      }
     } catch (error) {
-        console.error("Failed to clear message history:", error);
+      console.error("Failed to clear message history:", error);
     }
-}
-
+  }
 }

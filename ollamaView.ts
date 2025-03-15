@@ -1,5 +1,13 @@
-import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
+// import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
+import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, TFile } from "obsidian";
 import OllamaPlugin from "./main";
+
+// import fetch from 'node-fetch';
+// import * as fs from 'fs/promises';
+import * as faiss from 'faiss-node';
+import { marked } from 'marked'; // Виправлений імпорт
+import pdf from 'pdf-parse'; // Декларації типів повинні бути додані
+
 
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 
@@ -7,6 +15,35 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+}
+
+interface OllamaEmbeddingsResponse {
+  embedding: number[];
+}
+
+interface OllamaGenerateResponse {
+  response: string;
+}
+
+interface OllamaResponse {
+  model: string;
+  response: string;
+  context?: number[];
+  total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_count?: number;
+  eval_duration?: number;
+}
+
+function isOllamaEmbeddingsResponse(obj: any): obj is OllamaEmbeddingsResponse {
+  return typeof obj === 'object' && obj !== null &&
+      Array.isArray(obj.embedding) && obj.embedding.every((item: number) => typeof item === 'number'); // Додаємо анотацію типу
+}
+
+function isOllamaGenerateResponse(obj: any): obj is OllamaGenerateResponse {
+  return typeof obj === 'object' && obj !== null && typeof obj.response === 'string';
 }
 
 export class OllamaView extends ItemView {
@@ -19,6 +56,8 @@ export class OllamaView extends ItemView {
   private historyLoaded: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
   static instance: OllamaView | null = null;
+  private embeddings: number[][] = [];
+
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -30,6 +69,68 @@ export class OllamaView extends ItemView {
     OllamaView.instance = this;
   }
 
+  private index: faiss.IndexFlatL2 | undefined;
+  private documents: string[] = [];
+
+
+  private async readFileContent(filePath: string): Promise<string> {
+    // Отримуємо файл з Obsidian vault
+    const file = this.app?.vault.getAbstractFileByPath(filePath);
+    
+    if (!file || !(file instanceof TFile)) {
+        throw new Error(`File not found: ${filePath}`);
+    }
+    
+    if (filePath.endsWith('.md')) {
+        return this.readMdFile(file);
+    } else if (filePath.endsWith('.pdf')) {
+        throw new Error("PDF reading not supported in browser environment");
+        // PDF обробка потребує іншого підходу
+    } else {
+        return this.app.vault.read(file);
+    }
+}
+private async readMdFile(file: TFile): Promise<string> {
+  const mdContent = await this.app.vault.read(file);
+  const textContent = await marked.parse(mdContent);
+  return textContent.replace(/<[^>]*>?/gm, '');
+}
+
+private async readPdfFile(file: TFile): Promise<string> {
+  throw new Error("PDF reading not supported in browser environment");
+  // Тут потрібно буде реалізувати інший підхід для читання PDF
+}
+
+
+
+private findTopK(array: number[], k: number): number[] {
+  return array
+      .map((value, index) => ({ value, index }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, k)
+      .map(item => item.index);
+}
+
+private cosineSimilarity(vecA: number[], vecB: number[]): number {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+  }
+
+  normA = Math.sqrt(normA);
+  normB = Math.sqrt(normB);
+
+  if (normA === 0 || normB === 0) {
+      return 0;
+  }
+
+  return dotProduct / (normA * normB);
+}
 
   getViewType(): string {
     return VIEW_TYPE_OLLAMA;
@@ -301,56 +402,59 @@ export class OllamaView extends ItemView {
     // Add a temporary "loading" message
     const loadingMessageEl = this.addLoadingMessage();
 
-    // Execute the request in a background thread
+    // Execute the request
     setTimeout(async () => {
-      try {
-        const serverUrl = this.plugin.getOllamaApiUrl();
-        const response = await fetch(`${serverUrl}/api/generate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: this.plugin.settings.modelName,
-            prompt: content,
-            stream: false,
-          }),
-        });
+        try {
+            // Get context from RAG if enabled
+            let prompt = content;
+            
+            if (this.plugin.settings.ragEnabled) {
+                // Make sure documents are indexed
+                if (this.plugin.ragService && 
+                  this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+                  await this.plugin.ragService.indexDocuments();
+              }
+                
+                // Get context based on the query
+                const ragContext = this.plugin.ragService.prepareContext(content);
+                console.log(ragContext)
+                if (ragContext) {
+                    // Combine context with prompt
+                    prompt = `${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
+                }
+            }
+            
+            // Use the API service instead of direct fetch
+            const data = await this.plugin.apiService.generateResponse(
+                this.plugin.settings.modelName, 
+                prompt
+            );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
+            // Update the UI
+            if (loadingMessageEl && loadingMessageEl.parentNode) {
+                loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+            }
+            
+            this.addMessage("assistant", data.response);
+        } catch (error) {
+            console.error("Error processing request with Ollama:", error);
+
+            if (loadingMessageEl && loadingMessageEl.parentNode) {
+                loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+            }
+            
+            this.addMessage(
+                "assistant",
+                "Connection error with Ollama. Please check the settings and ensure the server is running."
+            );
+        } finally {
+            this.isProcessing = false;
         }
-
-        const data = await response.json();
-
-        // Update the UI in requestAnimationFrame
-        requestAnimationFrame(() => {
-          if (loadingMessageEl.parentNode) {
-            loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-          }
-          this.addMessage("assistant", data.response);
-        });
-      } catch (error) {
-        console.error("Error processing request with Ollama:", error);
-
-        requestAnimationFrame(() => {
-          if (loadingMessageEl.parentNode) {
-            loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-          }
-          this.addMessage(
-            "assistant",
-            "Connection error with Ollama. Please check the settings and ensure the server is running."
-          );
-        });
-      } finally {
-        this.isProcessing = false;
-      }
     }, 0);
-  }
+}
 
 
-
-  addLoadingMessage(): HTMLElement {
+    addLoadingMessage(): HTMLElement {
     const messageGroup = this.chatContainer.createDiv({
       cls: "message-group ollama-message-group"
     });
