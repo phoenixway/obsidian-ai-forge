@@ -1,22 +1,12 @@
-/* Main container to hold both chat and input */
+/* Змінюємо стилі контейнера, щоб він притискався до низу */
 .ollama-container {
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative; /* Додаємо позиціонування */
 }
 
-/* Chat container with scrollable content */
-.ollama-chat-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 15px;
-  box-sizing: border-box;
-  background-color: var(--background-secondary-alt);
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-}
-
-/* Input container fixed at the bottom */
+/* Змінюємо стилі input контейнера */
 .chat-input-container {
   display: flex;
   align-items: center;
@@ -25,26 +15,41 @@
   background-color: var(--background-secondary-alt);
   z-index: 10;
   border-radius: 20px;
-  margin: 15px;
+  margin: 10px 15px; /* Зменшуємо відступ знизу */
+  margin-bottom: 5px; /* Мінімальний відступ знизу */
   box-sizing: border-box;
 }
 
+/* Додаємо стиль для пуш-контейнера чату до низу */
+.ollama-chat-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  padding-bottom: 5px; /* Зменшуємо відступ знизу */
+  box-sizing: border-box;
+  background-color: var(--background-secondary-alt);
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+/* Встановлюємо висоту текстового поля трохи меншою */
 .chat-input-container textarea {
   flex: 1;
   resize: none;
   border: 1px solid var(--divider-color);
   border-radius: 20px;
-  padding: 12px 15px;
+  padding: 10px 15px; /* Зменшуємо внутрішній відступ */
   margin-right: 10px;
-  height: 48px;
+  height: 40px; /* Зменшуємо висоту з 48px до 40px */
   background-color: var(--background-primary);
   color: var(--text-normal);
   font-size: 14px;
 }
 
+/* Також змінюємо розмір кнопок, щоб вони відповідали новій висоті */
 .chat-input-container button {
-  width: 40px;
-  height: 40px;
+  width: 36px; /* Зменшуємо з 40px */
+  height: 36px; /* Зменшуємо з 40px */
   border: none;
   border-radius: 50%;
   background-color: var(--interactive-accent);
@@ -314,5 +319,25 @@
   }
 }
 
+@media screen and (max-width: 400px) {
+  .chat-input-container .send-button,
+  .chat-input-container .settings-button {
+    display: none;
+  }
+  
+  .chat-input-container textarea {
+    margin-right: 0;
+  }
+}
 
+/* Додайте цей стиль, якщо попередні зміни не допомогли */
+.workspace-leaf-content[data-type='ollama-chat-view'] {
+  display: flex;
+  flex-direction: column;
+}
 
+.workspace-leaf-content[data-type='ollama-chat-view'] .view-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}

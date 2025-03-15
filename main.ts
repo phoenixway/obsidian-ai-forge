@@ -17,13 +17,16 @@ export default class OllamaPlugin extends Plugin {
       return this.view;
     });
 
-    this.addRibbonIcon("message-square", "Відкрити Ollama", () => {
-      this.activateView();
-    });
+// With this:
+const ribbonIconEl = this.addRibbonIcon('brain', 'Open Ollama', () => {
+  this.activateView();
+});
+ribbonIconEl.addClass('ollama-ribbon-icon');
+
 
     this.addCommand({
       id: "open-ollama-view",
-      name: "Відкрити Ollama Chat",
+      name: "Open Ollama Chat",
       callback: () => {
         this.activateView();
       },

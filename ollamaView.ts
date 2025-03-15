@@ -18,11 +18,18 @@ export class OllamaView extends ItemView {
   private isProcessing: boolean = false;
   private historyLoaded: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
+  static instance: OllamaView | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
+    // Force singleton pattern
+    if (OllamaView.instance) {
+      return OllamaView.instance;
+    }
+    OllamaView.instance = this;
   }
+
 
   getViewType(): string {
     return VIEW_TYPE_OLLAMA;
@@ -30,6 +37,10 @@ export class OllamaView extends ItemView {
 
   getDisplayText(): string {
     return "Ollama Chat";
+  }
+
+  getIcon(): string {
+    return "message-square"; // Та сама іконка, що використовується в рібоні
   }
 
   async onOpen(): Promise<void> {
@@ -45,7 +56,7 @@ export class OllamaView extends ItemView {
     // Create textarea for input
     this.inputEl = inputContainer.createEl("textarea", {
       attr: {
-        placeholder: "Напишіть повідомлення...",
+        placeholder: "Type a message...",
       },
     });
     // Create send button (moved before settings button)
@@ -68,8 +79,10 @@ export class OllamaView extends ItemView {
     // Handle settings button click
     settingsButton.addEventListener("click", () => {
       const setting = (this.app as any).setting;
-      setting.open();
-      setting.openTabById('obsidian-ollama-duet');
+      // setting.open();
+      // setting.openTabById('obsidian-ollama-duet');
+      setting.open('obsidian-ollama-duet');
+
     });
 
     // Handle send button click
@@ -134,15 +147,15 @@ export class OllamaView extends ItemView {
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
     }
-  
+
     // Use requestAnimationFrame to ensure scroll happens after rendering
     requestAnimationFrame(() => {
       if (!this.chatContainer) return;
-  
+
       // Log scroll values for debugging
       console.log("Scroll Top:", this.chatContainer.scrollTop);
       console.log("Scroll Height:", this.chatContainer.scrollHeight);
-  
+
       // Scroll to bottom
       this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     });
@@ -165,20 +178,20 @@ export class OllamaView extends ItemView {
   }
 
 
-  
+
   addMessage(role: "user" | "assistant", content: string): void {
     const message: Message = {
       role,
       content,
       timestamp: new Date()
     };
-  
+
     this.messages.push(message);
     this.renderMessage(message);
-  
+
     // Save updated message history
     this.saveMessageHistory();
-  
+
     // Guaranteed scroll to bottom after rendering
     setTimeout(() => {
       this.guaranteedScrollToBottom();
@@ -248,7 +261,7 @@ export class OllamaView extends ItemView {
       navigator.clipboard.writeText(message.content);
 
       // Show feedback
-      copyButton.setText("Скопійовано!");
+      copyButton.setText("Copied!");
       setTimeout(() => {
         copyButton.empty();
         setIcon(copyButton, "copy");
@@ -290,50 +303,50 @@ export class OllamaView extends ItemView {
 
     // Execute the request in a background thread
     setTimeout(async () => {
-        try {
-            const serverUrl = this.plugin.getOllamaApiUrl();
-            const response = await fetch(`${serverUrl}/api/generate`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: this.plugin.settings.modelName,
-                    prompt: content,
-                    stream: false,
-                }),
-            });
+      try {
+        const serverUrl = this.plugin.getOllamaApiUrl();
+        const response = await fetch(`${serverUrl}/api/generate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: this.plugin.settings.modelName,
+            prompt: content,
+            stream: false,
+          }),
+        });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-
-            const data = await response.json();
-
-            // Update the UI in requestAnimationFrame
-            requestAnimationFrame(() => {
-                if (loadingMessageEl.parentNode) {
-                    loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-                }
-                this.addMessage("assistant", data.response);
-            });
-        } catch (error) {
-            console.error("Error processing request with Ollama:", error);
-
-            requestAnimationFrame(() => {
-                if (loadingMessageEl.parentNode) {
-                    loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-                }
-                this.addMessage(
-                    "assistant",
-                    "Connection error with Ollama. Please check the settings and ensure the server is running."
-                );
-            });
-        } finally {
-            this.isProcessing = false;
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
         }
+
+        const data = await response.json();
+
+        // Update the UI in requestAnimationFrame
+        requestAnimationFrame(() => {
+          if (loadingMessageEl.parentNode) {
+            loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+          }
+          this.addMessage("assistant", data.response);
+        });
+      } catch (error) {
+        console.error("Error processing request with Ollama:", error);
+
+        requestAnimationFrame(() => {
+          if (loadingMessageEl.parentNode) {
+            loadingMessageEl.parentNode.removeChild(loadingMessageEl);
+          }
+          this.addMessage(
+            "assistant",
+            "Connection error with Ollama. Please check the settings and ensure the server is running."
+          );
+        });
+      } finally {
+        this.isProcessing = false;
+      }
     }, 0);
-}
+  }
 
 
 

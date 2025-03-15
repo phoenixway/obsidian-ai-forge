@@ -34,7 +34,7 @@ export class OllamaSettingTab extends PluginSettingTab {
   async display(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
-
+  
     // Add field for Ollama server URL
     new Setting(containerEl)
       .setName("Ollama Server URL")
@@ -46,15 +46,46 @@ export class OllamaSettingTab extends PluginSettingTab {
           this.plugin.settings.ollamaServerUrl = value;
           await this.plugin.saveSettings();
         }));
-
-    // Fetch the list of available models from the configured server
+  
+    // Add reconnect button
+    new Setting(containerEl)
+      .setName("Server Connection")
+      .setDesc("Reconnect to local model server and refresh available models")
+      .addButton(button => button
+        .setButtonText("Reconnect")
+        .setIcon("refresh-cw")
+        .onClick(async () => {
+          try {
+            new Notice("Connecting to Ollama server...");
+            
+            // Fetch models from the server
+            const response = await fetch(`${this.plugin.settings.ollamaServerUrl}/api/tags`, {
+              method: "GET",
+              headers: { "Content-Type": "application/json" },
+            });
+  
+            if (response.ok) {
+              new Notice("Successfully connected to Ollama server!");
+              // Completely rebuild the settings panel by removing all child elements
+              containerEl.empty();
+              // Then redisplay the settings
+              this.display();
+            } else {
+              new Notice("Failed to connect to Ollama server. Check the URL and ensure the server is running.");
+            }
+          } catch (error) {
+            new Notice("Connection error. Please check the server URL and your network connection.");
+          }
+        }));
+  
+    // Fetch available models
     let availableModels: string[] = [];
     try {
       const response = await fetch(`${this.plugin.settings.ollamaServerUrl}/api/tags`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
       });
-
+  
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data.models)) {
@@ -62,35 +93,43 @@ export class OllamaSettingTab extends PluginSettingTab {
             typeof model === 'object' ? model.name : model
           );
         }
-      } else {
-        console.error("Failed to fetch available models");
       }
     } catch (error) {
       console.error("Error fetching available models:", error);
     }
-
-    // Pre-select the last selected model or the first available model
+  
+    // Select the model
     const selectedModel = availableModels.includes(this.plugin.settings.modelName)
       ? this.plugin.settings.modelName
       : (availableModels.length > 0 ? availableModels[0] : "");
-
-    // Create a dropdown for model selection
-    new Setting(containerEl)
+  
+    // Create model selection dropdown (fixed version)
+    const modelSetting = new Setting(containerEl)
       .setName("Model Name")
-      .setDesc("Select the language model to use")
-      .addDropdown((dropdown) => {
-        availableModels.forEach((model) => {
-          dropdown.addOption(model, model);
-        });
-        if (availableModels.length === 0) {
-          dropdown.addOption("", "No models available");
-        }
-        dropdown.setValue(selectedModel);
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.modelName = value;
-          await this.plugin.saveSettings();
-        });
+      .setDesc("Select the language model to use");
+    
+    const dropdown = modelSetting.addDropdown(dropdown => {
+      // Clear existing options (properly)
+      const selectEl = dropdown.selectEl;
+      while (selectEl.firstChild) {
+        selectEl.removeChild(selectEl.firstChild);
+      }
+      
+      // Add new options
+      availableModels.forEach(model => {
+        dropdown.addOption(model, model);
       });
+      
+      if (availableModels.length === 0) {
+        dropdown.addOption("", "No models available");
+      }
+      
+      dropdown.setValue(selectedModel);
+      dropdown.onChange(async value => {
+        this.plugin.settings.modelName = value;
+        await this.plugin.saveSettings();
+      });
+    });
       
     // Add save message history toggle
     new Setting(containerEl)
@@ -123,15 +162,17 @@ export class OllamaSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
           this.display();
         }));
-    new Setting(containerEl)
-        .setName("Очистити історію")
-        .setDesc("Видалити всю історію чату")
-        .addButton(button => button
-            .setButtonText("Очистити")
-            .onClick(async () => {
-                await this.plugin.clearMessageHistory();
-                new Notice("Історія чату очищена.");
-            }));
         
+    // Change clear history button text to English
+    new Setting(containerEl)
+      .setName("Clear History")
+      .setDesc("Delete all chat history")
+      .addButton(button => button
+        .setButtonText("Clear")
+        .onClick(async () => {
+          await this.plugin.clearMessageHistory();
+          new Notice("Chat history cleared.");
+        }));
   }
+  
 }
