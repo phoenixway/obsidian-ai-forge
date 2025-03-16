@@ -34,18 +34,18 @@ export class RagService {
       const allFiles = vault.getFiles();
       console.log(`Total files in vault: ${allFiles.length}`);
       
-      // Друкуємо перші кілька файлів для перевірки
-      for (let i = 0; i < Math.min(5, allFiles.length); i++) {
-        console.log(`File ${i}: ${allFiles[i].path}`);
-      }
+      // // Друкуємо перші кілька файлів для перевірки
+      // for (let i = 0; i < Math.min(5, allFiles.length); i++) {
+      //   console.log(`File ${i}: ${allFiles[i].path}`);
+      // }
       
       // Get all markdown files in the specified folder
       const files = await this.getMarkdownFiles(vault, folderPath);
       
       console.log(`Found ${files.length} markdown files from "${folderPath}"`);
-      for (const file of files) {
-        console.log(`Found file: ${file.path}`);
-      }
+      // for (const file of files) {
+      //   console.log(`Found file: ${file.path}`);
+      // }
       
       console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
       this.documents = [];
@@ -103,7 +103,7 @@ export class RagService {
           console.log(`Adding file: ${file.path}`);
           files.push(file);
         } else {
-          console.log(`Skipping file as it doesn't match path: ${file.path}`);
+          // console.log(`Skipping file as it doesn't match path: ${file.path}`);
         }
       }
     }

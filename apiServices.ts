@@ -31,7 +31,12 @@ export class ApiService {
           stream: false,
         }),
       });
-  
+      // const data = await response.json();
+
+      // console.log("API raw response:", response);
+      // console.log("API response.response:", data.response);
+      // console.log("Contains thinking tags:", data.response.includes("<thinking>"));
+    
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error! Status: ${response.status}, ${errorText}`);

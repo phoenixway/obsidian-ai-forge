@@ -2292,6 +2292,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
           this.renderMessage(message);
         }
         this.guaranteedScrollToBottom();
+        this.initializeThinkingBlocks();
       }
       this.historyLoaded = true;
     } catch (error) {
@@ -2319,8 +2320,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
     requestAnimationFrame(() => {
       if (!this.chatContainer)
         return;
-      console.log("Scroll Top:", this.chatContainer.scrollTop);
-      console.log("Scroll Height:", this.chatContainer.scrollHeight);
       this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     });
   }
@@ -2347,6 +2346,108 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.guaranteedScrollToBottom();
     }, 100);
   }
+  processThinkingTags(content) {
+    if (!content.includes("<think>")) {
+      return content;
+    }
+    const parts = [];
+    let currentPosition = 0;
+    const thinkingRegex = /<think>([\s\S]*?)<\/think>/g;
+    let match;
+    while ((match = thinkingRegex.exec(content)) !== null) {
+      if (match.index > currentPosition) {
+        const textBefore = content.substring(currentPosition, match.index);
+        parts.push(this.markdownToHtml(textBefore));
+      }
+      const thinkingContent = match[1];
+      const foldableHtml = `
+        <div class="thinking-block">
+          <div class="thinking-header" data-fold-state="expanded">
+            <div class="thinking-toggle">\u25BC</div>
+            <div class="thinking-title">Thinking</div>
+          </div>
+          <div class="thinking-content">${this.markdownToHtml(thinkingContent)}</div>
+        </div>
+      `;
+      parts.push(foldableHtml);
+      currentPosition = match.index + match[0].length;
+    }
+    if (currentPosition < content.length) {
+      const textAfter = content.substring(currentPosition);
+      parts.push(this.markdownToHtml(textAfter));
+    }
+    return parts.join("");
+  }
+  markdownToHtml(markdown) {
+    if (!markdown || markdown.trim() === "")
+      return "";
+    const tempDiv = document.createElement("div");
+    import_obsidian.MarkdownRenderer.renderMarkdown(markdown, tempDiv, "", this);
+    return tempDiv.innerHTML;
+  }
+  /**
+   * Escape HTML special characters
+   */
+  escapeHtml(unsafe) {
+    return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  }
+  addThinkingToggleListeners(contentEl) {
+    const thinkingHeaders = contentEl.querySelectorAll(".thinking-header");
+    thinkingHeaders.forEach((header) => {
+      header.addEventListener("click", () => {
+        const content = header.nextElementSibling;
+        const toggleIcon = header.querySelector(".thinking-toggle");
+        if (!content || !toggleIcon)
+          return;
+        const isFolded = header.getAttribute("data-fold-state") === "folded";
+        if (isFolded) {
+          content.style.display = "block";
+          toggleIcon.textContent = "\u25BC";
+          header.setAttribute("data-fold-state", "expanded");
+        } else {
+          content.style.display = "none";
+          toggleIcon.textContent = "\u25BA";
+          header.setAttribute("data-fold-state", "folded");
+        }
+      });
+    });
+  }
+  hasThinkingTags(content) {
+    const formats = [
+      "<think>",
+      "&lt;think&gt;",
+      "<think ",
+      // In case there are attributes
+      "\\<think\\>",
+      "%3Cthink%3E"
+      // URL encoded
+    ];
+    return formats.some((format) => content.includes(format));
+  }
+  /**
+   * Add toggle all button for thinking blocks
+   */
+  addToggleAllButton(contentContainer, contentEl) {
+    const toggleAllButton = contentContainer.createEl("button", {
+      cls: "toggle-all-thinking-button",
+      attr: { title: "\u0417\u0433\u043E\u0440\u043D\u0443\u0442\u0438/\u0440\u043E\u0437\u0433\u043E\u0440\u043D\u0443\u0442\u0438 \u0432\u0441\u0456 \u0431\u043B\u043E\u043A\u0438 thinking" }
+    });
+    toggleAllButton.textContent = "Toggle All Thinking";
+    toggleAllButton.addEventListener("click", () => {
+      const thinkingContents = contentEl.querySelectorAll(".thinking-content");
+      const thinkingToggles = contentEl.querySelectorAll(".thinking-toggle");
+      let allHidden = true;
+      thinkingContents.forEach((content) => {
+        if (content.style.display !== "none") {
+          allHidden = false;
+        }
+      });
+      thinkingContents.forEach((content, index) => {
+        content.style.display = allHidden ? "block" : "none";
+        thinkingToggles[index].textContent = allHidden ? "\u25BC" : "\u25BA";
+      });
+    });
+  }
   renderMessage(message) {
     const isUser = message.role === "user";
     const isFirstInGroup = this.isFirstMessageInGroup(message);
@@ -2368,12 +2469,22 @@ var _OllamaView = class extends import_obsidian.ItemView {
       cls: "message-content"
     });
     if (message.role === "assistant") {
-      import_obsidian.MarkdownRenderer.renderMarkdown(
-        message.content,
-        contentEl,
-        "",
-        this
-      );
+      console.log("Message content before rendering:", message.content);
+      console.log("Contains thinking tags:", message.content.includes("<think>"));
+      console.log("Rendering message, content:", message.content);
+      const tagDetection = this.detectThinkingTags(message.content);
+      console.log("Thinking tag detection in renderMessage:", tagDetection);
+      const decodedContent = this.decodeHtmlEntities(message.content);
+      const hasThinkingTags = message.content.includes("<think>") || decodedContent.includes("<think>");
+      if (hasThinkingTags) {
+        const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ? decodedContent : message.content;
+        console.log("Processing content with thinking tags:", contentToProcess);
+        const processedContent = this.processThinkingTags(contentToProcess);
+        contentEl.innerHTML = processedContent;
+        this.addThinkingToggleListeners(contentEl);
+      } else {
+        import_obsidian.MarkdownRenderer.renderMarkdown(message.content, contentEl, "", this);
+      }
     } else {
       message.content.split("\n").forEach((line, index, array) => {
         contentEl.createSpan({ text: line });
@@ -2388,7 +2499,11 @@ var _OllamaView = class extends import_obsidian.ItemView {
     });
     (0, import_obsidian.setIcon)(copyButton, "copy");
     copyButton.addEventListener("click", () => {
-      navigator.clipboard.writeText(message.content);
+      let textToCopy = message.content;
+      if (message.role === "assistant" && textToCopy.includes("<thinking>")) {
+        textToCopy = textToCopy.replace(/<thinking>[\s\S]*?<\/thinking>/g, "");
+      }
+      navigator.clipboard.writeText(textToCopy);
       copyButton.setText("Copied!");
       setTimeout(() => {
         copyButton.empty();
@@ -2419,6 +2534,25 @@ var _OllamaView = class extends import_obsidian.ItemView {
   formatTime(date) {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
+  decodeHtmlEntities(text) {
+    const textArea = document.createElement("textarea");
+    textArea.innerHTML = text;
+    return textArea.value;
+  }
+  detectThinkingTags(content) {
+    const formats = [
+      { name: "standard", regex: /<think>[\s\S]*?<\/think>/g },
+      { name: "escaped", regex: /&lt;think&gt;[\s\S]*?&lt;\/think&gt;/g },
+      { name: "backslash-escaped", regex: /\\<think\\>[\s\S]*?\\<\/think\\>/g },
+      { name: "url-encoded", regex: /%3Cthink%3E[\s\S]*?%3C\/think%3E/g }
+    ];
+    for (const format of formats) {
+      if (format.regex.test(content)) {
+        return { hasThinkingTags: true, format: format.name };
+      }
+    }
+    return { hasThinkingTags: false, format: "none" };
+  }
   async processWithOllama(content) {
     this.isProcessing = true;
     const loadingMessageEl = this.addLoadingMessage();
@@ -2430,7 +2564,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
             await this.plugin.ragService.indexDocuments();
           }
           const ragContext = this.plugin.ragService.prepareContext(content);
-          console.log(ragContext);
           if (ragContext) {
             prompt = `${ragContext}
 
@@ -2443,10 +2576,13 @@ Please respond to the user's query based on the provided context. If the context
           this.plugin.settings.modelName,
           prompt
         );
+        const decodedResponse = this.decodeHtmlEntities(data.response);
+        const finalResponse = decodedResponse.includes("<think>") ? decodedResponse : data.response;
         if (loadingMessageEl && loadingMessageEl.parentNode) {
           loadingMessageEl.parentNode.removeChild(loadingMessageEl);
         }
-        this.addMessage("assistant", data.response);
+        this.addMessage("assistant", finalResponse);
+        this.initializeThinkingBlocks();
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
         if (loadingMessageEl && loadingMessageEl.parentNode) {
@@ -2460,6 +2596,20 @@ Please respond to the user's query based on the provided context. If the context
         this.isProcessing = false;
       }
     }, 0);
+  }
+  initializeThinkingBlocks() {
+    setTimeout(() => {
+      const thinkingHeaders = this.chatContainer.querySelectorAll(".thinking-header");
+      thinkingHeaders.forEach((header) => {
+        const content = header.nextElementSibling;
+        const toggleIcon = header.querySelector(".thinking-toggle");
+        if (!content || !toggleIcon)
+          return;
+        content.style.display = "none";
+        toggleIcon.textContent = "\u25BA";
+        header.setAttribute("data-fold-state", "folded");
+      });
+    }, 100);
   }
   addLoadingMessage() {
     const messageGroup = this.chatContainer.createDiv({
@@ -2613,14 +2763,8 @@ var RagService = class {
       console.log(`RAG folder path: "${folderPath}"`);
       const allFiles = vault.getFiles();
       console.log(`Total files in vault: ${allFiles.length}`);
-      for (let i = 0; i < Math.min(5, allFiles.length); i++) {
-        console.log(`File ${i}: ${allFiles[i].path}`);
-      }
       const files = await this.getMarkdownFiles(vault, folderPath);
       console.log(`Found ${files.length} markdown files from "${folderPath}"`);
-      for (const file of files) {
-        console.log(`Found file: ${file.path}`);
-      }
       console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
       this.documents = [];
       for (const file of files) {
@@ -2664,7 +2808,6 @@ var RagService = class {
           console.log(`Adding file: ${file.path}`);
           files.push(file);
         } else {
-          console.log(`Skipping file as it doesn't match path: ${file.path}`);
         }
       }
     }

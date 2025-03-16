@@ -341,3 +341,42 @@
   display: flex;
   flex-direction: column;
 }
+
+.thinking-block {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin: 12px 0;
+  background-color: var(--background-primary-alt);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.thinking-header {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px 6px 0 0;
+}
+
+.thinking-toggle {
+  margin-right: 8px;
+  font-weight: bold;
+  transition: transform 0.2s;
+}
+
+.thinking-title {
+  font-weight: bold;
+}
+
+.thinking-content {
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  line-height: 1.5;
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary-alt);
+  font-size: 0.9em; /* Smaller font size for thinking content */
+}
