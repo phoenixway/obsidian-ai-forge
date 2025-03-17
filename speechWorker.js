@@ -1,10 +1,10 @@
 onmessage = async (event) => {
-    const { apiKey, audioBlob } = event.data;
-    console.log("Worker received audioBlob:", audioBlob);
-  
-    const url = `https://speech.googleapis.com/v1/speech:recognize?key=${apiKey}`;
-  
     try {
+      const { apiKey, audioBlob } = event.data;
+      console.log("Worker received audioBlob:", audioBlob);
+  
+      const url = `https://speech.googleapis.com/v1/speech:recognize?key=${apiKey}`;
+  
       const response = await fetch(url, {
         method: 'POST',
         body: JSON.stringify({
@@ -33,5 +33,10 @@ onmessage = async (event) => {
       console.error('Error in speech recognition:', error);
       postMessage('Error processing speech recognition');
     }
+  };
+  
+  // Add an error event listener to catch any errors in the worker
+  onerror = (event) => {
+    console.error('Worker error:', event);
   };
   
