@@ -380,3 +380,30 @@
   background-color: var(--background-secondary-alt);
   font-size: 0.9em; /* Smaller font size for thinking content */
 }
+.chat-input-container .voice-button {
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.chat-input-container .voice-button:hover {
+  background-color: var(--background-modifier-border-hover);
+}
+
+/* Стиль для кнопки мікрофона під час запису (синя) */
+.chat-input-container .voice-button.recording {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  animation: pulse 1.5s infinite;
+}
+
+/* Анімація пульсації для кнопки мікрофона під час запису */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}

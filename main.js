@@ -49,7 +49,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
       onmessage = async (event) => {
           try {
             const { apiKey, audioBlob } = event.data;
-            console.log("Worker received audioBlob:", audioBlob);
+            
         
             const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
             
@@ -61,7 +61,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
               )
             );
             
-            console.log("Audio converted to Base64");
+            
         
             const response = await fetch(url, {
               method: 'POST',
@@ -87,7 +87,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
             }
         
             const data = await response.json();
-            console.log("Speech recognition data:", data);
+            
             
             if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
               postMessage(data.results[0].alternatives[0].transcript);
@@ -104,16 +104,16 @@ var _OllamaView = class extends import_obsidian.ItemView {
         console.error('Worker error:', event);
       };
       `;
-      const workerBlob = new Blob([workerCode], { type: "application/javascript" });
+      const workerBlob = new Blob([workerCode], {
+        type: "application/javascript"
+      });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
-      console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
-      console.log("Received transcript from worker:", transcript);
       this.inputEl.value = transcript;
     };
     this.speechWorker.onerror = (error) => {
@@ -179,9 +179,15 @@ var _OllamaView = class extends import_obsidian.ItemView {
     return "message-square";
   }
   async onOpen() {
-    this.chatContainerEl = this.contentEl.createDiv({ cls: "ollama-container" });
-    this.chatContainer = this.chatContainerEl.createDiv({ cls: "ollama-chat-container" });
-    const inputContainer = this.chatContainerEl.createDiv({ cls: "chat-input-container" });
+    this.chatContainerEl = this.contentEl.createDiv({
+      cls: "ollama-container"
+    });
+    this.chatContainer = this.chatContainerEl.createDiv({
+      cls: "ollama-chat-container"
+    });
+    const inputContainer = this.chatContainerEl.createDiv({
+      cls: "chat-input-container"
+    });
     this.inputEl = inputContainer.createEl("textarea", {
       attr: {
         placeholder: "Type a message..."
@@ -308,7 +314,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
             <div class="thinking-toggle">\u25BC</div>
             <div class="thinking-title">Thinking</div>
           </div>
-          <div class="thinking-content">${this.markdownToHtml(thinkingContent)}</div>
+          <div class="thinking-content">${this.markdownToHtml(
+        thinkingContent
+      )}</div>
         </div>
       `;
       parts.push(foldableHtml);
@@ -338,7 +346,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
     thinkingHeaders.forEach((header) => {
       header.addEventListener("click", () => {
         const content = header.nextElementSibling;
-        const toggleIcon = header.querySelector(".thinking-toggle");
+        const toggleIcon = header.querySelector(
+          ".thinking-toggle"
+        );
         if (!content || !toggleIcon)
           return;
         const isFolded = header.getAttribute("data-fold-state") === "folded";
@@ -406,7 +416,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
     const messageEl = messageGroup.createDiv({
       cls: `message ${isUser ? "user-message bubble user-bubble" : "ollama-message bubble ollama-bubble"} ${isLastInGroup ? isUser ? "user-message-tail" : "ollama-message-tail" : ""}`
     });
-    const contentContainer = messageEl.createDiv({ cls: "message-content-container" });
+    const contentContainer = messageEl.createDiv({
+      cls: "message-content-container"
+    });
     const contentEl = contentContainer.createDiv({
       cls: "message-content"
     });
@@ -419,7 +431,12 @@ var _OllamaView = class extends import_obsidian.ItemView {
         contentEl.innerHTML = processedContent;
         this.addThinkingToggleListeners(contentEl);
       } else {
-        import_obsidian.MarkdownRenderer.renderMarkdown(message.content, contentEl, "", this);
+        import_obsidian.MarkdownRenderer.renderMarkdown(
+          message.content,
+          contentEl,
+          "",
+          this
+        );
       }
     } else {
       message.content.split("\n").forEach((line, index, array) => {
@@ -538,7 +555,9 @@ Please respond to the user's query based on the provided context. If the context
       const thinkingHeaders = this.chatContainer.querySelectorAll(".thinking-header");
       thinkingHeaders.forEach((header) => {
         const content = header.nextElementSibling;
-        const toggleIcon = header.querySelector(".thinking-toggle");
+        const toggleIcon = header.querySelector(
+          ".thinking-toggle"
+        );
         if (!content || !toggleIcon)
           return;
         content.style.display = "none";
@@ -575,6 +594,8 @@ Please respond to the user's query based on the provided context. If the context
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks = [];
+      const voiceButton = this.contentEl.querySelector(".voice-button");
+      voiceButton == null ? void 0 : voiceButton.classList.add("recording");
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           console.log("Data available, size:", event.data.size);
@@ -583,6 +604,7 @@ Please respond to the user's query based on the provided context. If the context
       };
       mediaRecorder.onstop = () => {
         console.log("Recording stopped, chunks:", audioChunks.length);
+        voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
           console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
@@ -606,6 +628,8 @@ Please respond to the user's query based on the provided context. If the context
       }, 5e3);
     } catch (error) {
       console.error("Error accessing microphone:", error);
+      const voiceButton = this.contentEl.querySelector(".voice-button");
+      voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
     }
   }
 };

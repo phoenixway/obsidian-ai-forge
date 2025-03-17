@@ -1,13 +1,18 @@
 // import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
-import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, TFile } from "obsidian";
+import {
+  ItemView,
+  WorkspaceLeaf,
+  setIcon,
+  MarkdownRenderer,
+  TFile,
+} from "obsidian";
 import OllamaPlugin from "./main";
 
 // import fetch from 'node-fetch';
 // import * as fs from 'fs/promises';
 // import * as faiss from 'faiss-node';
-import { marked } from 'marked'; // Виправлений імпорт
-import pdf from 'pdf-parse'; // Декларації типів повинні бути додані
-
+import { marked } from "marked"; // Виправлений імпорт
+import pdf from "pdf-parse"; // Декларації типів повинні бути додані
 
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 
@@ -38,12 +43,18 @@ interface OllamaResponse {
 }
 
 function isOllamaEmbeddingsResponse(obj: any): obj is OllamaEmbeddingsResponse {
-  return typeof obj === 'object' && obj !== null &&
-    Array.isArray(obj.embedding) && obj.embedding.every((item: number) => typeof item === 'number'); // Додаємо анотацію типу
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    Array.isArray(obj.embedding) &&
+    obj.embedding.every((item: number) => typeof item === "number")
+  ); // Додаємо анотацію типу
 }
 
 function isOllamaGenerateResponse(obj: any): obj is OllamaGenerateResponse {
-  return typeof obj === 'object' && obj !== null && typeof obj.response === 'string';
+  return (
+    typeof obj === "object" && obj !== null && typeof obj.response === "string"
+  );
 }
 
 export class OllamaView extends ItemView {
@@ -58,7 +69,6 @@ export class OllamaView extends ItemView {
   static instance: OllamaView | null = null;
   // private embeddings: number[][] = [];
   private speechWorker: Worker;
-
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -75,7 +85,7 @@ export class OllamaView extends ItemView {
       onmessage = async (event) => {
           try {
             const { apiKey, audioBlob } = event.data;
-            console.log("Worker received audioBlob:", audioBlob);
+            
         
             const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
             
@@ -87,7 +97,7 @@ export class OllamaView extends ItemView {
               )
             );
             
-            console.log("Audio converted to Base64");
+            
         
             const response = await fetch(url, {
               method: 'POST',
@@ -113,7 +123,7 @@ export class OllamaView extends ItemView {
             }
         
             const data = await response.json();
-            console.log("Speech recognition data:", data);
+            
             
             if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
               postMessage(data.results[0].alternatives[0].transcript);
@@ -131,10 +141,11 @@ export class OllamaView extends ItemView {
       };
       `;
 
-      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+      const workerBlob = new Blob([workerCode], {
+        type: "application/javascript",
+      });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
-      console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
@@ -142,19 +153,17 @@ export class OllamaView extends ItemView {
     // Add event listeners to the worker
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
-      console.log("Received transcript from worker:", transcript);
+
       this.inputEl.value = transcript;
     };
 
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
-
   }
 
   // private index: faiss.IndexFlatL2 | undefined;
   // private documents: string[] = [];
-
 
   // private async readFileContent(filePath: string): Promise<string> {
   //   // Отримуємо файл з Obsidian vault
@@ -183,8 +192,6 @@ export class OllamaView extends ItemView {
   //   throw new Error("PDF reading not supported in browser environment");
   //   // Тут потрібно буде реалізувати інший підхід для читання PDF
   // }
-
-
 
   // private findTopK(array: number[], k: number): number[] {
   //   return array
@@ -229,13 +236,19 @@ export class OllamaView extends ItemView {
 
   async onOpen(): Promise<void> {
     // Create main container
-    this.chatContainerEl = this.contentEl.createDiv({ cls: "ollama-container" });
+    this.chatContainerEl = this.contentEl.createDiv({
+      cls: "ollama-container",
+    });
 
     // Create chat messages container
-    this.chatContainer = this.chatContainerEl.createDiv({ cls: "ollama-chat-container" });
+    this.chatContainer = this.chatContainerEl.createDiv({
+      cls: "ollama-chat-container",
+    });
 
     // Create input container
-    const inputContainer = this.chatContainerEl.createDiv({ cls: "chat-input-container" });
+    const inputContainer = this.chatContainerEl.createDiv({
+      cls: "chat-input-container",
+    });
 
     // Create textarea for input
     this.inputEl = inputContainer.createEl("textarea", {
@@ -268,8 +281,7 @@ export class OllamaView extends ItemView {
       const setting = (this.app as any).setting;
       // setting.open();
       // setting.openTabById('obsidian-ollama-duet');
-      setting.open('obsidian-ollama-duet');
-
+      setting.open("obsidian-ollama-duet");
     });
 
     // Handle send button click
@@ -299,7 +311,7 @@ export class OllamaView extends ItemView {
           // Convert string timestamp to Date object
           const message = {
             ...msg,
-            timestamp: new Date(msg.timestamp)
+            timestamp: new Date(msg.timestamp),
           };
 
           this.messages.push(message);
@@ -319,16 +331,15 @@ export class OllamaView extends ItemView {
     }
   }
 
-
   async saveMessageHistory() {
     if (this.messages.length === 0) return;
 
     try {
       // Convert messages to a serializable format
-      const serializedMessages = this.messages.map(msg => ({
+      const serializedMessages = this.messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
-        timestamp: msg.timestamp.toISOString()
+        timestamp: msg.timestamp.toISOString(),
       }));
       await this.plugin.saveMessageHistory(JSON.stringify(serializedMessages));
     } catch (error) {
@@ -347,8 +358,8 @@ export class OllamaView extends ItemView {
       if (!this.chatContainer) return;
 
       // Log scroll values for debugging
-      // console.log("Scroll Top:", this.chatContainer.scrollTop);
-      // console.log("Scroll Height:", this.chatContainer.scrollHeight);
+      //
+      //
 
       // Scroll to bottom
       this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
@@ -371,13 +382,11 @@ export class OllamaView extends ItemView {
     await this.processWithOllama(content);
   }
 
-
-
   addMessage(role: "user" | "assistant", content: string): void {
     const message: Message = {
       role,
       content,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
     this.messages.push(message);
@@ -421,7 +430,9 @@ export class OllamaView extends ItemView {
             <div class="thinking-toggle">▼</div>
             <div class="thinking-title">Thinking</div>
           </div>
-          <div class="thinking-content">${this.markdownToHtml(thinkingContent)}</div>
+          <div class="thinking-content">${this.markdownToHtml(
+        thinkingContent
+      )}</div>
         </div>
       `;
 
@@ -435,14 +446,14 @@ export class OllamaView extends ItemView {
       parts.push(this.markdownToHtml(textAfter));
     }
 
-    return parts.join('');
+    return parts.join("");
   }
 
   private markdownToHtml(markdown: string): string {
-    if (!markdown || markdown.trim() === '') return '';
+    if (!markdown || markdown.trim() === "") return "";
 
-    const tempDiv = document.createElement('div');
-    MarkdownRenderer.renderMarkdown(markdown, tempDiv, '', this as any);
+    const tempDiv = document.createElement("div");
+    MarkdownRenderer.renderMarkdown(markdown, tempDiv, "", this as any);
     return tempDiv.innerHTML;
   }
 
@@ -462,25 +473,27 @@ export class OllamaView extends ItemView {
     // Find all thinking headers
     const thinkingHeaders = contentEl.querySelectorAll(".thinking-header");
 
-    thinkingHeaders.forEach(header => {
+    thinkingHeaders.forEach((header) => {
       header.addEventListener("click", () => {
         const content = header.nextElementSibling as HTMLElement;
-        const toggleIcon = header.querySelector(".thinking-toggle") as HTMLElement;
+        const toggleIcon = header.querySelector(
+          ".thinking-toggle"
+        ) as HTMLElement;
 
         if (!content || !toggleIcon) return;
 
-        const isFolded = header.getAttribute('data-fold-state') === 'folded';
+        const isFolded = header.getAttribute("data-fold-state") === "folded";
 
         if (isFolded) {
           // Expand
           content.style.display = "block";
           toggleIcon.textContent = "▼";
-          header.setAttribute('data-fold-state', 'expanded');
+          header.setAttribute("data-fold-state", "expanded");
         } else {
           // Fold
           content.style.display = "none";
           toggleIcon.textContent = "►";
-          header.setAttribute('data-fold-state', 'folded');
+          header.setAttribute("data-fold-state", "folded");
         }
       });
     });
@@ -493,18 +506,21 @@ export class OllamaView extends ItemView {
       "&lt;think&gt;",
       "<think ", // In case there are attributes
       "\\<think\\>",
-      "%3Cthink%3E" // URL encoded
+      "%3Cthink%3E", // URL encoded
     ];
 
-    return formats.some(format => content.includes(format));
+    return formats.some((format) => content.includes(format));
   }
   /**
    * Add toggle all button for thinking blocks
    */
-  private addToggleAllButton(contentContainer: HTMLElement, contentEl: HTMLElement): void {
+  private addToggleAllButton(
+    contentContainer: HTMLElement,
+    contentEl: HTMLElement
+  ): void {
     const toggleAllButton = contentContainer.createEl("button", {
       cls: "toggle-all-thinking-button",
-      attr: { title: "Згорнути/розгорнути всі блоки thinking" }
+      attr: { title: "Згорнути/розгорнути всі блоки thinking" },
     });
     toggleAllButton.textContent = "Toggle All Thinking";
 
@@ -514,7 +530,7 @@ export class OllamaView extends ItemView {
 
       // Check if all blocks are collapsed or expanded
       let allHidden = true;
-      thinkingContents.forEach(content => {
+      thinkingContents.forEach((content) => {
         if ((content as HTMLElement).style.display !== "none") {
           allHidden = false;
         }
@@ -523,7 +539,9 @@ export class OllamaView extends ItemView {
       // Toggle all blocks
       thinkingContents.forEach((content, index) => {
         (content as HTMLElement).style.display = allHidden ? "block" : "none";
-        (thinkingToggles[index] as HTMLElement).textContent = allHidden ? "▼" : "►";
+        (thinkingToggles[index] as HTMLElement).textContent = allHidden
+          ? "▼"
+          : "►";
       });
     });
   }
@@ -539,7 +557,8 @@ export class OllamaView extends ItemView {
     if (isFirstInGroup) {
       // Create a new message group
       messageGroup = this.chatContainer.createDiv({
-        cls: `message-group ${isUser ? "user-message-group" : "ollama-message-group"}`
+        cls: `message-group ${isUser ? "user-message-group" : "ollama-message-group"
+          }`,
       });
     } else {
       // Use the last group
@@ -548,37 +567,50 @@ export class OllamaView extends ItemView {
 
     // Create message element
     const messageEl = messageGroup.createDiv({
-      cls: `message ${isUser ? "user-message bubble user-bubble" : "ollama-message bubble ollama-bubble"} ${isLastInGroup ? (isUser ? "user-message-tail" : "ollama-message-tail") : ""}`
+      cls: `message ${isUser
+          ? "user-message bubble user-bubble"
+          : "ollama-message bubble ollama-bubble"
+        } ${isLastInGroup
+          ? isUser
+            ? "user-message-tail"
+            : "ollama-message-tail"
+          : ""
+        }`,
     });
 
     // Create message content container
-    const contentContainer = messageEl.createDiv({ cls: "message-content-container" });
+    const contentContainer = messageEl.createDiv({
+      cls: "message-content-container",
+    });
 
     // Add message content
     const contentEl = contentContainer.createDiv({
-      cls: "message-content"
+      cls: "message-content",
     });
 
     // Render markdown for assistant messages, plain text for user
     if (message.role === "assistant") {
       // Log raw message content
-      // console.log("Message content before rendering:", message.content);
-      // console.log("Contains thinking tags:", message.content.includes("<think>"));
-      // console.log("Rendering message, content:", message.content);
+      //
+      //
+      //
       // const tagDetection = this.detectThinkingTags(message.content);
-      // console.log("Thinking tag detection in renderMessage:", tagDetection);
+      //
 
       // Check for encoded thinking tags too
       const decodedContent = this.decodeHtmlEntities(message.content);
-      const hasThinkingTags = message.content.includes("<think>") ||
+      const hasThinkingTags =
+        message.content.includes("<think>") ||
         decodedContent.includes("<think>");
 
       if (hasThinkingTags) {
         // Use decoded content if needed
-        const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ?
-          decodedContent : message.content;
+        const contentToProcess =
+          hasThinkingTags && !message.content.includes("<thing>")
+            ? decodedContent
+            : message.content;
 
-        // console.log("Processing content with thinking tags:", contentToProcess);
+        //
         const processedContent = this.processThinkingTags(contentToProcess);
         contentEl.innerHTML = processedContent;
 
@@ -586,14 +618,19 @@ export class OllamaView extends ItemView {
         this.addThinkingToggleListeners(contentEl);
       } else {
         // Regular markdown rendering
-        MarkdownRenderer.renderMarkdown(message.content, contentEl, '', this as any);
+        MarkdownRenderer.renderMarkdown(
+          message.content,
+          contentEl,
+          "",
+          this as any
+        );
       }
     } else {
       // For user messages, keep as plain text
-      message.content.split('\n').forEach((line, index, array) => {
+      message.content.split("\n").forEach((line, index, array) => {
         contentEl.createSpan({ text: line });
         if (index < array.length - 1) {
-          contentEl.createEl('br');
+          contentEl.createEl("br");
         }
       });
     }
@@ -601,7 +638,7 @@ export class OllamaView extends ItemView {
     // Add copy button
     const copyButton = contentContainer.createEl("button", {
       cls: "copy-button",
-      attr: { title: "Скопіювати" }
+      attr: { title: "Скопіювати" },
     });
     setIcon(copyButton, "copy");
 
@@ -627,11 +664,10 @@ export class OllamaView extends ItemView {
     if (isLastInGroup) {
       messageEl.createDiv({
         cls: "message-timestamp",
-        text: this.formatTime(message.timestamp)
+        text: this.formatTime(message.timestamp),
       });
     }
   }
-
 
   isFirstMessageInGroup(message: Message): boolean {
     const index = this.messages.indexOf(message);
@@ -648,19 +684,22 @@ export class OllamaView extends ItemView {
   }
 
   formatTime(date: Date): string {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
   private decodeHtmlEntities(text: string): string {
-    const textArea = document.createElement('textarea');
+    const textArea = document.createElement("textarea");
     textArea.innerHTML = text;
     return textArea.value;
   }
-  private detectThinkingTags(content: string): { hasThinkingTags: boolean, format: string } {
+  private detectThinkingTags(content: string): {
+    hasThinkingTags: boolean;
+    format: string;
+  } {
     const formats = [
       { name: "standard", regex: /<think>[\s\S]*?<\/think>/g },
       { name: "escaped", regex: /&lt;think&gt;[\s\S]*?&lt;\/think&gt;/g },
       { name: "backslash-escaped", regex: /\\<think\\>[\s\S]*?\\<\/think\\>/g },
-      { name: "url-encoded", regex: /%3Cthink%3E[\s\S]*?%3C\/think%3E/g }
+      { name: "url-encoded", regex: /%3Cthink%3E[\s\S]*?%3C\/think%3E/g },
     ];
 
     for (const format of formats) {
@@ -685,8 +724,10 @@ export class OllamaView extends ItemView {
 
         if (this.plugin.settings.ragEnabled) {
           // Make sure documents are indexed
-          if (this.plugin.ragService &&
-            this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+          if (
+            this.plugin.ragService &&
+            this.plugin.ragService.findRelevantDocuments("test").length === 0
+          ) {
             await this.plugin.ragService.indexDocuments();
           }
 
@@ -705,40 +746,41 @@ export class OllamaView extends ItemView {
         );
 
         // In processWithOllama function:
-        // console.log("Raw Ollama response (stringified):", JSON.stringify(data.response));
-        // console.log("Raw response type:", typeof data.response);
+        //
+        //
 
-        // console.log("Contains literal thinking tag:", data.response.includes("<think>"));
-        // console.log("Contains encoded thinking tag:", data.response.includes("&lt;think&gt;"));
-        // console.log("Response type:", typeof data.response);
-        // console.log("Response length:", data.response.length);
+        //
+        //
+        //
+        //
 
         const decodedResponse = this.decodeHtmlEntities(data.response);
-        // console.log("Decoded response:", decodedResponse);
-        // console.log("Decoded contains thinking tags:", decodedResponse.includes("<think>"));
+        //
+        //
 
         // Use the decoded response if it contains thinking tags
-        const finalResponse = decodedResponse.includes("<think>") ?
-          decodedResponse : data.response;
+        const finalResponse = decodedResponse.includes("<think>")
+          ? decodedResponse
+          : data.response;
 
         // Check for thinking tags with different methods
         // const hasLiteralThinkingTags = data.response.includes("<think>");
         // const hasRegexMatch = /<think>[\s\S]*?<\/think>/g.test(data.response);
 
-        // console.log("Has literal thinking tags:", hasLiteralThinkingTags);
-        // console.log("Has regex match for thinking tags:", hasRegexMatch);
+        //
+        //
 
         // Try to find thinking tags using regex
         // const thinkingRegex = /<think>[\s\S]*?<\/think>/g;
         // const matches = data.response.match(thinkingRegex);
-        // console.log("Regex matches:", matches);
+        //
 
         // const tagDetection = this.detectThinkingTags(data.response);
-        // console.log("Thinking tag detection:", tagDetection);
+        //
 
         // If thinking tags are detected but in an alternative format
         // if (tagDetection.hasThinkingTags && tagDetection.format !== "standard") {
-        //   console.log("Detected thinking tags in non-standard format:", tagDetection.format);
+        //
         // }
 
         // Update the UI
@@ -751,8 +793,6 @@ export class OllamaView extends ItemView {
 
         // Ensure thinking blocks are properly initialized
         this.initializeThinkingBlocks();
-
-
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
 
@@ -772,42 +812,42 @@ export class OllamaView extends ItemView {
   private initializeThinkingBlocks(): void {
     // Find all thinking blocks and initialize them correctly
     setTimeout(() => {
-      const thinkingHeaders = this.chatContainer.querySelectorAll(".thinking-header");
+      const thinkingHeaders =
+        this.chatContainer.querySelectorAll(".thinking-header");
 
-      thinkingHeaders.forEach(header => {
+      thinkingHeaders.forEach((header) => {
         const content = header.nextElementSibling as HTMLElement;
-        const toggleIcon = header.querySelector(".thinking-toggle") as HTMLElement;
+        const toggleIcon = header.querySelector(
+          ".thinking-toggle"
+        ) as HTMLElement;
 
         if (!content || !toggleIcon) return;
 
         // By default, thinking blocks are collapsed
         content.style.display = "none";
         toggleIcon.textContent = "►";
-        header.setAttribute('data-fold-state', 'folded');
+        header.setAttribute("data-fold-state", "folded");
       });
     }, 100);
   }
 
-
-
-
   addLoadingMessage(): HTMLElement {
     const messageGroup = this.chatContainer.createDiv({
-      cls: "message-group ollama-message-group"
+      cls: "message-group ollama-message-group",
     });
 
     const messageEl = messageGroup.createDiv({
-      cls: "message ollama-message ollama-message-tail"
+      cls: "message ollama-message ollama-message-tail",
     });
 
     const dotsContainer = messageEl.createDiv({
-      cls: "thinking-dots"
+      cls: "thinking-dots",
     });
 
     // Створюємо три точки
     for (let i = 0; i < 3; i++) {
       dotsContainer.createDiv({
-        cls: "thinking-dot"
+        cls: "thinking-dot",
       });
     }
 
@@ -828,6 +868,12 @@ export class OllamaView extends ItemView {
       // Використовуємо підтримуваний формат без специфікації кодеку
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks: Blob[] = [];
+      
+      // Знаходимо кнопку мікрофона
+      const voiceButton = this.contentEl.querySelector('.voice-button');
+      
+      // Додаємо клас recording для зміни стилю на синій
+      voiceButton?.classList.add('recording');
   
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -838,6 +884,10 @@ export class OllamaView extends ItemView {
   
       mediaRecorder.onstop = () => {
         console.log("Recording stopped, chunks:", audioChunks.length);
+        
+        // Видаляємо клас recording, коли запис зупинено
+        voiceButton?.classList.remove('recording');
+        
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
           console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
@@ -867,6 +917,10 @@ export class OllamaView extends ItemView {
       }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
+      
+      // Прибираємо клас recording у разі помилки
+      const voiceButton = this.contentEl.querySelector('.voice-button');
+      voiceButton?.classList.remove('recording');
     }
   }
 }
