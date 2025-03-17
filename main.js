@@ -506,11 +506,13 @@ Please respond to the user's query based on the provided context. If the context
         audioChunks.push(event.data);
       };
       mediaRecorder.onstop = () => {
+        console.log(mediaRecorder.onstop);
         const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
         this.speechWorker.postMessage({ apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4", audioBlob });
         this.speechWorker.onmessage = (event) => {
           const transcript = event.data;
           this.inputEl.value = transcript;
+          console.log(this.speechWorker.onmessage);
         };
       };
       mediaRecorder.start();
