@@ -438,8 +438,8 @@ onerror = (event) => {
     (0, import_obsidian.setIcon)(copyButton, "copy");
     copyButton.addEventListener("click", () => {
       let textToCopy = message.content;
-      if (message.role === "assistant" && textToCopy.includes("<thinking>")) {
-        textToCopy = textToCopy.replace(/<thinking>[\s\S]*?<\/thinking>/g, "");
+      if (message.role === "assistant" && textToCopy.includes("<think>")) {
+        textToCopy = textToCopy.replace(/<think>[\s\S]*?<\/think>/g, "");
       }
       navigator.clipboard.writeText(textToCopy);
       copyButton.setText("Copied!");
@@ -496,19 +496,44 @@ onerror = (event) => {
     const loadingMessageEl = this.addLoadingMessage();
     setTimeout(async () => {
       try {
+        const roleDefinition = await this.plugin.getRoleDefinition();
         let prompt = content;
+        let systemPrompt = "";
+        if (roleDefinition) {
+          systemPrompt = `You are an AI assistant with the following role definition: 
+
+${roleDefinition}
+
+Please adhere strictly to this role in your responses.`;
+        }
         if (this.plugin.settings.ragEnabled) {
           if (this.plugin.ragService && this.plugin.ragService.findRelevantDocuments("test").length === 0) {
             await this.plugin.ragService.indexDocuments();
           }
           const ragContext = this.plugin.ragService.prepareContext(content);
           if (ragContext) {
-            prompt = `${ragContext}
+            if (systemPrompt) {
+              prompt = `${systemPrompt}
+
+${ragContext}
+
+User Query: ${content}
+
+Please respond to the user's query based on the provided context and adhering to your role. If the context doesn't contain relevant information, please state that and answer based on your general knowledge while staying in character.`;
+            } else {
+              prompt = `${ragContext}
 
 User Query: ${content}
 
 Please respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
+            }
           }
+        } else if (systemPrompt) {
+          prompt = `${systemPrompt}
+
+User Query: ${content}
+
+Please respond to the user's query while adhering to your defined role.`;
         }
         const data = await this.plugin.apiService.generateResponse(
           this.plugin.settings.modelName,
@@ -643,7 +668,8 @@ var DEFAULT_SETTINGS = {
   googleApiKey: "",
   speechLanguage: "uk-UA",
   maxRecordingTime: 15,
-  silenceDetection: true
+  silenceDetection: true,
+  followRole: true
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
@@ -753,10 +779,10 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("RAG Folder Path").setDesc(
-      "Path to the folder containing notes for RAG (relative to vault root)"
+    new import_obsidian2.Setting(containerEl).setName("AI Assistant Path").setDesc(
+      "Path to the folder containing assistant settings. RAG documents will be loaded from 'data' subfolder (relative to vault root)"
     ).addText(
-      (text) => text.setPlaceholder("data").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
+      (text) => text.setPlaceholder("").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
         this.plugin.settings.ragFolderPath = value;
         await this.plugin.saveSettings();
       })
@@ -789,6 +815,12 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    new import_obsidian2.Setting(containerEl).setName("Follow Role Definition").setDesc("Make Ollama follow the role defined in the assistant settings file").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
+        this.plugin.settings.followRole = value;
+        await this.plugin.saveSettings();
+      })
+    );
   }
 };
 
@@ -803,37 +835,13 @@ var RagService = class {
    * Index all markdown files in the specified folder path
    */
   async indexDocuments() {
-    var _a, _b;
     if (this.isIndexing)
       return;
     this.isIndexing = true;
     try {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
-      console.log(`RAG folder path: "${folderPath}"`);
-      const allFiles = vault.getFiles();
-      console.log(`Total files in vault: ${allFiles.length}`);
-      const files = await this.getMarkdownFiles(vault, folderPath);
-      console.log(`Found ${files.length} markdown files from "${folderPath}"`);
-      console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
-      this.documents = [];
-      for (const file of files) {
-        try {
-          const content = await vault.read(file);
-          this.documents.push({
-            path: file.path,
-            content,
-            metadata: {
-              filename: file.name,
-              created: (_a = file.stat) == null ? void 0 : _a.ctime,
-              modified: (_b = file.stat) == null ? void 0 : _b.mtime
-            }
-          });
-        } catch (error) {
-          console.error(`Error reading file ${file.path}:`, error);
-        }
-      }
-      console.log(`Indexed ${this.documents.length} documents for RAG`);
+      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from 'data' subfolder)`);
     } catch (error) {
       console.error("Error indexing documents:", error);
     } finally {
@@ -845,20 +853,20 @@ var RagService = class {
    */
   async getMarkdownFiles(vault, folderPath) {
     const files = [];
+    if (!folderPath) {
+      return files;
+    }
     let normalizedFolderPath = folderPath;
-    if (normalizedFolderPath && !normalizedFolderPath.endsWith("/")) {
+    if (!normalizedFolderPath.endsWith("/")) {
       normalizedFolderPath += "/";
     }
-    const isRootPath = !normalizedFolderPath || normalizedFolderPath === "/";
-    console.log(`Normalized path: "${normalizedFolderPath}", isRoot: ${isRootPath}`);
+    const dataFolderPath = normalizedFolderPath + "data/";
+    console.log(`Looking for markdown files in: "${dataFolderPath}"`);
     const allFiles = vault.getFiles();
     for (const file of allFiles) {
-      if (file.extension === "md") {
-        if (isRootPath || file.path.startsWith(normalizedFolderPath)) {
-          console.log(`Adding file: ${file.path}`);
-          files.push(file);
-        } else {
-        }
+      if (file.extension === "md" && file.path.startsWith(dataFolderPath)) {
+        console.log(`Adding file: ${file.path}`);
+        files.push(file);
       }
     }
     return files;
@@ -901,7 +909,7 @@ var RagService = class {
     if (relevantDocs.length === 0) {
       return "";
     }
-    let context = "### Context from your notes:\n\n";
+    let context = "### Context:\n\n";
     relevantDocs.forEach((doc, index) => {
       var _a;
       context += `Document ${index + 1} (${(_a = doc.metadata) == null ? void 0 : _a.filename}):
@@ -938,7 +946,8 @@ var ApiService = class {
       body: JSON.stringify({
         model,
         prompt,
-        stream: false
+        stream: false,
+        temperature: 0.2
       })
     });
     if (!response.ok) {
@@ -1146,6 +1155,31 @@ var OllamaPlugin = class extends import_obsidian3.Plugin {
       }
     } catch (error) {
       console.error("Failed to clear message history:", error);
+    }
+  }
+  async getRoleDefinition() {
+    if (!this.settings.followRole) {
+      return null;
+    }
+    try {
+      const basePath = this.settings.ragFolderPath;
+      if (!basePath) {
+        return null;
+      }
+      let normalizedPath = basePath;
+      if (!normalizedPath.endsWith("/")) {
+        normalizedPath += "/";
+      }
+      const rolePath = normalizedPath + "role.md";
+      const file = this.app.vault.getAbstractFileByPath(rolePath);
+      if (file instanceof import_obsidian3.TFile) {
+        const content = await this.app.vault.read(file);
+        return content;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error reading role definition:", error);
+      return null;
     }
   }
 };

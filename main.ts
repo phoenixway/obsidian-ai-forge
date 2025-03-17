@@ -1,4 +1,4 @@
-import { Plugin, WorkspaceLeaf } from "obsidian";
+import { Plugin, TFile } from "obsidian";
 import { OllamaView, VIEW_TYPE_OLLAMA } from "./ollamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
 import { RagService } from "./ragService";
@@ -252,6 +252,39 @@ export default class OllamaPlugin extends Plugin {
       }
     } catch (error) {
       console.error("Failed to clear message history:", error);
+    }
+  }
+
+  async getRoleDefinition(): Promise<string | null> {
+    if (!this.settings.followRole) {
+      return null;
+    }
+
+    try {
+      const basePath = this.settings.ragFolderPath;
+      if (!basePath) {
+        return null;
+      }
+
+      // Нормалізуємо шлях
+      let normalizedPath = basePath;
+      if (!normalizedPath.endsWith('/')) {
+        normalizedPath += '/';
+      }
+
+      // Шукаємо файл role.md в заданому шляху
+      const rolePath = normalizedPath + 'role.md';
+      const file = this.app.vault.getAbstractFileByPath(rolePath);
+
+      if (file instanceof TFile) {
+        const content = await this.app.vault.read(file);
+        return content;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error reading role definition:", error);
+      return null;
     }
   }
 }

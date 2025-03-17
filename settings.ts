@@ -19,6 +19,7 @@ export interface OllamaPluginSettings {
   speechLanguage: string; // Language code for speech recognition
   maxRecordingTime: number; // Maximum recording time in seconds
   silenceDetection: boolean; // Enable silence detection
+  followRole: boolean;
 }
 
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
@@ -33,6 +34,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   speechLanguage: "uk-UA",
   maxRecordingTime: 15,
   silenceDetection: true,
+  followRole: true,
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -125,8 +127,8 @@ export class OllamaSettingTab extends PluginSettingTab {
     )
       ? this.plugin.settings.modelName
       : availableModels.length > 0
-      ? availableModels[0]
-      : "";
+        ? availableModels[0]
+        : "";
 
     // Create model selection dropdown (fixed version)
     const modelSetting = new Setting(containerEl)
@@ -220,13 +222,13 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("RAG Folder Path")
+      .setName("AI Assistant Path")
       .setDesc(
-        "Path to the folder containing notes for RAG (relative to vault root)"
+        "Path to the folder containing assistant settings. RAG documents will be loaded from 'data' subfolder (relative to vault root)"
       )
       .addText((text) =>
         text
-          .setPlaceholder("data")
+          .setPlaceholder("")
           .setValue(this.plugin.settings.ragFolderPath)
           .onChange(async (value) => {
             this.plugin.settings.ragFolderPath = value;
@@ -277,7 +279,6 @@ export class OllamaSettingTab extends PluginSettingTab {
           })
       );
 
-    // Додати налаштування для максимального часу запису
     new Setting(containerEl)
       .setName("Maximum Recording Time")
       .setDesc(
@@ -290,6 +291,17 @@ export class OllamaSettingTab extends PluginSettingTab {
           .setDynamicTooltip()
           .onChange(async (value) => {
             this.plugin.settings.maxRecordingTime = value;
+            await this.plugin.saveSettings();
+          })
+      );
+    new Setting(containerEl)
+      .setName("Follow Role Definition")
+      .setDesc("Make Ollama follow the role defined in the assistant settings file")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.followRole)
+          .onChange(async (value) => {
+            this.plugin.settings.followRole = value;
             await this.plugin.saveSettings();
           })
       );

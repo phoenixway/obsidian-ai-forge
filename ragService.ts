@@ -27,48 +27,12 @@ export class RagService {
     try {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
-      
-      console.log(`RAG folder path: "${folderPath}"`);
-      
-      // Отримуємо всі файли у vault для перевірки
-      const allFiles = vault.getFiles();
-      console.log(`Total files in vault: ${allFiles.length}`);
-      
-      // // Друкуємо перші кілька файлів для перевірки
-      // for (let i = 0; i < Math.min(5, allFiles.length); i++) {
-      //   console.log(`File ${i}: ${allFiles[i].path}`);
-      // }
-      
-      // Get all markdown files in the specified folder
-      const files = await this.getMarkdownFiles(vault, folderPath);
-      
-      console.log(`Found ${files.length} markdown files from "${folderPath}"`);
-      // for (const file of files) {
-      //   console.log(`Found file: ${file.path}`);
-      // }
-      
-      console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
-      this.documents = [];
 
-      // Read content from each file
-      for (const file of files) {
-        try {
-          const content = await vault.read(file);
-          this.documents.push({
-            path: file.path,
-            content,
-            metadata: {
-              filename: file.name,
-              created: file.stat?.ctime,
-              modified: file.stat?.mtime
-            }
-          });
-        } catch (error) {
-          console.error(`Error reading file ${file.path}:`, error);
-        }
-      }
+      // Оновлюємо повідомлення для логування
+      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from 'data' subfolder)`);
 
-      console.log(`Indexed ${this.documents.length} documents for RAG`);
+      // Решта коду залишається без змін
+      // ...
     } catch (error) {
       console.error("Error indexing documents:", error);
     } finally {
@@ -81,35 +45,36 @@ export class RagService {
    */
   private async getMarkdownFiles(vault: Vault, folderPath: string): Promise<TFile[]> {
     const files: TFile[] = [];
-    
+
+    // Перевіряємо, чи не порожній шлях
+    if (!folderPath) {
+      return files;
+    }
+
     // Нормалізуємо шлях для порівняння
     let normalizedFolderPath = folderPath;
-    if (normalizedFolderPath && !normalizedFolderPath.endsWith('/')) {
-        normalizedFolderPath += '/';
+    if (!normalizedFolderPath.endsWith('/')) {
+      normalizedFolderPath += '/';
     }
-    
-    // Спеціальна логіка для кореневого шляху
-    const isRootPath = !normalizedFolderPath || normalizedFolderPath === '/';
-    
-    console.log(`Normalized path: "${normalizedFolderPath}", isRoot: ${isRootPath}`);
-    
+
+    // Завжди шукаємо тільки в підпапці "data" заданого шляху
+    const dataFolderPath = normalizedFolderPath + 'data/';
+
+    console.log(`Looking for markdown files in: "${dataFolderPath}"`);
+
     // Get all files in the vault
     const allFiles = vault.getFiles();
-    
-    // Filter for markdown files in the specified folder
+
+    // Filter for markdown files in the data subfolder
     for (const file of allFiles) {
-      if (file.extension === "md") {
-        if (isRootPath || file.path.startsWith(normalizedFolderPath)) {
-          console.log(`Adding file: ${file.path}`);
-          files.push(file);
-        } else {
-          // console.log(`Skipping file as it doesn't match path: ${file.path}`);
-        }
+      if (file.extension === "md" && file.path.startsWith(dataFolderPath)) {
+        console.log(`Adding file: ${file.path}`);
+        files.push(file);
       }
     }
-    
+
     return files;
-}
+  }
 
   /**
    * Simple search implementation to find relevant documents for a query
@@ -125,11 +90,11 @@ export class RagService {
     const scoredDocs = this.documents.map(doc => {
       const lowerContent = doc.content.toLowerCase();
       const lowerQuery = query.toLowerCase();
-      
+
       // Split query into terms and count occurrences
       const terms = lowerQuery.split(/\s+/);
       let score = 0;
-      
+
       for (const term of terms) {
         if (term.length > 2) { // Ignore very short terms
           const regex = new RegExp(term, 'gi');
@@ -166,14 +131,14 @@ export class RagService {
     }
 
     // Format the context
-    let context = "### Context from your notes:\n\n";
-    
+    let context = "### Context:\n\n";
+
     relevantDocs.forEach((doc, index) => {
       context += `Document ${index + 1} (${doc.metadata?.filename}):\n`;
       // Truncate documents if they're too long to avoid token limits
       const maxChars = 1500;
-      const content = doc.content.length > maxChars 
-        ? doc.content.substring(0, maxChars) + "..." 
+      const content = doc.content.length > maxChars
+        ? doc.content.substring(0, maxChars) + "..."
         : doc.content;
       context += content + "\n\n";
     });

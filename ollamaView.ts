@@ -1,18 +1,10 @@
-// import { ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer } from "obsidian";
 import {
   ItemView,
   WorkspaceLeaf,
   setIcon,
   MarkdownRenderer,
-  TFile,
 } from "obsidian";
 import OllamaPlugin from "./main";
-
-// import fetch from 'node-fetch';
-// import * as fs from 'fs/promises';
-// import * as faiss from 'faiss-node';
-import { marked } from "marked"; // Виправлений імпорт
-import pdf from "pdf-parse"; // Декларації типів повинні бути додані
 
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 
@@ -20,41 +12,6 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-}
-
-interface OllamaEmbeddingsResponse {
-  embedding: number[];
-}
-
-interface OllamaGenerateResponse {
-  response: string;
-}
-
-interface OllamaResponse {
-  model: string;
-  response: string;
-  context?: number[];
-  total_duration?: number;
-  load_duration?: number;
-  prompt_eval_count?: number;
-  prompt_eval_duration?: number;
-  eval_count?: number;
-  eval_duration?: number;
-}
-
-function isOllamaEmbeddingsResponse(obj: any): obj is OllamaEmbeddingsResponse {
-  return (
-    typeof obj === "object" &&
-    obj !== null &&
-    Array.isArray(obj.embedding) &&
-    obj.embedding.every((item: number) => typeof item === "number")
-  ); // Додаємо анотацію типу
-}
-
-function isOllamaGenerateResponse(obj: any): obj is OllamaGenerateResponse {
-  return (
-    typeof obj === "object" && obj !== null && typeof obj.response === "string"
-  );
 }
 
 export class OllamaView extends ItemView {
@@ -80,14 +37,14 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
-    
+
     // Додати змінну для зберігання посилання на mediaRecorder
     this.mediaRecorder = null;
-  
+
     try {
       // Варіант з використанням Blob API
-// Оновлений код воркера для speechWorker
-const workerCode = `
+      // Оновлений код воркера для speechWorker
+      const workerCode = `
 onmessage = async (event) => {
     try {
       const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
@@ -166,7 +123,7 @@ onmessage = async (event) => {
 onerror = (event) => {
   console.error('Worker error:', event);
 };
-`;  
+`;
       const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
@@ -174,38 +131,38 @@ onerror = (event) => {
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
-  
+
     // Оновлений обробник повідомлень від воркера
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
       console.log("Received transcript from worker:", transcript);
-      
+
       // Вставляємо текст у позицію курсора
       const cursorPosition = this.inputEl.selectionStart || 0;
       const currentValue = this.inputEl.value;
-      
+
       // Додаємо пробіл перед текстом, якщо курсор не на початку рядка і попередній символ не пробіл
       let insertText = transcript;
       if (cursorPosition > 0 && currentValue.charAt(cursorPosition - 1) !== ' ' && insertText.charAt(0) !== ' ') {
         insertText = ' ' + insertText;
       }
-      
+
       // Створюємо новий текст, вставляючи розпізнаний текст у позицію курсора
-      const newValue = currentValue.substring(0, cursorPosition) + 
-                       insertText + 
-                       currentValue.substring(cursorPosition);
-      
+      const newValue = currentValue.substring(0, cursorPosition) +
+        insertText +
+        currentValue.substring(cursorPosition);
+
       // Оновлюємо значення поля вводу
       this.inputEl.value = newValue;
-      
+
       // Переміщуємо курсор після вставленого тексту
       const newCursorPosition = cursorPosition + insertText.length;
       this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
-      
+
       // Фокусуємось на полі вводу
       this.inputEl.focus();
     };
-  
+
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
@@ -389,7 +346,6 @@ onerror = (event) => {
       this.guaranteedScrollToBottom();
     }, 100); // Adjust timeout if necessary
   }
-
   private processThinkingTags(content: string): string {
     // Early return if no thinking tags
     if (!content.includes("<think>")) {
@@ -557,8 +513,8 @@ onerror = (event) => {
     // Create message element
     const messageEl = messageGroup.createDiv({
       cls: `message ${isUser
-          ? "user-message bubble user-bubble"
-          : "ollama-message bubble ollama-bubble"
+        ? "user-message bubble user-bubble"
+        : "ollama-message bubble ollama-bubble"
         } ${isLastInGroup
           ? isUser
             ? "user-message-tail"
@@ -635,8 +591,8 @@ onerror = (event) => {
     copyButton.addEventListener("click", () => {
       // For assistant messages with thinking tags, strip the thinking tags when copying
       let textToCopy = message.content;
-      if (message.role === "assistant" && textToCopy.includes("<thinking>")) {
-        textToCopy = textToCopy.replace(/<thinking>[\s\S]*?<\/thinking>/g, "");
+      if (message.role === "assistant" && textToCopy.includes("<think>")) {
+        textToCopy = textToCopy.replace(/<think>[\s\S]*?<\/think>/g, "");
       }
 
       navigator.clipboard.writeText(textToCopy);
@@ -708,8 +664,17 @@ onerror = (event) => {
     // Execute the request
     setTimeout(async () => {
       try {
+        // Отримуємо визначення ролі (якщо доступно)
+        const roleDefinition = await this.plugin.getRoleDefinition();
+
         // Get context from RAG if enabled
         let prompt = content;
+        let systemPrompt = "";
+
+        // Якщо є визначення ролі, додаємо його до системного промпту
+        if (roleDefinition) {
+          systemPrompt = `You are an AI assistant with the following role definition: \n\n${roleDefinition}\n\nPlease adhere strictly to this role in your responses.`;
+        }
 
         if (this.plugin.settings.ragEnabled) {
           // Make sure documents are indexed
@@ -722,10 +687,20 @@ onerror = (event) => {
 
           // Get context based on the query
           const ragContext = this.plugin.ragService.prepareContext(content);
+
           if (ragContext) {
             // Combine context with prompt
-            prompt = `${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
+            if (systemPrompt) {
+              // Якщо є роль, додаємо її разом з контекстом
+              prompt = `${systemPrompt}\n\n${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context and adhering to your role. If the context doesn't contain relevant information, please state that and answer based on your general knowledge while staying in character.`;
+            } else {
+              // Якщо ролі немає, використовуємо стандартний промпт
+              prompt = `${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
+            }
           }
+        } else if (systemPrompt) {
+          // Якщо RAG не включений, але є роль
+          prompt = `${systemPrompt}\n\nUser Query: ${content}\n\nPlease respond to the user's query while adhering to your defined role.`;
         }
 
         // Use the API service instead of direct fetch
@@ -734,45 +709,13 @@ onerror = (event) => {
           prompt
         );
 
-        // In processWithOllama function:
-        //
-        //
-
-        //
-        //
-        //
-        //
-
+        // Обробка відповіді залишається без змін
         const decodedResponse = this.decodeHtmlEntities(data.response);
-        //
-        //
-
-        // Use the decoded response if it contains thinking tags
         const finalResponse = decodedResponse.includes("<think>")
           ? decodedResponse
           : data.response;
 
-        // Check for thinking tags with different methods
-        // const hasLiteralThinkingTags = data.response.includes("<think>");
-        // const hasRegexMatch = /<think>[\s\S]*?<\/think>/g.test(data.response);
-
-        //
-        //
-
-        // Try to find thinking tags using regex
-        // const thinkingRegex = /<think>[\s\S]*?<\/think>/g;
-        // const matches = data.response.match(thinkingRegex);
-        //
-
-        // const tagDetection = this.detectThinkingTags(data.response);
-        //
-
-        // If thinking tags are detected but in an alternative format
-        // if (tagDetection.hasThinkingTags && tagDetection.format !== "standard") {
-        //
-        // }
-
-        // Update the UI
+        // Оновлення інтерфейсу
         if (loadingMessageEl && loadingMessageEl.parentNode) {
           loadingMessageEl.parentNode.removeChild(loadingMessageEl);
         }
@@ -798,6 +741,7 @@ onerror = (event) => {
       }
     }, 0);
   }
+
   private initializeThinkingBlocks(): void {
     // Find all thinking blocks and initialize them correctly
     setTimeout(() => {
@@ -855,7 +799,7 @@ onerror = (event) => {
   async startVoiceRecognition(): Promise<void> {
     // Знаходимо кнопку мікрофона
     const voiceButton = this.contentEl.querySelector('.voice-button');
-    
+
     // Перевіряємо, чи вже йде запис
     if (voiceButton?.classList.contains('recording')) {
       // Якщо вже записуємо, зупиняємо запис
@@ -864,57 +808,57 @@ onerror = (event) => {
       }
       return;
     }
-    
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Використовуємо підтримуваний формат без специфікації кодеку
       const mediaRecorder = new MediaRecorder(stream);
       this.mediaRecorder = mediaRecorder; // Зберігаємо посилання на mediaRecorder
       const audioChunks: Blob[] = [];
-      
+
       // Додаємо клас recording для зміни стилю на синій
       voiceButton?.classList.add('recording');
-  
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           console.log("Data available, size:", event.data.size);
           audioChunks.push(event.data);
         }
       };
-  
+
       mediaRecorder.onstop = () => {
         console.log("Recording stopped, chunks:", audioChunks.length);
-        
+
         // Видаляємо клас recording, коли запис зупинено
         voiceButton?.classList.remove('recording');
-        
+
         // Зупиняємо всі треки потоку
         stream.getTracks().forEach(track => track.stop());
-        
+
         this.inputEl.placeholder = "Type a message...";
-        
+
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
           console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
-          
+
           if (this.speechWorker) {
-            this.speechWorker.postMessage({ 
-              apiKey: this.plugin.settings.googleApiKey, 
-              audioBlob 
+            this.speechWorker.postMessage({
+              apiKey: this.plugin.settings.googleApiKey,
+              audioBlob
             });
           }
         } else {
           console.error("No audio data recorded");
         }
       };
-  
+
       // Просимо MediaRecorder записувати частіше (для більш швидкої відповіді)
       mediaRecorder.start(100);
       console.log("Recording started with mime type:", mediaRecorder.mimeType);
-      
+
       // Додайте візуальну індикацію запису
       this.inputEl.placeholder = "Record...";
-      
+
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
@@ -923,7 +867,7 @@ onerror = (event) => {
       }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      
+
       // Прибираємо клас recording у разі помилки
       voiceButton?.classList.remove('recording');
     }
