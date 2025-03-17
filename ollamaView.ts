@@ -72,49 +72,64 @@ export class OllamaView extends ItemView {
     try {
       // Варіант з використанням Blob API
       const workerCode = `
-onmessage = async (event) => {
-    try {
-      const { apiKey, audioBlob } = event.data;
-      console.log("Worker received audioBlob:", audioBlob);
-  
-      const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
-  
-      const response = await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify({
-          config: {
-            encoding: 'LINEAR16',
-            sampleRateHertz: 16000,
-            languageCode: 'en-US',
-          },
-          audio: {
-            content: await audioBlob.arrayBuffer(),
-          },
-        }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-  
-      if (!response.ok) {
-        throw new Error("HTTP error! status: " + response.status);
-      }
-  
-      const data = await response.json();
-      console.log("Speech recognition data:", data);
-      postMessage(data.results[0].alternatives[0].transcript);
-    } catch (error) {
-      console.error('Error in speech recognition:', error);
-      postMessage('Error processing speech recognition');
-    }
-  };
-  
-  // Add an error event listener to catch any errors in the worker
-  onerror = (event) => {
-    console.error('Worker error:', event);
-  };
-  
-`;
+      onmessage = async (event) => {
+          try {
+            const { apiKey, audioBlob } = event.data;
+            console.log("Worker received audioBlob:", audioBlob);
+        
+            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+            
+            // Конвертуємо Blob у Base64
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const base64Audio = btoa(
+              new Uint8Array(arrayBuffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte), ''
+              )
+            );
+            
+            console.log("Audio converted to Base64");
+        
+            const response = await fetch(url, {
+              method: 'POST',
+              body: JSON.stringify({
+                config: {
+                  encoding: 'WEBM_OPUS', // Змінено з LINEAR16 на відповідний формат запису
+                  sampleRateHertz: 48000, // Стандартна частота для багатьох пристроїв
+                  languageCode: 'uk-UA', // Змінено на українську мову, можете вказати потрібну
+                },
+                audio: {
+                  content: base64Audio
+                },
+              }),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+        
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error("API error details:", errorData);
+              throw new Error("HTTP error! status: " + response.status);
+            }
+        
+            const data = await response.json();
+            console.log("Speech recognition data:", data);
+            
+            if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
+              postMessage(data.results[0].alternatives[0].transcript);
+            } else {
+              postMessage('No speech detected');
+            }
+          } catch (error) {
+            console.error('Error in speech recognition:', error);
+            postMessage('Error processing speech recognition');
+          }
+      };
+        
+      onerror = (event) => {
+        console.error('Worker error:', event);
+      };
+      `;
 
       const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
@@ -810,51 +825,48 @@ onmessage = async (event) => {
   async startVoiceRecognition(): Promise<void> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=pcm' });
+      // Використовуємо підтримуваний формат без специфікації кодеку
+      const mediaRecorder = new MediaRecorder(stream);
       const audioChunks: Blob[] = [];
-
+  
       mediaRecorder.ondataavailable = (event) => {
-        console.log("mediaRecorder.ondataavailable", event.data);
-        audioChunks.push(event.data);
-      };
-
-      mediaRecorder.onstop = () => {
-        console.log("mediaRecorder.onstop");
-        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-        console.log("Sending audioBlob to worker:", audioBlob);
-
-        // Ensure the worker is correctly initialized
-        if (this.speechWorker) {
-          this.speechWorker.postMessage({ apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', audioBlob });
-          console.log("Message posted to worker");
-        } else {
-          console.error("Worker is not initialized");
+        if (event.data.size > 0) {
+          console.log("Data available, size:", event.data.size);
+          audioChunks.push(event.data);
         }
-
-        this.speechWorker.onmessage = (event) => {
-          const transcript = event.data;
-          console.log("Received transcript from worker:", transcript);
-          this.inputEl.value = transcript;
-        };
-
-        this.speechWorker.onerror = (error) => {
-          console.error("Worker error:", error);
-        };
       };
-
-      mediaRecorder.start();
-      console.log("Recording started");
+  
+      mediaRecorder.onstop = () => {
+        console.log("Recording stopped, chunks:", audioChunks.length);
+        if (audioChunks.length > 0) {
+          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+          console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
+          
+          if (this.speechWorker) {
+            this.speechWorker.postMessage({ 
+              apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', 
+              audioBlob 
+            });
+          }
+        } else {
+          console.error("No audio data recorded");
+        }
+      };
+  
+      // Просимо MediaRecorder записувати частіше (для більш швидкої відповіді)
+      mediaRecorder.start(100);
+      console.log("Recording started with mime type:", mediaRecorder.mimeType);
+      
+      // Додайте візуальну індикацію запису
+      this.inputEl.placeholder = "Запис...";
+      
       setTimeout(() => {
         mediaRecorder.stop();
-        console.log("Recording stopped");
-      }, 5000); // Stop recording after 5 seconds
+        this.inputEl.placeholder = "Type a message...";
+        console.log("Recording stopped after timeout");
+      }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
     }
   }
-
-
-
-
-
 }

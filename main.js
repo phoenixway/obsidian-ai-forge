@@ -46,49 +46,64 @@ var _OllamaView = class extends import_obsidian.ItemView {
     _OllamaView.instance = this;
     try {
       const workerCode = `
-onmessage = async (event) => {
-    try {
-      const { apiKey, audioBlob } = event.data;
-      console.log("Worker received audioBlob:", audioBlob);
-  
-      const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
-  
-      const response = await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify({
-          config: {
-            encoding: 'LINEAR16',
-            sampleRateHertz: 16000,
-            languageCode: 'en-US',
-          },
-          audio: {
-            content: await audioBlob.arrayBuffer(),
-          },
-        }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-  
-      if (!response.ok) {
-        throw new Error("HTTP error! status: " + response.status);
-      }
-  
-      const data = await response.json();
-      console.log("Speech recognition data:", data);
-      postMessage(data.results[0].alternatives[0].transcript);
-    } catch (error) {
-      console.error('Error in speech recognition:', error);
-      postMessage('Error processing speech recognition');
-    }
-  };
-  
-  // Add an error event listener to catch any errors in the worker
-  onerror = (event) => {
-    console.error('Worker error:', event);
-  };
-  
-`;
+      onmessage = async (event) => {
+          try {
+            const { apiKey, audioBlob } = event.data;
+            console.log("Worker received audioBlob:", audioBlob);
+        
+            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+            
+            // \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0443\u0454\u043C\u043E Blob \u0443 Base64
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            const base64Audio = btoa(
+              new Uint8Array(arrayBuffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte), ''
+              )
+            );
+            
+            console.log("Audio converted to Base64");
+        
+            const response = await fetch(url, {
+              method: 'POST',
+              body: JSON.stringify({
+                config: {
+                  encoding: 'WEBM_OPUS', // \u0417\u043C\u0456\u043D\u0435\u043D\u043E \u0437 LINEAR16 \u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u0438\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u0437\u0430\u043F\u0438\u0441\u0443
+                  sampleRateHertz: 48000, // \u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0430 \u0447\u0430\u0441\u0442\u043E\u0442\u0430 \u0434\u043B\u044F \u0431\u0430\u0433\u0430\u0442\u044C\u043E\u0445 \u043F\u0440\u0438\u0441\u0442\u0440\u043E\u0457\u0432
+                  languageCode: 'uk-UA', // \u0417\u043C\u0456\u043D\u0435\u043D\u043E \u043D\u0430 \u0443\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0443 \u043C\u043E\u0432\u0443, \u043C\u043E\u0436\u0435\u0442\u0435 \u0432\u043A\u0430\u0437\u0430\u0442\u0438 \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u0443
+                },
+                audio: {
+                  content: base64Audio
+                },
+              }),
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+        
+            if (!response.ok) {
+              const errorData = await response.json();
+              console.error("API error details:", errorData);
+              throw new Error("HTTP error! status: " + response.status);
+            }
+        
+            const data = await response.json();
+            console.log("Speech recognition data:", data);
+            
+            if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
+              postMessage(data.results[0].alternatives[0].transcript);
+            } else {
+              postMessage('No speech detected');
+            }
+          } catch (error) {
+            console.error('Error in speech recognition:', error);
+            postMessage('Error processing speech recognition');
+          }
+      };
+        
+      onerror = (event) => {
+        console.error('Worker error:', event);
+      };
+      `;
       const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
@@ -558,36 +573,36 @@ Please respond to the user's query based on the provided context. If the context
   async startVoiceRecognition() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm; codecs=pcm" });
+      const mediaRecorder = new MediaRecorder(stream);
       const audioChunks = [];
       mediaRecorder.ondataavailable = (event) => {
-        console.log("mediaRecorder.ondataavailable", event.data);
-        audioChunks.push(event.data);
+        if (event.data.size > 0) {
+          console.log("Data available, size:", event.data.size);
+          audioChunks.push(event.data);
+        }
       };
       mediaRecorder.onstop = () => {
-        console.log("mediaRecorder.onstop");
-        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-        console.log("Sending audioBlob to worker:", audioBlob);
-        if (this.speechWorker) {
-          this.speechWorker.postMessage({ apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4", audioBlob });
-          console.log("Message posted to worker");
+        console.log("Recording stopped, chunks:", audioChunks.length);
+        if (audioChunks.length > 0) {
+          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+          console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
+          if (this.speechWorker) {
+            this.speechWorker.postMessage({
+              apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4",
+              audioBlob
+            });
+          }
         } else {
-          console.error("Worker is not initialized");
+          console.error("No audio data recorded");
         }
-        this.speechWorker.onmessage = (event) => {
-          const transcript = event.data;
-          console.log("Received transcript from worker:", transcript);
-          this.inputEl.value = transcript;
-        };
-        this.speechWorker.onerror = (error) => {
-          console.error("Worker error:", error);
-        };
       };
-      mediaRecorder.start();
-      console.log("Recording started");
+      mediaRecorder.start(100);
+      console.log("Recording started with mime type:", mediaRecorder.mimeType);
+      this.inputEl.placeholder = "\u0417\u0430\u043F\u0438\u0441...";
       setTimeout(() => {
         mediaRecorder.stop();
-        console.log("Recording stopped");
+        this.inputEl.placeholder = "Type a message...";
+        console.log("Recording stopped after timeout");
       }, 5e3);
     } catch (error) {
       console.error("Error accessing microphone:", error);
