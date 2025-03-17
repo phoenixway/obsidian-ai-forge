@@ -499,7 +499,7 @@ Please respond to the user's query based on the provided context. If the context
   async startVoiceRecognition() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm; codecs=pcm" });
       const audioChunks = [];
       mediaRecorder.ondataavailable = (event) => {
         console.log("mediaRecorder.ondataavailable", event.data);

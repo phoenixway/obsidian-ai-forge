@@ -746,7 +746,7 @@ export class OllamaView extends ItemView {
   async startVoiceRecognition(): Promise<void> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=pcm' });
       const audioChunks: Blob[] = [];
   
       mediaRecorder.ondataavailable = (event) => {
@@ -782,6 +782,6 @@ export class OllamaView extends ItemView {
       console.error("Error accessing microphone:", error);
     }
   }
-  
+    
 
 }
