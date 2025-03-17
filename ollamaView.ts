@@ -68,7 +68,24 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
-    this.speechWorker = new Worker(new URL('./speechWorker.js', document.baseURI));
+    // Ensure the worker is correctly initialized
+    try {
+      this.speechWorker = new Worker(new URL('./speechWorker.js', document.baseURI));
+      console.log("Worker initialized successfully:", this.speechWorker);
+    } catch (error) {
+      console.error("Failed to initialize worker:", error);
+    }
+
+    // Add event listeners to the worker
+    this.speechWorker.onmessage = (event) => {
+      const transcript = event.data;
+      console.log("Received transcript from worker:", transcript);
+      this.inputEl.value = transcript;
+    };
+
+    this.speechWorker.onerror = (error) => {
+      console.error("Worker error:", error);
+    };
 
   }
 
@@ -206,10 +223,10 @@ export class OllamaView extends ItemView {
 
   async loadMessageHistory() {
     if (this.historyLoaded) return;
-  
+
     try {
       const history = await this.plugin.loadMessageHistory();
-  
+
       if (Array.isArray(history) && history.length > 0) {
         // Clear existing messages
         this.messages = [];
@@ -221,24 +238,24 @@ export class OllamaView extends ItemView {
             ...msg,
             timestamp: new Date(msg.timestamp)
           };
-  
+
           this.messages.push(message);
           this.renderMessage(message);
         }
-  
+
         // Scroll to bottom after loading history
         this.guaranteedScrollToBottom();
-  
+
         // Initialize thinking blocks to be collapsed
         this.initializeThinkingBlocks();
       }
-  
+
       this.historyLoaded = true;
     } catch (error) {
       console.error("Error loading message history:", error);
     }
   }
-  
+
 
   async saveMessageHistory() {
     if (this.messages.length === 0) return;
@@ -405,17 +422,17 @@ export class OllamaView extends ItemView {
       });
     });
   }
-  
+
   private hasThinkingTags(content: string): boolean {
     // Check for various possible formats of thinking tags
     const formats = [
-      "<think>", 
+      "<think>",
       "&lt;think&gt;",
       "<think ", // In case there are attributes
       "\\<think\\>",
       "%3Cthink%3E" // URL encoded
     ];
-    
+
     return formats.some(format => content.includes(format));
   }
   /**
@@ -451,11 +468,11 @@ export class OllamaView extends ItemView {
     const isUser = message.role === "user";
     const isFirstInGroup = this.isFirstMessageInGroup(message);
     const isLastInGroup = this.isLastMessageInGroup(message);
-  
+
     // Check if we need to create a new message group
     let messageGroup: HTMLElement;
     const lastGroup = this.chatContainer.lastElementChild;
-  
+
     if (isFirstInGroup) {
       // Create a new message group
       messageGroup = this.chatContainer.createDiv({
@@ -465,20 +482,20 @@ export class OllamaView extends ItemView {
       // Use the last group
       messageGroup = lastGroup as HTMLElement;
     }
-  
+
     // Create message element
     const messageEl = messageGroup.createDiv({
       cls: `message ${isUser ? "user-message bubble user-bubble" : "ollama-message bubble ollama-bubble"} ${isLastInGroup ? (isUser ? "user-message-tail" : "ollama-message-tail") : ""}`
     });
-  
+
     // Create message content container
     const contentContainer = messageEl.createDiv({ cls: "message-content-container" });
-  
+
     // Add message content
     const contentEl = contentContainer.createDiv({
       cls: "message-content"
     });
-  
+
     // Render markdown for assistant messages, plain text for user
     if (message.role === "assistant") {
       // Log raw message content
@@ -487,21 +504,21 @@ export class OllamaView extends ItemView {
       // console.log("Rendering message, content:", message.content);
       // const tagDetection = this.detectThinkingTags(message.content);
       // console.log("Thinking tag detection in renderMessage:", tagDetection);
-  
+
       // Check for encoded thinking tags too
       const decodedContent = this.decodeHtmlEntities(message.content);
       const hasThinkingTags = message.content.includes("<think>") ||
-                             decodedContent.includes("<think>");
-  
+        decodedContent.includes("<think>");
+
       if (hasThinkingTags) {
         // Use decoded content if needed
         const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ?
-                                decodedContent : message.content;
-  
+          decodedContent : message.content;
+
         // console.log("Processing content with thinking tags:", contentToProcess);
         const processedContent = this.processThinkingTags(contentToProcess);
         contentEl.innerHTML = processedContent;
-  
+
         // Add event listeners
         this.addThinkingToggleListeners(contentEl);
       } else {
@@ -517,14 +534,14 @@ export class OllamaView extends ItemView {
         }
       });
     }
-  
+
     // Add copy button
     const copyButton = contentContainer.createEl("button", {
       cls: "copy-button",
       attr: { title: "Скопіювати" }
     });
     setIcon(copyButton, "copy");
-  
+
     // Add copy functionality
     copyButton.addEventListener("click", () => {
       // For assistant messages with thinking tags, strip the thinking tags when copying
@@ -532,9 +549,9 @@ export class OllamaView extends ItemView {
       if (message.role === "assistant" && textToCopy.includes("<thinking>")) {
         textToCopy = textToCopy.replace(/<thinking>[\s\S]*?<\/thinking>/g, "");
       }
-  
+
       navigator.clipboard.writeText(textToCopy);
-  
+
       // Show feedback
       copyButton.setText("Copied!");
       setTimeout(() => {
@@ -542,7 +559,7 @@ export class OllamaView extends ItemView {
         setIcon(copyButton, "copy");
       }, 2000);
     });
-  
+
     // Add timestamp if last in group
     if (isLastInGroup) {
       messageEl.createDiv({
@@ -551,7 +568,7 @@ export class OllamaView extends ItemView {
       });
     }
   }
-  
+
 
   isFirstMessageInGroup(message: Message): boolean {
     const index = this.messages.indexOf(message);
@@ -574,7 +591,7 @@ export class OllamaView extends ItemView {
     const textArea = document.createElement('textarea');
     textArea.innerHTML = text;
     return textArea.value;
-  } 
+  }
   private detectThinkingTags(content: string): { hasThinkingTags: boolean, format: string } {
     const formats = [
       { name: "standard", regex: /<think>[\s\S]*?<\/think>/g },
@@ -582,13 +599,13 @@ export class OllamaView extends ItemView {
       { name: "backslash-escaped", regex: /\\<think\\>[\s\S]*?\\<\/think\\>/g },
       { name: "url-encoded", regex: /%3Cthink%3E[\s\S]*?%3C\/think%3E/g }
     ];
-    
+
     for (const format of formats) {
       if (format.regex.test(content)) {
         return { hasThinkingTags: true, format: format.name };
       }
     }
-    
+
     return { hasThinkingTags: false, format: "none" };
   }
   async processWithOllama(content: string): Promise<void> {
@@ -636,30 +653,30 @@ export class OllamaView extends ItemView {
         const decodedResponse = this.decodeHtmlEntities(data.response);
         // console.log("Decoded response:", decodedResponse);
         // console.log("Decoded contains thinking tags:", decodedResponse.includes("<think>"));
-        
-        // Use the decoded response if it contains thinking tags
-        const finalResponse = decodedResponse.includes("<think>") ? 
-                              decodedResponse : data.response;
-    
-      // Check for thinking tags with different methods
-      // const hasLiteralThinkingTags = data.response.includes("<think>");
-      // const hasRegexMatch = /<think>[\s\S]*?<\/think>/g.test(data.response);
-      
-      // console.log("Has literal thinking tags:", hasLiteralThinkingTags);
-      // console.log("Has regex match for thinking tags:", hasRegexMatch);
-      
-      // Try to find thinking tags using regex
-      // const thinkingRegex = /<think>[\s\S]*?<\/think>/g;
-      // const matches = data.response.match(thinkingRegex);
-      // console.log("Regex matches:", matches);
 
-      // const tagDetection = this.detectThinkingTags(data.response);
-      // console.log("Thinking tag detection:", tagDetection);
-      
-      // If thinking tags are detected but in an alternative format
-      // if (tagDetection.hasThinkingTags && tagDetection.format !== "standard") {
-      //   console.log("Detected thinking tags in non-standard format:", tagDetection.format);
-      // }
+        // Use the decoded response if it contains thinking tags
+        const finalResponse = decodedResponse.includes("<think>") ?
+          decodedResponse : data.response;
+
+        // Check for thinking tags with different methods
+        // const hasLiteralThinkingTags = data.response.includes("<think>");
+        // const hasRegexMatch = /<think>[\s\S]*?<\/think>/g.test(data.response);
+
+        // console.log("Has literal thinking tags:", hasLiteralThinkingTags);
+        // console.log("Has regex match for thinking tags:", hasRegexMatch);
+
+        // Try to find thinking tags using regex
+        // const thinkingRegex = /<think>[\s\S]*?<\/think>/g;
+        // const matches = data.response.match(thinkingRegex);
+        // console.log("Regex matches:", matches);
+
+        // const tagDetection = this.detectThinkingTags(data.response);
+        // console.log("Thinking tag detection:", tagDetection);
+
+        // If thinking tags are detected but in an alternative format
+        // if (tagDetection.hasThinkingTags && tagDetection.format !== "standard") {
+        //   console.log("Detected thinking tags in non-standard format:", tagDetection.format);
+        // }
 
         // Update the UI
         if (loadingMessageEl && loadingMessageEl.parentNode) {
@@ -693,13 +710,13 @@ export class OllamaView extends ItemView {
     // Find all thinking blocks and initialize them correctly
     setTimeout(() => {
       const thinkingHeaders = this.chatContainer.querySelectorAll(".thinking-header");
-  
+
       thinkingHeaders.forEach(header => {
         const content = header.nextElementSibling as HTMLElement;
         const toggleIcon = header.querySelector(".thinking-toggle") as HTMLElement;
-  
+
         if (!content || !toggleIcon) return;
-  
+
         // By default, thinking blocks are collapsed
         content.style.display = "none";
         toggleIcon.textContent = "►";
@@ -707,8 +724,8 @@ export class OllamaView extends ItemView {
       });
     }, 100);
   }
-  
-  
+
+
 
 
   addLoadingMessage(): HTMLElement {
@@ -747,17 +764,17 @@ export class OllamaView extends ItemView {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm; codecs=pcm' });
       const audioChunks: Blob[] = [];
-  
+
       mediaRecorder.ondataavailable = (event) => {
         console.log("mediaRecorder.ondataavailable", event.data);
         audioChunks.push(event.data);
       };
-  
+
       mediaRecorder.onstop = () => {
         console.log("mediaRecorder.onstop");
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
         console.log("Sending audioBlob to worker:", audioBlob);
-  
+
         // Ensure the worker is correctly initialized
         if (this.speechWorker) {
           this.speechWorker.postMessage({ apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', audioBlob });
@@ -765,18 +782,18 @@ export class OllamaView extends ItemView {
         } else {
           console.error("Worker is not initialized");
         }
-  
+
         this.speechWorker.onmessage = (event) => {
           const transcript = event.data;
           console.log("Received transcript from worker:", transcript);
           this.inputEl.value = transcript;
         };
-  
+
         this.speechWorker.onerror = (error) => {
           console.error("Worker error:", error);
         };
       };
-  
+
       mediaRecorder.start();
       console.log("Recording started");
       setTimeout(() => {
@@ -787,9 +804,9 @@ export class OllamaView extends ItemView {
       console.error("Error accessing microphone:", error);
     }
   }
-  
-  
-  
-    
+
+
+
+
 
 }
