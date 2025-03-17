@@ -45,7 +45,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     _OllamaView.instance = this;
     try {
-      this.speechWorker = new Worker(new URL("./speechWorker.js", document.baseURI));
+      const workerUrl = new URL("./speechWorker.js", document.baseURI);
+      console.log("Worker URL:", workerUrl.href);
+      this.speechWorker = new Worker(workerUrl);
       console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
