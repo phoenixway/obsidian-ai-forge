@@ -4,7 +4,7 @@ import OllamaPlugin from "./main";
 
 // import fetch from 'node-fetch';
 // import * as fs from 'fs/promises';
-import * as faiss from 'faiss-node';
+// import * as faiss from 'faiss-node';
 import { marked } from 'marked'; // Виправлений імпорт
 import pdf from 'pdf-parse'; // Декларації типів повинні бути додані
 
@@ -56,7 +56,8 @@ export class OllamaView extends ItemView {
   private historyLoaded: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
   static instance: OllamaView | null = null;
-  private embeddings: number[][] = [];
+  // private embeddings: number[][] = [];
+  private speechWorker: Worker;
 
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
@@ -67,70 +68,72 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
+    this.speechWorker = new Worker(new URL('./speechWorker.js', import.meta.url));
+
   }
 
-  private index: faiss.IndexFlatL2 | undefined;
-  private documents: string[] = [];
+  // private index: faiss.IndexFlatL2 | undefined;
+  // private documents: string[] = [];
 
 
-  private async readFileContent(filePath: string): Promise<string> {
-    // Отримуємо файл з Obsidian vault
-    const file = this.app?.vault.getAbstractFileByPath(filePath);
+  // private async readFileContent(filePath: string): Promise<string> {
+  //   // Отримуємо файл з Obsidian vault
+  //   const file = this.app?.vault.getAbstractFileByPath(filePath);
 
-    if (!file || !(file instanceof TFile)) {
-      throw new Error(`File not found: ${filePath}`);
-    }
+  //   if (!file || !(file instanceof TFile)) {
+  //     throw new Error(`File not found: ${filePath}`);
+  //   }
 
-    if (filePath.endsWith('.md')) {
-      return this.readMdFile(file);
-    } else if (filePath.endsWith('.pdf')) {
-      throw new Error("PDF reading not supported in browser environment");
-      // PDF обробка потребує іншого підходу
-    } else {
-      return this.app.vault.read(file);
-    }
-  }
-  private async readMdFile(file: TFile): Promise<string> {
-    const mdContent = await this.app.vault.read(file);
-    const textContent = await marked.parse(mdContent);
-    return textContent.replace(/<[^>]*>?/gm, '');
-  }
+  //   if (filePath.endsWith('.md')) {
+  //     return this.readMdFile(file);
+  //   } else if (filePath.endsWith('.pdf')) {
+  //     throw new Error("PDF reading not supported in browser environment");
+  //     // PDF обробка потребує іншого підходу
+  //   } else {
+  //     return this.app.vault.read(file);
+  //   }
+  // }
+  // private async readMdFile(file: TFile): Promise<string> {
+  //   const mdContent = await this.app.vault.read(file);
+  //   const textContent = await marked.parse(mdContent);
+  //   return textContent.replace(/<[^>]*>?/gm, '');
+  // }
 
-  private async readPdfFile(file: TFile): Promise<string> {
-    throw new Error("PDF reading not supported in browser environment");
-    // Тут потрібно буде реалізувати інший підхід для читання PDF
-  }
+  // private async readPdfFile(file: TFile): Promise<string> {
+  //   throw new Error("PDF reading not supported in browser environment");
+  //   // Тут потрібно буде реалізувати інший підхід для читання PDF
+  // }
 
 
 
-  private findTopK(array: number[], k: number): number[] {
-    return array
-      .map((value, index) => ({ value, index }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, k)
-      .map(item => item.index);
-  }
+  // private findTopK(array: number[], k: number): number[] {
+  //   return array
+  //     .map((value, index) => ({ value, index }))
+  //     .sort((a, b) => b.value - a.value)
+  //     .slice(0, k)
+  //     .map(item => item.index);
+  // }
 
-  private cosineSimilarity(vecA: number[], vecB: number[]): number {
-    let dotProduct = 0;
-    let normA = 0;
-    let normB = 0;
+  // private cosineSimilarity(vecA: number[], vecB: number[]): number {
+  //   let dotProduct = 0;
+  //   let normA = 0;
+  //   let normB = 0;
 
-    for (let i = 0; i < vecA.length; i++) {
-      dotProduct += vecA[i] * vecB[i];
-      normA += vecA[i] * vecA[i];
-      normB += vecB[i] * vecB[i];
-    }
+  //   for (let i = 0; i < vecA.length; i++) {
+  //     dotProduct += vecA[i] * vecB[i];
+  //     normA += vecA[i] * vecA[i];
+  //     normB += vecB[i] * vecB[i];
+  //   }
 
-    normA = Math.sqrt(normA);
-    normB = Math.sqrt(normB);
+  //   normA = Math.sqrt(normA);
+  //   normB = Math.sqrt(normB);
 
-    if (normA === 0 || normB === 0) {
-      return 0;
-    }
+  //   if (normA === 0 || normB === 0) {
+  //     return 0;
+  //   }
 
-    return dotProduct / (normA * normB);
-  }
+  //   return dotProduct / (normA * normB);
+  // }
 
   getViewType(): string {
     return VIEW_TYPE_OLLAMA;
@@ -160,7 +163,10 @@ export class OllamaView extends ItemView {
         placeholder: "Type a message...",
       },
     });
-    // Create send button (moved before settings button)
+    const voiceButton = inputContainer.createEl("button", {
+      cls: "voice-button",
+    });
+    setIcon(voiceButton, "microphone");
     const sendButton = inputContainer.createEl("button", {
       cls: "send-button",
     });
@@ -191,7 +197,9 @@ export class OllamaView extends ItemView {
       this.sendMessage();
     });
 
-    // this.addStyles();
+    voiceButton.addEventListener("click", () => {
+      this.startVoiceRecognition();
+    });
     // Load message history
     await this.loadMessageHistory();
   }
@@ -733,6 +741,35 @@ export class OllamaView extends ItemView {
     this.messages = [];
     this.chatContainer.empty();
     this.historyLoaded = false;
+  }
+
+  async startVoiceRecognition(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      const audioChunks: Blob[] = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        audioChunks.push(event.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+        this.speechWorker.postMessage({ apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', audioBlob });
+
+        this.speechWorker.onmessage = (event) => {
+          const transcript = event.data;
+          this.inputEl.value = transcript;
+        };
+      };
+
+      mediaRecorder.start();
+      setTimeout(() => {
+        mediaRecorder.stop();
+      }, 5000); // Stop recording after 5 seconds
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+    }
   }
 
 }
