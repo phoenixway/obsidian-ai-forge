@@ -14,13 +14,14 @@
 	"devDependencies": {
 		"@types/node": "^16.11.6",
 		"@types/pdf-parse": "^1.1.4",
-		"@typescript-eslint/eslint-plugin": "5.29.0",
-		"@typescript-eslint/parser": "5.29.0",
+		"@typescript-eslint/eslint-plugin": "^8.26.1",
+		"@typescript-eslint/parser": "^8.26.1",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
+		"eslint": "^9.22.0",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"typescript": "^5.8.2"
 	},
 	"dependencies": {
 		"faiss-node": "^0.5.1",
