@@ -31,6 +31,7 @@ var import_obsidian3 = require("obsidian");
 
 // ollamaView.ts
 var import_obsidian = require("obsidian");
+var import_meta = {};
 var VIEW_TYPE_OLLAMA = "ollama-chat-view";
 var _OllamaView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
@@ -45,7 +46,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     _OllamaView.instance = this;
     try {
-      const workerUrl = new URL("./speechWorker.js", document.baseURI);
+      const workerUrl = new URL("./speechWorker.js", import_meta.url);
       console.log("Worker URL:", workerUrl.href);
       this.speechWorker = new Worker(workerUrl);
       console.log("Worker initialized successfully:", this.speechWorker);

@@ -69,7 +69,7 @@ export class OllamaView extends ItemView {
     }
     OllamaView.instance = this;
     try {
-      const workerUrl = new URL('./speechWorker.js', document.baseURI);
+      const workerUrl = new URL('./speechWorker.js', import.meta.url);
       console.log("Worker URL:", workerUrl.href);
       this.speechWorker = new Worker(workerUrl);
       console.log("Worker initialized successfully:", this.speechWorker);
