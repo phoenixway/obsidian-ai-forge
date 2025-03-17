@@ -69,6 +69,8 @@ export class OllamaView extends ItemView {
   static instance: OllamaView | null = null;
   // private embeddings: number[][] = [];
   private speechWorker: Worker;
+  private mediaRecorder: MediaRecorder | null = null; // Додана нова змінна
+
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -78,14 +80,17 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
-
+    
+    // Додати змінну для зберігання посилання на mediaRecorder
+    this.mediaRecorder = null;
+  
     try {
       // Варіант з використанням Blob API
       const workerCode = `
       onmessage = async (event) => {
           try {
             const { apiKey, audioBlob } = event.data;
-            
+            console.log("Worker received audioBlob:", audioBlob);
         
             const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
             
@@ -97,7 +102,7 @@ export class OllamaView extends ItemView {
               )
             );
             
-            
+            console.log("Audio converted to Base64");
         
             const response = await fetch(url, {
               method: 'POST',
@@ -123,7 +128,7 @@ export class OllamaView extends ItemView {
             }
         
             const data = await response.json();
-            
+            console.log("Speech recognition data:", data);
             
             if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
               postMessage(data.results[0].alternatives[0].transcript);
@@ -140,23 +145,46 @@ export class OllamaView extends ItemView {
         console.error('Worker error:', event);
       };
       `;
-
-      const workerBlob = new Blob([workerCode], {
-        type: "application/javascript",
-      });
+  
+      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
+      console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
-
-    // Add event listeners to the worker
+  
+    // Оновлений обробник повідомлень від воркера
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
-
-      this.inputEl.value = transcript;
+      console.log("Received transcript from worker:", transcript);
+      
+      // Вставляємо текст у позицію курсора
+      const cursorPosition = this.inputEl.selectionStart || 0;
+      const currentValue = this.inputEl.value;
+      
+      // Додаємо пробіл перед текстом, якщо курсор не на початку рядка і попередній символ не пробіл
+      let insertText = transcript;
+      if (cursorPosition > 0 && currentValue.charAt(cursorPosition - 1) !== ' ' && insertText.charAt(0) !== ' ') {
+        insertText = ' ' + insertText;
+      }
+      
+      // Створюємо новий текст, вставляючи розпізнаний текст у позицію курсора
+      const newValue = currentValue.substring(0, cursorPosition) + 
+                       insertText + 
+                       currentValue.substring(cursorPosition);
+      
+      // Оновлюємо значення поля вводу
+      this.inputEl.value = newValue;
+      
+      // Переміщуємо курсор після вставленого тексту
+      const newCursorPosition = cursorPosition + insertText.length;
+      this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
+      
+      // Фокусуємось на полі вводу
+      this.inputEl.focus();
     };
-
+  
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
@@ -863,14 +891,24 @@ export class OllamaView extends ItemView {
     this.historyLoaded = false;
   }
   async startVoiceRecognition(): Promise<void> {
+    // Знаходимо кнопку мікрофона
+    const voiceButton = this.contentEl.querySelector('.voice-button');
+    
+    // Перевіряємо, чи вже йде запис
+    if (voiceButton?.classList.contains('recording')) {
+      // Якщо вже записуємо, зупиняємо запис
+      if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+        this.mediaRecorder.stop();
+      }
+      return;
+    }
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // Використовуємо підтримуваний формат без специфікації кодеку
       const mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder = mediaRecorder; // Зберігаємо посилання на mediaRecorder
       const audioChunks: Blob[] = [];
-      
-      // Знаходимо кнопку мікрофона
-      const voiceButton = this.contentEl.querySelector('.voice-button');
       
       // Додаємо клас recording для зміни стилю на синій
       voiceButton?.classList.add('recording');
@@ -887,6 +925,11 @@ export class OllamaView extends ItemView {
         
         // Видаляємо клас recording, коли запис зупинено
         voiceButton?.classList.remove('recording');
+        
+        // Зупиняємо всі треки потоку
+        stream.getTracks().forEach(track => track.stop());
+        
+        this.inputEl.placeholder = "Type a message...";
         
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
@@ -911,15 +954,15 @@ export class OllamaView extends ItemView {
       this.inputEl.placeholder = "Запис...";
       
       setTimeout(() => {
-        mediaRecorder.stop();
-        this.inputEl.placeholder = "Type a message...";
-        console.log("Recording stopped after timeout");
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+          console.log("Recording stopped after timeout");
+        }
       }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
       
       // Прибираємо клас recording у разі помилки
-      const voiceButton = this.contentEl.querySelector('.voice-button');
       voiceButton?.classList.remove('recording');
     }
   }

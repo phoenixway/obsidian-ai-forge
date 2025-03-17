@@ -33,23 +33,26 @@ var import_obsidian3 = require("obsidian");
 var import_obsidian = require("obsidian");
 var VIEW_TYPE_OLLAMA = "ollama-chat-view";
 var _OllamaView = class extends import_obsidian.ItemView {
+  // Додана нова змінна
   constructor(leaf, plugin) {
     super(leaf);
     this.messages = [];
     this.isProcessing = false;
     this.historyLoaded = false;
     this.scrollTimeout = null;
+    this.mediaRecorder = null;
     this.plugin = plugin;
     if (_OllamaView.instance) {
       return _OllamaView.instance;
     }
     _OllamaView.instance = this;
+    this.mediaRecorder = null;
     try {
       const workerCode = `
       onmessage = async (event) => {
           try {
             const { apiKey, audioBlob } = event.data;
-            
+            console.log("Worker received audioBlob:", audioBlob);
         
             const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
             
@@ -61,7 +64,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
               )
             );
             
-            
+            console.log("Audio converted to Base64");
         
             const response = await fetch(url, {
               method: 'POST',
@@ -87,7 +90,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
             }
         
             const data = await response.json();
-            
+            console.log("Speech recognition data:", data);
             
             if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
               postMessage(data.results[0].alternatives[0].transcript);
@@ -104,17 +107,27 @@ var _OllamaView = class extends import_obsidian.ItemView {
         console.error('Worker error:', event);
       };
       `;
-      const workerBlob = new Blob([workerCode], {
-        type: "application/javascript"
-      });
+      const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
+      console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
-      this.inputEl.value = transcript;
+      console.log("Received transcript from worker:", transcript);
+      const cursorPosition = this.inputEl.selectionStart || 0;
+      const currentValue = this.inputEl.value;
+      let insertText = transcript;
+      if (cursorPosition > 0 && currentValue.charAt(cursorPosition - 1) !== " " && insertText.charAt(0) !== " ") {
+        insertText = " " + insertText;
+      }
+      const newValue = currentValue.substring(0, cursorPosition) + insertText + currentValue.substring(cursorPosition);
+      this.inputEl.value = newValue;
+      const newCursorPosition = cursorPosition + insertText.length;
+      this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
+      this.inputEl.focus();
     };
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
@@ -590,11 +603,18 @@ Please respond to the user's query based on the provided context. If the context
     this.historyLoaded = false;
   }
   async startVoiceRecognition() {
+    const voiceButton = this.contentEl.querySelector(".voice-button");
+    if (voiceButton == null ? void 0 : voiceButton.classList.contains("recording")) {
+      if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+        this.mediaRecorder.stop();
+      }
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder = mediaRecorder;
       const audioChunks = [];
-      const voiceButton = this.contentEl.querySelector(".voice-button");
       voiceButton == null ? void 0 : voiceButton.classList.add("recording");
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -605,6 +625,8 @@ Please respond to the user's query based on the provided context. If the context
       mediaRecorder.onstop = () => {
         console.log("Recording stopped, chunks:", audioChunks.length);
         voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
+        stream.getTracks().forEach((track) => track.stop());
+        this.inputEl.placeholder = "Type a message...";
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
           console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
@@ -622,13 +644,13 @@ Please respond to the user's query based on the provided context. If the context
       console.log("Recording started with mime type:", mediaRecorder.mimeType);
       this.inputEl.placeholder = "\u0417\u0430\u043F\u0438\u0441...";
       setTimeout(() => {
-        mediaRecorder.stop();
-        this.inputEl.placeholder = "Type a message...";
-        console.log("Recording stopped after timeout");
+        if (mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+          console.log("Recording stopped after timeout");
+        }
       }, 5e3);
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      const voiceButton = this.contentEl.querySelector(".voice-button");
       voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
     }
   }
