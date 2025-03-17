@@ -337,16 +337,10 @@ var _OllamaView = class extends import_obsidian.ItemView {
       cls: "message-content"
     });
     if (message.role === "assistant") {
-      // console.log("Message content before rendering:", message.content);
-      // console.log("Contains thinking tags:", message.content.includes("<think>"));
-      // console.log("Rendering message, content:", message.content);
-      // const tagDetection = this.detectThinkingTags(message.content);
-      // console.log("Thinking tag detection in renderMessage:", tagDetection);
       const decodedContent = this.decodeHtmlEntities(message.content);
       const hasThinkingTags = message.content.includes("<think>") || decodedContent.includes("<think>");
       if (hasThinkingTags) {
         const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ? decodedContent : message.content;
-        // console.log("Processing content with thinking tags:", contentToProcess);
         const processedContent = this.processThinkingTags(contentToProcess);
         contentEl.innerHTML = processedContent;
         this.addThinkingToggleListeners(contentEl);
@@ -504,6 +498,7 @@ Please respond to the user's query based on the provided context. If the context
   }
   async startVoiceRecognition() {
     try {
+      console.log("this.startVoiceRecognition");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks = [];
