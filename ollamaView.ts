@@ -86,66 +86,87 @@ export class OllamaView extends ItemView {
   
     try {
       // Варіант з використанням Blob API
-      const workerCode = `
-      onmessage = async (event) => {
-          try {
-            const { apiKey, audioBlob } = event.data;
-            console.log("Worker received audioBlob:", audioBlob);
-        
-            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
-            
-            // Конвертуємо Blob у Base64
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            const base64Audio = btoa(
-              new Uint8Array(arrayBuffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte), ''
-              )
-            );
-            
-            console.log("Audio converted to Base64");
-        
-            const response = await fetch(url, {
-              method: 'POST',
-              body: JSON.stringify({
-                config: {
-                  encoding: 'WEBM_OPUS', // Змінено з LINEAR16 на відповідний формат запису
-                  sampleRateHertz: 48000, // Стандартна частота для багатьох пристроїв
-                  languageCode: 'uk-UA', // Змінено на українську мову, можете вказати потрібну
-                },
-                audio: {
-                  content: base64Audio
-                },
-              }),
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-        
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error("API error details:", errorData);
-              throw new Error("HTTP error! status: " + response.status);
-            }
-        
-            const data = await response.json();
-            console.log("Speech recognition data:", data);
-            
-            if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
-              postMessage(data.results[0].alternatives[0].transcript);
-            } else {
-              postMessage('No speech detected');
-            }
-          } catch (error) {
-            console.error('Error in speech recognition:', error);
-            postMessage('Error processing speech recognition');
-          }
-      };
-        
-      onerror = (event) => {
-        console.error('Worker error:', event);
-      };
-      `;
+// Оновлений код воркера для speechWorker
+const workerCode = `
+onmessage = async (event) => {
+    try {
+      const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+      console.log("Worker received audioBlob:", audioBlob);
+      
+      // Перевіряємо наявність API ключа
+      if (!apiKey || apiKey.trim() === '') {
+        postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
+        return;
+      }
+
+      const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+      
+      // Конвертуємо Blob у Base64
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const base64Audio = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte), ''
+        )
+      );
+      
+      console.log("Audio converted to Base64");
   
+      const response = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({
+          config: {
+            encoding: 'WEBM_OPUS',
+            sampleRateHertz: 48000,
+            languageCode: languageCode, // Використовуємо параметр мови
+            model: 'latest_long', // Використовуємо модель для довгих записів
+            enableAutomaticPunctuation: true, // Додаємо автоматичну пунктуацію
+          },
+          audio: {
+            content: base64Audio
+          },
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API error details:", errorData);
+        postMessage({ 
+          error: true, 
+          message: "Error from Google Speech API: " + (errorData.error?.message || response.status)
+        });
+        return;
+      }
+  
+      const data = await response.json();
+      console.log("Speech recognition data:", data);
+      
+      if (data.results && data.results.length > 0) {
+        // Об'єднуємо всі розпізнані фрагменти тексту
+        const transcript = data.results
+          .map(result => result.alternatives[0].transcript)
+          .join(' ')
+          .trim();
+        
+        postMessage(transcript);
+      } else {
+        postMessage({ error: true, message: 'No speech detected' });
+      }
+    } catch (error) {
+      console.error('Error in speech recognition:', error);
+      postMessage({ 
+        error: true, 
+        message: 'Error processing speech recognition: ' + error.message 
+      });
+    }
+};
+  
+onerror = (event) => {
+  console.error('Worker error:', event);
+};
+`;  
       const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
@@ -189,66 +210,6 @@ export class OllamaView extends ItemView {
       console.error("Worker error:", error);
     };
   }
-
-  // private index: faiss.IndexFlatL2 | undefined;
-  // private documents: string[] = [];
-
-  // private async readFileContent(filePath: string): Promise<string> {
-  //   // Отримуємо файл з Obsidian vault
-  //   const file = this.app?.vault.getAbstractFileByPath(filePath);
-
-  //   if (!file || !(file instanceof TFile)) {
-  //     throw new Error(`File not found: ${filePath}`);
-  //   }
-
-  //   if (filePath.endsWith('.md')) {
-  //     return this.readMdFile(file);
-  //   } else if (filePath.endsWith('.pdf')) {
-  //     throw new Error("PDF reading not supported in browser environment");
-  //     // PDF обробка потребує іншого підходу
-  //   } else {
-  //     return this.app.vault.read(file);
-  //   }
-  // }
-  // private async readMdFile(file: TFile): Promise<string> {
-  //   const mdContent = await this.app.vault.read(file);
-  //   const textContent = await marked.parse(mdContent);
-  //   return textContent.replace(/<[^>]*>?/gm, '');
-  // }
-
-  // private async readPdfFile(file: TFile): Promise<string> {
-  //   throw new Error("PDF reading not supported in browser environment");
-  //   // Тут потрібно буде реалізувати інший підхід для читання PDF
-  // }
-
-  // private findTopK(array: number[], k: number): number[] {
-  //   return array
-  //     .map((value, index) => ({ value, index }))
-  //     .sort((a, b) => b.value - a.value)
-  //     .slice(0, k)
-  //     .map(item => item.index);
-  // }
-
-  // private cosineSimilarity(vecA: number[], vecB: number[]): number {
-  //   let dotProduct = 0;
-  //   let normA = 0;
-  //   let normB = 0;
-
-  //   for (let i = 0; i < vecA.length; i++) {
-  //     dotProduct += vecA[i] * vecB[i];
-  //     normA += vecA[i] * vecA[i];
-  //     normB += vecB[i] * vecB[i];
-  //   }
-
-  //   normA = Math.sqrt(normA);
-  //   normB = Math.sqrt(normB);
-
-  //   if (normA === 0 || normB === 0) {
-  //     return 0;
-  //   }
-
-  //   return dotProduct / (normA * normB);
-  // }
 
   getViewType(): string {
     return VIEW_TYPE_OLLAMA;
@@ -890,6 +851,7 @@ export class OllamaView extends ItemView {
     this.chatContainer.empty();
     this.historyLoaded = false;
   }
+
   async startVoiceRecognition(): Promise<void> {
     // Знаходимо кнопку мікрофона
     const voiceButton = this.contentEl.querySelector('.voice-button');
@@ -937,7 +899,7 @@ export class OllamaView extends ItemView {
           
           if (this.speechWorker) {
             this.speechWorker.postMessage({ 
-              apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', 
+              apiKey: this.plugin.settings.googleApiKey, 
               audioBlob 
             });
           }
@@ -951,7 +913,7 @@ export class OllamaView extends ItemView {
       console.log("Recording started with mime type:", mediaRecorder.mimeType);
       
       // Додайте візуальну індикацію запису
-      this.inputEl.placeholder = "Запис...";
+      this.inputEl.placeholder = "Record...";
       
       setTimeout(() => {
         if (mediaRecorder.state === 'recording') {

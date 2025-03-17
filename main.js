@@ -49,64 +49,85 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.mediaRecorder = null;
     try {
       const workerCode = `
-      onmessage = async (event) => {
-          try {
-            const { apiKey, audioBlob } = event.data;
-            console.log("Worker received audioBlob:", audioBlob);
+onmessage = async (event) => {
+    try {
+      const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+      console.log("Worker received audioBlob:", audioBlob);
+      
+      // \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E \u043D\u0430\u044F\u0432\u043D\u0456\u0441\u0442\u044C API \u043A\u043B\u044E\u0447\u0430
+      if (!apiKey || apiKey.trim() === '') {
+        postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
+        return;
+      }
+
+      const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+      
+      // \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0443\u0454\u043C\u043E Blob \u0443 Base64
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const base64Audio = btoa(
+        new Uint8Array(arrayBuffer).reduce(
+          (data, byte) => data + String.fromCharCode(byte), ''
+        )
+      );
+      
+      console.log("Audio converted to Base64");
+  
+      const response = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify({
+          config: {
+            encoding: 'WEBM_OPUS',
+            sampleRateHertz: 48000,
+            languageCode: languageCode, // \u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u043C\u043E\u0432\u0438
+            model: 'latest_long', // \u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E \u043C\u043E\u0434\u0435\u043B\u044C \u0434\u043B\u044F \u0434\u043E\u0432\u0433\u0438\u0445 \u0437\u0430\u043F\u0438\u0441\u0456\u0432
+            enableAutomaticPunctuation: true, // \u0414\u043E\u0434\u0430\u0454\u043C\u043E \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0443 \u043F\u0443\u043D\u043A\u0442\u0443\u0430\u0446\u0456\u044E
+          },
+          audio: {
+            content: base64Audio
+          },
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API error details:", errorData);
+        postMessage({ 
+          error: true, 
+          message: "Error from Google Speech API: " + (errorData.error?.message || response.status)
+        });
+        return;
+      }
+  
+      const data = await response.json();
+      console.log("Speech recognition data:", data);
+      
+      if (data.results && data.results.length > 0) {
+        // \u041E\u0431'\u0454\u0434\u043D\u0443\u0454\u043C\u043E \u0432\u0441\u0456 \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u043D\u0456 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u0438 \u0442\u0435\u043A\u0441\u0442\u0443
+        const transcript = data.results
+          .map(result => result.alternatives[0].transcript)
+          .join(' ')
+          .trim();
         
-            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
-            
-            // \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0443\u0454\u043C\u043E Blob \u0443 Base64
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            const base64Audio = btoa(
-              new Uint8Array(arrayBuffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte), ''
-              )
-            );
-            
-            console.log("Audio converted to Base64");
-        
-            const response = await fetch(url, {
-              method: 'POST',
-              body: JSON.stringify({
-                config: {
-                  encoding: 'WEBM_OPUS', // \u0417\u043C\u0456\u043D\u0435\u043D\u043E \u0437 LINEAR16 \u043D\u0430 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u043D\u0438\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u0437\u0430\u043F\u0438\u0441\u0443
-                  sampleRateHertz: 48000, // \u0421\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0430 \u0447\u0430\u0441\u0442\u043E\u0442\u0430 \u0434\u043B\u044F \u0431\u0430\u0433\u0430\u0442\u044C\u043E\u0445 \u043F\u0440\u0438\u0441\u0442\u0440\u043E\u0457\u0432
-                  languageCode: 'uk-UA', // \u0417\u043C\u0456\u043D\u0435\u043D\u043E \u043D\u0430 \u0443\u043A\u0440\u0430\u0457\u043D\u0441\u044C\u043A\u0443 \u043C\u043E\u0432\u0443, \u043C\u043E\u0436\u0435\u0442\u0435 \u0432\u043A\u0430\u0437\u0430\u0442\u0438 \u043F\u043E\u0442\u0440\u0456\u0431\u043D\u0443
-                },
-                audio: {
-                  content: base64Audio
-                },
-              }),
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-        
-            if (!response.ok) {
-              const errorData = await response.json();
-              console.error("API error details:", errorData);
-              throw new Error("HTTP error! status: " + response.status);
-            }
-        
-            const data = await response.json();
-            console.log("Speech recognition data:", data);
-            
-            if (data.results && data.results[0] && data.results[0].alternatives && data.results[0].alternatives[0]) {
-              postMessage(data.results[0].alternatives[0].transcript);
-            } else {
-              postMessage('No speech detected');
-            }
-          } catch (error) {
-            console.error('Error in speech recognition:', error);
-            postMessage('Error processing speech recognition');
-          }
-      };
-        
-      onerror = (event) => {
-        console.error('Worker error:', event);
-      };
-      `;
+        postMessage(transcript);
+      } else {
+        postMessage({ error: true, message: 'No speech detected' });
+      }
+    } catch (error) {
+      console.error('Error in speech recognition:', error);
+      postMessage({ 
+        error: true, 
+        message: 'Error processing speech recognition: ' + error.message 
+      });
+    }
+};
+  
+onerror = (event) => {
+  console.error('Worker error:', event);
+};
+`;
       const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
@@ -133,55 +154,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
       console.error("Worker error:", error);
     };
   }
-  // private index: faiss.IndexFlatL2 | undefined;
-  // private documents: string[] = [];
-  // private async readFileContent(filePath: string): Promise<string> {
-  //   // Отримуємо файл з Obsidian vault
-  //   const file = this.app?.vault.getAbstractFileByPath(filePath);
-  //   if (!file || !(file instanceof TFile)) {
-  //     throw new Error(`File not found: ${filePath}`);
-  //   }
-  //   if (filePath.endsWith('.md')) {
-  //     return this.readMdFile(file);
-  //   } else if (filePath.endsWith('.pdf')) {
-  //     throw new Error("PDF reading not supported in browser environment");
-  //     // PDF обробка потребує іншого підходу
-  //   } else {
-  //     return this.app.vault.read(file);
-  //   }
-  // }
-  // private async readMdFile(file: TFile): Promise<string> {
-  //   const mdContent = await this.app.vault.read(file);
-  //   const textContent = await marked.parse(mdContent);
-  //   return textContent.replace(/<[^>]*>?/gm, '');
-  // }
-  // private async readPdfFile(file: TFile): Promise<string> {
-  //   throw new Error("PDF reading not supported in browser environment");
-  //   // Тут потрібно буде реалізувати інший підхід для читання PDF
-  // }
-  // private findTopK(array: number[], k: number): number[] {
-  //   return array
-  //     .map((value, index) => ({ value, index }))
-  //     .sort((a, b) => b.value - a.value)
-  //     .slice(0, k)
-  //     .map(item => item.index);
-  // }
-  // private cosineSimilarity(vecA: number[], vecB: number[]): number {
-  //   let dotProduct = 0;
-  //   let normA = 0;
-  //   let normB = 0;
-  //   for (let i = 0; i < vecA.length; i++) {
-  //     dotProduct += vecA[i] * vecB[i];
-  //     normA += vecA[i] * vecA[i];
-  //     normB += vecB[i] * vecB[i];
-  //   }
-  //   normA = Math.sqrt(normA);
-  //   normB = Math.sqrt(normB);
-  //   if (normA === 0 || normB === 0) {
-  //     return 0;
-  //   }
-  //   return dotProduct / (normA * normB);
-  // }
   getViewType() {
     return VIEW_TYPE_OLLAMA;
   }
@@ -632,7 +604,7 @@ Please respond to the user's query based on the provided context. If the context
           console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
           if (this.speechWorker) {
             this.speechWorker.postMessage({
-              apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4",
+              apiKey: this.plugin.settings.googleApiKey,
               audioBlob
             });
           }
@@ -642,7 +614,7 @@ Please respond to the user's query based on the provided context. If the context
       };
       mediaRecorder.start(100);
       console.log("Recording started with mime type:", mediaRecorder.mimeType);
-      this.inputEl.placeholder = "\u0417\u0430\u043F\u0438\u0441...";
+      this.inputEl.placeholder = "Record...";
       setTimeout(() => {
         if (mediaRecorder.state === "recording") {
           mediaRecorder.stop();
@@ -664,11 +636,14 @@ var DEFAULT_SETTINGS = {
   modelName: "mistral",
   ollamaServerUrl: "http://localhost:11434",
   logFileSizeLimit: 1024,
-  // Default 1MB (1024 KB)
   saveMessageHistory: true,
   ragEnabled: false,
   ragFolderPath: "data",
-  contextWindowSize: 5
+  contextWindowSize: 5,
+  googleApiKey: "",
+  speechLanguage: "uk-UA",
+  maxRecordingTime: 15,
+  silenceDetection: true
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
@@ -684,35 +659,50 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   async display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc("IP address and port where Ollama is running (e.g. http://192.168.1.10:11434)").addText((text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
-      this.plugin.settings.ollamaServerUrl = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian2.Setting(containerEl).setName("Server Connection").setDesc("Reconnect to local model server and refresh available models").addButton((button) => button.setButtonText("Reconnect").setIcon("refresh-cw").onClick(async () => {
-      try {
-        new import_obsidian2.Notice("Connecting to Ollama server...");
-        const response = await fetch(`${this.plugin.settings.ollamaServerUrl}/api/tags`, {
-          method: "GET",
-          headers: { "Content-Type": "application/json" }
-        });
-        if (response.ok) {
-          new import_obsidian2.Notice("Successfully connected to Ollama server!");
-          containerEl.empty();
-          this.display();
-        } else {
-          new import_obsidian2.Notice("Failed to connect to Ollama server. Check the URL and ensure the server is running.");
+    new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc(
+      "IP address and port where Ollama is running (e.g. http://192.168.1.10:11434)"
+    ).addText(
+      (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
+        this.plugin.settings.ollamaServerUrl = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Server Connection").setDesc("Reconnect to local model server and refresh available models").addButton(
+      (button) => button.setButtonText("Reconnect").setIcon("refresh-cw").onClick(async () => {
+        try {
+          new import_obsidian2.Notice("Connecting to Ollama server...");
+          const response = await fetch(
+            `${this.plugin.settings.ollamaServerUrl}/api/tags`,
+            {
+              method: "GET",
+              headers: { "Content-Type": "application/json" }
+            }
+          );
+          if (response.ok) {
+            new import_obsidian2.Notice("Successfully connected to Ollama server!");
+            containerEl.empty();
+            this.display();
+          } else {
+            new import_obsidian2.Notice(
+              "Failed to connect to Ollama server. Check the URL and ensure the server is running."
+            );
+          }
+        } catch (error) {
+          new import_obsidian2.Notice(
+            "Connection error. Please check the server URL and your network connection."
+          );
         }
-      } catch (error) {
-        new import_obsidian2.Notice("Connection error. Please check the server URL and your network connection.");
-      }
-    }));
+      })
+    );
     let availableModels = [];
     try {
       availableModels = await this.plugin.apiService.getModels();
     } catch (error) {
       console.error("Error fetching available models:", error);
     }
-    const selectedModel = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : availableModels.length > 0 ? availableModels[0] : "";
+    const selectedModel = availableModels.includes(
+      this.plugin.settings.modelName
+    ) ? this.plugin.settings.modelName : availableModels.length > 0 ? availableModels[0] : "";
     const modelSetting = new import_obsidian2.Setting(containerEl).setName("Model Name").setDesc("Select the language model to use");
     const dropdown = modelSetting.addDropdown((dropdown2) => {
       const selectEl = dropdown2.selectEl;
@@ -731,34 +721,74 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat message history between sessions").addToggle((toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
-      this.plugin.settings.saveMessageHistory = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian2.Setting(containerEl).setName("Log File Size Limit").setDesc("Maximum size of message history log file in KB (1024 KB = 1 MB)").addSlider((slider) => slider.setLimits(256, 10240, 256).setValue(this.plugin.settings.logFileSizeLimit).setDynamicTooltip().onChange(async (value) => {
-      this.plugin.settings.logFileSizeLimit = value;
-      await this.plugin.saveSettings();
-    })).addExtraButton((button) => button.setIcon("reset").setTooltip("Reset to default (1024 KB)").onClick(async () => {
-      this.plugin.settings.logFileSizeLimit = DEFAULT_SETTINGS.logFileSizeLimit;
-      await this.plugin.saveSettings();
-      this.display();
-    }));
-    new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton((button) => button.setButtonText("Clear").onClick(async () => {
-      await this.plugin.clearMessageHistory();
-      new import_obsidian2.Notice("Chat history cleared.");
-    }));
-    new import_obsidian2.Setting(containerEl).setName("Enable RAG").setDesc("Use Retrieval Augmented Generation with your notes").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
-      this.plugin.settings.ragEnabled = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian2.Setting(containerEl).setName("RAG Folder Path").setDesc("Path to the folder containing notes for RAG (relative to vault root)").addText((text) => text.setPlaceholder("data").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
-      this.plugin.settings.ragFolderPath = value;
-      await this.plugin.saveSettings();
-    }));
-    new import_obsidian2.Setting(containerEl).setName("Context Window Size").setDesc("Number of relevant documents to include in context").addSlider((slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.contextWindowSize).setDynamicTooltip().onChange(async (value) => {
-      this.plugin.settings.contextWindowSize = value;
-      await this.plugin.saveSettings();
-    }));
+    new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat message history between sessions").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
+        this.plugin.settings.saveMessageHistory = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Log File Size Limit").setDesc(
+      "Maximum size of message history log file in KB (1024 KB = 1 MB)"
+    ).addSlider(
+      (slider) => slider.setLimits(256, 10240, 256).setValue(this.plugin.settings.logFileSizeLimit).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.logFileSizeLimit = value;
+        await this.plugin.saveSettings();
+      })
+    ).addExtraButton(
+      (button) => button.setIcon("reset").setTooltip("Reset to default (1024 KB)").onClick(async () => {
+        this.plugin.settings.logFileSizeLimit = DEFAULT_SETTINGS.logFileSizeLimit;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton(
+      (button) => button.setButtonText("Clear").onClick(async () => {
+        await this.plugin.clearMessageHistory();
+        new import_obsidian2.Notice("Chat history cleared.");
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Enable RAG").setDesc("Use Retrieval Augmented Generation with your notes").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
+        this.plugin.settings.ragEnabled = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("RAG Folder Path").setDesc(
+      "Path to the folder containing notes for RAG (relative to vault root)"
+    ).addText(
+      (text) => text.setPlaceholder("data").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
+        this.plugin.settings.ragFolderPath = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Context Window Size").setDesc("Number of relevant documents to include in context").addSlider(
+      (slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.contextWindowSize).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.contextWindowSize = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API key for Google Speech-to-Text service").addText(
+      (text) => text.setPlaceholder("Enter your Google API key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+        this.plugin.settings.googleApiKey = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Speech Recognition Language").setDesc(
+      "Language code for Google Speech-to-Text (e.g., uk-UA, en-US, ru-RU)"
+    ).addText(
+      (text) => text.setPlaceholder("uk-UA").setValue(this.plugin.settings.speechLanguage).onChange(async (value) => {
+        this.plugin.settings.speechLanguage = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("Maximum Recording Time").setDesc(
+      "Maximum time (in seconds) to record before automatically stopping"
+    ).addSlider(
+      (slider) => slider.setLimits(5, 60, 5).setValue(this.plugin.settings.maxRecordingTime).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.maxRecordingTime = value;
+        await this.plugin.saveSettings();
+      })
+    );
   }
 };
 
