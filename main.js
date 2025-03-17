@@ -835,6 +835,7 @@ var RagService = class {
    * Index all markdown files in the specified folder path
    */
   async indexDocuments() {
+    var _a, _b;
     if (this.isIndexing)
       return;
     this.isIndexing = true;
@@ -842,6 +843,29 @@ var RagService = class {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
       console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from 'data' subfolder)`);
+      const allFiles = vault.getFiles();
+      console.log(`Total files in vault: ${allFiles.length}`);
+      const files = await this.getMarkdownFiles(vault, folderPath);
+      console.log(`Found ${files.length} markdown files from "${folderPath}"`);
+      console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
+      this.documents = [];
+      for (const file of files) {
+        try {
+          const content = await vault.read(file);
+          this.documents.push({
+            path: file.path,
+            content,
+            metadata: {
+              filename: file.name,
+              created: (_a = file.stat) == null ? void 0 : _a.ctime,
+              modified: (_b = file.stat) == null ? void 0 : _b.mtime
+            }
+          });
+        } catch (error) {
+          console.error(`Error reading file ${file.path}:`, error);
+        }
+      }
+      console.log(`Indexed ${this.documents.length} documents for RAG`);
     } catch (error) {
       console.error("Error indexing documents:", error);
     } finally {
