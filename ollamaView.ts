@@ -482,11 +482,11 @@ export class OllamaView extends ItemView {
     // Render markdown for assistant messages, plain text for user
     if (message.role === "assistant") {
       // Log raw message content
-      console.log("Message content before rendering:", message.content);
-      console.log("Contains thinking tags:", message.content.includes("<think>"));
-      console.log("Rendering message, content:", message.content);
-      const tagDetection = this.detectThinkingTags(message.content);
-      console.log("Thinking tag detection in renderMessage:", tagDetection);
+      // console.log("Message content before rendering:", message.content);
+      // console.log("Contains thinking tags:", message.content.includes("<think>"));
+      // console.log("Rendering message, content:", message.content);
+      // const tagDetection = this.detectThinkingTags(message.content);
+      // console.log("Thinking tag detection in renderMessage:", tagDetection);
   
       // Check for encoded thinking tags too
       const decodedContent = this.decodeHtmlEntities(message.content);
@@ -498,7 +498,7 @@ export class OllamaView extends ItemView {
         const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ?
                                 decodedContent : message.content;
   
-        console.log("Processing content with thinking tags:", contentToProcess);
+        // console.log("Processing content with thinking tags:", contentToProcess);
         const processedContent = this.processThinkingTags(contentToProcess);
         contentEl.innerHTML = processedContent;
   
@@ -631,7 +631,7 @@ export class OllamaView extends ItemView {
         // console.log("Contains literal thinking tag:", data.response.includes("<think>"));
         // console.log("Contains encoded thinking tag:", data.response.includes("&lt;think&gt;"));
         // console.log("Response type:", typeof data.response);
-        // console.log("Response length:", data.response.length);
+        // console.log("Response length:", data.response.length);S
 
         const decodedResponse = this.decodeHtmlEntities(data.response);
         // console.log("Decoded response:", decodedResponse);
