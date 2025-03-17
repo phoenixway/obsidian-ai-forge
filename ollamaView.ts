@@ -68,21 +68,22 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
-    // Ensure the worker is correctly initialized
     try {
-      this.speechWorker = new Worker(new URL('./speechWorker.js', document.baseURI));
+      const workerUrl = new URL('./speechWorker.js', document.baseURI);
+      console.log("Worker URL:", workerUrl.href);
+      this.speechWorker = new Worker(workerUrl);
       console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
-
+    
     // Add event listeners to the worker
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
       console.log("Received transcript from worker:", transcript);
       this.inputEl.value = transcript;
     };
-
+    
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
