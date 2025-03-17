@@ -44,7 +44,20 @@ var _OllamaView = class extends import_obsidian.ItemView {
       return _OllamaView.instance;
     }
     _OllamaView.instance = this;
-    this.speechWorker = new Worker(new URL("./speechWorker.js", document.baseURI));
+    try {
+      this.speechWorker = new Worker(new URL("./speechWorker.js", document.baseURI));
+      console.log("Worker initialized successfully:", this.speechWorker);
+    } catch (error) {
+      console.error("Failed to initialize worker:", error);
+    }
+    this.speechWorker.onmessage = (event) => {
+      const transcript = event.data;
+      console.log("Received transcript from worker:", transcript);
+      this.inputEl.value = transcript;
+    };
+    this.speechWorker.onerror = (error) => {
+      console.error("Worker error:", error);
+    };
   }
   // private index: faiss.IndexFlatL2 | undefined;
   // private documents: string[] = [];
