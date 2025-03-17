@@ -69,9 +69,13 @@ export class OllamaView extends ItemView {
     }
     OllamaView.instance = this;
     try {
-      const workerUrl = new URL('./speechWorker.js', import.meta.url);
-      console.log("Worker URL:", workerUrl.href);
-      this.speechWorker = new Worker(workerUrl);
+      const basePath = (this.app as any).vault.adapter.basePath;
+      const workerPath = `${basePath}/.obsidian/plugins/obsidian-ollama-duet/speechWorker.js`;
+console.log(workerPath);
+
+      // const workerUrl = this.plugin.app.vault.adapter.getBasePath() + '/path/to/speechWorker.js';
+this.speechWorker = new Worker(workerPath)
+      // this.speechWorker = new Worker(workerUrl);
       console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
