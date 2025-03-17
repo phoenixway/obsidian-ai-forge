@@ -752,11 +752,13 @@ export class OllamaView extends ItemView {
       const audioChunks: Blob[] = [];
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('mediaRecorder.ondataavailable');
+        
         audioChunks.push(event.data);
       };
 
       mediaRecorder.onstop = () => {
-        console.log(mediaRecorder.onstop);
+        console.log("mediaRecorder.onstop");
         
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
         this.speechWorker.postMessage({ apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', audioBlob });

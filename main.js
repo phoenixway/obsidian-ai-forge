@@ -503,10 +503,11 @@ Please respond to the user's query based on the provided context. If the context
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks = [];
       mediaRecorder.ondataavailable = (event) => {
+        console.log("mediaRecorder.ondataavailable");
         audioChunks.push(event.data);
       };
       mediaRecorder.onstop = () => {
-        console.log(mediaRecorder.onstop);
+        console.log("mediaRecorder.onstop");
         const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
         this.speechWorker.postMessage({ apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4", audioBlob });
         this.speechWorker.onmessage = (event) => {
