@@ -498,27 +498,32 @@ Please respond to the user's query based on the provided context. If the context
   }
   async startVoiceRecognition() {
     try {
-      console.log("this.startVoiceRecognition");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks = [];
       mediaRecorder.ondataavailable = (event) => {
-        console.log("mediaRecorder.ondataavailable");
+        console.log("mediaRecorder.ondataavailable", event.data);
         audioChunks.push(event.data);
       };
       mediaRecorder.onstop = () => {
         console.log("mediaRecorder.onstop");
         const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+        console.log("Sending audioBlob to worker:", audioBlob);
         this.speechWorker.postMessage({ apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4", audioBlob });
         this.speechWorker.onmessage = (event) => {
           const transcript = event.data;
+          console.log("Received transcript from worker:", transcript);
           this.inputEl.value = transcript;
-          console.log(this.speechWorker.onmessage);
+        };
+        this.speechWorker.onerror = (error) => {
+          console.error("Worker error:", error);
         };
       };
       mediaRecorder.start();
+      console.log("Recording started");
       setTimeout(() => {
         mediaRecorder.stop();
+        console.log("Recording stopped");
       }, 5e3);
     } catch (error) {
       console.error("Error accessing microphone:", error);

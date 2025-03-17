@@ -1,13 +1,11 @@
 // speechWorker.ts
 
-// Add an empty export to make this file a module
-export {};
+export {}; // Add this line to make the file a module
 
-// Define the onmessage event handler
 onmessage = async (event: MessageEvent) => {
   const { apiKey, audioBlob } = event.data;
-  console.log('onmessage');
-    
+  console.log("Worker received audioBlob:", audioBlob);
+
   const url = `https://speech.googleapis.com/v1/speech:recognize?key=${apiKey}`;
 
   try {
@@ -28,9 +26,15 @@ onmessage = async (event: MessageEvent) => {
       },
     });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
+    console.log("Speech recognition data:", data);
     postMessage(data.results[0].alternatives[0].transcript);
   } catch (error) {
     console.error('Error in speech recognition:', error);
+    postMessage('Error processing speech recognition');
   }
 };
