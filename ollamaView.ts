@@ -742,7 +742,6 @@ export class OllamaView extends ItemView {
     this.chatContainer.empty();
     this.historyLoaded = false;
   }
-
   async startVoiceRecognition(): Promise<void> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -759,7 +758,13 @@ export class OllamaView extends ItemView {
         const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
         console.log("Sending audioBlob to worker:", audioBlob);
   
-        this.speechWorker.postMessage({ apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', audioBlob });
+        // Ensure the worker is correctly initialized
+        if (this.speechWorker) {
+          this.speechWorker.postMessage({ apiKey: 'AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4', audioBlob });
+          console.log("Message posted to worker");
+        } else {
+          console.error("Worker is not initialized");
+        }
   
         this.speechWorker.onmessage = (event) => {
           const transcript = event.data;
@@ -782,6 +787,7 @@ export class OllamaView extends ItemView {
       console.error("Error accessing microphone:", error);
     }
   }
+  
     
 
 }

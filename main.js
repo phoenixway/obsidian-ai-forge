@@ -509,7 +509,12 @@ Please respond to the user's query based on the provided context. If the context
         console.log("mediaRecorder.onstop");
         const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
         console.log("Sending audioBlob to worker:", audioBlob);
-        this.speechWorker.postMessage({ apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4", audioBlob });
+        if (this.speechWorker) {
+          this.speechWorker.postMessage({ apiKey: "AIzaSyCm9wPh6ZLy-KsDzr2arMSTQ1i-yTu8nR4", audioBlob });
+          console.log("Message posted to worker");
+        } else {
+          console.error("Worker is not initialized");
+        }
         this.speechWorker.onmessage = (event) => {
           const transcript = event.data;
           console.log("Received transcript from worker:", transcript);

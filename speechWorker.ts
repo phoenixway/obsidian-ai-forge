@@ -3,6 +3,7 @@
 export {}; // Add this line to make the file a module
 
 onmessage = async (event: MessageEvent) => {
+  console.log("Worker received message:", event.data);
   const { apiKey, audioBlob } = event.data;
   console.log("Worker received audioBlob:", audioBlob);
 
