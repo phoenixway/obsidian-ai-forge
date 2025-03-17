@@ -6,7 +6,8 @@ export {};
 // Define the onmessage event handler
 onmessage = async (event: MessageEvent) => {
   const { apiKey, audioBlob } = event.data;
-
+  console.log('onmessage');
+    
   const url = `https://speech.googleapis.com/v1/speech:recognize?key=${apiKey}`;
 
   try {

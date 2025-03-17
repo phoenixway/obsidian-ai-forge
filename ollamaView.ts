@@ -631,7 +631,7 @@ export class OllamaView extends ItemView {
         // console.log("Contains literal thinking tag:", data.response.includes("<think>"));
         // console.log("Contains encoded thinking tag:", data.response.includes("&lt;think&gt;"));
         // console.log("Response type:", typeof data.response);
-        // console.log("Response length:", data.response.length);S
+        // console.log("Response length:", data.response.length);
 
         const decodedResponse = this.decodeHtmlEntities(data.response);
         // console.log("Decoded response:", decodedResponse);
@@ -745,6 +745,8 @@ export class OllamaView extends ItemView {
 
   async startVoiceRecognition(): Promise<void> {
     try {
+      console.log('this.startVoiceRecognition');
+      
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const audioChunks: Blob[] = [];
