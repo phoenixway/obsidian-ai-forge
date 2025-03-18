@@ -20,6 +20,8 @@ export interface OllamaPluginSettings {
   maxRecordingTime: number; // Maximum recording time in seconds
   silenceDetection: boolean; // Enable silence detection
   followRole: boolean;
+  systemPromptInterval: number;
+  temperature: number;
 }
 
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
@@ -35,6 +37,8 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   maxRecordingTime: 15,
   silenceDetection: true,
   followRole: true,
+  systemPromptInterval: 0,
+  temperature: 0.2,
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -305,5 +309,19 @@ export class OllamaSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("System Prompt Interval")
+      .setDesc("Кількість пар повідомлень між відправками системного повідомлення. 0 - з кожним запитом, від'ємне - ніколи не відправляти")
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.systemPromptInterval || 0))
+          .onChange(async (value) => {
+            this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
+            await this.plugin.saveSettings();
+          })
+      );
+
+
   }
 }

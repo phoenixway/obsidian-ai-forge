@@ -3,6 +3,8 @@ import { OllamaView, VIEW_TYPE_OLLAMA } from "./ollamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
 import { RagService } from "./ragService";
 import { ApiService } from "./apiServices";
+import { PromptService } from './promptService';
+
 
 // Interface for document in RAG
 interface RAGDocument {
@@ -26,6 +28,8 @@ export default class OllamaPlugin extends Plugin {
   view: OllamaView | null = null;
   ragService: RagService;
   apiService: ApiService;
+  promptService: PromptService;
+
 
   documents: RAGDocument[] = [];
   embeddings: Embedding[] = [];
@@ -35,11 +39,9 @@ export default class OllamaPlugin extends Plugin {
 
     await this.loadSettings();
 
-    // Initialize API service
     this.apiService = new ApiService(this.settings.ollamaServerUrl);
-
-    // Initialize RAG service
     this.ragService = new RagService(this);
+    this.promptService = new PromptService(this);
 
     this.registerView(VIEW_TYPE_OLLAMA, (leaf) => {
       this.view = new OllamaView(leaf, this);

@@ -26,7 +26,9 @@ export class OllamaView extends ItemView {
   static instance: OllamaView | null = null;
   // private embeddings: number[][] = [];
   private speechWorker: Worker;
-  private mediaRecorder: MediaRecorder | null = null; // Додана нова змінна
+  private mediaRecorder: MediaRecorder | null = null;
+  private systemMessageInterval: number = 0;
+  private messagesPairCount: number = 0; // Лічильник пар повідомлень
 
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
@@ -37,7 +39,9 @@ export class OllamaView extends ItemView {
       return OllamaView.instance;
     }
     OllamaView.instance = this;
-
+    if (this.plugin.apiService) {
+      this.plugin.apiService.setOllamaView(this);
+    }
     // Додати змінну для зберігання посилання на mediaRecorder
     this.mediaRecorder = null;
 
@@ -353,14 +357,23 @@ onerror = (event) => {
     this.messages.push(message);
     this.renderMessage(message);
 
+    // Збільшуємо лічильник пар, коли додаємо повідомлення асистента після повідомлення користувача
+    if (role === "assistant" && this.messages.length >= 2) {
+      // Перевіряємо, що попереднє повідомлення було від користувача
+      if (this.messages[this.messages.length - 2].role === "user") {
+        this.messagesPairCount++;
+      }
+    }
+
     // Save updated message history
     this.saveMessageHistory();
 
     // Guaranteed scroll to bottom after rendering
     setTimeout(() => {
       this.guaranteedScrollToBottom();
-    }, 100); // Adjust timeout if necessary
+    }, 100);
   }
+
   private processThinkingTags(content: string): string {
     // Early return if no thinking tags
     if (!content.includes("<think>")) {
@@ -683,13 +696,49 @@ onerror = (event) => {
         // Check if this is a new conversation
         const isNewConversation = this.messages.length <= 1;
 
-        // Use the API service to generate a response
-        // All the prompt preparation is now handled inside the API service
-        const data = await this.plugin.apiService.generateResponse(
-          this.plugin.settings.modelName,
+        // Визначаємо, чи потрібно відправляти системне повідомлення
+        const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
+        let useSystemPrompt = false;
+
+        if (systemPromptInterval === 0) {
+          // Відправляємо з кожним повідомленням
+          useSystemPrompt = true;
+        } else if (systemPromptInterval > 0) {
+          // Відправляємо кожні N пар повідомлень
+          useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
+        }
+        // Якщо systemPromptInterval < 0, то системне повідомлення не відправляється взагалі
+
+        // Підготовка повного prompt
+        const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
           content,
           isNewConversation
         );
+
+        // Створення requestBody безпосередньо в processWithOllama
+        const requestBody: {
+          model: string;
+          prompt: string;
+          stream: boolean;
+          temperature: number;
+          system?: string;
+        } = {
+          model: this.plugin.settings.modelName,
+          prompt: formattedPrompt,
+          stream: false,
+          temperature: this.plugin.settings.temperature || 0.2,
+        };
+
+        // Додаємо системне повідомлення, якщо потрібно
+        if (useSystemPrompt) {
+          const systemPrompt = this.plugin.promptService.getSystemPrompt();
+          if (systemPrompt) {
+            requestBody.system = systemPrompt;
+          }
+        }
+
+        // Використовуємо модифікований apiService.generateResponse
+        const data = await this.plugin.apiService.generateResponse(requestBody);
 
         // Remove loading message
         if (loadingMessageEl && loadingMessageEl.parentNode) {
@@ -715,6 +764,7 @@ onerror = (event) => {
       }
     }, 0);
   }
+
   private initializeThinkingBlocks(): void {
     // Find all thinking blocks and initialize them correctly
     setTimeout(() => {
@@ -794,7 +844,7 @@ onerror = (event) => {
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          console.log("Data available, size:", event.data.size);
+          // console.log("Data available, size:", event.data.size);
           audioChunks.push(event.data);
         }
       };
@@ -845,4 +895,12 @@ onerror = (event) => {
       voiceButton?.classList.remove('recording');
     }
   }
+
+  setSystemMessageInterval(interval: number): void {
+    this.systemMessageInterval = interval;
+  }
+
+
+
+
 }

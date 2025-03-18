@@ -5,6 +5,7 @@ export class ApiService {
   private baseUrl: string;
   private stateManager: StateManager;
   private promptService: PromptService;
+  private ollamaView: any = null;
 
   constructor(baseUrl: string, plugin?: any) {
     this.baseUrl = baseUrl;
@@ -19,6 +20,10 @@ export class ApiService {
    */
   getPromptService(): PromptService {
     return this.promptService;
+  }
+
+  setOllamaView(view: any): void {
+    this.ollamaView = view;
   }
 
   /**
@@ -45,16 +50,7 @@ export class ApiService {
   /**
    * Generate response from Ollama
    */
-  async generateResponse(
-    modelName: string,
-    prompt: string,
-    isNewConversation: boolean = false
-  ): Promise<OllamaResponse> {
-    // Let the prompt service prepare the full prompt with all enhancements
-    const formattedPrompt = await this.promptService.prepareFullPrompt(prompt, isNewConversation);
-
-    // Prepare the request body
-    const requestBody = this.promptService.prepareRequestBody(modelName, formattedPrompt);
+  async generateResponse(requestBody: any): Promise<OllamaResponse> {
 
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
@@ -77,7 +73,10 @@ export class ApiService {
     // Save state after processing
     this.stateManager.saveStateToStorage();
 
-    return data;
+    return {
+      model: requestBody.model,
+      response: this.promptService.processModelResponse(data.response)
+    };
   }
 
   /**
@@ -122,6 +121,9 @@ export class ApiService {
     };
     this.stateManager.updateState(initialState);
     this.stateManager.saveStateToStorage();
+    if (this.ollamaView) {
+      this.ollamaView.messagesPairCount = 0;
+    }
   }
 }
 
