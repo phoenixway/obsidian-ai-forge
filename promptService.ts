@@ -46,8 +46,9 @@ export class PromptService {
         }
 
         // Get formatted state for inclusion in the prompt
-        const stateHeader = this.stateManager.getStateFormatted();
-        return `${stateHeader}\n\n${userInput}`;
+        // const stateHeader = this.stateManager.getStateFormatted();
+        // return `${stateHeader}\n\n${userInput}`;
+        return userInput;
     }
 
     /**

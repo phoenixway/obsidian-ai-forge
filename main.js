@@ -1082,10 +1082,7 @@ var PromptService = class {
     if (isNewConversation) {
       return userInput;
     }
-    const stateHeader = this.stateManager.getStateFormatted();
-    return `${stateHeader}
-
-${userInput}`;
+    return userInput;
   }
   /**
    * Enhance prompt with RAG context if available
