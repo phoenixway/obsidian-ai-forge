@@ -680,40 +680,14 @@ onerror = (event) => {
     // Execute the request
     setTimeout(async () => {
       try {
-        // Get role definition (if available)
-        const roleDefinition = await this.plugin.getRoleDefinition();
-
-        // Set the system prompt in the API service if it exists
-        if (roleDefinition) {
-          this.plugin.apiService.setSystemPrompt(roleDefinition);
-        }
-
-        // Initialize prompt with user content
-        let prompt = content;
-
-        // Handle RAG if enabled
-        if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
-          // Make sure documents are indexed
-          if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
-            await this.plugin.ragService.indexDocuments();
-          }
-
-          // Get context based on the query
-          const ragContext = this.plugin.ragService.prepareContext(content);
-
-          // Let the prompt service enhance the prompt with context
-          if (ragContext) {
-            prompt = this.plugin.apiService.getPromptService().enhanceWithRagContext(prompt, ragContext);
-          }
-        }
-
         // Check if this is a new conversation
         const isNewConversation = this.messages.length <= 1;
 
         // Use the API service to generate a response
+        // All the prompt preparation is now handled inside the API service
         const data = await this.plugin.apiService.generateResponse(
           this.plugin.settings.modelName,
-          prompt,
+          content,
           isNewConversation
         );
 
@@ -741,7 +715,6 @@ onerror = (event) => {
       }
     }, 0);
   }
-
   private initializeThinkingBlocks(): void {
     // Find all thinking blocks and initialize them correctly
     setTimeout(() => {

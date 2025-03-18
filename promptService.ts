@@ -4,9 +4,18 @@ import { StateManager } from './stateManager';
 export class PromptService {
     private stateManager: StateManager;
     private systemPrompt: string | null = null;
+    private plugin: any; // Reference to the plugin for accessing services
 
-    constructor() {
+    constructor(plugin?: any) {
         this.stateManager = StateManager.getInstance();
+        this.plugin = plugin;
+    }
+
+    /**
+     * Set plugin reference for accessing services
+     */
+    setPlugin(plugin: any): void {
+        this.plugin = plugin;
     }
 
     /**
@@ -80,5 +89,51 @@ export class PromptService {
 
         // Return decoded response if it contains thinking tags
         return decodedResponse.includes("<think>") ? decodedResponse : response;
+    }
+
+    /**
+     * Prepare a complete prompt with all enhancements (RAG, role definition, etc.)
+     */
+    async prepareFullPrompt(content: string, isNewConversation: boolean = false): Promise<string> {
+        if (!this.plugin) {
+            return this.formatPrompt(content, isNewConversation);
+        }
+
+        // Get role definition if available
+        try {
+            const roleDefinition = await this.plugin.getRoleDefinition();
+
+            // Set the system prompt if role definition exists
+            if (roleDefinition) {
+                this.setSystemPrompt(roleDefinition);
+            }
+        } catch (error) {
+            console.error("Error getting role definition:", error);
+        }
+
+        // Initialize prompt with user content
+        let formattedPrompt = this.formatPrompt(content, isNewConversation);
+
+        // Handle RAG if enabled
+        if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+            try {
+                // Make sure documents are indexed
+                if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+                    await this.plugin.ragService.indexDocuments();
+                }
+
+                // Get context based on the query
+                const ragContext = this.plugin.ragService.prepareContext(content);
+
+                // Enhance the prompt with context
+                if (ragContext) {
+                    formattedPrompt = this.enhanceWithRagContext(formattedPrompt, ragContext);
+                }
+            } catch (error) {
+                console.error("Error processing RAG:", error);
+            }
+        }
+
+        return formattedPrompt;
     }
 }

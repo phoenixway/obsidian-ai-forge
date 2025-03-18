@@ -6,12 +6,19 @@ export class ApiService {
   private stateManager: StateManager;
   private promptService: PromptService;
 
-  constructor(baseUrl: string) {
+  constructor(baseUrl: string, plugin?: any) {
     this.baseUrl = baseUrl;
     this.stateManager = StateManager.getInstance();
-    this.promptService = new PromptService();
+    this.promptService = new PromptService(plugin);
     // Try to load saved state
     this.stateManager.loadStateFromStorage();
+  }
+
+  /**
+   * Get the prompt service instance
+   */
+  getPromptService(): PromptService {
+    return this.promptService;
   }
 
   /**
@@ -29,6 +36,13 @@ export class ApiService {
   }
 
   /**
+   * Set plugin reference for prompt service
+   */
+  setPlugin(plugin: any): void {
+    this.promptService.setPlugin(plugin);
+  }
+
+  /**
    * Generate response from Ollama
    */
   async generateResponse(
@@ -36,8 +50,8 @@ export class ApiService {
     prompt: string,
     isNewConversation: boolean = false
   ): Promise<OllamaResponse> {
-    // Format the prompt with state information if needed
-    const formattedPrompt = this.promptService.formatPrompt(prompt, isNewConversation);
+    // Let the prompt service prepare the full prompt with all enhancements
+    const formattedPrompt = await this.promptService.prepareFullPrompt(prompt, isNewConversation);
 
     // Prepare the request body
     const requestBody = this.promptService.prepareRequestBody(modelName, formattedPrompt);
@@ -108,10 +122,6 @@ export class ApiService {
     };
     this.stateManager.updateState(initialState);
     this.stateManager.saveStateToStorage();
-  }
-
-  getPromptService(): PromptService {
-    return this.promptService;
   }
 }
 

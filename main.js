@@ -507,24 +507,10 @@ onerror = (event) => {
     const loadingMessageEl = this.addLoadingMessage();
     setTimeout(async () => {
       try {
-        const roleDefinition = await this.plugin.getRoleDefinition();
-        if (roleDefinition) {
-          this.plugin.apiService.setSystemPrompt(roleDefinition);
-        }
-        let prompt = content;
-        if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
-          if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
-            await this.plugin.ragService.indexDocuments();
-          }
-          const ragContext = this.plugin.ragService.prepareContext(content);
-          if (ragContext) {
-            prompt = this.plugin.apiService.getPromptService().enhanceWithRagContext(prompt, ragContext);
-          }
-        }
         const isNewConversation = this.messages.length <= 1;
         const data = await this.plugin.apiService.generateResponse(
           this.plugin.settings.modelName,
-          prompt,
+          content,
           isNewConversation
         );
         if (loadingMessageEl && loadingMessageEl.parentNode) {
@@ -1075,9 +1061,17 @@ var StateManager = class {
 
 // promptService.ts
 var PromptService = class {
-  constructor() {
+  // Reference to the plugin for accessing services
+  constructor(plugin) {
     this.systemPrompt = null;
     this.stateManager = StateManager.getInstance();
+    this.plugin = plugin;
+  }
+  /**
+   * Set plugin reference for accessing services
+   */
+  setPlugin(plugin) {
+    this.plugin = plugin;
   }
   /**
    * Set system prompt to be used with each request
@@ -1140,15 +1134,52 @@ User message: ${prompt}`;
     const decodedResponse = textArea.value;
     return decodedResponse.includes("<think>") ? decodedResponse : response;
   }
+  /**
+   * Prepare a complete prompt with all enhancements (RAG, role definition, etc.)
+   */
+  async prepareFullPrompt(content, isNewConversation = false) {
+    if (!this.plugin) {
+      return this.formatPrompt(content, isNewConversation);
+    }
+    try {
+      const roleDefinition = await this.plugin.getRoleDefinition();
+      if (roleDefinition) {
+        this.setSystemPrompt(roleDefinition);
+      }
+    } catch (error) {
+      console.error("Error getting role definition:", error);
+    }
+    let formattedPrompt = this.formatPrompt(content, isNewConversation);
+    if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+      try {
+        if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+          await this.plugin.ragService.indexDocuments();
+        }
+        const ragContext = this.plugin.ragService.prepareContext(content);
+        if (ragContext) {
+          formattedPrompt = this.enhanceWithRagContext(formattedPrompt, ragContext);
+        }
+      } catch (error) {
+        console.error("Error processing RAG:", error);
+      }
+    }
+    return formattedPrompt;
+  }
 };
 
 // apiServices.ts
 var ApiService = class {
-  constructor(baseUrl) {
+  constructor(baseUrl, plugin) {
     this.baseUrl = baseUrl;
     this.stateManager = StateManager.getInstance();
-    this.promptService = new PromptService();
+    this.promptService = new PromptService(plugin);
     this.stateManager.loadStateFromStorage();
+  }
+  /**
+   * Get the prompt service instance
+   */
+  getPromptService() {
+    return this.promptService;
   }
   /**
    * Set system prompt to be used with each request
@@ -1163,10 +1194,16 @@ var ApiService = class {
     this.baseUrl = url;
   }
   /**
+   * Set plugin reference for prompt service
+   */
+  setPlugin(plugin) {
+    this.promptService.setPlugin(plugin);
+  }
+  /**
    * Generate response from Ollama
    */
   async generateResponse(modelName, prompt, isNewConversation = false) {
-    const formattedPrompt = this.promptService.formatPrompt(prompt, isNewConversation);
+    const formattedPrompt = await this.promptService.prepareFullPrompt(prompt, isNewConversation);
     const requestBody = this.promptService.prepareRequestBody(modelName, formattedPrompt);
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
@@ -1223,9 +1260,6 @@ var ApiService = class {
     };
     this.stateManager.updateState(initialState);
     this.stateManager.saveStateToStorage();
-  }
-  getPromptService() {
-    return this.promptService;
   }
 };
 
