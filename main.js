@@ -219,6 +219,9 @@ onerror = (event) => {
       }
     });
     await this.loadMessageHistory();
+    setTimeout(() => {
+      this.inputEl.focus();
+    }, 100);
   }
   async loadMessageHistory() {
     if (this.historyLoaded)

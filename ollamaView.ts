@@ -261,6 +261,10 @@ onerror = (event) => {
     });
     // Load message history
     await this.loadMessageHistory();
+    // Add this at the end of the onOpen() method
+    setTimeout(() => {
+      this.inputEl.focus();
+    }, 100);
   }
 
   async loadMessageHistory() {
