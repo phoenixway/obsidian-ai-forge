@@ -407,3 +407,13 @@
     opacity: 0.8;
   }
 }
+
+reset-button {
+     margin-right: 5px;
+     cursor: pointer;
+     color: var(--text-muted);
+   }
+   
+   .reset-button:hover {
+     color: var(--text-normal);
+   }

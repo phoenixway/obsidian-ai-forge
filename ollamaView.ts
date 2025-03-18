@@ -247,6 +247,18 @@ onerror = (event) => {
     voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
     });
+    resetButton.addEventListener("click", () => {
+      // Показываем подтверждение
+      const confirmReset = confirm("Reset assistant state? This will clear all state variables and start a new conversation.");
+      if (confirmReset) {
+        // Сбрасываем состояние
+        this.plugin.apiService.resetState();
+        // Очищаем чат
+        this.clearChatMessages();
+        // Добавляем приветственное сообщение
+        this.addMessage("assistant", "State reset. What would you like to do now?");
+      }
+    });
     // Load message history
     await this.loadMessageHistory();
   }
