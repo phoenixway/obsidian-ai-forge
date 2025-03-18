@@ -734,6 +734,8 @@ onerror = (event) => {
           const systemPrompt = this.plugin.promptService.getSystemPrompt();
           if (systemPrompt) {
             requestBody.system = systemPrompt;
+            console.log("processWithOllama: system prompt is used!");
+
           }
         }
 
