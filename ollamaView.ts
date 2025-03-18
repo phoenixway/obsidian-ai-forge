@@ -688,26 +688,22 @@ onerror = (event) => {
           this.plugin.apiService.setSystemPrompt(roleDefinition);
         }
 
-        // Initialize prompt
+        // Initialize prompt with user content
         let prompt = content;
 
         // Handle RAG if enabled
-        if (this.plugin.settings.ragEnabled) {
+        if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
           // Make sure documents are indexed
-          if (
-            this.plugin.ragService &&
-            this.plugin.ragService.findRelevantDocuments("test").length === 0
-          ) {
+          if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
             await this.plugin.ragService.indexDocuments();
           }
 
           // Get context based on the query
           const ragContext = this.plugin.ragService.prepareContext(content);
 
+          // Let the prompt service enhance the prompt with context
           if (ragContext) {
-            // Add context information while preserving the original user message
-            // Format it in a way that won't interfere with state tracking
-            prompt = `Context information:\n${ragContext}\n\nUser message: ${content}`;
+            prompt = this.plugin.apiService.getPromptService().enhanceWithRagContext(prompt, ragContext);
           }
         }
 
@@ -721,18 +717,13 @@ onerror = (event) => {
           isNewConversation
         );
 
-        // Process response as before
-        const decodedResponse = this.decodeHtmlEntities(data.response);
-        const finalResponse = decodedResponse.includes("<think>")
-          ? decodedResponse
-          : data.response;
-
-        // Update UI as before
+        // Remove loading message
         if (loadingMessageEl && loadingMessageEl.parentNode) {
           loadingMessageEl.parentNode.removeChild(loadingMessageEl);
         }
 
-        this.addMessage("assistant", finalResponse);
+        // Add the assistant's response to the chat
+        this.addMessage("assistant", data.response);
         this.initializeThinkingBlocks();
       } catch (error) {
         console.error("Error processing request with Ollama:", error);

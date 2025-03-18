@@ -512,16 +512,13 @@ onerror = (event) => {
           this.plugin.apiService.setSystemPrompt(roleDefinition);
         }
         let prompt = content;
-        if (this.plugin.settings.ragEnabled) {
-          if (this.plugin.ragService && this.plugin.ragService.findRelevantDocuments("test").length === 0) {
+        if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+          if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
             await this.plugin.ragService.indexDocuments();
           }
           const ragContext = this.plugin.ragService.prepareContext(content);
           if (ragContext) {
-            prompt = `Context information:
-${ragContext}
-
-User message: ${content}`;
+            prompt = this.plugin.apiService.getPromptService().enhanceWithRagContext(prompt, ragContext);
           }
         }
         const isNewConversation = this.messages.length <= 1;
@@ -530,12 +527,10 @@ User message: ${content}`;
           prompt,
           isNewConversation
         );
-        const decodedResponse = this.decodeHtmlEntities(data.response);
-        const finalResponse = decodedResponse.includes("<think>") ? decodedResponse : data.response;
         if (loadingMessageEl && loadingMessageEl.parentNode) {
           loadingMessageEl.parentNode.removeChild(loadingMessageEl);
         }
-        this.addMessage("assistant", finalResponse);
+        this.addMessage("assistant", data.response);
         this.initializeThinkingBlocks();
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
@@ -1078,16 +1073,88 @@ var StateManager = class {
   }
 };
 
+// promptService.ts
+var PromptService = class {
+  constructor() {
+    this.systemPrompt = null;
+    this.stateManager = StateManager.getInstance();
+  }
+  /**
+   * Set system prompt to be used with each request
+   */
+  setSystemPrompt(prompt) {
+    this.systemPrompt = prompt;
+  }
+  /**
+   * Get system prompt if set
+   */
+  getSystemPrompt() {
+    return this.systemPrompt;
+  }
+  /**
+   * Format user prompt with necessary context and state information
+   */
+  formatPrompt(userInput, isNewConversation = false) {
+    this.stateManager.processUserMessage(userInput);
+    if (isNewConversation) {
+      return userInput;
+    }
+    const stateHeader = this.stateManager.getStateFormatted();
+    return `${stateHeader}
+
+${userInput}`;
+  }
+  /**
+   * Enhance prompt with RAG context if available
+   */
+  enhanceWithRagContext(prompt, ragContext) {
+    if (!ragContext) {
+      return prompt;
+    }
+    return `Context information:
+${ragContext}
+
+User message: ${prompt}`;
+  }
+  /**
+   * Prepare request body for model API call
+   */
+  prepareRequestBody(modelName, prompt, temperature = 0.2) {
+    const requestBody = {
+      model: modelName,
+      prompt,
+      stream: false,
+      temperature
+    };
+    if (this.systemPrompt) {
+      requestBody.system = this.systemPrompt;
+    }
+    return requestBody;
+  }
+  /**
+   * Process response from language model
+   */
+  processModelResponse(response) {
+    const textArea = document.createElement("textarea");
+    textArea.innerHTML = response;
+    const decodedResponse = textArea.value;
+    return decodedResponse.includes("<think>") ? decodedResponse : response;
+  }
+};
+
 // apiServices.ts
 var ApiService = class {
   constructor(baseUrl) {
-    this.systemPrompt = null;
     this.baseUrl = baseUrl;
     this.stateManager = StateManager.getInstance();
+    this.promptService = new PromptService();
     this.stateManager.loadStateFromStorage();
   }
+  /**
+   * Set system prompt to be used with each request
+   */
   setSystemPrompt(prompt) {
-    this.systemPrompt = prompt;
+    this.promptService.setSystemPrompt(prompt);
   }
   /**
    * Set base URL for the API
@@ -1099,23 +1166,8 @@ var ApiService = class {
    * Generate response from Ollama
    */
   async generateResponse(modelName, prompt, isNewConversation = false) {
-    this.stateManager.processUserMessage(prompt);
-    const stateHeader = this.stateManager.getStateFormatted();
-    let enhancedPrompt = prompt;
-    if (!isNewConversation) {
-      enhancedPrompt = `${stateHeader}
-
-${prompt}`;
-    }
-    const requestBody = {
-      model: modelName,
-      prompt: enhancedPrompt,
-      stream: false,
-      temperature: 0.2
-    };
-    if (this.systemPrompt) {
-      requestBody.system = this.systemPrompt;
-    }
+    const formattedPrompt = this.promptService.formatPrompt(prompt, isNewConversation);
+    const requestBody = this.promptService.prepareRequestBody(modelName, formattedPrompt);
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: {
@@ -1128,6 +1180,7 @@ ${prompt}`;
       throw new Error(`HTTP error! Status: ${response.status}, ${errorText}`);
     }
     const data = await response.json();
+    data.response = this.promptService.processModelResponse(data.response);
     this.stateManager.saveStateToStorage();
     return data;
   }
@@ -1164,13 +1217,15 @@ ${prompt}`;
       currentGoal: "Identify if there are any urgent tasks",
       userActivity: "talking with AI",
       hasUrgentTasks: "unknown",
-      // This will now match the expected type
       urgentTasksList: [],
       currentUrgentTask: null,
       planExists: "unknown"
     };
     this.stateManager.updateState(initialState);
     this.stateManager.saveStateToStorage();
+  }
+  getPromptService() {
+    return this.promptService;
   }
 };
 

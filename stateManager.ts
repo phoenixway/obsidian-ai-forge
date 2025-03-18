@@ -16,7 +16,6 @@ export class StateManager {
     private static instance: StateManager;
 
     private constructor() {
-        // Инициализация состояния по умолчанию
         this.state = {
             currentPhase: "next goal choosing",
             currentGoal: "Identify if there are any urgent tasks",

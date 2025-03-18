@@ -1,19 +1,24 @@
 import { StateManager, AssistantState } from './stateManager';
+import { PromptService } from './promptService';
 
 export class ApiService {
   private baseUrl: string;
-  private systemPrompt: string | null = null;
   private stateManager: StateManager;
-
-  setSystemPrompt(prompt: string | null): void {
-    this.systemPrompt = prompt;
-  }
+  private promptService: PromptService;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
     this.stateManager = StateManager.getInstance();
-    // Пытаемся загрузить сохраненное состояние
+    this.promptService = new PromptService();
+    // Try to load saved state
     this.stateManager.loadStateFromStorage();
+  }
+
+  /**
+   * Set system prompt to be used with each request
+   */
+  setSystemPrompt(prompt: string | null): void {
+    this.promptService.setSystemPrompt(prompt);
   }
 
   /**
@@ -31,32 +36,11 @@ export class ApiService {
     prompt: string,
     isNewConversation: boolean = false
   ): Promise<OllamaResponse> {
-    // Обрабатываем сообщение пользователя и обновляем состояние
-    this.stateManager.processUserMessage(prompt);
+    // Format the prompt with state information if needed
+    const formattedPrompt = this.promptService.formatPrompt(prompt, isNewConversation);
 
-    // Получаем актуальное состояние для включения в запрос
-    const stateHeader = this.stateManager.getStateFormatted();
-
-    // Создаем запрос с включением системного промпта и текущего состояния
-    let enhancedPrompt = prompt;
-
-    // Если это не новый разговор, включаем информацию о состоянии в промпт
-    if (!isNewConversation) {
-      enhancedPrompt = `${stateHeader}\n\n${prompt}`;
-    }
-
-    // Создаем тело запроса
-    const requestBody: any = {
-      model: modelName,
-      prompt: enhancedPrompt,
-      stream: false,
-      temperature: 0.2,
-    };
-
-    // Включаем системный промпт в каждый запрос
-    if (this.systemPrompt) {
-      requestBody.system = this.systemPrompt;
-    }
+    // Prepare the request body
+    const requestBody = this.promptService.prepareRequestBody(modelName, formattedPrompt);
 
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
@@ -73,7 +57,10 @@ export class ApiService {
 
     const data = await response.json();
 
-    // После получения ответа от модели, сохраняем состояние
+    // Process the model response if needed
+    data.response = this.promptService.processModelResponse(data.response);
+
+    // Save state after processing
     this.stateManager.saveStateToStorage();
 
     return data;
@@ -114,13 +101,17 @@ export class ApiService {
       currentPhase: "next goal choosing",
       currentGoal: "Identify if there are any urgent tasks",
       userActivity: "talking with AI",
-      hasUrgentTasks: "unknown", // This will now match the expected type
+      hasUrgentTasks: "unknown",
       urgentTasksList: [],
       currentUrgentTask: null,
       planExists: "unknown"
     };
     this.stateManager.updateState(initialState);
     this.stateManager.saveStateToStorage();
+  }
+
+  getPromptService(): PromptService {
+    return this.promptService;
   }
 }
 
