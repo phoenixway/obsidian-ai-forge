@@ -211,17 +211,13 @@ onerror = (event) => {
       this.startVoiceRecognition();
     });
     resetButton.addEventListener("click", () => {
-      const confirmReset = confirm("Reset assistant state? This will clear all state variables and start a new conversation.");
-      if (confirmReset) {
-        this.plugin.apiService.resetState();
-        this.clearChatMessages();
-        this.addMessage("assistant", "State reset. What would you like to do now?");
-      }
+      this.plugin.apiService.resetState();
+      this.clearChatMessages();
+      this.addMessage("assistant", "State reset. What would you like to do now?");
+      setTimeout(() => {
+        this.inputEl.focus();
+      }, 100);
     });
-    await this.loadMessageHistory();
-    setTimeout(() => {
-      this.inputEl.focus();
-    }, 100);
   }
   async loadMessageHistory() {
     if (this.historyLoaded)
