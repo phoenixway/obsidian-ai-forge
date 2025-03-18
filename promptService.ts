@@ -38,7 +38,7 @@ export class PromptService {
      */
     formatPrompt(userInput: string, isNewConversation: boolean = false): string {
         // Process user message and update state
-        this.stateManager.processUserMessage(userInput);
+        // this.stateManager.processUserMessage(userInput);
 
         // If it's a new conversation, return the prompt without state header
         if (isNewConversation) {
@@ -46,8 +46,9 @@ export class PromptService {
         }
 
         // Get formatted state for inclusion in the prompt
-        const stateHeader = this.stateManager.getStateFormatted();
-        return `${stateHeader}\n\n${userInput}`;
+        // const stateHeader = this.stateManager.getStateFormatted();
+        // return `${stateHeader}\n\n${userInput}`;
+        return userInput;
     }
 
     /**

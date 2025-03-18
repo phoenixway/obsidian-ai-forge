@@ -1090,14 +1090,10 @@ var PromptService = class {
    * Format user prompt with necessary context and state information
    */
   formatPrompt(userInput, isNewConversation = false) {
-    this.stateManager.processUserMessage(userInput);
     if (isNewConversation) {
       return userInput;
     }
-    const stateHeader = this.stateManager.getStateFormatted();
-    return `${stateHeader}
-
-${userInput}`;
+    return userInput;
   }
   /**
    * Enhance prompt with RAG context if available
