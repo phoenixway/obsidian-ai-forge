@@ -497,47 +497,27 @@ onerror = (event) => {
     setTimeout(async () => {
       try {
         const roleDefinition = await this.plugin.getRoleDefinition();
-        let prompt = content;
-        let systemPrompt = "";
         if (roleDefinition) {
-          systemPrompt = `You are an AI assistant with the following role definition: 
-
-${roleDefinition}
-
-Please adhere strictly to this role in your responses.`;
+          this.plugin.apiService.setSystemPrompt(roleDefinition);
         }
+        let prompt = content;
         if (this.plugin.settings.ragEnabled) {
           if (this.plugin.ragService && this.plugin.ragService.findRelevantDocuments("test").length === 0) {
             await this.plugin.ragService.indexDocuments();
           }
           const ragContext = this.plugin.ragService.prepareContext(content);
           if (ragContext) {
-            if (systemPrompt) {
-              prompt = `${systemPrompt}
-
+            prompt = `Context information:
 ${ragContext}
 
-User Query: ${content}
-
-Please respond to the user's query based on the provided context and adhering to your role. If the context doesn't contain relevant information, please state that and answer based on your general knowledge while staying in character.`;
-            } else {
-              prompt = `${ragContext}
-
-User Query: ${content}
-
-Please respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
-            }
+User message: ${content}`;
           }
-        } else if (systemPrompt) {
-          prompt = `${systemPrompt}
-
-User Query: ${content}
-
-Please respond to the user's query while adhering to your defined role.`;
         }
+        const isNewConversation = this.messages.length <= 1;
         const data = await this.plugin.apiService.generateResponse(
           this.plugin.settings.modelName,
-          prompt
+          prompt,
+          isNewConversation
         );
         const decodedResponse = this.decodeHtmlEntities(data.response);
         const finalResponse = decodedResponse.includes("<think>") ? decodedResponse : data.response;
@@ -950,7 +930,11 @@ var RagService = class {
 // apiServices.ts
 var ApiService = class {
   constructor(baseUrl) {
+    this.systemPrompt = null;
     this.baseUrl = baseUrl;
+  }
+  setSystemPrompt(prompt) {
+    this.systemPrompt = prompt;
   }
   /**
    * Set base URL for the API
@@ -961,18 +945,22 @@ var ApiService = class {
   /**
    * Generate response from Ollama
    */
-  async generateResponse(model, prompt) {
+  async generateResponse(modelName, prompt, isNewConversation = false) {
+    const requestBody = {
+      model: modelName,
+      prompt,
+      stream: false,
+      temperature: 0.2
+    };
+    if (isNewConversation && this.systemPrompt) {
+      requestBody.system = this.systemPrompt;
+    }
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model,
-        prompt,
-        stream: false,
-        temperature: 0.2
-      })
+      body: JSON.stringify(requestBody)
     });
     if (!response.ok) {
       const errorText = await response.text();

@@ -1,5 +1,10 @@
 export class ApiService {
   private baseUrl: string;
+  private systemPrompt: string | null = null;
+
+  setSystemPrompt(prompt: string | null): void {
+    this.systemPrompt = prompt;
+  }
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -15,18 +20,31 @@ export class ApiService {
   /**
    * Generate response from Ollama
    */
-  async generateResponse(model: string, prompt: string): Promise<OllamaResponse> {
+  async generateResponse(
+    modelName: string,
+    prompt: string,
+    isNewConversation: boolean = false
+  ): Promise<OllamaResponse> {
+    // Create the request body
+    const requestBody: any = {
+      model: modelName,
+      prompt: prompt,
+      stream: false,
+      temperature: 0.2,
+    };
+
+    // If this is a new conversation and we have a system prompt, 
+    // include it separately rather than prepending it to the prompt
+    if (isNewConversation && this.systemPrompt) {
+      requestBody.system = this.systemPrompt;
+    }
+
     const response = await fetch(`${this.baseUrl}/api/generate`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: model,
-        prompt: prompt,
-        stream: false,
-        temperature: 0.2,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

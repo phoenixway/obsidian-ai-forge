@@ -33,5 +33,5 @@ If you have any questions or ideas, create an [Issue](https://github.com/phoenix
 This project is licensed under the [MIT License](LICENSE).
 
 ---
-✍ Author: [Your Name](https://github.com/phoenixway)
+✍ Author: [Roman Kozak (Pylypchuk)](https://github.com/phoenixway)
 

@@ -655,6 +655,7 @@ onerror = (event) => {
 
     return { hasThinkingTags: false, format: "none" };
   }
+
   async processWithOllama(content: string): Promise<void> {
     this.isProcessing = true;
 
@@ -664,18 +665,18 @@ onerror = (event) => {
     // Execute the request
     setTimeout(async () => {
       try {
-        // Отримуємо визначення ролі (якщо доступно)
+        // Get role definition (if available)
         const roleDefinition = await this.plugin.getRoleDefinition();
 
-        // Get context from RAG if enabled
-        let prompt = content;
-        let systemPrompt = "";
-
-        // Якщо є визначення ролі, додаємо його до системного промпту
+        // Set the system prompt in the API service if it exists
         if (roleDefinition) {
-          systemPrompt = `You are an AI assistant with the following role definition: \n\n${roleDefinition}\n\nPlease adhere strictly to this role in your responses.`;
+          this.plugin.apiService.setSystemPrompt(roleDefinition);
         }
 
+        // Initialize prompt
+        let prompt = content;
+
+        // Handle RAG if enabled
         if (this.plugin.settings.ragEnabled) {
           // Make sure documents are indexed
           if (
@@ -689,41 +690,34 @@ onerror = (event) => {
           const ragContext = this.plugin.ragService.prepareContext(content);
 
           if (ragContext) {
-            // Combine context with prompt
-            if (systemPrompt) {
-              // Якщо є роль, додаємо її разом з контекстом
-              prompt = `${systemPrompt}\n\n${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context and adhering to your role. If the context doesn't contain relevant information, please state that and answer based on your general knowledge while staying in character.`;
-            } else {
-              // Якщо ролі немає, використовуємо стандартний промпт
-              prompt = `${ragContext}\n\nUser Query: ${content}\n\nPlease respond to the user's query based on the provided context. If the context doesn't contain relevant information, please state that and answer based on your general knowledge.`;
-            }
+            // Add context information while preserving the original user message
+            // Format it in a way that won't interfere with state tracking
+            prompt = `Context information:\n${ragContext}\n\nUser message: ${content}`;
           }
-        } else if (systemPrompt) {
-          // Якщо RAG не включений, але є роль
-          prompt = `${systemPrompt}\n\nUser Query: ${content}\n\nPlease respond to the user's query while adhering to your defined role.`;
         }
 
-        // Use the API service instead of direct fetch
+        // Check if this is a new conversation
+        const isNewConversation = this.messages.length <= 1;
+
+        // Use the API service to generate a response
         const data = await this.plugin.apiService.generateResponse(
           this.plugin.settings.modelName,
-          prompt
+          prompt,
+          isNewConversation
         );
 
-        // Обробка відповіді залишається без змін
+        // Process response as before
         const decodedResponse = this.decodeHtmlEntities(data.response);
         const finalResponse = decodedResponse.includes("<think>")
           ? decodedResponse
           : data.response;
 
-        // Оновлення інтерфейсу
+        // Update UI as before
         if (loadingMessageEl && loadingMessageEl.parentNode) {
           loadingMessageEl.parentNode.removeChild(loadingMessageEl);
         }
 
-        // Add the response to the messages
         this.addMessage("assistant", finalResponse);
-
-        // Ensure thinking blocks are properly initialized
         this.initializeThinkingBlocks();
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
