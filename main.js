@@ -675,7 +675,7 @@ var DEFAULT_SETTINGS = {
   silenceDetection: true,
   followRole: true,
   systemPromptInterval: 0,
-  temperature: 0.2
+  temperature: 0.1
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {

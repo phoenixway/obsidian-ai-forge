@@ -118,7 +118,7 @@ var _OllamaView =
 function (_import_obsidian$Item) {
   _inherits(_OllamaView, _import_obsidian$Item);
 
-  // Додана нова змінна
+  // Лічильник пар повідомлень
   function _OllamaView(leaf, plugin) {
     var _this;
 
@@ -130,6 +130,8 @@ function (_import_obsidian$Item) {
     _this.historyLoaded = false;
     _this.scrollTimeout = null;
     _this.mediaRecorder = null;
+    _this.systemMessageInterval = 0;
+    _this.messagesPairCount = 0;
     _this.plugin = plugin;
 
     if (_OllamaView.instance) {
@@ -137,6 +139,11 @@ function (_import_obsidian$Item) {
     }
 
     _OllamaView.instance = _assertThisInitialized(_this);
+
+    if (_this.plugin.apiService) {
+      _this.plugin.apiService.setOllamaView(_assertThisInitialized(_this));
+    }
+
     _this.mediaRecorder = null;
 
     try {
@@ -475,6 +482,13 @@ function (_import_obsidian$Item) {
       };
       this.messages.push(message);
       this.renderMessage(message);
+
+      if (role === "assistant" && this.messages.length >= 2) {
+        if (this.messages[this.messages.length - 2].role === "user") {
+          this.messagesPairCount++;
+        }
+      }
+
       this.saveMessageHistory();
       setTimeout(function () {
         _this4.guaranteedScrollToBottom();
@@ -747,17 +761,47 @@ function (_import_obsidian$Item) {
               this.isProcessing = true;
               loadingMessageEl = this.addLoadingMessage();
               setTimeout(function _callee() {
-                var isNewConversation, data;
+                var isNewConversation, systemPromptInterval, useSystemPrompt, formattedPrompt, requestBody, systemPrompt, data;
                 return regeneratorRuntime.async(function _callee$(_context5) {
                   while (1) {
                     switch (_context5.prev = _context5.next) {
                       case 0:
                         _context5.prev = 0;
                         isNewConversation = _this5.messages.length <= 1;
-                        _context5.next = 4;
-                        return regeneratorRuntime.awrap(_this5.plugin.apiService.generateResponse(_this5.plugin.settings.modelName, content, isNewConversation));
+                        systemPromptInterval = _this5.plugin.settings.systemPromptInterval || 0;
+                        useSystemPrompt = false;
 
-                      case 4:
+                        if (systemPromptInterval === 0) {
+                          useSystemPrompt = true;
+                        } else if (systemPromptInterval > 0) {
+                          useSystemPrompt = _this5.messagesPairCount % systemPromptInterval === 0;
+                        }
+
+                        _context5.next = 7;
+                        return regeneratorRuntime.awrap(_this5.plugin.promptService.prepareFullPrompt(content, isNewConversation));
+
+                      case 7:
+                        formattedPrompt = _context5.sent;
+                        requestBody = {
+                          model: _this5.plugin.settings.modelName,
+                          prompt: formattedPrompt,
+                          stream: false,
+                          temperature: _this5.plugin.settings.temperature || 0.2
+                        };
+
+                        if (useSystemPrompt) {
+                          systemPrompt = _this5.plugin.promptService.getSystemPrompt();
+
+                          if (systemPrompt) {
+                            requestBody.system = systemPrompt;
+                            console.log("processWithOllama: system prompt is used!");
+                          }
+                        }
+
+                        _context5.next = 12;
+                        return regeneratorRuntime.awrap(_this5.plugin.apiService.generateResponse(requestBody));
+
+                      case 12:
                         data = _context5.sent;
 
                         if (loadingMessageEl && loadingMessageEl.parentNode) {
@@ -768,11 +812,11 @@ function (_import_obsidian$Item) {
 
                         _this5.initializeThinkingBlocks();
 
-                        _context5.next = 15;
+                        _context5.next = 23;
                         break;
 
-                      case 10:
-                        _context5.prev = 10;
+                      case 18:
+                        _context5.prev = 18;
                         _context5.t0 = _context5["catch"](0);
                         console.error("Error processing request with Ollama:", _context5.t0);
 
@@ -782,17 +826,17 @@ function (_import_obsidian$Item) {
 
                         _this5.addMessage("assistant", "Connection error with Ollama. Please check the settings and ensure the server is running.");
 
-                      case 15:
-                        _context5.prev = 15;
+                      case 23:
+                        _context5.prev = 23;
                         _this5.isProcessing = false;
-                        return _context5.finish(15);
+                        return _context5.finish(23);
 
-                      case 18:
+                      case 26:
                       case "end":
                         return _context5.stop();
                     }
                   }
-                }, null, null, [[0, 10, 15, 18]]);
+                }, null, null, [[0, 18, 23, 26]]);
               }, 0);
 
             case 3:
@@ -852,9 +896,8 @@ function (_import_obsidian$Item) {
               this.messages = [];
               this.chatContainer.empty();
               this.historyLoaded = false;
-              this.messagesPairCount = 0;
 
-            case 4:
+            case 3:
             case "end":
               return _context7.stop();
           }
@@ -900,7 +943,6 @@ function (_import_obsidian$Item) {
 
               mediaRecorder.ondataavailable = function (event) {
                 if (event.data.size > 0) {
-                  // console.log("Data available, size:", event.data.size);
                   audioChunks.push(event.data);
                 }
               };
@@ -955,6 +997,11 @@ function (_import_obsidian$Item) {
         }
       }, null, this, [[4, 20]]);
     }
+  }, {
+    key: "setSystemMessageInterval",
+    value: function setSystemMessageInterval(interval) {
+      this.systemMessageInterval = interval;
+    }
   }]);
 
   return _OllamaView;
@@ -977,7 +1024,9 @@ var DEFAULT_SETTINGS = {
   speechLanguage: "uk-UA",
   maxRecordingTime: 15,
   silenceDetection: true,
-  followRole: true
+  followRole: true,
+  systemPromptInterval: 0,
+  temperature: 0.1
 };
 
 var OllamaSettingTab =
@@ -1011,9 +1060,9 @@ function (_import_obsidian2$Plu) {
       var _this9 = this;
 
       var containerEl, availableModels, selectedModel, modelSetting, dropdown;
-      return regeneratorRuntime.async(function display$(_context23) {
+      return regeneratorRuntime.async(function display$(_context24) {
         while (1) {
-          switch (_context23.prev = _context23.next) {
+          switch (_context24.prev = _context24.next) {
             case 0:
               containerEl = this.containerEl;
               containerEl.empty();
@@ -1081,19 +1130,19 @@ function (_import_obsidian2$Plu) {
                 });
               });
               availableModels = [];
-              _context23.prev = 5;
-              _context23.next = 8;
+              _context24.prev = 5;
+              _context24.next = 8;
               return regeneratorRuntime.awrap(this.plugin.apiService.getModels());
 
             case 8:
-              availableModels = _context23.sent;
-              _context23.next = 14;
+              availableModels = _context24.sent;
+              _context24.next = 14;
               break;
 
             case 11:
-              _context23.prev = 11;
-              _context23.t0 = _context23["catch"](5);
-              console.error("Error fetching available models:", _context23.t0);
+              _context24.prev = 11;
+              _context24.t0 = _context24["catch"](5);
+              console.error("Error fetching available models:", _context24.t0);
 
             case 14:
               selectedModel = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : availableModels.length > 0 ? availableModels[0] : "";
@@ -1333,10 +1382,28 @@ function (_import_obsidian2$Plu) {
                   });
                 });
               });
+              new import_obsidian2.Setting(containerEl).setName("System Prompt Interval").setDesc("\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u043F\u0430\u0440 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C \u043C\u0456\u0436 \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043A\u0430\u043C\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0433\u043E \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F. 0 - \u0437 \u043A\u043E\u0436\u043D\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C, \u0432\u0456\u0434'\u0454\u043C\u043D\u0435 - \u043D\u0456\u043A\u043E\u043B\u0438 \u043D\u0435 \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u0438").addText(function (text) {
+                return text.setValue(String(_this9.plugin.settings.systemPromptInterval || 0)).onChange(function _callee16(value) {
+                  return regeneratorRuntime.async(function _callee16$(_context23) {
+                    while (1) {
+                      switch (_context23.prev = _context23.next) {
+                        case 0:
+                          _this9.plugin.settings.systemPromptInterval = parseInt(value) || 0;
+                          _context23.next = 3;
+                          return regeneratorRuntime.awrap(_this9.plugin.saveSettings());
 
-            case 27:
+                        case 3:
+                        case "end":
+                          return _context23.stop();
+                      }
+                    }
+                  });
+                });
+              });
+
+            case 28:
             case "end":
-              return _context23.stop();
+              return _context24.stop();
           }
         }
       }, null, this, [[5, 11]]);
@@ -1367,52 +1434,52 @@ function () {
     value: function indexDocuments() {
       var _a, _b, folderPath, vault, allFiles, files, _iteratorNormalCompletion3, _didIteratorError3, _iteratorError3, _iterator3, _step3, file, content;
 
-      return regeneratorRuntime.async(function indexDocuments$(_context24) {
+      return regeneratorRuntime.async(function indexDocuments$(_context25) {
         while (1) {
-          switch (_context24.prev = _context24.next) {
+          switch (_context25.prev = _context25.next) {
             case 0:
               if (!this.isIndexing) {
-                _context24.next = 2;
+                _context25.next = 2;
                 break;
               }
 
-              return _context24.abrupt("return");
+              return _context25.abrupt("return");
 
             case 2:
               this.isIndexing = true;
-              _context24.prev = 3;
+              _context25.prev = 3;
               folderPath = this.plugin.settings.ragFolderPath;
               vault = this.plugin.app.vault;
               console.log("AI Assistant path: \"".concat(folderPath, "\" (RAG documents will be loaded from 'data' subfolder)"));
               allFiles = vault.getFiles();
               console.log("Total files in vault: ".concat(allFiles.length));
-              _context24.next = 11;
+              _context25.next = 11;
               return regeneratorRuntime.awrap(this.getMarkdownFiles(vault, folderPath));
 
             case 11:
-              files = _context24.sent;
+              files = _context25.sent;
               console.log("Found ".concat(files.length, " markdown files from \"").concat(folderPath, "\""));
               console.log("Indexing ".concat(files.length, " markdown files from ").concat(folderPath));
               this.documents = [];
               _iteratorNormalCompletion3 = true;
               _didIteratorError3 = false;
               _iteratorError3 = undefined;
-              _context24.prev = 18;
+              _context25.prev = 18;
               _iterator3 = files[Symbol.iterator]();
 
             case 20:
               if (_iteratorNormalCompletion3 = (_step3 = _iterator3.next()).done) {
-                _context24.next = 35;
+                _context25.next = 35;
                 break;
               }
 
               file = _step3.value;
-              _context24.prev = 22;
-              _context24.next = 25;
+              _context25.prev = 22;
+              _context25.next = 25;
               return regeneratorRuntime.awrap(vault.read(file));
 
             case 25:
-              content = _context24.sent;
+              content = _context25.sent;
               this.documents.push({
                 path: file.path,
                 content: content,
@@ -1422,71 +1489,71 @@ function () {
                   modified: (_b = file.stat) == null ? void 0 : _b.mtime
                 }
               });
-              _context24.next = 32;
+              _context25.next = 32;
               break;
 
             case 29:
-              _context24.prev = 29;
-              _context24.t0 = _context24["catch"](22);
-              console.error("Error reading file ".concat(file.path, ":"), _context24.t0);
+              _context25.prev = 29;
+              _context25.t0 = _context25["catch"](22);
+              console.error("Error reading file ".concat(file.path, ":"), _context25.t0);
 
             case 32:
               _iteratorNormalCompletion3 = true;
-              _context24.next = 20;
+              _context25.next = 20;
               break;
 
             case 35:
-              _context24.next = 41;
+              _context25.next = 41;
               break;
 
             case 37:
-              _context24.prev = 37;
-              _context24.t1 = _context24["catch"](18);
+              _context25.prev = 37;
+              _context25.t1 = _context25["catch"](18);
               _didIteratorError3 = true;
-              _iteratorError3 = _context24.t1;
+              _iteratorError3 = _context25.t1;
 
             case 41:
-              _context24.prev = 41;
-              _context24.prev = 42;
+              _context25.prev = 41;
+              _context25.prev = 42;
 
               if (!_iteratorNormalCompletion3 && _iterator3["return"] != null) {
                 _iterator3["return"]();
               }
 
             case 44:
-              _context24.prev = 44;
+              _context25.prev = 44;
 
               if (!_didIteratorError3) {
-                _context24.next = 47;
+                _context25.next = 47;
                 break;
               }
 
               throw _iteratorError3;
 
             case 47:
-              return _context24.finish(44);
+              return _context25.finish(44);
 
             case 48:
-              return _context24.finish(41);
+              return _context25.finish(41);
 
             case 49:
               console.log("Indexed ".concat(this.documents.length, " documents for RAG"));
-              _context24.next = 55;
+              _context25.next = 55;
               break;
 
             case 52:
-              _context24.prev = 52;
-              _context24.t2 = _context24["catch"](3);
-              console.error("Error indexing documents:", _context24.t2);
+              _context25.prev = 52;
+              _context25.t2 = _context25["catch"](3);
+              console.error("Error indexing documents:", _context25.t2);
 
             case 55:
-              _context24.prev = 55;
+              _context25.prev = 55;
               this.isIndexing = false;
-              return _context24.finish(55);
+              return _context25.finish(55);
 
             case 58:
             case "end":
-              return _context24.stop();
+              return _context25.stop();
           }
         }
       }, null, this, [[3, 52, 55, 58], [18, 37, 41, 49], [22, 29], [42,, 44, 48]]);
@@ -1500,18 +1567,18 @@ function () {
     value: function getMarkdownFiles(vault, folderPath) {
       var files, normalizedFolderPath, dataFolderPath, allFiles, _iteratorNormalCompletion4, _didIteratorError4, _iteratorError4, _iterator4, _step4, file;
 
-      return regeneratorRuntime.async(function getMarkdownFiles$(_context25) {
+      return regeneratorRuntime.async(function getMarkdownFiles$(_context26) {
         while (1) {
-          switch (_context25.prev = _context25.next) {
+          switch (_context26.prev = _context26.next) {
             case 0:
               files = [];
 
               if (folderPath) {
-                _context25.next = 3;
+                _context26.next = 3;
                 break;
               }
 
-              return _context25.abrupt("return", files);
+              return _context26.abrupt("return", files);
 
             case 3:
               normalizedFolderPath = folderPath;
@@ -1526,7 +1593,7 @@ function () {
               _iteratorNormalCompletion4 = true;
               _didIteratorError4 = false;
               _iteratorError4 = undefined;
-              _context25.prev = 11;
+              _context26.prev = 11;
 
               for (_iterator4 = allFiles[Symbol.iterator](); !(_iteratorNormalCompletion4 = (_step4 = _iterator4.next()).done); _iteratorNormalCompletion4 = true) {
                 file = _step4.value;
@@ -1537,45 +1604,45 @@ function () {
                 }
               }
 
-              _context25.next = 19;
+              _context26.next = 19;
               break;
 
             case 15:
-              _context25.prev = 15;
-              _context25.t0 = _context25["catch"](11);
+              _context26.prev = 15;
+              _context26.t0 = _context26["catch"](11);
               _didIteratorError4 = true;
-              _iteratorError4 = _context25.t0;
+              _iteratorError4 = _context26.t0;
 
             case 19:
-              _context25.prev = 19;
-              _context25.prev = 20;
+              _context26.prev = 19;
+              _context26.prev = 20;
 
               if (!_iteratorNormalCompletion4 && _iterator4["return"] != null) {
                 _iterator4["return"]();
               }
 
             case 22:
-              _context25.prev = 22;
+              _context26.prev = 22;
 
               if (!_didIteratorError4) {
-                _context25.next = 25;
+                _context26.next = 25;
                 break;
               }
 
               throw _iteratorError4;
 
             case 25:
-              return _context25.finish(22);
+              return _context26.finish(22);
 
             case 26:
-              return _context25.finish(19);
+              return _context26.finish(19);
 
             case 27:
-              return _context25.abrupt("return", files);
+              return _context26.abrupt("return", files);
 
             case 28:
             case "end":
-              return _context25.stop();
+              return _context26.stop();
           }
         }
       }, null, null, [[11, 15, 19, 27], [20,, 22, 26]]);
@@ -1852,8 +1919,7 @@ function () {
         return userInput;
       }
 
-      var stateHeader = this.stateManager.getStateFormatted();
-      return "".concat(stateHeader, "\n\n").concat(userInput);
+      return userInput;
     }
     /**
      * Enhance prompt with RAG context if available
@@ -1909,27 +1975,27 @@ function () {
     key: "getRoleDefinition",
     value: function getRoleDefinition() {
       var basePath, normalizedPath, rolePath, file, content;
-      return regeneratorRuntime.async(function getRoleDefinition$(_context26) {
+      return regeneratorRuntime.async(function getRoleDefinition$(_context27) {
         while (1) {
-          switch (_context26.prev = _context26.next) {
+          switch (_context27.prev = _context27.next) {
             case 0:
               if (!(!this.plugin || !this.plugin.settings.followRole)) {
-                _context26.next = 2;
+                _context27.next = 2;
                 break;
               }
 
-              return _context26.abrupt("return", null);
+              return _context27.abrupt("return", null);
 
             case 2:
-              _context26.prev = 2;
+              _context27.prev = 2;
               basePath = this.plugin.settings.ragFolderPath;
 
               if (basePath) {
-                _context26.next = 6;
+                _context27.next = 6;
                 break;
               }
 
-              return _context26.abrupt("return", null);
+              return _context27.abrupt("return", null);
 
             case 6:
               normalizedPath = basePath;
@@ -1942,29 +2008,29 @@ function () {
               file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
 
               if (!(file instanceof import_obsidian3.TFile)) {
-                _context26.next = 15;
+                _context27.next = 15;
                 break;
               }
 
-              _context26.next = 13;
+              _context27.next = 13;
               return regeneratorRuntime.awrap(this.plugin.app.vault.read(file));
 
             case 13:
-              content = _context26.sent;
-              return _context26.abrupt("return", content);
+              content = _context27.sent;
+              return _context27.abrupt("return", content);
 
             case 15:
-              return _context26.abrupt("return", null);
+              return _context27.abrupt("return", null);
 
             case 18:
-              _context26.prev = 18;
-              _context26.t0 = _context26["catch"](2);
-              console.error("Error reading role definition:", _context26.t0);
-              return _context26.abrupt("return", null);
+              _context27.prev = 18;
+              _context27.t0 = _context27["catch"](2);
+              console.error("Error reading role definition:", _context27.t0);
+              return _context27.abrupt("return", null);
 
             case 22:
             case "end":
-              return _context26.stop();
+              return _context27.stop();
           }
         }
       }, null, this, [[2, 18]]);
@@ -1980,56 +2046,56 @@ function () {
           roleDefinition,
           formattedPrompt,
           ragContext,
-          _args27 = arguments;
-      return regeneratorRuntime.async(function prepareFullPrompt$(_context27) {
+          _args28 = arguments;
+      return regeneratorRuntime.async(function prepareFullPrompt$(_context28) {
         while (1) {
-          switch (_context27.prev = _context27.next) {
+          switch (_context28.prev = _context28.next) {
             case 0:
-              isNewConversation = _args27.length > 1 && _args27[1] !== undefined ? _args27[1] : false;
+              isNewConversation = _args28.length > 1 && _args28[1] !== undefined ? _args28[1] : false;
 
               if (this.plugin) {
-                _context27.next = 3;
+                _context28.next = 3;
                 break;
               }
 
-              return _context27.abrupt("return", this.formatPrompt(content, isNewConversation));
+              return _context28.abrupt("return", this.formatPrompt(content, isNewConversation));
 
             case 3:
-              _context27.prev = 3;
-              _context27.next = 6;
+              _context28.prev = 3;
+              _context28.next = 6;
               return regeneratorRuntime.awrap(this.getRoleDefinition());
 
             case 6:
-              roleDefinition = _context27.sent;
+              roleDefinition = _context28.sent;
 
               if (roleDefinition) {
                 this.setSystemPrompt(roleDefinition);
               }
 
-              _context27.next = 13;
+              _context28.next = 13;
               break;
 
             case 10:
-              _context27.prev = 10;
-              _context27.t0 = _context27["catch"](3);
-              console.error("Error getting role definition:", _context27.t0);
+              _context28.prev = 10;
+              _context28.t0 = _context28["catch"](3);
+              console.error("Error getting role definition:", _context28.t0);
 
             case 13:
               formattedPrompt = this.formatPrompt(content, isNewConversation);
 
               if (!(this.plugin.settings.ragEnabled && this.plugin.ragService)) {
-                _context27.next = 26;
+                _context28.next = 26;
                 break;
               }
 
-              _context27.prev = 15;
+              _context28.prev = 15;
 
               if (!(this.plugin.ragService.findRelevantDocuments("test").length === 0)) {
-                _context27.next = 19;
+                _context28.next = 19;
                 break;
               }
 
-              _context27.next = 19;
+              _context28.next = 19;
               return regeneratorRuntime.awrap(this.plugin.ragService.indexDocuments());
 
             case 19:
@@ -2039,20 +2105,20 @@ function () {
                 formattedPrompt = this.enhanceWithRagContext(formattedPrompt, ragContext);
               }
 
-              _context27.next = 26;
+              _context28.next = 26;
               break;
 
             case 23:
-              _context27.prev = 23;
-              _context27.t1 = _context27["catch"](15);
-              console.error("Error processing RAG:", _context27.t1);
+              _context28.prev = 23;
+              _context28.t1 = _context28["catch"](15);
+              console.error("Error processing RAG:", _context28.t1);
 
             case 26:
-              return _context27.abrupt("return", formattedPrompt);
+              return _context28.abrupt("return", formattedPrompt);
 
             case 27:
             case "end":
-              return _context27.stop();
+              return _context28.stop();
           }
         }
       }, null, this, [[3, 10], [15, 23]]);
@@ -2069,6 +2135,7 @@ function () {
   function ApiService(baseUrl, plugin) {
     _classCallCheck(this, ApiService);
 
+    this.ollamaView = null;
     this.baseUrl = baseUrl;
     this.stateManager = StateManager.getInstance();
     this.promptService = new PromptService(plugin);
@@ -2083,6 +2150,11 @@ function () {
     key: "getPromptService",
     value: function getPromptService() {
       return this.promptService;
+    }
+  }, {
+    key: "setOllamaView",
+    value: function setOllamaView(view) {
+      this.ollamaView = view;
     }
     /**
      * Set system prompt to be used with each request
@@ -2117,26 +2189,13 @@ function () {
 
   }, {
     key: "generateResponse",
-    value: function generateResponse(modelName, prompt) {
-      var isNewConversation,
-          formattedPrompt,
-          requestBody,
-          response,
-          errorText,
-          data,
-          _args28 = arguments;
-      return regeneratorRuntime.async(function generateResponse$(_context28) {
+    value: function generateResponse(requestBody) {
+      var response, errorText, data;
+      return regeneratorRuntime.async(function generateResponse$(_context29) {
         while (1) {
-          switch (_context28.prev = _context28.next) {
+          switch (_context29.prev = _context29.next) {
             case 0:
-              isNewConversation = _args28.length > 2 && _args28[2] !== undefined ? _args28[2] : false;
-              _context28.next = 3;
-              return regeneratorRuntime.awrap(this.promptService.prepareFullPrompt(prompt, isNewConversation));
-
-            case 3:
-              formattedPrompt = _context28.sent;
-              requestBody = this.promptService.prepareRequestBody(modelName, formattedPrompt);
-              _context28.next = 7;
+              _context29.next = 2;
               return regeneratorRuntime.awrap(fetch("".concat(this.baseUrl, "/api/generate"), {
                 method: "POST",
                 headers: {
@@ -2145,34 +2204,37 @@ function () {
                 body: JSON.stringify(requestBody)
               }));
 
-            case 7:
-              response = _context28.sent;
+            case 2:
+              response = _context29.sent;
 
               if (response.ok) {
-                _context28.next = 13;
+                _context29.next = 8;
                 break;
               }
 
-              _context28.next = 11;
+              _context29.next = 6;
               return regeneratorRuntime.awrap(response.text());
 
-            case 11:
-              errorText = _context28.sent;
+            case 6:
+              errorText = _context29.sent;
               throw new Error("HTTP error! Status: ".concat(response.status, ", ").concat(errorText));
 
-            case 13:
-              _context28.next = 15;
+            case 8:
+              _context29.next = 10;
               return regeneratorRuntime.awrap(response.json());
 
-            case 15:
-              data = _context28.sent;
+            case 10:
+              data = _context29.sent;
               data.response = this.promptService.processModelResponse(data.response);
               this.stateManager.saveStateToStorage();
-              return _context28.abrupt("return", data);
+              return _context29.abrupt("return", {
+                model: requestBody.model,
+                response: this.promptService.processModelResponse(data.response)
+              });
 
-            case 19:
+            case 14:
             case "end":
-              return _context28.stop();
+              return _context29.stop();
           }
         }
       }, null, this);
@@ -2185,12 +2247,12 @@ function () {
     key: "getModels",
     value: function getModels() {
       var response, data;
-      return regeneratorRuntime.async(function getModels$(_context29) {
+      return regeneratorRuntime.async(function getModels$(_context30) {
         while (1) {
-          switch (_context29.prev = _context29.next) {
+          switch (_context30.prev = _context30.next) {
             case 0:
-              _context29.prev = 0;
-              _context29.next = 3;
+              _context30.prev = 0;
+              _context30.next = 3;
               return regeneratorRuntime.awrap(fetch("".concat(this.baseUrl, "/api/tags"), {
                 method: "GET",
                 headers: {
@@ -2199,43 +2261,43 @@ function () {
               }));
 
             case 3:
-              response = _context29.sent;
+              response = _context30.sent;
 
               if (response.ok) {
-                _context29.next = 6;
+                _context30.next = 6;
                 break;
               }
 
               throw new Error("HTTP error! Status: ".concat(response.status));
 
             case 6:
-              _context29.next = 8;
+              _context30.next = 8;
               return regeneratorRuntime.awrap(response.json());
 
             case 8:
-              data = _context29.sent;
+              data = _context30.sent;
 
               if (!Array.isArray(data.models)) {
-                _context29.next = 11;
+                _context30.next = 11;
                 break;
               }
 
-              return _context29.abrupt("return", data.models.map(function (model) {
+              return _context30.abrupt("return", data.models.map(function (model) {
                 return _typeof(model) === "object" ? model.name : model;
               }));
 
             case 11:
-              return _context29.abrupt("return", []);
+              return _context30.abrupt("return", []);
 
             case 14:
-              _context29.prev = 14;
-              _context29.t0 = _context29["catch"](0);
-              console.error("Error fetching models:", _context29.t0);
-              return _context29.abrupt("return", []);
+              _context30.prev = 14;
+              _context30.t0 = _context30["catch"](0);
+              console.error("Error fetching models:", _context30.t0);
+              return _context30.abrupt("return", []);
 
             case 18:
             case "end":
-              return _context29.stop();
+              return _context30.stop();
           }
         }
       }, null, this, [[0, 14]]);
@@ -2258,6 +2320,10 @@ function () {
       };
       this.stateManager.updateState(initialState);
       this.stateManager.saveStateToStorage();
+
+      if (this.ollamaView) {
+        this.ollamaView.messagesPairCount = 0;
+      }
     }
   }]);
 
@@ -2289,17 +2355,18 @@ function (_import_obsidian4$Plu) {
     value: function onload() {
       var _this11 = this;
 
-      return regeneratorRuntime.async(function onload$(_context31) {
+      return regeneratorRuntime.async(function onload$(_context32) {
         while (1) {
-          switch (_context31.prev = _context31.next) {
+          switch (_context32.prev = _context32.next) {
             case 0:
               console.log("Ollama Plugin Loaded!");
-              _context31.next = 3;
+              _context32.next = 3;
               return regeneratorRuntime.awrap(this.loadSettings());
 
             case 3:
               this.apiService = new ApiService(this.settings.ollamaServerUrl);
               this.ragService = new RagService(this);
+              this.promptService = new PromptService(this);
               this.registerView(VIEW_TYPE_OLLAMA, function (leaf) {
                 _this11.view = new OllamaView(leaf, _this11);
                 return _this11.view;
@@ -2318,16 +2385,16 @@ function (_import_obsidian4$Plu) {
                 id: "index-rag-documents",
                 name: "\u0406\u043D\u0434\u0435\u043A\u0441\u0443\u0432\u0430\u0442\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0434\u043B\u044F RAG",
                 callback: function callback() {
-                  return regeneratorRuntime.async(function callback$(_context30) {
+                  return regeneratorRuntime.async(function callback$(_context31) {
                     while (1) {
-                      switch (_context30.prev = _context30.next) {
+                      switch (_context31.prev = _context31.next) {
                         case 0:
-                          _context30.next = 2;
+                          _context31.next = 2;
                           return regeneratorRuntime.awrap(_this11.ragService.indexDocuments());
 
                         case 2:
                         case "end":
-                          return _context30.stop();
+                          return _context31.stop();
                       }
                     }
                   });
@@ -2354,9 +2421,9 @@ function (_import_obsidian4$Plu) {
                 }
               }));
 
-            case 13:
+            case 14:
             case "end":
-              return _context31.stop();
+              return _context32.stop();
           }
         }
       }, null, this);
@@ -2387,28 +2454,28 @@ function (_import_obsidian4$Plu) {
     value: function activateView() {
       var _a, workspace, leaf;
 
-      return regeneratorRuntime.async(function activateView$(_context32) {
+      return regeneratorRuntime.async(function activateView$(_context33) {
         while (1) {
-          switch (_context32.prev = _context32.next) {
+          switch (_context33.prev = _context33.next) {
             case 0:
               workspace = this.app.workspace;
               leaf = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
 
               if (leaf) {
-                _context32.next = 9;
+                _context33.next = 9;
                 break;
               }
 
               console.log("Creating new Ollama view leaf");
               leaf = (_a = workspace.getRightLeaf(false)) != null ? _a : workspace.getLeaf();
-              _context32.next = 7;
+              _context33.next = 7;
               return regeneratorRuntime.awrap(leaf.setViewState({
                 type: VIEW_TYPE_OLLAMA,
                 active: true
               }));
 
             case 7:
-              _context32.next = 10;
+              _context33.next = 10;
               break;
 
             case 9:
@@ -2416,33 +2483,9 @@ function (_import_obsidian4$Plu) {
 
             case 10:
               workspace.revealLeaf(leaf);
-              return _context32.abrupt("return", leaf);
+              return _context33.abrupt("return", leaf);
 
             case 12:
-            case "end":
-              return _context32.stop();
-          }
-        }
-      }, null, this);
-    }
-  }, {
-    key: "loadSettings",
-    value: function loadSettings() {
-      return regeneratorRuntime.async(function loadSettings$(_context33) {
-        while (1) {
-          switch (_context33.prev = _context33.next) {
-            case 0:
-              _context33.t0 = Object;
-              _context33.t1 = {};
-              _context33.t2 = DEFAULT_SETTINGS;
-              _context33.next = 5;
-              return regeneratorRuntime.awrap(this.loadData());
-
-            case 5:
-              _context33.t3 = _context33.sent;
-              this.settings = _context33.t0.assign.call(_context33.t0, _context33.t1, _context33.t2, _context33.t3);
-
-            case 7:
             case "end":
               return _context33.stop();
           }
@@ -2450,13 +2493,37 @@ function (_import_obsidian4$Plu) {
       }, null, this);
     }
   }, {
-    key: "saveSettings",
-    value: function saveSettings() {
-      return regeneratorRuntime.async(function saveSettings$(_context34) {
+    key: "loadSettings",
+    value: function loadSettings() {
+      return regeneratorRuntime.async(function loadSettings$(_context34) {
         while (1) {
           switch (_context34.prev = _context34.next) {
             case 0:
-              _context34.next = 2;
+              _context34.t0 = Object;
+              _context34.t1 = {};
+              _context34.t2 = DEFAULT_SETTINGS;
+              _context34.next = 5;
+              return regeneratorRuntime.awrap(this.loadData());
+
+            case 5:
+              _context34.t3 = _context34.sent;
+              this.settings = _context34.t0.assign.call(_context34.t0, _context34.t1, _context34.t2, _context34.t3);
+
+            case 7:
+            case "end":
+              return _context34.stop();
+          }
+        }
+      }, null, this);
+    }
+  }, {
+    key: "saveSettings",
+    value: function saveSettings() {
+      return regeneratorRuntime.async(function saveSettings$(_context35) {
+        while (1) {
+          switch (_context35.prev = _context35.next) {
+            case 0:
+              _context35.next = 2;
               return regeneratorRuntime.awrap(this.saveData(this.settings));
 
             case 2:
@@ -2464,7 +2531,7 @@ function (_import_obsidian4$Plu) {
 
             case 3:
             case "end":
-              return _context34.stop();
+              return _context35.stop();
           }
         }
       }, null, this);
@@ -2479,103 +2546,103 @@ function (_import_obsidian4$Plu) {
     key: "saveMessageHistory",
     value: function saveMessageHistory(messages) {
       var basePath, logPath, adapter, fileExists, fileSize, stat, backupPath, existingData, existingMessages, newMessages, merged, allMessages, trimmedMessages;
-      return regeneratorRuntime.async(function saveMessageHistory$(_context35) {
+      return regeneratorRuntime.async(function saveMessageHistory$(_context36) {
         while (1) {
-          switch (_context35.prev = _context35.next) {
+          switch (_context36.prev = _context36.next) {
             case 0:
               if (this.settings.saveMessageHistory) {
-                _context35.next = 2;
+                _context36.next = 2;
                 break;
               }
 
-              return _context35.abrupt("return");
+              return _context36.abrupt("return");
 
             case 2:
-              _context35.prev = 2;
+              _context36.prev = 2;
               basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
               logPath = basePath + "/chat_history.json";
               adapter = this.app.vault.adapter;
-              _context35.next = 8;
+              _context36.next = 8;
               return regeneratorRuntime.awrap(adapter.exists(logPath));
 
             case 8:
-              fileExists = _context35.sent;
+              fileExists = _context36.sent;
               fileSize = 0;
 
               if (!fileExists) {
-                _context35.next = 15;
+                _context36.next = 15;
                 break;
               }
 
-              _context35.next = 13;
+              _context36.next = 13;
               return regeneratorRuntime.awrap(adapter.stat(logPath));
 
             case 13:
-              stat = _context35.sent;
+              stat = _context36.sent;
               fileSize = (stat == null ? void 0 : stat.size) ? stat.size / 1024 : 0;
 
             case 15:
               if (!(fileSize > this.settings.logFileSizeLimit)) {
-                _context35.next = 29;
+                _context36.next = 29;
                 break;
               }
 
               if (!fileExists) {
-                _context35.next = 25;
+                _context36.next = 25;
                 break;
               }
 
               backupPath = logPath + ".backup";
-              _context35.next = 20;
+              _context36.next = 20;
               return regeneratorRuntime.awrap(adapter.exists(backupPath));
 
             case 20:
-              if (!_context35.sent) {
-                _context35.next = 23;
+              if (!_context36.sent) {
+                _context36.next = 23;
                 break;
               }
 
-              _context35.next = 23;
+              _context36.next = 23;
               return regeneratorRuntime.awrap(adapter.remove(backupPath));
 
             case 23:
-              _context35.next = 25;
+              _context36.next = 25;
               return regeneratorRuntime.awrap(adapter.copy(logPath, backupPath));
 
             case 25:
-              _context35.next = 27;
+              _context36.next = 27;
               return regeneratorRuntime.awrap(adapter.write(logPath, messages));
 
             case 27:
-              _context35.next = 58;
+              _context36.next = 58;
               break;
 
             case 29:
               if (fileExists) {
-                _context35.next = 34;
+                _context36.next = 34;
                 break;
               }
 
-              _context35.next = 32;
+              _context36.next = 32;
               return regeneratorRuntime.awrap(adapter.write(logPath, messages));
 
             case 32:
-              _context35.next = 58;
+              _context36.next = 58;
               break;
 
             case 34:
-              _context35.next = 36;
+              _context36.next = 36;
               return regeneratorRuntime.awrap(adapter.read(logPath));
 
             case 36:
-              existingData = _context35.sent;
-              _context35.prev = 37;
+              existingData = _context36.sent;
+              _context36.prev = 37;
               existingMessages = JSON.parse(existingData);
               newMessages = JSON.parse(messages);
               merged = JSON.stringify([].concat(_toConsumableArray(existingMessages), _toConsumableArray(newMessages)));
 
               if (!(merged.length / 1024 > this.settings.logFileSizeLimit)) {
-                _context35.next = 49;
+                _context36.next = 49;
                 break;
               }
 
@@ -2586,40 +2653,40 @@ function (_import_obsidian4$Plu) {
                 trimmedMessages = trimmedMessages.slice(1);
               }
 
-              _context35.next = 47;
+              _context36.next = 47;
               return regeneratorRuntime.awrap(adapter.write(logPath, JSON.stringify(trimmedMessages)));
 
             case 47:
-              _context35.next = 51;
+              _context36.next = 51;
               break;
 
             case 49:
-              _context35.next = 51;
+              _context36.next = 51;
               return regeneratorRuntime.awrap(adapter.write(logPath, merged));
 
             case 51:
-              _context35.next = 58;
+              _context36.next = 58;
               break;
 
             case 53:
-              _context35.prev = 53;
-              _context35.t0 = _context35["catch"](37);
-              console.error("Error parsing message history:", _context35.t0);
-              _context35.next = 58;
+              _context36.prev = 53;
+              _context36.t0 = _context36["catch"](37);
+              console.error("Error parsing message history:", _context36.t0);
+              _context36.next = 58;
               return regeneratorRuntime.awrap(adapter.write(logPath, messages));
 
             case 58:
-              _context35.next = 63;
+              _context36.next = 63;
               break;
 
             case 60:
-              _context35.prev = 60;
-              _context35.t1 = _context35["catch"](2);
-              console.error("Failed to save message history:", _context35.t1);
+              _context36.prev = 60;
+              _context36.t1 = _context36["catch"](2);
+              console.error("Failed to save message history:", _context36.t1);
 
             case 63:
             case "end":
-              return _context35.stop();
+              return _context36.stop();
           }
         }
       }, null, this, [[2, 60], [37, 53]]);
@@ -2628,52 +2695,52 @@ function (_import_obsidian4$Plu) {
     key: "loadMessageHistory",
     value: function loadMessageHistory() {
       var logPath, adapter, data;
-      return regeneratorRuntime.async(function loadMessageHistory$(_context36) {
+      return regeneratorRuntime.async(function loadMessageHistory$(_context37) {
         while (1) {
-          switch (_context36.prev = _context36.next) {
+          switch (_context37.prev = _context37.next) {
             case 0:
               if (this.settings.saveMessageHistory) {
-                _context36.next = 2;
+                _context37.next = 2;
                 break;
               }
 
-              return _context36.abrupt("return", []);
+              return _context37.abrupt("return", []);
 
             case 2:
-              _context36.prev = 2;
+              _context37.prev = 2;
               logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
               adapter = this.app.vault.adapter;
-              _context36.next = 7;
+              _context37.next = 7;
               return regeneratorRuntime.awrap(adapter.exists(logPath));
 
             case 7:
-              if (!_context36.sent) {
-                _context36.next = 12;
+              if (!_context37.sent) {
+                _context37.next = 12;
                 break;
               }
 
-              _context36.next = 10;
+              _context37.next = 10;
               return regeneratorRuntime.awrap(adapter.read(logPath));
 
             case 10:
-              data = _context36.sent;
-              return _context36.abrupt("return", JSON.parse(data));
+              data = _context37.sent;
+              return _context37.abrupt("return", JSON.parse(data));
 
             case 12:
-              _context36.next = 17;
+              _context37.next = 17;
               break;
 
             case 14:
-              _context36.prev = 14;
-              _context36.t0 = _context36["catch"](2);
-              console.error("Failed to load message history:", _context36.t0);
+              _context37.prev = 14;
+              _context37.t0 = _context37["catch"](2);
+              console.error("Failed to load message history:", _context37.t0);
 
             case 17:
-              return _context36.abrupt("return", []);
+              return _context37.abrupt("return", []);
 
             case 18:
             case "end":
-              return _context36.stop();
+              return _context37.stop();
           }
         }
       }, null, this, [[2, 14]]);
@@ -2682,23 +2749,23 @@ function (_import_obsidian4$Plu) {
     key: "clearMessageHistory",
     value: function clearMessageHistory() {
       var logPath, adapter;
-      return regeneratorRuntime.async(function clearMessageHistory$(_context37) {
+      return regeneratorRuntime.async(function clearMessageHistory$(_context38) {
         while (1) {
-          switch (_context37.prev = _context37.next) {
+          switch (_context38.prev = _context38.next) {
             case 0:
-              _context37.prev = 0;
+              _context38.prev = 0;
               logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
               adapter = this.app.vault.adapter;
-              _context37.next = 5;
+              _context38.next = 5;
               return regeneratorRuntime.awrap(adapter.exists(logPath));
 
             case 5:
-              if (!_context37.sent) {
-                _context37.next = 9;
+              if (!_context38.sent) {
+                _context38.next = 9;
                 break;
               }
 
-              _context37.next = 8;
+              _context38.next = 8;
               return regeneratorRuntime.awrap(adapter.remove(logPath));
 
             case 8:
@@ -2707,17 +2774,17 @@ function (_import_obsidian4$Plu) {
               }
 
             case 9:
-              _context37.next = 14;
+              _context38.next = 14;
               break;
 
             case 11:
-              _context37.prev = 11;
-              _context37.t0 = _context37["catch"](0);
-              console.error("Failed to clear message history:", _context37.t0);
+              _context38.prev = 11;
+              _context38.t0 = _context38["catch"](0);
+              console.error("Failed to clear message history:", _context38.t0);
 
             case 14:
             case "end":
-              return _context37.stop();
+              return _context38.stop();
           }
         }
       }, null, this, [[0, 11]]);

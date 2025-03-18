@@ -38,7 +38,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   silenceDetection: true,
   followRole: true,
   systemPromptInterval: 0,
-  temperature: 0.2,
+  temperature: 0.1,
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
