@@ -202,19 +202,28 @@ onerror = (event) => {
         placeholder: "Type a message...",
       },
     });
-    const voiceButton = inputContainer.createEl("button", {
-      cls: "voice-button",
-    });
-    setIcon(voiceButton, "microphone");
+
     const sendButton = inputContainer.createEl("button", {
       cls: "send-button",
     });
     setIcon(sendButton, "send");
-    // Create settings button (now after send button)
+
+    const voiceButton = inputContainer.createEl("button", {
+      cls: "voice-button",
+    });
+    setIcon(voiceButton, "microphone");
+
+    const resetButton = inputContainer.createEl("button", {
+      cls: "reset-button",
+    });
+    setIcon(resetButton, "refresh-ccw");
+
+    // Create settings button
     const settingsButton = inputContainer.createEl("button", {
       cls: "settings-button",
     });
     setIcon(settingsButton, "settings");
+
     // Handle enter key to send message
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {

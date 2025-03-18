@@ -178,14 +178,18 @@ onerror = (event) => {
         placeholder: "Type a message..."
       }
     });
-    const voiceButton = inputContainer.createEl("button", {
-      cls: "voice-button"
-    });
-    (0, import_obsidian.setIcon)(voiceButton, "microphone");
     const sendButton = inputContainer.createEl("button", {
       cls: "send-button"
     });
     (0, import_obsidian.setIcon)(sendButton, "send");
+    const voiceButton = inputContainer.createEl("button", {
+      cls: "voice-button"
+    });
+    (0, import_obsidian.setIcon)(voiceButton, "microphone");
+    const resetButton = inputContainer.createEl("button", {
+      cls: "reset-button"
+    });
+    (0, import_obsidian.setIcon)(resetButton, "refresh-ccw");
     const settingsButton = inputContainer.createEl("button", {
       cls: "settings-button"
     });
@@ -927,11 +931,153 @@ var RagService = class {
   }
 };
 
+// stateManager.ts
+var StateManager = class {
+  constructor() {
+    this.state = {
+      currentPhase: "next goal choosing",
+      currentGoal: "Identify if there are any urgent tasks",
+      userActivity: "talking with AI",
+      hasUrgentTasks: "unknown",
+      urgentTasksList: [],
+      currentUrgentTask: null,
+      planExists: "unknown",
+      lastUpdateTime: new Date()
+    };
+  }
+  // Singleton паттерн для доступа к состоянию
+  static getInstance() {
+    if (!StateManager.instance) {
+      StateManager.instance = new StateManager();
+    }
+    return StateManager.instance;
+  }
+  // Получить текущее состояние
+  getState() {
+    this.state.lastUpdateTime = new Date();
+    return { ...this.state };
+  }
+  // Обновить состояние
+  updateState(newState) {
+    this.state = {
+      ...this.state,
+      ...newState,
+      lastUpdateTime: new Date()
+    };
+  }
+  // Добавление задачи в список срочных задач
+  addUrgentTask(task) {
+    if (!this.state.urgentTasksList.includes(task)) {
+      this.state.urgentTasksList.push(task);
+      if (!this.state.currentUrgentTask && this.state.urgentTasksList.length > 0) {
+        this.state.currentUrgentTask = this.state.urgentTasksList[0];
+      }
+      this.state.hasUrgentTasks = true;
+    }
+  }
+  // Удаление задачи из списка и обновление текущей задачи
+  completeUrgentTask(task) {
+    const index = this.state.urgentTasksList.indexOf(task);
+    if (index !== -1) {
+      this.state.urgentTasksList.splice(index, 1);
+      if (this.state.urgentTasksList.length > 0) {
+        this.state.currentUrgentTask = this.state.urgentTasksList[0];
+      } else {
+        this.state.currentUrgentTask = null;
+        this.state.hasUrgentTasks = false;
+      }
+    }
+  }
+  // Получить состояние в формате для вставки в сообщение
+  getStateFormatted() {
+    const currentTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `- **[day phase]** ${this.state.currentPhase}
+  - **[next goal]** ${this.state.currentGoal}
+  - **[user activity]** ${this.state.userActivity}
+  - **[AI time]** ${currentTime}`;
+  }
+  // Анализ сообщения пользователя для обновления состояния
+  processUserMessage(message) {
+    var _a;
+    const lowerMsg = message.toLowerCase();
+    const completionKeywords = ["finished", "completed", "done with", "accomplished", "taken care of", "\u0437\u0430\u043A\u043E\u043D\u0447\u0438\u043B", "\u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043B", "\u0433\u043E\u0442\u043E\u0432\u043E", "\u0441\u0434\u0435\u043B\u0430\u043D\u043E"];
+    const urgentKeywords = ["urgent", "critical", "immediate", "emergency", "priority", "need to", "have to", "\u0441\u0440\u043E\u0447\u043D\u043E", "\u0441\u0440\u043E\u0447\u043D\u0430\u044F", "\u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E", "\u043D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E", "\u043D\u0443\u0436\u043D\u043E"];
+    if (this.state.currentUrgentTask && completionKeywords.some((keyword) => lowerMsg.includes(keyword))) {
+      this.completeUrgentTask(this.state.currentUrgentTask);
+      if (this.state.urgentTasksList.length === 0) {
+        this.updateState({
+          currentPhase: "next goal choosing",
+          currentGoal: "Determine if Roman has a plan for today",
+          userActivity: "planning his day"
+        });
+      } else {
+        this.updateState({
+          currentGoal: (_a = this.state.currentUrgentTask) != null ? _a : "",
+          userActivity: "working on " + this.state.currentUrgentTask
+        });
+      }
+    } else if (urgentKeywords.some((keyword) => lowerMsg.includes(keyword))) {
+      this.updateState({
+        hasUrgentTasks: true,
+        currentPhase: "specific goal realization"
+      });
+      const potentialTasks = this.extractTasksFromMessage(message);
+      potentialTasks.forEach((task) => this.addUrgentTask(task));
+      if (this.state.currentUrgentTask) {
+        this.updateState({
+          currentGoal: this.state.currentUrgentTask,
+          userActivity: "working on " + this.state.currentUrgentTask
+        });
+      }
+    }
+  }
+  // Упрощенный метод извлечения задач из сообщения
+  // В реальном приложении здесь должен быть NLP или более сложный анализ
+  extractTasksFromMessage(message) {
+    const tasks = [];
+    const indicators = ["need to", "have to", "must", "\u043D\u0443\u0436\u043D\u043E", "\u043D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E"];
+    for (const indicator of indicators) {
+      if (message.toLowerCase().includes(indicator)) {
+        const parts = message.split(indicator);
+        for (let i = 1; i < parts.length; i++) {
+          const endOfSentence = parts[i].indexOf(".");
+          const taskText = endOfSentence !== -1 ? parts[i].substring(0, endOfSentence).trim() : parts[i].trim();
+          if (taskText && taskText.length > 3) {
+            tasks.push(indicator + " " + taskText);
+          }
+        }
+      }
+    }
+    return tasks;
+  }
+  // Сохранение состояния в локальное хранилище
+  saveStateToStorage() {
+    localStorage.setItem("assistantState", JSON.stringify(this.state));
+  }
+  // Загрузка состояния из локального хранилища
+  loadStateFromStorage() {
+    const savedState = localStorage.getItem("assistantState");
+    if (savedState) {
+      try {
+        const parsedState = JSON.parse(savedState);
+        parsedState.lastUpdateTime = new Date(parsedState.lastUpdateTime);
+        this.state = parsedState;
+        return true;
+      } catch (e) {
+        console.error("Error parsing saved state:", e);
+      }
+    }
+    return false;
+  }
+};
+
 // apiServices.ts
 var ApiService = class {
   constructor(baseUrl) {
     this.systemPrompt = null;
     this.baseUrl = baseUrl;
+    this.stateManager = StateManager.getInstance();
+    this.stateManager.loadStateFromStorage();
   }
   setSystemPrompt(prompt) {
     this.systemPrompt = prompt;
@@ -946,13 +1092,21 @@ var ApiService = class {
    * Generate response from Ollama
    */
   async generateResponse(modelName, prompt, isNewConversation = false) {
+    this.stateManager.processUserMessage(prompt);
+    const stateHeader = this.stateManager.getStateFormatted();
+    let enhancedPrompt = prompt;
+    if (!isNewConversation) {
+      enhancedPrompt = `${stateHeader}
+
+${prompt}`;
+    }
     const requestBody = {
       model: modelName,
-      prompt,
+      prompt: enhancedPrompt,
       stream: false,
       temperature: 0.2
     };
-    if (isNewConversation && this.systemPrompt) {
+    if (this.systemPrompt) {
       requestBody.system = this.systemPrompt;
     }
     const response = await fetch(`${this.baseUrl}/api/generate`, {
@@ -966,7 +1120,9 @@ var ApiService = class {
       const errorText = await response.text();
       throw new Error(`HTTP error! Status: ${response.status}, ${errorText}`);
     }
-    return await response.json();
+    const data = await response.json();
+    this.stateManager.saveStateToStorage();
+    return data;
   }
   /**
    * Get available models from Ollama
@@ -991,6 +1147,23 @@ var ApiService = class {
       console.error("Error fetching models:", error);
       return [];
     }
+  }
+  /**
+   * Reset assistant state to initial values
+   */
+  resetState() {
+    const initialState = {
+      currentPhase: "next goal choosing",
+      currentGoal: "Identify if there are any urgent tasks",
+      userActivity: "talking with AI",
+      hasUrgentTasks: "unknown",
+      // This will now match the expected type
+      urgentTasksList: [],
+      currentUrgentTask: null,
+      planExists: "unknown"
+    };
+    this.stateManager.updateState(initialState);
+    this.stateManager.saveStateToStorage();
   }
 };
 

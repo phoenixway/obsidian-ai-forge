@@ -1,6 +1,9 @@
+import { StateManager, AssistantState } from './stateManager';
+
 export class ApiService {
   private baseUrl: string;
   private systemPrompt: string | null = null;
+  private stateManager: StateManager;
 
   setSystemPrompt(prompt: string | null): void {
     this.systemPrompt = prompt;
@@ -8,6 +11,9 @@ export class ApiService {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+    this.stateManager = StateManager.getInstance();
+    // Пытаемся загрузить сохраненное состояние
+    this.stateManager.loadStateFromStorage();
   }
 
   /**
@@ -25,17 +31,30 @@ export class ApiService {
     prompt: string,
     isNewConversation: boolean = false
   ): Promise<OllamaResponse> {
-    // Create the request body
+    // Обрабатываем сообщение пользователя и обновляем состояние
+    this.stateManager.processUserMessage(prompt);
+
+    // Получаем актуальное состояние для включения в запрос
+    const stateHeader = this.stateManager.getStateFormatted();
+
+    // Создаем запрос с включением системного промпта и текущего состояния
+    let enhancedPrompt = prompt;
+
+    // Если это не новый разговор, включаем информацию о состоянии в промпт
+    if (!isNewConversation) {
+      enhancedPrompt = `${stateHeader}\n\n${prompt}`;
+    }
+
+    // Создаем тело запроса
     const requestBody: any = {
       model: modelName,
-      prompt: prompt,
+      prompt: enhancedPrompt,
       stream: false,
       temperature: 0.2,
     };
 
-    // If this is a new conversation and we have a system prompt, 
-    // include it separately rather than prepending it to the prompt
-    if (isNewConversation && this.systemPrompt) {
+    // Включаем системный промпт в каждый запрос
+    if (this.systemPrompt) {
       requestBody.system = this.systemPrompt;
     }
 
@@ -52,7 +71,12 @@ export class ApiService {
       throw new Error(`HTTP error! Status: ${response.status}, ${errorText}`);
     }
 
-    return await response.json();
+    const data = await response.json();
+
+    // После получения ответа от модели, сохраняем состояние
+    this.stateManager.saveStateToStorage();
+
+    return data;
   }
 
   /**
@@ -80,6 +104,23 @@ export class ApiService {
       console.error("Error fetching models:", error);
       return [];
     }
+  }
+
+  /**
+   * Reset assistant state to initial values
+   */
+  resetState(): void {
+    const initialState: Partial<AssistantState> = {
+      currentPhase: "next goal choosing",
+      currentGoal: "Identify if there are any urgent tasks",
+      userActivity: "talking with AI",
+      hasUrgentTasks: "unknown", // This will now match the expected type
+      urgentTasksList: [],
+      currentUrgentTask: null,
+      planExists: "unknown"
+    };
+    this.stateManager.updateState(initialState);
+    this.stateManager.saveStateToStorage();
   }
 }
 
