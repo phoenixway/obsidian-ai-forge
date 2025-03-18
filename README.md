@@ -1,6 +1,6 @@
-# About.
-Author's personal assitant in Obsidian.
+# Robin-AI.
 ## 🔹 Description
+Author's personal assitant in Obsidian.
 **Obsidian Virtual Assistant** is a plugin for Obsidian that integrates an intelligent personal assistant to automate routine tasks, organize notes, and work with the locally running Ollama language model.
 
 ## 🚀 Features
