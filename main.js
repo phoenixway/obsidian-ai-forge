@@ -986,57 +986,6 @@ var StateManager = class {
   }
   // Анализ сообщения пользователя для обновления состояния
   processUserMessage(message) {
-    var _a;
-    const lowerMsg = message.toLowerCase();
-    const completionKeywords = ["finished", "completed", "done with", "accomplished", "taken care of", "\u0437\u0430\u043A\u043E\u043D\u0447\u0438\u043B", "\u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043B", "\u0433\u043E\u0442\u043E\u0432\u043E", "\u0441\u0434\u0435\u043B\u0430\u043D\u043E"];
-    const urgentKeywords = ["urgent", "critical", "immediate", "emergency", "priority", "need to", "have to", "\u0441\u0440\u043E\u0447\u043D\u043E", "\u0441\u0440\u043E\u0447\u043D\u0430\u044F", "\u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E", "\u043D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E", "\u043D\u0443\u0436\u043D\u043E"];
-    if (this.state.currentUrgentTask && completionKeywords.some((keyword) => lowerMsg.includes(keyword))) {
-      this.completeUrgentTask(this.state.currentUrgentTask);
-      if (this.state.urgentTasksList.length === 0) {
-        this.updateState({
-          currentPhase: "next goal choosing",
-          currentGoal: "Determine if Roman has a plan for today",
-          userActivity: "planning his day"
-        });
-      } else {
-        this.updateState({
-          currentGoal: (_a = this.state.currentUrgentTask) != null ? _a : "",
-          userActivity: "working on " + this.state.currentUrgentTask
-        });
-      }
-    } else if (urgentKeywords.some((keyword) => lowerMsg.includes(keyword))) {
-      this.updateState({
-        hasUrgentTasks: true,
-        currentPhase: "specific goal realization"
-      });
-      const potentialTasks = this.extractTasksFromMessage(message);
-      potentialTasks.forEach((task) => this.addUrgentTask(task));
-      if (this.state.currentUrgentTask) {
-        this.updateState({
-          currentGoal: this.state.currentUrgentTask,
-          userActivity: "working on " + this.state.currentUrgentTask
-        });
-      }
-    }
-  }
-  // Упрощенный метод извлечения задач из сообщения
-  // В реальном приложении здесь должен быть NLP или более сложный анализ
-  extractTasksFromMessage(message) {
-    const tasks = [];
-    const indicators = ["need to", "have to", "must", "\u043D\u0443\u0436\u043D\u043E", "\u043D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E"];
-    for (const indicator of indicators) {
-      if (message.toLowerCase().includes(indicator)) {
-        const parts = message.split(indicator);
-        for (let i = 1; i < parts.length; i++) {
-          const endOfSentence = parts[i].indexOf(".");
-          const taskText = endOfSentence !== -1 ? parts[i].substring(0, endOfSentence).trim() : parts[i].trim();
-          if (taskText && taskText.length > 3) {
-            tasks.push(indicator + " " + taskText);
-          }
-        }
-      }
-    }
-    return tasks;
   }
   // Сохранение состояния в локальное хранилище
   saveStateToStorage() {
@@ -1090,10 +1039,14 @@ var PromptService = class {
    * Format user prompt with necessary context and state information
    */
   formatPrompt(userInput, isNewConversation = false) {
+    this.stateManager.processUserMessage(userInput);
     if (isNewConversation) {
       return userInput;
     }
-    return userInput;
+    const stateHeader = this.stateManager.getStateFormatted();
+    return `${stateHeader}
+
+${userInput}`;
   }
   /**
    * Enhance prompt with RAG context if available

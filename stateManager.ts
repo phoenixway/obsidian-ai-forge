@@ -94,79 +94,9 @@ export class StateManager {
 
     // Анализ сообщения пользователя для обновления состояния
     public processUserMessage(message: string): void {
-        const lowerMsg = message.toLowerCase();
 
-        // Ключевые слова для определения завершения задачи
-        const completionKeywords = ["finished", "completed", "done with", "accomplished", "taken care of", "закончил", "завершил", "готово", "сделано"];
-
-        // Ключевые слова для определения срочных задач
-        const urgentKeywords = ["urgent", "critical", "immediate", "emergency", "priority", "need to", "have to", "срочно", "срочная", "критично", "необходимо", "нужно"];
-
-        // Проверка на завершение задачи
-        if (this.state.currentUrgentTask && completionKeywords.some(keyword => lowerMsg.includes(keyword))) {
-            this.completeUrgentTask(this.state.currentUrgentTask);
-
-            // Обновляем фазу и цель в зависимости от наличия задач
-            if (this.state.urgentTasksList.length === 0) {
-                this.updateState({
-                    currentPhase: "next goal choosing",
-                    currentGoal: "Determine if Roman has a plan for today",
-                    userActivity: "planning his day"
-                });
-            } else {
-                this.updateState({
-                    currentGoal: this.state.currentUrgentTask ?? "",
-                    userActivity: "working on " + this.state.currentUrgentTask
-                });
-            }
-        }
-        // Проверка на упоминание срочных задач
-        else if (urgentKeywords.some(keyword => lowerMsg.includes(keyword))) {
-            this.updateState({
-                hasUrgentTasks: true,
-                currentPhase: "specific goal realization"
-            });
-
-            // Поиск потенциальных задач в сообщении (упрощенный алгоритм)
-            // В реальном приложении здесь должен быть более сложный анализ текста
-            const potentialTasks = this.extractTasksFromMessage(message);
-            potentialTasks.forEach(task => this.addUrgentTask(task));
-
-            if (this.state.currentUrgentTask) {
-                this.updateState({
-                    currentGoal: this.state.currentUrgentTask,
-                    userActivity: "working on " + this.state.currentUrgentTask
-                });
-            }
-        }
     }
 
-    // Упрощенный метод извлечения задач из сообщения
-    // В реальном приложении здесь должен быть NLP или более сложный анализ
-    private extractTasksFromMessage(message: string): string[] {
-        const tasks: string[] = [];
-        const indicators = ["need to", "have to", "must", "нужно", "необходимо"];
-
-        for (const indicator of indicators) {
-            if (message.toLowerCase().includes(indicator)) {
-                // Получаем часть предложения после индикатора
-                const parts = message.split(indicator);
-                for (let i = 1; i < parts.length; i++) {
-                    // Берем до конца предложения или до следующего индикатора
-                    const endOfSentence = parts[i].indexOf('.');
-                    const taskText = endOfSentence !== -1
-                        ? parts[i].substring(0, endOfSentence).trim()
-                        : parts[i].trim();
-
-                    if (taskText && taskText.length > 3) {
-                        tasks.push(indicator + " " + taskText);
-                    }
-                }
-            }
-        }
-
-        return tasks;
-    }
 
     // Сохранение состояния в локальное хранилище
     public saveStateToStorage(): void {
