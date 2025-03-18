@@ -4,7 +4,7 @@ import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./sett
 import { RagService } from "./ragService";
 import { ApiService } from "./apiServices";
 
-// Інтерфейс для документа у RAG
+// Interface for document in RAG
 interface RAGDocument {
   id: string;
   content: string;
@@ -14,7 +14,7 @@ interface RAGDocument {
   };
 }
 
-// Інтерфейс для векторів ембедінгів
+// Interface for embedding vectors
 interface Embedding {
   documentId: string;
   vector: number[];
@@ -70,10 +70,8 @@ export default class OllamaPlugin extends Plugin {
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
 
-    // Activate the view when layout is ready, but don't send automatic greeting
-    // Activate the view when layout is ready, but don't send automatic greeting
     this.app.workspace.onLayoutReady(() => {
-      // Перевіряємо, чи view вже існує
+      // Check if view already exists
       const existingLeaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
 
       if (!existingLeaf) {
@@ -88,8 +86,6 @@ export default class OllamaPlugin extends Plugin {
       }
     });
 
-
-
     // Register for vault changes to update index
     this.registerEvent(
       this.app.vault.on("modify", () => {
@@ -100,6 +96,7 @@ export default class OllamaPlugin extends Plugin {
       })
     );
   }
+
   // Update API service when settings change
   updateApiService() {
     this.apiService.setBaseUrl(this.settings.ollamaServerUrl);
@@ -121,7 +118,7 @@ export default class OllamaPlugin extends Plugin {
   async activateView() {
     const { workspace } = this.app;
 
-    // Перевіряємо, чи view вже відкрита
+    // Check if view is already open
     let leaf = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
 
     if (!leaf) {
@@ -148,7 +145,8 @@ export default class OllamaPlugin extends Plugin {
   getOllamaApiUrl() {
     return this.settings.ollamaServerUrl || DEFAULT_SETTINGS.ollamaServerUrl;
   }
-  // Функція для збереження історії повідомлень
+
+  // Function to save message history
   async saveMessageHistory(messages: string) {
     if (!this.settings.saveMessageHistory) return;
 
@@ -245,46 +243,13 @@ export default class OllamaPlugin extends Plugin {
 
       if (await adapter.exists(logPath)) {
         await adapter.remove(logPath);
-        // Очистити історію з view
+        // Clear history from view
         if (this.view) {
           this.view.clearChatMessages();
         }
       }
     } catch (error) {
       console.error("Failed to clear message history:", error);
-    }
-  }
-
-  async getRoleDefinition(): Promise<string | null> {
-    if (!this.settings.followRole) {
-      return null;
-    }
-
-    try {
-      const basePath = this.settings.ragFolderPath;
-      if (!basePath) {
-        return null;
-      }
-
-      // Нормалізуємо шлях
-      let normalizedPath = basePath;
-      if (!normalizedPath.endsWith('/')) {
-        normalizedPath += '/';
-      }
-
-      // Шукаємо файл role.md в заданому шляху
-      const rolePath = normalizedPath + 'role.md';
-      const file = this.app.vault.getAbstractFileByPath(rolePath);
-
-      if (file instanceof TFile) {
-        const content = await this.app.vault.read(file);
-        return content;
-      }
-
-      return null;
-    } catch (error) {
-      console.error("Error reading role definition:", error);
-      return null;
     }
   }
 }

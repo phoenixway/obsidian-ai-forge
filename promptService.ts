@@ -1,5 +1,6 @@
 // promptService.ts
 import { StateManager } from './stateManager';
+import { TFile } from "obsidian";
 
 export class PromptService {
     private stateManager: StateManager;
@@ -92,6 +93,42 @@ export class PromptService {
     }
 
     /**
+     * Get role definition from the specified path
+     */
+    async getRoleDefinition(): Promise<string | null> {
+        if (!this.plugin || !this.plugin.settings.followRole) {
+            return null;
+        }
+
+        try {
+            const basePath = this.plugin.settings.ragFolderPath;
+            if (!basePath) {
+                return null;
+            }
+
+            // Normalize the path
+            let normalizedPath = basePath;
+            if (!normalizedPath.endsWith('/')) {
+                normalizedPath += '/';
+            }
+
+            // Look for role.md file in the specified path
+            const rolePath = normalizedPath + 'role.md';
+            const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
+
+            if (file instanceof TFile) {
+                const content = await this.plugin.app.vault.read(file);
+                return content;
+            }
+
+            return null;
+        } catch (error) {
+            console.error("Error reading role definition:", error);
+            return null;
+        }
+    }
+
+    /**
      * Prepare a complete prompt with all enhancements (RAG, role definition, etc.)
      */
     async prepareFullPrompt(content: string, isNewConversation: boolean = false): Promise<string> {
@@ -101,7 +138,7 @@ export class PromptService {
 
         // Get role definition if available
         try {
-            const roleDefinition = await this.plugin.getRoleDefinition();
+            const roleDefinition = await this.getRoleDefinition();
 
             // Set the system prompt if role definition exists
             if (roleDefinition) {

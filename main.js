@@ -27,7 +27,7 @@ __export(main_exports, {
   default: () => OllamaPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian3 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // ollamaView.ts
 var import_obsidian = require("obsidian");
@@ -1060,6 +1060,7 @@ var StateManager = class {
 };
 
 // promptService.ts
+var import_obsidian3 = require("obsidian");
 var PromptService = class {
   // Reference to the plugin for accessing services
   constructor(plugin) {
@@ -1135,6 +1136,34 @@ User message: ${prompt}`;
     return decodedResponse.includes("<think>") ? decodedResponse : response;
   }
   /**
+   * Get role definition from the specified path
+   */
+  async getRoleDefinition() {
+    if (!this.plugin || !this.plugin.settings.followRole) {
+      return null;
+    }
+    try {
+      const basePath = this.plugin.settings.ragFolderPath;
+      if (!basePath) {
+        return null;
+      }
+      let normalizedPath = basePath;
+      if (!normalizedPath.endsWith("/")) {
+        normalizedPath += "/";
+      }
+      const rolePath = normalizedPath + "role.md";
+      const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
+      if (file instanceof import_obsidian3.TFile) {
+        const content = await this.plugin.app.vault.read(file);
+        return content;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error reading role definition:", error);
+      return null;
+    }
+  }
+  /**
    * Prepare a complete prompt with all enhancements (RAG, role definition, etc.)
    */
   async prepareFullPrompt(content, isNewConversation = false) {
@@ -1142,7 +1171,7 @@ User message: ${prompt}`;
       return this.formatPrompt(content, isNewConversation);
     }
     try {
-      const roleDefinition = await this.plugin.getRoleDefinition();
+      const roleDefinition = await this.getRoleDefinition();
       if (roleDefinition) {
         this.setSystemPrompt(roleDefinition);
       }
@@ -1264,7 +1293,7 @@ var ApiService = class {
 };
 
 // main.ts
-var OllamaPlugin = class extends import_obsidian3.Plugin {
+var OllamaPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -1357,7 +1386,7 @@ var OllamaPlugin = class extends import_obsidian3.Plugin {
   getOllamaApiUrl() {
     return this.settings.ollamaServerUrl || DEFAULT_SETTINGS.ollamaServerUrl;
   }
-  // Функція для збереження історії повідомлень
+  // Function to save message history
   async saveMessageHistory(messages) {
     if (!this.settings.saveMessageHistory)
       return;
@@ -1436,31 +1465,6 @@ var OllamaPlugin = class extends import_obsidian3.Plugin {
       }
     } catch (error) {
       console.error("Failed to clear message history:", error);
-    }
-  }
-  async getRoleDefinition() {
-    if (!this.settings.followRole) {
-      return null;
-    }
-    try {
-      const basePath = this.settings.ragFolderPath;
-      if (!basePath) {
-        return null;
-      }
-      let normalizedPath = basePath;
-      if (!normalizedPath.endsWith("/")) {
-        normalizedPath += "/";
-      }
-      const rolePath = normalizedPath + "role.md";
-      const file = this.app.vault.getAbstractFileByPath(rolePath);
-      if (file instanceof import_obsidian3.TFile) {
-        const content = await this.app.vault.read(file);
-        return content;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error reading role definition:", error);
-      return null;
     }
   }
 };
