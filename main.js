@@ -1143,7 +1143,10 @@ User message: ${prompt}`;
       const rolePath = normalizedPath + "role.md";
       const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
       if (file instanceof import_obsidian3.TFile) {
-        const content = await this.plugin.app.vault.read(file);
+        let content = await this.plugin.app.vault.read(file);
+        const currentTime = new Date().toLocaleTimeString();
+        content += `
+AI time is ${currentTime} now`;
         return content;
       }
       return null;

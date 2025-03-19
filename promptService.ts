@@ -118,7 +118,9 @@ export class PromptService {
             const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
 
             if (file instanceof TFile) {
-                const content = await this.plugin.app.vault.read(file);
+                let content = await this.plugin.app.vault.read(file);
+                const currentTime = new Date().toLocaleTimeString();
+                content += `\nAI time is ${currentTime} now`;
                 return content;
             }
 
