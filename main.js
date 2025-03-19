@@ -1177,16 +1177,29 @@ User message: ${prompt}`;
     }
     try {
       const pluginFolder = this.plugin.manifest.dir;
-      const rolePath = path.join(pluginFolder, "default-role.md");
-      const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
-      if (!file) {
-        console.log("File not found, trying to create it...");
-        const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
-        await this.plugin.app.vault.create(rolePath, defaultContent);
-        return defaultContent;
+      const rolePath = "default-role.md";
+      const fullPath = path.join(pluginFolder, rolePath);
+      let content;
+      try {
+        content = await this.plugin.app.vault.adapter.read(fullPath);
+      } catch (readError) {
+        console.log("Couldn't read file, attempting to create it");
+        try {
+          const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
+          const exists = await this.plugin.app.vault.adapter.exists(fullPath);
+          if (!exists) {
+            await this.plugin.app.vault.adapter.write(fullPath, defaultContent);
+            content = defaultContent;
+          } else {
+            console.error("File exists but couldn't be read:", fullPath);
+            return null;
+          }
+        } catch (createError) {
+          console.error("Error creating default role file:", createError);
+          return null;
+        }
       }
-      if (file instanceof import_obsidian3.TFile) {
-        let content = await this.plugin.app.vault.read(file);
+      if (content) {
         const currentTime = new Date().toLocaleTimeString();
         content += `
 AI time is ${currentTime} now`;
@@ -1194,7 +1207,7 @@ AI time is ${currentTime} now`;
       }
       return null;
     } catch (error) {
-      console.error("Error reading default role definition:", error);
+      console.error("Error handling default role definition:", error);
       return null;
     }
   }

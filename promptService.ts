@@ -103,23 +103,41 @@ export class PromptService {
         }
 
         try {
-            // Get absolute plugin folder path
+            // Get plugin folder path
             const pluginFolder = this.plugin.manifest.dir;
-            const rolePath = path.join(pluginFolder, 'default-role.md');
+            const rolePath = 'default-role.md';
+            const fullPath = path.join(pluginFolder, rolePath);
 
-            // Try to get the file using the absolute path
-            const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
+            let content;
 
-            if (!file) {
-                console.log("File not found, trying to create it...");
-                // If file doesn't exist, create it with default content
-                const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
-                await this.plugin.app.vault.create(rolePath, defaultContent);
-                return defaultContent;
+            try {
+                // First try to read the file directly using Obsidian's adapter
+                content = await this.plugin.app.vault.adapter.read(fullPath);
+            } catch (readError) {
+                // If reading fails, try to create the file
+                console.log("Couldn't read file, attempting to create it");
+
+                try {
+                    const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
+                    // Check if file exists before creating
+                    const exists = await this.plugin.app.vault.adapter.exists(fullPath);
+
+                    if (!exists) {
+                        await this.plugin.app.vault.adapter.write(fullPath, defaultContent);
+                        content = defaultContent;
+                    } else {
+                        // If it exists but we couldn't read it, there's a problem
+                        console.error("File exists but couldn't be read:", fullPath);
+                        return null;
+                    }
+                } catch (createError) {
+                    console.error("Error creating default role file:", createError);
+                    return null;
+                }
             }
 
-            if (file instanceof TFile) {
-                let content = await this.plugin.app.vault.read(file);
+            // If we got content, append time and return
+            if (content) {
                 const currentTime = new Date().toLocaleTimeString();
                 content += `\nAI time is ${currentTime} now`;
                 return content;
@@ -127,7 +145,7 @@ export class PromptService {
 
             return null;
         } catch (error) {
-            console.error("Error reading default role definition:", error);
+            console.error("Error handling default role definition:", error);
             return null;
         }
     }
