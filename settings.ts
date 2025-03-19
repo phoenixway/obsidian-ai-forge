@@ -22,6 +22,7 @@ export interface OllamaPluginSettings {
   followRole: boolean;
   systemPromptInterval: number;
   temperature: number;
+  contextWindow: number;
 }
 
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
@@ -39,6 +40,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   followRole: true,
   systemPromptInterval: 0,
   temperature: 0.1,
+  contextWindow: 8192,
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -321,7 +323,17 @@ export class OllamaSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
-
+    new Setting(containerEl)
+      .setName("AI context window")
+      .setDesc("Better > 8192")
+      .addText((text) =>
+        text
+          .setValue(String(this.plugin.settings.contextWindow || 8192))
+          .onChange(async (value) => {
+            this.plugin.settings.contextWindow = parseInt(value) || 8192;
+            await this.plugin.saveSettings();
+          })
+      );
 
   }
 }

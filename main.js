@@ -535,7 +535,7 @@ onerror = (event) => {
           stream: false,
           temperature: this.plugin.settings.temperature || 0.2,
           options: {
-            num_ctx: 8192
+            num_ctx: this.plugin.settings.contextWindow || 8192
           }
         };
         if (useSystemPrompt) {
@@ -678,7 +678,8 @@ var DEFAULT_SETTINGS = {
   silenceDetection: true,
   followRole: true,
   systemPromptInterval: 0,
-  temperature: 0.1
+  temperature: 0.1,
+  contextWindow: 8192
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
@@ -833,6 +834,12 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     new import_obsidian2.Setting(containerEl).setName("System Prompt Interval").setDesc("\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u043F\u0430\u0440 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C \u043C\u0456\u0436 \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043A\u0430\u043C\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0433\u043E \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F. 0 - \u0437 \u043A\u043E\u0436\u043D\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C, \u0432\u0456\u0434'\u0454\u043C\u043D\u0435 - \u043D\u0456\u043A\u043E\u043B\u0438 \u043D\u0435 \u0432\u0456\u0434\u043F\u0440\u0430\u0432\u043B\u044F\u0442\u0438").addText(
       (text) => text.setValue(String(this.plugin.settings.systemPromptInterval || 0)).onChange(async (value) => {
         this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("AI context window").setDesc("Better > 8192").addText(
+      (text) => text.setValue(String(this.plugin.settings.contextWindow || 8192)).onChange(async (value) => {
+        this.plugin.settings.contextWindow = parseInt(value) || 8192;
         await this.plugin.saveSettings();
       })
     );

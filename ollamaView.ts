@@ -734,7 +734,7 @@ onerror = (event) => {
           stream: false,
           temperature: this.plugin.settings.temperature || 0.2,
           options: {
-            num_ctx: 8192
+            num_ctx: this.plugin.settings.contextWindow || 8192,
           }
         };
 
