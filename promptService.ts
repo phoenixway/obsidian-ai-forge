@@ -110,6 +110,8 @@ export class PromptService {
             const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
             console.log(rolePath);
             console.log(pluginFolder);
+            console.log(file);
+
 
 
             if (file instanceof TFile) {

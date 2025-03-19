@@ -1181,6 +1181,7 @@ User message: ${prompt}`;
       const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
       console.log(rolePath);
       console.log(pluginFolder);
+      console.log(file);
       if (file instanceof import_obsidian3.TFile) {
         let content = await this.plugin.app.vault.read(file);
         console.log(content);
