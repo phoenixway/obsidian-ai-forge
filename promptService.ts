@@ -109,6 +109,8 @@ export class PromptService {
 
             const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
             console.log(rolePath);
+            console.log(pluginFolder);
+
 
             if (file instanceof TFile) {
                 let content = await this.plugin.app.vault.read(file);
