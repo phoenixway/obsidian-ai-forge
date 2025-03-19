@@ -105,7 +105,7 @@ export class PromptService {
         try {
             // Get plugin folder path
             const pluginFolder = this.plugin.manifest.dir;
-            const rolePath = path.join(pluginFolder, 'role.md');
+            const rolePath = path.join(pluginFolder, 'default-role.md');
 
             const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
 

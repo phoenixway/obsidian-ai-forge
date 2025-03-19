@@ -1177,7 +1177,7 @@ User message: ${prompt}`;
     }
     try {
       const pluginFolder = this.plugin.manifest.dir;
-      const rolePath = path.join(pluginFolder, "role.md");
+      const rolePath = path.join(pluginFolder, "default-role.md");
       const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
       if (file instanceof import_obsidian3.TFile) {
         let content = await this.plugin.app.vault.read(file);
