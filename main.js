@@ -533,7 +533,10 @@ onerror = (event) => {
           model: this.plugin.settings.modelName,
           prompt: formattedPrompt,
           stream: false,
-          temperature: this.plugin.settings.temperature || 0.2
+          temperature: this.plugin.settings.temperature || 0.2,
+          options: {
+            num_ctx: 4096
+          }
         };
         if (useSystemPrompt) {
           const systemPrompt = this.plugin.promptService.getSystemPrompt();

@@ -14,6 +14,10 @@ interface Message {
   timestamp: Date;
 }
 
+interface RequestOptions {
+  num_ctx?: number;
+}
+
 export class OllamaView extends ItemView {
   private plugin: OllamaPlugin;
   private chatContainerEl: HTMLElement;
@@ -716,17 +720,22 @@ onerror = (event) => {
         );
 
         // Створення requestBody безпосередньо в processWithOllama
+
         const requestBody: {
           model: string;
           prompt: string;
           stream: boolean;
           temperature: number;
           system?: string;
+          options?: RequestOptions;
         } = {
           model: this.plugin.settings.modelName,
           prompt: formattedPrompt,
           stream: false,
           temperature: this.plugin.settings.temperature || 0.2,
+          options: {
+            num_ctx: 4096
+          }
         };
 
         // Додаємо системне повідомлення, якщо потрібно
