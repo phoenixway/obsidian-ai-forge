@@ -1179,12 +1179,14 @@ User message: ${prompt}`;
       const pluginFolder = this.plugin.manifest.dir;
       const rolePath = path.join(pluginFolder, "default-role.md");
       const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
-      console.log(rolePath);
-      console.log(pluginFolder);
-      console.log(file);
+      if (!file) {
+        console.log("File not found, trying to create it...");
+        const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
+        await this.plugin.app.vault.create(rolePath, defaultContent);
+        return defaultContent;
+      }
       if (file instanceof import_obsidian3.TFile) {
         let content = await this.plugin.app.vault.read(file);
-        console.log(content);
         const currentTime = new Date().toLocaleTimeString();
         content += `
 AI time is ${currentTime} now`;
