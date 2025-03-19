@@ -1,6 +1,7 @@
 // promptService.ts
 import { StateManager } from './stateManager';
 import { TFile } from "obsidian";
+import * as path from 'path';
 
 export class PromptService {
     private stateManager: StateManager;
@@ -94,27 +95,18 @@ export class PromptService {
     }
 
     /**
-     * Get role definition from the specified path
+     * Get default role definition from plugin folder
      */
-    async getRoleDefinition(): Promise<string | null> {
-        if (!this.plugin || !this.plugin.settings.followRole) {
+    async getDefaultRoleDefinition(): Promise<string | null> {
+        if (!this.plugin) {
             return null;
         }
 
         try {
-            const basePath = this.plugin.settings.ragFolderPath;
-            if (!basePath) {
-                return null;
-            }
+            // Get plugin folder path
+            const pluginFolder = this.plugin.manifest.dir;
+            const rolePath = path.join(pluginFolder, 'role.md');
 
-            // Normalize the path
-            let normalizedPath = basePath;
-            if (!normalizedPath.endsWith('/')) {
-                normalizedPath += '/';
-            }
-
-            // Look for role.md file in the specified path
-            const rolePath = normalizedPath + 'role.md';
             const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
 
             if (file instanceof TFile) {
@@ -122,6 +114,57 @@ export class PromptService {
                 const currentTime = new Date().toLocaleTimeString();
                 content += `\nAI time is ${currentTime} now`;
                 return content;
+            }
+
+            return null;
+        } catch (error) {
+            console.error("Error reading default role definition:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Get custom role definition from specified path
+     */
+    async getCustomRoleDefinition(): Promise<string | null> {
+        if (!this.plugin || !this.plugin.settings.customRoleFilePath) {
+            return null;
+        }
+
+        try {
+            const customPath = this.plugin.settings.customRoleFilePath;
+            const file = this.plugin.app.vault.getAbstractFileByPath(customPath);
+
+            if (file instanceof TFile) {
+                let content = await this.plugin.app.vault.read(file);
+                const currentTime = new Date().toLocaleTimeString();
+                content += `\nAI time is ${currentTime} now`;
+                return content;
+            }
+
+            return null;
+        } catch (error) {
+            console.error("Error reading custom role definition:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Get role definition based on settings
+     */
+    async getRoleDefinition(): Promise<string | null> {
+        if (!this.plugin || !this.plugin.settings.followRole) {
+            return null;
+        }
+
+        try {
+            // Use default role if enabled
+            if (this.plugin.settings.useDefaultRoleDefinition) {
+                return await this.getDefaultRoleDefinition();
+            }
+            // Otherwise use custom role path if provided
+            else if (this.plugin.settings.customRoleFilePath) {
+                return await this.getCustomRoleDefinition();
             }
 
             return null;
