@@ -898,7 +898,8 @@ onerror = (event) => {
           mediaRecorder.stop();
           console.log("Recording stopped after timeout");
         }
-      }, 5000);
+      }, 15000);
+      //   }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
 

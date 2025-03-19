@@ -649,7 +649,7 @@ onerror = (event) => {
           mediaRecorder.stop();
           console.log("Recording stopped after timeout");
         }
-      }, 5e3);
+      }, 15e3);
     } catch (error) {
       console.error("Error accessing microphone:", error);
       voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
