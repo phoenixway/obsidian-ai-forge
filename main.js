@@ -1181,6 +1181,7 @@ User message: ${prompt}`;
       const file = this.plugin.app.vault.getAbstractFileByPath(rolePath);
       if (file instanceof import_obsidian3.TFile) {
         let content = await this.plugin.app.vault.read(file);
+        console.log(content);
         const currentTime = new Date().toLocaleTimeString();
         content += `
 AI time is ${currentTime} now`;

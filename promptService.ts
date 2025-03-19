@@ -111,6 +111,8 @@ export class PromptService {
 
             if (file instanceof TFile) {
                 let content = await this.plugin.app.vault.read(file);
+                console.log(content);
+
                 const currentTime = new Date().toLocaleTimeString();
                 content += `\nAI time is ${currentTime} now`;
                 return content;
