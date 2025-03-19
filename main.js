@@ -535,7 +535,7 @@ onerror = (event) => {
           stream: false,
           temperature: this.plugin.settings.temperature || 0.2,
           options: {
-            num_ctx: 4096
+            num_ctx: 8192
           }
         };
         if (useSystemPrompt) {
