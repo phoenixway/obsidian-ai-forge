@@ -79,10 +79,12 @@ export default class OllamaPlugin extends Plugin {
         await this.saveSettings();
 
         // Notify about the model change
-        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
+        // this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
 
         // Emit model-changed event (to update UI)
         this.emit('model-changed', newModel);
+        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
+
       }
     });
     this.apiService.on('connection-error', (error) => {

@@ -710,6 +710,7 @@ onerror = (event) => {
     this.showEmptyState();
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
     });
     this.register(() => removeListener());
   }
@@ -1930,8 +1931,8 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
         const newModel = "llama2:13b";
         this.settings.modelName = newModel;
         await this.saveSettings();
-        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
         this.emit("model-changed", newModel);
+        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
       }
     });
     this.apiService.on("connection-error", (error) => {
