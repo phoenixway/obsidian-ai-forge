@@ -304,6 +304,8 @@ onerror = (event) => {
   }
 
   private showEmptyState(): void {
+    console.log("show empti state");
+
     if (this.messages.length === 0 && !this.emptyStateEl) {
       this.emptyStateEl = this.chatContainer.createDiv({
         cls: "ollama-empty-state",
