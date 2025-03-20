@@ -334,7 +334,7 @@ export class MessageService {
                     const systemPrompt = this.plugin.promptService.getSystemPrompt();
                     if (systemPrompt) {
                         requestBody.system = systemPrompt;
-                        console.log("processWithOllama: system prompt is used!");
+                        // console.log("processWithOllama: system prompt is used!");
                     }
                 }
 

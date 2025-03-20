@@ -3460,7 +3460,7 @@ function (_import_obsidian5$Plu) {
                 if (!existingLeaf) {
                   _this16.activateView();
                 } else {
-                  console.log("Ollama view already exists, not creating a new one");
+                  // console.log("Ollama view already exists, not creating a new one");
                 }
 
                 if (_this16.settings.ragEnabled) {

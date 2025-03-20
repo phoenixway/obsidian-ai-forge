@@ -283,7 +283,6 @@ var MessageService = class {
           const systemPrompt = this.plugin.promptService.getSystemPrompt();
           if (systemPrompt) {
             requestBody.system = systemPrompt;
-            console.log("processWithOllama: system prompt is used!");
           }
         }
         const data = await this.plugin.apiService.generateResponse(requestBody);
@@ -532,7 +531,6 @@ onerror = (event) => {
       const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
-      console.log("Worker initialized successfully:", this.speechWorker);
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
