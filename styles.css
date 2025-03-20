@@ -649,7 +649,7 @@ reset-button {
     /* margin-bottom: 15px; */
     display: flex;
     flex-direction: column;
-    /* align-items: center; */
+    align-items: center;
     margin: 8px 0;
   }
   
