@@ -553,7 +553,7 @@ reset-button {
 
 /* Fix the icon styling */
 .error-icon {
-  color: red !important; /* White icon color for contrast against red background */
+  color: white !important; /* White icon color for contrast against red background */
   margin-right: 10px !important;
   /* color: white !important; White icon color for contrast against red background */
 
