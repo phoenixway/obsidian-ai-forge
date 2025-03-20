@@ -1,26 +1,54 @@
 /* Additional CSS styles for message service */
 
 /* Error message styling */
+/* Enhanced error message styling */
 .error-message {
-    background-color: rgba(220, 53, 69, 0.1) !important;
-    color: var(--text-normal) !important;
-    border-left: 3px solid var(--color-red) !important;
-  }
-  
-  .error-bubble {
-    box-shadow: 0 1px 2px rgba(220, 53, 69, 0.25) !important;
-  }
-  
-  .error-icon {
-    color: var(--color-red);
-    margin-right: 8px;
-    display: inline-flex;
-    align-items: center;
-  }
-  
-  .error-message-tail::before {
-    border-color: transparent rgba(220, 53, 69, 0.1) transparent transparent;
-  }
+  background-color: rgba(220, 53, 69, 0.15) !important; /* Increased opacity for more visibility */
+  color: var(--text-error, #dc3545) !important; /* Darker text color for better contrast */
+  border-left: 4px solid var(--color-red) !important; /* Thicker left border */
+  font-weight: 500; /* Slightly bolder text */
+  padding: 12px 15px !important; /* Additional padding */
+}
+
+.error-bubble {
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3) !important; /* Enhanced shadow */
+}
+
+.error-icon {
+  color: var(--color-red);
+  margin-right: 10px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 1.1em; /* Slightly larger icon */
+}
+
+.error-message-tail::before {
+  border-color: transparent rgba(220, 53, 69, 0.15) transparent transparent;
+}
+
+/* Add a subtle pulsing animation for new error messages */
+@keyframes error-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+
+.error-message-group:last-child .error-message {
+  animation: error-pulse 2s ease-out 1;
+}
+
+/* Increase spacing for error message groups */
+.error-message-group {
+  margin-bottom: 18px;
+  margin-top: 18px;
+}
+
+/* Make error message text more noticeable */
+.error-message-text {
+  display: inline;
+  line-height: 1.5;
+  letter-spacing: 0.01em; /* Slight letter spacing for better readability */
+}
   
   /* System message styling */
   .system-message {
@@ -46,13 +74,11 @@
   }
   
   /* Message group spacing */
-  .error-message-group,
   .system-message-group {
     margin-bottom: 15px;
   }
   
   /* Message content text */
-  .error-message-text,
   .system-message-text {
     display: inline;
     line-height: 1.5;
