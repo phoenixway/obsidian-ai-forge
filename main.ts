@@ -1,4 +1,4 @@
-import { Plugin, TFile } from "obsidian";
+import { Plugin } from "obsidian";
 import { OllamaView, VIEW_TYPE_OLLAMA } from "./ollamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
 import { RagService } from "./ragService";
@@ -29,10 +29,30 @@ export default class OllamaPlugin extends Plugin {
   ragService: RagService;
   apiService: ApiService;
   promptService: PromptService;
-
-
+  private eventHandlers: Record<string, Array<(data: any) => any>> = {};
   documents: RAGDocument[] = [];
   embeddings: Embedding[] = [];
+
+  on(event: string, callback: (data: any) => any): () => void {
+    if (!this.eventHandlers[event]) {
+      this.eventHandlers[event] = [];
+    }
+    this.eventHandlers[event].push(callback);
+
+    // Return a function to remove this specific event handler
+    return () => {
+      this.eventHandlers[event] = this.eventHandlers[event].filter(
+        handler => handler !== callback
+      );
+    };
+  }
+
+  emit(event: string, data?: any): void {
+    const handlers = this.eventHandlers[event];
+    if (handlers) {
+      handlers.forEach(handler => handler(data));
+    }
+  }
 
   async onload() {
     console.log("Ollama Plugin Loaded!");

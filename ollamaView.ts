@@ -28,17 +28,16 @@ export class OllamaView extends ItemView {
   private historyLoaded: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
   static instance: OllamaView | null = null;
-  // private embeddings: number[][] = [];
   private speechWorker: Worker;
   private mediaRecorder: MediaRecorder | null = null;
   private systemMessageInterval: number = 0;
-  private messagesPairCount: number = 0; // Лічильник пар повідомлень
-
+  private messagesPairCount: number = 0;
+  private emptyStateEl: HTMLElement | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
-    // Force singleton pattern
+
     if (OllamaView.instance) {
       return OllamaView.instance;
     }
@@ -46,19 +45,16 @@ export class OllamaView extends ItemView {
     if (this.plugin.apiService) {
       this.plugin.apiService.setOllamaView(this);
     }
-    // Додати змінну для зберігання посилання на mediaRecorder
+
     this.mediaRecorder = null;
 
     try {
-      // Варіант з використанням Blob API
-      // Оновлений код воркера для speechWorker
       const workerCode = `
 onmessage = async (event) => {
     try {
       const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
       console.log("Worker received audioBlob:", audioBlob);
       
-      // Перевіряємо наявність API ключа
       if (!apiKey || apiKey.trim() === '') {
         postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
         return;
@@ -66,7 +62,6 @@ onmessage = async (event) => {
 
       const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
       
-      // Конвертуємо Blob у Base64
       const arrayBuffer = await audioBlob.arrayBuffer();
       const base64Audio = btoa(
         new Uint8Array(arrayBuffer).reduce(
@@ -82,9 +77,9 @@ onmessage = async (event) => {
           config: {
             encoding: 'WEBM_OPUS',
             sampleRateHertz: 48000,
-            languageCode: languageCode, // Використовуємо параметр мови
-            model: 'latest_long', // Використовуємо модель для довгих записів
-            enableAutomaticPunctuation: true, // Додаємо автоматичну пунктуацію
+            languageCode: languageCode,
+            model: 'latest_long',
+            enableAutomaticPunctuation: true,
           },
           audio: {
             content: base64Audio
@@ -109,7 +104,6 @@ onmessage = async (event) => {
       console.log("Speech recognition data:", data);
       
       if (data.results && data.results.length > 0) {
-        // Об'єднуємо всі розпізнані фрагменти тексту
         const transcript = data.results
           .map(result => result.alternatives[0].transcript)
           .join(' ')
@@ -140,34 +134,27 @@ onerror = (event) => {
       console.error("Failed to initialize worker:", error);
     }
 
-    // Оновлений обробник повідомлень від воркера
     this.speechWorker.onmessage = (event) => {
       const transcript = event.data;
       console.log("Received transcript from worker:", transcript);
 
-      // Вставляємо текст у позицію курсора
       const cursorPosition = this.inputEl.selectionStart || 0;
       const currentValue = this.inputEl.value;
 
-      // Додаємо пробіл перед текстом, якщо курсор не на початку рядка і попередній символ не пробіл
       let insertText = transcript;
       if (cursorPosition > 0 && currentValue.charAt(cursorPosition - 1) !== ' ' && insertText.charAt(0) !== ' ') {
         insertText = ' ' + insertText;
       }
 
-      // Створюємо новий текст, вставляючи розпізнаний текст у позицію курсора
       const newValue = currentValue.substring(0, cursorPosition) +
         insertText +
         currentValue.substring(cursorPosition);
 
-      // Оновлюємо значення поля вводу
       this.inputEl.value = newValue;
 
-      // Переміщуємо курсор після вставленого тексту
       const newCursorPosition = cursorPosition + insertText.length;
       this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
 
-      // Фокусуємось на полі вводу
       this.inputEl.focus();
     };
 
@@ -185,29 +172,25 @@ onerror = (event) => {
   }
 
   getIcon(): string {
-    return "message-square"; // Та сама іконка, що використовується в рібоні
+    return "message-square";
   }
 
   async onOpen(): Promise<void> {
-    // Create main container
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container",
     });
 
-    // Create chat messages container
     this.chatContainer = this.chatContainerEl.createDiv({
       cls: "ollama-chat-container",
     });
 
-    // Create input container
     const inputContainer = this.chatContainerEl.createDiv({
       cls: "chat-input-container",
     });
 
-    // Create textarea for input
     this.inputEl = inputContainer.createEl("textarea", {
       attr: {
-        placeholder: "Type a message...",
+        placeholder: `Text to ${this.plugin.settings.modelName}...`,
       },
     });
 
@@ -226,28 +209,23 @@ onerror = (event) => {
     });
     setIcon(resetButton, "refresh-ccw");
 
-    // Create settings button
     const settingsButton = inputContainer.createEl("button", {
       cls: "settings-button",
     });
     setIcon(settingsButton, "settings");
 
-    // Handle enter key to send message
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         this.sendMessage();
       }
     });
-    // Handle settings button click
+
     settingsButton.addEventListener("click", () => {
       const setting = (this.app as any).setting;
-      // setting.open();
-      // setting.openTabById('obsidian-ollama-duet');
       setting.open("obsidian-ollama-duet");
     });
 
-    // Handle send button click
     sendButton.addEventListener("click", () => {
       this.sendMessage();
     });
@@ -255,6 +233,7 @@ onerror = (event) => {
     voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
     });
+
     resetButton.addEventListener("click", () => {
       this.plugin.apiService.resetState();
       this.clearChatMessages();
@@ -263,6 +242,43 @@ onerror = (event) => {
         this.inputEl.focus();
       }, 100);
     });
+
+    this.showEmptyState();
+    const removeListener = this.plugin.on('model-changed', (modelName: string) => {
+      this.updateInputPlaceholder(modelName);
+    });
+    this.register(() => removeListener());
+  }
+
+  private updateInputPlaceholder(modelName: string): void {
+    if (this.inputEl) {
+      this.inputEl.placeholder = `Text to ${modelName}...`;
+    }
+  }
+
+  private showEmptyState(): void {
+    if (this.messages.length === 0 && !this.emptyStateEl) {
+      this.emptyStateEl = this.chatContainer.createDiv({
+        cls: "ollama-empty-state",
+      });
+
+      const messageEl = this.emptyStateEl.createDiv({
+        cls: "empty-state-message",
+        text: "No messages yet"
+      });
+
+      const tipEl = this.emptyStateEl.createDiv({
+        cls: "empty-state-tip",
+        text: `Type a message to start chatting with ${this.plugin.settings.modelName}`
+      });
+    }
+  }
+
+  private hideEmptyState(): void {
+    if (this.emptyStateEl && this.emptyStateEl.parentNode) {
+      this.emptyStateEl.remove();
+      this.emptyStateEl = null;
+    }
   }
 
   async loadMessageHistory() {
@@ -272,12 +288,10 @@ onerror = (event) => {
       const history = await this.plugin.loadMessageHistory();
 
       if (Array.isArray(history) && history.length > 0) {
-        // Clear existing messages
         this.messages = [];
         this.chatContainer.empty();
-        // Add each message from history
+
         for (const msg of history) {
-          // Convert string timestamp to Date object
           const message = {
             ...msg,
             timestamp: new Date(msg.timestamp),
@@ -287,16 +301,17 @@ onerror = (event) => {
           this.renderMessage(message);
         }
 
-        // Scroll to bottom after loading history
         this.guaranteedScrollToBottom();
-
-        // Initialize thinking blocks to be collapsed
         this.initializeThinkingBlocks();
+        this.hideEmptyState();
+      } else {
+        this.showEmptyState();
       }
 
       this.historyLoaded = true;
     } catch (error) {
       console.error("Error loading message history:", error);
+      this.showEmptyState();
     }
   }
 
@@ -304,7 +319,6 @@ onerror = (event) => {
     if (this.messages.length === 0) return;
 
     try {
-      // Convert messages to a serializable format
       const serializedMessages = this.messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -317,20 +331,12 @@ onerror = (event) => {
   }
 
   guaranteedScrollToBottom(): void {
-    // Clear any pending scroll operation
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
     }
 
-    // Use requestAnimationFrame to ensure scroll happens after rendering
     requestAnimationFrame(() => {
       if (!this.chatContainer) return;
-
-      // Log scroll values for debugging
-      //
-      //
-
-      // Scroll to bottom
       this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
     });
   }
@@ -341,13 +347,9 @@ onerror = (event) => {
     const content = this.inputEl.value.trim();
     if (!content) return;
 
-    // Add user message to chat
+    this.hideEmptyState();
     this.addMessage("user", content);
-
-    // Clear input
     this.inputEl.value = "";
-
-    // Process with Ollama API
     await this.processWithOllama(content);
   }
 
@@ -361,46 +363,37 @@ onerror = (event) => {
     this.messages.push(message);
     this.renderMessage(message);
 
-    // Збільшуємо лічильник пар, коли додаємо повідомлення асистента після повідомлення користувача
     if (role === "assistant" && this.messages.length >= 2) {
-      // Перевіряємо, що попереднє повідомлення було від користувача
       if (this.messages[this.messages.length - 2].role === "user") {
         this.messagesPairCount++;
       }
     }
 
-    // Save updated message history
     this.saveMessageHistory();
 
-    // Guaranteed scroll to bottom after rendering
     setTimeout(() => {
       this.guaranteedScrollToBottom();
     }, 100);
   }
 
   private processThinkingTags(content: string): string {
-    // Early return if no thinking tags
     if (!content.includes("<think>")) {
       return content;
     }
 
     const parts = [];
     let currentPosition = 0;
-    // Use a more robust regex with the 's' flag for multi-line matching
     const thinkingRegex = /<think>([\s\S]*?)<\/think>/g;
     let match;
 
     while ((match = thinkingRegex.exec(content)) !== null) {
-      // Add text before the thinking block
       if (match.index > currentPosition) {
         const textBefore = content.substring(currentPosition, match.index);
         parts.push(this.markdownToHtml(textBefore));
       }
 
-      // Get the thinking content
       const thinkingContent = match[1];
 
-      // Create foldable thinking block
       const foldableHtml = `
         <div class="thinking-block">
           <div class="thinking-header" data-fold-state="expanded">
@@ -417,7 +410,6 @@ onerror = (event) => {
       currentPosition = match.index + match[0].length;
     }
 
-    // Add remaining content after last thinking block
     if (currentPosition < content.length) {
       const textAfter = content.substring(currentPosition);
       parts.push(this.markdownToHtml(textAfter));
@@ -434,9 +426,6 @@ onerror = (event) => {
     return tempDiv.innerHTML;
   }
 
-  /**
-   * Escape HTML special characters
-   */
   private escapeHtml(unsafe: string): string {
     return unsafe
       .replace(/&/g, "&amp;")
@@ -447,7 +436,6 @@ onerror = (event) => {
   }
 
   private addThinkingToggleListeners(contentEl: HTMLElement): void {
-    // Find all thinking headers
     const thinkingHeaders = contentEl.querySelectorAll(".thinking-header");
 
     thinkingHeaders.forEach((header) => {
@@ -462,12 +450,10 @@ onerror = (event) => {
         const isFolded = header.getAttribute("data-fold-state") === "folded";
 
         if (isFolded) {
-          // Expand
           content.style.display = "block";
           toggleIcon.textContent = "▼";
           header.setAttribute("data-fold-state", "expanded");
         } else {
-          // Fold
           content.style.display = "none";
           toggleIcon.textContent = "►";
           header.setAttribute("data-fold-state", "folded");
@@ -477,20 +463,17 @@ onerror = (event) => {
   }
 
   private hasThinkingTags(content: string): boolean {
-    // Check for various possible formats of thinking tags
     const formats = [
       "<think>",
       "&lt;think&gt;",
-      "<think ", // In case there are attributes
+      "<think ",
       "\\<think\\>",
-      "%3Cthink%3E", // URL encoded
+      "%3Cthink%3E",
     ];
 
     return formats.some((format) => content.includes(format));
   }
-  /**
-   * Add toggle all button for thinking blocks
-   */
+
   private addToggleAllButton(
     contentContainer: HTMLElement,
     contentEl: HTMLElement
@@ -505,7 +488,6 @@ onerror = (event) => {
       const thinkingContents = contentEl.querySelectorAll(".thinking-content");
       const thinkingToggles = contentEl.querySelectorAll(".thinking-toggle");
 
-      // Check if all blocks are collapsed or expanded
       let allHidden = true;
       thinkingContents.forEach((content) => {
         if ((content as HTMLElement).style.display !== "none") {
@@ -513,7 +495,6 @@ onerror = (event) => {
         }
       });
 
-      // Toggle all blocks
       thinkingContents.forEach((content, index) => {
         (content as HTMLElement).style.display = allHidden ? "block" : "none";
         (thinkingToggles[index] as HTMLElement).textContent = allHidden
@@ -522,27 +503,24 @@ onerror = (event) => {
       });
     });
   }
+
   renderMessage(message: Message): void {
     const isUser = message.role === "user";
     const isFirstInGroup = this.isFirstMessageInGroup(message);
     const isLastInGroup = this.isLastMessageInGroup(message);
 
-    // Check if we need to create a new message group
     let messageGroup: HTMLElement;
     const lastGroup = this.chatContainer.lastElementChild;
 
     if (isFirstInGroup) {
-      // Create a new message group
       messageGroup = this.chatContainer.createDiv({
         cls: `message-group ${isUser ? "user-message-group" : "ollama-message-group"
           }`,
       });
     } else {
-      // Use the last group
       messageGroup = lastGroup as HTMLElement;
     }
 
-    // Create message element
     const messageEl = messageGroup.createDiv({
       cls: `message ${isUser
         ? "user-message bubble user-bubble"
@@ -555,46 +533,31 @@ onerror = (event) => {
         }`,
     });
 
-    // Create message content container
     const contentContainer = messageEl.createDiv({
       cls: "message-content-container",
     });
 
-    // Add message content
     const contentEl = contentContainer.createDiv({
       cls: "message-content",
     });
 
-    // Render markdown for assistant messages, plain text for user
     if (message.role === "assistant") {
-      // Log raw message content
-      //
-      //
-      //
-      // const tagDetection = this.detectThinkingTags(message.content);
-      //
-
-      // Check for encoded thinking tags too
       const decodedContent = this.decodeHtmlEntities(message.content);
       const hasThinkingTags =
         message.content.includes("<think>") ||
         decodedContent.includes("<think>");
 
       if (hasThinkingTags) {
-        // Use decoded content if needed
         const contentToProcess =
           hasThinkingTags && !message.content.includes("<thing>")
             ? decodedContent
             : message.content;
 
-        //
         const processedContent = this.processThinkingTags(contentToProcess);
         contentEl.innerHTML = processedContent;
 
-        // Add event listeners
         this.addThinkingToggleListeners(contentEl);
       } else {
-        // Regular markdown rendering
         MarkdownRenderer.renderMarkdown(
           message.content,
           contentEl,
@@ -603,7 +566,6 @@ onerror = (event) => {
         );
       }
     } else {
-      // For user messages, keep as plain text
       message.content.split("\n").forEach((line, index, array) => {
         contentEl.createSpan({ text: line });
         if (index < array.length - 1) {
@@ -612,16 +574,13 @@ onerror = (event) => {
       });
     }
 
-    // Add copy button
     const copyButton = contentContainer.createEl("button", {
       cls: "copy-button",
       attr: { title: "Скопіювати" },
     });
     setIcon(copyButton, "copy");
 
-    // Add copy functionality
     copyButton.addEventListener("click", () => {
-      // For assistant messages with thinking tags, strip the thinking tags when copying
       let textToCopy = message.content;
       if (message.role === "assistant" && textToCopy.includes("<think>")) {
         textToCopy = textToCopy.replace(/<think>[\s\S]*?<\/think>/g, "");
@@ -629,7 +588,6 @@ onerror = (event) => {
 
       navigator.clipboard.writeText(textToCopy);
 
-      // Show feedback
       copyButton.setText("Copied!");
       setTimeout(() => {
         copyButton.empty();
@@ -637,7 +595,6 @@ onerror = (event) => {
       }, 2000);
     });
 
-    // Add timestamp if last in group
     if (isLastInGroup) {
       messageEl.createDiv({
         cls: "message-timestamp",
@@ -663,11 +620,13 @@ onerror = (event) => {
   formatTime(date: Date): string {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
+
   private decodeHtmlEntities(text: string): string {
     const textArea = document.createElement("textarea");
     textArea.innerHTML = text;
     return textArea.value;
   }
+
   private detectThinkingTags(content: string): {
     hasThinkingTags: boolean;
     format: string;
@@ -691,35 +650,25 @@ onerror = (event) => {
   async processWithOllama(content: string): Promise<void> {
     this.isProcessing = true;
 
-    // Add a temporary "loading" message
     const loadingMessageEl = this.addLoadingMessage();
 
-    // Execute the request
     setTimeout(async () => {
       try {
-        // Check if this is a new conversation
         const isNewConversation = this.messages.length <= 1;
 
-        // Визначаємо, чи потрібно відправляти системне повідомлення
         const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
         let useSystemPrompt = false;
 
         if (systemPromptInterval === 0) {
-          // Відправляємо з кожним повідомленням
           useSystemPrompt = true;
         } else if (systemPromptInterval > 0) {
-          // Відправляємо кожні N пар повідомлень
           useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
         }
-        // Якщо systemPromptInterval < 0, то системне повідомлення не відправляється взагалі
 
-        // Підготовка повного prompt
         const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
           content,
           isNewConversation
         );
-
-        // Створення requestBody безпосередньо в processWithOllama
 
         const requestBody: {
           model: string;
@@ -738,25 +687,20 @@ onerror = (event) => {
           }
         };
 
-        // Додаємо системне повідомлення, якщо потрібно
         if (useSystemPrompt) {
           const systemPrompt = this.plugin.promptService.getSystemPrompt();
           if (systemPrompt) {
             requestBody.system = systemPrompt;
             console.log("processWithOllama: system prompt is used!");
-
           }
         }
 
-        // Використовуємо модифікований apiService.generateResponse
         const data = await this.plugin.apiService.generateResponse(requestBody);
 
-        // Remove loading message
         if (loadingMessageEl && loadingMessageEl.parentNode) {
           loadingMessageEl.parentNode.removeChild(loadingMessageEl);
         }
 
-        // Add the assistant's response to the chat
         this.addMessage("assistant", data.response);
         this.initializeThinkingBlocks();
       } catch (error) {
@@ -777,7 +721,6 @@ onerror = (event) => {
   }
 
   private initializeThinkingBlocks(): void {
-    // Find all thinking blocks and initialize them correctly
     setTimeout(() => {
       const thinkingHeaders =
         this.chatContainer.querySelectorAll(".thinking-header");
@@ -790,7 +733,6 @@ onerror = (event) => {
 
         if (!content || !toggleIcon) return;
 
-        // By default, thinking blocks are collapsed
         content.style.display = "none";
         toggleIcon.textContent = "►";
         header.setAttribute("data-fold-state", "folded");
@@ -811,14 +753,12 @@ onerror = (event) => {
       cls: "thinking-dots",
     });
 
-    // Створюємо три точки
     for (let i = 0; i < 3; i++) {
       dotsContainer.createDiv({
         cls: "thinking-dot",
       });
     }
 
-    // Scroll to bottom after adding loading indicator
     this.guaranteedScrollToBottom();
 
     return messageGroup;
@@ -828,15 +768,13 @@ onerror = (event) => {
     this.messages = [];
     this.chatContainer.empty();
     this.historyLoaded = false;
+    this.showEmptyState();
   }
 
   async startVoiceRecognition(): Promise<void> {
-    // Знаходимо кнопку мікрофона
     const voiceButton = this.contentEl.querySelector('.voice-button');
 
-    // Перевіряємо, чи вже йде запис
     if (voiceButton?.classList.contains('recording')) {
-      // Якщо вже записуємо, зупиняємо запис
       if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
         this.mediaRecorder.stop();
       }
@@ -845,17 +783,14 @@ onerror = (event) => {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Використовуємо підтримуваний формат без специфікації кодеку
       const mediaRecorder = new MediaRecorder(stream);
-      this.mediaRecorder = mediaRecorder; // Зберігаємо посилання на mediaRecorder
+      this.mediaRecorder = mediaRecorder;
       const audioChunks: Blob[] = [];
 
-      // Додаємо клас recording для зміни стилю на синій
       voiceButton?.classList.add('recording');
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          // console.log("Data available, size:", event.data.size);
           audioChunks.push(event.data);
         }
       };
@@ -863,13 +798,11 @@ onerror = (event) => {
       mediaRecorder.onstop = () => {
         console.log("Recording stopped, chunks:", audioChunks.length);
 
-        // Видаляємо клас recording, коли запис зупинено
         voiceButton?.classList.remove('recording');
 
-        // Зупиняємо всі треки потоку
         stream.getTracks().forEach(track => track.stop());
 
-        this.inputEl.placeholder = "Type a message...";
+        this.updateInputPlaceholder(this.plugin.settings.modelName);
 
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
@@ -886,11 +819,9 @@ onerror = (event) => {
         }
       };
 
-      // Просимо MediaRecorder записувати частіше (для більш швидкої відповіді)
       mediaRecorder.start(100);
       console.log("Recording started with mime type:", mediaRecorder.mimeType);
 
-      // Додайте візуальну індикацію запису
       this.inputEl.placeholder = "Record...";
 
       setTimeout(() => {
@@ -899,11 +830,9 @@ onerror = (event) => {
           console.log("Recording stopped after timeout");
         }
       }, 15000);
-      //   }, 5000);
     } catch (error) {
       console.error("Error accessing microphone:", error);
 
-      // Прибираємо клас recording у разі помилки
       voiceButton?.classList.remove('recording');
     }
   }
@@ -911,8 +840,4 @@ onerror = (event) => {
   setSystemMessageInterval(interval: number): void {
     this.systemMessageInterval = interval;
   }
-
-
-
-
 }

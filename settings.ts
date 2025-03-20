@@ -145,6 +145,7 @@ export class OllamaSettingTab extends PluginSettingTab {
       .setName("Model Name")
       .setDesc("Select the language model to use");
 
+
     const dropdown = modelSetting.addDropdown((dropdown) => {
       // Clear existing options (properly)
       const selectEl = dropdown.selectEl;
@@ -164,6 +165,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       dropdown.setValue(selectedModel);
       dropdown.onChange(async (value) => {
         this.plugin.settings.modelName = value;
+        this.plugin.emit('model-changed', value);
+
         await this.plugin.saveSettings();
       });
     });

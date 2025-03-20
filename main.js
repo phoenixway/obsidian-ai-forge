@@ -43,7 +43,6 @@ var import_obsidian4 = require("obsidian");
 var import_obsidian = require("obsidian");
 var VIEW_TYPE_OLLAMA = "ollama-chat-view";
 var _OllamaView = class extends import_obsidian.ItemView {
-  // Лічильник пар повідомлень
   constructor(leaf, plugin) {
     super(leaf);
     this.messages = [];
@@ -53,6 +52,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.mediaRecorder = null;
     this.systemMessageInterval = 0;
     this.messagesPairCount = 0;
+    this.emptyStateEl = null;
     this.plugin = plugin;
     if (_OllamaView.instance) {
       return _OllamaView.instance;
@@ -69,7 +69,6 @@ onmessage = async (event) => {
       const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
       console.log("Worker received audioBlob:", audioBlob);
       
-      // \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u044F\u0454\u043C\u043E \u043D\u0430\u044F\u0432\u043D\u0456\u0441\u0442\u044C API \u043A\u043B\u044E\u0447\u0430
       if (!apiKey || apiKey.trim() === '') {
         postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
         return;
@@ -77,7 +76,6 @@ onmessage = async (event) => {
 
       const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
       
-      // \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0443\u0454\u043C\u043E Blob \u0443 Base64
       const arrayBuffer = await audioBlob.arrayBuffer();
       const base64Audio = btoa(
         new Uint8Array(arrayBuffer).reduce(
@@ -93,9 +91,9 @@ onmessage = async (event) => {
           config: {
             encoding: 'WEBM_OPUS',
             sampleRateHertz: 48000,
-            languageCode: languageCode, // \u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u043C\u043E\u0432\u0438
-            model: 'latest_long', // \u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u043C\u043E \u043C\u043E\u0434\u0435\u043B\u044C \u0434\u043B\u044F \u0434\u043E\u0432\u0433\u0438\u0445 \u0437\u0430\u043F\u0438\u0441\u0456\u0432
-            enableAutomaticPunctuation: true, // \u0414\u043E\u0434\u0430\u0454\u043C\u043E \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0443 \u043F\u0443\u043D\u043A\u0442\u0443\u0430\u0446\u0456\u044E
+            languageCode: languageCode,
+            model: 'latest_long',
+            enableAutomaticPunctuation: true,
           },
           audio: {
             content: base64Audio
@@ -120,7 +118,6 @@ onmessage = async (event) => {
       console.log("Speech recognition data:", data);
       
       if (data.results && data.results.length > 0) {
-        // \u041E\u0431'\u0454\u0434\u043D\u0443\u0454\u043C\u043E \u0432\u0441\u0456 \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u043D\u0456 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u0438 \u0442\u0435\u043A\u0441\u0442\u0443
         const transcript = data.results
           .map(result => result.alternatives[0].transcript)
           .join(' ')
@@ -190,7 +187,7 @@ onerror = (event) => {
     });
     this.inputEl = inputContainer.createEl("textarea", {
       attr: {
-        placeholder: "Type a message..."
+        placeholder: `Text to ${this.plugin.settings.modelName}...`
       }
     });
     const sendButton = inputContainer.createEl("button", {
@@ -233,6 +230,37 @@ onerror = (event) => {
         this.inputEl.focus();
       }, 100);
     });
+    this.showEmptyState();
+    const removeListener = this.plugin.on("model-changed", (modelName) => {
+      this.updateInputPlaceholder(modelName);
+    });
+    this.register(() => removeListener());
+  }
+  updateInputPlaceholder(modelName) {
+    if (this.inputEl) {
+      this.inputEl.placeholder = `Text to ${modelName}...`;
+    }
+  }
+  showEmptyState() {
+    if (this.messages.length === 0 && !this.emptyStateEl) {
+      this.emptyStateEl = this.chatContainer.createDiv({
+        cls: "ollama-empty-state"
+      });
+      const messageEl = this.emptyStateEl.createDiv({
+        cls: "empty-state-message",
+        text: "No messages yet"
+      });
+      const tipEl = this.emptyStateEl.createDiv({
+        cls: "empty-state-tip",
+        text: `Type a message to start chatting with ${this.plugin.settings.modelName}`
+      });
+    }
+  }
+  hideEmptyState() {
+    if (this.emptyStateEl && this.emptyStateEl.parentNode) {
+      this.emptyStateEl.remove();
+      this.emptyStateEl = null;
+    }
   }
   async loadMessageHistory() {
     if (this.historyLoaded)
@@ -252,10 +280,14 @@ onerror = (event) => {
         }
         this.guaranteedScrollToBottom();
         this.initializeThinkingBlocks();
+        this.hideEmptyState();
+      } else {
+        this.showEmptyState();
       }
       this.historyLoaded = true;
     } catch (error) {
       console.error("Error loading message history:", error);
+      this.showEmptyState();
     }
   }
   async saveMessageHistory() {
@@ -288,6 +320,7 @@ onerror = (event) => {
     const content = this.inputEl.value.trim();
     if (!content)
       return;
+    this.hideEmptyState();
     this.addMessage("user", content);
     this.inputEl.value = "";
     await this.processWithOllama(content);
@@ -351,9 +384,6 @@ onerror = (event) => {
     import_obsidian.MarkdownRenderer.renderMarkdown(markdown, tempDiv, "", this);
     return tempDiv.innerHTML;
   }
-  /**
-   * Escape HTML special characters
-   */
   escapeHtml(unsafe) {
     return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
   }
@@ -385,16 +415,11 @@ onerror = (event) => {
       "<think>",
       "&lt;think&gt;",
       "<think ",
-      // In case there are attributes
       "\\<think\\>",
       "%3Cthink%3E"
-      // URL encoded
     ];
     return formats.some((format) => content.includes(format));
   }
-  /**
-   * Add toggle all button for thinking blocks
-   */
   addToggleAllButton(contentContainer, contentEl) {
     const toggleAllButton = contentContainer.createEl("button", {
       cls: "toggle-all-thinking-button",
@@ -613,6 +638,7 @@ onerror = (event) => {
     this.messages = [];
     this.chatContainer.empty();
     this.historyLoaded = false;
+    this.showEmptyState();
   }
   async startVoiceRecognition() {
     const voiceButton = this.contentEl.querySelector(".voice-button");
@@ -637,7 +663,7 @@ onerror = (event) => {
         console.log("Recording stopped, chunks:", audioChunks.length);
         voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
         stream.getTracks().forEach((track) => track.stop());
-        this.inputEl.placeholder = "Type a message...";
+        this.updateInputPlaceholder(this.plugin.settings.modelName);
         if (audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
           console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
@@ -766,6 +792,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
       dropdown2.setValue(selectedModel);
       dropdown2.onChange(async (value) => {
         this.plugin.settings.modelName = value;
+        this.plugin.emit("model-changed", value);
         await this.plugin.saveSettings();
       });
     });
@@ -1395,10 +1422,28 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
+    this.eventHandlers = {};
     this.documents = [];
     this.embeddings = [];
     // Add debouncing to prevent excessive indexing
     this.indexUpdateTimeout = null;
+  }
+  on(event, callback) {
+    if (!this.eventHandlers[event]) {
+      this.eventHandlers[event] = [];
+    }
+    this.eventHandlers[event].push(callback);
+    return () => {
+      this.eventHandlers[event] = this.eventHandlers[event].filter(
+        (handler) => handler !== callback
+      );
+    };
+  }
+  emit(event, data) {
+    const handlers = this.eventHandlers[event];
+    if (handlers) {
+      handlers.forEach((handler) => handler(data));
+    }
   }
   async onload() {
     console.log("Ollama Plugin Loaded!");
