@@ -709,6 +709,7 @@ onerror = (event) => {
     this.showEmptyState();
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
     });
     this.register(() => removeListener());
   }
@@ -1139,7 +1140,6 @@ onerror = (event) => {
   }
   onModelChanged(modelName) {
     this.updateInputPlaceholder(modelName);
-    this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
   }
 };
 var OllamaView = _OllamaView;

@@ -366,7 +366,7 @@ onerror = (event) => {
     this.showEmptyState();
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
-      // this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
 
     });
     this.register(() => removeListener());
@@ -928,7 +928,7 @@ onerror = (event) => {
 
   onModelChanged(modelName: string): void {
     this.updateInputPlaceholder(modelName);
-    this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+    // this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
   }
 
 
