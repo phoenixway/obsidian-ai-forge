@@ -1244,6 +1244,7 @@ var OllamaSettingTab = class extends import_obsidian3.PluginSettingTab {
       dropdown2.onChange(async (value) => {
         this.plugin.settings.modelName = value;
         this.plugin.emit("model-changed", value);
+        this.plugin.messageService.addSystemMessage(`Model changed to: ${value}`);
         await this.plugin.saveSettings();
       });
     });
