@@ -538,7 +538,7 @@ reset-button {
 /* Enhanced error message styling */
 /* Error message styling - with important flags for all properties */
 .error-message {
-  background-color: var(--text-error, #dc3545) !important; /* Red background */
+  background-color: var(--text-error, blue) !important; /* Red background */
   color: rgba(255, 255, 255, 0.95) !important; /* Light text color for contrast */
   border-left: 4px solid darkred !important; /* Darker red border */
   font-weight: 500 !important; /* Slightly bolder text */
