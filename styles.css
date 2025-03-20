@@ -618,15 +618,13 @@ reset-button {
     /* color: var(--text-normal) !important; */
     border-left: 3px solid var(--interactive-accent) !important;
     font-style: italic; 
-
-
     background-color: #f0f0f0 !important; 
     color: #555 !important;
     padding: 8px 12px;
     border-radius: 12px;
     max-width: 90%;
     display: flex !important;
-    align-items: center !important;
+    /* align-items: center !important; */
   }
   
   .system-bubble {
@@ -651,7 +649,7 @@ reset-button {
     /* margin-bottom: 15px; */
     display: flex;
     flex-direction: column;
-    align-items: center;
+    /* align-items: center; */
     margin: 8px 0;
   }
   
