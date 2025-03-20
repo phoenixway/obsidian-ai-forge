@@ -624,7 +624,7 @@ reset-button {
     border-radius: 12px;
     max-width: 90%;
     display: flex !important;
-    /* align-items: center !important; */
+    align-items: center !important;
   }
   
   .system-bubble {
