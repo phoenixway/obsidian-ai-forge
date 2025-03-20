@@ -115,6 +115,7 @@ var MessageService = class {
       content,
       timestamp: new Date()
     };
+    console.log(`messageService.ts -> Addmessage: 2`);
     this.messages.push(message);
     this.renderMessage(message);
     if (role === "assistant" /* ASSISTANT */ && this.messages.length >= 2) {
