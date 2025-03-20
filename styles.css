@@ -614,8 +614,8 @@ reset-button {
   /*---------------------------------------------------------------------------*/
   /* System message styling */
   .system-message {
-    /* background-color: rgba(13, 110, 253, 0.1) !important;*/
-    color: var(--text-normal) !important;
+    /* background-color: rgba(13, 110, 253, 0.1) !important; */
+    /* color: var(--text-normal) !important; */
     border-left: 3px solid var(--interactive-accent) !important;
     font-style: italic; 
 
@@ -635,12 +635,11 @@ reset-button {
   }
   
   .system-icon {
-    /* color: var(--interactive-accent);
-    margin-right: 8px;
+    color: var(--interactive-accent);
     display: inline-flex;
-    align-items: center; */
+    align-items: center; 
     margin-right: 8px;
-    color: #1976d2;
+    /* color: #1976d2; */
   }
   
   .system-message-tail::before {
