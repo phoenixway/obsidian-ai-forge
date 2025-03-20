@@ -417,3 +417,31 @@ reset-button {
    .reset-button:hover {
      color: var(--text-normal);
    }
+
+/* Centering the empty state message in the chat container */
+.ollama-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px;
+}
+
+.empty-state-message {
+  font-size: 18px;
+  margin-bottom: 10px;
+  opacity: 0.7;
+}
+
+.empty-state-tip {
+  font-size: 14px;
+  opacity: 0.5;
+  max-width: 80%;
+}
