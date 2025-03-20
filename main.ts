@@ -84,7 +84,7 @@ export default class OllamaPlugin extends Plugin {
 
         // Emit model-changed event (to update UI)
         this.emit('model-changed', newModel);
-        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
+        // this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
 
       }
     });

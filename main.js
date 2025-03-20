@@ -109,16 +109,12 @@ var MessageService = class {
   }
   // Add a message to the chat and render it
   addMessage(role, content) {
-    console.log(role, content);
     const message = {
       role,
       content,
       timestamp: new Date()
     };
-    console.log(`messageService.ts -> Addmessage: 2`);
     this.messages.push(message);
-    console.log(`messageService.ts -> Addmessage: message: ${message}`);
-    console.log(`messageService.ts -> Addmessage: this.messages: ${this.messages}`);
     this.renderMessage(message);
     if (role === "assistant" /* ASSISTANT */ && this.messages.length >= 2) {
       if (this.messages[this.messages.length - 2].role === "user" /* USER */) {
@@ -142,7 +138,6 @@ var MessageService = class {
   }
   // Render a message in the chat container
   renderMessage(message) {
-    console.log(`messageService.ts -> renderMessage: this.view: ${this.view}`);
     if (!this.view)
       return;
     const isUser = message.role === "user" /* USER */;
@@ -216,7 +211,6 @@ var MessageService = class {
         cls: "system-message-text",
         text: message.content
       });
-      console.log("System message created:", messageEl, messageGroup);
     } else {
       message.content.split("\n").forEach((line, index, array) => {
         contentEl.createSpan({ text: line });
@@ -312,7 +306,6 @@ var MessageService = class {
   // Add a system notification message
   addSystemMessage(content) {
     this.addMessage("system" /* SYSTEM */, content);
-    new import_obsidian.Notice(content, 3e3);
   }
   // Helper methods
   removeLoadingMessage(loadingMessageEl) {
@@ -1939,7 +1932,6 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
         this.settings.modelName = newModel;
         await this.saveSettings();
         this.emit("model-changed", newModel);
-        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
       }
     });
     this.apiService.on("connection-error", (error) => {
