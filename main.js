@@ -198,37 +198,17 @@ onerror = (event) => {
       cls: "voice-button"
     });
     (0, import_obsidian.setIcon)(voiceButton, "microphone");
-    const resetButton = inputContainer.createEl("button", {
-      cls: "reset-button"
-    });
-    (0, import_obsidian.setIcon)(resetButton, "refresh-ccw");
-    const settingsButton = inputContainer.createEl("button", {
-      cls: "settings-button"
-    });
-    (0, import_obsidian.setIcon)(settingsButton, "settings");
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         this.sendMessage();
       }
     });
-    settingsButton.addEventListener("click", () => {
-      const setting = this.app.setting;
-      setting.open("obsidian-ollama-duet");
-    });
     sendButton.addEventListener("click", () => {
       this.sendMessage();
     });
     voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
-    });
-    resetButton.addEventListener("click", () => {
-      this.plugin.apiService.resetState();
-      this.clearChatMessages();
-      this.addMessage("assistant", "State reset. What would you like to do now?");
-      setTimeout(() => {
-        this.inputEl.focus();
-      }, 100);
     });
     const menuButton = inputContainer.createEl("button", {
       cls: "menu-button"
