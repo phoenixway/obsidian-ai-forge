@@ -22,8 +22,10 @@
 
 /* Fix the icon styling */
 .error-icon {
-  color: white !important; /* White icon color for contrast against red background */
+  color: red !important; /* White icon color for contrast against red background */
   margin-right: 10px !important;
+  /* color: white !important; White icon color for contrast against red background */
+
   display: inline-flex !important;
   align-items: center !important;
   font-size: 1.1em !important; /* Slightly larger icon */
