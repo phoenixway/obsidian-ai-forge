@@ -212,6 +212,7 @@ var MessageService = class {
         cls: "system-message-text",
         text: message.content
       });
+      console.log("System message created:", messageEl, messageGroup);
     } else {
       message.content.split("\n").forEach((line, index, array) => {
         contentEl.createSpan({ text: line });

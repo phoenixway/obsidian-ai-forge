@@ -241,6 +241,8 @@ export class MessageService {
                 cls: "system-message-text",
                 text: message.content
             });
+            console.log("System message created:", messageEl, messageGroup);
+
         } else {
             // Format user message
             message.content.split("\n").forEach((line, index, array) => {
