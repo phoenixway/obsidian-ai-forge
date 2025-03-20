@@ -190,10 +190,10 @@
     max-width: 75%;
     word-wrap: break-word;
     position: relative;
-    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15); */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     font-size: 14px;
     line-height: 1.4;
-    /* transition: transform 0.2s, box-shadow 0.2s; */
+    transition: transform 0.2s, box-shadow 0.2s;
   }
   
   /* Enhanced user messages using theme variables */
@@ -203,11 +203,11 @@
     color: var(--text-on-accent);
     align-self: flex-end;
     border-top-right-radius: 5px;
-    /* box-shadow: 0 2px 10px rgba(var(--interactive-accent-rgb), 0.3); */
+    box-shadow: 0 2px 10px rgba(var(--interactive-accent-rgb), 0.3);
   }
   
   .ollama-chat-container .user-message:hover {
-    /* box-shadow: 0 4px 15px rgba(var(--interactive-accent-rgb), 0.4); */
+    box-shadow: 0 4px 15px rgba(var(--interactive-accent-rgb), 0.4);
     transform: translateY(-1px);
   }
   
@@ -230,13 +230,13 @@
     background-color: var(--background-primary);
     color: var(--text-normal);
     align-self: flex-start;
-    /* border-top-left-radius: 5px; */
-    /* border-left: 3px solid var(--text-muted); */
-    /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); */
+    /* border-top-left-radius: 5px; */ 
+    /* border-left: 3px solid var(--text-muted);  */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); 
   }
   
   .ollama-chat-container .ollama-message:hover {
-    /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transform: translateY(-1px);
   }
   
@@ -369,7 +369,7 @@
   .error-message {
     background: linear-gradient(135deg, var(--text-error), var(--text-error-hover)) !important;
     color: white !important;
-    border-left: 4px solid var(--text-error-hover) !important;
+    /* border-left: 4px solid var(--text-error-hover) !important; */
     font-weight: 500 !important;
     padding: 12px 15px !important;
     max-width: 85% !important;
@@ -517,7 +517,7 @@
     border-radius: 6px;
     margin: 12px 0;
     background-color: var(--background-primary-alt);
-    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
   .thinking-header {
