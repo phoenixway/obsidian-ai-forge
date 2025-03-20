@@ -117,6 +117,8 @@ var MessageService = class {
     };
     console.log(`messageService.ts -> Addmessage: 2`);
     this.messages.push(message);
+    console.log(`messageService.ts -> Addmessage: message: ${message}`);
+    console.log(`messageService.ts -> Addmessage: this.messages: ${this.messages}`);
     this.renderMessage(message);
     if (role === "assistant" /* ASSISTANT */ && this.messages.length >= 2) {
       if (this.messages[this.messages.length - 2].role === "user" /* USER */) {
@@ -140,6 +142,7 @@ var MessageService = class {
   }
   // Render a message in the chat container
   renderMessage(message) {
+    console.log(`messageService.ts -> renderMessage: this.view: ${this.view}`);
     if (!this.view)
       return;
     const isUser = message.role === "user" /* USER */;

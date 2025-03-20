@@ -120,6 +120,9 @@ export class MessageService {
         };
         console.log(`messageService.ts -> Addmessage: 2`);
         this.messages.push(message);
+        console.log(`messageService.ts -> Addmessage: message: ${message}`);
+        console.log(`messageService.ts -> Addmessage: this.messages: ${this.messages}`);
+
         this.renderMessage(message);
 
         if (role === MessageType.ASSISTANT && this.messages.length >= 2) {
@@ -148,6 +151,7 @@ export class MessageService {
 
     // Render a message in the chat container
     private renderMessage(message: Message): void {
+        console.log(`messageService.ts -> renderMessage: this.view: ${this.view}`);
         if (!this.view) return;
 
         const isUser = message.role === MessageType.USER;
