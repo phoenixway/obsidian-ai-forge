@@ -1,675 +1,691 @@
-/* Змінюємо стилі контейнера, щоб він притискався до низу */
-.ollama-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  position: relative; /* Додаємо позиціонування */
-}
+/* ==========================================================================
+   MAIN LAYOUT & CONTAINERS
+   ========================================================================== */
 
-/* Змінюємо стилі input контейнера */
-.chat-input-container {
-  display: flex;
-  align-items: center;
-  padding: 10px 15px;
-  border-top: 1px solid var(--divider-color);
-  background-color: var(--background-secondary-alt);
-  z-index: 10;
-  border-radius: 20px;
-  margin: 10px 15px; /* Зменшуємо відступ знизу */
-  margin-bottom: 5px; /* Мінімальний відступ знизу */
-  box-sizing: border-box;
-}
-
-/* Додаємо стиль для пуш-контейнера чату до низу */
-.ollama-chat-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 15px;
-  padding-bottom: 5px; /* Зменшуємо відступ знизу */
-  box-sizing: border-box;
-  background-color: var(--background-secondary-alt);
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-}
-
-/* Встановлюємо висоту текстового поля трохи меншою */
-.chat-input-container textarea {
-  flex: 1;
-  resize: none;
-  border: 1px solid var(--divider-color);
-  border-radius: 20px;
-  padding: 10px 15px; /* Зменшуємо внутрішній відступ */
-  margin-right: 10px;
-  height: 40px; /* Зменшуємо висоту з 48px до 40px */
-  background-color: var(--background-primary);
-  color: var(--text-normal);
-  font-size: 14px;
-}
-
-/* Також змінюємо розмір кнопок, щоб вони відповідали новій висоті */
-.chat-input-container button {
-  width: 36px; /* Зменшуємо з 40px */
-  height: 36px; /* Зменшуємо з 40px */
-  border: none;
-  border-radius: 50%;
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 8px;
-}
-
-.chat-input-container button:hover {
-  background-color: var(--interactive-hover);
-}
-
-.chat-input-container .settings-button {
-  background-color: var(--background-modifier-border);
-  color: var(--text-normal);
-}
-
-.chat-input-container .settings-button:hover {
-  background-color: var(--background-modifier-border-hover);
-}
-
-/* ---------------------------------------------*/
-
-.ollama-chat-container .message-group {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  margin-bottom: 10px;
-}
-
-.ollama-chat-container .user-message-group {
-  align-items: flex-end;
-}
-
-.ollama-chat-container .message {
-  margin-bottom: 15px;
-  padding: 10px 15px;
-  border-radius: 15px;
-  max-width: 75%;
-  word-wrap: break-word;
-  position: relative;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.ollama-chat-container .user-message {
-  background-color: var(--interactive-accent-hover);
-  color: var(--text-on-accent);
-  align-self: flex-end;
-  border-top-right-radius: 5px;
-}
-
-.ollama-chat-container .ollama-message {
-  background-color: var(--background-primary);
-  color: var(--text-normal);
-  align-self: flex-start;
-  border-top-left-radius: 5px;
-}
-
-/* Додано хвостики для бульбашок */
-.ollama-chat-container .user-message-tail {
-  border-top-right-radius: 15px;
-}
-
-.ollama-chat-container .user-message-tail::after {
-  content: '';
-  position: absolute;
-  right: -10px;
-  bottom: 0;
-  border-width: 10px 0 0 10px;
-  border-color: transparent transparent transparent var(--interactive-accent-hover);
-}
-
-.ollama-chat-container .ollama-message-tail {
-  border-top-left-radius: 15px;
-}
-
-.ollama-chat-container .ollama-message-tail::before {
-  content: '';
-  position: absolute;
-  left: -10px;
-  bottom: 0;
-  border-width: 10px 10px 0 0;
-  border-color: transparent var(--background-primary) transparent transparent;
-}
-
-.message-content-container {
-  display: flex;
-  align-items: flex-start;
-  width: 100%;
-}
-
-.message-content {
-  flex: 1;
-}
-
-.message-timestamp {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 4px;
-  align-self: flex-end;
-  opacity: 0.7;
-}
-
-.message-sender {
-  font-size: 12px;
-  font-weight: bold;
-  margin-bottom: 4px;
-  color: var(--text-accent);
-}
-
-
-.copy-button {
-  background: none !important;
-  border: none !important;
-  outline: none !important;
-  color: var(--text-muted) !important;
-  font-size: 10px !important;
-  cursor: pointer;
-  opacity: 0.5 !important;
-  transition: opacity 0.3s !important;
-  margin-left: 5px !important;
-  padding: 2px !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px !important;
-  height: 16px !important;
-}
-
-.copy-button:hover {
-  opacity: 1 !important;
-  background-color: var(--background-modifier-hover) !important;
-  border-radius: 3px !important;
-}
-
-.loading-indicator {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--text-muted);
-  border-top-color: var(--interactive-accent);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-left: 10px;
-}
-
-@keyframes spin {
-  to {
-      transform: rotate(360deg);
-  }
-}
-
-.ollama-chat-container .user-message {
-  background-color: var(--interactive-accent-hover);
-  color: var(--text-on-accent);
-  align-self: flex-end;
-  border-top-right-radius: 5px;
-}
-
-.ollama-chat-container .user-message .message-timestamp {
-  color: var(--text-on-accent); /* Змінюємо колір тексту дати */
-  opacity: 0.8; /* Робимо трохи менш прозорим */
-}
-
-.ollama-chat-container .user-message .copy-button {
-  color: var(--text-on-accent) !important; /* Змінюємо колір іконки копіювання */
-  opacity: 0.4 !important; /* Робимо трохи менш прозорим */
-}
-
-.ollama-chat-container .user-message .copy-button:hover {
-  opacity: 1 !important; /* Робимо повністю непрозорим при наведенні */
-}
-
-/* Стилі для Markdown-контенту в повідомленнях */
-.ollama-message .message-content {
-  width: 100%;
-}
-
-.ollama-message .message-content p {
-  margin: 0.5em 0;
-}
-
-.ollama-message .message-content p:first-child {
-  margin-top: 0;
-}
-
-.ollama-message .message-content p:last-child {
-  margin-bottom: 0;
-}
-
-.ollama-message .message-content ul,
-.ollama-message .message-content ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
-}
-
-.ollama-message .message-content pre {
-  background-color: var(--background-secondary);
-  border-radius: 5px;
-  padding: 8px;
-  margin: 0.5em 0;
-  overflow-x: auto;
-}
-
-.ollama-message .message-content code {
-  font-family: var(--font-monospace);
-  font-size: 0.9em;
-  background-color: var(--background-secondary);
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-}
-
-.ollama-message .message-content pre code {
-  padding: 0;
-  background-color: transparent;
-}
-
-.ollama-message .message-content blockquote {
-  border-left: 3px solid var(--text-muted);
-  margin: 0.5em 0;
-  padding-left: 1em;
-  color: var(--text-muted);
-}
-
-/* Стилі для індикатора "думання" */
-.thinking-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-}
-
-.thinking-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--text-muted);
-  margin: 0 3px;
-  opacity: 0.6;
-}
-
-.thinking-dot:nth-child(1) {
-  animation: dot-pulse 1.5s infinite ease-in-out;
-}
-
-.thinking-dot:nth-child(2) {
-  animation: dot-pulse 1.5s infinite ease-in-out 0.5s;
-}
-
-.thinking-dot:nth-child(3) {
-  animation: dot-pulse 1.5s infinite ease-in-out 1s;
-}
-
-@keyframes dot-pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.5);
-    opacity: 1;
-  }
-}
-
-@media screen and (max-width: 400px) {
-  .chat-input-container .send-button,
-  .chat-input-container .settings-button {
-    display: none;
+   .ollama-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
   }
   
+  .ollama-chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    padding-bottom: 5px;
+    box-sizing: border-box;
+    background-color: var(--background-secondary-alt);
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+  }
+  
+  .workspace-leaf-content[data-type='ollama-chat-view'] {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .workspace-leaf-content[data-type='ollama-chat-view'] .view-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Empty state styling */
+  .ollama-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+  }
+  
+  .empty-state-message {
+    font-size: 18px;
+    margin-bottom: 10px;
+    opacity: 0.7;
+  }
+  
+  .empty-state-tip {
+    font-size: 14px;
+    opacity: 0.5;
+    max-width: 80%;
+  }
+  
+  /* ==========================================================================
+     CHAT INPUT SECTION
+     ========================================================================== */
+  
+  .chat-input-container {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    border-top: 1px solid var(--divider-color);
+    background-color: var(--background-secondary-alt);
+    z-index: 10;
+    border-radius: 20px;
+    margin: 10px 15px;
+    margin-bottom: 5px;
+    box-sizing: border-box;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Textarea styling */
   .chat-input-container textarea {
-    margin-right: 0;
+    flex: 1;
+    resize: none;
+    border: 1px solid var(--divider-color);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin-right: 10px;
+    height: 40px;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    transition: border-color 0.3s, box-shadow 0.3s;
   }
-}
-
-/* Додайте цей стиль, якщо попередні зміни не допомогли */
-.workspace-leaf-content[data-type='ollama-chat-view'] {
-  display: flex;
-  flex-direction: column;
-}
-
-.workspace-leaf-content[data-type='ollama-chat-view'] .view-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.thinking-block {
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  margin: 12px 0;
-  background-color: var(--background-primary-alt);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.thinking-header {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  border-radius: 6px 6px 0 0;
-}
-
-.thinking-toggle {
-  margin-right: 8px;
-  font-weight: bold;
-  transition: transform 0.2s;
-}
-
-.thinking-title {
-  font-weight: bold;
-}
-
-.thinking-content {
-  padding: 12px;
-  white-space: pre-wrap;
-  overflow-x: auto;
-  line-height: 1.5;
-  border-top: 1px solid var(--background-modifier-border);
-  background-color: var(--background-secondary-alt);
-  font-size: 0.9em; /* Smaller font size for thinking content */
-}
-.chat-input-container .voice-button {
-  background-color: var(--background-modifier-border);
-  color: var(--text-normal);
-}
-
-.chat-input-container .voice-button:hover {
-  background-color: var(--background-modifier-border-hover);
-}
-
-/* Стиль для кнопки мікрофона під час запису (синя) */
-.chat-input-container .voice-button.recording {
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  animation: pulse 1.5s infinite;
-}
-
-/* Анімація пульсації для кнопки мікрофона під час запису */
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
+  
+  .chat-input-container textarea:focus {
+    border-color: var(--interactive-accent);
+    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
+    outline: none;
   }
-  50% {
-    transform: scale(1.1);
+  
+  /* Button styling */
+  .chat-input-container button {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    transition: transform 0.2s, background-color 0.2s;
+  }
+  
+  .chat-input-container button:hover {
+    background-color: var(--interactive-hover);
+    transform: scale(1.05);
+  }
+  
+  .chat-input-container .settings-button,
+  .chat-input-container .menu-button {
+    background-color: var(--background-modifier-border);
+    color: var(--text-normal);
+  }
+  
+  .chat-input-container .settings-button:hover,
+  .chat-input-container .menu-button:hover {
+    background-color: var(--background-modifier-border-hover);
+  }
+  
+  /* Voice button */
+  .chat-input-container .voice-button {
+    background-color: var(--background-modifier-border);
+    color: var(--text-normal);
+  }
+  
+  .chat-input-container .voice-button:hover {
+    background-color: var(--background-modifier-border-hover);
+  }
+  
+  .chat-input-container .voice-button.recording {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    animation: pulse 1.5s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+  
+  /* Reset button */
+  .reset-button {
+    margin-right: 5px;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  
+  .reset-button:hover {
+    color: var(--text-normal);
+  }
+  
+  /* ==========================================================================
+     REGULAR MESSAGE STYLING (ENHANCED)
+     ========================================================================== */
+  
+  .ollama-chat-container .message-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  
+  .ollama-chat-container .user-message-group {
+    align-items: flex-end;
+  }
+  
+  .ollama-chat-container .message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 15px;
+    max-width: 75%;
+    word-wrap: break-word;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    font-size: 14px;
+    line-height: 1.4;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  /* Enhanced user messages */
+  .ollama-chat-container .user-message {
+    background-color: #3a7bd5;
+    background-image: linear-gradient(to right, #3a7bd5, #00d2ff);
+    color: white;
+    align-self: flex-end;
+    border-top-right-radius: 5px;
+    box-shadow: 0 2px 10px rgba(58, 123, 213, 0.3);
+  }
+  
+  .ollama-chat-container .user-message:hover {
+    box-shadow: 0 4px 15px rgba(58, 123, 213, 0.4);
+    transform: translateY(-1px);
+  }
+  
+  .ollama-chat-container .user-message .message-timestamp {
+    color: rgba(255, 255, 255, 0.8);
     opacity: 0.8;
   }
-}
-
-reset-button {
-     margin-right: 5px;
-     cursor: pointer;
-     color: var(--text-muted);
-   }
-   
-   .reset-button:hover {
-     color: var(--text-normal);
-   }
-
-/* Centering the empty state message in the chat container */
-.ollama-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
-  position: absolute;
-  top: 0;
-  left: 0;
-  text-align: center;
-  color: var(--text-muted);
-  padding: 20px;
-}
-
-.empty-state-message {
-  font-size: 18px;
-  margin-bottom: 10px;
-  opacity: 0.7;
-}
-
-.empty-state-tip {
-  font-size: 14px;
-  opacity: 0.5;
-  max-width: 80%;
-}
-
-/* Three-dot menu button */
-.chat-input-container .menu-button {
-  width: 36px;
-  height: 36px;
-  border: none;
-  border-radius: 50%;
-  background-color: var(--background-modifier-border);
-  color: var(--text-normal);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-left: 8px;
-  position: relative;
-}
-
-.chat-input-container .menu-button:hover {
-  background-color: var(--background-modifier-border-hover);
-}
-
-/* Menu dropdown */
-.menu-dropdown {
-  position: absolute;
-  right: 15px;
-  bottom: 50px;
-  background-color: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  min-width: 180px;
-  overflow: hidden;
-}
-
-/* Menu options */
-.menu-option {
-  display: flex;
-  align-items: center;
-  padding: 10px 15px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.menu-option:hover {
-  background-color: var(--background-modifier-hover);
-}
-
-.menu-option-icon {
-  margin-right: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-}
-
-.menu-option-text {
-  font-size: 14px;
-  color: var(--text-normal);
-}
-
-/* Responsive adjustments */
-@media screen and (max-width: 400px) {
-  /* Keep the three-dot menu visible while hiding other buttons on mobile */
-  .chat-input-container .send-button {
-    display: none;
+  
+  .ollama-chat-container .user-message .copy-button {
+    color: rgba(255, 255, 255, 0.8) !important;
+    opacity: 0.4 !important;
   }
   
-  .chat-input-container textarea {
-    margin-right: 8px;
+  .ollama-chat-container .user-message .copy-button:hover {
+    opacity: 1 !important;
   }
   
-  /* Position the menu dropdown better on mobile */
-  .menu-dropdown {
-    right: 10px;
-    width: 75vw; /* Wider menu on mobile */
-    max-width: 250px;
+  /* Enhanced AI messages */
+  .ollama-chat-container .ollama-message {
+    background-color: #f0f4f9;
+    color: #2c3e50;
+    align-self: flex-start;
+    border-top-left-radius: 5px;
+    border-left: 3px solid #7f8c8d;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
   
-  .menu-option {
-    padding: 12px 15px; /* Slightly larger touch targets on mobile */
+  .ollama-chat-container .ollama-message:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
   }
-}
-
-/* Additional CSS styles for message service */
-
-
-
-/*---------------------------------------------------------------------------*/
-/* Error message styling */
-/* Enhanced error message styling */
-/* Error message styling - with important flags for all properties */
-.error-message {
-  background-color: var(--text-normal) !important; /* Використовуємо колір тексту системного повідомлення */
-  color: rgba(13, 110, 253, 0.1) !important; /* Використовуємо колір фону системного повідомлення */
-  border-left: 3px solid var(--interactive-accent) !important; /* Або залишити темно-червоним */
-
-  font-weight: 500 !important; /* Slightly bolder text */
-  padding: 12px 15px !important; /* Additional padding */
-  max-width: 85% !important; /* Maintain max width */
-}
-
-/* Make sure the bubble styling is properly applied */
-.error-bubble {
-  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3) !important; /* Enhanced shadow */
-}
-
-/* Fix the icon styling */
-.error-icon {
-  color: white !important; /* White icon color for contrast against red background */
-  margin-right: 10px !important;
-  /* color: white !important; White icon color for contrast against red background */
-
-  display: inline-flex !important;
-  align-items: center !important;
-  font-size: 1.1em !important; /* Slightly larger icon */
-}
-
-/* Fix the message tail styling */
-.error-message-tail::before,
-.error-message-tail::after {
-  border-color: transparent var(--text-error, #dc3545) transparent transparent !important;
-}
-
-/* Override any general bubble tail styles for error messages */
-.ollama-chat-container .error-message-tail::before {
-  content: '' !important;
-  position: absolute !important;
-  left: -10px !important;
-  bottom: 0 !important;
-  border-width: 10px 10px 0 0 !important;
-  border-color: transparent var(--text-error, #dc3545) transparent transparent !important;
-}
-
-/* Add a subtle pulsing animation for new error messages */
-@keyframes error-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
-}
-
-.error-message-group:last-child .error-message {
-  animation: error-pulse 2s ease-out 1 !important;
-}
-
-/* Increase spacing for error message groups */
-.error-message-group {
-  margin-bottom: 18px !important;
-  margin-top: 18px !important;
-}
-
-/* Make error message text more noticeable */
-.error-message-text {
-  display: inline !important;
-  line-height: 1.5 !important;
-  letter-spacing: 0.01em !important; /* Slight letter spacing for better readability */
-  color: rgba(255, 255, 255, 0.95) !important; /* Ensure text color is set here too */
-}
-
-/* Mobile responsiveness - placed at the end to ensure it takes precedence */
-@media screen and (max-width: 400px) {
-  .error-message {
-    max-width: 95% !important;
-  }
-}
   
-  /*---------------------------------------------------------------------------*/
-  /* System message styling */
+  /* Speech bubbles tails */
+  .ollama-chat-container .user-message-tail {
+    border-top-right-radius: 15px;
+  }
+  
+  .ollama-chat-container .user-message-tail::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    bottom: 0;
+    border-width: 10px 0 0 10px;
+    border-style: solid;
+    border-color: transparent transparent transparent #00d2ff;
+  }
+  
+  .ollama-chat-container .ollama-message-tail {
+    border-top-left-radius: 15px;
+  }
+  
+  .ollama-chat-container .ollama-message-tail::before {
+    content: '';
+    position: absolute;
+    left: -10px;
+    bottom: 0;
+    border-width: 10px 10px 0 0;
+    border-style: solid;
+    border-color: transparent #f0f4f9 transparent transparent;
+  }
+  
+  .message-content-container {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+  }
+  
+  .message-content {
+    flex: 1;
+  }
+  
+  .message-timestamp {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    align-self: flex-end;
+    opacity: 0.7;
+  }
+  
+  .message-sender {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    color: var(--text-accent);
+  }
+  
+  /* ==========================================================================
+     SYSTEM MESSAGES (MORE EXPRESSIVE)
+     ========================================================================== */
+  
+  .system-message-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 15px 0;
+  }
+  
   .system-message {
-    /* background-color: rgba(13, 110, 253, 0.1) !important; */
-    /* color: var(--text-normal) !important; */
-    border-left: 3px solid var(--interactive-accent) !important;
-    font-style: italic; 
-    background-color: #f0f0f0 !important; 
-    color: #555 !important;
-    padding: 8px 12px;
+    background: linear-gradient(135deg, #f6f8fa, #e9ecef);
+    color: #495057;
+    border-left: 4px solid #4e73df !important;
+    font-style: italic;
+    padding: 10px 15px;
     border-radius: 12px;
     max-width: 90%;
     display: flex !important;
     align-items: center !important;
+    box-shadow: 0 3px 10px rgba(78, 115, 223, 0.15) !important;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .system-message::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, rgba(78, 115, 223, 0.05), transparent);
+    pointer-events: none;
   }
   
   .system-bubble {
-    box-shadow: 0 1px 2px rgba(13, 110, 253, 0.25) !important;
-    border: 1px solid #e0e0e0;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.25) !important;
+    border: 1px solid #dee2e6;
   }
   
   .system-icon {
-    color: var(--interactive-accent);
+    color: #4e73df;
     display: inline-flex;
-    align-items: center; 
-    margin-right: 8px;
-    /* color: #1976d2; */
+    align-items: center;
+    margin-right: 10px;
+    font-size: 1.1em;
   }
   
   .system-message-tail::before {
-    border-color: transparent rgba(13, 110, 253, 0.1) transparent transparent;
+    border-color: transparent #e9ecef transparent transparent;
   }
   
-  /* Message group spacing */
-  .system-message-group {
-    /* margin-bottom: 15px; */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin: 8px 0;
-  }
-  
-  /* Message content text */
   .system-message-text {
     display: inline;
     line-height: 1.5;
+    font-size: 0.95em;
+    font-weight: 500;
+  }
+  
+  /* ==========================================================================
+     ERROR MESSAGES (MOST EXPRESSIVE)
+     ========================================================================== */
+  
+  .error-message-group {
+    margin: 20px 0 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .error-message {
+    background: linear-gradient(135deg, #ff6b6b, #ee5253) !important;
+    color: white !important;
+    border-left: 4px solid #c0392b !important;
+    font-weight: 500 !important;
+    padding: 12px 15px !important;
+    max-width: 85% !important;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3) !important;
+    border-radius: 10px !important;
+  }
+  
+  .error-bubble {
+    box-shadow: 0 3px 12px rgba(220, 53, 69, 0.4) !important;
+  }
+  
+  .error-icon {
+    color: white !important;
+    margin-right: 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    font-size: 1.1em !important;
+  }
+  
+  .error-message-tail::before,
+  .error-message-tail::after {
+    border-color: transparent #ee5253 transparent transparent !important;
+  }
+  
+  .ollama-chat-container .error-message-tail::before {
+    content: '' !important;
+    position: absolute !important;
+    left: -10px !important;
+    bottom: 0 !important;
+    border-width: 10px 10px 0 0 !important;
+    border-color: transparent #ee5253 transparent transparent !important;
+  }
+  
+  @keyframes error-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+  }
+  
+  .error-message-group:last-child .error-message {
+    animation: error-pulse 2s ease-out 1 !important;
+  }
+  
+  .error-message-text {
+    display: inline !important;
+    line-height: 1.5 !important;
+    letter-spacing: 0.01em !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    font-weight: 500 !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  /* ==========================================================================
+     COPY BUTTON & UTILITIES
+     ========================================================================== */
+  
+  .copy-button {
+    background: none !important;
+    border: none !important;
+    outline: none !important;
+    color: var(--text-muted) !important;
+    font-size: 10px !important;
+    cursor: pointer;
+    opacity: 0.5 !important;
+    transition: opacity 0.3s, transform 0.2s !important;
+    margin-left: 5px !important;
+    padding: 2px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px !important;
+    height: 16px !important;
+  }
+  
+  .copy-button:hover {
+    opacity: 1 !important;
+    background-color: var(--background-modifier-hover) !important;
+    border-radius: 3px !important;
+    transform: scale(1.1) !important;
+  }
+  
+  /* ==========================================================================
+     LOADING & THINKING INDICATORS
+     ========================================================================== */
+  
+  .loading-indicator {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-muted);
+    border-top-color: var(--interactive-accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 10px;
+  }
+  
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .thinking-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+  }
+  
+  .thinking-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--text-muted);
+    margin: 0 3px;
+    opacity: 0.6;
+  }
+  
+  .thinking-dot:nth-child(1) {
+    animation: dot-pulse 1.5s infinite ease-in-out;
+  }
+  
+  .thinking-dot:nth-child(2) {
+    animation: dot-pulse 1.5s infinite ease-in-out 0.5s;
+  }
+  
+  .thinking-dot:nth-child(3) {
+    animation: dot-pulse 1.5s infinite ease-in-out 1s;
+  }
+  
+  @keyframes dot-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 1;
+    }
+  }
+  
+  .thinking-block {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    margin: 12px 0;
+    background-color: var(--background-primary-alt);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .thinking-header {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 6px 6px 0 0;
+  }
+  
+  .thinking-toggle {
+    margin-right: 8px;
+    font-weight: bold;
+    transition: transform 0.2s;
+  }
+  
+  .thinking-title {
+    font-weight: bold;
+  }
+  
+  .thinking-content {
+    padding: 12px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    line-height: 1.5;
+    border-top: 1px solid var(--background-modifier-border);
+    background-color: var(--background-secondary-alt);
     font-size: 0.9em;
   }
   
-  /* Maximum width for system and error messages */
-  .system-message,
-  .error-message {
-    max-width: 85%;
+  /* ==========================================================================
+     MARKDOWN CONTENT IN MESSAGES
+     ========================================================================== */
+  
+  .ollama-message .message-content {
+    width: 100%;
   }
   
-  /* Mobile responsiveness */
+  .ollama-message .message-content p {
+    margin: 0.5em 0;
+  }
+  
+  .ollama-message .message-content p:first-child {
+    margin-top: 0;
+  }
+  
+  .ollama-message .message-content p:last-child {
+    margin-bottom: 0;
+  }
+  
+  .ollama-message .message-content ul,
+  .ollama-message .message-content ol {
+    margin: 0.5em 0;
+    padding-left: 1.5em;
+  }
+  
+  .ollama-message .message-content pre {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+    padding: 10px;
+    margin: 0.7em 0;
+    overflow-x: auto;
+    border-left: 3px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  .ollama-message .message-content code {
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+    background-color: rgba(0, 0, 0, 0.05);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+  }
+  
+  .ollama-message .message-content pre code {
+    padding: 0;
+    background-color: transparent;
+  }
+  
+  .ollama-message .message-content blockquote {
+    border-left: 3px solid #7f8c8d;
+    margin: 0.7em 0;
+    padding-left: 1em;
+    color: #7f8c8d;
+    background-color: rgba(127, 140, 141, 0.05);
+    padding: 0.5em 1em;
+    border-radius: 0 5px 5px 0;
+  }
+  
+  /* ==========================================================================
+     MENU DROPDOWN
+     ========================================================================== */
+  
+  .menu-dropdown {
+    position: absolute;
+    right: 15px;
+    bottom: 50px;
+    background-color: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    min-width: 180px;
+    overflow: hidden;
+    animation: menu-fade-in 0.2s ease-out;
+  }
+  
+  @keyframes menu-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
+  .menu-option {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  .menu-option:hover {
+    background-color: var(--background-modifier-hover);
+  }
+  
+  .menu-option-icon {
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+  }
+  
+  .menu-option-text {
+    font-size: 14px;
+    color: var(--text-normal);
+  }
+  
+  /* ==========================================================================
+     RESPONSIVE DESIGN
+     ========================================================================== */
+  
   @media screen and (max-width: 400px) {
+    .chat-input-container .send-button {
+      display: none;
+    }
+    
+    .chat-input-container textarea {
+      margin-right: 8px;
+    }
+    
+    .menu-dropdown {
+      right: 10px;
+      width: 75vw;
+      max-width: 250px;
+    }
+    
+    .menu-option {
+      padding: 12px 15px;
+    }
+    
     .system-message,
     .error-message {
       max-width: 95%;
+    }
+    
+    .ollama-chat-container .message {
+      max-width: 85%;
     }
   }
