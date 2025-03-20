@@ -169,7 +169,7 @@ export class OllamaSettingTab extends PluginSettingTab {
       dropdown.onChange(async (value) => {
         this.plugin.settings.modelName = value;
         this.plugin.emit('model-changed', value);
-        this.plugin.messageService.addSystemMessage(`Model changed to: ${value}`);
+        // this.plugin.messageService.addSystemMessage(`Model changed to: ${value}`);
 
 
         await this.plugin.saveSettings();
