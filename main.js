@@ -1928,6 +1928,7 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
     this.messageService = new MessageService(this);
     this.registerView(VIEW_TYPE_OLLAMA, (leaf) => {
       this.view = new OllamaView(leaf, this);
+      this.messageService.setView(this.view);
       return this.view;
     });
     this.addCommand({
@@ -2010,6 +2011,9 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
       console.log("Ollama view leaf already exists");
     }
     workspace.revealLeaf(leaf);
+    if (this.view) {
+      this.messageService.setView(this.view);
+    }
     return leaf;
   }
   async loadSettings() {

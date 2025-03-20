@@ -66,6 +66,7 @@ export default class OllamaPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_OLLAMA, (leaf) => {
       this.view = new OllamaView(leaf, this);
+      this.messageService.setView(this.view);
       return this.view;
     });
 
@@ -165,7 +166,6 @@ export default class OllamaPlugin extends Plugin {
   async activateView() {
     const { workspace } = this.app;
 
-    // Check if view is already open
     let leaf = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA)[0];
 
     if (!leaf) {
@@ -177,10 +177,13 @@ export default class OllamaPlugin extends Plugin {
     }
 
     workspace.revealLeaf(leaf);
-    return leaf;
-  }
 
-  async loadSettings() {
+    if (this.view) {
+      this.messageService.setView(this.view);
+    }
+
+    return leaf;
+  } async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
 
