@@ -445,3 +445,86 @@ reset-button {
   opacity: 0.5;
   max-width: 80%;
 }
+
+/* Three-dot menu button */
+.chat-input-container .menu-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--background-modifier-border);
+  color: var(--text-normal);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  position: relative;
+}
+
+.chat-input-container .menu-button:hover {
+  background-color: var(--background-modifier-border-hover);
+}
+
+/* Menu dropdown */
+.menu-dropdown {
+  position: absolute;
+  right: 15px;
+  bottom: 50px;
+  background-color: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  min-width: 180px;
+  overflow: hidden;
+}
+
+/* Menu options */
+.menu-option {
+  display: flex;
+  align-items: center;
+  padding: 10px 15px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.menu-option:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.menu-option-icon {
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.menu-option-text {
+  font-size: 14px;
+  color: var(--text-normal);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 400px) {
+  /* Keep the three-dot menu visible while hiding other buttons on mobile */
+  .chat-input-container .send-button {
+    display: none;
+  }
+  
+  .chat-input-container textarea {
+    margin-right: 8px;
+  }
+  
+  /* Position the menu dropdown better on mobile */
+  .menu-dropdown {
+    right: 10px;
+    width: 75vw; /* Wider menu on mobile */
+    max-width: 250px;
+  }
+  
+  .menu-option {
+    padding: 12px 15px; /* Slightly larger touch targets on mobile */
+  }
+}
