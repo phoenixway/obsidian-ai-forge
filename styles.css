@@ -196,28 +196,28 @@
     transition: transform 0.2s, box-shadow 0.2s;
   }
   
-  /* Enhanced user messages */
+  /* Enhanced user messages using theme variables */
   .ollama-chat-container .user-message {
-    background-color: #3a7bd5;
-    background-image: linear-gradient(to right, #3a7bd5, #00d2ff);
-    color: white;
+    background-color: var(--interactive-accent);
+    background-image: linear-gradient(to right, var(--interactive-accent), var(--interactive-accent-hover));
+    color: var(--text-on-accent);
     align-self: flex-end;
     border-top-right-radius: 5px;
-    box-shadow: 0 2px 10px rgba(58, 123, 213, 0.3);
+    box-shadow: 0 2px 10px rgba(var(--interactive-accent-rgb), 0.3);
   }
   
   .ollama-chat-container .user-message:hover {
-    box-shadow: 0 4px 15px rgba(58, 123, 213, 0.4);
+    box-shadow: 0 4px 15px rgba(var(--interactive-accent-rgb), 0.4);
     transform: translateY(-1px);
   }
   
   .ollama-chat-container .user-message .message-timestamp {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-on-accent);
     opacity: 0.8;
   }
   
   .ollama-chat-container .user-message .copy-button {
-    color: rgba(255, 255, 255, 0.8) !important;
+    color: var(--text-on-accent) !important;
     opacity: 0.4 !important;
   }
   
@@ -227,11 +227,11 @@
   
   /* Enhanced AI messages */
   .ollama-chat-container .ollama-message {
-    background-color: #f0f4f9;
-    color: #2c3e50;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
     align-self: flex-start;
     border-top-left-radius: 5px;
-    border-left: 3px solid #7f8c8d;
+    border-left: 3px solid var(--text-muted);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
   
@@ -252,7 +252,7 @@
     bottom: 0;
     border-width: 10px 0 0 10px;
     border-style: solid;
-    border-color: transparent transparent transparent #00d2ff;
+    border-color: transparent transparent transparent var(--interactive-accent-hover);
   }
   
   .ollama-chat-container .ollama-message-tail {
@@ -266,7 +266,7 @@
     bottom: 0;
     border-width: 10px 10px 0 0;
     border-style: solid;
-    border-color: transparent #f0f4f9 transparent transparent;
+    border-color: transparent var(--background-primary) transparent transparent;
   }
   
   .message-content-container {
@@ -306,16 +306,16 @@
   }
   
   .system-message {
-    background: linear-gradient(135deg, #f6f8fa, #e9ecef);
-    color: #495057;
-    border-left: 4px solid #4e73df !important;
+    background: linear-gradient(135deg, var(--background-primary), var(--background-secondary));
+    color: var(--text-accent);
+    border-left: 4px solid var(--text-accent) !important;
     font-style: italic;
     padding: 10px 15px;
     border-radius: 12px;
     max-width: 90%;
     display: flex !important;
     align-items: center !important;
-    box-shadow: 0 3px 10px rgba(78, 115, 223, 0.15) !important;
+    box-shadow: 0 3px 10px rgba(var(--text-accent-rgb), 0.2) !important;
     position: relative;
     overflow: hidden;
   }
@@ -327,17 +327,17 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(to right, rgba(78, 115, 223, 0.05), transparent);
+    background: linear-gradient(to right, rgba(var(--text-accent-rgb), 0.05), transparent);
     pointer-events: none;
   }
   
   .system-bubble {
-    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.25) !important;
-    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 8px rgba(var(--text-accent-rgb), 0.25) !important;
+    border: 1px solid var(--background-modifier-border);
   }
   
   .system-icon {
-    color: #4e73df;
+    color: var(--text-accent);
     display: inline-flex;
     align-items: center;
     margin-right: 10px;
@@ -345,7 +345,7 @@
   }
   
   .system-message-tail::before {
-    border-color: transparent #e9ecef transparent transparent;
+    border-color: transparent var(--background-secondary) transparent transparent;
   }
   
   .system-message-text {
@@ -367,19 +367,19 @@
   }
   
   .error-message {
-    background: linear-gradient(135deg, #ff6b6b, #ee5253) !important;
+    background: linear-gradient(135deg, var(--text-error), var(--text-error-hover)) !important;
     color: white !important;
-    border-left: 4px solid #c0392b !important;
+    border-left: 4px solid var(--text-error-hover) !important;
     font-weight: 500 !important;
     padding: 12px 15px !important;
     max-width: 85% !important;
     position: relative;
-    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(var(--text-error-rgb), 0.3) !important;
     border-radius: 10px !important;
   }
   
   .error-bubble {
-    box-shadow: 0 3px 12px rgba(220, 53, 69, 0.4) !important;
+    box-shadow: 0 3px 12px rgba(var(--text-error-rgb), 0.4) !important;
   }
   
   .error-icon {
@@ -392,7 +392,7 @@
   
   .error-message-tail::before,
   .error-message-tail::after {
-    border-color: transparent #ee5253 transparent transparent !important;
+    border-color: transparent var(--text-error-hover) transparent transparent !important;
   }
   
   .ollama-chat-container .error-message-tail::before {
@@ -401,13 +401,13 @@
     left: -10px !important;
     bottom: 0 !important;
     border-width: 10px 10px 0 0 !important;
-    border-color: transparent #ee5253 transparent transparent !important;
+    border-color: transparent var(--text-error-hover) transparent transparent !important;
   }
   
   @keyframes error-pulse {
-    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
-    70% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(var(--text-error-rgb), 0); }
+    100% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); }
   }
   
   .error-message-group:last-child .error-message {
@@ -578,18 +578,18 @@
   }
   
   .ollama-message .message-content pre {
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--background-primary-alt);
     border-radius: 5px;
     padding: 10px;
     margin: 0.7em 0;
     overflow-x: auto;
-    border-left: 3px solid rgba(0, 0, 0, 0.1);
+    border-left: 3px solid var(--background-modifier-border);
   }
   
   .ollama-message .message-content code {
     font-family: var(--font-monospace);
     font-size: 0.9em;
-    background-color: rgba(0, 0, 0, 0.05);
+    background-color: var(--background-primary-alt);
     padding: 0.2em 0.4em;
     border-radius: 3px;
   }
@@ -600,11 +600,11 @@
   }
   
   .ollama-message .message-content blockquote {
-    border-left: 3px solid #7f8c8d;
+    border-left: 3px solid var(--text-muted);
     margin: 0.7em 0;
     padding-left: 1em;
-    color: #7f8c8d;
-    background-color: rgba(127, 140, 141, 0.05);
+    color: var(--text-muted);
+    background-color: var(--background-primary-alt);
     padding: 0.5em 1em;
     border-radius: 0 5px 5px 0;
   }
