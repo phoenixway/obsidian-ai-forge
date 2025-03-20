@@ -538,9 +538,10 @@ reset-button {
 /* Enhanced error message styling */
 /* Error message styling - with important flags for all properties */
 .error-message {
-  background-color: var(--text-error, blue) !important; /* Red background */
-  color: rgba(255, 255, 255, 0.95) !important; /* Light text color for contrast */
-  border-left: 4px solid darkred !important; /* Darker red border */
+  background-color: var(--text-normal) !important; /* Використовуємо колір тексту системного повідомлення */
+  color: rgba(13, 110, 253, 0.1) !important; /* Використовуємо колір фону системного повідомлення */
+  border-left: 3px solid var(--interactive-accent) !important; /* Або залишити темно-червоним */
+
   font-weight: 500 !important; /* Slightly bolder text */
   padding: 12px 15px !important; /* Additional padding */
   max-width: 85% !important; /* Maintain max width */
