@@ -614,21 +614,33 @@ reset-button {
   /*---------------------------------------------------------------------------*/
   /* System message styling */
   .system-message {
-    background-color: rgba(13, 110, 253, 0.1) !important;
+    /* background-color: rgba(13, 110, 253, 0.1) !important;
     color: var(--text-normal) !important;
     border-left: 3px solid var(--interactive-accent) !important;
-    font-style: italic;
+    font-style: italic; */
+
+
+    background-color: #f0f0f0;
+    color: #555;
+    padding: 8px 12px;
+    border-radius: 12px;
+    max-width: 90%;
+    display: flex;
+    align-items: center;
   }
   
   .system-bubble {
     box-shadow: 0 1px 2px rgba(13, 110, 253, 0.25) !important;
+    border: 1px solid #e0e0e0;
   }
   
   .system-icon {
-    color: var(--interactive-accent);
+    /* color: var(--interactive-accent);
     margin-right: 8px;
     display: inline-flex;
-    align-items: center;
+    align-items: center; */
+    margin-right: 8px;
+    color: #1976d2;
   }
   
   .system-message-tail::before {
@@ -637,13 +649,18 @@ reset-button {
   
   /* Message group spacing */
   .system-message-group {
-    margin-bottom: 15px;
+    /* margin-bottom: 15px; */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 8px 0;
   }
   
   /* Message content text */
   .system-message-text {
     display: inline;
     line-height: 1.5;
+    font-size: 0.9em;
   }
   
   /* Maximum width for system and error messages */
