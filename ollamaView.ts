@@ -243,6 +243,78 @@ onerror = (event) => {
       }, 100);
     });
 
+
+    const menuButton = inputContainer.createEl("button", {
+      cls: "menu-button",
+    });
+    setIcon(menuButton, "more-vertical");
+
+    // Create a dropdown container for the menu items
+    const menuDropdown = inputContainer.createEl("div", {
+      cls: "menu-dropdown",
+    });
+    menuDropdown.style.display = "none";
+
+    // Add reset option to the dropdown
+    const resetOption = menuDropdown.createEl("div", {
+      cls: "menu-option reset-option",
+    });
+    const resetIcon = resetOption.createEl("span", { cls: "menu-option-icon" });
+    setIcon(resetIcon, "refresh-ccw");
+    resetOption.createEl("span", {
+      cls: "menu-option-text",
+      text: "Reset Conversation",
+    });
+
+    // Add settings option to the dropdown
+    const settingsOption = menuDropdown.createEl("div", {
+      cls: "menu-option settings-option",
+    });
+    const settingsIcon = settingsOption.createEl("span", { cls: "menu-option-icon" });
+    setIcon(settingsIcon, "settings");
+    settingsOption.createEl("span", {
+      cls: "menu-option-text",
+      text: "Settings",
+    });
+
+    // Toggle menu display on button click
+    menuButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (menuDropdown.style.display === "none") {
+        menuDropdown.style.display = "block";
+        // Add a global click listener to close the menu when clicking outside
+        setTimeout(() => {
+          document.addEventListener("click", closeMenu);
+        }, 0);
+      } else {
+        closeMenu();
+      }
+    });
+
+    // Function to close the menu
+    const closeMenu = () => {
+      menuDropdown.style.display = "none";
+      document.removeEventListener("click", closeMenu);
+    };
+
+    // Add functionality to the reset option
+    resetOption.addEventListener("click", () => {
+      this.plugin.apiService.resetState();
+      this.clearChatMessages();
+      this.addMessage("assistant", "State reset. What would you like to do now?");
+      setTimeout(() => {
+        this.inputEl.focus();
+      }, 100);
+      closeMenu();
+    });
+
+    // Add functionality to the settings option
+    settingsOption.addEventListener("click", () => {
+      const setting = (this.app as any).setting;
+      setting.open("obsidian-ollama-duet");
+      closeMenu();
+    });
+
     this.showEmptyState();
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);

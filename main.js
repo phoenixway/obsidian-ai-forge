@@ -230,6 +230,61 @@ onerror = (event) => {
         this.inputEl.focus();
       }, 100);
     });
+    const menuButton = inputContainer.createEl("button", {
+      cls: "menu-button"
+    });
+    (0, import_obsidian.setIcon)(menuButton, "more-vertical");
+    const menuDropdown = inputContainer.createEl("div", {
+      cls: "menu-dropdown"
+    });
+    menuDropdown.style.display = "none";
+    const resetOption = menuDropdown.createEl("div", {
+      cls: "menu-option reset-option"
+    });
+    const resetIcon = resetOption.createEl("span", { cls: "menu-option-icon" });
+    (0, import_obsidian.setIcon)(resetIcon, "refresh-ccw");
+    resetOption.createEl("span", {
+      cls: "menu-option-text",
+      text: "Reset Conversation"
+    });
+    const settingsOption = menuDropdown.createEl("div", {
+      cls: "menu-option settings-option"
+    });
+    const settingsIcon = settingsOption.createEl("span", { cls: "menu-option-icon" });
+    (0, import_obsidian.setIcon)(settingsIcon, "settings");
+    settingsOption.createEl("span", {
+      cls: "menu-option-text",
+      text: "Settings"
+    });
+    menuButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (menuDropdown.style.display === "none") {
+        menuDropdown.style.display = "block";
+        setTimeout(() => {
+          document.addEventListener("click", closeMenu);
+        }, 0);
+      } else {
+        closeMenu();
+      }
+    });
+    const closeMenu = () => {
+      menuDropdown.style.display = "none";
+      document.removeEventListener("click", closeMenu);
+    };
+    resetOption.addEventListener("click", () => {
+      this.plugin.apiService.resetState();
+      this.clearChatMessages();
+      this.addMessage("assistant", "State reset. What would you like to do now?");
+      setTimeout(() => {
+        this.inputEl.focus();
+      }, 100);
+      closeMenu();
+    });
+    settingsOption.addEventListener("click", () => {
+      const setting = this.app.setting;
+      setting.open("obsidian-ollama-duet");
+      closeMenu();
+    });
     this.showEmptyState();
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
