@@ -109,6 +109,7 @@ var MessageService = class {
   }
   // Add a message to the chat and render it
   addMessage(role, content) {
+    console.log(role, content);
     const message = {
       role,
       content,

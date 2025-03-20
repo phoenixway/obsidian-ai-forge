@@ -111,6 +111,8 @@ export class MessageService {
 
     // Add a message to the chat and render it
     public addMessage(role: MessageType, content: string): void {
+        console.log(role, content);
+
         const message: Message = {
             role,
             content,
