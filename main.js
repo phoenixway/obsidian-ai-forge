@@ -254,7 +254,6 @@ onerror = (event) => {
     resetOption.addEventListener("click", () => {
       this.plugin.apiService.resetState();
       this.clearChatMessages();
-      this.addMessage("assistant", "State reset. What would you like to do now?");
       setTimeout(() => {
         this.inputEl.focus();
       }, 100);
