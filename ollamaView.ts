@@ -357,9 +357,11 @@ onerror = (event) => {
     });
 
     // Add functionality to the settings option
-    settingsOption.addEventListener("click", () => {
+    settingsOption.addEventListener("click", async () => {
       const setting = (this.app as any).setting;
-      setting.open("obsidian-ollama-duet");
+      await setting.open();
+      // await setting.open("obsidian-ollama-duet");
+      setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
 
@@ -780,7 +782,7 @@ onerror = (event) => {
           const systemPrompt = this.plugin.promptService.getSystemPrompt();
           if (systemPrompt) {
             requestBody.system = systemPrompt;
-            console.log("processWithOllama: system prompt is used!");
+            // console.log("processWithOllama: system prompt is used!");
           }
         }
 
