@@ -231,12 +231,12 @@
     color: var(--text-normal);
     align-self: flex-start;
     /* border-top-left-radius: 5px; */
-    border-left: 3px solid var(--text-muted);
+    /* border-left: 3px solid var(--text-muted); */
     /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); */
   }
   
   .ollama-chat-container .ollama-message:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    /* box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); */
     transform: translateY(-1px);
   }
   
