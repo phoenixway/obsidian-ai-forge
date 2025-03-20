@@ -1960,7 +1960,6 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
       if (!existingLeaf) {
         this.activateView();
       } else {
-        console.log("Ollama view already exists, not creating a new one");
       }
       if (this.settings.ragEnabled) {
         this.ragService.indexDocuments();

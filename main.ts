@@ -125,7 +125,7 @@ export default class OllamaPlugin extends Plugin {
       if (!existingLeaf) {
         this.activateView();
       } else {
-        console.log("Ollama view already exists, not creating a new one");
+        // console.log("Ollama view already exists, not creating a new one");
       }
 
       // Start indexing if RAG is enabled
