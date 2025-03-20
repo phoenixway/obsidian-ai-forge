@@ -1,11 +1,14 @@
 /* Additional CSS styles for message service */
 
+
+
+/*---------------------------------------------------------------------------*/
 /* Error message styling */
 /* Enhanced error message styling */
 .error-message {
-  background-color: rgba(220, 53, 69, 0.15) !important; /* Increased opacity for more visibility */
-  color: var(--text-error, #dc3545) !important; /* Darker text color for better contrast */
-  border-left: 4px solid var(--color-red) !important; /* Thicker left border */
+  background-color: var(--text-error, #dc3545) !important; /* Red background */
+  color: rgba(255, 255, 255, 0.95) !important; /* Light text color for contrast */
+  border-left: 4px solid darkred !important; /* Darker red border */
   font-weight: 500; /* Slightly bolder text */
   padding: 12px 15px !important; /* Additional padding */
 }
@@ -15,7 +18,7 @@
 }
 
 .error-icon {
-  color: var(--color-red);
+  color: white; /* White icon color for contrast against red background */
   margin-right: 10px;
   display: inline-flex;
   align-items: center;
@@ -23,7 +26,7 @@
 }
 
 .error-message-tail::before {
-  border-color: transparent rgba(220, 53, 69, 0.15) transparent transparent;
+  border-color: transparent var(--text-error, #dc3545) transparent transparent;
 }
 
 /* Add a subtle pulsing animation for new error messages */
@@ -49,7 +52,14 @@
   line-height: 1.5;
   letter-spacing: 0.01em; /* Slight letter spacing for better readability */
 }
+/* Make error message text more noticeable */
+.error-message-text {
+  display: inline;
+  line-height: 1.5;
+  letter-spacing: 0.01em; /* Slight letter spacing for better readability */
+}
   
+  /*---------------------------------------------------------------------------*/
   /* System message styling */
   .system-message {
     background-color: rgba(13, 110, 253, 0.1) !important;
