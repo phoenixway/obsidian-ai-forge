@@ -614,19 +614,19 @@ reset-button {
   /*---------------------------------------------------------------------------*/
   /* System message styling */
   .system-message {
-    /* background-color: rgba(13, 110, 253, 0.1) !important;
+    /* background-color: rgba(13, 110, 253, 0.1) !important;*/
     color: var(--text-normal) !important;
     border-left: 3px solid var(--interactive-accent) !important;
-    font-style: italic; */
+    font-style: italic; 
 
 
-    background-color: #f0f0f0;
-    color: #555;
+    background-color: #f0f0f0 !important; 
+    color: #555 !important;
     padding: 8px 12px;
     border-radius: 12px;
     max-width: 90%;
-    display: flex;
-    align-items: center;
+    display: flex !important;
+    align-items: center !important;
   }
   
   .system-bubble {
