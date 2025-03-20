@@ -114,11 +114,13 @@ export class OllamaSettingTab extends PluginSettingTab {
                 new Notice(
                   "Failed to connect to Ollama server. Check the URL and ensure the server is running."
                 );
+                this.plugin.apiService.emit('connection-error');
               }
             } catch (error) {
               new Notice(
                 "Connection error. Please check the server URL and your network connection."
               );
+              this.plugin.apiService.emit('connection-error');
             }
           })
       );
@@ -129,6 +131,7 @@ export class OllamaSettingTab extends PluginSettingTab {
       availableModels = await this.plugin.apiService.getModels();
     } catch (error) {
       console.error("Error fetching available models:", error);
+      this.plugin.apiService.emit('connection-error');
     }
 
     // Pre-select the last selected model or the first available model

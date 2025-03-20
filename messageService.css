@@ -1,0 +1,73 @@
+/* Additional CSS styles for message service */
+
+/* Error message styling */
+.error-message {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+    color: var(--text-normal) !important;
+    border-left: 3px solid var(--color-red) !important;
+  }
+  
+  .error-bubble {
+    box-shadow: 0 1px 2px rgba(220, 53, 69, 0.25) !important;
+  }
+  
+  .error-icon {
+    color: var(--color-red);
+    margin-right: 8px;
+    display: inline-flex;
+    align-items: center;
+  }
+  
+  .error-message-tail::before {
+    border-color: transparent rgba(220, 53, 69, 0.1) transparent transparent;
+  }
+  
+  /* System message styling */
+  .system-message {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    color: var(--text-normal) !important;
+    border-left: 3px solid var(--interactive-accent) !important;
+    font-style: italic;
+  }
+  
+  .system-bubble {
+    box-shadow: 0 1px 2px rgba(13, 110, 253, 0.25) !important;
+  }
+  
+  .system-icon {
+    color: var(--interactive-accent);
+    margin-right: 8px;
+    display: inline-flex;
+    align-items: center;
+  }
+  
+  .system-message-tail::before {
+    border-color: transparent rgba(13, 110, 253, 0.1) transparent transparent;
+  }
+  
+  /* Message group spacing */
+  .error-message-group,
+  .system-message-group {
+    margin-bottom: 15px;
+  }
+  
+  /* Message content text */
+  .error-message-text,
+  .system-message-text {
+    display: inline;
+    line-height: 1.5;
+  }
+  
+  /* Maximum width for system and error messages */
+  .system-message,
+  .error-message {
+    max-width: 85%;
+  }
+  
+  /* Mobile responsiveness */
+  @media screen and (max-width: 400px) {
+    .system-message,
+    .error-message {
+      max-width: 95%;
+    }
+  }

@@ -6,6 +6,8 @@ export class ApiService {
   private stateManager: StateManager;
   private promptService: PromptService;
   private ollamaView: any = null;
+  private eventHandlers: Record<string, Array<(data: any) => any>> = {};
+
 
   constructor(baseUrl: string, plugin?: any) {
     this.baseUrl = baseUrl;
@@ -15,9 +17,27 @@ export class ApiService {
     this.stateManager.loadStateFromStorage();
   }
 
-  /**
-   * Get the prompt service instance
-   */
+  on(event: string, callback: (data: any) => any): () => void {
+    if (!this.eventHandlers[event]) {
+      this.eventHandlers[event] = [];
+    }
+    this.eventHandlers[event].push(callback);
+
+    // Return a function to remove this specific event handler
+    return () => {
+      this.eventHandlers[event] = this.eventHandlers[event].filter(
+        handler => handler !== callback
+      );
+    };
+  }
+
+  emit(event: string, data?: any): void {
+    const handlers = this.eventHandlers[event];
+    if (handlers) {
+      handlers.forEach(handler => handler(data));
+    }
+  }
+
   getPromptService(): PromptService {
     return this.promptService;
   }

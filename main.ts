@@ -4,9 +4,9 @@ import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./sett
 import { RagService } from "./ragService";
 import { ApiService } from "./apiServices";
 import { PromptService } from './promptService';
+import { MessageService, MessageType } from "./messageService";
 
 
-// Interface for document in RAG
 interface RAGDocument {
   id: string;
   content: string;
@@ -16,7 +16,6 @@ interface RAGDocument {
   };
 }
 
-// Interface for embedding vectors
 interface Embedding {
   documentId: string;
   vector: number[];
@@ -32,6 +31,7 @@ export default class OllamaPlugin extends Plugin {
   private eventHandlers: Record<string, Array<(data: any) => any>> = {};
   documents: RAGDocument[] = [];
   embeddings: Embedding[] = [];
+  messageService: MessageService;
 
   on(event: string, callback: (data: any) => any): () => void {
     if (!this.eventHandlers[event]) {
@@ -62,12 +62,35 @@ export default class OllamaPlugin extends Plugin {
     this.apiService = new ApiService(this.settings.ollamaServerUrl);
     this.ragService = new RagService(this);
     this.promptService = new PromptService(this);
+    this.messageService = new MessageService(this);
 
     this.registerView(VIEW_TYPE_OLLAMA, (leaf) => {
       this.view = new OllamaView(leaf, this);
       return this.view;
     });
 
+    this.addCommand({
+      id: 'change-model',
+      name: 'Change Ollama Model',
+      callback: async () => {
+        // Logic to change model...
+        const newModel = "llama2:13b"; // Example model change
+        this.settings.modelName = newModel;
+        await this.saveSettings();
+
+        // Notify about the model change
+        this.messageService.addSystemMessage(`Model changed to: ${newModel}`);
+
+        // Emit model-changed event (to update UI)
+        this.emit('model-changed', newModel);
+      }
+    });
+    this.apiService.on('connection-error', (error) => {
+      this.messageService.addMessage(
+        MessageType.ERROR,
+        `Failed to connect to Ollama: ${error.message}`
+      );
+    });
     this.addRibbonIcon("message-square", "Відкрити Ollama", () => {
       this.activateView();
     });

@@ -5,6 +5,8 @@ import {
   MarkdownRenderer,
 } from "obsidian";
 import OllamaPlugin from "./main";
+import { MessageService } from "./messageService";
+
 
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 
@@ -32,7 +34,9 @@ export class OllamaView extends ItemView {
   private mediaRecorder: MediaRecorder | null = null;
   private systemMessageInterval: number = 0;
   private messagesPairCount: number = 0;
+  private messageService: MessageService;
   private emptyStateEl: HTMLElement | null = null;
+
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -161,6 +165,75 @@ onerror = (event) => {
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
+
+    this.messageService = new MessageService(plugin);
+    this.messageService.setView(this);
+  }
+
+
+  // New methods to support MessageService
+  public getChatContainer(): HTMLElement {
+    return this.chatContainer;
+  }
+
+  public clearChatContainer(): void {
+    this.chatContainer.empty();
+  }
+
+  public scrollToBottom(): void {
+    this.guaranteedScrollToBottom();
+  }
+
+  public clearInputField(): void {
+    this.inputEl.value = "";
+  }
+
+  public createGroupElement(className: string): HTMLElement {
+    return this.chatContainer.createDiv({
+      cls: className,
+    });
+  }
+
+  public createMessageElement(parent: HTMLElement, className: string): HTMLElement {
+    return parent.createDiv({
+      cls: className,
+    });
+  }
+
+  public createContentContainer(parent: HTMLElement): HTMLElement {
+    return parent.createDiv({
+      cls: "message-content-container",
+    });
+  }
+
+  public createContentElement(parent: HTMLElement): HTMLElement {
+    return parent.createDiv({
+      cls: "message-content",
+    });
+  }
+
+  public addLoadingMessage1(): HTMLElement {
+    const messageGroup = this.chatContainer.createDiv({
+      cls: "message-group ollama-message-group",
+    });
+
+    const messageEl = messageGroup.createDiv({
+      cls: "message ollama-message ollama-message-tail",
+    });
+
+    const dotsContainer = messageEl.createDiv({
+      cls: "thinking-dots",
+    });
+
+    for (let i = 0; i < 3; i++) {
+      dotsContainer.createDiv({
+        cls: "thinking-dot",
+      });
+    }
+
+    this.guaranteedScrollToBottom();
+
+    return messageGroup;
   }
 
   getViewType(): string {
@@ -303,8 +376,8 @@ onerror = (event) => {
     }
   }
 
-  private showEmptyState(): void {
-    console.log("show empti state");
+  public showEmptyState(): void {
+    // console.log("show empti state");
 
     if (this.messages.length === 0 && !this.emptyStateEl) {
       this.emptyStateEl = this.chatContainer.createDiv({
@@ -323,45 +396,15 @@ onerror = (event) => {
     }
   }
 
-  private hideEmptyState(): void {
+  public hideEmptyState(): void {
     if (this.emptyStateEl && this.emptyStateEl.parentNode) {
       this.emptyStateEl.remove();
       this.emptyStateEl = null;
     }
   }
 
-  async loadMessageHistory() {
-    if (this.historyLoaded) return;
-
-    try {
-      const history = await this.plugin.loadMessageHistory();
-
-      if (Array.isArray(history) && history.length > 0) {
-        this.messages = [];
-        this.chatContainer.empty();
-
-        for (const msg of history) {
-          const message = {
-            ...msg,
-            timestamp: new Date(msg.timestamp),
-          };
-
-          this.messages.push(message);
-          this.renderMessage(message);
-        }
-
-        this.guaranteedScrollToBottom();
-        this.initializeThinkingBlocks();
-        this.hideEmptyState();
-      } else {
-        this.showEmptyState();
-      }
-
-      this.historyLoaded = true;
-    } catch (error) {
-      console.error("Error loading message history:", error);
-      this.showEmptyState();
-    }
+  async loadMessageHistory(): Promise<void> {
+    this.messageService.loadMessageHistory();
   }
 
   async saveMessageHistory() {
@@ -391,15 +434,10 @@ onerror = (event) => {
   }
 
   async sendMessage(): Promise<void> {
-    if (this.isProcessing) return;
-
     const content = this.inputEl.value.trim();
     if (!content) return;
 
-    this.hideEmptyState();
-    this.addMessage("user", content);
-    this.inputEl.value = "";
-    await this.processWithOllama(content);
+    this.messageService.sendMessage(content);
   }
 
   addMessage(role: "user" | "assistant", content: string): void {
@@ -812,12 +850,8 @@ onerror = (event) => {
 
     return messageGroup;
   }
-
-  async clearChatMessages() {
-    this.messages = [];
-    this.chatContainer.empty();
-    this.historyLoaded = false;
-    this.showEmptyState();
+  async clearChatMessages(): Promise<void> {
+    this.messageService.clearChatMessages();
   }
 
   async startVoiceRecognition(): Promise<void> {
@@ -889,4 +923,11 @@ onerror = (event) => {
   setSystemMessageInterval(interval: number): void {
     this.systemMessageInterval = interval;
   }
+
+  onModelChanged(modelName: string): void {
+    this.updateInputPlaceholder(modelName);
+    this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+  }
+
+
 }
