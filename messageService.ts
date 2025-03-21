@@ -304,16 +304,18 @@ export class MessageService {
 
         setTimeout(async () => {
             try {
-                const isNewConversation = this.messages.length <= 1;
-
-                const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
                 let useSystemPrompt = false;
+                if (this.plugin.settings.followRole) {
+                    const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
 
-                if (systemPromptInterval === 0) {
-                    useSystemPrompt = true;
-                } else if (systemPromptInterval > 0) {
-                    useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
+                    if (systemPromptInterval === 0) {
+                        useSystemPrompt = true;
+                    } else if (systemPromptInterval > 0) {
+                        useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
+                    }
                 }
+
+                const isNewConversation = this.messages.length <= 1;
 
                 const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
                     content,
@@ -334,7 +336,6 @@ export class MessageService {
                     const systemPrompt = this.plugin.promptService.getSystemPrompt();
                     if (systemPrompt) {
                         requestBody.system = systemPrompt;
-                        // console.log("processWithOllama: system prompt is used!");
                     }
                 }
 
@@ -361,15 +362,10 @@ export class MessageService {
         }, 0);
     }
 
-    // Add a system notification message
     public addSystemMessage(content: string): void {
         this.addMessage(MessageType.SYSTEM, content);
-
-        // Also show a notification
-        // new Notice(content, 3000);
     }
 
-    // Helper methods
     private removeLoadingMessage(loadingMessageEl: HTMLElement): void {
         if (loadingMessageEl && loadingMessageEl.parentNode) {
             loadingMessageEl.parentNode.removeChild(loadingMessageEl);

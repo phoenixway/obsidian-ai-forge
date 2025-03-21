@@ -258,14 +258,16 @@ var MessageService = class {
     const loadingMessageEl = this.view.addLoadingMessage();
     setTimeout(async () => {
       try {
-        const isNewConversation = this.messages.length <= 1;
-        const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
         let useSystemPrompt = false;
-        if (systemPromptInterval === 0) {
-          useSystemPrompt = true;
-        } else if (systemPromptInterval > 0) {
-          useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
+        if (this.plugin.settings.followRole) {
+          const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
+          if (systemPromptInterval === 0) {
+            useSystemPrompt = true;
+          } else if (systemPromptInterval > 0) {
+            useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
+          }
         }
+        const isNewConversation = this.messages.length <= 1;
         const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
           content,
           isNewConversation
@@ -302,11 +304,9 @@ var MessageService = class {
       }
     }, 0);
   }
-  // Add a system notification message
   addSystemMessage(content) {
     this.addMessage("system" /* SYSTEM */, content);
   }
-  // Helper methods
   removeLoadingMessage(loadingMessageEl) {
     if (loadingMessageEl && loadingMessageEl.parentNode) {
       loadingMessageEl.parentNode.removeChild(loadingMessageEl);
