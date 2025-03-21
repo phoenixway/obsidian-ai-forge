@@ -624,6 +624,8 @@ onerror = (event) => {
   getIcon() {
     return "message-square";
   }
+  // In the onOpen() method of ollamaView.ts, remove the reset option code
+  // and only keep the settings option in the menu dropdown
   async onOpen() {
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container"
@@ -667,15 +669,6 @@ onerror = (event) => {
       cls: "menu-dropdown"
     });
     menuDropdown.style.display = "none";
-    const resetOption = menuDropdown.createEl("div", {
-      cls: "menu-option reset-option"
-    });
-    const resetIcon = resetOption.createEl("span", { cls: "menu-option-icon" });
-    (0, import_obsidian2.setIcon)(resetIcon, "refresh-ccw");
-    resetOption.createEl("span", {
-      cls: "menu-option-text",
-      text: "Reset Conversation"
-    });
     const settingsOption = menuDropdown.createEl("div", {
       cls: "menu-option settings-option"
     });
@@ -700,14 +693,6 @@ onerror = (event) => {
       menuDropdown.style.display = "none";
       document.removeEventListener("click", closeMenu);
     };
-    resetOption.addEventListener("click", () => {
-      this.plugin.apiService.resetState();
-      this.clearChatMessages();
-      setTimeout(() => {
-        this.inputEl.focus();
-      }, 100);
-      closeMenu();
-    });
     settingsOption.addEventListener("click", async () => {
       const setting = this.app.setting;
       await setting.open();

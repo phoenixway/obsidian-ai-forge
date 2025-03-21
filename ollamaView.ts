@@ -265,6 +265,9 @@ onerror = (event) => {
     return "message-square";
   }
 
+  // In the onOpen() method of ollamaView.ts, remove the reset option code
+  // and only keep the settings option in the menu dropdown
+
   async onOpen(): Promise<void> {
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container",
@@ -320,18 +323,7 @@ onerror = (event) => {
     });
     menuDropdown.style.display = "none";
 
-    // Add reset option to the dropdown
-    const resetOption = menuDropdown.createEl("div", {
-      cls: "menu-option reset-option",
-    });
-    const resetIcon = resetOption.createEl("span", { cls: "menu-option-icon" });
-    setIcon(resetIcon, "refresh-ccw");
-    resetOption.createEl("span", {
-      cls: "menu-option-text",
-      text: "Reset Conversation",
-    });
-
-    // Add settings option to the dropdown
+    // Only add settings option to the dropdown (removed reset option)
     const settingsOption = menuDropdown.createEl("div", {
       cls: "menu-option settings-option",
     });
@@ -362,17 +354,6 @@ onerror = (event) => {
       document.removeEventListener("click", closeMenu);
     };
 
-    // Add functionality to the reset option
-    resetOption.addEventListener("click", () => {
-      this.plugin.apiService.resetState();
-      this.clearChatMessages();
-      // this.addMessage("assistant", "State reset. What would you like to do now?");
-      setTimeout(() => {
-        this.inputEl.focus();
-      }, 100);
-      closeMenu();
-    });
-
     // Add functionality to the settings option
     settingsOption.addEventListener("click", async () => {
       const setting = (this.app as any).setting;
@@ -381,12 +362,12 @@ onerror = (event) => {
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
+
     await this.messageService.loadMessageHistory();
     this.showEmptyState();
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
-
     });
     this.register(() => removeListener());
   }
