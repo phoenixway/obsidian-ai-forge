@@ -138,9 +138,26 @@ onerror = (event) => {
       console.error("Failed to initialize worker:", error);
     }
 
+    // In ollamaView.ts, modify the speechWorker.onmessage handler:
     this.speechWorker.onmessage = (event) => {
-      const transcript = event.data;
+      const data = event.data;
+      console.log("Received data from worker:", data);
+
+      // Check if the response is an error object
+      if (data && typeof data === 'object' && data.error) {
+        console.error("Speech recognition error:", data.message);
+        // Optionally display error message to user
+        // this.plugin.showNotice(`Speech recognition error: ${data.message}`);
+        return;
+      }
+
+      // Only process valid transcript text
+      const transcript = typeof data === 'string' ? data : '';
       console.log("Received transcript from worker:", transcript);
+
+      if (!transcript) {
+        return; // Don't modify the input field if there's no transcript
+      }
 
       const cursorPosition = this.inputEl.selectionStart || 0;
       const currentValue = this.inputEl.value;

@@ -535,8 +535,17 @@ onerror = (event) => {
       console.error("Failed to initialize worker:", error);
     }
     this.speechWorker.onmessage = (event) => {
-      const transcript = event.data;
+      const data = event.data;
+      console.log("Received data from worker:", data);
+      if (data && typeof data === "object" && data.error) {
+        console.error("Speech recognition error:", data.message);
+        return;
+      }
+      const transcript = typeof data === "string" ? data : "";
       console.log("Received transcript from worker:", transcript);
+      if (!transcript) {
+        return;
+      }
       const cursorPosition = this.inputEl.selectionStart || 0;
       const currentValue = this.inputEl.value;
       let insertText = transcript;
