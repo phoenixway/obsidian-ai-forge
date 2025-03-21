@@ -364,7 +364,7 @@ onerror = (event) => {
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
-
+    await this.messageService.loadMessageHistory();
     this.showEmptyState();
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
