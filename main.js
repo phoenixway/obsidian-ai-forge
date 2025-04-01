@@ -163,6 +163,16 @@ var MessageService = class {
     } else {
       messageGroup = lastGroup;
     }
+    let messageClass = "message ";
+    if (isUser) {
+      messageClass += "user-message bubble user-bubble";
+    } else if (isAssistant(message.role)) {
+      messageClass += "ollama-message bubble ollama-bubble";
+    } else if (isError) {
+      messageClass += "error-message bubble error-bubble";
+    } else if (isSystem) {
+      messageClass += "system-message bubble system-bubble";
+    }
   }
   // Create a copy button for the message
   createCopyButton(container, message) {
