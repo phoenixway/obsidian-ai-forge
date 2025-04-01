@@ -77,15 +77,7 @@
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
       position: relative; 
     }
-  
-    .buttons-container {
-      display: flex;
-      position: absolute; /* Абсолютне позиціонування відносно chat-input-container */
-      bottom: 10px; /* Відступ від низу */
-      right: 15px; /* Відступ справа */
-      align-items: center;
-    }
-
+ 
     .chat-input-container textarea {
       flex: 1;
       resize: none;
@@ -93,7 +85,7 @@
       border-radius: 20px;
       padding: 10px 15px;
       padding-right: 100px; /* Збільшений відступ справа для кнопок */
-      margin-right: 0; /* Видалено відступ справа, тепер це контролюється padding-right */
+      margin-right: 0; 
       min-height: 40px;
       max-height: 66vh;
       background-color: var(--background-primary);
@@ -103,92 +95,118 @@
       overflow: hidden;
       width: 100%; /* Щоб textarea займала всю доступну ширину */
     }
-    
+/* Нова позиція для контейнера кнопок - всередині текстового поля */
+.buttons-container {
+  display: flex;
+  position: absolute;
+  bottom: 50%;
+  right: 25px;
+  transform: translateY(50%);
+  align-items: center;
+  z-index: 11;
+}
 
-    .buttons-container button {
-      width: 36px;
-      height: 36px;
-      border: none;
-      border-radius: 50%;
-      background-color: var(--interactive-accent);
-      color: var(--text-on-accent);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-left: 8px;
-      transition: transform 0.2s, background-color 0.2s;
-    }
+/* Оновлений стиль кнопок для кращої інтеграції */
+.buttons-container button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  opacity: 0.75;
+}
+
+.buttons-container button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  transform: scale(1.05);
+  opacity: 1;
+}
+
+/* Головна кнопка відправки - особливий стиль */
+.buttons-container .send-button {
+  background-color: var(--interactive-accent-hover);
+  color: var(--text-on-accent);
+  opacity: 0.9;
+}
+
+.buttons-container .send-button:hover {
+  opacity: 1;
+  background-color: var(--interactive-accent);
+  transform: scale(1.05);
+}
     
   
-  .chat-input-container textarea.expanded {
-    overflow-y: auto; 
-  }
+/* Стилі для налаштувань та меню кнопок */
+.chat-input-container .settings-button,
+.chat-input-container .menu-button {
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
+  opacity: 0.7;
+}
 
-  .chat-input-container textarea:focus {
-    border-color: var(--interactive-accent);
-    box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
-    outline: none;
+.chat-input-container .settings-button:hover,
+.chat-input-container .menu-button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  opacity: 1;
+}
+
+/* Стиль для голосової кнопки */
+.chat-input-container .voice-button {
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.chat-input-container .voice-button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  opacity: 1;
+}
+
+.chat-input-container .voice-button.recording {
+  background-color: var(--text-error);
+  color: white;
+  opacity: 1;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+/* Адаптивні стилі для малих екранів */
+@media screen and (max-width: 400px) {
+  .buttons-container {
+    right: 15px;
   }
   
-  /* Button styling */
-  .chat-input-container button {
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 50%;
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-left: 8px;
-    transition: transform 0.2s, background-color 0.2s;
+  .buttons-container button {
+    width: 28px;
+    height: 28px;
+    margin-left: 5px;
   }
   
-  .chat-input-container button:hover {
-    background-color: var(--interactive-hover);
-    transform: scale(1.05);
+  .chat-input-container textarea {
+    padding-right: 90px;
   }
-  
-  .chat-input-container .settings-button,
-  .chat-input-container .menu-button {
-    background-color: var(--background-modifier-border);
-    color: var(--text-normal);
-  }
-  
-  .chat-input-container .settings-button:hover,
-  .chat-input-container .menu-button:hover {
-    background-color: var(--background-modifier-border-hover);
-  }
-  
-  /* Voice button */
-  .chat-input-container .voice-button {
-    background-color: var(--background-modifier-border);
-    color: var(--text-normal);
-  }
-  
-  .chat-input-container .voice-button:hover {
-    background-color: var(--background-modifier-border-hover);
-  }
-  
-  .chat-input-container .voice-button.recording {
-    background-color: var(--interactive-accent);
-    color: var(--text-on-accent);
-    animation: pulse 1.5s infinite;
-  }
-  
-  @keyframes pulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1.1);
-      opacity: 0.8;
-    }
-  }
+}
   
   /* Reset button */
   .reset-button {
