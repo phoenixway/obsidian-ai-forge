@@ -512,25 +512,33 @@
     }
     
     .message:hover .copy-button {
-      /* --- Головна зміна тут --- */
-      opacity: 1; /* **Встановлюємо одразу повну непрозорість** */
-      /* --- Кінець зміни --- */
+      opacity: 0.6; /* Стає видимою, але трохи прозорою */
       visibility: visible;
       transition-delay: 0s;
+      /* --- Важливо: Не додаємо фон тут, бо він різний для user/ollama --- */
     }
     
     .copy-button:hover {
-      opacity: 1; /* Вже встановлено, але для надійності */
-      background-color: var(--background-modifier-hover);
-      transform: scale(1.1);
+      opacity: 1; /* Повна непрозорість */
+      background-color: var(--background-modifier-hover); /* Стандартний фон для hover (для повідомлень Ollama) */
+      transform: scale(1.1); /* Зберігаємо ефект збільшення */
     }
     .user-message:hover .copy-button {
-      color: var(--text-on-accent); /* Правильний колір при появі */
-    }
-    .user-message .copy-button:hover {
-      background-color: rgba(255, 255, 255, 0.2); /* Специфічний фон при наведенні */
+      color: var(--text-on-accent); /* Правильний колір іконки */
+      opacity: 0.6; /* Успадковано, але для ясності */
+      visibility: visible; /* Успадковано */
+      /* --- Новий фон для перекриття артефакту --- */
+      background-color: var(--interactive-accent); /* !! Встановлюємо фон одразу !! */
+      /* Можна спробувати --interactive-accent-hover, якщо він краще підходить до градієнта */
     }
     
+    /* Коли наведено БЕЗПОСЕРЕДНЬО на кнопку всередині ПОВІДОМЛЕННЯ КОРИСТУВАЧА */
+    .user-message .copy-button:hover {
+      background-color: rgba(255, 255, 255, 0.2); /* Специфічний hover фон */
+      opacity: 1; /* Повна непрозорість */
+      /* color та transform успадковуються або встановлені вище */
+    }
+        
       
   
   /* ==========================================================================
