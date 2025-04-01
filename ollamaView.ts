@@ -208,6 +208,10 @@ onerror = (event) => {
 
   public clearInputField(): void {
     this.inputEl.value = "";
+    setTimeout(() => {
+      const event = new Event('input');
+      this.inputEl.dispatchEvent(event);
+    }, 100);
   }
 
   public createGroupElement(className: string): HTMLElement {
@@ -518,10 +522,6 @@ onerror = (event) => {
   async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
     if (!content) return;
-    setTimeout(() => {
-      const event = new Event('input');
-      this.inputEl.dispatchEvent(event);
-    }, 100);
     this.messageService.sendMessage(content);
   }
 

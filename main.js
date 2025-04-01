@@ -577,6 +577,10 @@ onerror = (event) => {
   }
   clearInputField() {
     this.inputEl.value = "";
+    setTimeout(() => {
+      const event = new Event("input");
+      this.inputEl.dispatchEvent(event);
+    }, 100);
   }
   createGroupElement(className) {
     return this.chatContainer.createDiv({
@@ -834,10 +838,6 @@ onerror = (event) => {
     const content = this.inputEl.value.trim();
     if (!content)
       return;
-    setTimeout(() => {
-      const event = new Event("input");
-      this.inputEl.dispatchEvent(event);
-    }, 100);
     this.messageService.sendMessage(content);
   }
   addMessage(role, content) {
