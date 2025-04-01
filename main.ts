@@ -198,6 +198,7 @@ export default class OllamaPlugin extends Plugin {
 
   async saveMessageHistory(messages: string) { // 'messages' - це рядок JSON з ПОВНОЮ поточною історією від OllamaView
     if (!this.settings.saveMessageHistory) return;
+    console.log(`OllamaPlugin: Received data string (length ${messages.length}):`, messages.substring(0, 200) + "...");
 
     const basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
     const logPath = basePath + "/chat_history.json";
@@ -207,6 +208,7 @@ export default class OllamaPlugin extends Plugin {
       // 1. Обробка операції очищення (залишається)
       if (messages.trim() === "[]") {
         console.log("OllamaPlugin: Clear operation detected. Overwriting history file with empty array.");
+
         await adapter.write(logPath, "[]");
         return;
       }
@@ -272,7 +274,10 @@ export default class OllamaPlugin extends Plugin {
 
       // 4. Запис фінальних даних (перезапис)
       console.log(`OllamaPlugin: Writing history (size: ${currentSizeKB}KB) to ${logPath}`);
+      console.log(`OllamaPlugin: Final data to write (length ${dataToWrite.length}):`, dataToWrite.substring(0, 200) + "...");
+
       await adapter.write(logPath, dataToWrite); // Перезаписуємо файл
+      console.log("OllamaPlugin: Write operation completed.");
 
     } catch (error) {
       console.error("OllamaPlugin: Failed to save message history:", error);

@@ -775,6 +775,8 @@ var _OllamaView = class extends import_obsidian2.ItemView {
         content: msg.content,
         timestamp: msg.timestamp.toISOString()
       }));
+      const serializedData = JSON.stringify(this.messages.map((msg) => ({ role: msg.role, content: msg.content, timestamp: msg.timestamp.toISOString() })));
+      console.log(`OllamaView: Preparing to save (${this.messages.length} messages). Data:`, serializedData.substring(0, 200) + "...");
       await this.plugin.saveMessageHistory(JSON.stringify(serializedMessages));
     } catch (error) {
       console.error("Error saving message history:", error);
@@ -2261,6 +2263,7 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
   async saveMessageHistory(messages) {
     if (!this.settings.saveMessageHistory)
       return;
+    console.log(`OllamaPlugin: Received data string (length ${messages.length}):`, messages.substring(0, 200) + "...");
     const basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
     const logPath = basePath + "/chat_history.json";
     const adapter = this.app.vault.adapter;
@@ -2305,7 +2308,9 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
         await adapter.copy(logPath, backupPath);
       }
       console.log(`OllamaPlugin: Writing history (size: ${currentSizeKB}KB) to ${logPath}`);
+      console.log(`OllamaPlugin: Final data to write (length ${dataToWrite.length}):`, dataToWrite.substring(0, 200) + "...");
       await adapter.write(logPath, dataToWrite);
+      console.log("OllamaPlugin: Write operation completed.");
     } catch (error) {
       console.error("OllamaPlugin: Failed to save message history:", error);
     }

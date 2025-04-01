@@ -448,6 +448,10 @@ export class OllamaView extends ItemView {
         content: msg.content,
         timestamp: msg.timestamp.toISOString(),
       }));
+      const serializedData = JSON.stringify(this.messages.map(msg => ({ role: msg.role, content: msg.content, timestamp: msg.timestamp.toISOString() })));
+
+      console.log(`OllamaView: Preparing to save (${this.messages.length} messages). Data:`, serializedData.substring(0, 200) + "..."); // Логуємо початок даних
+
       await this.plugin.saveMessageHistory(JSON.stringify(serializedMessages));
     } catch (error) {
       console.error("Error saving message history:", error);
