@@ -77,7 +77,6 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   }
   
-  /* Textarea styling */
   .chat-input-container textarea {
     flex: 1;
     resize: none;
@@ -85,13 +84,19 @@
     border-radius: 20px;
     padding: 10px 15px;
     margin-right: 10px;
-    height: 40px;
+    min-height: 40px;
+    max-height: 66vh; /* Максимальна висота - 2/3 від висоти view */
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
-    transition: border-color 0.3s, box-shadow 0.3s;
+    transition: border-color 0.3s, box-shadow 0.3s, height 0.2s;
+    overflow: hidden; /* Спочатку приховуємо скрол */
   }
   
+  .chat-input-container textarea.expanded {
+    overflow-y: auto; 
+  }
+
   .chat-input-container textarea:focus {
     border-color: var(--interactive-accent);
     box-shadow: 0 0 0 2px rgba(var(--interactive-accent-rgb), 0.2);
