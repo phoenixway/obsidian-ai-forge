@@ -133,7 +133,7 @@ export class OllamaView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.createUIElements();
-    this.updateInputPlaceholder(this.plugin.settings.modelName); // Set initial placeholder
+    this.updateInputPlaceholder(this.plugin.settings.modelName);
     this.attachEventListeners();
     this.autoResizeTextarea(); // Setup auto-resize
 
@@ -457,6 +457,7 @@ export class OllamaView extends ItemView {
       this.isProcessing = false; // Reset processing state
       this.inputEl.focus(); // Re-focus input
       this.adjustTextareaHeight(); // Adjust height after clearing
+      this.guaranteedScrollToBottom(100);
     }
   }
 

@@ -100,7 +100,7 @@ export class MessageService {
         if (this.isProcessing || !content.trim() || !this.view) return;
         this.view.clearInputField();
         this.view.hideEmptyState();
-        this.addMessage(MessageType.USER, content);
+        // this.addMessage(MessageType.USER, content);
 
         await this.processWithOllama(content);
     }

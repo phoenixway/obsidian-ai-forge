@@ -104,7 +104,6 @@ var MessageService = class {
       return;
     this.view.clearInputField();
     this.view.hideEmptyState();
-    this.addMessage("user" /* USER */, content);
     await this.processWithOllama(content);
   }
   // Add a message to the chat and render it
@@ -752,6 +751,7 @@ var _OllamaView = class extends import_obsidian2.ItemView {
       this.isProcessing = false;
       this.inputEl.focus();
       this.adjustTextareaHeight();
+      this.guaranteedScrollToBottom(100);
     }
   }
   // Internal method to add message to local state and render
