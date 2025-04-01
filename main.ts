@@ -295,7 +295,7 @@ export default class OllamaPlugin extends Plugin {
         await adapter.remove(logPath);
         // Clear history from view
         if (this.view) {
-          this.view.clearChatMessages();
+          this.view.clearChatContainer();
         }
       }
     } catch (error) {

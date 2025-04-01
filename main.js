@@ -76,11 +76,11 @@ var MessageService = class {
         this.view.scrollToBottom();
         this.initializeThinkingBlocks();
       } else {
-        this.view.showEmptyHistory();
+        this.view.showEmptyState();
       }
     } catch (error) {
       console.error("Error loading message history:", error);
-      this.view.showEmptyHistory();
+      this.view.showEmptyState();
     }
   }
   // Save message history to storage
@@ -133,7 +133,7 @@ var MessageService = class {
     this.messages = [];
     if (this.view) {
       this.view.clearChatContainer();
-      this.view.showEmptyHistory();
+      this.view.showEmptyState();
     }
   }
   // Render a message in the chat container
@@ -256,7 +256,7 @@ var MessageService = class {
     if (!this.view)
       return;
     this.isProcessing = true;
-    const loadingMessageEl = this.view.addLoadingMessage();
+    this.view.setLoadingState(true);
     setTimeout(async () => {
       try {
         let useSystemPrompt = false;
@@ -289,12 +289,14 @@ var MessageService = class {
           }
         }
         const data = await this.plugin.apiService.generateResponse(requestBody);
-        this.removeLoadingMessage(loadingMessageEl);
+        if (this.view)
+          this.view.setLoadingState(false);
         this.addMessage("assistant" /* ASSISTANT */, data.response);
         this.initializeThinkingBlocks();
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
-        this.removeLoadingMessage(loadingMessageEl);
+        if (this.view)
+          this.view.setLoadingState(false);
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         this.addMessage(
           "error" /* ERROR */,
@@ -431,197 +433,163 @@ function isAssistant(role) {
 
 // ollamaView.ts
 var VIEW_TYPE_OLLAMA = "ollama-chat-view";
+var CSS_CLASS_CONTAINER = "ollama-container";
+var CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
+var CSS_CLASS_INPUT_CONTAINER = "chat-input-container";
+var CSS_CLASS_BUTTONS_CONTAINER = "buttons-container";
+var CSS_CLASS_SEND_BUTTON = "send-button";
+var CSS_CLASS_VOICE_BUTTON = "voice-button";
+var CSS_CLASS_MENU_BUTTON = "menu-button";
+var CSS_CLASS_MENU_DROPDOWN = "menu-dropdown";
+var CSS_CLASS_MENU_OPTION = "menu-option";
+var CSS_CLASS_SETTINGS_OPTION = "settings-option";
+var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
+var CSS_CLASS_MESSAGE_GROUP = "message-group";
+var CSS_CLASS_USER_GROUP = "user-message-group";
+var CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
+var CSS_CLASS_MESSAGE = "message";
+var CSS_CLASS_USER_MESSAGE = "user-message";
+var CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
+var CSS_CLASS_BUBBLE = "bubble";
+var CSS_CLASS_USER_BUBBLE = "user-bubble";
+var CSS_CLASS_OLLAMA_BUBBLE = "ollama-bubble";
+var CSS_CLASS_TAIL_USER = "user-message-tail";
+var CSS_CLASS_TAIL_OLLAMA = "ollama-message-tail";
+var CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
+var CSS_CLASS_CONTENT = "message-content";
+var CSS_CLASS_THINKING_DOTS = "thinking-dots";
+var CSS_CLASS_THINKING_DOT = "thinking-dot";
+var CSS_CLASS_THINKING_BLOCK = "thinking-block";
+var CSS_CLASS_THINKING_HEADER = "thinking-header";
+var CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
+var CSS_CLASS_THINKING_TITLE = "thinking-title";
+var CSS_CLASS_THINKING_CONTENT = "thinking-content";
+var CSS_CLASS_TIMESTAMP = "message-timestamp";
+var CSS_CLASS_COPY_BUTTON = "copy-button";
+var CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
+var CSS_CLASS_BUTTONS_LOW = "low";
+var CSS_CLASS_RECORDING = "recording";
 var _OllamaView = class extends import_obsidian2.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
+    // Added for easier access
+    // Use MessageService directly for messages if appropriate, or keep local copy
+    // Assuming MessageService is the source of truth, potentially remove local `messages`
+    // For this optimization, we'll keep the local `messages` array as the structure relies on it.
     this.messages = [];
     this.isProcessing = false;
-    this.historyLoaded = false;
     this.scrollTimeout = null;
+    // Keep singleton pattern as is
+    // Speech Recognition related
+    this.speechWorker = null;
+    // Initialize as null
     this.mediaRecorder = null;
-    this.systemMessageInterval = 0;
+    this.audioStream = null;
+    // Store stream for cleanup
     this.messagesPairCount = 0;
+    // Make readonly
     this.emptyStateEl = null;
+    // Debounce/Throttle timers
+    this.resizeTimeout = null;
+    // --- Event Handlers ---
+    this.handleKeyDown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !this.isProcessing) {
+        e.preventDefault();
+        this.sendMessage();
+      }
+    };
+    this.handleSendClick = () => {
+      if (!this.isProcessing) {
+        this.sendMessage();
+      }
+    };
+    this.handleVoiceClick = () => {
+      this.toggleVoiceRecognition();
+    };
+    this.handleMenuClick = (e) => {
+      e.stopPropagation();
+      const isHidden = this.menuDropdown.style.display === "none";
+      this.menuDropdown.style.display = isHidden ? "block" : "none";
+    };
+    this.handleSettingsClick = async () => {
+      this.closeMenu();
+      const setting = this.app.setting;
+      if (setting) {
+        await setting.open();
+        setting.openTabById("obsidian-ollama-duet");
+      } else {
+        new import_obsidian2.Notice("Could not open settings.");
+      }
+    };
+    this.handleDocumentClickForMenu = (e) => {
+      if (this.menuDropdown.style.display === "block" && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
+        this.closeMenu();
+      }
+    };
+    this.handleModelChange = (modelName) => {
+      this.updateInputPlaceholder(modelName);
+      if (this.messages.length > 0) {
+        this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+      }
+    };
+    this.handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        requestAnimationFrame(() => {
+          this.guaranteedScrollToBottom(50);
+          this.adjustTextareaHeight();
+        });
+      }
+    };
+    this.handleActiveLeafChange = () => {
+      var _a;
+      if (this.app.workspace.getActiveViewOfType(_OllamaView) === this) {
+        setTimeout(() => this.guaranteedScrollToBottom(100), 100);
+        (_a = this.inputEl) == null ? void 0 : _a.focus();
+      }
+    };
+    // Debounced handlers for resize/input
+    this.handleInputForResize = () => {
+      if (this.resizeTimeout)
+        clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 50);
+    };
+    this.handleWindowResize = () => {
+      if (this.resizeTimeout)
+        clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100);
+    };
+    // Renamed from adjustHeight for clarity
+    this.adjustTextareaHeight = () => {
+      requestAnimationFrame(() => {
+        if (!this.inputEl || !this.buttonsContainer)
+          return;
+        const viewHeight = this.contentEl.clientHeight;
+        const maxHeight = Math.max(100, viewHeight * 0.6);
+        this.inputEl.style.height = "auto";
+        const scrollHeight = this.inputEl.scrollHeight;
+        const newHeight = Math.min(scrollHeight, maxHeight);
+        this.inputEl.style.height = `${newHeight}px`;
+        if (newHeight > 45) {
+          this.buttonsContainer.classList.add(CSS_CLASS_BUTTONS_LOW);
+        } else {
+          this.buttonsContainer.classList.remove(CSS_CLASS_BUTTONS_LOW);
+        }
+        this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight);
+      });
+    };
     this.plugin = plugin;
-    if (_OllamaView.instance) {
-      return _OllamaView.instance;
+    if (_OllamaView.instance && _OllamaView.instance !== this) {
+      console.warn("Replacing existing OllamaView instance. This might indicate an issue if not intended.");
     }
     _OllamaView.instance = this;
+    this.messageService = new MessageService(plugin);
+    this.messageService.setView(this);
     if (this.plugin.apiService) {
       this.plugin.apiService.setOllamaView(this);
     }
-    this.mediaRecorder = null;
     this.initSpeechWorker();
-    this.messageService = new MessageService(plugin);
-    this.messageService.setView(this);
   }
-  /*
-  ***************************
-  * Init speech functionality
-  ***************************
-  */
-  initSpeechWorker() {
-    try {
-      const workerCode = `
-onmessage = async (event) => {
-    try {
-      const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
-      
-      if (!apiKey || apiKey.trim() === '') {
-        postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
-        return;
-      }
-
-      const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
-      
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const base64Audio = btoa(
-        new Uint8Array(arrayBuffer).reduce(
-          (data, byte) => data + String.fromCharCode(byte), ''
-        )
-      );
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        body: JSON.stringify({
-          config: {
-            encoding: 'WEBM_OPUS',
-            sampleRateHertz: 48000,
-            languageCode: languageCode,
-            model: 'latest_long',
-            enableAutomaticPunctuation: true,
-          },
-          audio: {
-            content: base64Audio
-          },
-        }),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        postMessage({ 
-          error: true, 
-          message: "Error from Google Speech API: " + (errorData.error?.message || response.status)
-        });
-        return;
-      }
-  
-      const data = await response.json();
-      
-      if (data.results && data.results.length > 0) {
-        const transcript = data.results
-          .map(result => result.alternatives[0].transcript)
-          .join(' ')
-          .trim();
-        
-        postMessage(transcript);
-      } else {
-        postMessage({ error: true, message: 'No speech detected' });
-      }
-    } catch (error) {
-      postMessage({ 
-        error: true, 
-        message: 'Error processing speech recognition: ' + error.message 
-      });
-    }
-};
-`;
-      const workerBlob = new Blob([workerCode], { type: "application/javascript" });
-      const workerUrl = URL.createObjectURL(workerBlob);
-      this.speechWorker = new Worker(workerUrl);
-      this.initSpeechWorkerHandlers();
-    } catch (error) {
-      console.error("Failed to initialize worker:", error);
-    }
-  }
-  initSpeechWorkerHandlers() {
-    this.speechWorker.onmessage = (event) => {
-      const data = event.data;
-      if (data && typeof data === "object" && data.error) {
-        console.error("Speech recognition error:", data.message);
-        return;
-      }
-      const transcript = typeof data === "string" ? data : "";
-      if (!transcript)
-        return;
-      const cursorPosition = this.inputEl.selectionStart || 0;
-      const currentValue = this.inputEl.value;
-      let insertText = transcript;
-      if (cursorPosition > 0 && currentValue.charAt(cursorPosition - 1) !== " " && insertText.charAt(0) !== " ") {
-        insertText = " " + insertText;
-      }
-      const newValue = currentValue.substring(0, cursorPosition) + insertText + currentValue.substring(cursorPosition);
-      this.inputEl.value = newValue;
-      const newCursorPosition = cursorPosition + insertText.length;
-      this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
-      this.inputEl.focus();
-    };
-    this.speechWorker.onerror = (error) => {
-      console.error("Worker error:", error);
-    };
-  }
-  /*
-  *******************************
-  * End speech...
-  *******************************
-  */
-  // New methods to support MessageService
-  getChatContainer() {
-    return this.chatContainer;
-  }
-  clearChatContainer() {
-    this.chatContainer.empty();
-  }
-  scrollToBottom() {
-    this.guaranteedScrollToBottom();
-  }
-  clearInputField() {
-    this.inputEl.value = "";
-    setTimeout(() => {
-      this.inputEl.dispatchEvent(new Event("input"));
-    }, 100);
-  }
-  createGroupElement(className) {
-    return this.chatContainer.createDiv({
-      cls: className
-    });
-  }
-  createMessageElement(parent, className) {
-    return parent.createDiv({
-      cls: className
-    });
-  }
-  createContentContainer(parent) {
-    return parent.createDiv({
-      cls: "message-content-container"
-    });
-  }
-  createContentElement(parent) {
-    return parent.createDiv({
-      cls: "message-content"
-    });
-  }
-  addLoadingMessage1() {
-    const messageGroup = this.chatContainer.createDiv({
-      cls: "message-group ollama-message-group"
-    });
-    const messageEl = messageGroup.createDiv({
-      cls: "message ollama-message ollama-message-tail"
-    });
-    const dotsContainer = messageEl.createDiv({
-      cls: "thinking-dots"
-    });
-    for (let i = 0; i < 3; i++) {
-      dotsContainer.createDiv({
-        cls: "thinking-dot"
-      });
-    }
-    this.guaranteedScrollToBottom();
-    return messageGroup;
-  }
+  // --- Obsidian View Lifecycle Methods ---
   getViewType() {
     return VIEW_TYPE_OLLAMA;
   }
@@ -631,182 +599,124 @@ onmessage = async (event) => {
   getIcon() {
     return "message-square";
   }
-  autoResizeTextarea() {
-    const adjustHeight = () => {
-      const buttonsContainer = this.contentEl.querySelector(".buttons-container");
-      if (!buttonsContainer || !this.inputEl)
-        return;
-      const viewHeight = this.contentEl.clientHeight;
-      const maxHeight = viewHeight * 0.66;
-      requestAnimationFrame(() => {
-        this.inputEl.style.height = "auto";
-        const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
-        this.inputEl.style.height = newHeight + "px";
-        if (newHeight > 40) {
-          buttonsContainer.style.cssText = "bottom: 10px; top: auto; transform: translateY(0);";
-        } else {
-          buttonsContainer.style.cssText = "bottom: 50%; top: auto; transform: translateY(50%);";
-        }
-        this.inputEl.classList.toggle("expanded", this.inputEl.scrollHeight > maxHeight);
-      });
-    };
-    let resizeTimeout;
-    const handleInput = () => {
-      if (resizeTimeout)
-        clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(adjustHeight, 50);
-    };
-    this.inputEl.addEventListener("input", handleInput);
-    const handleResize = () => {
-      if (resizeTimeout)
-        clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(adjustHeight, 50);
-    };
-    this.registerDomEvent(window, "resize", handleResize);
-    this.registerEvent(this.app.workspace.on("resize", handleResize));
-    setTimeout(adjustHeight, 100);
-  }
-  /*
-  * onOpen method
-  */
   async onOpen() {
+    var _a, _b;
     this.createUIElements();
-    this.showEmptyHistory();
-    setTimeout(async () => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      this.inputEl.dispatchEvent(new Event("input"));
-      this.attachEventListeners();
-      await this.messageService.loadMessageHistory();
-      this.autoResizeTextarea();
-    }, 500);
+    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    this.attachEventListeners();
+    this.autoResizeTextarea();
+    await this.loadAndRenderHistory();
+    (_a = this.inputEl) == null ? void 0 : _a.focus();
+    this.guaranteedScrollToBottom(150);
+    (_b = this.inputEl) == null ? void 0 : _b.dispatchEvent(new Event("input"));
   }
+  // Cleanup resources when the view is closed
+  async onClose() {
+    console.log("OllamaView onClose: Cleaning up resources.");
+    if (this.speechWorker) {
+      this.speechWorker.terminate();
+      this.speechWorker = null;
+      console.log("Speech worker terminated.");
+    }
+    this.stopVoiceRecording(false);
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach((track) => track.stop());
+      this.audioStream = null;
+      console.log("Audio stream stopped.");
+    }
+    if (this.scrollTimeout)
+      clearTimeout(this.scrollTimeout);
+    if (this.resizeTimeout)
+      clearTimeout(this.resizeTimeout);
+    if (_OllamaView.instance === this) {
+      _OllamaView.instance = null;
+    }
+  }
+  // --- UI Creation and Management ---
   createUIElements() {
-    this.chatContainerEl = this.contentEl.createDiv({
-      cls: "ollama-container"
-    });
-    this.chatContainer = this.chatContainerEl.createDiv({
-      cls: "ollama-chat-container"
-    });
-    const inputContainer = this.chatContainerEl.createDiv({
-      cls: "chat-input-container"
-    });
+    this.contentEl.empty();
+    this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
+    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+    const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
     this.inputEl = inputContainer.createEl("textarea", {
-      attr: {
-        placeholder: `Text to ${this.plugin.settings.modelName}...`
-      }
+      attr: { placeholder: `Text to ${this.plugin.settings.modelName}...` }
+      // Initial placeholder
     });
-    const buttonsContainer = inputContainer.createDiv({
-      cls: "buttons-container"
-    });
-    this.sendButton = buttonsContainer.createEl("button", {
-      cls: "send-button"
-    });
+    this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON });
     (0, import_obsidian2.setIcon)(this.sendButton, "send");
-    this.voiceButton = buttonsContainer.createEl("button", {
-      cls: "voice-button"
-    });
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON });
     (0, import_obsidian2.setIcon)(this.voiceButton, "microphone");
-    this.menuButton = buttonsContainer.createEl("button", {
-      cls: "menu-button"
-    });
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON });
     (0, import_obsidian2.setIcon)(this.menuButton, "more-vertical");
-    this.menuDropdown = inputContainer.createEl("div", {
-      cls: "menu-dropdown"
-    });
+    this.menuDropdown = inputContainer.createEl("div", { cls: CSS_CLASS_MENU_DROPDOWN });
     this.menuDropdown.style.display = "none";
-    this.settingsOption = this.menuDropdown.createEl("div", {
-      cls: "menu-option settings-option"
-    });
+    this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
     const settingsIcon = this.settingsOption.createEl("span", { cls: "menu-option-icon" });
     (0, import_obsidian2.setIcon)(settingsIcon, "settings");
-    this.settingsOption.createEl("span", {
-      cls: "menu-option-text",
-      text: "Settings"
-    });
+    this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
   }
-  /*
-  * Initialize event listeners
-  */
   attachEventListeners() {
-    this.inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        this.sendMessage();
-      }
-    });
-    this.sendButton.addEventListener("click", () => this.sendMessage());
-    this.voiceButton.addEventListener("click", () => this.startVoiceRecognition());
-    const closeMenu = () => {
-      this.menuDropdown.style.display = "none";
-      document.removeEventListener("click", closeMenu);
-    };
-    this.menuButton.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (this.menuDropdown.style.display === "none") {
-        this.menuDropdown.style.display = "block";
-        setTimeout(() => {
-          document.addEventListener("click", closeMenu);
-        }, 0);
-      } else {
-        closeMenu();
-      }
-    });
-    this.settingsOption.addEventListener("click", async () => {
-      const setting = this.app.setting;
-      await setting.open();
-      setting.openTabById("obsidian-ollama-duet");
-      closeMenu();
-    });
-    const removeListener = this.plugin.on("model-changed", (modelName) => {
-      this.updateInputPlaceholder(modelName);
-      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
-    });
-    this.register(() => removeListener());
-    this.registerDomEvent(document, "visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        setTimeout(() => {
-          this.guaranteedScrollToBottom();
-          this.inputEl.dispatchEvent(new Event("input"));
-        }, 200);
-      }
-    });
+    this.inputEl.addEventListener("keydown", this.handleKeyDown);
+    this.sendButton.addEventListener("click", this.handleSendClick);
+    this.voiceButton.addEventListener("click", this.handleVoiceClick);
+    this.menuButton.addEventListener("click", this.handleMenuClick);
+    this.settingsOption.addEventListener("click", this.handleSettingsClick);
+    this.inputEl.addEventListener("input", this.handleInputForResize);
+    this.registerDomEvent(window, "resize", this.handleWindowResize);
+    this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
+    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
+    this.register(this.plugin.on("model-changed", this.handleModelChange));
+    this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(
-      this.app.workspace.on("active-leaf-change", () => {
-        if (this.app.workspace.getActiveViewOfType(this.constructor) === this) {
-          setTimeout(() => this.guaranteedScrollToBottom(), 100);
-        }
-      })
+      this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange)
     );
   }
+  // --- UI Update Methods ---
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {
       this.inputEl.placeholder = `Text to ${modelName}...`;
     }
   }
-  showEmptyHistory() {
-    if (this.messages.length === 0 && !this.emptyStateEl) {
-      this.emptyStateEl = this.chatContainer.createDiv({
-        cls: "ollama-empty-state"
-      });
-      const messageEl = this.emptyStateEl.createDiv({
-        cls: "empty-state-message",
-        text: "No messages yet"
-      });
-      const tipEl = this.emptyStateEl.createDiv({
+  closeMenu() {
+    if (this.menuDropdown) {
+      this.menuDropdown.style.display = "none";
+    }
+  }
+  autoResizeTextarea() {
+    this.adjustTextareaHeight();
+  }
+  showEmptyState() {
+    if (this.messages.length === 0 && !this.emptyStateEl && this.chatContainer) {
+      this.chatContainer.empty();
+      this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE });
+      this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" });
+      this.emptyStateEl.createDiv({
         cls: "empty-state-tip",
-        text: `Type a message to start chatting with ${this.plugin.settings.modelName}`
+        text: `Type a message or use voice input to chat with ${this.plugin.settings.modelName}`
       });
     }
   }
   hideEmptyState() {
-    if (this.emptyStateEl && this.emptyStateEl.parentNode) {
+    if (this.emptyStateEl) {
       this.emptyStateEl.remove();
       this.emptyStateEl = null;
     }
   }
-  async loadMessageHistory() {
-    this.messageService.loadMessageHistory();
+  // --- Message Handling ---
+  async loadAndRenderHistory() {
+    try {
+      await this.messageService.loadMessageHistory();
+      if (this.messages.length === 0) {
+        this.showEmptyState();
+      } else {
+        this.hideEmptyState();
+      }
+    } catch (error) {
+      console.error("Error loading message history:", error);
+      new import_obsidian2.Notice("Failed to load chat history.");
+      this.showEmptyState();
+    }
   }
   async saveMessageHistory() {
     if (this.messages.length === 0)
@@ -816,100 +726,186 @@ onmessage = async (event) => {
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp.toISOString()
+        // ISO format is standard
       }));
       await this.plugin.saveMessageHistory(JSON.stringify(serializedMessages));
     } catch (error) {
       console.error("Error saving message history:", error);
+      new import_obsidian2.Notice("Failed to save chat history.");
     }
   }
-  guaranteedScrollToBottom() {
-    if (this.scrollTimeout) {
-      clearTimeout(this.scrollTimeout);
-    }
-    this.scrollTimeout = setTimeout(() => {
-      requestAnimationFrame(() => {
-        if (!this.chatContainer)
-          return;
-        this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
-      });
-    }, 50);
-  }
+  // Centralized message sending logic
   async sendMessage() {
     const content = this.inputEl.value.trim();
-    if (!content)
+    if (!content || this.isProcessing)
       return;
-    this.messageService.sendMessage(content);
+    this.isProcessing = true;
+    this.hideEmptyState();
+    this.clearInputField();
+    try {
+      this.internalAddMessage("user", content);
+      await this.messageService.sendMessage(content);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      new import_obsidian2.Notice("Failed to send message. Please try again.");
+      this.internalAddMessage("assistant", "Error: Could not send message.");
+    } finally {
+      this.isProcessing = false;
+      this.inputEl.focus();
+      this.adjustTextareaHeight();
+    }
   }
-  addMessage(role, content) {
+  // Internal method to add message to local state and render
+  // Called by sendMessage (user) and MessageService (assistant/system)
+  internalAddMessage(role, content) {
     const message = {
       role,
       content,
       timestamp: new Date()
     };
     this.messages.push(message);
-    this.renderMessage(message);
     if (role === "assistant" && this.messages.length >= 2) {
-      if (this.messages[this.messages.length - 2].role === "user") {
+      const prevMessage = this.messages[this.messages.length - 2];
+      if (prevMessage && prevMessage.role === "user") {
         this.messagesPairCount++;
       }
     }
+    this.renderMessage(message);
+    this.hideEmptyState();
     this.saveMessageHistory();
-    setTimeout(() => {
-      this.guaranteedScrollToBottom();
-    }, 100);
+    this.guaranteedScrollToBottom(50);
   }
-  processThinkingTags(content) {
-    if (!content.includes("<think>")) {
-      return content;
+  // --- Rendering Logic ---
+  // Combined logic to render any message type
+  renderMessage(message) {
+    const isUser = message.role === "user";
+    const messageIndex = this.messages.indexOf(message);
+    if (messageIndex === -1)
+      return;
+    const prevMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
+    const nextMessage = messageIndex < this.messages.length - 1 ? this.messages[messageIndex + 1] : null;
+    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role;
+    const isLastInGroup = !nextMessage || nextMessage.role !== message.role;
+    let messageGroup;
+    const lastGroup = this.chatContainer.lastElementChild;
+    if (isFirstInGroup || !lastGroup || !lastGroup.classList.contains(isUser ? CSS_CLASS_USER_GROUP : CSS_CLASS_OLLAMA_GROUP)) {
+      messageGroup = this.chatContainer.createDiv({
+        cls: `${CSS_CLASS_MESSAGE_GROUP} ${isUser ? CSS_CLASS_USER_GROUP : CSS_CLASS_OLLAMA_GROUP}`
+      });
+    } else {
+      messageGroup = lastGroup;
+      const prevMessageEl = messageGroup.lastElementChild;
+      if (prevMessageEl) {
+        prevMessageEl.classList.remove(CSS_CLASS_TAIL_USER, CSS_CLASS_TAIL_OLLAMA);
+      }
     }
-    const parts = [];
-    let currentPosition = 0;
+    const messageEl = messageGroup.createDiv({
+      cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_BUBBLE} ${isUser ? CSS_CLASS_USER_MESSAGE + " " + CSS_CLASS_USER_BUBBLE : CSS_CLASS_OLLAMA_MESSAGE + " " + CSS_CLASS_OLLAMA_BUBBLE}`
+    });
+    if (isLastInGroup) {
+      messageEl.classList.add(isUser ? CSS_CLASS_TAIL_USER : CSS_CLASS_TAIL_OLLAMA);
+    }
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+    if (message.role === "assistant") {
+      this.renderAssistantContent(contentEl, message.content);
+    } else {
+      message.content.split("\n").forEach((line, index, array) => {
+        contentEl.appendText(line);
+        if (index < array.length - 1) {
+          contentEl.createEl("br");
+        }
+      });
+    }
+    const copyButton = contentContainer.createEl("button", {
+      cls: CSS_CLASS_COPY_BUTTON,
+      attr: { title: "Copy" }
+      // Use English or i18n
+    });
+    (0, import_obsidian2.setIcon)(copyButton, "copy");
+    copyButton.addEventListener("click", () => this.handleCopyClick(message.content, copyButton));
+    if (isLastInGroup) {
+      messageEl.createDiv({
+        cls: CSS_CLASS_TIMESTAMP,
+        text: this.formatTime(message.timestamp)
+      });
+    }
+  }
+  renderAssistantContent(containerEl, content) {
+    const decodedContent = this.decodeHtmlEntities(content);
+    const hasThinking = this.detectThinkingTags(decodedContent);
+    if (hasThinking.hasThinkingTags) {
+      const processedHtml = this.processThinkingTags(decodedContent);
+      containerEl.innerHTML = processedHtml;
+      this.addThinkingToggleListeners(containerEl);
+    } else {
+      import_obsidian2.MarkdownRenderer.renderMarkdown(content, containerEl, this.plugin.app.vault.getRoot().path, this);
+    }
+  }
+  handleCopyClick(content, buttonEl) {
+    let textToCopy = content;
+    if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
+      textToCopy = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    }
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      buttonEl.setText("Copied!");
+      (0, import_obsidian2.setIcon)(buttonEl, "check");
+      setTimeout(() => {
+        buttonEl.setText("");
+        (0, import_obsidian2.setIcon)(buttonEl, "copy");
+      }, 2e3);
+    }).catch((err) => {
+      console.error("Failed to copy text: ", err);
+      new import_obsidian2.Notice("Failed to copy text.");
+    });
+  }
+  // --- Thinking Tag Processing ---
+  processThinkingTags(content) {
     const thinkingRegex = /<think>([\s\S]*?)<\/think>/g;
+    let lastIndex = 0;
+    const parts = [];
     let match;
     while ((match = thinkingRegex.exec(content)) !== null) {
-      if (match.index > currentPosition) {
-        const textBefore = content.substring(currentPosition, match.index);
-        parts.push(this.markdownToHtml(textBefore));
+      if (match.index > lastIndex) {
+        parts.push(this.markdownToHtml(content.substring(lastIndex, match.index)));
       }
       const thinkingContent = match[1];
       const foldableHtml = `
-        <div class="thinking-block">
-          <div class="thinking-header" data-fold-state="expanded">
-            <div class="thinking-toggle">\u25BC</div>
-            <div class="thinking-title">Thinking</div>
-          </div>
-          <div class="thinking-content">${this.markdownToHtml(
-        thinkingContent
-      )}</div>
-        </div>
-      `;
+            <div class="${CSS_CLASS_THINKING_BLOCK}">
+                <div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded">
+                    <div class="${CSS_CLASS_THINKING_TOGGLE}">\u25BA</div>
+                    <div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div>
+                </div>
+                <div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">
+                    ${this.markdownToHtml(thinkingContent)}
+                </div>
+            </div>
+        `;
       parts.push(foldableHtml);
-      currentPosition = match.index + match[0].length;
+      lastIndex = thinkingRegex.lastIndex;
     }
-    if (currentPosition < content.length) {
-      const textAfter = content.substring(currentPosition);
-      parts.push(this.markdownToHtml(textAfter));
+    if (lastIndex < content.length) {
+      parts.push(this.markdownToHtml(content.substring(lastIndex)));
     }
     return parts.join("");
   }
+  // Renders markdown to HTML (using Obsidian's renderer)
   markdownToHtml(markdown) {
+    var _a, _b;
     if (!markdown || markdown.trim() === "")
       return "";
     const tempDiv = document.createElement("div");
-    import_obsidian2.MarkdownRenderer.renderMarkdown(markdown, tempDiv, "", this);
+    const contextFilePath = (_b = (_a = this.app.workspace.getActiveFile()) == null ? void 0 : _a.path) != null ? _b : "";
+    import_obsidian2.MarkdownRenderer.renderMarkdown(markdown, tempDiv, contextFilePath, this);
     return tempDiv.innerHTML;
   }
-  escapeHtml(unsafe) {
-    return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-  }
+  // Adds click listeners to thinking block headers
   addThinkingToggleListeners(contentEl) {
-    const thinkingHeaders = contentEl.querySelectorAll(".thinking-header");
+    const thinkingHeaders = contentEl.querySelectorAll(`.${CSS_CLASS_THINKING_HEADER}`);
     thinkingHeaders.forEach((header) => {
       header.addEventListener("click", () => {
         const content = header.nextElementSibling;
-        const toggleIcon = header.querySelector(
-          ".thinking-toggle"
-        );
+        const toggleIcon = header.querySelector(`.${CSS_CLASS_THINKING_TOGGLE}`);
         if (!content || !toggleIcon)
           return;
         const isFolded = header.getAttribute("data-fold-state") === "folded";
@@ -925,288 +921,364 @@ onmessage = async (event) => {
       });
     });
   }
-  hasThinkingTags(content) {
-    const formats = [
-      "<think>",
-      "&lt;think&gt;",
-      "<think ",
-      "\\<think\\>",
-      "%3Cthink%3E"
-    ];
-    return formats.some((format) => content.includes(format));
-  }
-  addToggleAllButton(contentContainer, contentEl) {
-    const toggleAllButton = contentContainer.createEl("button", {
-      cls: "toggle-all-thinking-button",
-      attr: { title: "\u0417\u0433\u043E\u0440\u043D\u0443\u0442\u0438/\u0440\u043E\u0437\u0433\u043E\u0440\u043D\u0443\u0442\u0438 \u0432\u0441\u0456 \u0431\u043B\u043E\u043A\u0438 thinking" }
-    });
-    toggleAllButton.textContent = "Toggle All Thinking";
-    toggleAllButton.addEventListener("click", () => {
-      const thinkingContents = contentEl.querySelectorAll(".thinking-content");
-      const thinkingToggles = contentEl.querySelectorAll(".thinking-toggle");
-      let allHidden = true;
-      thinkingContents.forEach((content) => {
-        if (content.style.display !== "none") {
-          allHidden = false;
-        }
-      });
-      thinkingContents.forEach((content, index) => {
-        content.style.display = allHidden ? "block" : "none";
-        thinkingToggles[index].textContent = allHidden ? "\u25BC" : "\u25BA";
-      });
-    });
-  }
-  renderMessage(message) {
-    const isUser = message.role === "user";
-    const isFirstInGroup = this.isFirstMessageInGroup(message);
-    const isLastInGroup = this.isLastMessageInGroup(message);
-    let messageGroup;
-    const lastGroup = this.chatContainer.lastElementChild;
-    if (isFirstInGroup) {
-      messageGroup = this.chatContainer.createDiv({
-        cls: `message-group ${isUser ? "user-message-group" : "ollama-message-group"}`
-      });
-    } else {
-      messageGroup = lastGroup;
-    }
-    const messageEl = messageGroup.createDiv({
-      cls: `message ${isUser ? "user-message bubble user-bubble" : "ollama-message bubble ollama-bubble"} ${isLastInGroup ? isUser ? "user-message-tail" : "ollama-message-tail" : ""}`
-    });
-    const contentContainer = messageEl.createDiv({
-      cls: "message-content-container"
-    });
-    const contentEl = contentContainer.createDiv({
-      cls: "message-content"
-    });
-    if (message.role === "assistant") {
-      const decodedContent = this.decodeHtmlEntities(message.content);
-      const hasThinkingTags = message.content.includes("<think>") || decodedContent.includes("<think>");
-      if (hasThinkingTags) {
-        const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ? decodedContent : message.content;
-        const processedContent = this.processThinkingTags(contentToProcess);
-        contentEl.innerHTML = processedContent;
-        this.addThinkingToggleListeners(contentEl);
-      } else {
-        import_obsidian2.MarkdownRenderer.renderMarkdown(
-          message.content,
-          contentEl,
-          "",
-          this
-        );
-      }
-    } else {
-      message.content.split("\n").forEach((line, index, array) => {
-        contentEl.createSpan({ text: line });
-        if (index < array.length - 1) {
-          contentEl.createEl("br");
-        }
-      });
-    }
-    const copyButton = contentContainer.createEl("button", {
-      cls: "copy-button",
-      attr: { title: "\u0421\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438" }
-    });
-    (0, import_obsidian2.setIcon)(copyButton, "copy");
-    copyButton.addEventListener("click", () => {
-      let textToCopy = message.content;
-      if (message.role === "assistant" && textToCopy.includes("<think>")) {
-        textToCopy = textToCopy.replace(/<think>[\s\S]*?<\/think>/g, "");
-      }
-      navigator.clipboard.writeText(textToCopy);
-      copyButton.setText("Copied!");
-      setTimeout(() => {
-        copyButton.empty();
-        (0, import_obsidian2.setIcon)(copyButton, "copy");
-      }, 2e3);
-    });
-    if (isLastInGroup) {
-      messageEl.createDiv({
-        cls: "message-timestamp",
-        text: this.formatTime(message.timestamp)
-      });
-    }
-  }
-  isFirstMessageInGroup(message) {
-    const index = this.messages.indexOf(message);
-    if (index === 0)
-      return true;
-    const prevMessage = this.messages[index - 1];
-    return prevMessage.role !== message.role;
-  }
-  isLastMessageInGroup(message) {
-    const index = this.messages.indexOf(message);
-    if (index === this.messages.length - 1)
-      return true;
-    const nextMessage = this.messages[index + 1];
-    return nextMessage.role !== message.role;
-  }
-  formatTime(date) {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
+  // Utility to decode HTML entities (safer than innerHTML)
   decodeHtmlEntities(text) {
+    if (typeof document === "undefined")
+      return text;
     const textArea = document.createElement("textarea");
     textArea.innerHTML = text;
     return textArea.value;
   }
+  // Detects if thinking tags are present (checks common variations)
   detectThinkingTags(content) {
-    const formats = [
-      { name: "standard", regex: /<think>[\s\S]*?<\/think>/g },
-      { name: "escaped", regex: /&lt;think&gt;[\s\S]*?&lt;\/think&gt;/g },
-      { name: "backslash-escaped", regex: /\\<think\\>[\s\S]*?\\<\/think\\>/g },
-      { name: "url-encoded", regex: /%3Cthink%3E[\s\S]*?%3C\/think%3E/g }
-    ];
-    for (const format of formats) {
-      if (format.regex.test(content)) {
-        return { hasThinkingTags: true, format: format.name };
-      }
+    if (/<think>[\s\S]*?<\/think>/gi.test(content)) {
+      return { hasThinkingTags: true, format: "standard" };
     }
     return { hasThinkingTags: false, format: "none" };
   }
-  async processWithOllama(content) {
-    this.isProcessing = true;
-    const loadingMessageEl = this.addLoadingMessage();
-    setTimeout(async () => {
-      try {
-        const isNewConversation = this.messages.length <= 1;
-        const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
-        let useSystemPrompt = false;
-        if (systemPromptInterval === 0) {
-          useSystemPrompt = true;
-        } else if (systemPromptInterval > 0) {
-          useSystemPrompt = this.messagesPairCount % systemPromptInterval === 0;
+  // --- Speech Recognition ---
+  initSpeechWorker() {
+    try {
+      const bufferToBase64 = (buffer) => {
+        let binary = "";
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
         }
-        const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
-          content,
-          isNewConversation
-        );
-        const requestBody = {
-          model: this.plugin.settings.modelName,
-          prompt: formattedPrompt,
-          stream: false,
-          temperature: this.plugin.settings.temperature || 0.2,
-          options: {
-            num_ctx: this.plugin.settings.contextWindow || 8192
+        return btoa(binary);
+      };
+      const workerCode = `
+        // Worker Scope
+        self.onmessage = async (event) => {
+          const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+
+          if (!apiKey || apiKey.trim() === '') {
+            self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
+            return;
+          }
+
+          const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+
+          try {
+            const arrayBuffer = await audioBlob.arrayBuffer();
+
+            // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
+            // Simpler approach: pass buffer directly if API allows, or use efficient base64:
+            let base64Audio;
+            if (typeof TextDecoder !== 'undefined') { // Browser environment check
+                 // Modern approach (often faster if native)
+                 const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                 base64Audio = base64String;
+
+            } else {
+                 // Fallback (similar to original, ensure correctness)
+                 base64Audio = btoa(
+                   new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                 );
+            }
+
+
+            const response = await fetch(url, {
+              method: 'POST',
+              body: JSON.stringify({
+                config: {
+                  encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
+                  sampleRateHertz: 48000, // Match sample rate if possible
+                  languageCode: languageCode,
+                  model: 'latest_long', // Consider other models if needed
+                  enableAutomaticPunctuation: true,
+                },
+                audio: { content: base64Audio },
+              }),
+              headers: { 'Content-Type': 'application/json' },
+            });
+
+            const responseData = await response.json();
+
+            if (!response.ok) {
+              console.error("Google Speech API Error:", responseData);
+              self.postMessage({
+                error: true,
+                message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
+              });
+              return;
+            }
+
+            if (responseData.results && responseData.results.length > 0) {
+              const transcript = responseData.results
+                .map(result => result.alternatives[0].transcript)
+                .join(' ')
+                .trim();
+              self.postMessage(transcript); // Send back only the transcript string
+            } else {
+               // Handle cases where API returns ok but no results (e.g., silence)
+               self.postMessage({ error: true, message: 'No speech detected or recognized.' });
+            }
+          } catch (error) {
+             console.error("Error in speech worker processing:", error);
+             self.postMessage({
+               error: true,
+               message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
+             });
           }
         };
-        if (useSystemPrompt) {
-          const systemPrompt = this.plugin.promptService.getSystemPrompt();
-          if (systemPrompt) {
-            requestBody.system = systemPrompt;
-          }
-        }
-        const data = await this.plugin.apiService.generateResponse(requestBody);
-        if (loadingMessageEl && loadingMessageEl.parentNode) {
-          loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-        }
-        this.addMessage("assistant", data.response);
-        this.initializeThinkingBlocks();
-      } catch (error) {
-        console.error("Error processing request with Ollama:", error);
-        if (loadingMessageEl && loadingMessageEl.parentNode) {
-          loadingMessageEl.parentNode.removeChild(loadingMessageEl);
-        }
-        this.addMessage(
-          "assistant",
-          "Connection error with Ollama. Please check the settings and ensure the server is running."
-        );
-      } finally {
-        this.isProcessing = false;
-      }
-    }, 0);
-  }
-  initializeThinkingBlocks() {
-    setTimeout(() => {
-      const thinkingHeaders = this.chatContainer.querySelectorAll(".thinking-header");
-      thinkingHeaders.forEach((header) => {
-        const content = header.nextElementSibling;
-        const toggleIcon = header.querySelector(
-          ".thinking-toggle"
-        );
-        if (!content || !toggleIcon)
-          return;
-        content.style.display = "none";
-        toggleIcon.textContent = "\u25BA";
-        header.setAttribute("data-fold-state", "folded");
-      });
-    }, 100);
-  }
-  addLoadingMessage() {
-    const messageGroup = this.chatContainer.createDiv({
-      cls: "message-group ollama-message-group"
-    });
-    const messageEl = messageGroup.createDiv({
-      cls: "message ollama-message ollama-message-tail"
-    });
-    const dotsContainer = messageEl.createDiv({
-      cls: "thinking-dots"
-    });
-    for (let i = 0; i < 3; i++) {
-      dotsContainer.createDiv({
-        cls: "thinking-dot"
-      });
+      `;
+      const workerBlob = new Blob([workerCode], { type: "application/javascript" });
+      const workerUrl = URL.createObjectURL(workerBlob);
+      this.speechWorker = new Worker(workerUrl);
+      URL.revokeObjectURL(workerUrl);
+      this.setupSpeechWorkerHandlers();
+      console.log("Speech worker initialized.");
+    } catch (error) {
+      console.error("Failed to initialize speech worker:", error);
+      new import_obsidian2.Notice("Speech recognition feature failed to initialize.");
+      this.speechWorker = null;
     }
-    this.guaranteedScrollToBottom();
-    return messageGroup;
   }
-  async clearChatMessages() {
-    this.messageService.clearChatMessages();
-  }
-  async startVoiceRecognition() {
-    const voiceButton = this.contentEl.querySelector(".voice-button");
-    if (voiceButton == null ? void 0 : voiceButton.classList.contains("recording")) {
-      if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-        this.mediaRecorder.stop();
+  setupSpeechWorkerHandlers() {
+    if (!this.speechWorker)
+      return;
+    this.speechWorker.onmessage = (event) => {
+      const data = event.data;
+      if (data && typeof data === "object" && data.error) {
+        console.error("Speech recognition error:", data.message);
+        new import_obsidian2.Notice(`Speech Recognition Error: ${data.message}`);
+        this.updateInputPlaceholder(this.plugin.settings.modelName);
+        return;
       }
+      if (typeof data === "string" && data.trim()) {
+        const transcript = data.trim();
+        this.insertTranscript(transcript);
+      } else if (typeof data !== "string") {
+        console.warn("Received unexpected data format from speech worker:", data);
+      }
+    };
+    this.speechWorker.onerror = (error) => {
+      console.error("Unhandled worker error:", error);
+      new import_obsidian2.Notice("An unexpected error occurred in the speech recognition worker.");
+      this.updateInputPlaceholder(this.plugin.settings.modelName);
+      this.stopVoiceRecording(false);
+    };
+  }
+  // Inserts recognized text into the input field
+  insertTranscript(transcript) {
+    var _a, _b;
+    if (!this.inputEl)
+      return;
+    const currentVal = this.inputEl.value;
+    const start = (_a = this.inputEl.selectionStart) != null ? _a : currentVal.length;
+    const end = (_b = this.inputEl.selectionEnd) != null ? _b : currentVal.length;
+    let textToInsert = transcript;
+    const precedingChar = start > 0 ? currentVal[start - 1] : null;
+    const followingChar = end < currentVal.length ? currentVal[end] : null;
+    if (precedingChar && precedingChar !== " " && precedingChar !== "\n") {
+      textToInsert = " " + textToInsert;
+    }
+    if (followingChar && followingChar !== " " && followingChar !== "\n" && !textToInsert.endsWith(" ")) {
+      textToInsert += " ";
+    }
+    const newValue = currentVal.substring(0, start) + textToInsert + currentVal.substring(end);
+    this.inputEl.value = newValue;
+    const newCursorPos = start + textToInsert.length;
+    this.inputEl.setSelectionRange(newCursorPos, newCursorPos);
+    this.inputEl.focus();
+    this.inputEl.dispatchEvent(new Event("input"));
+  }
+  // Toggles voice recording state
+  async toggleVoiceRecognition() {
+    if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+      this.stopVoiceRecording(true);
+    } else {
+      await this.startVoiceRecognition();
+    }
+  }
+  // Starts the voice recording process
+  // Починає процес розпізнавання голосу
+  async startVoiceRecognition() {
+    var _a, _b, _c;
+    if (!this.speechWorker) {
+      new import_obsidian2.Notice("\u0424\u0443\u043D\u043A\u0446\u0456\u044F \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 (worker \u043D\u0435 \u0456\u043D\u0456\u0446\u0456\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E).");
+      console.error("\u0421\u043F\u0440\u043E\u0431\u0430 \u0440\u043E\u0437\u043F\u043E\u0447\u0430\u0442\u0438 \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u0433\u043E\u043B\u043E\u0441\u0443 \u0431\u0435\u0437 \u0456\u043D\u0456\u0446\u0456\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E\u0433\u043E worker'\u0430.");
+      return;
+    }
+    if (!this.plugin.settings.googleApiKey) {
+      new import_obsidian2.Notice("\u041A\u043B\u044E\u0447 Google API \u043D\u0435 \u043D\u0430\u043B\u0430\u0448\u0442\u043E\u0432\u0430\u043D\u043E. \u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u0434\u043E\u0434\u0430\u0439\u0442\u0435 \u0439\u043E\u0433\u043E \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u043F\u043B\u0430\u0433\u0456\u043D\u0430 \u0434\u043B\u044F \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043D\u043D\u044F \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0432\u0432\u043E\u0434\u0443.");
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      this.mediaRecorder = mediaRecorder;
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let recorderOptions;
+      const preferredMimeType = "audio/webm;codecs=opus";
+      if (MediaRecorder.isTypeSupported(preferredMimeType)) {
+        console.log(`\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0432\u0430\u043D\u0438\u0439 mimeType: ${preferredMimeType}`);
+        recorderOptions = { mimeType: preferredMimeType };
+      } else {
+        console.warn(`${preferredMimeType} \u043D\u0435 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454\u0442\u044C\u0441\u044F, \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0438\u0439 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430.`);
+        recorderOptions = void 0;
+      }
+      this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
       const audioChunks = [];
-      voiceButton == null ? void 0 : voiceButton.classList.add("recording");
-      mediaRecorder.ondataavailable = (event) => {
+      (_a = this.voiceButton) == null ? void 0 : _a.classList.add(CSS_CLASS_RECORDING);
+      (0, import_obsidian2.setIcon)(this.voiceButton, "stop-circle");
+      this.inputEl.placeholder = "\u0417\u0430\u043F\u0438\u0441... \u0413\u043E\u0432\u043E\u0440\u0456\u0442\u044C \u0437\u0430\u0440\u0430\u0437.";
+      this.mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunks.push(event.data);
         }
       };
-      mediaRecorder.onstop = () => {
-        console.log("Recording stopped, chunks:", audioChunks.length);
-        voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
-        stream.getTracks().forEach((track) => track.stop());
-        this.updateInputPlaceholder(this.plugin.settings.modelName);
-        if (audioChunks.length > 0) {
-          const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
-          console.log("Audio blob created, type:", mediaRecorder.mimeType, "size:", audioBlob.size);
-          if (this.speechWorker) {
-            this.speechWorker.postMessage({
-              apiKey: this.plugin.settings.googleApiKey,
-              audioBlob
-            });
-          }
-        } else {
-          console.error("No audio data recorded");
+      this.mediaRecorder.onstop = () => {
+        var _a2;
+        console.log("MediaRecorder \u0437\u0443\u043F\u0438\u043D\u0435\u043D\u043E.");
+        if (this.speechWorker && audioChunks.length > 0) {
+          const audioBlob = new Blob(audioChunks, { type: ((_a2 = this.mediaRecorder) == null ? void 0 : _a2.mimeType) || "audio/webm" });
+          console.log(`\u0412\u0456\u0434\u043F\u0440\u0430\u0432\u043A\u0430 \u0430\u0443\u0434\u0456\u043E blob \u0434\u043E worker: type=${audioBlob.type}, size=${audioBlob.size}`);
+          this.inputEl.placeholder = "\u041E\u0431\u0440\u043E\u0431\u043A\u0430 \u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F...";
+          this.speechWorker.postMessage({
+            apiKey: this.plugin.settings.googleApiKey,
+            audioBlob,
+            languageCode: this.plugin.settings.speechLanguage || "uk-UA"
+            // Використати мову з налаштувань або українську за замовчуванням
+          });
+        } else if (audioChunks.length === 0) {
+          console.log("\u0410\u0443\u0434\u0456\u043E\u0434\u0430\u043D\u0456 \u043D\u0435 \u0437\u0430\u043F\u0438\u0441\u0430\u043D\u043E.");
+          this.updateInputPlaceholder(this.plugin.settings.modelName);
         }
       };
-      mediaRecorder.start(100);
-      console.log("Recording started with mime type:", mediaRecorder.mimeType);
-      this.inputEl.placeholder = "Record...";
-      setTimeout(() => {
-        if (mediaRecorder.state === "recording") {
-          mediaRecorder.stop();
-          console.log("Recording stopped after timeout");
-        }
-      }, 15e3);
+      this.mediaRecorder.onerror = (event) => {
+        console.error("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 MediaRecorder:", event);
+        new import_obsidian2.Notice("\u041F\u0456\u0434 \u0447\u0430\u0441 \u0437\u0430\u043F\u0438\u0441\u0443 \u0441\u0442\u0430\u043B\u0430\u0441\u044F \u043F\u043E\u043C\u0438\u043B\u043A\u0430.");
+        this.stopVoiceRecording(false);
+      };
+      this.mediaRecorder.start();
+      console.log("\u0417\u0430\u043F\u0438\u0441 \u0440\u043E\u0437\u043F\u043E\u0447\u0430\u0442\u043E. MimeType:", (_c = (_b = this.mediaRecorder) == null ? void 0 : _b.mimeType) != null ? _c : "\u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0438\u0439");
     } catch (error) {
-      console.error("Error accessing microphone:", error);
-      voiceButton == null ? void 0 : voiceButton.classList.remove("recording");
+      console.error("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0434\u043E\u0441\u0442\u0443\u043F\u0443 \u0434\u043E \u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D\u0430 \u0430\u0431\u043E \u0437\u0430\u043F\u0443\u0441\u043A\u0443 \u0437\u0430\u043F\u0438\u0441\u0443:", error);
+      if (error instanceof DOMException && error.name === "NotAllowedError") {
+        new import_obsidian2.Notice("\u0414\u043E\u0441\u0442\u0443\u043F \u0434\u043E \u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D\u0430 \u0437\u0430\u0431\u043E\u0440\u043E\u043D\u0435\u043D\u043E. \u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u043D\u0430\u0434\u0430\u0439\u0442\u0435 \u0434\u043E\u0437\u0432\u0456\u043B \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430/\u0441\u0438\u0441\u0442\u0435\u043C\u0438.");
+      } else if (error instanceof DOMException && error.name === "NotFoundError") {
+        new import_obsidian2.Notice("\u041C\u0456\u043A\u0440\u043E\u0444\u043E\u043D \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E. \u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u043F\u0435\u0440\u0435\u043A\u043E\u043D\u0430\u0439\u0442\u0435\u0441\u044F, \u0449\u043E \u043C\u0456\u043A\u0440\u043E\u0444\u043E\u043D \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0442\u0430 \u0443\u0432\u0456\u043C\u043A\u043D\u0435\u043D\u043E.");
+      } else {
+        new import_obsidian2.Notice("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0440\u043E\u0437\u043F\u043E\u0447\u0430\u0442\u0438 \u0437\u0430\u043F\u0438\u0441 \u0433\u043E\u043B\u043E\u0441\u0443.");
+      }
+      this.stopVoiceRecording(false);
     }
   }
-  setSystemMessageInterval(interval) {
-    this.systemMessageInterval = interval;
+  // Stops the voice recording
+  stopVoiceRecording(processAudio) {
+    var _a;
+    console.log(`Stopping voice recording. Process audio: ${processAudio}`);
+    if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+      this.mediaRecorder.stop();
+    }
+    (_a = this.voiceButton) == null ? void 0 : _a.classList.remove(CSS_CLASS_RECORDING);
+    (0, import_obsidian2.setIcon)(this.voiceButton, "microphone");
+    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach((track) => track.stop());
+      this.audioStream = null;
+      console.log("Audio stream tracks stopped.");
+    }
+    this.mediaRecorder = null;
   }
-  onModelChanged(modelName) {
-    this.updateInputPlaceholder(modelName);
+  // --- Helpers & Utilities ---
+  getChatContainer() {
+    return this.chatContainer;
+  }
+  clearChatContainer() {
+    this.messages = [];
+    this.messagesPairCount = 0;
+    if (this.chatContainer) {
+      this.chatContainer.empty();
+    }
+    this.showEmptyState();
+    this.saveMessageHistory();
+  }
+  // Add a loading indicator (dots animation)
+  addLoadingIndicator() {
+    this.hideEmptyState();
+    const messageGroup = this.chatContainer.createDiv({
+      cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
+      // Belongs to assistant
+    });
+    const messageEl = messageGroup.createDiv({
+      cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE} ${CSS_CLASS_TAIL_OLLAMA}`
+      // Has tail initially
+    });
+    const dotsContainer = messageEl.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
+    for (let i = 0; i < 3; i++) {
+      dotsContainer.createDiv({ cls: CSS_CLASS_THINKING_DOT });
+    }
+    this.guaranteedScrollToBottom(50);
+    return messageGroup;
+  }
+  removeLoadingIndicator(loadingEl) {
+    if (loadingEl && loadingEl.parentNode) {
+      loadingEl.remove();
+    }
+  }
+  scrollToBottom() {
+    this.guaranteedScrollToBottom();
+  }
+  clearInputField() {
+    if (this.inputEl) {
+      this.inputEl.value = "";
+      this.inputEl.dispatchEvent(new Event("input"));
+    }
+  }
+  // Creates elements for MessageService to populate
+  // Consider if MessageService should be more passive (return data)
+  // vs active (directly manipulating view elements via these methods)
+  // Keeping existing pattern for now.
+  createGroupElement(className) {
+    return this.chatContainer.createDiv({ cls: className });
+  }
+  createMessageElement(parent, className) {
+    return parent.createDiv({ cls: className });
+  }
+  createContentContainer(parent) {
+    return parent.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+  }
+  createContentElement(parent) {
+    return parent.createDiv({ cls: CSS_CLASS_CONTENT });
+  }
+  // Ensures scrolling happens after potential DOM updates
+  guaranteedScrollToBottom(delay = 50) {
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+    }
+    this.scrollTimeout = setTimeout(() => {
+      requestAnimationFrame(() => {
+        if (this.chatContainer) {
+          const scrollThreshold = 100;
+          const isScrolledUp = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold;
+          if (!isScrolledUp || this.isProcessing) {
+            this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+          }
+        }
+      });
+    }, delay);
+  }
+  formatTime(date) {
+    return date.toLocaleTimeString(void 0, { hour: "2-digit", minute: "2-digit" });
+  }
+  // --- Methods previously part of OllamaView called by MessageService ---
+  // These methods now act more directly or are handled internally
+  // No longer needed directly if MessageService calls internalAddMessage
+  // public addMessage(role: "user" | "assistant", content: string): void {
+  //   this.internalAddMessage(role, content);
+  // }
+  // Replaced by addLoadingIndicator/removeLoadingIndicator
+  // public addLoadingMessage1(): HTMLElement {
+  //     return this.addLoadingIndicator();
+  // }
+  // Method likely used by MessageService or API service to update view state
+  setLoadingState(isLoading) {
+    this.isProcessing = isLoading;
+    if (this.inputEl)
+      this.inputEl.disabled = isLoading;
+    if (this.sendButton)
+      this.sendButton.disabled = isLoading;
   }
 };
 var OllamaView = _OllamaView;
@@ -2156,7 +2228,7 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
       if (await adapter.exists(logPath)) {
         await adapter.remove(logPath);
         if (this.view) {
-          this.view.clearChatMessages();
+          this.view.clearChatContainer();
         }
       }
     } catch (error) {

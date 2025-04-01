@@ -71,11 +71,11 @@ export class MessageService {
                 this.view.scrollToBottom();
                 this.initializeThinkingBlocks();
             } else {
-                this.view.showEmptyHistory();
+                this.view.showEmptyState();
             }
         } catch (error) {
             console.error("Error loading message history:", error);
-            this.view.showEmptyHistory();
+            this.view.showEmptyState();
         }
     }
 
@@ -140,7 +140,7 @@ export class MessageService {
         this.messages = [];
         if (this.view) {
             this.view.clearChatContainer();
-            this.view.showEmptyHistory();
+            this.view.showEmptyState();
         }
     }
 
@@ -291,7 +291,8 @@ export class MessageService {
         if (!this.view) return;
 
         this.isProcessing = true;
-        const loadingMessageEl = this.view.addLoadingMessage();
+        this.view.setLoadingState(true);
+        // const loadingMessageEl = this.view.addLoadingMessage();
 
         setTimeout(async () => {
             try {
@@ -332,12 +333,18 @@ export class MessageService {
 
                 const data = await this.plugin.apiService.generateResponse(requestBody);
 
-                this.removeLoadingMessage(loadingMessageEl);
+                // this.removeLoadingMessage(loadingMessageEl);
+                if (this.view)
+                    this.view.setLoadingState(false);
+
                 this.addMessage(MessageType.ASSISTANT, data.response);
                 this.initializeThinkingBlocks();
             } catch (error) {
                 console.error("Error processing request with Ollama:", error);
-                this.removeLoadingMessage(loadingMessageEl);
+                // this.removeLoadingMessage(loadingMessageEl);
+                if (this.view)
+                    this.view.setLoadingState(false);
+
 
                 const errorMessage = error instanceof Error
                     ? error.message
