@@ -266,60 +266,53 @@ onerror = (event) => {
   }
 
   autoResizeTextarea(): void {
-    // Початкове налаштування висоти
     const adjustHeight = () => {
-      // Reference to buttons container with proper type casting
+      // Cache DOM elements and measurements to reduce reflows
       const buttonsContainer = this.contentEl.querySelector('.buttons-container') as HTMLElement;
+      if (!buttonsContainer || !this.inputEl) return;
 
-      // Спочатку скидаємо висоту до мінімальної
-      this.inputEl.style.height = 'auto';
-
-      // Встановлюємо нову висоту на основі вмісту
       const viewHeight = this.contentEl.clientHeight;
-      const maxHeight = viewHeight * 0.66; // 2/3 від висоти view
-      const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
-      this.inputEl.style.height = newHeight + 'px';
+      const maxHeight = viewHeight * 0.66;
 
-      // Adjust buttons position based on textarea height
-      if (buttonsContainer) {
-        // If textarea is multiline, position buttons at the bottom
-        if (newHeight > 40) { // 40px is the initial minimum height
-          buttonsContainer.style.bottom = '10px'; // Position at bottom with padding
-          buttonsContainer.style.top = 'auto';
-          buttonsContainer.style.transform = 'translateY(0)';
+      // Batch DOM operations
+      requestAnimationFrame(() => {
+        // Reset height first
+        this.inputEl.style.height = 'auto';
+
+        // Set new height based on content
+        const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
+        this.inputEl.style.height = newHeight + 'px';
+
+        // Update button position
+        if (newHeight > 40) {
+          buttonsContainer.style.cssText = 'bottom: 10px; top: auto; transform: translateY(0);';
         } else {
-          // Reset to centered position for single line
-          buttonsContainer.style.bottom = '50%';
-          buttonsContainer.style.top = 'auto';
-          buttonsContainer.style.transform = 'translateY(50%)';
+          buttonsContainer.style.cssText = 'bottom: 50%; top: auto; transform: translateY(50%);';
         }
-      }
 
-      // Додаємо клас expanded, якщо досягли максимальної висоти
-      if (this.inputEl.scrollHeight > maxHeight) {
-        this.inputEl.classList.add('expanded');
-      } else {
-        this.inputEl.classList.remove('expanded');
-      }
-      setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        // Add/remove expanded class
+        this.inputEl.classList.toggle('expanded', this.inputEl.scrollHeight > maxHeight);
+      });
     };
 
-    adjustHeight();
+    // Throttle the input event handler to improve performance
+    let resizeTimeout: NodeJS.Timeout;
+    this.inputEl.addEventListener('input', () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(adjustHeight, 50) as unknown as NodeJS.Timeout;
+    });
 
-
-    // Налаштування при введенні тексту
-    this.inputEl.addEventListener('input', adjustHeight);
-
-    // Додаткова обробка при зміні розміру вікна
-    this.registerDomEvent(window, 'resize', adjustHeight);
-    this.registerEvent(
-      this.app.workspace.on('resize', () => {
-        setTimeout(adjustHeight, 0);
-      })
-    );
-
-    // Ініціалізація висоти
+    // Initial adjustment after a short delay
     setTimeout(adjustHeight, 100);
+
+    // Use one event listener for window resize
+    const handleResize = () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(adjustHeight, 50) as unknown as NodeJS.Timeout;
+    };
+
+    this.registerDomEvent(window, 'resize', handleResize);
+    this.registerEvent(this.app.workspace.on('resize', handleResize));
   }
 
   // In the onOpen() method of ollamaView.ts, remove the reset option code

@@ -627,38 +627,36 @@ onerror = (event) => {
   autoResizeTextarea() {
     const adjustHeight = () => {
       const buttonsContainer = this.contentEl.querySelector(".buttons-container");
-      this.inputEl.style.height = "auto";
+      if (!buttonsContainer || !this.inputEl)
+        return;
       const viewHeight = this.contentEl.clientHeight;
       const maxHeight = viewHeight * 0.66;
-      const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
-      this.inputEl.style.height = newHeight + "px";
-      if (buttonsContainer) {
+      requestAnimationFrame(() => {
+        this.inputEl.style.height = "auto";
+        const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
+        this.inputEl.style.height = newHeight + "px";
         if (newHeight > 40) {
-          buttonsContainer.style.bottom = "10px";
-          buttonsContainer.style.top = "auto";
-          buttonsContainer.style.transform = "translateY(0)";
+          buttonsContainer.style.cssText = "bottom: 10px; top: auto; transform: translateY(0);";
         } else {
-          buttonsContainer.style.bottom = "50%";
-          buttonsContainer.style.top = "auto";
-          buttonsContainer.style.transform = "translateY(50%)";
+          buttonsContainer.style.cssText = "bottom: 50%; top: auto; transform: translateY(50%);";
         }
-      }
-      if (this.inputEl.scrollHeight > maxHeight) {
-        this.inputEl.classList.add("expanded");
-      } else {
-        this.inputEl.classList.remove("expanded");
-      }
-      setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        this.inputEl.classList.toggle("expanded", this.inputEl.scrollHeight > maxHeight);
+      });
     };
-    adjustHeight();
-    this.inputEl.addEventListener("input", adjustHeight);
-    this.registerDomEvent(window, "resize", adjustHeight);
-    this.registerEvent(
-      this.app.workspace.on("resize", () => {
-        setTimeout(adjustHeight, 0);
-      })
-    );
+    let resizeTimeout;
+    this.inputEl.addEventListener("input", () => {
+      if (resizeTimeout)
+        clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(adjustHeight, 50);
+    });
     setTimeout(adjustHeight, 100);
+    const handleResize = () => {
+      if (resizeTimeout)
+        clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(adjustHeight, 50);
+    };
+    this.registerDomEvent(window, "resize", handleResize);
+    this.registerEvent(this.app.workspace.on("resize", handleResize));
   }
   // In the onOpen() method of ollamaView.ts, remove the reset option code
   // and only keep the settings option in the menu dropdown
