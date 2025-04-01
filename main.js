@@ -703,6 +703,7 @@ onerror = (event) => {
       cls: "menu-option-text",
       text: "Settings"
     });
+    this.autoResizeTextarea();
     setTimeout(() => {
       this.forceInitialization();
       this.attachEventListeners();

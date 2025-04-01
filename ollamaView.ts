@@ -376,7 +376,7 @@ onerror = (event) => {
       text: "Settings",
     });
 
-    // this.autoResizeTextarea();
+    this.autoResizeTextarea();
 
     // await this.messageService.loadMessageHistory();
     // this.showEmptyState();
