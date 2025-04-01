@@ -407,8 +407,19 @@
   }
   
   /* Вміст повідомлення та метадані */
-  .message-content-container { display: flex; align-items: flex-start; width: 100%; position: relative; }
-  .message-content { flex: 1; padding-right: 28px; /* Збільшено місце для копі-кнопки */ }
+  .message-content-container {
+    display: flex;
+    align-items: flex-start; /* Вирівнювання тексту та кнопки по верху */
+    width: 100%;
+    /* position: relative; - Ймовірно, більше не потрібно для кнопки */
+    justify-content: space-between; /* Розміщує контент і кнопку по краях */
+  }
+  .message-content {
+    flex: 1; /* Займає основний простір */
+    /* padding-right: 28px; - Більше не потрібен, кнопка стоїть поруч */
+    /* Можна додати невеликий правий відступ, якщо текст надто близько до кнопки */
+    padding-right: var(--chat-spacing-unit); /* Наприклад, 4px */
+  }
   .message-timestamp {
       font-size: 0.75em; /* Ще менший шрифт */
       color: var(--text-faint); /* Дуже приглушений колір */
@@ -470,20 +481,22 @@
      ========================================================================== */
   
      .copy-button {
-      position: absolute;
-      top: 6px;
-      right: 6px;
+      /* --- Видаліть або закоментуйте ці рядки --- */
+      /* position: absolute; */
+      /* top: 6px; */
+      /* right: 6px; */
+      /* --- Кінець видалення --- */
+    
+      /* Інші стилі залишаються, але додаємо відступ */
       background: none;
       border: none;
       outline: none;
       color: var(--text-muted);
       font-size: 13px;
       cursor: pointer;
-      /* --- Зміни тут --- */
-      opacity: 0; /* Залишаємо для плавної анімації */
-      visibility: hidden; /* **Додаємо це, щоб повністю приховати** */
-      /* --- Кінець змін --- */
-      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s; /* Додаємо visibility до transition з затримкою */
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s;
       padding: 4px;
       border-radius: 5px;
       display: flex;
@@ -492,8 +505,10 @@
       width: 22px;
       height: 22px;
       z-index: 1;
+      flex-shrink: 0; /* Забороняємо кнопці стискатися */
+      margin-top: 0; /* Можливо, потрібен невеликий відступ зверху, якщо align-items не спрацює ідеально */
+      margin-left: var(--chat-spacing-unit); /* Невеликий відступ від тексту */
     }
-
     .message:hover .copy-button {
       /* --- Зміни тут --- */
       opacity: 0.6;
