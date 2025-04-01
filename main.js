@@ -71,8 +71,12 @@ var MessageService = class {
             timestamp: new Date(msg.timestamp)
           };
           this.messages.push(message);
+          this.renderMessage(message);
         }
-        console.log(`messageService.ts -> : here`);
+        this.view.scrollToBottom();
+        this.initializeThinkingBlocks();
+      } else {
+        this.view.showEmptyState();
       }
     } catch (error) {
       console.error("Error loading message history:", error);
@@ -134,6 +138,7 @@ var MessageService = class {
   }
   // Render a message in the chat container
   renderMessage(message) {
+    console.log(`messageService.ts -> renderMessage: this.view: ${this.view}`);
     if (!this.view)
       return;
     const isUser = message.role === "user" /* USER */;
@@ -157,72 +162,6 @@ var MessageService = class {
       messageGroup = this.view.createGroupElement(groupClass);
     } else {
       messageGroup = lastGroup;
-    }
-    let messageClass = "message ";
-    if (isUser) {
-      messageClass += "user-message bubble user-bubble";
-    } else if (isAssistant(message.role)) {
-      messageClass += "ollama-message bubble ollama-bubble";
-    } else if (isError) {
-      messageClass += "error-message bubble error-bubble";
-    } else if (isSystem) {
-      messageClass += "system-message bubble system-bubble";
-    }
-    if (isLastInGroup) {
-      if (isUser) {
-        messageClass += " user-message-tail";
-      } else if (isAssistant(message.role)) {
-        messageClass += " ollama-message-tail";
-      } else if (isError) {
-        messageClass += " error-message-tail";
-      } else if (isSystem) {
-        messageClass += " system-message-tail";
-      }
-    }
-    const messageEl = this.view.createMessageElement(messageGroup, messageClass);
-    const contentContainer = this.view.createContentContainer(messageEl);
-    const contentEl = this.view.createContentElement(contentContainer);
-    if (isAssistant(message.role)) {
-      const decodedContent = this.decodeHtmlEntities(message.content);
-      const hasThinkingTags = message.content.includes("<think>") || decodedContent.includes("<think>");
-      if (hasThinkingTags) {
-        const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ? decodedContent : message.content;
-        const processedContent = this.processThinkingTags(contentToProcess);
-        contentEl.innerHTML = processedContent;
-        this.addThinkingToggleListeners(contentEl);
-      } else {
-        this.renderMarkdown(message.content, contentEl);
-      }
-    } else if (isError) {
-      const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
-      (0, import_obsidian.setIcon)(errorIconSpan, "alert-triangle");
-      const messageSpan = contentEl.createSpan({
-        cls: "error-message-text",
-        text: message.content
-      });
-    } else if (isSystem) {
-      const infoIconSpan = contentEl.createSpan({ cls: "system-icon" });
-      (0, import_obsidian.setIcon)(infoIconSpan, "info");
-      const messageSpan = contentEl.createSpan({
-        cls: "system-message-text",
-        text: message.content
-      });
-    } else {
-      message.content.split("\n").forEach((line, index, array) => {
-        contentEl.createSpan({ text: line });
-        if (index < array.length - 1) {
-          contentEl.createEl("br");
-        }
-      });
-    }
-    if (!isSystem) {
-      const copyButton = this.createCopyButton(contentContainer, message);
-    }
-    if (isLastInGroup) {
-      messageEl.createDiv({
-        cls: "message-timestamp",
-        text: this.formatTime(message.timestamp)
-      });
     }
   }
   // Create a copy button for the message
