@@ -190,14 +190,6 @@ var MessageService = class {
     if (isAssistant(message.role)) {
       const decodedContent = this.decodeHtmlEntities(message.content);
       const hasThinkingTags = message.content.includes("<think>") || decodedContent.includes("<think>");
-      if (hasThinkingTags) {
-        const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ? decodedContent : message.content;
-        const processedContent = this.processThinkingTags(contentToProcess);
-        contentEl.innerHTML = processedContent;
-        this.addThinkingToggleListeners(contentEl);
-      } else {
-        this.renderMarkdown(message.content, contentEl);
-      }
     } else if (isError) {
     } else if (isSystem) {
     } else {
