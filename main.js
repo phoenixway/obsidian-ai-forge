@@ -62,22 +62,7 @@ var MessageService = class {
       return;
     try {
       const history = await this.plugin.loadMessageHistory();
-      if (Array.isArray(history) && history.length > 0) {
-        this.messages = [];
-        this.view.clearChatContainer();
-        for (const msg of history) {
-          const message = {
-            ...msg,
-            timestamp: new Date(msg.timestamp)
-          };
-          this.messages.push(message);
-          this.renderMessage(message);
-        }
-        this.view.scrollToBottom();
-        this.initializeThinkingBlocks();
-      } else {
-        this.view.showEmptyState();
-      }
+      console.log(`messageService.ts -> : here`);
     } catch (error) {
       console.error("Error loading message history:", error);
       this.view.showEmptyState();
@@ -704,6 +689,7 @@ onerror = (event) => {
       text: "Settings"
     });
     await this.messageService.loadMessageHistory();
+    this.showEmptyState();
     this.autoResizeTextarea();
     setTimeout(() => {
       this.forceInitialization();

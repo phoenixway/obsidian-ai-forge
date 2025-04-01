@@ -377,8 +377,9 @@ onerror = (event) => {
     });
 
     await this.messageService.loadMessageHistory();
+
+    this.showEmptyState();
     this.autoResizeTextarea();
-    // this.showEmptyState();
 
     setTimeout(() => {
       this.forceInitialization();
