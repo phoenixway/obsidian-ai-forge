@@ -98,10 +98,10 @@ export class MessageService {
     // Send a message from the user to Ollama
     public async sendMessage(content: string): Promise<void> {
         if (this.isProcessing || !content.trim() || !this.view) return;
-
+        this.view.clearInputField();
         this.view.hideEmptyState();
         this.addMessage(MessageType.USER, content);
-        this.view.clearInputField();
+
         await this.processWithOllama(content);
     }
 

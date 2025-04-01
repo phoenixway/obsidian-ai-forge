@@ -102,9 +102,9 @@ var MessageService = class {
   async sendMessage(content) {
     if (this.isProcessing || !content.trim() || !this.view)
       return;
+    this.view.clearInputField();
     this.view.hideEmptyState();
     this.addMessage("user" /* USER */, content);
-    this.view.clearInputField();
     await this.processWithOllama(content);
   }
   // Add a message to the chat and render it
