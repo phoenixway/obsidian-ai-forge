@@ -218,7 +218,7 @@ export class MessageService {
                 const processedContent = this.processThinkingTags(contentToProcess);
                 contentEl.innerHTML = processedContent;
 
-                //     this.addThinkingToggleListeners(contentEl);
+                this.addThinkingToggleListeners(contentEl);
             } else {
                 // this.renderMarkdown(message.content, contentEl);
             }
