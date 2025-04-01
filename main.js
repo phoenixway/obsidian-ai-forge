@@ -739,9 +739,10 @@ var _OllamaView = class extends import_obsidian2.ItemView {
       return;
     this.isProcessing = true;
     this.hideEmptyState();
+    const messageContent = this.inputEl.value;
     this.clearInputField();
     try {
-      this.internalAddMessage("user", content);
+      this.internalAddMessage("user", messageContent);
       await this.messageService.sendMessage(content);
     } catch (error) {
       console.error("Error sending message:", error);
@@ -749,7 +750,6 @@ var _OllamaView = class extends import_obsidian2.ItemView {
       this.internalAddMessage("assistant", "Error: Could not send message.");
     } finally {
       this.isProcessing = false;
-      this.guaranteedScrollToBottom(1e3);
       this.inputEl.focus();
       this.adjustTextareaHeight();
     }
@@ -772,7 +772,8 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     this.renderMessage(message);
     this.hideEmptyState();
     this.saveMessageHistory();
-    this.guaranteedScrollToBottom(50);
+    const forceScroll = role === "assistant";
+    this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
   }
   // --- Rendering Logic ---
   // Combined logic to render any message type
@@ -1208,7 +1209,7 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     for (let i = 0; i < 3; i++) {
       dotsContainer.createDiv({ cls: CSS_CLASS_THINKING_DOT });
     }
-    this.guaranteedScrollToBottom(50);
+    this.guaranteedScrollToBottom(50, true);
     return messageGroup;
   }
   removeLoadingIndicator(loadingEl) {
@@ -1242,7 +1243,8 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     return parent.createDiv({ cls: CSS_CLASS_CONTENT });
   }
   // Ensures scrolling happens after potential DOM updates
-  guaranteedScrollToBottom(delay = 50) {
+  // Add a forceScroll parameter (defaulting to false)
+  guaranteedScrollToBottom(delay = 50, forceScroll = false) {
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
     }
@@ -1251,7 +1253,7 @@ var _OllamaView = class extends import_obsidian2.ItemView {
         if (this.chatContainer) {
           const scrollThreshold = 100;
           const isScrolledUp = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold;
-          if (!isScrolledUp || this.isProcessing) {
+          if (forceScroll || !isScrolledUp || this.isProcessing) {
             this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
           }
         }

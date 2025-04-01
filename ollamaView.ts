@@ -439,26 +439,28 @@ export class OllamaView extends ItemView {
 
     this.isProcessing = true; // Set processing state
     this.hideEmptyState(); // Ensure empty state is hidden
+    const messageContent = this.inputEl.value; // Grab content before clearing
     this.clearInputField(); // Clear input immediately for better UX
+
 
     try {
       // Add user message locally first (Optimistic UI update)
-      this.internalAddMessage("user", content);
+      this.internalAddMessage("user", messageContent); // Call internalAddMessage which now handles its own scroll logic correctly
 
       // Let MessageService handle the actual API call and response
-      await this.messageService.sendMessage(content);
+      await this.messageService.sendMessage(content); // content is trimmed, messageContent is original for display
 
     } catch (error) {
       console.error("Error sending message:", error);
       new Notice("Failed to send message. Please try again.");
       // Optional: Add an error message to the chat?
+      // Consider if error message should also force scroll
       this.internalAddMessage("assistant", "Error: Could not send message.");
     } finally {
       this.isProcessing = false; // Reset processing state
-      this.guaranteedScrollToBottom(1000);
+      // No need for an extra scroll call here, internalAddMessage handles it for both user and assistant messages.
       this.inputEl.focus(); // Re-focus input
       this.adjustTextareaHeight(); // Adjust height after clearing
-
     }
   }
 
@@ -485,9 +487,12 @@ export class OllamaView extends ItemView {
     this.hideEmptyState(); // Ensure empty state is hidden
     this.saveMessageHistory(); // Persist history
 
-    this.guaranteedScrollToBottom(50);
-  }
+    // Determine if forceScroll should be true
+    const forceScroll = role === "assistant"; // Force scroll for assistant messages
 
+    // Use a slightly longer delay for assistant messages to allow rendering time, and force the scroll
+    this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+  }
   // --- Rendering Logic ---
 
   // Combined logic to render any message type
@@ -1062,7 +1067,8 @@ export class OllamaView extends ItemView {
       dotsContainer.createDiv({ cls: CSS_CLASS_THINKING_DOT });
     }
 
-    this.guaranteedScrollToBottom(50);
+    this.guaranteedScrollToBottom(50, true);
+
     return messageGroup; // Return the group element so it can be removed later
   }
 
@@ -1107,7 +1113,8 @@ export class OllamaView extends ItemView {
 
 
   // Ensures scrolling happens after potential DOM updates
-  guaranteedScrollToBottom(delay = 50): void {
+  // Add a forceScroll parameter (defaulting to false)
+  guaranteedScrollToBottom(delay = 50, forceScroll = false): void {
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
     }
@@ -1119,7 +1126,8 @@ export class OllamaView extends ItemView {
           const scrollThreshold = 100; // Pixels from bottom
           const isScrolledUp = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold;
 
-          if (!isScrolledUp || this.isProcessing) { // Auto-scroll if near bottom or if processing new message
+          // ALWAYS scroll if forceScroll is true, OR if not scrolled up, OR if processing
+          if (forceScroll || !isScrolledUp || this.isProcessing) {
             this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
           }
         }
