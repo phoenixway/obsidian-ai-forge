@@ -196,6 +196,7 @@ var MessageService = class {
         contentEl.innerHTML = processedContent;
         this.addThinkingToggleListeners(contentEl);
       } else {
+        this.renderMarkdown(message.content, contentEl);
       }
     } else if (isError) {
       const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
@@ -703,13 +704,13 @@ onerror = (event) => {
       cls: "menu-option-text",
       text: "Settings"
     });
-    await this.messageService.loadMessageHistory();
-    this.showEmptyState();
-    this.autoResizeTextarea();
     setTimeout(() => {
       this.forceInitialization();
       this.attachEventListeners();
     }, 500);
+    await this.messageService.loadMessageHistory();
+    this.showEmptyState();
+    this.autoResizeTextarea();
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);

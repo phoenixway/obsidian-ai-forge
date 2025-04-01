@@ -376,15 +376,15 @@ onerror = (event) => {
       text: "Settings",
     });
 
-    await this.messageService.loadMessageHistory();
 
-    this.showEmptyState();
-    this.autoResizeTextarea();
 
     setTimeout(() => {
       this.forceInitialization();
       this.attachEventListeners();
     }, 500);
+    await this.messageService.loadMessageHistory();
+    this.showEmptyState();
+    this.autoResizeTextarea();
 
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);

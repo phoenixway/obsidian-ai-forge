@@ -220,7 +220,7 @@ export class MessageService {
 
                 this.addThinkingToggleListeners(contentEl);
             } else {
-                // this.renderMarkdown(message.content, contentEl);
+                this.renderMarkdown(message.content, contentEl);
             }
         } else if (isError) {
             const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
