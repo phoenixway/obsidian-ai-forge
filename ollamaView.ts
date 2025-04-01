@@ -301,6 +301,7 @@ onerror = (event) => {
       } else {
         this.inputEl.classList.remove('expanded');
       }
+      this.guaranteedScrollToBottom();
     };
 
     // Налаштування при введенні тексту

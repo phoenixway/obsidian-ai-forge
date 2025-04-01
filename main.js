@@ -648,6 +648,7 @@ onerror = (event) => {
       } else {
         this.inputEl.classList.remove("expanded");
       }
+      this.guaranteedScrollToBottom();
     };
     this.inputEl.addEventListener("input", adjustHeight);
     this.registerDomEvent(window, "resize", adjustHeight);
