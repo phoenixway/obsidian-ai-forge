@@ -460,14 +460,12 @@ onerror = (event) => {
   }
 
   forceInitialization(): void {
-    setTimeout(() => this.guaranteedScrollToBottom(), 50);
-    setTimeout(() => this.guaranteedScrollToBottom(), 150);
-    setTimeout(() => this.guaranteedScrollToBottom(), 500);
     setTimeout(() => {
+      this.guaranteedScrollToBottom();
       this.inputEl.focus();
+      // Trigger resize event only once
       const event = new Event('input');
       this.inputEl.dispatchEvent(event);
-      this.guaranteedScrollToBottom();
     }, 200);
   }
 
@@ -528,10 +526,13 @@ onerror = (event) => {
       clearTimeout(this.scrollTimeout);
     }
 
-    requestAnimationFrame(() => {
-      if (!this.chatContainer) return;
-      this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
-    });
+    // Use a single requestAnimationFrame for better performance
+    this.scrollTimeout = setTimeout(() => {
+      requestAnimationFrame(() => {
+        if (!this.chatContainer) return;
+        this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+      });
+    }, 50) as unknown as NodeJS.Timeout;
   }
 
   async sendMessage(): Promise<void> {

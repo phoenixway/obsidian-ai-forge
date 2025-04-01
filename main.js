@@ -765,14 +765,11 @@ onerror = (event) => {
     );
   }
   forceInitialization() {
-    setTimeout(() => this.guaranteedScrollToBottom(), 50);
-    setTimeout(() => this.guaranteedScrollToBottom(), 150);
-    setTimeout(() => this.guaranteedScrollToBottom(), 500);
     setTimeout(() => {
+      this.guaranteedScrollToBottom();
       this.inputEl.focus();
       const event = new Event("input");
       this.inputEl.dispatchEvent(event);
-      this.guaranteedScrollToBottom();
     }, 200);
   }
   updateInputPlaceholder(modelName) {
@@ -822,11 +819,13 @@ onerror = (event) => {
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
     }
-    requestAnimationFrame(() => {
-      if (!this.chatContainer)
-        return;
-      this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
-    });
+    this.scrollTimeout = setTimeout(() => {
+      requestAnimationFrame(() => {
+        if (!this.chatContainer)
+          return;
+        this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+      });
+    }, 50);
   }
   async sendMessage() {
     const content = this.inputEl.value.trim();
