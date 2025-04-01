@@ -624,6 +624,23 @@ onerror = (event) => {
   getIcon() {
     return "message-square";
   }
+  autoResizeTextarea() {
+    const adjustHeight = () => {
+      this.inputEl.style.height = "auto";
+      const viewHeight = this.contentEl.clientHeight;
+      const maxHeight = viewHeight * 0.66;
+      const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
+      this.inputEl.style.height = newHeight + "px";
+      if (this.inputEl.scrollHeight > maxHeight) {
+        this.inputEl.classList.add("expanded");
+      } else {
+        this.inputEl.classList.remove("expanded");
+      }
+    };
+    this.inputEl.addEventListener("input", adjustHeight);
+    this.registerDomEvent(window, "resize", adjustHeight);
+    setTimeout(adjustHeight, 0);
+  }
   // In the onOpen() method of ollamaView.ts, remove the reset option code
   // and only keep the settings option in the menu dropdown
   async onOpen() {
@@ -655,6 +672,7 @@ onerror = (event) => {
         this.sendMessage();
       }
     });
+    this.autoResizeTextarea();
     sendButton.addEventListener("click", () => {
       this.sendMessage();
     });

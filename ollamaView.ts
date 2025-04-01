@@ -265,6 +265,36 @@ onerror = (event) => {
     return "message-square";
   }
 
+  autoResizeTextarea(): void {
+    // Початкове налаштування висоти
+    const adjustHeight = () => {
+      // Спочатку скидаємо висоту до мінімальної
+      this.inputEl.style.height = 'auto';
+
+      // Встановлюємо нову висоту на основі вмісту
+      const viewHeight = this.contentEl.clientHeight;
+      const maxHeight = viewHeight * 0.66; // 2/3 від висоти view
+      const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
+      this.inputEl.style.height = newHeight + 'px';
+
+      // Додаємо клас expanded, якщо досягли максимальної висоти
+      if (this.inputEl.scrollHeight > maxHeight) {
+        this.inputEl.classList.add('expanded');
+      } else {
+        this.inputEl.classList.remove('expanded');
+      }
+    };
+
+    // Налаштування при введенні тексту
+    this.inputEl.addEventListener('input', adjustHeight);
+
+    // Додаткова обробка при зміні розміру вікна
+    this.registerDomEvent(window, 'resize', adjustHeight);
+
+    // Ініціалізація висоти
+    setTimeout(adjustHeight, 0);
+  }
+
   // In the onOpen() method of ollamaView.ts, remove the reset option code
   // and only keep the settings option in the menu dropdown
 
@@ -303,6 +333,8 @@ onerror = (event) => {
         this.sendMessage();
       }
     });
+
+    this.autoResizeTextarea();
 
     sendButton.addEventListener("click", () => {
       this.sendMessage();
