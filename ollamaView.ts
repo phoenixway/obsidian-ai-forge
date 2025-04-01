@@ -518,12 +518,11 @@ onerror = (event) => {
   async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
     if (!content) return;
-
-    this.messageService.sendMessage(content);
     setTimeout(() => {
       const event = new Event('input');
       this.inputEl.dispatchEvent(event);
     }, 100);
+    this.messageService.sendMessage(content);
   }
 
   addMessage(role: "user" | "assistant", content: string): void {
