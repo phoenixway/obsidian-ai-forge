@@ -710,6 +710,27 @@ onerror = (event) => {
       this.forceInitialization();
       this.attachEventListeners();
     }, 500);
+    const removeListener = this.plugin.on("model-changed", (modelName) => {
+      this.updateInputPlaceholder(modelName);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+    });
+    this.register(() => removeListener());
+    this.registerDomEvent(document, "visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        setTimeout(() => {
+          this.guaranteedScrollToBottom();
+          const event = new Event("input");
+          this.inputEl.dispatchEvent(event);
+        }, 200);
+      }
+    });
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        if (this.app.workspace.getActiveViewOfType(this.constructor) === this) {
+          setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        }
+      })
+    );
   }
   forceInitialization() {
     setTimeout(() => {
@@ -753,27 +774,6 @@ onerror = (event) => {
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
-    const removeListener = this.plugin.on("model-changed", (modelName) => {
-      this.updateInputPlaceholder(modelName);
-      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
-    });
-    this.register(() => removeListener());
-    this.registerDomEvent(document, "visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        setTimeout(() => {
-          this.guaranteedScrollToBottom();
-          const event = new Event("input");
-          this.inputEl.dispatchEvent(event);
-        }, 200);
-      }
-    });
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", () => {
-        if (this.app.workspace.getActiveViewOfType(this.constructor) === this) {
-          setTimeout(() => this.guaranteedScrollToBottom(), 100);
-        }
-      })
-    );
   }
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {

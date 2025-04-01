@@ -386,6 +386,31 @@ onerror = (event) => {
       this.attachEventListeners();
     }, 500);
 
+    const removeListener = this.plugin.on('model-changed', (modelName: string) => {
+      this.updateInputPlaceholder(modelName);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+    });
+    this.register(() => removeListener());
+    this.registerDomEvent(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // When tab becomes visible again
+        setTimeout(() => {
+          this.guaranteedScrollToBottom();
+          // Force textarea resize
+          const event = new Event('input');
+          this.inputEl.dispatchEvent(event);
+        }, 200);
+      }
+    });
+
+    // Also handle view activation specifically
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
+          setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        }
+      })
+    );
   }
 
   forceInitialization(): void {
@@ -435,32 +460,7 @@ onerror = (event) => {
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
-
-    const removeListener = this.plugin.on('model-changed', (modelName: string) => {
-      this.updateInputPlaceholder(modelName);
-      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
-    });
-    this.register(() => removeListener());
-    this.registerDomEvent(document, 'visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        // When tab becomes visible again
-        setTimeout(() => {
-          this.guaranteedScrollToBottom();
-          // Force textarea resize
-          const event = new Event('input');
-          this.inputEl.dispatchEvent(event);
-        }, 200);
-      }
-    });
-    this.registerEvent(
-      this.app.workspace.on('active-leaf-change', () => {
-        if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
-          setTimeout(() => this.guaranteedScrollToBottom(), 100);
-        }
-      })
-    );
   }
-
 
   private updateInputPlaceholder(modelName: string): void {
     if (this.inputEl) {
