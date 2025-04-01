@@ -658,14 +658,21 @@ onerror = (event) => {
         placeholder: `Text to ${this.plugin.settings.modelName}...`
       }
     });
-    const sendButton = inputContainer.createEl("button", {
+    const buttonsContainer = inputContainer.createDiv({
+      cls: "buttons-container"
+    });
+    const sendButton = buttonsContainer.createEl("button", {
       cls: "send-button"
     });
     (0, import_obsidian2.setIcon)(sendButton, "send");
-    const voiceButton = inputContainer.createEl("button", {
+    const voiceButton = buttonsContainer.createEl("button", {
       cls: "voice-button"
     });
     (0, import_obsidian2.setIcon)(voiceButton, "microphone");
+    const menuButton = buttonsContainer.createEl("button", {
+      cls: "menu-button"
+    });
+    (0, import_obsidian2.setIcon)(menuButton, "more-vertical");
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -679,10 +686,6 @@ onerror = (event) => {
     voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
     });
-    const menuButton = inputContainer.createEl("button", {
-      cls: "menu-button"
-    });
-    (0, import_obsidian2.setIcon)(menuButton, "more-vertical");
     const menuDropdown = inputContainer.createEl("div", {
       cls: "menu-dropdown"
     });

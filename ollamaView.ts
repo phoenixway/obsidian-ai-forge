@@ -317,15 +317,26 @@ onerror = (event) => {
       },
     });
 
-    const sendButton = inputContainer.createEl("button", {
+    // Створюємо контейнер для кнопок
+    const buttonsContainer = inputContainer.createDiv({
+      cls: "buttons-container",
+    });
+
+    // Додаємо всі кнопки до контейнера кнопок
+    const sendButton = buttonsContainer.createEl("button", {
       cls: "send-button",
     });
     setIcon(sendButton, "send");
 
-    const voiceButton = inputContainer.createEl("button", {
+    const voiceButton = buttonsContainer.createEl("button", {
       cls: "voice-button",
     });
     setIcon(voiceButton, "microphone");
+
+    const menuButton = buttonsContainer.createEl("button", {
+      cls: "menu-button",
+    });
+    setIcon(menuButton, "more-vertical");
 
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
@@ -343,11 +354,6 @@ onerror = (event) => {
     voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
     });
-
-    const menuButton = inputContainer.createEl("button", {
-      cls: "menu-button",
-    });
-    setIcon(menuButton, "more-vertical");
 
     // Create a dropdown container for the menu items
     const menuDropdown = inputContainer.createEl("div", {
