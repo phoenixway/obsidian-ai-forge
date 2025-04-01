@@ -703,9 +703,6 @@ onerror = (event) => {
       cls: "menu-option-text",
       text: "Settings"
     });
-    this.autoResizeTextarea();
-    await this.messageService.loadMessageHistory();
-    this.showEmptyState();
     setTimeout(() => {
       this.forceInitialization();
       this.attachEventListeners();
