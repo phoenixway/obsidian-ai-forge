@@ -407,7 +407,6 @@ onerror = (event) => {
       e.stopPropagation();
       if (this.menuDropdown.style.display === "none") {
         this.menuDropdown.style.display = "block";
-        // Add a global click listener to close the menu when clicking outside
         setTimeout(() => {
           document.addEventListener("click", closeMenu);
         }, 0);
@@ -521,6 +520,10 @@ onerror = (event) => {
     if (!content) return;
 
     this.messageService.sendMessage(content);
+    setTimeout(() => {
+      const event = new Event('input');
+      this.inputEl.dispatchEvent(event);
+    }, 100);
   }
 
   addMessage(role: "user" | "assistant", content: string): void {

@@ -835,6 +835,10 @@ onerror = (event) => {
     if (!content)
       return;
     this.messageService.sendMessage(content);
+    setTimeout(() => {
+      const event = new Event("input");
+      this.inputEl.dispatchEvent(event);
+    }, 100);
   }
   addMessage(role, content) {
     const message = {
