@@ -480,65 +480,57 @@
   /* ==========================================================================
      COPY BUTTON (Refined)
      ========================================================================== */
-  
      .copy-button {
-      /* --- Повертаємо абсолютне позиціонування --- */
-      position: absolute;
-      top: 5px; /* Відступ зверху (можна зменшити до 4px) */
-      right: 5px; /* Відступ справа (можна зменшити до 4px) */
-      /* --- Кінець позиціонування --- */
-    
-      /* --- Зменшуємо розміри --- */
-      width: 18px;  /* Зменшено */
-      height: 18px; /* Зменшено */
-      padding: 2px; /* Зменшено */
-      font-size: 11px; /* Зменшено для іконки */
-      /* --- Кінець розмірів --- */
-    
-      background: none;
+      /* ... position, size, etc ... */
       border: none;
       outline: none;
       color: var(--text-muted);
       cursor: pointer;
       opacity: 0;
       visibility: hidden;
-      /* Можна спростити transition, прибравши opacity, якщо стрибок 0 -> 1 прийнятний */
-      transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s;
-      border-radius: 4px; /* Менший радіус */
+      /* --- Зміни тут --- */
+      background-color: transparent; /* Явно вказуємо прозорий фон */
+      /* Повертаємо background-color до transition */
+      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s;
+      /* --- Кінець змін --- */
+      /* ... інші стилі ... */
+      border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 2px;
+      font-size: 11px;
       z-index: 1;
     }
     
-    .message:hover .copy-button {
-      opacity: 0.6; /* Стає видимою, але трохи прозорою */
-      visibility: visible;
-      transition-delay: 0s;
-      /* --- Важливо: Не додаємо фон тут, бо він різний для user/ollama --- */
-    }
+/* Показуємо кнопку, коли курсор наведено на БАТЬКІВСЬКЕ повідомлення */
+.message:hover .copy-button {
+  opacity: 0.6; /* Знову використовуємо часткову прозорість, раз попередні кроки не допомогли з артефактом */
+  visibility: visible;
+  transition-delay: 0s;
+  /* background-color: transparent; НЕ встановлюємо фон тут */
+}
     
-    .copy-button:hover {
-      opacity: 1; /* Повна непрозорість */
-      background-color: var(--background-modifier-hover); /* Стандартний фон для hover (для повідомлень Ollama) */
-      transform: scale(1.1); /* Зберігаємо ефект збільшення */
-    }
+.copy-button:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover); /* Фон для AI повідомлень */
+  transform: scale(1.1);
+}
     .user-message:hover .copy-button {
-      color: var(--text-on-accent); /* Правильний колір іконки */
-      opacity: 0.6; /* Успадковано, але для ясності */
-      visibility: visible; /* Успадковано */
-      /* --- Новий фон для перекриття артефакту --- */
-      background-color: var(--interactive-accent); /* !! Встановлюємо фон одразу !! */
-      /* Можна спробувати --interactive-accent-hover, якщо він краще підходить до градієнта */
+      color: var(--text-on-accent);
+      /* Встановлюємо фон, який має з'явитися */
+      background-color: var(--interactive-accent);
+      /* opacity (0.6) та visibility (visible) застосовуються від .message:hover... */
     }
     
     /* Коли наведено БЕЗПОСЕРЕДНЬО на кнопку всередині ПОВІДОМЛЕННЯ КОРИСТУВАЧА */
     .user-message .copy-button:hover {
-      background-color: rgba(255, 255, 255, 0.2); /* Специфічний hover фон */
-      opacity: 1; /* Повна непрозорість */
-      /* color та transform успадковуються або встановлені вище */
+      background-color: rgba(255, 255, 255, 0.2);
+      opacity: 1; /* Повна непрозорість при прямому наведенні */
     }
-        
+            
       
   
   /* ==========================================================================
