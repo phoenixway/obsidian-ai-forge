@@ -256,8 +256,9 @@ var MessageService = class {
     if (!this.view)
       return;
     this.isProcessing = true;
-    this.view.setLoadingState(true);
+    const loadingMessageEl = this.view.addLoadingIndicator();
     setTimeout(async () => {
+      var _a, _b;
       try {
         let useSystemPrompt = false;
         if (this.plugin.settings.followRole) {
@@ -289,14 +290,12 @@ var MessageService = class {
           }
         }
         const data = await this.plugin.apiService.generateResponse(requestBody);
-        if (this.view)
-          this.view.setLoadingState(false);
+        (_a = this.view) == null ? void 0 : _a.removeLoadingIndicator(loadingMessageEl);
         this.addMessage("assistant" /* ASSISTANT */, data.response);
         this.initializeThinkingBlocks();
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
-        if (this.view)
-          this.view.setLoadingState(false);
+        (_b = this.view) == null ? void 0 : _b.removeLoadingIndicator(loadingMessageEl);
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
         this.addMessage(
           "error" /* ERROR */,

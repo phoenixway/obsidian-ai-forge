@@ -291,7 +291,7 @@ export class MessageService {
         if (!this.view) return;
 
         this.isProcessing = true;
-        this.view.setLoadingState(true);
+        const loadingMessageEl = this.view.addLoadingIndicator();
         // const loadingMessageEl = this.view.addLoadingMessage();
 
         setTimeout(async () => {
@@ -333,19 +333,12 @@ export class MessageService {
 
                 const data = await this.plugin.apiService.generateResponse(requestBody);
 
-                // this.removeLoadingMessage(loadingMessageEl);
-                if (this.view)
-                    this.view.setLoadingState(false);
-
+                this.view?.removeLoadingIndicator(loadingMessageEl);
                 this.addMessage(MessageType.ASSISTANT, data.response);
                 this.initializeThinkingBlocks();
             } catch (error) {
                 console.error("Error processing request with Ollama:", error);
-                // this.removeLoadingMessage(loadingMessageEl);
-                if (this.view)
-                    this.view.setLoadingState(false);
-
-
+                this.view?.removeLoadingIndicator(loadingMessageEl);
                 const errorMessage = error instanceof Error
                     ? error.message
                     : "Unknown error occurred";
