@@ -210,12 +210,12 @@ export class MessageService {
                 decodedContent.includes("<think>");
 
             if (hasThinkingTags) {
-                //     const contentToProcess =
-                //         hasThinkingTags && !message.content.includes("<thing>")
-                //             ? decodedContent
-                //             : message.content;
+                const contentToProcess =
+                    hasThinkingTags && !message.content.includes("<thing>")
+                        ? decodedContent
+                        : message.content;
 
-                //     const processedContent = this.processThinkingTags(contentToProcess);
+                const processedContent = this.processThinkingTags(contentToProcess);
                 //     contentEl.innerHTML = processedContent;
 
                 //     this.addThinkingToggleListeners(contentEl);
