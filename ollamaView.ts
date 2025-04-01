@@ -301,7 +301,7 @@ onerror = (event) => {
       } else {
         this.inputEl.classList.remove('expanded');
       }
-      this.guaranteedScrollToBottom();
+      setTimeout(() => this.guaranteedScrollToBottom(), 100);
     };
 
     // Налаштування при введенні тексту
@@ -422,6 +422,10 @@ onerror = (event) => {
 
     await this.messageService.loadMessageHistory();
     this.showEmptyState();
+
+    setTimeout(() => this.guaranteedScrollToBottom(), 100);
+
+
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);

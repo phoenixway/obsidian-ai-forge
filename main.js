@@ -648,7 +648,7 @@ onerror = (event) => {
       } else {
         this.inputEl.classList.remove("expanded");
       }
-      this.guaranteedScrollToBottom();
+      setTimeout(() => this.guaranteedScrollToBottom(), 100);
     };
     this.inputEl.addEventListener("input", adjustHeight);
     this.registerDomEvent(window, "resize", adjustHeight);
@@ -735,6 +735,7 @@ onerror = (event) => {
     });
     await this.messageService.loadMessageHistory();
     this.showEmptyState();
+    setTimeout(() => this.guaranteedScrollToBottom(), 100);
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
