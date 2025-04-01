@@ -749,9 +749,9 @@ var _OllamaView = class extends import_obsidian2.ItemView {
       this.internalAddMessage("assistant", "Error: Could not send message.");
     } finally {
       this.isProcessing = false;
+      this.guaranteedScrollToBottom(1e3);
       this.inputEl.focus();
       this.adjustTextareaHeight();
-      this.guaranteedScrollToBottom(100);
     }
   }
   // Internal method to add message to local state and render

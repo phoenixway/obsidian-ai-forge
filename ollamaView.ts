@@ -455,9 +455,10 @@ export class OllamaView extends ItemView {
       this.internalAddMessage("assistant", "Error: Could not send message.");
     } finally {
       this.isProcessing = false; // Reset processing state
+      this.guaranteedScrollToBottom(1000);
       this.inputEl.focus(); // Re-focus input
       this.adjustTextareaHeight(); // Adjust height after clearing
-      this.guaranteedScrollToBottom(100);
+
     }
   }
 
