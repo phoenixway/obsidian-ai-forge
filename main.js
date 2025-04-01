@@ -650,9 +650,15 @@ onerror = (event) => {
       }
       setTimeout(() => this.guaranteedScrollToBottom(), 100);
     };
+    adjustHeight();
     this.inputEl.addEventListener("input", adjustHeight);
     this.registerDomEvent(window, "resize", adjustHeight);
-    setTimeout(adjustHeight, 0);
+    this.registerEvent(
+      this.app.workspace.on("resize", () => {
+        setTimeout(adjustHeight, 0);
+      })
+    );
+    setTimeout(adjustHeight, 100);
   }
   // In the onOpen() method of ollamaView.ts, remove the reset option code
   // and only keep the settings option in the menu dropdown
@@ -735,12 +741,39 @@ onerror = (event) => {
     });
     await this.messageService.loadMessageHistory();
     this.showEmptyState();
-    setTimeout(() => this.guaranteedScrollToBottom(), 100);
+    this.forceInitialization();
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
     });
     this.register(() => removeListener());
+    this.registerDomEvent(document, "visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        setTimeout(() => {
+          this.guaranteedScrollToBottom();
+          const event = new Event("input");
+          this.inputEl.dispatchEvent(event);
+        }, 200);
+      }
+    });
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        if (this.app.workspace.getActiveViewOfType(this.constructor) === this) {
+          setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        }
+      })
+    );
+  }
+  forceInitialization() {
+    setTimeout(() => this.guaranteedScrollToBottom(), 50);
+    setTimeout(() => this.guaranteedScrollToBottom(), 150);
+    setTimeout(() => this.guaranteedScrollToBottom(), 500);
+    setTimeout(() => {
+      this.inputEl.focus();
+      const event = new Event("input");
+      this.inputEl.dispatchEvent(event);
+      this.guaranteedScrollToBottom();
+    }, 200);
   }
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {

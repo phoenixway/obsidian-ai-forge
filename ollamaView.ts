@@ -304,14 +304,22 @@ onerror = (event) => {
       setTimeout(() => this.guaranteedScrollToBottom(), 100);
     };
 
+    adjustHeight();
+
+
     // Налаштування при введенні тексту
     this.inputEl.addEventListener('input', adjustHeight);
 
     // Додаткова обробка при зміні розміру вікна
     this.registerDomEvent(window, 'resize', adjustHeight);
+    this.registerEvent(
+      this.app.workspace.on('resize', () => {
+        setTimeout(adjustHeight, 0);
+      })
+    );
 
     // Ініціалізація висоти
-    setTimeout(adjustHeight, 0);
+    setTimeout(adjustHeight, 100);
   }
 
   // In the onOpen() method of ollamaView.ts, remove the reset option code
@@ -422,15 +430,45 @@ onerror = (event) => {
 
     await this.messageService.loadMessageHistory();
     this.showEmptyState();
-
-    setTimeout(() => this.guaranteedScrollToBottom(), 100);
-
+    this.forceInitialization();
 
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
     });
     this.register(() => removeListener());
+    this.registerDomEvent(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // When tab becomes visible again
+        setTimeout(() => {
+          this.guaranteedScrollToBottom();
+          // Force textarea resize
+          const event = new Event('input');
+          this.inputEl.dispatchEvent(event);
+        }, 200);
+      }
+    });
+
+    // Also handle view activation specifically
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
+          setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        }
+      })
+    );
+  }
+
+  forceInitialization(): void {
+    setTimeout(() => this.guaranteedScrollToBottom(), 50);
+    setTimeout(() => this.guaranteedScrollToBottom(), 150);
+    setTimeout(() => this.guaranteedScrollToBottom(), 500);
+    setTimeout(() => {
+      this.inputEl.focus();
+      const event = new Event('input');
+      this.inputEl.dispatchEvent(event);
+      this.guaranteedScrollToBottom();
+    }, 200);
   }
 
   private updateInputPlaceholder(modelName: string): void {
