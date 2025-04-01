@@ -272,45 +272,35 @@ onerror = (event) => {
 
   autoResizeTextarea(): void {
     const adjustHeight = () => {
-      // Cache DOM elements and measurements to reduce reflows
       const buttonsContainer = this.contentEl.querySelector('.buttons-container') as HTMLElement;
       if (!buttonsContainer || !this.inputEl) return;
 
       const viewHeight = this.contentEl.clientHeight;
       const maxHeight = viewHeight * 0.66;
 
-      // Batch DOM operations
       requestAnimationFrame(() => {
-        // Reset height first
         this.inputEl.style.height = 'auto';
-
-        // Set new height based on content
         const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
         this.inputEl.style.height = newHeight + 'px';
 
-        // Update button position
         if (newHeight > 40) {
           buttonsContainer.style.cssText = 'bottom: 10px; top: auto; transform: translateY(0);';
         } else {
           buttonsContainer.style.cssText = 'bottom: 50%; top: auto; transform: translateY(50%);';
         }
 
-        // Add/remove expanded class
         this.inputEl.classList.toggle('expanded', this.inputEl.scrollHeight > maxHeight);
       });
     };
 
-    // Throttle the input event handler to improve performance
     let resizeTimeout: NodeJS.Timeout;
     this.inputEl.addEventListener('input', () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(adjustHeight, 50) as unknown as NodeJS.Timeout;
     });
 
-    // Initial adjustment after a short delay
     setTimeout(adjustHeight, 100);
 
-    // Use one event listener for window resize
     const handleResize = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(adjustHeight, 50) as unknown as NodeJS.Timeout;
@@ -320,9 +310,9 @@ onerror = (event) => {
     this.registerEvent(this.app.workspace.on('resize', handleResize));
   }
 
-  // In the onOpen() method of ollamaView.ts, remove the reset option code
-  // and only keep the settings option in the menu dropdown
-
+  /*
+  * onOpen method
+  */
   async onOpen(): Promise<void> {
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container",
@@ -377,7 +367,6 @@ onerror = (event) => {
     });
 
     this.showEmptyHistory();
-    this.autoResizeTextarea();
 
     setTimeout(async () => {
       this.guaranteedScrollToBottom();
@@ -386,19 +375,15 @@ onerror = (event) => {
       this.inputEl.dispatchEvent(event);
       this.attachEventListeners();
       await this.messageService.loadMessageHistory();
+      this.autoResizeTextarea();
+
     }, 500);
 
   }
 
-  forceInitialization(): void {
-    setTimeout(() => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      const event = new Event('input');
-      this.inputEl.dispatchEvent(event);
-    }, 200);
-  }
-
+  /*
+  * Initialize event listeners
+  */
   private attachEventListeners(): void {
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {

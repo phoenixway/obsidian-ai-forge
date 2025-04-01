@@ -659,8 +659,9 @@ onerror = (event) => {
     this.registerDomEvent(window, "resize", handleResize);
     this.registerEvent(this.app.workspace.on("resize", handleResize));
   }
-  // In the onOpen() method of ollamaView.ts, remove the reset option code
-  // and only keep the settings option in the menu dropdown
+  /*
+  * onOpen method
+  */
   async onOpen() {
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container"
@@ -705,7 +706,6 @@ onerror = (event) => {
       text: "Settings"
     });
     this.showEmptyHistory();
-    this.autoResizeTextarea();
     setTimeout(async () => {
       this.guaranteedScrollToBottom();
       this.inputEl.focus();
@@ -713,16 +713,12 @@ onerror = (event) => {
       this.inputEl.dispatchEvent(event);
       this.attachEventListeners();
       await this.messageService.loadMessageHistory();
+      this.autoResizeTextarea();
     }, 500);
   }
-  forceInitialization() {
-    setTimeout(() => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      const event = new Event("input");
-      this.inputEl.dispatchEvent(event);
-    }, 200);
-  }
+  /*
+  * Initialize event listeners
+  */
   attachEventListeners() {
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
