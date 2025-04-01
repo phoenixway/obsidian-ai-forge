@@ -408,18 +408,19 @@
   
   /* Вміст повідомлення та метадані */
   .message-content-container {
-    display: flex;
-    align-items: flex-start; /* Вирівнювання тексту та кнопки по верху */
+    /* Переконайтеся, що тут немає display: flex */
+    align-items: flex-start;
     width: 100%;
-    /* position: relative; - Ймовірно, більше не потрібно для кнопки */
-    justify-content: space-between; /* Розміщує контент і кнопку по краях */
+    position: relative; /* Важливо для position:absolute дочірнього елемента */
   }
+  
   .message-content {
-    flex: 1; /* Займає основний простір */
-    /* padding-right: 28px; - Більше не потрібен, кнопка стоїть поруч */
-    /* Можна додати невеликий правий відступ, якщо текст надто близько до кнопки */
-    padding-right: var(--chat-spacing-unit); /* Наприклад, 4px */
+    flex: 1;
+    /* Відновіть або встановіть padding-right, щоб звільнити місце для кнопки */
+    /* Наприклад, для кнопки 18px + відступи: */
+    padding-right: 26px;
   }
+  
   .message-timestamp {
       font-size: 0.75em; /* Ще менший шрифт */
       color: var(--text-faint); /* Дуже приглушений колір */
@@ -481,56 +482,56 @@
      ========================================================================== */
   
      .copy-button {
-      /* --- Видаліть або закоментуйте ці рядки --- */
-      /* position: absolute; */
-      /* top: 6px; */
-      /* right: 6px; */
-      /* --- Кінець видалення --- */
+      /* --- Повертаємо абсолютне позиціонування --- */
+      position: absolute;
+      top: 5px; /* Відступ зверху (можна зменшити до 4px) */
+      right: 5px; /* Відступ справа (можна зменшити до 4px) */
+      /* --- Кінець позиціонування --- */
     
-      /* Інші стилі залишаються, але додаємо відступ */
+      /* --- Зменшуємо розміри --- */
+      width: 18px;  /* Зменшено */
+      height: 18px; /* Зменшено */
+      padding: 2px; /* Зменшено */
+      font-size: 11px; /* Зменшено для іконки */
+      /* --- Кінець розмірів --- */
+    
       background: none;
       border: none;
       outline: none;
       color: var(--text-muted);
-      font-size: 13px;
       cursor: pointer;
       opacity: 0;
       visibility: hidden;
-      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s;
-      padding: 4px;
-      border-radius: 5px;
+      /* Можна спростити transition, прибравши opacity, якщо стрибок 0 -> 1 прийнятний */
+      transition: background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s, opacity 0.15s ease-in-out;
+      border-radius: 4px; /* Менший радіус */
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
-      height: 22px;
       z-index: 1;
-      flex-shrink: 0; /* Забороняємо кнопці стискатися */
-      margin-top: 0; /* Можливо, потрібен невеликий відступ зверху, якщо align-items не спрацює ідеально */
-      margin-left: var(--chat-spacing-unit); /* Невеликий відступ від тексту */
     }
+    
     .message:hover .copy-button {
-      /* --- Зміни тут --- */
-      opacity: 0.6;
-      visibility: visible; /* **Робимо видимим при наведенні на повідомлення** */
-      transition-delay: 0s; /* Скидаємо затримку для visibility */
-       /* --- Кінець змін --- */
+      /* --- Головна зміна тут --- */
+      opacity: 1; /* **Встановлюємо одразу повну непрозорість** */
+      /* --- Кінець зміни --- */
+      visibility: visible;
+      transition-delay: 0s;
     }
+    
     .copy-button:hover {
-      opacity: 1;
+      opacity: 1; /* Вже встановлено, але для надійності */
       background-color: var(--background-modifier-hover);
       transform: scale(1.1);
-      /* visibility: visible; вже встановлено батьківським hover */
     }
     .user-message:hover .copy-button {
-      color: var(--text-on-accent);
-      /* opacity та visibility успадковуються від .message:hover .copy-button */
+      color: var(--text-on-accent); /* Правильний колір при появі */
     }
     .user-message .copy-button:hover {
-      background-color: rgba(255, 255, 255, 0.2);
-      /* opacity та color успадковуються */
+      background-color: rgba(255, 255, 255, 0.2); /* Специфічний фон при наведенні */
     }
-  
+    
+      
   
   /* ==========================================================================
      LOADING & THINKING INDICATORS (Refined)
