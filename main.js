@@ -71,7 +71,6 @@ var MessageService = class {
             timestamp: new Date(msg.timestamp)
           };
           this.messages.push(message);
-          this.renderMessage(message);
         }
         console.log(`messageService.ts -> : here`);
       }
