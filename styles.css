@@ -6,17 +6,18 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    position: relative;
+    position: relative; /* Потрібно для позиціонування empty state та меню */
+    background-color: var(--background-secondary-alt); /* Фон для всього контейнера */
   }
   
   .ollama-chat-container {
-    flex: 1;
-    overflow-y: auto;
+    flex: 1; /* Займає весь доступний простір по висоті */
+    overflow-y: auto; /* Дозволяє вертикальну прокрутку */
     padding: 15px;
     padding-bottom: 5px; /* Залишаємо невеликий відступ знизу */
     box-sizing: border-box;
-    background-color: var(--background-secondary-alt);
-    scroll-behavior: smooth;
+    /* background-color: var(--background-secondary-alt); -- Перенесено на .ollama-container */
+    scroll-behavior: smooth; /* Плавна прокрутка */
     overscroll-behavior: contain; /* Запобігає скролу сторінки при досягненні краю */
   }
   
@@ -24,12 +25,14 @@
   .workspace-leaf-content[data-type='ollama-chat-view'] {
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* Запобігає подвійним скролбарам */
   }
   
   .workspace-leaf-content[data-type='ollama-chat-view'] .view-content {
     height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden; /* Запобігає подвійним скролбарам */
   }
   
   /* Empty state styling */
@@ -48,7 +51,8 @@
     padding: 20px;
     box-sizing: border-box;
     z-index: 1; /* Щоб бути під полем вводу */
-    background-color: var(--background-secondary-alt); /* Фон як у контейнера чату */
+    /* background-color: var(--background-secondary-alt); -- Успадковується від .ollama-container */
+    pointer-events: none; /* Не заважає клікам на чат, якщо він під ним */
   }
   
   .empty-state-message {
@@ -76,11 +80,13 @@
     z-index: 10; /* Щоб бути над empty state та чатом */
     border-radius: 12px; /* Трохи менш заокруглені кути */
     margin: 10px 15px;
+    margin-top: 0; /* Прибираємо верхній відступ, бо контейнер чату має padding-bottom */
     margin-bottom: 5px; /* Менший відступ знизу */
     box-sizing: border-box;
     /* Тінь трохи м'якша */
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     position: relative; /* Для позиціонування кнопок */
+    flex-shrink: 0; /* Забороняємо контейнеру стискатися */
   }
   
   .chat-input-container textarea {
@@ -229,7 +235,7 @@
   
   .ollama-chat-container .message {
     /* Відступ лише між повідомленнями В межах однієї групи */
-    margin-bottom: 2px; 
+    margin-bottom: 2px;
     padding: 10px 15px;
     border-radius: 18px; /* Більш заокруглені повідомлення */
     max-width: 80%; /* Трохи ширші повідомлення */
@@ -268,11 +274,11 @@
     border-top-left-radius: 18px;
     border-bottom-left-radius: 18px;
     border-top-right-radius: 18px;
-    border-bottom-right-radius: 5px; /* Гостріший кут для хвоста */
+    /* border-bottom-right-radius: 5px; -- Змінено для видалення "хвостика" */
     box-shadow: 0 2px 5px rgba(var(--interactive-accent-rgb), 0.25);
   }
   .ollama-chat-container .user-message-group .message:last-child.user-message {
-    border-bottom-right-radius: 18px; /* Відновлюємо радіус для останнього в групі */
+    /* border-bottom-right-radius: 18px; -- Не потрібне без "хвостика" */
   }
   
   
@@ -293,6 +299,7 @@
   
   .ollama-chat-container .user-message .copy-button:hover {
     opacity: 1 !important;
+    background-color: rgba(255, 255, 255, 0.2) !important; /* Прозорий білий фон */
   }
   
   /* Enhanced AI messages */
@@ -304,11 +311,11 @@
     border-top-right-radius: 18px;
     border-bottom-right-radius: 18px;
     border-top-left-radius: 18px;
-    border-bottom-left-radius: 5px; /* Гостріший кут для хвоста */
+    /* border-bottom-left-radius: 5px; -- Змінено для видалення "хвостика" */
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
   }
   .ollama-chat-container .ollama-message-group .message:last-child.ollama-message {
-    border-bottom-left-radius: 18px; /* Відновлюємо радіус для останнього в групі */
+   /* border-bottom-left-radius: 18px; -- Не потрібне без "хвостика" */
   }
   
   
@@ -318,51 +325,7 @@
   }
   
   /* --- Хвостики повідомлень (Speech bubble tails) --- */
-  /* Видаляємо хвостики для більш чистого вигляду. Якщо потрібні, розкоментуйте.
-  .ollama-chat-container .user-message-tail::after {
-    content: '';
-    position: absolute;
-    right: -10px;
-    bottom: 0;
-    width: 0;
-    height: 0;
-    border: 10px solid transparent;
-    border-left-color: var(--interactive-accent-hover); // Або основний колір user-message
-    border-right: 0;
-    border-bottom: 0;
-    margin-top: -5px; // Підняти трохи
-    margin-right: -10px;
-  }
-  
-  .ollama-chat-container .ollama-message-tail::before {
-    content: '';
-    position: absolute;
-    left: -10px;
-    bottom: 0;
-    width: 0;
-    height: 0;
-    border: 10px solid transparent;
-    border-right-color: var(--background-primary); // Колір фону ollama-message
-    border-left: 0;
-    border-bottom: 0;
-    margin-top: -5px;
-    margin-left: -10px;
-  }
-  */
-  /* Застосування класів tail (якщо хвостики розкоментовані) */
-  .ollama-chat-container .user-message-group .message:last-child {
-    /* border-bottom-right-radius: 5px; */ /* Закоментовано, бо хвостики видалені */
-  }
-  .ollama-chat-container .user-message-group .message:last-child.user-message-tail {
-    /* Цей клас тепер не потрібен без ::after */
-  }
-  
-  .ollama-chat-container .ollama-message-group .message:last-child {
-   /* border-bottom-left-radius: 5px; */ /* Закоментовано, бо хвостики видалені */
-  }
-  .ollama-chat-container .ollama-message-group .message:last-child.ollama-message-tail {
-   /* Цей клас тепер не потрібен без ::before */
-  }
+  /* Видалені для більш чистого вигляду. Якщо потрібні, розкоментуйте відповідні секції вище та нижче. */
   
   /* --- Вміст повідомлення та метадані --- */
   
@@ -376,6 +339,7 @@
   .message-content {
     flex: 1; /* Основний контент займає доступний простір */
     padding-right: 25px; /* Залишаємо місце для кнопки копіювання */
+    min-width: 0; /* Дозволяє контенту стискатися і переносити текст */
   }
   
   .message-timestamp {
@@ -386,6 +350,7 @@
     display: block; /* Щоб зайняти весь рядок */
     width: 100%;
     opacity: 0.7;
+    clear: both; /* Щоб час не налізав на float елементи, якщо вони будуть */
   }
   /* Специфічний колір для часу в повідомленні користувача */
   .user-message .message-timestamp {
@@ -435,12 +400,14 @@
     align-items: center;
     margin-right: 8px;
     font-size: 1em;
+    flex-shrink: 0;
   }
   
   .system-message-text {
     display: inline;
     line-height: 1.4;
     font-size: 0.9em; /* Трохи менший шрифт */
+    min-width: 0; /* Дозволяє тексту переноситися */
   }
   
   /* ==========================================================================
@@ -487,6 +454,7 @@
     color: var(--text-on-error) !important;
     font-weight: normal !important; /* Звичайний шрифт */
     font-size: 0.95em !important;
+    min-width: 0; /* Дозволяє тексту переноситися */
   }
   
   /* Анімація при появі останнього повідомлення про помилку */
@@ -540,10 +508,6 @@
      color: var(--text-on-accent) !important;
      opacity: 0.6 !important;
   }
-  .user-message .copy-button:hover {
-     background-color: rgba(255, 255, 255, 0.2) !important; /* Прозорий білий фон */
-     opacity: 1 !important;
-  }
   
   
   /* ==========================================================================
@@ -566,13 +530,18 @@
     to { transform: rotate(360deg); }
   }
   
-  /* Анімовані крапки "Thinking..." */
-  .thinking-dots {
+  /* Анімовані крапки "Thinking..." в повідомленні Ollama */
+  .ollama-message .thinking-dots {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start; /* Вирівнюємо по лівому краю */
     padding: 8px 0; /* Вертикальний відступ */
   }
+  /* Анімовані крапки в окремому блоці завантаження */
+  .ollama-chat-container > .message-group.ollama-message-group .thinking-dots {
+      justify-content: center; /* Центруємо, якщо це єдиний вміст */
+  }
+  
   
   .thinking-dot {
     width: 7px; /* Трохи менші крапки */
@@ -676,6 +645,7 @@
   .ollama-message .message-content p {
     margin: 0.6em 0; /* Стандартні відступи для параграфів */
     line-height: 1.5; /* Міжрядковий інтервал */
+    word-wrap: break-word; /* Дозволяє переносити дуже довгі слова */
   }
   
   .ollama-message .message-content ul,
@@ -695,6 +665,7 @@
     overflow-x: auto; /* Горизонтальний скрол для довгого коду */
     border: 1px solid var(--background-modifier-border); /* Легка рамка */
     font-size: 0.9em; /* Трохи менший шрифт коду */
+    line-height: 1.4; /* Міжрядковий інтервал для коду */
   }
   
   .ollama-message .message-content code {
@@ -703,7 +674,8 @@
     background-color: var(--background-modifier-hover); /* Фон для вбудованого коду */
     padding: 0.2em 0.4em;
     border-radius: 4px;
-    word-break: break-word; /* Перенос для дуже довгих слів в коді */
+    word-break: break-all; /* Примусовий перенос для дуже довгих слів в коді */
+    color: var(--text-normal); /* Явний колір тексту */
   }
   
   .ollama-message .message-content pre code {
@@ -711,6 +683,8 @@
     background-color: transparent; /* Фон вже є у <pre> */
     font-size: inherit; /* Успадковуємо розмір шрифту від <pre> */
     border-radius: 0;
+    word-break: normal; /* Скасовуємо примусовий перенос всередині pre */
+    color: inherit; /* Успадковуємо колір тексту від <pre> */
   }
   
   .ollama-message .message-content blockquote {
