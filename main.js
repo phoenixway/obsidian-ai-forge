@@ -1585,9 +1585,19 @@ var MessageService = class {
           isNewConversation
         );
         const requestBody = {
-          /* ... без змін ... */
+          model: this.plugin.settings.modelName,
+          prompt: formattedPrompt,
+          stream: false,
+          temperature: this.plugin.settings.temperature || 0.2,
+          options: {
+            num_ctx: this.plugin.settings.contextWindow || 8192
+          }
         };
         if (useSystemPrompt) {
+          const systemPrompt = this.plugin.promptService.getSystemPrompt();
+          if (systemPrompt) {
+            requestBody.system = systemPrompt;
+          }
         }
         const data = await this.plugin.apiService.generateResponse(requestBody);
         (_a = this.view) == null ? void 0 : _a.removeLoadingIndicator(loadingMessageEl);

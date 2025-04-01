@@ -13,8 +13,14 @@ export enum MessageType {
     SYSTEM = "system"
 }
 export interface RequestOptions { num_ctx?: number; }
-export interface OllamaRequestBody { /* ... без змін ... */ }
-// --- Кінець визначення типів ---
+export interface OllamaRequestBody {
+    model: string;
+    prompt: string;
+    stream: boolean;
+    temperature: number;
+    system?: string;
+    options?: RequestOptions;
+}// --- Кінець визначення типів ---
 
 export class MessageService {
     private plugin: OllamaPlugin;
@@ -122,9 +128,22 @@ export class MessageService {
                     content,
                     isNewConversation
                 );
-                const requestBody: OllamaRequestBody = { /* ... без змін ... */ };
-                if (useSystemPrompt) { /* ... без змін ... */ }
-                // --- Кінець логіки системного промпту ---
+                const requestBody: OllamaRequestBody = {
+                    model: this.plugin.settings.modelName,
+                    prompt: formattedPrompt,
+                    stream: false,
+                    temperature: this.plugin.settings.temperature || 0.2,
+                    options: {
+                        num_ctx: this.plugin.settings.contextWindow || 8192,
+                    }
+                };
+
+                if (useSystemPrompt) {
+                    const systemPrompt = this.plugin.promptService.getSystemPrompt();
+                    if (systemPrompt) {
+                        requestBody.system = systemPrompt;
+                    }
+                }                // --- Кінець логіки системного промпту ---
 
 
                 const data = await this.plugin.apiService.generateResponse(requestBody);
