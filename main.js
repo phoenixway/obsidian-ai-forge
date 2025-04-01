@@ -198,8 +198,26 @@ var MessageService = class {
       } else {
       }
     } else if (isError) {
+      const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
+      (0, import_obsidian.setIcon)(errorIconSpan, "alert-triangle");
+      const messageSpan = contentEl.createSpan({
+        cls: "error-message-text",
+        text: message.content
+      });
     } else if (isSystem) {
+      const infoIconSpan = contentEl.createSpan({ cls: "system-icon" });
+      (0, import_obsidian.setIcon)(infoIconSpan, "info");
+      const messageSpan = contentEl.createSpan({
+        cls: "system-message-text",
+        text: message.content
+      });
     } else {
+      message.content.split("\n").forEach((line, index, array) => {
+        contentEl.createSpan({ text: line });
+        if (index < array.length - 1) {
+          contentEl.createEl("br");
+        }
+      });
     }
     if (!isSystem) {
       const copyButton = this.createCopyButton(contentContainer, message);
