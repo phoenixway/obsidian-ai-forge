@@ -359,7 +359,7 @@
   
   /* Стилізація послідовних повідомлень */
   .message-group .message:not(:last-child) {
-    margin-bottom: calc(var(--chat-spacing-unit) * 1); /* Синхронізуйте з .message */
+    margin-bottom: calc(var(--chat-spacing-unit) * 4); /* Синхронізуйте з .message */
     /* border-radius стилі залишаються */
 }
 .user-message-group .message:not(:last-child) { border-bottom-right-radius: 5px; }
