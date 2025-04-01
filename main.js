@@ -704,13 +704,13 @@ onerror = (event) => {
       cls: "menu-option-text",
       text: "Settings"
     });
-    setTimeout(() => {
-      this.forceInitialization();
-      this.attachEventListeners();
-    }, 500);
-    await this.messageService.loadMessageHistory();
     this.showEmptyState();
     this.autoResizeTextarea();
+    setTimeout(async () => {
+      this.forceInitialization();
+      this.attachEventListeners();
+      await this.messageService.loadMessageHistory();
+    }, 500);
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
