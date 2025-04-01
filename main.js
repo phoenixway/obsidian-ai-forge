@@ -626,11 +626,23 @@ onerror = (event) => {
   }
   autoResizeTextarea() {
     const adjustHeight = () => {
+      const buttonsContainer = this.contentEl.querySelector(".buttons-container");
       this.inputEl.style.height = "auto";
       const viewHeight = this.contentEl.clientHeight;
       const maxHeight = viewHeight * 0.66;
       const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
       this.inputEl.style.height = newHeight + "px";
+      if (buttonsContainer) {
+        if (newHeight > 40) {
+          buttonsContainer.style.bottom = "10px";
+          buttonsContainer.style.top = "auto";
+          buttonsContainer.style.transform = "translateY(0)";
+        } else {
+          buttonsContainer.style.bottom = "50%";
+          buttonsContainer.style.top = "auto";
+          buttonsContainer.style.transform = "translateY(50%)";
+        }
+      }
       if (this.inputEl.scrollHeight > maxHeight) {
         this.inputEl.classList.add("expanded");
       } else {

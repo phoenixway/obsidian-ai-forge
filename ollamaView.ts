@@ -268,6 +268,9 @@ onerror = (event) => {
   autoResizeTextarea(): void {
     // Початкове налаштування висоти
     const adjustHeight = () => {
+      // Reference to buttons container with proper type casting
+      const buttonsContainer = this.contentEl.querySelector('.buttons-container') as HTMLElement;
+
       // Спочатку скидаємо висоту до мінімальної
       this.inputEl.style.height = 'auto';
 
@@ -276,6 +279,21 @@ onerror = (event) => {
       const maxHeight = viewHeight * 0.66; // 2/3 від висоти view
       const newHeight = Math.min(this.inputEl.scrollHeight, maxHeight);
       this.inputEl.style.height = newHeight + 'px';
+
+      // Adjust buttons position based on textarea height
+      if (buttonsContainer) {
+        // If textarea is multiline, position buttons at the bottom
+        if (newHeight > 40) { // 40px is the initial minimum height
+          buttonsContainer.style.bottom = '10px'; // Position at bottom with padding
+          buttonsContainer.style.top = 'auto';
+          buttonsContainer.style.transform = 'translateY(0)';
+        } else {
+          // Reset to centered position for single line
+          buttonsContainer.style.bottom = '50%';
+          buttonsContainer.style.top = 'auto';
+          buttonsContainer.style.transform = 'translateY(50%)';
+        }
+      }
 
       // Додаємо клас expanded, якщо досягли максимальної висоти
       if (this.inputEl.scrollHeight > maxHeight) {

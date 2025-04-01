@@ -95,16 +95,16 @@
       overflow: hidden;
       width: 100%; /* Щоб textarea займала всю доступну ширину */
     }
-/* Нова позиція для контейнера кнопок - всередині текстового поля */
-.buttons-container {
-  display: flex;
-  position: absolute;
-  bottom: 50%;
-  right: 25px;
-  transform: translateY(50%);
-  align-items: center;
-  z-index: 11;
-}
+    .buttons-container {
+      display: flex;
+      position: absolute;
+      bottom: 50%;
+      right: 25px;
+      transform: translateY(50%);
+      align-items: center;
+      z-index: 11;
+      transition: bottom 0.2s, transform 0.2s; /* Add smooth transition */
+    }
 
 /* Оновлений стиль кнопок для кращої інтеграції */
 .buttons-container button {
