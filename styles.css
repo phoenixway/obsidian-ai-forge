@@ -301,7 +301,7 @@
     flex-direction: column;
     width: 100%;
     /* Збільшений відступ між групами повідомлень */
-    margin-bottom: calc(var(--chat-spacing-unit) * 3); /* Стало 12px (або оберіть інше значення, наприклад * 4 = 16px) */
+    margin-bottom: calc(var(--chat-spacing-unit) * 4); /* Стало 12px (або оберіть інше значення, наприклад * 4 = 16px) */
     position: relative;
     padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
     padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
@@ -469,27 +469,45 @@
      COPY BUTTON (Refined)
      ========================================================================== */
   
-  .copy-button {
-    position: absolute;
-    top: 6px; /* Трохи нижче */
-    right: 6px;
-    background: none !important; border: none !important; outline: none !important;
-    color: var(--text-muted) !important;
-    font-size: 13px !important; /* Трохи більша іконка */
-    cursor: pointer; opacity: 0 !important;
-    transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out !important;
-    padding: 4px !important; /* Збільшено клікабельну область */
-    border-radius: 5px; display: flex; align-items: center; justify-content: center;
-    width: 22px !important; height: 22px !important; z-index: 1;
-  }
-  .message:hover .copy-button { opacity: 0.6 !important; }
-  .copy-button:hover {
-    opacity: 1 !important;
-    background-color: var(--background-modifier-hover) !important;
-    transform: scale(1.1); /* Ефект при наведенні */
-  }
-  .user-message:hover .copy-button { color: var(--text-on-accent) !important; opacity: 0.6 !important; }
-  .user-message .copy-button:hover { background-color: rgba(255, 255, 255, 0.2) !important; opacity: 1 !important; }
+     .copy-button {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: none; /* Базовий фон відсутній */
+      border: none;
+      outline: none;
+      color: var(--text-muted); /* Базовий колір для AI повідомлень */
+      font-size: 13px;
+      cursor: pointer;
+      opacity: 0; /* **Повністю прихована за замовчуванням** */
+      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out;
+      padding: 4px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      z-index: 1;
+    }
+
+.message:hover .copy-button {
+  opacity: 0.6; /* Стає видимою, але трохи прозорою */
+}
+.copy-button:hover {
+  opacity: 1; /* Повна непрозорість */
+  background-color: var(--background-modifier-hover); /* Стандартний фон для hover */
+  transform: scale(1.1);
+}
+.user-message:hover .copy-button {
+  color: var(--text-on-accent); /* Білий колір іконки */
+  /* opacity: 0.6; успадковується від .message:hover .copy-button */
+}
+.user-message .copy-button:hover {
+  background-color: rgba(255, 255, 255, 0.2); /* Прозорий білий фон */
+  /* color: var(--text-on-accent); успадковується */
+  /* opacity: 1; успадковується від .copy-button:hover */
+}
   
   
   /* ==========================================================================
