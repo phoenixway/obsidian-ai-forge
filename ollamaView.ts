@@ -320,6 +320,20 @@ onmessage = async (event) => {
   * onOpen method
   */
   async onOpen(): Promise<void> {
+    this.createUIElements();
+    this.showEmptyHistory();
+
+    setTimeout(async () => {
+      this.guaranteedScrollToBottom();
+      this.inputEl.focus();
+      this.inputEl.dispatchEvent(new Event('input'));
+      this.attachEventListeners();
+      await this.messageService.loadMessageHistory();
+      this.autoResizeTextarea();
+    }, 500);
+  }
+
+  private createUIElements(): void {
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container",
     });
@@ -371,43 +385,30 @@ onmessage = async (event) => {
       cls: "menu-option-text",
       text: "Settings",
     });
-
-    this.showEmptyHistory();
-
-    setTimeout(async () => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      const event = new Event('input');
-      this.inputEl.dispatchEvent(event);
-      this.attachEventListeners();
-      await this.messageService.loadMessageHistory();
-      this.autoResizeTextarea();
-
-    }, 500);
-
   }
 
   /*
   * Initialize event listeners
   */
   private attachEventListeners(): void {
+    // Input handling
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         this.sendMessage();
       }
     });
-    this.sendButton.addEventListener("click", () => {
-      this.sendMessage();
-    });
 
-    this.voiceButton.addEventListener("click", () => {
-      this.startVoiceRecognition();
-    });
+    // Button handling
+    this.sendButton.addEventListener("click", () => this.sendMessage());
+    this.voiceButton.addEventListener("click", () => this.startVoiceRecognition());
+
+    // Menu handling
     const closeMenu = () => {
       this.menuDropdown.style.display = "none";
       document.removeEventListener("click", closeMenu);
     };
+
     this.menuButton.addEventListener("click", (e) => {
       e.stopPropagation();
       if (this.menuDropdown.style.display === "none") {
@@ -419,31 +420,32 @@ onmessage = async (event) => {
         closeMenu();
       }
     });
+
     this.settingsOption.addEventListener("click", async () => {
       const setting = (this.app as any).setting;
       await setting.open();
-      // await setting.open("obsidian-ollama-duet");
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
+
+    // Plugin event handling
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
     });
     this.register(() => removeListener());
+
+    // Visibility change handling for better UX
     this.registerDomEvent(document, 'visibilitychange', () => {
       if (document.visibilityState === 'visible') {
-        // When tab becomes visible again
         setTimeout(() => {
           this.guaranteedScrollToBottom();
-          // Force textarea resize
-          const event = new Event('input');
-          this.inputEl.dispatchEvent(event);
+          this.inputEl.dispatchEvent(new Event('input'));
         }, 200);
       }
     });
 
-    // Also handle view activation specifically
+    // Handle view activation
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => {
         if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
@@ -451,8 +453,8 @@ onmessage = async (event) => {
         }
       })
     );
-
   }
+
 
   private updateInputPlaceholder(modelName: string): void {
     if (this.inputEl) {
@@ -1012,7 +1014,6 @@ onmessage = async (event) => {
 
   onModelChanged(modelName: string): void {
     this.updateInputPlaceholder(modelName);
-    // this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
   }
 
 

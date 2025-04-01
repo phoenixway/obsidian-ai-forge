@@ -670,6 +670,18 @@ onmessage = async (event) => {
   * onOpen method
   */
   async onOpen() {
+    this.createUIElements();
+    this.showEmptyHistory();
+    setTimeout(async () => {
+      this.guaranteedScrollToBottom();
+      this.inputEl.focus();
+      this.inputEl.dispatchEvent(new Event("input"));
+      this.attachEventListeners();
+      await this.messageService.loadMessageHistory();
+      this.autoResizeTextarea();
+    }, 500);
+  }
+  createUIElements() {
     this.chatContainerEl = this.contentEl.createDiv({
       cls: "ollama-container"
     });
@@ -712,16 +724,6 @@ onmessage = async (event) => {
       cls: "menu-option-text",
       text: "Settings"
     });
-    this.showEmptyHistory();
-    setTimeout(async () => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      const event = new Event("input");
-      this.inputEl.dispatchEvent(event);
-      this.attachEventListeners();
-      await this.messageService.loadMessageHistory();
-      this.autoResizeTextarea();
-    }, 500);
   }
   /*
   * Initialize event listeners
@@ -733,12 +735,8 @@ onmessage = async (event) => {
         this.sendMessage();
       }
     });
-    this.sendButton.addEventListener("click", () => {
-      this.sendMessage();
-    });
-    this.voiceButton.addEventListener("click", () => {
-      this.startVoiceRecognition();
-    });
+    this.sendButton.addEventListener("click", () => this.sendMessage());
+    this.voiceButton.addEventListener("click", () => this.startVoiceRecognition());
     const closeMenu = () => {
       this.menuDropdown.style.display = "none";
       document.removeEventListener("click", closeMenu);
@@ -769,8 +767,7 @@ onmessage = async (event) => {
       if (document.visibilityState === "visible") {
         setTimeout(() => {
           this.guaranteedScrollToBottom();
-          const event = new Event("input");
-          this.inputEl.dispatchEvent(event);
+          this.inputEl.dispatchEvent(new Event("input"));
         }, 200);
       }
     });
