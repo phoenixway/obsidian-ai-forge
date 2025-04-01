@@ -187,6 +187,22 @@ export class MessageService {
             messageClass += "system-message bubble system-bubble";
         }
 
+        if (isLastInGroup) {
+            if (isUser) {
+                messageClass += " user-message-tail";
+            } else if (isAssistant(message.role)) {
+                messageClass += " ollama-message-tail";
+            } else if (isError) {
+                messageClass += " error-message-tail";
+            } else if (isSystem) {
+                messageClass += " system-message-tail";
+            }
+        }
+
+        const messageEl = this.view.createMessageElement(messageGroup, messageClass);
+        const contentContainer = this.view.createContentContainer(messageEl);
+        const contentEl = this.view.createContentElement(contentContainer);
+
 
     }
 
