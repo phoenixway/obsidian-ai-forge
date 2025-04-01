@@ -71,11 +71,11 @@ export class MessageService {
                 this.view.scrollToBottom();
                 this.initializeThinkingBlocks();
             } else {
-                this.view.showEmptyState();
+                this.view.showEmptyHistory();
             }
         } catch (error) {
             console.error("Error loading message history:", error);
-            this.view.showEmptyState();
+            this.view.showEmptyHistory();
         }
     }
 
@@ -140,7 +140,7 @@ export class MessageService {
         this.messages = [];
         if (this.view) {
             this.view.clearChatContainer();
-            this.view.showEmptyState();
+            this.view.showEmptyHistory();
         }
     }
 

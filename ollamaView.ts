@@ -376,49 +376,24 @@ onerror = (event) => {
       text: "Settings",
     });
 
-
-
-    this.showEmptyState();
+    this.showEmptyHistory();
     this.autoResizeTextarea();
 
     setTimeout(async () => {
-      this.forceInitialization();
+      this.guaranteedScrollToBottom();
+      this.inputEl.focus();
+      const event = new Event('input');
+      this.inputEl.dispatchEvent(event);
       this.attachEventListeners();
       await this.messageService.loadMessageHistory();
     }, 500);
 
-    const removeListener = this.plugin.on('model-changed', (modelName: string) => {
-      this.updateInputPlaceholder(modelName);
-      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
-    });
-    this.register(() => removeListener());
-    this.registerDomEvent(document, 'visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        // When tab becomes visible again
-        setTimeout(() => {
-          this.guaranteedScrollToBottom();
-          // Force textarea resize
-          const event = new Event('input');
-          this.inputEl.dispatchEvent(event);
-        }, 200);
-      }
-    });
-
-    // Also handle view activation specifically
-    this.registerEvent(
-      this.app.workspace.on('active-leaf-change', () => {
-        if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
-          setTimeout(() => this.guaranteedScrollToBottom(), 100);
-        }
-      })
-    );
   }
 
   forceInitialization(): void {
     setTimeout(() => {
       this.guaranteedScrollToBottom();
       this.inputEl.focus();
-      // Trigger resize event only once
       const event = new Event('input');
       this.inputEl.dispatchEvent(event);
     }, 200);
@@ -461,6 +436,32 @@ onerror = (event) => {
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
+    const removeListener = this.plugin.on('model-changed', (modelName: string) => {
+      this.updateInputPlaceholder(modelName);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+    });
+    this.register(() => removeListener());
+    this.registerDomEvent(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // When tab becomes visible again
+        setTimeout(() => {
+          this.guaranteedScrollToBottom();
+          // Force textarea resize
+          const event = new Event('input');
+          this.inputEl.dispatchEvent(event);
+        }, 200);
+      }
+    });
+
+    // Also handle view activation specifically
+    this.registerEvent(
+      this.app.workspace.on('active-leaf-change', () => {
+        if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
+          setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        }
+      })
+    );
+
   }
 
   private updateInputPlaceholder(modelName: string): void {
@@ -469,7 +470,7 @@ onerror = (event) => {
     }
   }
 
-  public showEmptyState(): void {
+  public showEmptyHistory(): void {
     // console.log("show empti state");
 
     if (this.messages.length === 0 && !this.emptyStateEl) {

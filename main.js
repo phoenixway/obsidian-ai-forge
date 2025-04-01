@@ -76,11 +76,11 @@ var MessageService = class {
         this.view.scrollToBottom();
         this.initializeThinkingBlocks();
       } else {
-        this.view.showEmptyState();
+        this.view.showEmptyHistory();
       }
     } catch (error) {
       console.error("Error loading message history:", error);
-      this.view.showEmptyState();
+      this.view.showEmptyHistory();
     }
   }
   // Save message history to storage
@@ -133,7 +133,7 @@ var MessageService = class {
     this.messages = [];
     if (this.view) {
       this.view.clearChatContainer();
-      this.view.showEmptyState();
+      this.view.showEmptyHistory();
     }
   }
   // Render a message in the chat container
@@ -704,34 +704,16 @@ onerror = (event) => {
       cls: "menu-option-text",
       text: "Settings"
     });
-    this.showEmptyState();
+    this.showEmptyHistory();
     this.autoResizeTextarea();
     setTimeout(async () => {
-      this.forceInitialization();
+      this.guaranteedScrollToBottom();
+      this.inputEl.focus();
+      const event = new Event("input");
+      this.inputEl.dispatchEvent(event);
       this.attachEventListeners();
       await this.messageService.loadMessageHistory();
     }, 500);
-    const removeListener = this.plugin.on("model-changed", (modelName) => {
-      this.updateInputPlaceholder(modelName);
-      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
-    });
-    this.register(() => removeListener());
-    this.registerDomEvent(document, "visibilitychange", () => {
-      if (document.visibilityState === "visible") {
-        setTimeout(() => {
-          this.guaranteedScrollToBottom();
-          const event = new Event("input");
-          this.inputEl.dispatchEvent(event);
-        }, 200);
-      }
-    });
-    this.registerEvent(
-      this.app.workspace.on("active-leaf-change", () => {
-        if (this.app.workspace.getActiveViewOfType(this.constructor) === this) {
-          setTimeout(() => this.guaranteedScrollToBottom(), 100);
-        }
-      })
-    );
   }
   forceInitialization() {
     setTimeout(() => {
@@ -775,13 +757,34 @@ onerror = (event) => {
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
+    const removeListener = this.plugin.on("model-changed", (modelName) => {
+      this.updateInputPlaceholder(modelName);
+      this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+    });
+    this.register(() => removeListener());
+    this.registerDomEvent(document, "visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        setTimeout(() => {
+          this.guaranteedScrollToBottom();
+          const event = new Event("input");
+          this.inputEl.dispatchEvent(event);
+        }, 200);
+      }
+    });
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", () => {
+        if (this.app.workspace.getActiveViewOfType(this.constructor) === this) {
+          setTimeout(() => this.guaranteedScrollToBottom(), 100);
+        }
+      })
+    );
   }
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {
       this.inputEl.placeholder = `Text to ${modelName}...`;
     }
   }
-  showEmptyState() {
+  showEmptyHistory() {
     if (this.messages.length === 0 && !this.emptyStateEl) {
       this.emptyStateEl = this.chatContainer.createDiv({
         cls: "ollama-empty-state"
