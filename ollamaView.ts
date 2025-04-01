@@ -499,6 +499,9 @@ export class OllamaView extends ItemView {
 
     this.renderMessage(message); // Render *before* checking scroll indicator
     this.hideEmptyState();
+    console.log(`internalAddMessage: About to save history. Role: ${role}. Messages length: ${this.messages.length}`);
+    console.log(`internalAddMessage: About to save history. Role: ${role}. Messages: ${this.messages}`);
+
     this.saveMessageHistory();
 
     // --- Handle "New Messages" Indicator ---

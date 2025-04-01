@@ -818,6 +818,8 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     }
     this.renderMessage(message);
     this.hideEmptyState();
+    console.log(`internalAddMessage: About to save history. Role: ${role}. Messages length: ${this.messages.length}`);
+    console.log(`internalAddMessage: About to save history. Role: ${role}. Messages: ${this.messages}`);
     this.saveMessageHistory();
     if (role === "assistant" && this.userScrolledUp && this.newMessagesIndicatorEl) {
       this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
