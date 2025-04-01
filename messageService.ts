@@ -216,11 +216,11 @@ export class MessageService {
                         : message.content;
 
                 const processedContent = this.processThinkingTags(contentToProcess);
-                //     contentEl.innerHTML = processedContent;
+                contentEl.innerHTML = processedContent;
 
                 //     this.addThinkingToggleListeners(contentEl);
             } else {
-                //     this.renderMarkdown(message.content, contentEl);
+                this.renderMarkdown(message.content, contentEl);
             }
         } else if (isError) {
             // const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
