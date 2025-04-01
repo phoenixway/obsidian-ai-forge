@@ -57,12 +57,23 @@ export class OllamaView extends ItemView {
 
     this.mediaRecorder = null;
 
+    this.initSpeechWorker();
+
+    this.messageService = new MessageService(plugin);
+    this.messageService.setView(this);
+  }
+
+  /*
+  ***************************
+  * Init speech functionality
+  ***************************
+  */
+  private initSpeechWorker(): void {
     try {
       const workerCode = `
 onmessage = async (event) => {
     try {
       const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
-      console.log("Worker received audioBlob:", audioBlob);
       
       if (!apiKey || apiKey.trim() === '') {
         postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
@@ -78,8 +89,6 @@ onmessage = async (event) => {
         )
       );
       
-      console.log("Audio converted to Base64");
-  
       const response = await fetch(url, {
         method: 'POST',
         body: JSON.stringify({
@@ -101,7 +110,6 @@ onmessage = async (event) => {
   
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("API error details:", errorData);
         postMessage({ 
           error: true, 
           message: "Error from Google Speech API: " + (errorData.error?.message || response.status)
@@ -110,7 +118,6 @@ onmessage = async (event) => {
       }
   
       const data = await response.json();
-      console.log("Speech recognition data:", data);
       
       if (data.results && data.results.length > 0) {
         const transcript = data.results
@@ -123,46 +130,36 @@ onmessage = async (event) => {
         postMessage({ error: true, message: 'No speech detected' });
       }
     } catch (error) {
-      console.error('Error in speech recognition:', error);
       postMessage({ 
         error: true, 
         message: 'Error processing speech recognition: ' + error.message 
       });
     }
 };
-  
-onerror = (event) => {
-  console.error('Worker error:', event);
-};
 `;
       const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
-      // console.log("Worker initialized successfully:", this.speechWorker);
+
+      this.initSpeechWorkerHandlers();
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
+  }
 
-    // In ollamaView.ts, modify the speechWorker.onmessage handler:
+  private initSpeechWorkerHandlers(): void {
     this.speechWorker.onmessage = (event) => {
       const data = event.data;
-      console.log("Received data from worker:", data);
 
       // Check if the response is an error object
       if (data && typeof data === 'object' && data.error) {
         console.error("Speech recognition error:", data.message);
-        // Optionally display error message to user
-        // this.plugin.showNotice(`Speech recognition error: ${data.message}`);
         return;
       }
 
       // Only process valid transcript text
       const transcript = typeof data === 'string' ? data : '';
-      console.log("Received transcript from worker:", transcript);
-
-      if (!transcript) {
-        return; // Don't modify the input field if there's no transcript
-      }
+      if (!transcript) return;
 
       const cursorPosition = this.inputEl.selectionStart || 0;
       const currentValue = this.inputEl.value;
@@ -187,11 +184,12 @@ onerror = (event) => {
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
-
-    this.messageService = new MessageService(plugin);
-    this.messageService.setView(this);
   }
-
+  /*
+  *******************************
+  * End speech...
+  *******************************
+  */
 
   // New methods to support MessageService
   public getChatContainer(): HTMLElement {
@@ -209,8 +207,7 @@ onerror = (event) => {
   public clearInputField(): void {
     this.inputEl.value = "";
     setTimeout(() => {
-      const event = new Event('input');
-      this.inputEl.dispatchEvent(event);
+      this.inputEl.dispatchEvent(new Event('input'));
     }, 100);
   }
 
@@ -274,7 +271,7 @@ onerror = (event) => {
     return "message-square";
   }
 
-  autoResizeTextarea(): void {
+  private autoResizeTextarea(): void {
     const adjustHeight = () => {
       const buttonsContainer = this.contentEl.querySelector('.buttons-container') as HTMLElement;
       if (!buttonsContainer || !this.inputEl) return;
@@ -295,17 +292,18 @@ onerror = (event) => {
 
         this.inputEl.classList.toggle('expanded', this.inputEl.scrollHeight > maxHeight);
       });
-
     };
 
+    // Debounce the resize event
     let resizeTimeout: NodeJS.Timeout;
-    this.inputEl.addEventListener('input', () => {
+    const handleInput = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(adjustHeight, 50) as unknown as NodeJS.Timeout;
-    });
+    };
 
-    setTimeout(adjustHeight, 100);
+    this.inputEl.addEventListener('input', handleInput);
 
+    // Handle window resize events
     const handleResize = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(adjustHeight, 50) as unknown as NodeJS.Timeout;
@@ -313,6 +311,9 @@ onerror = (event) => {
 
     this.registerDomEvent(window, 'resize', handleResize);
     this.registerEvent(this.app.workspace.on('resize', handleResize));
+
+    // Initial adjustment
+    setTimeout(adjustHeight, 100);
   }
 
   /*

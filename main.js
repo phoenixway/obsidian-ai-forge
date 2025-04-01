@@ -451,12 +451,21 @@ var _OllamaView = class extends import_obsidian2.ItemView {
       this.plugin.apiService.setOllamaView(this);
     }
     this.mediaRecorder = null;
+    this.initSpeechWorker();
+    this.messageService = new MessageService(plugin);
+    this.messageService.setView(this);
+  }
+  /*
+  ***************************
+  * Init speech functionality
+  ***************************
+  */
+  initSpeechWorker() {
     try {
       const workerCode = `
 onmessage = async (event) => {
     try {
       const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
-      console.log("Worker received audioBlob:", audioBlob);
       
       if (!apiKey || apiKey.trim() === '') {
         postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
@@ -472,8 +481,6 @@ onmessage = async (event) => {
         )
       );
       
-      console.log("Audio converted to Base64");
-  
       const response = await fetch(url, {
         method: 'POST',
         body: JSON.stringify({
@@ -495,7 +502,6 @@ onmessage = async (event) => {
   
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("API error details:", errorData);
         postMessage({ 
           error: true, 
           message: "Error from Google Speech API: " + (errorData.error?.message || response.status)
@@ -504,7 +510,6 @@ onmessage = async (event) => {
       }
   
       const data = await response.json();
-      console.log("Speech recognition data:", data);
       
       if (data.results && data.results.length > 0) {
         const transcript = data.results
@@ -517,36 +522,31 @@ onmessage = async (event) => {
         postMessage({ error: true, message: 'No speech detected' });
       }
     } catch (error) {
-      console.error('Error in speech recognition:', error);
       postMessage({ 
         error: true, 
         message: 'Error processing speech recognition: ' + error.message 
       });
     }
 };
-  
-onerror = (event) => {
-  console.error('Worker error:', event);
-};
 `;
       const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
+      this.initSpeechWorkerHandlers();
     } catch (error) {
       console.error("Failed to initialize worker:", error);
     }
+  }
+  initSpeechWorkerHandlers() {
     this.speechWorker.onmessage = (event) => {
       const data = event.data;
-      console.log("Received data from worker:", data);
       if (data && typeof data === "object" && data.error) {
         console.error("Speech recognition error:", data.message);
         return;
       }
       const transcript = typeof data === "string" ? data : "";
-      console.log("Received transcript from worker:", transcript);
-      if (!transcript) {
+      if (!transcript)
         return;
-      }
       const cursorPosition = this.inputEl.selectionStart || 0;
       const currentValue = this.inputEl.value;
       let insertText = transcript;
@@ -562,9 +562,12 @@ onerror = (event) => {
     this.speechWorker.onerror = (error) => {
       console.error("Worker error:", error);
     };
-    this.messageService = new MessageService(plugin);
-    this.messageService.setView(this);
   }
+  /*
+  *******************************
+  * End speech...
+  *******************************
+  */
   // New methods to support MessageService
   getChatContainer() {
     return this.chatContainer;
@@ -578,8 +581,7 @@ onerror = (event) => {
   clearInputField() {
     this.inputEl.value = "";
     setTimeout(() => {
-      const event = new Event("input");
-      this.inputEl.dispatchEvent(event);
+      this.inputEl.dispatchEvent(new Event("input"));
     }, 100);
   }
   createGroupElement(className) {
@@ -649,12 +651,12 @@ onerror = (event) => {
       });
     };
     let resizeTimeout;
-    this.inputEl.addEventListener("input", () => {
+    const handleInput = () => {
       if (resizeTimeout)
         clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(adjustHeight, 50);
-    });
-    setTimeout(adjustHeight, 100);
+    };
+    this.inputEl.addEventListener("input", handleInput);
     const handleResize = () => {
       if (resizeTimeout)
         clearTimeout(resizeTimeout);
@@ -662,6 +664,7 @@ onerror = (event) => {
     };
     this.registerDomEvent(window, "resize", handleResize);
     this.registerEvent(this.app.workspace.on("resize", handleResize));
+    setTimeout(adjustHeight, 100);
   }
   /*
   * onOpen method
