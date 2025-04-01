@@ -4,12 +4,14 @@ import {
   setIcon,
   MarkdownRenderer,
   Notice, // Import Notice for user feedback
+  debounce // Import debounce if needed, or use simple timeouts
 } from "obsidian";
 import OllamaPlugin from "./main";
 import { MessageService } from "./messageService";
 
 // --- Constants ---
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
+// --- Existing CSS Class Constants ---
 const CSS_CLASS_CONTAINER = "ollama-container";
 const CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
 const CSS_CLASS_INPUT_CONTAINER = "chat-input-container";
@@ -27,11 +29,11 @@ const CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
 const CSS_CLASS_MESSAGE = "message";
 const CSS_CLASS_USER_MESSAGE = "user-message";
 const CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
-const CSS_CLASS_BUBBLE = "bubble"; // Combined bubble class
+const CSS_CLASS_BUBBLE = "bubble";
 const CSS_CLASS_USER_BUBBLE = "user-bubble";
 const CSS_CLASS_OLLAMA_BUBBLE = "ollama-bubble";
-const CSS_CLASS_TAIL_USER = "user-message-tail";
-const CSS_CLASS_TAIL_OLLAMA = "ollama-message-tail";
+// const CSS_CLASS_TAIL_USER = "user-message-tail"; // Tails removed in latest CSS
+// const CSS_CLASS_TAIL_OLLAMA = "ollama-message-tail"; // Tails removed in latest CSS
 const CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
 const CSS_CLASS_CONTENT = "message-content";
 const CSS_CLASS_THINKING_DOTS = "thinking-dots";
@@ -43,9 +45,21 @@ const CSS_CLASS_THINKING_TITLE = "thinking-title";
 const CSS_CLASS_THINKING_CONTENT = "thinking-content";
 const CSS_CLASS_TIMESTAMP = "message-timestamp";
 const CSS_CLASS_COPY_BUTTON = "copy-button";
-const CSS_CLASS_TEXTAREA_EXPANDED = "expanded"; // For styling textarea height
-const CSS_CLASS_BUTTONS_LOW = "low"; // For styling button position
-const CSS_CLASS_RECORDING = "recording"; // For voice button state
+const CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
+// const CSS_CLASS_BUTTONS_LOW = "low"; // This logic might be handled differently by positioning in CSS now
+const CSS_CLASS_RECORDING = "recording";
+const CSS_CLASS_DISABLED = "disabled"; // For disabled buttons
+const CSS_CLASS_MESSAGE_ARRIVING = "message-arriving"; // For animation
+const CSS_CLASS_DATE_SEPARATOR = "chat-date-separator"; // For date separator
+const CSS_CLASS_AVATAR = "message-group-avatar"; // For avatars
+const CSS_CLASS_AVATAR_USER = "user-avatar";
+const CSS_CLASS_AVATAR_AI = "ai-avatar";
+const CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button"; // Copy btn in code blocks
+const CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator"; // Scroll down indicator
+const CSS_CLASS_VISIBLE = "visible"; // For making elements visible
+const CSS_CLASS_MENU_SEPARATOR = "menu-separator"; // Menu separator
+const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option"; // Clear chat menu option
+
 
 interface Message {
   role: "user" | "assistant";
@@ -58,157 +72,143 @@ interface RequestOptions {
 }
 
 export class OllamaView extends ItemView {
-  private readonly plugin: OllamaPlugin; // Make plugin readonly
-  private chatContainerEl!: HTMLElement; // Use definite assignment assertion
+  private readonly plugin: OllamaPlugin;
+  private chatContainerEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private chatContainer!: HTMLElement;
-  private sendButton!: HTMLButtonElement; // Change HTMLElement to HTMLButtonElement
-  private voiceButton!: HTMLButtonElement; // Change HTMLElement to HTMLButtonElement
-  private menuButton!: HTMLButtonElement;  // Change HTMLElement to HTMLButtonElement
+  private sendButton!: HTMLButtonElement;
+  private voiceButton!: HTMLButtonElement;
+  private menuButton!: HTMLButtonElement;
 
   private menuDropdown!: HTMLElement;
+  private clearChatOption!: HTMLElement; // Added menu option
   private settingsOption!: HTMLElement;
-  private buttonsContainer!: HTMLElement; // Added for easier access
+  private buttonsContainer!: HTMLElement;
 
-  // Use MessageService directly for messages if appropriate, or keep local copy
-  // Assuming MessageService is the source of truth, potentially remove local `messages`
-  // For this optimization, we'll keep the local `messages` array as the structure relies on it.
   private messages: Message[] = [];
   private isProcessing: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
-  static instance: OllamaView | null = null; // Keep singleton pattern as is
+  static instance: OllamaView | null = null;
 
   // Speech Recognition related
-  private speechWorker: Worker | null = null; // Initialize as null
+  private speechWorker: Worker | null = null;
   private mediaRecorder: MediaRecorder | null = null;
-  private audioStream: MediaStream | null = null; // Store stream for cleanup
+  private audioStream: MediaStream | null = null;
 
-  private messagesPairCount: number = 0; // Renamed for clarity from systemMessageInterval usage
-  private readonly messageService: MessageService; // Make readonly
+  private messagesPairCount: number = 0;
+  private readonly messageService: MessageService;
   private emptyStateEl: HTMLElement | null = null;
 
   // Debounce/Throttle timers
   private resizeTimeout: NodeJS.Timeout | null = null;
+  private scrollListenerDebounced: () => void; // For debounced scroll handling
 
+  // --- New State Variables for UI Improvements ---
+  private lastMessageDate: Date | null = null; // For date separators
+  private newMessagesIndicatorEl: HTMLElement | null = null; // For "New Msgs" btn
+  private userScrolledUp: boolean = false; // Track if user scrolled away from bottom
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
 
-    // Refined Singleton logic: Ensure only one instance exists *per workspace leaf* concept might be complex.
-    // The original logic replaces the instance globally, which might be intended. Let's keep it simple.
-    // If an instance exists, potentially focus it instead of replacing? Depends on desired UX.
-    // For now, keep the replacement logic but log a warning if it happens unexpectedly.
+    // Singleton Logic (keep as is)
     if (OllamaView.instance && OllamaView.instance !== this) {
-      console.warn("Replacing existing OllamaView instance. This might indicate an issue if not intended.");
-      // Optionally: OllamaView.instance.leaf.detach(); // Detach the old view
+      console.warn("Replacing existing OllamaView instance.");
     }
     OllamaView.instance = this;
 
-    // Initialize services
     this.messageService = new MessageService(plugin);
-    this.messageService.setView(this); // Pass the current instance
+    this.messageService.setView(this);
 
-    // Initialize API service link if available
     if (this.plugin.apiService) {
       this.plugin.apiService.setOllamaView(this);
     }
 
-    this.initSpeechWorker(); // Initialize worker during construction
+    this.initSpeechWorker();
+
+    // Debounce scroll listener
+    this.scrollListenerDebounced = debounce(this.handleScroll, 150, true);
   }
 
   // --- Obsidian View Lifecycle Methods ---
 
-  getViewType(): string {
-    return VIEW_TYPE_OLLAMA;
-  }
-
-  getDisplayText(): string {
-    return "Ollama Chat"; // Consider making dynamic (e.g., based on model)
-  }
-
-  getIcon(): string {
-    return "message-square"; // Ollama or AI related icon might be better
-  }
+  getViewType(): string { return VIEW_TYPE_OLLAMA; }
+  getDisplayText(): string { return "Ollama Chat"; }
+  getIcon(): string { return "message-square"; } // Consider "bot" or a custom icon
 
   async onOpen(): Promise<void> {
     this.createUIElements();
     this.updateInputPlaceholder(this.plugin.settings.modelName);
     this.attachEventListeners();
-    this.autoResizeTextarea(); // Setup auto-resize
+    this.autoResizeTextarea();
+    this.updateSendButtonState(); // Initial state check
 
-    // Defer history loading and UI updates slightly
-    // to ensure the view is fully rendered in the DOM.
+    // Load history and reset date tracking
+    this.lastMessageDate = null; // Reset date for history loading
     await this.loadAndRenderHistory();
 
-    // Initial focus and scroll after history is loaded
     this.inputEl?.focus();
-    this.guaranteedScrollToBottom(150); // Slightly longer delay after history load
-    this.inputEl?.dispatchEvent(new Event('input')); // Trigger initial resize calculation
+    this.guaranteedScrollToBottom(150, true); // Force scroll on open
+    this.inputEl?.dispatchEvent(new Event('input'));
   }
 
-  // Cleanup resources when the view is closed
   async onClose(): Promise<void> {
+    // --- Cleanup remains the same ---
     console.log("OllamaView onClose: Cleaning up resources.");
-
-    // Terminate Web Worker
     if (this.speechWorker) {
-      this.speechWorker.terminate();
-      this.speechWorker = null;
-      console.log("Speech worker terminated.");
+      this.speechWorker.terminate(); this.speechWorker = null; console.log("Speech worker terminated.");
     }
-
-    // Stop media recorder and release media stream
-    this.stopVoiceRecording(false); // Stop without processing if active
+    this.stopVoiceRecording(false);
     if (this.audioStream) {
-      this.audioStream.getTracks().forEach(track => track.stop());
-      this.audioStream = null;
-      console.log("Audio stream stopped.");
+      this.audioStream.getTracks().forEach(track => track.stop()); this.audioStream = null; console.log("Audio stream stopped.");
     }
-
-    // Clear timeouts
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-
-    // Remove instance reference if this is the active instance
-    if (OllamaView.instance === this) {
-      OllamaView.instance = null;
-    }
-
-    // Obsidian handles registered events/DOM events cleanup automatically
-    // await super.onClose(); // No need to call super.onClose usually
+    if (OllamaView.instance === this) { OllamaView.instance = null; }
+    // --- End of Cleanup ---
   }
 
   // --- UI Creation and Management ---
 
   private createUIElements(): void {
-    this.contentEl.empty(); // Clear previous content
-
+    this.contentEl.empty();
     this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
-
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
 
+    // --- New Message Indicator (Initially Hidden) ---
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+    const indicatorIcon = this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" });
+    setIcon(indicatorIcon, "arrow-down"); // Use an arrow icon
+    this.newMessagesIndicatorEl.createSpan({ text: " New Messages" }); // Add text
+
+
     const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-
     this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Text to ${this.plugin.settings.modelName}...` }, // Initial placeholder
+      attr: { placeholder: `Text to ${this.plugin.settings.modelName}...` },
     });
-
     this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
-
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON });
     setIcon(this.sendButton, "send");
-
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON });
     setIcon(this.voiceButton, "microphone");
-
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON });
     setIcon(this.menuButton, "more-vertical");
 
     // --- Menu Dropdown ---
     this.menuDropdown = inputContainer.createEl("div", { cls: CSS_CLASS_MENU_DROPDOWN });
-    this.menuDropdown.style.display = "none"; // Initially hidden
+    this.menuDropdown.style.display = "none";
 
+    // --- Add Clear Chat Option ---
+    this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
+    const clearIcon = this.clearChatOption.createEl("span", { cls: "menu-option-icon" });
+    setIcon(clearIcon, "trash-2"); // Use trash icon
+    this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
+
+    // --- Add Separator ---
+    this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
+
+    // --- Settings Option ---
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
     const settingsIcon = this.settingsOption.createEl("span", { cls: "menu-option-icon" });
     setIcon(settingsIcon, "settings");
@@ -216,73 +216,85 @@ export class OllamaView extends ItemView {
   }
 
   private attachEventListeners(): void {
-    // Input Handling (Enter key)
+    // Input Handling
     this.inputEl.addEventListener("keydown", this.handleKeyDown);
+    this.inputEl.addEventListener('input', this.handleInputForResize); // Also update send button state here
 
     // Button Clicks
     this.sendButton.addEventListener("click", this.handleSendClick);
     this.voiceButton.addEventListener("click", this.handleVoiceClick);
     this.menuButton.addEventListener("click", this.handleMenuClick);
     this.settingsOption.addEventListener("click", this.handleSettingsClick);
+    this.clearChatOption.addEventListener("click", this.handleClearChatClick); // Add listener for clear chat
 
-    // Input auto-resize
-    this.inputEl.addEventListener('input', this.handleInputForResize);
-    this.registerDomEvent(window, 'resize', this.handleWindowResize); // Use Obsidian's registration
+    // Auto-resize
+    this.registerDomEvent(window, 'resize', this.handleWindowResize);
     this.registerEvent(this.app.workspace.on('resize', this.handleWindowResize));
 
-    // Handle clicks outside the menu to close it
+    // Menu Handling
     this.registerDomEvent(document, 'click', this.handleDocumentClickForMenu);
 
-    // Plugin Event Handling (Model Change)
+    // Plugin Event Handling
     this.register(this.plugin.on('model-changed', this.handleModelChange));
 
-    // Visibility Change Handling (UX)
+    // Visibility & Focus Handling
     this.registerDomEvent(document, 'visibilitychange', this.handleVisibilityChange);
+    this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange));
 
-    // Active Leaf Change Handling (UX)
-    this.registerEvent(
-      this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange)
-    );
+    // --- New Event Listeners ---
+    // Scroll listener for "New Messages" indicator
+    this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced);
+    // Click listener for "New Messages" indicator
+    if (this.newMessagesIndicatorEl) {
+      this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick);
+    }
   }
 
   // --- Event Handlers ---
 
   private handleKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === "Enter" && !e.shiftKey && !this.isProcessing) {
+    if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) {
       e.preventDefault();
       this.sendMessage();
     }
   }
 
   private handleSendClick = (): void => {
-    if (!this.isProcessing) {
+    if (!this.isProcessing && !this.sendButton.disabled) {
       this.sendMessage();
     }
   }
 
-  private handleVoiceClick = (): void => {
+  private handleVoiceClick = (): void => { // No changes needed here for UI
     this.toggleVoiceRecognition();
   }
 
-  private handleMenuClick = (e: MouseEvent): void => {
-    e.stopPropagation(); // Prevent document click handler from closing immediately
+  private handleMenuClick = (e: MouseEvent): void => { // No changes needed here
+    e.stopPropagation();
     const isHidden = this.menuDropdown.style.display === "none";
     this.menuDropdown.style.display = isHidden ? "block" : "none";
   }
 
-  private handleSettingsClick = async (): Promise<void> => {
-    this.closeMenu(); // Close menu first
+  private handleSettingsClick = async (): Promise<void> => { // No changes needed here
+    this.closeMenu();
     const setting = (this.app as any).setting;
     if (setting) {
       await setting.open();
-      setting.openTabById("obsidian-ollama-duet"); // Use plugin ID
+      setting.openTabById("obsidian-ollama-duet");
     } else {
       new Notice("Could not open settings.");
     }
   }
 
-  private handleDocumentClickForMenu = (e: MouseEvent): void => {
-    // Close menu if clicked outside the menu button and dropdown
+  // --- New Handler for Clear Chat ---
+  private handleClearChatClick = (): void => {
+    this.closeMenu();
+    // Confirmation could be added here
+    this.clearChatContainer();
+    new Notice("Chat history cleared.");
+  }
+
+  private handleDocumentClickForMenu = (e: MouseEvent): void => { // No changes needed here
     if (this.menuDropdown.style.display === 'block' &&
       !this.menuButton.contains(e.target as Node) &&
       !this.menuDropdown.contains(e.target as Node)) {
@@ -290,96 +302,104 @@ export class OllamaView extends ItemView {
     }
   }
 
-  private handleModelChange = (modelName: string): void => {
+  private handleModelChange = (modelName: string): void => { // No changes needed here
     this.updateInputPlaceholder(modelName);
-    // Consider if a system message is always needed here. Maybe only if chat isn't empty?
     if (this.messages.length > 0) {
       this.messageService.addSystemMessage(`Model changed to: ${modelName}`);
     }
   }
 
-  private handleVisibilityChange = (): void => {
+  private handleVisibilityChange = (): void => { // No changes needed here
     if (document.visibilityState === 'visible') {
-      // Use requestAnimationFrame for smoother updates after visibility change
       requestAnimationFrame(() => {
         this.guaranteedScrollToBottom(50);
-        this.adjustTextareaHeight(); // Recalculate height in case view size changed while hidden
+        this.adjustTextareaHeight();
       });
     }
   }
 
-  private handleActiveLeafChange = (): void => {
+  private handleActiveLeafChange = (): void => { // No changes needed here
     if (this.app.workspace.getActiveViewOfType(OllamaView) === this) {
-      // Delay slightly to ensure layout is complete
       setTimeout(() => this.guaranteedScrollToBottom(100), 100);
-      this.inputEl?.focus(); // Focus input when view becomes active
+      this.inputEl?.focus();
     }
   }
 
-  // Debounced handlers for resize/input
+  // Combined handler for input and send button state update
   private handleInputForResize = (): void => {
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
     this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 50);
+    this.updateSendButtonState(); // Update button state on input
   };
 
-  private handleWindowResize = (): void => {
+  private handleWindowResize = (): void => { // No changes needed here
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-    this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100); // Longer debounce for resize
+    this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100);
   };
+
+  // --- New Scroll Handler ---
+  private handleScroll = (): void => {
+    if (!this.chatContainer) return;
+    const scrollThreshold = 150; // Increased threshold a bit
+    const isScrolledToBottom = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight < scrollThreshold;
+
+    if (!isScrolledToBottom) {
+      this.userScrolledUp = true;
+      // Don't show indicator immediately, only when new messages arrive while scrolled up
+    } else {
+      this.userScrolledUp = false;
+      // Hide indicator if user scrolls back down manually
+      this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+    }
+  }
+
+  // --- New Indicator Click Handler ---
+  private handleNewMessageIndicatorClick = (): void => {
+    this.guaranteedScrollToBottom(50, true); // Force scroll
+    this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); // Hide after click
+  }
 
 
   // --- UI Update Methods ---
 
-  private updateInputPlaceholder(modelName: string): void {
-    if (this.inputEl) {
-      this.inputEl.placeholder = `Text to ${modelName}...`;
-    }
+  private updateInputPlaceholder(modelName: string): void { // No changes needed
+    if (this.inputEl) { this.inputEl.placeholder = `Text to ${modelName}...`; }
   }
 
-  private closeMenu(): void {
-    if (this.menuDropdown) {
-      this.menuDropdown.style.display = "none";
-    }
+  private closeMenu(): void { // No changes needed
+    if (this.menuDropdown) { this.menuDropdown.style.display = "none"; }
   }
 
-  private autoResizeTextarea(): void {
-    // Initial adjustment
+  private autoResizeTextarea(): void { // No changes needed
     this.adjustTextareaHeight();
-    // Listeners are attached in attachEventListeners
   }
 
-  // Renamed from adjustHeight for clarity
-  private adjustTextareaHeight = (): void => {
-    // Use rAF for smoothnes and accurate scrollHeight calculation
+  private adjustTextareaHeight = (): void => { // No changes needed (CSS handles button pos)
     requestAnimationFrame(() => {
       if (!this.inputEl || !this.buttonsContainer) return;
-
       const viewHeight = this.contentEl.clientHeight;
-      // Max height relative to view, prevents excessive growth
-      const maxHeight = Math.max(100, viewHeight * 0.60); // Ensure min height + relative max
-
-      this.inputEl.style.height = 'auto'; // Temporarily shrink to measure scrollHeight
+      const maxHeight = Math.max(100, viewHeight * 0.50); // Reduced max height slightly
+      this.inputEl.style.height = 'auto';
       const scrollHeight = this.inputEl.scrollHeight;
       const newHeight = Math.min(scrollHeight, maxHeight);
-
       this.inputEl.style.height = `${newHeight}px`;
-
-      // Use classes for button positioning for better CSS management
-      if (newHeight > 45) { // Adjust threshold as needed
-        this.buttonsContainer.classList.add(CSS_CLASS_BUTTONS_LOW);
-      } else {
-        this.buttonsContainer.classList.remove(CSS_CLASS_BUTTONS_LOW);
-      }
-
-      // Indicate visually if max height is reached and scrolling is needed
       this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight);
+      // Removed buttons low logic, assuming CSS handles it now
     });
   }
 
+  // --- New: Update Send Button Enabled/Disabled State ---
+  private updateSendButtonState(): void {
+    if (!this.inputEl || !this.sendButton) return;
+    const isDisabled = this.inputEl.value.trim() === '' || this.isProcessing;
+    this.sendButton.disabled = isDisabled;
+    this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled);
+  }
 
-  public showEmptyState(): void {
+
+  public showEmptyState(): void { // No changes needed
     if (this.messages.length === 0 && !this.emptyStateEl && this.chatContainer) {
-      this.chatContainer.empty(); // Clear any potential loading indicators first
+      this.chatContainer.empty();
       this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE });
       this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" });
       this.emptyStateEl.createDiv({
@@ -389,218 +409,255 @@ export class OllamaView extends ItemView {
     }
   }
 
-  public hideEmptyState(): void {
+  public hideEmptyState(): void { // No changes needed
     if (this.emptyStateEl) {
-      this.emptyStateEl.remove();
-      this.emptyStateEl = null;
+      this.emptyStateEl.remove(); this.emptyStateEl = null;
     }
   }
 
   // --- Message Handling ---
 
   private async loadAndRenderHistory(): Promise<void> {
+    this.lastMessageDate = null; // Reset date before rendering history
     try {
       await this.messageService.loadMessageHistory();
-      // The messageService calls back to render methods (renderMessage, showEmptyState etc.)
-      // Ensure initial state is correct after loading
       if (this.messages.length === 0) {
         this.showEmptyState();
       } else {
         this.hideEmptyState();
+        // Render all loaded messages (messageService should call renderMessage via internalAddMessage)
+        // Re-rendering logic might be needed if messageService doesn't call back for each
+        // this.messages.forEach(msg => this.renderMessage(msg)); // Ensure all are rendered if needed
       }
     } catch (error) {
       console.error("Error loading message history:", error);
       new Notice("Failed to load chat history.");
-      this.showEmptyState(); // Show empty state on error
+      this.showEmptyState();
     }
   }
 
-  async saveMessageHistory(): Promise<void> {
-    if (this.messages.length === 0) return;
-
+  async saveMessageHistory(): Promise<void> { // No changes needed
+    if (this.messages.length === 0) {
+      // Optionally save an empty array explicitly
+      // await this.plugin.saveMessageHistory("[]");
+      return;
+    }
     try {
-      // Use a stable serialization format
       const serializedMessages = this.messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
-        timestamp: msg.timestamp.toISOString(), // ISO format is standard
+        timestamp: msg.timestamp.toISOString(),
       }));
       await this.plugin.saveMessageHistory(JSON.stringify(serializedMessages));
     } catch (error) {
       console.error("Error saving message history:", error);
-      new Notice("Failed to save chat history."); // Inform user
+      new Notice("Failed to save chat history.");
     }
   }
 
-  // Centralized message sending logic
   async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
-    if (!content || this.isProcessing) return; // Prevent empty or duplicate sends
+    // Check disabled state again just in case
+    if (!content || this.isProcessing || this.sendButton.disabled) return;
 
-    this.isProcessing = true; // Set processing state
-    this.hideEmptyState(); // Ensure empty state is hidden
-    const messageContent = this.inputEl.value; // Grab content before clearing
-    this.clearInputField(); // Clear input immediately for better UX
-
+    this.setLoadingState(true); // Set processing AND update button state
+    this.hideEmptyState();
+    const messageContent = this.inputEl.value; // Keep original formatting for display
+    this.clearInputField(); // Clears input, triggers input event -> updateSendButtonState
 
     try {
-      // Add user message locally first (Optimistic UI update)
-      this.internalAddMessage("user", messageContent); // Call internalAddMessage which now handles its own scroll logic correctly
-
-      // Let MessageService handle the actual API call and response
-      await this.messageService.sendMessage(content); // content is trimmed, messageContent is original for display
-
+      this.internalAddMessage("user", messageContent);
+      await this.messageService.sendMessage(content);
     } catch (error) {
       console.error("Error sending message:", error);
       new Notice("Failed to send message. Please try again.");
-      // Optional: Add an error message to the chat?
-      // Consider if error message should also force scroll
       this.internalAddMessage("assistant", "Error: Could not send message.");
     } finally {
-      this.isProcessing = false; // Reset processing state
-      // No need for an extra scroll call here, internalAddMessage handles it for both user and assistant messages.
-      this.inputEl.focus(); // Re-focus input
-      this.adjustTextareaHeight(); // Adjust height after clearing
+      this.setLoadingState(false); // Reset processing AND update button state
+      this.inputEl.focus();
+      // adjustTextareaHeight is called by clearInputField via input event
     }
   }
 
-  // Internal method to add message to local state and render
-  // Called by sendMessage (user) and MessageService (assistant/system)
   public internalAddMessage(role: "user" | "assistant", content: string): void {
     const message: Message = {
       role,
       content,
       timestamp: new Date(),
     };
-
     this.messages.push(message);
 
-    // Update pair count for system prompt logic
+    // Pair count logic (no changes needed)
     if (role === "assistant" && this.messages.length >= 2) {
       const prevMessage = this.messages[this.messages.length - 2];
-      if (prevMessage && prevMessage.role === "user") {
-        this.messagesPairCount++;
-      }
+      if (prevMessage && prevMessage.role === "user") { this.messagesPairCount++; }
     }
 
-    this.renderMessage(message); // Render the newly added message
-    this.hideEmptyState(); // Ensure empty state is hidden
-    this.saveMessageHistory(); // Persist history
+    this.renderMessage(message); // Render *before* checking scroll indicator
+    this.hideEmptyState();
+    this.saveMessageHistory();
 
-    // Determine if forceScroll should be true
-    const forceScroll = role === "assistant"; // Force scroll for assistant messages
-
-    // Use a slightly longer delay for assistant messages to allow rendering time, and force the scroll
-    this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+    // --- Handle "New Messages" Indicator ---
+    if (role === "assistant" && this.userScrolledUp && this.newMessagesIndicatorEl) {
+      this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
+    } else if (!this.userScrolledUp) {
+      // If user isn't scrolled up, ensure we scroll down
+      const forceScroll = role === "assistant";
+      this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+    }
+    // Note: If user *is* scrolled up, we *don't* force scroll here, relying on the indicator.
   }
-  // --- Rendering Logic ---
 
-  // Combined logic to render any message type
+  // --- Rendering Logic (Modified for Date Separator, Avatar, Animation) ---
   renderMessage(message: Message): void {
     const isUser = message.role === "user";
-    const messageIndex = this.messages.indexOf(message); // Find index for group logic
-    if (messageIndex === -1) return; // Should not happen
+    const messageIndex = this.messages.indexOf(message);
+    if (messageIndex === -1) return;
 
     const prevMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
     const nextMessage = messageIndex < this.messages.length - 1 ? this.messages[messageIndex + 1] : null;
 
     const isFirstInGroup = !prevMessage || prevMessage.role !== message.role;
     const isLastInGroup = !nextMessage || nextMessage.role !== message.role;
+    const isNewDay = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
+
+    // --- Add Date Separator if it's a new day AND the first message being rendered OR first in its group ---
+    if (isNewDay && messageIndex === 0) { // Always add if first message ever and it's a new "session"
+      this.renderDateSeparator(message.timestamp);
+    } else if (isNewDay && isFirstInGroup) { // Add if first of group on a new day
+      this.renderDateSeparator(message.timestamp);
+    }
+    // Update last message date for next comparison *after* potential separator rendering
+    if (isLastInGroup || messageIndex === this.messages.length - 1) { // Update after rendering the last part of a day's messages
+      this.lastMessageDate = message.timestamp;
+    }
+
 
     let messageGroup: HTMLElement;
     const lastGroup = this.chatContainer.lastElementChild as HTMLElement;
 
-    // Create new group if first in sequence or if the last group belongs to the other role
     if (isFirstInGroup || !lastGroup || !lastGroup.classList.contains(isUser ? CSS_CLASS_USER_GROUP : CSS_CLASS_OLLAMA_GROUP)) {
       messageGroup = this.chatContainer.createDiv({
         cls: `${CSS_CLASS_MESSAGE_GROUP} ${isUser ? CSS_CLASS_USER_GROUP : CSS_CLASS_OLLAMA_GROUP}`
       });
+      // --- Add Avatar to the Group (only once per group) ---
+      this.renderAvatar(messageGroup, isUser);
     } else {
-      // Append to the existing last group
       messageGroup = lastGroup;
-      // Remove tail class from previous message in the same group
-      const prevMessageEl = messageGroup.lastElementChild;
-      if (prevMessageEl) {
-        prevMessageEl.classList.remove(CSS_CLASS_TAIL_USER, CSS_CLASS_TAIL_OLLAMA);
-      }
+      // Tails are removed in CSS, no need to remove classes
     }
 
     const messageEl = messageGroup.createDiv({
-      cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_BUBBLE} ${isUser ? CSS_CLASS_USER_MESSAGE + ' ' + CSS_CLASS_USER_BUBBLE : CSS_CLASS_OLLAMA_MESSAGE + ' ' + CSS_CLASS_OLLAMA_BUBBLE}`
+      // Add animation class here
+      cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING} ${isUser ? CSS_CLASS_USER_MESSAGE : CSS_CLASS_OLLAMA_MESSAGE}`
+      // Removed Bubble classes as they might be redundant with role-specific classes
     });
-    // Add tail class only if it's the last message in its group currently
-    if (isLastInGroup) {
-      messageEl.classList.add(isUser ? CSS_CLASS_TAIL_USER : CSS_CLASS_TAIL_OLLAMA);
-    }
-
+    // Tails removed in CSS
+    // if (isLastInGroup) {
+    //   messageEl.classList.add(isUser ? CSS_CLASS_TAIL_USER : CSS_CLASS_TAIL_OLLAMA);
+    // }
 
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
 
     // --- Content Rendering ---
     if (message.role === "assistant") {
-      // Use helper to render assistant message content (handles Markdown, thinking tags)
       this.renderAssistantContent(contentEl, message.content);
     } else {
-      // Simple text rendering for user messages, preserving line breaks
       message.content.split("\n").forEach((line, index, array) => {
         contentEl.appendText(line);
-        if (index < array.length - 1) {
-          contentEl.createEl("br");
-        }
+        if (index < array.length - 1) { contentEl.createEl("br"); }
       });
     }
 
     // --- Copy Button ---
-    const copyButton = contentContainer.createEl("button", {
-      cls: CSS_CLASS_COPY_BUTTON,
-      attr: { title: "Copy" }, // Use English or i18n
-    });
+    const copyButton = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
     setIcon(copyButton, "copy");
     copyButton.addEventListener("click", () => this.handleCopyClick(message.content, copyButton));
 
-    // --- Timestamp (only for last message in group) ---
-    if (isLastInGroup) {
-      messageEl.createDiv({
-        cls: CSS_CLASS_TIMESTAMP,
-        text: this.formatTime(message.timestamp),
-      });
-    }
+    // --- Timestamp (Render for all messages now, positioned by CSS) ---
+    messageEl.createDiv({
+      cls: CSS_CLASS_TIMESTAMP,
+      text: this.formatTime(message.timestamp),
+    });
+    // We render timestamp always and rely on CSS to position it (e.g., at the bottom right of the bubble)
   }
+
+  // --- New: Render Date Separator ---
+  private renderDateSeparator(date: Date): void {
+    if (!this.chatContainer) return;
+    this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) });
+  }
+
+  // --- New: Render Avatar ---
+  private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
+    const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI}` });
+    // Simple text avatar (U/A) - could be replaced with icons or images based on settings
+    avatarEl.textContent = isUser ? "U" : "A";
+  }
+
 
   private renderAssistantContent(containerEl: HTMLElement, content: string): void {
-    // Decode HTML entities first to reliably detect tags like <think>
     const decodedContent = this.decodeHtmlEntities(content);
-    const hasThinking = this.detectThinkingTags(decodedContent); // Use decoded content for detection
+    const hasThinking = this.detectThinkingTags(decodedContent);
+
+    containerEl.empty(); // Clear container before rendering
 
     if (hasThinking.hasThinkingTags) {
-      // If tags are detected, process them using the *decoded* content
       const processedHtml = this.processThinkingTags(decodedContent);
-      containerEl.innerHTML = processedHtml; // Set processed HTML
-      this.addThinkingToggleListeners(containerEl); // Add listeners for folding
-      // Potentially add a "Toggle All" button if needed (consider UX)
-      // this.addToggleAllButton(contentContainer, contentEl);
+      containerEl.innerHTML = processedHtml; // Use innerHTML for complex structure
+      this.addThinkingToggleListeners(containerEl);
+      // Add copy buttons AFTER innerHTML is set
+      this.addCodeBlockCopyButtons(containerEl);
     } else {
-      // If no thinking tags, render the *original* content as Markdown
-      // This preserves original formatting if no special tags were used
+      // Render regular markdown
       MarkdownRenderer.renderMarkdown(content, containerEl, this.plugin.app.vault.getRoot().path, this);
+      // Add copy buttons AFTER markdown is rendered
+      this.addCodeBlockCopyButtons(containerEl);
     }
   }
 
-  private handleCopyClick(content: string, buttonEl: HTMLElement): void {
+  // --- New: Add Copy Buttons to Code Blocks ---
+  private addCodeBlockCopyButtons(contentEl: HTMLElement): void {
+    const preElements = contentEl.querySelectorAll("pre");
+    preElements.forEach((pre) => {
+      // Avoid adding multiple buttons if re-rendered somehow
+      if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`)) return;
+
+      const codeContent = pre.textContent || ""; // Get text content to copy
+      const copyBtn = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
+      setIcon(copyBtn, "copy");
+      copyBtn.setAttribute("title", "Copy Code");
+
+      copyBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent triggering other listeners if any
+        navigator.clipboard.writeText(codeContent).then(() => {
+          setIcon(copyBtn, "check");
+          copyBtn.setAttribute("title", "Copied!");
+          setTimeout(() => {
+            setIcon(copyBtn, "copy");
+            copyBtn.setAttribute("title", "Copy Code");
+          }, 1500);
+        }).catch(err => {
+          console.error("Failed to copy code block:", err);
+          new Notice("Failed to copy code.");
+        });
+      });
+    });
+  }
+
+
+  private handleCopyClick(content: string, buttonEl: HTMLElement): void { // No changes needed here
     let textToCopy = content;
-    // Remove thinking blocks before copying if they exist
     if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
       textToCopy = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     }
-
     navigator.clipboard.writeText(textToCopy).then(() => {
-      buttonEl.setText("Copied!");
-      setIcon(buttonEl, "check"); // Change icon to checkmark
+      setIcon(buttonEl, "check");
+      buttonEl.setAttribute("title", "Copied!"); // Use attribute for tooltip consistency
       setTimeout(() => {
-        // Revert button state after 2 seconds
-        buttonEl.setText(""); // Clear text
         setIcon(buttonEl, "copy");
+        buttonEl.setAttribute("title", "Copy");
       }, 2000);
     }).catch(err => {
       console.error("Failed to copy text: ", err);
@@ -608,26 +665,16 @@ export class OllamaView extends ItemView {
     });
   }
 
-
-  // --- Thinking Tag Processing ---
-
-  private processThinkingTags(content: string): string {
-    // This regex assumes <think> tags are properly formed and not nested (usually safe assumption for LLM output)
-    // Using 's' flag to make '.' match newline characters as well
+  private processThinkingTags(content: string): string { // No changes needed here
     const thinkingRegex = /<think>([\s\S]*?)<\/think>/g;
     let lastIndex = 0;
     const parts: string[] = [];
-
-    // Find all matches
     let match;
     while ((match = thinkingRegex.exec(content)) !== null) {
-      // Add text before the match
       if (match.index > lastIndex) {
         parts.push(this.markdownToHtml(content.substring(lastIndex, match.index)));
       }
-
-      // Process the thinking content
-      const thinkingContent = match[1]; // Content inside <think>...</think>
+      const thinkingContent = match[1];
       const foldableHtml = `
             <div class="${CSS_CLASS_THINKING_BLOCK}">
                 <div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded">
@@ -640,80 +687,53 @@ export class OllamaView extends ItemView {
             </div>
         `;
       parts.push(foldableHtml);
-      lastIndex = thinkingRegex.lastIndex; // Update last index
+      lastIndex = thinkingRegex.lastIndex;
     }
-
-    // Add any remaining text after the last match
     if (lastIndex < content.length) {
       parts.push(this.markdownToHtml(content.substring(lastIndex)));
     }
-
-    return parts.join(""); // Join all parts into a single HTML string
+    return parts.join("");
   }
 
-
-  // Renders markdown to HTML (using Obsidian's renderer)
-  private markdownToHtml(markdown: string): string {
+  private markdownToHtml(markdown: string): string { // No changes needed
     if (!markdown || markdown.trim() === "") return "";
     const tempDiv = document.createElement("div");
-    // Use the current file path context if available, otherwise root.
     const contextFilePath = this.app.workspace.getActiveFile()?.path ?? "";
     MarkdownRenderer.renderMarkdown(markdown, tempDiv, contextFilePath, this);
     return tempDiv.innerHTML;
   }
 
-  // Adds click listeners to thinking block headers
-  private addThinkingToggleListeners(contentEl: HTMLElement): void {
-    const thinkingHeaders = contentEl.querySelectorAll<HTMLElement>(`.${CSS_CLASS_THINKING_HEADER}`); // Use type assertion
-
+  private addThinkingToggleListeners(contentEl: HTMLElement): void { // No changes needed
+    const thinkingHeaders = contentEl.querySelectorAll<HTMLElement>(`.${CSS_CLASS_THINKING_HEADER}`);
     thinkingHeaders.forEach((header) => {
-      // Use registerDomEvent for automatic cleanup if possible, or manage manually
       header.addEventListener("click", () => {
         const content = header.nextElementSibling as HTMLElement;
-        const toggleIcon = header.querySelector<HTMLElement>(`.${CSS_CLASS_THINKING_TOGGLE}`); // Use type assertion
-
+        const toggleIcon = header.querySelector<HTMLElement>(`.${CSS_CLASS_THINKING_TOGGLE}`);
         if (!content || !toggleIcon) return;
-
         const isFolded = header.getAttribute("data-fold-state") === "folded";
-
         if (isFolded) {
-          content.style.display = "block";
-          toggleIcon.textContent = "▼";
-          header.setAttribute("data-fold-state", "expanded");
+          content.style.display = "block"; toggleIcon.textContent = "▼"; header.setAttribute("data-fold-state", "expanded");
         } else {
-          content.style.display = "none";
-          toggleIcon.textContent = "►";
-          header.setAttribute("data-fold-state", "folded");
+          content.style.display = "none"; toggleIcon.textContent = "►"; header.setAttribute("data-fold-state", "folded");
         }
-        // Optional: Scroll slightly to keep the content in view after expanding/collapsing
-        // this.guaranteedScrollToBottom(50);
       });
     });
   }
 
-
-  // Utility to decode HTML entities (safer than innerHTML)
-  private decodeHtmlEntities(text: string): string {
-    if (typeof document === 'undefined') return text; // Guard for non-browser environments
+  private decodeHtmlEntities(text: string): string { // No changes needed
+    if (typeof document === 'undefined') return text;
     const textArea = document.createElement("textarea");
     textArea.innerHTML = text;
     return textArea.value;
   }
 
-  // Detects if thinking tags are present (checks common variations)
-  private detectThinkingTags(content: string): { hasThinkingTags: boolean; format: string } {
-    // Check for the standard <think> tag, potentially ignoring case
-    if (/<think>[\s\S]*?<\/think>/gi.test(content)) {
-      return { hasThinkingTags: true, format: "standard" };
-    }
-    // Add checks for other formats if necessary (e.g., escaped), but start simple
-    // Example: /&lt;think&gt;[\s\S]*?&lt;\/think&gt;/gi.test(content)
+  private detectThinkingTags(content: string): { hasThinkingTags: boolean; format: string } { // No changes needed
+    if (/<think>[\s\S]*?<\/think>/gi.test(content)) { return { hasThinkingTags: true, format: "standard" }; }
     return { hasThinkingTags: false, format: "none" };
   }
 
-  // --- Speech Recognition ---
-
-  private initSpeechWorker(): void {
+  // --- Speech Recognition --- (No changes needed in this section for UI)
+  private initSpeechWorker(): void { /* ... same as before ... */
     // Use try-catch for robustness, especially with Blob URLs and Workers
     try {
       // Optimized Base64 encoding helper function
@@ -729,81 +749,81 @@ export class OllamaView extends ItemView {
 
       // Worker code as a template literal for better readability
       const workerCode = `
-        // Worker Scope
-        self.onmessage = async (event) => {
-          const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+          // Worker Scope
+          self.onmessage = async (event) => {
+            const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
 
-          if (!apiKey || apiKey.trim() === '') {
-            self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
-            return;
-          }
-
-          const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
-
-          try {
-            const arrayBuffer = await audioBlob.arrayBuffer();
-
-            // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
-            // Simpler approach: pass buffer directly if API allows, or use efficient base64:
-            let base64Audio;
-            if (typeof TextDecoder !== 'undefined') { // Browser environment check
-                 // Modern approach (often faster if native)
-                 const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                 base64Audio = base64String;
-
-            } else {
-                 // Fallback (similar to original, ensure correctness)
-                 base64Audio = btoa(
-                   new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                 );
-            }
-
-
-            const response = await fetch(url, {
-              method: 'POST',
-              body: JSON.stringify({
-                config: {
-                  encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
-                  sampleRateHertz: 48000, // Match sample rate if possible
-                  languageCode: languageCode,
-                  model: 'latest_long', // Consider other models if needed
-                  enableAutomaticPunctuation: true,
-                },
-                audio: { content: base64Audio },
-              }),
-              headers: { 'Content-Type': 'application/json' },
-            });
-
-            const responseData = await response.json();
-
-            if (!response.ok) {
-              console.error("Google Speech API Error:", responseData);
-              self.postMessage({
-                error: true,
-                message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
-              });
+            if (!apiKey || apiKey.trim() === '') {
+              self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
               return;
             }
 
-            if (responseData.results && responseData.results.length > 0) {
-              const transcript = responseData.results
-                .map(result => result.alternatives[0].transcript)
-                .join(' ')
-                .trim();
-              self.postMessage(transcript); // Send back only the transcript string
-            } else {
-               // Handle cases where API returns ok but no results (e.g., silence)
-               self.postMessage({ error: true, message: 'No speech detected or recognized.' });
+            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+
+            try {
+              const arrayBuffer = await audioBlob.arrayBuffer();
+
+              // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
+              // Simpler approach: pass buffer directly if API allows, or use efficient base64:
+              let base64Audio;
+              if (typeof TextDecoder !== 'undefined') { // Browser environment check
+                   // Modern approach (often faster if native)
+                   const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                   base64Audio = base64String;
+
+              } else {
+                   // Fallback (similar to original, ensure correctness)
+                   base64Audio = btoa(
+                     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                   );
+              }
+
+
+              const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify({
+                  config: {
+                    encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
+                    sampleRateHertz: 48000, // Match sample rate if possible
+                    languageCode: languageCode,
+                    model: 'latest_long', // Consider other models if needed
+                    enableAutomaticPunctuation: true,
+                  },
+                  audio: { content: base64Audio },
+                }),
+                headers: { 'Content-Type': 'application/json' },
+              });
+
+              const responseData = await response.json();
+
+              if (!response.ok) {
+                console.error("Google Speech API Error:", responseData);
+                self.postMessage({
+                  error: true,
+                  message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
+                });
+                return;
+              }
+
+              if (responseData.results && responseData.results.length > 0) {
+                const transcript = responseData.results
+                  .map(result => result.alternatives[0].transcript)
+                  .join(' ')
+                  .trim();
+                self.postMessage(transcript); // Send back only the transcript string
+              } else {
+                 // Handle cases where API returns ok but no results (e.g., silence)
+                 self.postMessage({ error: true, message: 'No speech detected or recognized.' });
+              }
+            } catch (error) {
+               console.error("Error in speech worker processing:", error);
+               self.postMessage({
+                 error: true,
+                 message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
+               });
             }
-          } catch (error) {
-             console.error("Error in speech worker processing:", error);
-             self.postMessage({
-               error: true,
-               message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
-             });
-          }
-        };
-      `;
+          };
+        `;
 
       const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
@@ -819,8 +839,7 @@ export class OllamaView extends ItemView {
       this.speechWorker = null; // Ensure worker is null if init fails
     }
   }
-
-  private setupSpeechWorkerHandlers(): void {
+  private setupSpeechWorkerHandlers(): void { /* ... same as before ... */
     if (!this.speechWorker) return;
 
     this.speechWorker.onmessage = (event) => {
@@ -831,6 +850,7 @@ export class OllamaView extends ItemView {
         console.error("Speech recognition error:", data.message);
         new Notice(`Speech Recognition Error: ${data.message}`);
         this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder on error
+        this.updateSendButtonState(); // Update button state as well
         return;
       }
 
@@ -842,6 +862,7 @@ export class OllamaView extends ItemView {
         console.warn("Received unexpected data format from speech worker:", data);
       }
       // If data is an empty string, do nothing (might happen with short silence)
+      this.updateSendButtonState(); // Update button state after processing
     };
 
     this.speechWorker.onerror = (error) => {
@@ -849,12 +870,10 @@ export class OllamaView extends ItemView {
       new Notice("An unexpected error occurred in the speech recognition worker.");
       this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder
       // Attempt to gracefully stop recording if it was active
-      this.stopVoiceRecording(false);
+      this.stopVoiceRecording(false); // This also updates placeholder and button state
     };
   }
-
-  // Inserts recognized text into the input field
-  private insertTranscript(transcript: string): void {
+  private insertTranscript(transcript: string): void { /* ... same as before ... */
     if (!this.inputEl) return;
 
     const currentVal = this.inputEl.value;
@@ -882,22 +901,16 @@ export class OllamaView extends ItemView {
     this.inputEl.setSelectionRange(newCursorPos, newCursorPos);
 
     this.inputEl.focus();
-    this.inputEl.dispatchEvent(new Event('input')); // Trigger resize calculation
+    this.inputEl.dispatchEvent(new Event('input')); // Trigger resize calculation AND send button update
   }
-
-
-  // Toggles voice recording state
-  private async toggleVoiceRecognition(): Promise<void> {
+  private async toggleVoiceRecognition(): Promise<void> { /* ... same as before ... */
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       this.stopVoiceRecording(true); // Stop and process
     } else {
       await this.startVoiceRecognition(); // Start new recording
     }
   }
-
-  // Starts the voice recording process
-  // Починає процес розпізнавання голосу
-  private async startVoiceRecognition(): Promise<void> {
+  private async startVoiceRecognition(): Promise<void> { /* ... same as before ... */
     // Перевірка наявності worker'а для розпізнавання
     if (!this.speechWorker) {
       new Notice("Функція розпізнавання мовлення недоступна (worker не ініціалізовано).");
@@ -909,6 +922,8 @@ export class OllamaView extends ItemView {
       new Notice("Ключ Google API не налаштовано. Будь ласка, додайте його в налаштуваннях плагіна для використання голосового вводу.");
       return;
     }
+
+    // Disable send button while recording? Maybe not necessary.
 
     try {
       // Запит доступу до мікрофона
@@ -927,7 +942,6 @@ export class OllamaView extends ItemView {
       }
 
       // Створення екземпляру MediaRecorder з визначеними опціями
-      // Конструктор приймає MediaRecorderOptions | undefined
       this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
 
       const audioChunks: Blob[] = []; // Масив для зберігання шматків аудіо
@@ -935,230 +949,194 @@ export class OllamaView extends ItemView {
       // --- Оновлення UI для стану запису ---
       this.voiceButton?.classList.add(CSS_CLASS_RECORDING); // Додати клас для стилізації
       setIcon(this.voiceButton, "stop-circle"); // Змінити іконку на "стоп"
-      this.inputEl.placeholder = "Запис... Говоріть зараз."; // Оновити плейсхолдер
+      this.inputEl.placeholder = "Recording... Speak now."; // Оновити плейсхолдер (English for consistency)
 
       // --- Налаштування слухачів подій MediaRecorder ---
-
-      // Коли доступні дані (шматок аудіо)
       this.mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunks.push(event.data); // Додати шматок до масиву
-        }
+        if (event.data.size > 0) { audioChunks.push(event.data); }
       };
-
-      // Коли запис зупинено
       this.mediaRecorder.onstop = () => {
-        console.log("MediaRecorder зупинено.");
-        // Логіка обробки відбувається тут, після зупинки запису
-
-        // Перевірка, чи є worker і чи були записані дані
+        console.log("MediaRecorder stopped.");
         if (this.speechWorker && audioChunks.length > 0) {
-          // Створити єдиний Blob з усіх шматків
           const audioBlob = new Blob(audioChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
-          console.log(`Відправка аудіо blob до worker: type=${audioBlob.type}, size=${audioBlob.size}`);
-          this.inputEl.placeholder = "Обробка мовлення..."; // Оновити плейсхолдер
-
-          // Відправити дані до Web Worker для розпізнавання
+          console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
+          this.inputEl.placeholder = "Processing speech..."; // Update placeholder
           this.speechWorker.postMessage({
             apiKey: this.plugin.settings.googleApiKey,
             audioBlob,
-            languageCode: this.plugin.settings.speechLanguage || 'uk-UA' // Використати мову з налаштувань або українську за замовчуванням
+            languageCode: this.plugin.settings.speechLanguage || 'uk-UA'
           });
         } else if (audioChunks.length === 0) {
-          // Якщо дані не були записані (наприклад, тиша)
-          console.log("Аудіодані не записано.");
-          this.updateInputPlaceholder(this.plugin.settings.modelName); // Відновити стандартний плейсхолдер
+          console.log("No audio data recorded.");
+          this.updateInputPlaceholder(this.plugin.settings.modelName); // Restore placeholder if nothing was recorded
+          this.updateSendButtonState(); // Ensure button state is correct
         }
-        // Очищення UI та ресурсів відбувається в stopVoiceRecording, яке викликається для зупинки
       };
-
-      // У випадку помилки запису
       this.mediaRecorder.onerror = (event) => {
-        console.error("Помилка MediaRecorder:", event);
-        new Notice("Під час запису сталася помилка.");
-        // Зупинити запис без обробки аудіо у випадку помилки
-        this.stopVoiceRecording(false);
+        console.error("MediaRecorder Error:", event);
+        new Notice("An error occurred during recording.");
+        this.stopVoiceRecording(false); // Stop without processing on error
       };
 
       // --- Старт запису ---
-      this.mediaRecorder.start(); // Почати запис
-      // Логування типу MIME, який використовується
-      console.log("Запис розпочато. MimeType:", this.mediaRecorder?.mimeType ?? 'стандартний');
-
-      // Необов'язково: таймаут для автоматичної зупинки запису
-      // setTimeout(() => {
-      //   if (this.mediaRecorder?.state === 'recording') {
-      //     console.log("Зупинка запису через таймаут.");
-      //     this.stopVoiceRecording(true); // Зупинити та обробити аудіо
-      //   }
-      // }, 15000); // Наприклад, 15 секунд максимальної тривалості
+      this.mediaRecorder.start();
+      console.log("Recording started. MimeType:", this.mediaRecorder?.mimeType ?? 'default');
 
     } catch (error) {
-      // --- Обробка помилок під час налаштування ---
-      console.error("Помилка доступу до мікрофона або запуску запису:", error);
-      // Надати користувачу інформативне повідомлення про помилку
+      console.error("Error accessing microphone or starting recording:", error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
-        new Notice("Доступ до мікрофона заборонено. Будь ласка, надайте дозвіл у налаштуваннях браузера/системи.");
+        new Notice("Microphone access denied. Please grant permission.");
       } else if (error instanceof DOMException && error.name === 'NotFoundError') {
-        new Notice("Мікрофон не знайдено. Будь ласка, переконайтеся, що мікрофон підключено та увімкнено.");
+        new Notice("Microphone not found. Please ensure it's connected and enabled.");
+      } else {
+        new Notice("Could not start voice recording.");
       }
-      else {
-        new Notice("Не вдалося розпочати запис голосу.");
-      }
-      // Переконатися, що ресурси очищені, навіть якщо запуск не вдався
-      this.stopVoiceRecording(false);
+      this.stopVoiceRecording(false); // Ensure cleanup even if start failed
     }
   }
-
-  // Stops the voice recording
-  private stopVoiceRecording(processAudio: boolean): void {
+  private stopVoiceRecording(processAudio: boolean): void { /* ... same as before ... */
     console.log(`Stopping voice recording. Process audio: ${processAudio}`);
-    // Stop the recorder itself
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-      this.mediaRecorder.stop(); // This triggers 'onstop' handler eventually
+      // onstop handler will be triggered eventually to process if processAudio is true
+      this.mediaRecorder.stop();
+    } else if (!processAudio && this.mediaRecorder?.state === 'inactive') {
+      // If already stopped and asked not to process, just clean up UI/stream
     }
-    // Regardless of recorder state, perform UI cleanup and release resources
-    this.voiceButton?.classList.remove(CSS_CLASS_RECORDING);
-    setIcon(this.voiceButton, "microphone"); // Reset icon
-    this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder
 
-    // Stop and release the audio stream tracks
+    // UI Cleanup & Resource Release
+    this.voiceButton?.classList.remove(CSS_CLASS_RECORDING);
+    setIcon(this.voiceButton, "microphone");
+    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    this.updateSendButtonState(); // Update button state
+
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(track => track.stop());
-      this.audioStream = null; // Release reference
+      this.audioStream = null;
       console.log("Audio stream tracks stopped.");
     }
-
-    this.mediaRecorder = null; // Release recorder instance
-
-    // Note: Actual processing happens in the 'onstop' handler after recorder stops.
-    // This function mainly handles UI state and stream cleanup.
+    this.mediaRecorder = null;
   }
 
   // --- Helpers & Utilities ---
 
-  public getChatContainer(): HTMLElement {
-    return this.chatContainer;
-  }
+  public getChatContainer(): HTMLElement { return this.chatContainer; }
 
-  public clearChatContainer(): void {
-    this.messages = []; // Clear local message state
-    this.messagesPairCount = 0; // Reset pair count
+  public clearChatContainer(): void { // Modified to reset date tracking
+    this.messages = [];
+    this.messagesPairCount = 0;
+    this.lastMessageDate = null; // Reset last date
     if (this.chatContainer) {
       this.chatContainer.empty();
     }
-    this.showEmptyState(); // Show the empty state after clearing
-    this.saveMessageHistory(); // Save the cleared history (empty array)
+    this.showEmptyState();
+    this.saveMessageHistory(); // Save the empty state
+    this.updateSendButtonState(); // Update button state as input is now effectively empty
   }
 
-  // Add a loading indicator (dots animation)
-  public addLoadingIndicator(): HTMLElement {
-    this.hideEmptyState(); // Ensure empty state is hidden
-    const messageGroup = this.chatContainer.createDiv({
-      cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`, // Belongs to assistant
-    });
-
-    const messageEl = messageGroup.createDiv({
-      cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE} ${CSS_CLASS_TAIL_OLLAMA}`, // Has tail initially
-    });
-
+  public addLoadingIndicator(): HTMLElement { // No significant changes needed
+    this.hideEmptyState();
+    const messageGroup = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+    // Add AI Avatar to loading group
+    this.renderAvatar(messageGroup, false); // 'false' for AI avatar
+    const messageEl = messageGroup.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` /* Removed tail */ });
     const dotsContainer = messageEl.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
-    for (let i = 0; i < 3; i++) {
-      dotsContainer.createDiv({ cls: CSS_CLASS_THINKING_DOT });
-    }
-
+    for (let i = 0; i < 3; i++) { dotsContainer.createDiv({ cls: CSS_CLASS_THINKING_DOT }); }
     this.guaranteedScrollToBottom(50, true);
-
-    return messageGroup; // Return the group element so it can be removed later
+    return messageGroup;
   }
 
-  public removeLoadingIndicator(loadingEl: HTMLElement | null): void {
-    if (loadingEl && loadingEl.parentNode) {
-      loadingEl.remove();
-    }
+  public removeLoadingIndicator(loadingEl: HTMLElement | null): void { // No changes needed
+    if (loadingEl && loadingEl.parentNode) { loadingEl.remove(); }
   }
 
+  public scrollToBottom(): void { this.guaranteedScrollToBottom(50, true); } // Default to force scroll
 
-  public scrollToBottom(): void {
-    this.guaranteedScrollToBottom();
-  }
-
-  public clearInputField(): void {
+  public clearInputField(): void { // No changes needed
     if (this.inputEl) {
       this.inputEl.value = "";
-      // Trigger input event to potentially readjust height via autoResizeTextarea
-      this.inputEl.dispatchEvent(new Event('input'));
+      this.inputEl.dispatchEvent(new Event('input')); // Triggers resize and button state update
     }
   }
 
-  // Creates elements for MessageService to populate
-  // Consider if MessageService should be more passive (return data)
-  // vs active (directly manipulating view elements via these methods)
-  // Keeping existing pattern for now.
-  public createGroupElement(className: string): HTMLElement {
-    return this.chatContainer.createDiv({ cls: className });
-  }
+  // Element creation helpers (no changes needed)
+  public createGroupElement(className: string): HTMLElement { return this.chatContainer.createDiv({ cls: className }); }
+  public createMessageElement(parent: HTMLElement, className: string): HTMLElement { return parent.createDiv({ cls: className }); }
+  public createContentContainer(parent: HTMLElement): HTMLElement { return parent.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER }); }
+  public createContentElement(parent: HTMLElement): HTMLElement { return parent.createDiv({ cls: CSS_CLASS_CONTENT }); }
 
-  public createMessageElement(parent: HTMLElement, className: string): HTMLElement {
-    return parent.createDiv({ cls: className });
-  }
-
-  public createContentContainer(parent: HTMLElement): HTMLElement {
-    return parent.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-  }
-
-  public createContentElement(parent: HTMLElement): HTMLElement {
-    return parent.createDiv({ cls: CSS_CLASS_CONTENT });
-  }
-
-
-  // Ensures scrolling happens after potential DOM updates
-  // Add a forceScroll parameter (defaulting to false)
+  // Guaranteed Scroll (already modified)
   guaranteedScrollToBottom(delay = 50, forceScroll = false): void {
-    if (this.scrollTimeout) {
-      clearTimeout(this.scrollTimeout);
-    }
-
+    if (this.scrollTimeout) { clearTimeout(this.scrollTimeout); }
     this.scrollTimeout = setTimeout(() => {
-      requestAnimationFrame(() => { // Use rAF for smoother scrolling
+      requestAnimationFrame(() => {
         if (this.chatContainer) {
-          // Check if user has scrolled up significantly
-          const scrollThreshold = 100; // Pixels from bottom
-          const isScrolledUp = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold;
+          const scrollThreshold = 100;
+          const isScrolledUpCheck = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold;
+          // Update internal state if check differs from current state
+          if (isScrolledUpCheck !== this.userScrolledUp) {
+            this.userScrolledUp = isScrolledUpCheck;
+            if (!this.userScrolledUp) {
+              // Hide indicator immediately if scrolled back to bottom
+              this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+            }
+          }
 
-          // ALWAYS scroll if forceScroll is true, OR if not scrolled up, OR if processing
-          if (forceScroll || !isScrolledUp || this.isProcessing) {
+          if (forceScroll || !this.userScrolledUp || this.isProcessing) {
             this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+            // If we forced a scroll, user is no longer considered "scrolled up"
+            if (forceScroll || this.isProcessing) {
+              this.userScrolledUp = false;
+              this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+            }
           }
         }
       });
     }, delay);
   }
 
-
+  // Time formatting (No changes needed)
   formatTime(date: Date): string {
-    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }); // Use locale default
+    return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
   }
 
-  // --- Methods previously part of OllamaView called by MessageService ---
-  // These methods now act more directly or are handled internally
+  // --- New Helper: Format Date Separator ---
+  formatDateSeparator(date: Date): string {
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
 
-  // No longer needed directly if MessageService calls internalAddMessage
-  // public addMessage(role: "user" | "assistant", content: string): void {
-  //   this.internalAddMessage(role, content);
-  // }
+    if (this.isSameDay(date, now)) {
+      return "Today";
+    } else if (this.isSameDay(date, yesterday)) {
+      return "Yesterday";
+    } else {
+      // Use a locale-aware format for older dates
+      return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      // Or a shorter format:
+      // return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric'});
+    }
+  }
 
-  // Replaced by addLoadingIndicator/removeLoadingIndicator
-  // public addLoadingMessage1(): HTMLElement {
-  //     return this.addLoadingIndicator();
-  // }
+  // --- New Helper: Check if two dates are on the same day ---
+  isSameDay(date1: Date, date2: Date): boolean {
+    return date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate();
+  }
 
-  // Method likely used by MessageService or API service to update view state
+  // --- Update Loading State (Modified for button state) ---
   public setLoadingState(isLoading: boolean): void {
     this.isProcessing = isLoading;
-    // Maybe disable input/send button while loading?
+    // Disable input field while processing
     if (this.inputEl) this.inputEl.disabled = isLoading;
-    if (this.sendButton) this.sendButton.disabled = isLoading;
+    // Update send button state (will be disabled if isLoading is true)
+    this.updateSendButtonState();
+    // Optionally disable other buttons too
+    if (this.voiceButton) this.voiceButton.disabled = isLoading;
+    if (this.menuButton) this.menuButton.disabled = isLoading;
+    if (this.voiceButton) this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    if (this.menuButton) this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+
   }
 
 }
