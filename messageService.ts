@@ -57,26 +57,26 @@ export class MessageService {
 
         try {
             const history = await this.plugin.loadMessageHistory();
-            console.log(`messageService.ts -> : here`);
-            // if (Array.isArray(history) && history.length > 0) {
-            //     this.messages = [];
-            //     this.view.clearChatContainer();
+            if (Array.isArray(history) && history.length > 0) {
+                this.messages = [];
+                this.view.clearChatContainer();
+                console.log(`messageService.ts -> : here`);
 
-            //     for (const msg of history) {
-            //         const message = {
-            //             ...msg,
-            //             timestamp: new Date(msg.timestamp),
-            //         };
+                //     for (const msg of history) {
+                //         const message = {
+                //             ...msg,
+                //             timestamp: new Date(msg.timestamp),
+                //         };
 
-            //         this.messages.push(message);
-            //         this.renderMessage(message);
-            //     }
+                //         this.messages.push(message);
+                //         this.renderMessage(message);
+                //     }
 
-            //     this.view.scrollToBottom();
-            //     this.initializeThinkingBlocks();
-            // } else {
-            //     this.view.showEmptyState();
-            // }
+                //     this.view.scrollToBottom();
+                //     this.initializeThinkingBlocks();
+                // } else {
+                //     this.view.showEmptyState();
+            }
         } catch (error) {
             console.error("Error loading message history:", error);
             this.view.showEmptyState();

@@ -62,7 +62,11 @@ var MessageService = class {
       return;
     try {
       const history = await this.plugin.loadMessageHistory();
-      console.log(`messageService.ts -> : here`);
+      if (Array.isArray(history) && history.length > 0) {
+        this.messages = [];
+        this.view.clearChatContainer();
+        console.log(`messageService.ts -> : here`);
+      }
     } catch (error) {
       console.error("Error loading message history:", error);
       this.view.showEmptyState();
