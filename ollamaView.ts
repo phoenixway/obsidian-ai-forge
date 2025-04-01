@@ -291,6 +291,7 @@ onerror = (event) => {
 
         this.inputEl.classList.toggle('expanded', this.inputEl.scrollHeight > maxHeight);
       });
+
     };
 
     let resizeTimeout: NodeJS.Timeout;
