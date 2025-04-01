@@ -223,32 +223,39 @@ export class MessageService {
                 this.renderMarkdown(message.content, contentEl);
             }
         } else if (isError) {
-            // Add error icon and format error message
-            const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
-            setIcon(errorIconSpan, "alert-triangle");
+            // const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
+            // setIcon(errorIconSpan, "alert-triangle");
 
-            const messageSpan = contentEl.createSpan({
-                cls: "error-message-text",
-                text: message.content
-            });
+            // const messageSpan = contentEl.createSpan({
+            //     cls: "error-message-text",
+            //     text: message.content
+            // });
         } else if (isSystem) {
-            // Add system info icon and format system message
-            const infoIconSpan = contentEl.createSpan({ cls: "system-icon" });
-            setIcon(infoIconSpan, "info");
+            // const infoIconSpan = contentEl.createSpan({ cls: "system-icon" });
+            // setIcon(infoIconSpan, "info");
 
-            const messageSpan = contentEl.createSpan({
-                cls: "system-message-text",
-                text: message.content
-            });
-            // console.log("System message created:", messageEl, messageGroup);
-
+            // const messageSpan = contentEl.createSpan({
+            //     cls: "system-message-text",
+            //     text: message.content
+            // });
         } else {
-            // Format user message
-            message.content.split("\n").forEach((line, index, array) => {
-                contentEl.createSpan({ text: line });
-                if (index < array.length - 1) {
-                    contentEl.createEl("br");
-                }
+            // message.content.split("\n").forEach((line, index, array) => {
+            //     contentEl.createSpan({ text: line });
+            //     if (index < array.length - 1) {
+            //         contentEl.createEl("br");
+            //     }
+            // });
+        }
+
+        // Add copy button for all message types except system
+        if (!isSystem) {
+            const copyButton = this.createCopyButton(contentContainer, message);
+        }
+
+        if (isLastInGroup) {
+            messageEl.createDiv({
+                cls: "message-timestamp",
+                text: this.formatTime(message.timestamp),
             });
         }
     }
