@@ -187,6 +187,39 @@ var MessageService = class {
     const messageEl = this.view.createMessageElement(messageGroup, messageClass);
     const contentContainer = this.view.createContentContainer(messageEl);
     const contentEl = this.view.createContentElement(contentContainer);
+    if (isAssistant(message.role)) {
+      const decodedContent = this.decodeHtmlEntities(message.content);
+      const hasThinkingTags = message.content.includes("<think>") || decodedContent.includes("<think>");
+      if (hasThinkingTags) {
+        const contentToProcess = hasThinkingTags && !message.content.includes("<thing>") ? decodedContent : message.content;
+        const processedContent = this.processThinkingTags(contentToProcess);
+        contentEl.innerHTML = processedContent;
+        this.addThinkingToggleListeners(contentEl);
+      } else {
+        this.renderMarkdown(message.content, contentEl);
+      }
+    } else if (isError) {
+      const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
+      (0, import_obsidian.setIcon)(errorIconSpan, "alert-triangle");
+      const messageSpan = contentEl.createSpan({
+        cls: "error-message-text",
+        text: message.content
+      });
+    } else if (isSystem) {
+      const infoIconSpan = contentEl.createSpan({ cls: "system-icon" });
+      (0, import_obsidian.setIcon)(infoIconSpan, "info");
+      const messageSpan = contentEl.createSpan({
+        cls: "system-message-text",
+        text: message.content
+      });
+    } else {
+      message.content.split("\n").forEach((line, index, array) => {
+        contentEl.createSpan({ text: line });
+        if (index < array.length - 1) {
+          contentEl.createEl("br");
+        }
+      });
+    }
   }
   // Create a copy button for the message
   createCopyButton(container, message) {

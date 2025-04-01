@@ -203,7 +203,54 @@ export class MessageService {
         const contentContainer = this.view.createContentContainer(messageEl);
         const contentEl = this.view.createContentElement(contentContainer);
 
+        if (isAssistant(message.role)) {
+            const decodedContent = this.decodeHtmlEntities(message.content);
+            const hasThinkingTags =
+                message.content.includes("<think>") ||
+                decodedContent.includes("<think>");
 
+            if (hasThinkingTags) {
+                const contentToProcess =
+                    hasThinkingTags && !message.content.includes("<thing>")
+                        ? decodedContent
+                        : message.content;
+
+                const processedContent = this.processThinkingTags(contentToProcess);
+                contentEl.innerHTML = processedContent;
+
+                this.addThinkingToggleListeners(contentEl);
+            } else {
+                this.renderMarkdown(message.content, contentEl);
+            }
+        } else if (isError) {
+            // Add error icon and format error message
+            const errorIconSpan = contentEl.createSpan({ cls: "error-icon" });
+            setIcon(errorIconSpan, "alert-triangle");
+
+            const messageSpan = contentEl.createSpan({
+                cls: "error-message-text",
+                text: message.content
+            });
+        } else if (isSystem) {
+            // Add system info icon and format system message
+            const infoIconSpan = contentEl.createSpan({ cls: "system-icon" });
+            setIcon(infoIconSpan, "info");
+
+            const messageSpan = contentEl.createSpan({
+                cls: "system-message-text",
+                text: message.content
+            });
+            // console.log("System message created:", messageEl, messageGroup);
+
+        } else {
+            // Format user message
+            message.content.split("\n").forEach((line, index, array) => {
+                contentEl.createSpan({ text: line });
+                if (index < array.length - 1) {
+                    contentEl.createEl("br");
+                }
+            });
+        }
     }
 
     // Create a copy button for the message
