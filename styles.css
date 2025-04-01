@@ -473,14 +473,17 @@
       position: absolute;
       top: 6px;
       right: 6px;
-      background: none; /* Базовий фон відсутній */
+      background: none;
       border: none;
       outline: none;
-      color: var(--text-muted); /* Базовий колір для AI повідомлень */
+      color: var(--text-muted);
       font-size: 13px;
       cursor: pointer;
-      opacity: 0; /* **Повністю прихована за замовчуванням** */
-      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out;
+      /* --- Зміни тут --- */
+      opacity: 0; /* Залишаємо для плавної анімації */
+      visibility: hidden; /* **Додаємо це, щоб повністю приховати** */
+      /* --- Кінець змін --- */
+      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s; /* Додаємо visibility до transition з затримкою */
       padding: 4px;
       border-radius: 5px;
       display: flex;
@@ -491,23 +494,27 @@
       z-index: 1;
     }
 
-.message:hover .copy-button {
-  opacity: 0.6; /* Стає видимою, але трохи прозорою */
-}
-.copy-button:hover {
-  opacity: 1; /* Повна непрозорість */
-  background-color: var(--background-modifier-hover); /* Стандартний фон для hover */
-  transform: scale(1.1);
-}
-.user-message:hover .copy-button {
-  color: var(--text-on-accent); /* Білий колір іконки */
-  /* opacity: 0.6; успадковується від .message:hover .copy-button */
-}
-.user-message .copy-button:hover {
-  background-color: rgba(255, 255, 255, 0.2); /* Прозорий білий фон */
-  /* color: var(--text-on-accent); успадковується */
-  /* opacity: 1; успадковується від .copy-button:hover */
-}
+    .message:hover .copy-button {
+      /* --- Зміни тут --- */
+      opacity: 0.6;
+      visibility: visible; /* **Робимо видимим при наведенні на повідомлення** */
+      transition-delay: 0s; /* Скидаємо затримку для visibility */
+       /* --- Кінець змін --- */
+    }
+    .copy-button:hover {
+      opacity: 1;
+      background-color: var(--background-modifier-hover);
+      transform: scale(1.1);
+      /* visibility: visible; вже встановлено батьківським hover */
+    }
+    .user-message:hover .copy-button {
+      color: var(--text-on-accent);
+      /* opacity та visibility успадковуються від .message:hover .copy-button */
+    }
+    .user-message .copy-button:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+      /* opacity та color успадковуються */
+    }
   
   
   /* ==========================================================================
