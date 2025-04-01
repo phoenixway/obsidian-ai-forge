@@ -85,7 +85,7 @@
     padding: 10px 15px;
     margin-right: 10px;
     min-height: 40px;
-    /* max-height: 66vh;  */
+    max-height: 66vh; 
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
