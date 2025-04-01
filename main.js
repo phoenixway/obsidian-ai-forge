@@ -2258,34 +2258,70 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
   getOllamaApiUrl() {
     return this.settings.ollamaServerUrl || DEFAULT_SETTINGS.ollamaServerUrl;
   }
-  async saveMessageHistory(messagesJsonString) {
+  async saveMessageHistory(messages) {
     if (!this.settings.saveMessageHistory)
       return;
     const basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
     const logPath = basePath + "/chat_history.json";
     const adapter = this.app.vault.adapter;
     try {
-      console.log("OllamaPlugin: Attempting to save data:", messagesJsonString);
-      const fileExists = await adapter.exists(logPath);
+      if (messages.trim() === "[]") {
+        console.log("OllamaPlugin: Clear operation detected. Overwriting history file with empty array.");
+        await adapter.write(logPath, "[]");
+        return;
+      }
+      let fileExists = await adapter.exists(logPath);
+      let fileSize = 0;
       if (fileExists) {
         const stat = await adapter.stat(logPath);
-        const fileSizeKB = (stat == null ? void 0 : stat.size) ? stat.size / 1024 : 0;
-        if (fileSizeKB > this.settings.logFileSizeLimit) {
-          console.log(`OllamaPlugin: History file size (<span class="math-inline">{fileSizeKB}KB) exceeds limit (</span>{this.settings.logFileSizeLimit}KB). Backing up.`);
+        fileSize = (stat == null ? void 0 : stat.size) ? stat.size / 1024 : 0;
+      }
+      if (fileSize > this.settings.logFileSizeLimit) {
+        console.log(`OllamaPlugin: History file size (${fileSize}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Backing up and starting fresh.`);
+        if (fileExists) {
           const backupPath = logPath + ".backup";
+          if (await adapter.exists(backupPath)) {
+            await adapter.remove(backupPath);
+          }
+          await adapter.copy(logPath, backupPath);
+        }
+        await adapter.write(logPath, messages);
+      } else {
+        if (!fileExists) {
+          console.log("OllamaPlugin: History file does not exist. Creating new file.");
+          await adapter.write(logPath, messages);
+        } else {
+          console.log("OllamaPlugin: Appending new messages to existing history.");
+          const existingData = await adapter.read(logPath);
           try {
-            if (await adapter.exists(backupPath)) {
-              await adapter.remove(backupPath);
+            const existingMessages = existingData && existingData.trim() !== "" ? JSON.parse(existingData) : [];
+            const newMessages = JSON.parse(messages);
+            if (!Array.isArray(existingMessages) || !Array.isArray(newMessages)) {
+              throw new Error("Parsed history data is not an array.");
             }
-            await adapter.copy(logPath, backupPath);
-            console.log("OllamaPlugin: Backup created at", backupPath);
-          } catch (backupError) {
-            console.error("OllamaPlugin: Failed to create backup:", backupError);
+            const mergedMessages = [...existingMessages, ...newMessages];
+            let dataToWrite = JSON.stringify(mergedMessages);
+            let mergedSizeKB = dataToWrite.length / 1024;
+            if (mergedSizeKB > this.settings.logFileSizeLimit) {
+              console.log(`OllamaPlugin: Merged size (${mergedSizeKB}KB) would exceed limit. Trimming oldest messages.`);
+              let trimmedMessages = mergedMessages;
+              while (JSON.stringify(trimmedMessages).length / 1024 > this.settings.logFileSizeLimit && trimmedMessages.length > 0) {
+                trimmedMessages = trimmedMessages.slice(1);
+              }
+              if (trimmedMessages.length > 0) {
+                dataToWrite = JSON.stringify(trimmedMessages);
+              } else {
+                dataToWrite = "[]";
+              }
+            }
+            await adapter.write(logPath, dataToWrite);
+          } catch (e) {
+            console.error("OllamaPlugin: Error parsing or merging message history:", e);
+            console.log("OllamaPlugin: Resetting history file with current messages.");
+            await adapter.write(logPath, messages);
           }
         }
       }
-      await adapter.write(logPath, messagesJsonString);
-      console.log("OllamaPlugin: History saved successfully to", logPath);
     } catch (error) {
       console.error("OllamaPlugin: Failed to save message history:", error);
     }
@@ -2293,34 +2329,18 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
   async loadMessageHistory() {
     if (!this.settings.saveMessageHistory)
       return [];
-    const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
-    const adapter = this.app.vault.adapter;
-    console.log("OllamaPlugin: Attempting to load data from", logPath);
     try {
-      if (!await adapter.exists(logPath)) {
-        console.log("OllamaPlugin: History file does not exist, returning empty array.");
-        return [];
+      const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
+      const adapter = this.app.vault.adapter;
+      if (await adapter.exists(logPath)) {
+        const data = await adapter.read(logPath);
+        return JSON.parse(data);
       }
-      const data = await adapter.read(logPath);
-      console.log("OllamaPlugin: Data loaded, length:", data.length);
-      if (!data || data.trim() === "" || data.trim() === "[]") {
-        console.log("OllamaPlugin: History file is empty or contains '[]', returning empty array.");
-        return [];
-      }
-      const messages = JSON.parse(data);
-      if (!Array.isArray(messages)) {
-        console.error("OllamaPlugin: Parsed history data is not an array. Returning empty array.");
-        return [];
-      }
-      console.log("OllamaPlugin: History parsed successfully, messages count:", messages.length);
-      return messages;
     } catch (error) {
-      console.error("OllamaPlugin: Failed to load/parse message history:", error);
-      return [];
+      console.error("Failed to load message history:", error);
     }
+    return [];
   }
-  // Optional helper to backup corrupted file
-  // async backupCorruptedHistory(logPath: string) { ... }
   async clearMessageHistory() {
     try {
       const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";

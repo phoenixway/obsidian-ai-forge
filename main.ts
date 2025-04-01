@@ -196,93 +196,127 @@ export default class OllamaPlugin extends Plugin {
     return this.settings.ollamaServerUrl || DEFAULT_SETTINGS.ollamaServerUrl;
   }
 
-  async saveMessageHistory(messagesJsonString: string): Promise<void> { // Renamed param for clarity
+  async saveMessageHistory(messages: string) {
+    // Якщо збереження історії вимкнено в налаштуваннях, нічого не робимо
     if (!this.settings.saveMessageHistory) return;
 
+    // Шлях до файлу історії
     const basePath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet";
     const logPath = basePath + "/chat_history.json";
     const adapter = this.app.vault.adapter;
 
     try {
-      console.log("OllamaPlugin: Attempting to save data:", messagesJsonString);
+      // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+      // Перевіряємо, чи прийшла команда на очищення (порожній масив)
+      if (messages.trim() === "[]") {
+        console.log("OllamaPlugin: Clear operation detected. Overwriting history file with empty array.");
+        // Просто перезаписуємо файл порожнім масивом
+        await adapter.write(logPath, "[]");
+        // Виходимо з функції, подальша обробка не потрібна
+        return;
+      }
+      // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
-      // --- Optional: Backup Logic (Keep if desired, but simplify main save) ---
-      const fileExists = await adapter.exists(logPath);
+      // --- Існуюча логіка для додавання та лімітів ---
+      let fileExists = await adapter.exists(logPath);
+      let fileSize = 0;
+
       if (fileExists) {
         const stat = await adapter.stat(logPath);
-        const fileSizeKB = stat?.size ? stat.size / 1024 : 0;
-
-        if (fileSizeKB > this.settings.logFileSizeLimit) {
-          console.log(`OllamaPlugin: History file size (<span class="math-inline">\{fileSizeKB\}KB\) exceeds limit \(</span>{this.settings.logFileSizeLimit}KB). Backing up.`);
-          const backupPath = logPath + ".backup";
-          try {
-            if (await adapter.exists(backupPath)) {
-              await adapter.remove(backupPath);
-            }
-            await adapter.copy(logPath, backupPath);
-            console.log("OllamaPlugin: Backup created at", backupPath);
-          } catch (backupError) {
-            console.error("OllamaPlugin: Failed to create backup:", backupError);
-            // Decide if we should proceed with overwrite even if backup failed
-          }
-          // After backup (or failed backup), we still overwrite the main file below
-        }
+        fileSize = stat?.size ? stat.size / 1024 : 0; // KB
       }
-      // --- End of Optional Backup Logic ---
 
-      // --- Simple Overwrite ---
-      await adapter.write(logPath, messagesJsonString);
-      console.log("OllamaPlugin: History saved successfully to", logPath);
+      if (fileSize > this.settings.logFileSizeLimit) {
+        // --- Логіка бекапу та перезапису при перевищенні ліміту (залишається) ---
+        console.log(`OllamaPlugin: History file size (${fileSize}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Backing up and starting fresh.`);
+        if (fileExists) {
+          const backupPath = logPath + ".backup";
+          if (await adapter.exists(backupPath)) {
+            await adapter.remove(backupPath);
+          }
+          await adapter.copy(logPath, backupPath);
+        }
+        // Перезаписуємо файл ТІЛЬКИ новими повідомленнями, що надійшли
+        await adapter.write(logPath, messages);
+        // --- Кінець логіки бекапу ---
+      } else {
+        // --- Логіка додавання (append) до існуючого файлу (залишається) ---
+        if (!fileExists) {
+          console.log("OllamaPlugin: History file does not exist. Creating new file.");
+          // Якщо файлу немає, просто створюємо його з новими повідомленнями
+          await adapter.write(logPath, messages);
+        } else {
+          console.log("OllamaPlugin: Appending new messages to existing history.");
+          // Читаємо, парсимо, об'єднуємо та записуємо
+          const existingData = await adapter.read(logPath);
+          try {
+            // Парсимо існуючі та нові повідомлення
+            // Додамо перевірку на порожній existingData
+            const existingMessages = (existingData && existingData.trim() !== "") ? JSON.parse(existingData) : [];
+            const newMessages = JSON.parse(messages); // 'messages' тут НЕ буде "[]" через перевірку на початку
 
+            // Переконуємося, що обидва є масивами перед об'єднанням
+            if (!Array.isArray(existingMessages) || !Array.isArray(newMessages)) {
+              throw new Error("Parsed history data is not an array.");
+            }
+
+            const mergedMessages = [...existingMessages, ...newMessages];
+            let dataToWrite = JSON.stringify(mergedMessages);
+
+            // Перевіряємо розмір *після* об'єднання
+            let mergedSizeKB = dataToWrite.length / 1024;
+            if (mergedSizeKB > this.settings.logFileSizeLimit) {
+              console.log(`OllamaPlugin: Merged size (${mergedSizeKB}KB) would exceed limit. Trimming oldest messages.`);
+              // Обрізаємо найстаріші повідомлення, якщо потрібно
+              let trimmedMessages = mergedMessages;
+              while ((JSON.stringify(trimmedMessages).length / 1024) > this.settings.logFileSizeLimit && trimmedMessages.length > 0) {
+                trimmedMessages = trimmedMessages.slice(1); // Видаляємо найстаріше (перше)
+              }
+              // Якщо після обрізки щось залишилось, записуємо
+              if (trimmedMessages.length > 0) {
+                dataToWrite = JSON.stringify(trimmedMessages);
+              } else {
+                // Якщо після обрізки нічого не залишилось (дуже малий ліміт?)
+                dataToWrite = "[]"; // Записуємо порожній масив
+              }
+            }
+            // Записуємо фінальні дані (об'єднані або обрізані)
+            await adapter.write(logPath, dataToWrite);
+
+          } catch (e) {
+            // Обробка помилки парсингу JSON - перезаписуємо файл лише новими повідомленнями
+            console.error("OllamaPlugin: Error parsing or merging message history:", e);
+            console.log("OllamaPlugin: Resetting history file with current messages.");
+            await adapter.write(logPath, messages); // Записуємо тільки ті, що надійшли
+          }
+        }
+        // --- Кінець логіки додавання ---
+      }
     } catch (error) {
       console.error("OllamaPlugin: Failed to save message history:", error);
-      // Optionally notify the user via Notice if saving fails critically
-      // new Notice("Error saving chat history.");
+      // Тут можна додати Notice для користувача
+      // new Notice("Failed to save chat history.");
     }
   }
 
-  async loadMessageHistory(): Promise<any[]> { // Return type should be array
+  async loadMessageHistory() {
     if (!this.settings.saveMessageHistory) return [];
 
-    const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
-    const adapter = this.app.vault.adapter;
-    console.log("OllamaPlugin: Attempting to load data from", logPath); // Keep log
-
     try {
-      if (!(await adapter.exists(logPath))) {
-        console.log("OllamaPlugin: History file does not exist, returning empty array.");
-        return [];
+      const logPath = this.app.vault.configDir + "/plugins/obsidian-ollama-duet/chat_history.json";
+
+      const adapter = this.app.vault.adapter;
+
+      if (await adapter.exists(logPath)) {
+        const data = await adapter.read(logPath);
+        return JSON.parse(data);
       }
-
-      const data = await adapter.read(logPath);
-      console.log("OllamaPlugin: Data loaded, length:", data.length); // Log length
-
-      // Handle empty or explicitly empty array string
-      if (!data || data.trim() === "" || data.trim() === "[]") {
-        console.log("OllamaPlugin: History file is empty or contains '[]', returning empty array.");
-        return [];
-      }
-
-      // Parse the data
-      const messages = JSON.parse(data);
-      // Optional: Validate if it's actually an array
-      if (!Array.isArray(messages)) {
-        console.error("OllamaPlugin: Parsed history data is not an array. Returning empty array.");
-        // Optionally: Try to recover/backup the corrupted file
-        return [];
-      }
-      console.log("OllamaPlugin: History parsed successfully, messages count:", messages.length);
-      return messages;
-
     } catch (error) {
-      console.error("OllamaPlugin: Failed to load/parse message history:", error);
-      // Optionally: Try to backup the corrupted file before returning empty
-      // await this.backupCorruptedHistory(logPath);
-      return []; // Return empty array on any error
+      console.error("Failed to load message history:", error);
     }
+
+    return [];
   }
-  // Optional helper to backup corrupted file
-  // async backupCorruptedHistory(logPath: string) { ... }
 
   async clearMessageHistory() {
     try {
