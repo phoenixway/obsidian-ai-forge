@@ -376,9 +376,8 @@ onerror = (event) => {
       text: "Settings",
     });
 
+    await this.messageService.loadMessageHistory();
     this.autoResizeTextarea();
-
-    // await this.messageService.loadMessageHistory();
     // this.showEmptyState();
 
     setTimeout(() => {
