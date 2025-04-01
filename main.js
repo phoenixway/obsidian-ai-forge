@@ -2270,58 +2270,42 @@ var OllamaPlugin = class extends import_obsidian5.Plugin {
         await adapter.write(logPath, "[]");
         return;
       }
-      let fileExists = await adapter.exists(logPath);
-      let fileSize = 0;
+      let dataToWrite = messages;
+      let currentSizeKB = dataToWrite.length / 1024;
+      if (currentSizeKB > this.settings.logFileSizeLimit) {
+        console.log(`OllamaPlugin: New history size (${currentSizeKB}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`);
+        try {
+          let parsedMessages = JSON.parse(dataToWrite);
+          if (!Array.isArray(parsedMessages)) {
+            throw new Error("History data to be saved is not an array.");
+          }
+          while (JSON.stringify(parsedMessages).length / 1024 > this.settings.logFileSizeLimit && parsedMessages.length > 1) {
+            parsedMessages.shift();
+          }
+          if (parsedMessages.length === 0) {
+            dataToWrite = "[]";
+          } else {
+            dataToWrite = JSON.stringify(parsedMessages);
+          }
+          currentSizeKB = dataToWrite.length / 1024;
+          console.log(`OllamaPlugin: History trimmed. New size: ${currentSizeKB}KB`);
+        } catch (e) {
+          console.error("OllamaPlugin: Error parsing history for trimming. Resetting history to prevent data loss/corruption:", e);
+          dataToWrite = "[]";
+          currentSizeKB = dataToWrite.length / 1024;
+        }
+      }
+      const fileExists = await adapter.exists(logPath);
       if (fileExists) {
-        const stat = await adapter.stat(logPath);
-        fileSize = (stat == null ? void 0 : stat.size) ? stat.size / 1024 : 0;
-      }
-      if (fileSize > this.settings.logFileSizeLimit) {
-        console.log(`OllamaPlugin: History file size (${fileSize}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Backing up and starting fresh.`);
-        if (fileExists) {
-          const backupPath = logPath + ".backup";
-          if (await adapter.exists(backupPath)) {
-            await adapter.remove(backupPath);
-          }
-          await adapter.copy(logPath, backupPath);
+        console.log("OllamaPlugin: Backing up old history file before overwriting.");
+        const backupPath = logPath + ".backup";
+        if (await adapter.exists(backupPath)) {
+          await adapter.remove(backupPath);
         }
-        await adapter.write(logPath, messages);
-      } else {
-        if (!fileExists) {
-          console.log("OllamaPlugin: History file does not exist. Creating new file.");
-          await adapter.write(logPath, messages);
-        } else {
-          console.log("OllamaPlugin: Appending new messages to existing history.");
-          const existingData = await adapter.read(logPath);
-          try {
-            const existingMessages = existingData && existingData.trim() !== "" ? JSON.parse(existingData) : [];
-            const newMessages = JSON.parse(messages);
-            if (!Array.isArray(existingMessages) || !Array.isArray(newMessages)) {
-              throw new Error("Parsed history data is not an array.");
-            }
-            const mergedMessages = [...existingMessages, ...newMessages];
-            let dataToWrite = JSON.stringify(mergedMessages);
-            let mergedSizeKB = dataToWrite.length / 1024;
-            if (mergedSizeKB > this.settings.logFileSizeLimit) {
-              console.log(`OllamaPlugin: Merged size (${mergedSizeKB}KB) would exceed limit. Trimming oldest messages.`);
-              let trimmedMessages = mergedMessages;
-              while (JSON.stringify(trimmedMessages).length / 1024 > this.settings.logFileSizeLimit && trimmedMessages.length > 0) {
-                trimmedMessages = trimmedMessages.slice(1);
-              }
-              if (trimmedMessages.length > 0) {
-                dataToWrite = JSON.stringify(trimmedMessages);
-              } else {
-                dataToWrite = "[]";
-              }
-            }
-            await adapter.write(logPath, dataToWrite);
-          } catch (e) {
-            console.error("OllamaPlugin: Error parsing or merging message history:", e);
-            console.log("OllamaPlugin: Resetting history file with current messages.");
-            await adapter.write(logPath, messages);
-          }
-        }
+        await adapter.copy(logPath, backupPath);
       }
+      console.log(`OllamaPlugin: Writing history (size: ${currentSizeKB}KB) to ${logPath}`);
+      await adapter.write(logPath, dataToWrite);
     } catch (error) {
       console.error("OllamaPlugin: Failed to save message history:", error);
     }
