@@ -195,7 +195,6 @@ var MessageService = class {
         const processedContent = this.processThinkingTags(contentToProcess);
         contentEl.innerHTML = processedContent;
       } else {
-        this.renderMarkdown(message.content, contentEl);
       }
     } else if (isError) {
     } else if (isSystem) {
