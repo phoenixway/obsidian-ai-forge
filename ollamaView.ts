@@ -25,6 +25,11 @@ export class OllamaView extends ItemView {
   private chatContainerEl: HTMLElement;
   private inputEl: HTMLTextAreaElement;
   private chatContainer: HTMLElement;
+  private sendButton: HTMLElement;
+  private voiceButton: HTMLElement;
+  private menuButton: HTMLElement;
+  private menuDropdown: HTMLElement;
+  private settingsOption: HTMLElement;
   private messages: Message[] = [];
   private isProcessing: boolean = false;
   private historyLoaded: boolean = false;
@@ -337,66 +342,84 @@ onerror = (event) => {
       },
     });
 
-    // Створюємо контейнер для кнопок
     const buttonsContainer = inputContainer.createDiv({
       cls: "buttons-container",
     });
 
-    // Додаємо всі кнопки до контейнера кнопок
-    const sendButton = buttonsContainer.createEl("button", {
+    this.sendButton = buttonsContainer.createEl("button", {
       cls: "send-button",
     });
-    setIcon(sendButton, "send");
+    setIcon(this.sendButton, "send");
 
-    const voiceButton = buttonsContainer.createEl("button", {
+    this.voiceButton = buttonsContainer.createEl("button", {
       cls: "voice-button",
     });
-    setIcon(voiceButton, "microphone");
+    setIcon(this.voiceButton, "microphone");
 
-    const menuButton = buttonsContainer.createEl("button", {
+    this.menuButton = buttonsContainer.createEl("button", {
       cls: "menu-button",
     });
-    setIcon(menuButton, "more-vertical");
+    setIcon(this.menuButton, "more-vertical");
 
+    this.menuDropdown = inputContainer.createEl("div", {
+      cls: "menu-dropdown",
+    });
+    this.menuDropdown.style.display = "none";
+
+    this.settingsOption = this.menuDropdown.createEl("div", {
+      cls: "menu-option settings-option",
+    });
+    const settingsIcon = this.settingsOption.createEl("span", { cls: "menu-option-icon" });
+    setIcon(settingsIcon, "settings");
+    this.settingsOption.createEl("span", {
+      cls: "menu-option-text",
+      text: "Settings",
+    });
+
+    this.autoResizeTextarea();
+
+    await this.messageService.loadMessageHistory();
+    this.showEmptyState();
+
+    setTimeout(() => {
+      this.forceInitialization();
+      this.attachEventListeners();
+    }, 500);
+
+  }
+
+  forceInitialization(): void {
+    setTimeout(() => {
+      this.guaranteedScrollToBottom();
+      this.inputEl.focus();
+      // Trigger resize event only once
+      const event = new Event('input');
+      this.inputEl.dispatchEvent(event);
+    }, 200);
+  }
+
+  private attachEventListeners(): void {
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         this.sendMessage();
       }
     });
-
-    this.autoResizeTextarea();
-
-    sendButton.addEventListener("click", () => {
+    this.sendButton.addEventListener("click", () => {
       this.sendMessage();
     });
 
-    voiceButton.addEventListener("click", () => {
+    this.voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
     });
-
-    // Create a dropdown container for the menu items
-    const menuDropdown = inputContainer.createEl("div", {
-      cls: "menu-dropdown",
-    });
-    menuDropdown.style.display = "none";
-
-    // Only add settings option to the dropdown (removed reset option)
-    const settingsOption = menuDropdown.createEl("div", {
-      cls: "menu-option settings-option",
-    });
-    const settingsIcon = settingsOption.createEl("span", { cls: "menu-option-icon" });
-    setIcon(settingsIcon, "settings");
-    settingsOption.createEl("span", {
-      cls: "menu-option-text",
-      text: "Settings",
-    });
-
-    // Toggle menu display on button click
-    menuButton.addEventListener("click", (e) => {
+    const closeMenu = () => {
+      this.menuDropdown.style.display = "none";
+      document.removeEventListener("click", closeMenu);
+    };
+    this.menuButton.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (menuDropdown.style.display === "none") {
-        menuDropdown.style.display = "block";
+      if (this.menuDropdown.style.display === "none") {
+        this.menuDropdown.style.display = "block";
         // Add a global click listener to close the menu when clicking outside
         setTimeout(() => {
           document.addEventListener("click", closeMenu);
@@ -405,25 +428,13 @@ onerror = (event) => {
         closeMenu();
       }
     });
-
-    // Function to close the menu
-    const closeMenu = () => {
-      menuDropdown.style.display = "none";
-      document.removeEventListener("click", closeMenu);
-    };
-
-    // Add functionality to the settings option
-    settingsOption.addEventListener("click", async () => {
+    this.settingsOption.addEventListener("click", async () => {
       const setting = (this.app as any).setting;
       await setting.open();
       // await setting.open("obsidian-ollama-duet");
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
-
-    await this.messageService.loadMessageHistory();
-    this.showEmptyState();
-    this.forceInitialization();
 
     const removeListener = this.plugin.on('model-changed', (modelName: string) => {
       this.updateInputPlaceholder(modelName);
@@ -441,8 +452,6 @@ onerror = (event) => {
         }, 200);
       }
     });
-
-    // Also handle view activation specifically
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => {
         if (this.app.workspace.getActiveViewOfType(this.constructor as any) === this) {
@@ -452,15 +461,6 @@ onerror = (event) => {
     );
   }
 
-  forceInitialization(): void {
-    setTimeout(() => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      // Trigger resize event only once
-      const event = new Event('input');
-      this.inputEl.dispatchEvent(event);
-    }, 200);
-  }
 
   private updateInputPlaceholder(modelName: string): void {
     if (this.inputEl) {

@@ -678,48 +678,68 @@ onerror = (event) => {
     const buttonsContainer = inputContainer.createDiv({
       cls: "buttons-container"
     });
-    const sendButton = buttonsContainer.createEl("button", {
+    this.sendButton = buttonsContainer.createEl("button", {
       cls: "send-button"
     });
-    (0, import_obsidian2.setIcon)(sendButton, "send");
-    const voiceButton = buttonsContainer.createEl("button", {
+    (0, import_obsidian2.setIcon)(this.sendButton, "send");
+    this.voiceButton = buttonsContainer.createEl("button", {
       cls: "voice-button"
     });
-    (0, import_obsidian2.setIcon)(voiceButton, "microphone");
-    const menuButton = buttonsContainer.createEl("button", {
+    (0, import_obsidian2.setIcon)(this.voiceButton, "microphone");
+    this.menuButton = buttonsContainer.createEl("button", {
       cls: "menu-button"
     });
-    (0, import_obsidian2.setIcon)(menuButton, "more-vertical");
+    (0, import_obsidian2.setIcon)(this.menuButton, "more-vertical");
+    this.menuDropdown = inputContainer.createEl("div", {
+      cls: "menu-dropdown"
+    });
+    this.menuDropdown.style.display = "none";
+    this.settingsOption = this.menuDropdown.createEl("div", {
+      cls: "menu-option settings-option"
+    });
+    const settingsIcon = this.settingsOption.createEl("span", { cls: "menu-option-icon" });
+    (0, import_obsidian2.setIcon)(settingsIcon, "settings");
+    this.settingsOption.createEl("span", {
+      cls: "menu-option-text",
+      text: "Settings"
+    });
+    this.autoResizeTextarea();
+    await this.messageService.loadMessageHistory();
+    this.showEmptyState();
+    setTimeout(() => {
+      this.forceInitialization();
+      this.attachEventListeners();
+    }, 500);
+  }
+  forceInitialization() {
+    setTimeout(() => {
+      this.guaranteedScrollToBottom();
+      this.inputEl.focus();
+      const event = new Event("input");
+      this.inputEl.dispatchEvent(event);
+    }, 200);
+  }
+  attachEventListeners() {
     this.inputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         this.sendMessage();
       }
     });
-    this.autoResizeTextarea();
-    sendButton.addEventListener("click", () => {
+    this.sendButton.addEventListener("click", () => {
       this.sendMessage();
     });
-    voiceButton.addEventListener("click", () => {
+    this.voiceButton.addEventListener("click", () => {
       this.startVoiceRecognition();
     });
-    const menuDropdown = inputContainer.createEl("div", {
-      cls: "menu-dropdown"
-    });
-    menuDropdown.style.display = "none";
-    const settingsOption = menuDropdown.createEl("div", {
-      cls: "menu-option settings-option"
-    });
-    const settingsIcon = settingsOption.createEl("span", { cls: "menu-option-icon" });
-    (0, import_obsidian2.setIcon)(settingsIcon, "settings");
-    settingsOption.createEl("span", {
-      cls: "menu-option-text",
-      text: "Settings"
-    });
-    menuButton.addEventListener("click", (e) => {
+    const closeMenu = () => {
+      this.menuDropdown.style.display = "none";
+      document.removeEventListener("click", closeMenu);
+    };
+    this.menuButton.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (menuDropdown.style.display === "none") {
-        menuDropdown.style.display = "block";
+      if (this.menuDropdown.style.display === "none") {
+        this.menuDropdown.style.display = "block";
         setTimeout(() => {
           document.addEventListener("click", closeMenu);
         }, 0);
@@ -727,19 +747,12 @@ onerror = (event) => {
         closeMenu();
       }
     });
-    const closeMenu = () => {
-      menuDropdown.style.display = "none";
-      document.removeEventListener("click", closeMenu);
-    };
-    settingsOption.addEventListener("click", async () => {
+    this.settingsOption.addEventListener("click", async () => {
       const setting = this.app.setting;
       await setting.open();
       setting.openTabById("obsidian-ollama-duet");
       closeMenu();
     });
-    await this.messageService.loadMessageHistory();
-    this.showEmptyState();
-    this.forceInitialization();
     const removeListener = this.plugin.on("model-changed", (modelName) => {
       this.updateInputPlaceholder(modelName);
       this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
@@ -761,14 +774,6 @@ onerror = (event) => {
         }
       })
     );
-  }
-  forceInitialization() {
-    setTimeout(() => {
-      this.guaranteedScrollToBottom();
-      this.inputEl.focus();
-      const event = new Event("input");
-      this.inputEl.dispatchEvent(event);
-    }, 200);
   }
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {
