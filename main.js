@@ -4031,6 +4031,14 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     this.updateApiService();
     console.log("OllamaPlugin: Settings saved.");
   }
+  // main.ts (within OllamaPlugin class)
+  /**
+   * Saves the provided message history (as a JSON string) to the history file.
+   * Handles backup creation (only when saving non-empty history),
+   * history trimming based on size limit, and file writing.
+   * This function is primarily called by OllamaView when its internal state changes,
+   * or internally by clearMessageHistory (now deprecated for clearing, uses _deleteHistoryFile instead).
+   */
   async saveMessageHistory(messagesJsonString) {
     if (!this.settings.saveMessageHistory) {
       return;
@@ -4038,20 +4046,18 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     const adapter = this.app.vault.adapter;
     const pluginConfigDir = this.manifest.dir;
     if (!pluginConfigDir) {
-      console.error("OllamaPlugin: Could not determine plugin directory path.");
-      new import_obsidian4.Notice("Error: Could not determine plugin directory path for saving history.");
+      console.error("OllamaPlugin: Could not determine plugin directory path for saving.");
+      new import_obsidian4.Notice("Error: Cannot determine plugin directory path for saving history.");
       return;
     }
     const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
     const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
-    console.log(`OllamaPlugin: Preparing to save history to vault path: ${logPath}`);
+    console.log(`[Ollama Save] Preparing to save history to ${logPath}`);
     try {
       let dataToWrite = messagesJsonString;
       let finalSizeKB = dataToWrite.length / 1024;
-      if (dataToWrite.trim() === "[]") {
-        console.log("OllamaPlugin: Clear operation detected. Writing empty array.");
-      } else if (finalSizeKB > this.settings.logFileSizeLimit) {
-        console.log(`OllamaPlugin: New history size (${finalSizeKB.toFixed(2)}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`);
+      if (dataToWrite.trim() !== "[]" && finalSizeKB > this.settings.logFileSizeLimit) {
+        console.log(`[Ollama Save] History size (${finalSizeKB.toFixed(2)}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`);
         try {
           let parsedMessages = JSON.parse(dataToWrite);
           if (!Array.isArray(parsedMessages)) {
@@ -4062,15 +4068,16 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
           }
           dataToWrite = parsedMessages.length > 0 ? JSON.stringify(parsedMessages) : "[]";
           finalSizeKB = dataToWrite.length / 1024;
-          console.log(`OllamaPlugin: History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`);
+          console.log(`[Ollama Save] History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`);
         } catch (e) {
-          console.error("OllamaPlugin: Error parsing history for trimming. Resetting history:", e);
+          console.error("[Ollama Save] Error parsing history for trimming. Resetting history file content:", e);
           dataToWrite = "[]";
           finalSizeKB = dataToWrite.length / 1024;
+          new import_obsidian4.Notice("Error trimming history file. History might be reset.");
         }
       }
       const fileExists = await adapter.exists(logPath);
-      if (fileExists) {
+      if (fileExists && dataToWrite.trim() !== "[]") {
         try {
           const relativeBackupPath = relativeLogPath + ".backup";
           const backupPath = (0, import_obsidian4.normalizePath)(relativeBackupPath);
@@ -4079,13 +4086,14 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
           }
           await adapter.copy(logPath, backupPath);
         } catch (backupError) {
-          console.error("OllamaPlugin: Failed to create history backup:", backupError);
+          console.error("[Ollama Save] Failed to create history backup:", backupError);
+          new import_obsidian4.Notice("Warning: Failed to create history backup.");
         }
       }
       await adapter.write(logPath, dataToWrite);
-      console.log(`OllamaPlugin: Write operation completed for ${logPath}.`);
+      console.log("[Ollama Save] Write operation completed.");
     } catch (error) {
-      console.error(`OllamaPlugin: Failed to save message history to ${logPath}:`, error);
+      console.error("[Ollama Save] Failed to save message history:", error);
       new import_obsidian4.Notice("Error saving chat history.");
     }
   }
@@ -4122,20 +4130,49 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       return [];
     }
   }
-  async clearMessageHistory() {
-    console.log("OllamaPlugin: Clearing message history initiated.");
+  async _deleteHistoryFile() {
+    const adapter = this.app.vault.adapter;
+    const pluginConfigDir = this.manifest.dir;
+    if (!pluginConfigDir) {
+      console.error("OllamaPlugin: Could not determine plugin directory path for deletion.");
+      new import_obsidian4.Notice("Error: Cannot determine plugin directory for history deletion.");
+      return false;
+    }
+    const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
+    const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
     try {
-      await this.saveMessageHistory("[]");
-      if (this.view) {
-        this.view.clearDisplayAndState();
-        console.log("OllamaPlugin: Cleared active view display and state.");
+      if (await adapter.exists(logPath)) {
+        console.log(`[Ollama Clear] Deleting history file: ${logPath}`);
+        await adapter.remove(logPath);
+        const backupPath = (0, import_obsidian4.normalizePath)(relativeLogPath + ".backup");
+        if (await adapter.exists(backupPath)) {
+          await adapter.remove(backupPath);
+          console.log(`[Ollama Clear] Deleted backup file: ${backupPath}`);
+        }
+        console.log(`[Ollama Clear] History file deleted successfully.`);
+        return true;
       } else {
-        console.log("OllamaPlugin: View not active, history file cleared/reset.");
+        console.log(`[Ollama Clear] History file not found, nothing to delete: ${logPath}`);
+        return true;
       }
-      new import_obsidian4.Notice("Ollama chat history cleared.");
     } catch (error) {
-      console.error("OllamaPlugin: Failed to clear message history:", error);
-      new import_obsidian4.Notice("Error clearing chat history.");
+      console.error(`[Ollama Clear] Failed to delete history file ${logPath}:`, error);
+      new import_obsidian4.Notice("Error deleting chat history file.");
+      return false;
+    }
+  }
+  async clearMessageHistory() {
+    console.log("[Ollama Clear] Clearing message history initiated.");
+    const deleted = await this._deleteHistoryFile();
+    if (deleted && this.view) {
+      this.view.clearDisplayAndState();
+      console.log("[Ollama Clear] Cleared active view display and state.");
+      new import_obsidian4.Notice("Chat history cleared.");
+    } else if (!deleted) {
+      new import_obsidian4.Notice("Failed to clear chat history file. Please check console logs.");
+    } else {
+      console.log("[Ollama Clear] History file operation completed, view not active.");
+      new import_obsidian4.Notice("Chat history cleared.");
     }
   }
 };
