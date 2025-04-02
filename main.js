@@ -388,7 +388,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
         setTimeout(() => {
           console.log("[OllamaView] Attempting final scroll after history load.");
           this.guaranteedScrollToBottom(100, true);
-        }, 300);
+        }, 600);
       }
     } catch (error) {
       console.error("OllamaView: Error during history loading process:", error);

@@ -308,7 +308,7 @@ export class OllamaView extends ItemView {
         setTimeout(() => {
           console.log("[OllamaView] Attempting final scroll after history load.");
           this.guaranteedScrollToBottom(100, true); // Прокрутка в кінець
-        }, 300); // Збільшено затримку до 300ms (можна поекспериментувати)
+        }, 600); // Збільшено затримку до 300ms (можна поекспериментувати)
         // -----------------
       }
     } catch (error) {
