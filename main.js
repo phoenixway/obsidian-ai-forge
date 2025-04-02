@@ -789,11 +789,14 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   // --- Доданий метод для очищення ззовні (з main.ts) ---
   clearDisplayAndState() {
-    var _a;
     this.clearChatContainerInternal();
     this.showEmptyState();
     this.updateSendButtonState();
-    (_a = this.inputEl) == null ? void 0 : _a.focus();
+    setTimeout(() => {
+      var _a;
+      (_a = this.inputEl) == null ? void 0 : _a.focus();
+      console.log("OllamaView: Input focus attempted after clear.");
+    }, 50);
     console.log("OllamaView: \u0414\u0438\u0441\u043F\u043B\u0435\u0439 \u0442\u0430 \u0432\u043D\u0443\u0442\u0440\u0456\u0448\u043D\u0456\u0439 \u0441\u0442\u0430\u043D \u043E\u0447\u0438\u0449\u0435\u043D\u043E.");
   }
   // --- Інші хелпери (addLoadingIndicator, etc. - без змін) ---

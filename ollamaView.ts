@@ -682,7 +682,10 @@ export class OllamaView extends ItemView {
     this.clearChatContainerInternal(); // Очищає масив повідомлень та DOM
     this.showEmptyState(); // Показує порожній стан
     this.updateSendButtonState(); // Оновлює стан кнопок
-    this.inputEl?.focus(); // Фокусує поле вводу
+    setTimeout(() => {
+      this.inputEl?.focus();
+      console.log("OllamaView: Input focus attempted after clear."); // English log
+    }, 50); // Затримка 50ms (можна спробувати 0 або 100, якщо 50 не спрацює)
     console.log("OllamaView: Дисплей та внутрішній стан очищено.");
   }
 
