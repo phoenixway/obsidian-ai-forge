@@ -158,6 +158,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
         new import_obsidian.Notice("Could not open settings.");
       }
     };
+    // Use updated ID
     this.handleClearChatClick = () => {
       this.closeMenu();
       this.plugin.clearMessageHistory();
@@ -317,7 +318,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     (0, import_obsidian.setIcon)(this.voiceButton, "mic");
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian.setIcon)(this.menuButton, "more-vertical");
-    this.menuDropdown = inputContainer.createEl("div", { cls: CSS_CLASS_MENU_DROPDOWN });
+    this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
     this.menuDropdown.createEl("div", { text: "Select Model", cls: CSS_CLASS_MENU_HEADER });
     this.modelListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_MODEL_LIST_CONTAINER });
@@ -655,12 +656,14 @@ var _OllamaView = class extends import_obsidian.ItemView {
       }
     });
   }
+  // Check all messages (e.g., after history load)
   checkAllMessagesForCollapsing() {
     var _a;
     (_a = this.chatContainer) == null ? void 0 : _a.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
       this.checkMessageForCollapsing(msgEl);
     });
   }
+  // Toggle visibility of long message content
   toggleMessageCollapse(contentEl, buttonEl) {
     const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
     if (isCollapsed) {
@@ -750,10 +753,39 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   // --- NEW METHOD: Renders the model list in the menu ---
   async renderModelList() {
-    if (!this.modelListContainerEl)
+    if (!this.modelListContainerEl) {
+      console.warn("[OllamaView] Model list container not found during render.");
       return;
+    }
     this.modelListContainerEl.empty();
     const loadingEl = this.modelListContainerEl.createEl("span", { text: "Loading models..." });
+    const modelIconMap = {
+      "llama": "box-minimal",
+      // Generic box for Llama family
+      "mistral": "wind",
+      "mixtral": "blend",
+      "codellama": "code",
+      "code": "code",
+      // For models just named 'code...'
+      "phi": "sigma",
+      // Greek letter Phi
+      "phi3": "sigma",
+      "gemma": "gem",
+      "command-r": "terminal",
+      // Command prompt icon
+      "llava": "image",
+      // For multi-modal
+      "star": "star",
+      // For Starcoder etc.
+      "wizard": "wand",
+      // For WizardLM etc.
+      "hermes": "message-circle",
+      // For Hermes etc.
+      "dolphin": "anchor"
+      // For Dolphin etc. (just an example)
+      // Add more mappings here as needed
+    };
+    const defaultIcon = "box";
     try {
       const models2 = await this.plugin.apiService.getModels();
       const currentModel = this.plugin.settings.modelName;
@@ -762,16 +794,34 @@ var _OllamaView = class extends import_obsidian.ItemView {
         this.modelListContainerEl.createEl("span", { text: "No models available." });
         return;
       }
-      models2.sort();
       models2.forEach((modelName) => {
         const modelOptionEl = this.modelListContainerEl.createDiv({
           cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}`
+          // Add specific class
         });
         const iconSpan = modelOptionEl.createEl("span", { cls: "menu-option-icon" });
+        let iconToUse = defaultIcon;
         if (modelName === currentModel) {
-          (0, import_obsidian.setIcon)(iconSpan, "check");
+          iconToUse = "check";
           modelOptionEl.addClass("is-selected");
         } else {
+          const lowerModelName = modelName.toLowerCase();
+          let foundIcon = false;
+          for (const key in modelIconMap) {
+            if (lowerModelName.includes(key)) {
+              iconToUse = modelIconMap[key];
+              foundIcon = true;
+              break;
+            }
+          }
+          if (!foundIcon) {
+            iconToUse = defaultIcon;
+          }
+        }
+        try {
+          (0, import_obsidian.setIcon)(iconSpan, iconToUse);
+        } catch (e) {
+          console.warn(`Could not set icon '${iconToUse}' for model ${modelName}`);
           iconSpan.style.minWidth = "18px";
         }
         modelOptionEl.createEl("span", { cls: "menu-option-text", text: modelName });
@@ -831,14 +881,14 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   addLoadingIndicator() {
     this.hideEmptyState();
-    const grp = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
-    this.renderAvatar(grp, false);
-    const msgEl = grp.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
-    const dots = msgEl.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
+    const g = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+    this.renderAvatar(g, false);
+    const m = g.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+    const d = m.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
     for (let i = 0; i < 3; i++)
-      dots.createDiv({ cls: CSS_CLASS_THINKING_DOT });
+      d.createDiv({ cls: CSS_CLASS_THINKING_DOT });
     this.guaranteedScrollToBottom(50, true);
-    return grp;
+    return g;
   }
   removeLoadingIndicator(loadingEl) {
     if (loadingEl == null ? void 0 : loadingEl.parentNode) {

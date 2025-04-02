@@ -1,3 +1,5 @@
+// ollamaView.ts
+
 import {
   ItemView,
   WorkspaceLeaf,
@@ -66,9 +68,9 @@ const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
 const CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
 const CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
 const CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
-const CSS_CLASS_MODEL_OPTION = "model-option";
-const CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
-const CSS_CLASS_MENU_HEADER = "menu-header";
+const CSS_CLASS_MODEL_OPTION = "model-option"; // Специфічний клас для опції моделі
+const CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container"; // Клас для контейнера списку моделей
+const CSS_CLASS_MENU_HEADER = "menu-header"; // Клас для заголовка секції меню
 
 // Типи ролей та повідомлень
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -83,6 +85,7 @@ interface AddMessageOptions {
 }
 
 export class OllamaView extends ItemView {
+  // --- Поля класу ---
   private readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
@@ -91,7 +94,7 @@ export class OllamaView extends ItemView {
   private voiceButton!: HTMLButtonElement;
   private menuButton!: HTMLButtonElement;
   private menuDropdown!: HTMLElement;
-  private modelListContainerEl!: HTMLElement; // Контейнер для списку моделей
+  private modelListContainerEl!: HTMLElement; // Додано поле для контейнера моделей
   private clearChatOption!: HTMLElement;
   private settingsOption!: HTMLElement;
   private buttonsContainer!: HTMLElement;
@@ -203,7 +206,7 @@ export class OllamaView extends ItemView {
     setIcon(this.menuButton, "more-vertical");
 
     // Menu Dropdown Structure
-    this.menuDropdown = inputContainer.createEl("div", { cls: CSS_CLASS_MENU_DROPDOWN });
+    this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] }); // Added specific class
     this.menuDropdown.style.display = "none"; // Initially hidden
 
     // Model Selection Section
@@ -263,7 +266,7 @@ export class OllamaView extends ItemView {
       this.menuDropdown.style.display = "none";
     }
   }
-  private handleSettingsClick = async (): Promise<void> => { this.closeMenu(); const setting = (this.app as any).setting; if (setting) { await setting.open(); setting.openTabById("ollama-chat-plugin"); } else { new Notice("Could not open settings."); } }
+  private handleSettingsClick = async (): Promise<void> => { this.closeMenu(); const setting = (this.app as any).setting; if (setting) { await setting.open(); setting.openTabById("ollama-chat-plugin"); } else { new Notice("Could not open settings."); } } // Use updated ID
   private handleClearChatClick = (): void => {
     this.closeMenu();
     // No confirm dialog per user request
@@ -423,12 +426,14 @@ export class OllamaView extends ItemView {
     });
   }
 
+  // Check all messages (e.g., after history load)
   private checkAllMessagesForCollapsing(): void {
     this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => {
       this.checkMessageForCollapsing(msgEl);
     });
   }
 
+  // Toggle visibility of long message content
   private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void {
     const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
     if (isCollapsed) { contentEl.style.maxHeight = ''; contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show Less ▲'); }
@@ -446,38 +451,81 @@ export class OllamaView extends ItemView {
 
   // --- NEW METHOD: Renders the model list in the menu ---
   private async renderModelList(): Promise<void> {
-    if (!this.modelListContainerEl) return; // Guard clause
+    if (!this.modelListContainerEl) {
+      console.warn("[OllamaView] Model list container not found during render.");
+      return;
+    }
 
     this.modelListContainerEl.empty(); // Clear previous list
-    const loadingEl = this.modelListContainerEl.createEl("span", { text: "Loading models..." }); // Show loading state
+    const loadingEl = this.modelListContainerEl.createEl("span", { text: "Loading models..." });
+
+    // Simple map for common model icons (using Obsidian icon names)
+    const modelIconMap: Record<string, string> = {
+      'llama': 'box-minimal', // Generic box for Llama family
+      'mistral': 'wind',
+      'mixtral': 'blend',
+      'codellama': 'code',
+      'code': 'code', // For models just named 'code...'
+      'phi': 'sigma', // Greek letter Phi
+      'phi3': 'sigma',
+      'gemma': 'gem',
+      'command-r': 'terminal', // Command prompt icon
+      'llava': 'image', // For multi-modal
+      'star': 'star', // For Starcoder etc.
+      'wizard': 'wand', // For WizardLM etc.
+      'hermes': 'message-circle', // For Hermes etc.
+      'dolphin': 'anchor', // For Dolphin etc. (just an example)
+      // Add more mappings here as needed
+    };
+    const defaultIcon = 'box'; // Default icon if no specific match
 
     try {
-      const models = await this.plugin.apiService.getModels();
+      const models = await this.plugin.apiService.getModels(); // Already sorted by ApiService
       const currentModel = this.plugin.settings.modelName;
       this.modelListContainerEl.empty(); // Clear "Loading..."
 
       if (models.length === 0) {
-        this.modelListContainerEl.createEl("span", { text: "No models available." }); // Show empty state
+        this.modelListContainerEl.createEl("span", { text: "No models available." });
         return;
       }
 
-      // Sort models alphabetically for consistency
-      models.sort();
-
       models.forEach(modelName => {
         const modelOptionEl = this.modelListContainerEl.createDiv({
-          cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}`
+          cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}` // Add specific class
         });
         const iconSpan = modelOptionEl.createEl("span", { cls: "menu-option-icon" });
 
-        // Add checkmark for the currently selected model
+        let iconToUse = defaultIcon; // Start with default
+
         if (modelName === currentModel) {
-          setIcon(iconSpan, "check");
+          iconToUse = "check"; // Checkmark for selected
           modelOptionEl.addClass("is-selected");
         } else {
-          // Add a placeholder or set min-width to maintain alignment
-          iconSpan.style.minWidth = "18px"; // Adjust size as needed
+          // Try to find a matching icon based on keywords
+          const lowerModelName = modelName.toLowerCase();
+          let foundIcon = false;
+          for (const key in modelIconMap) {
+            // Check if the model name *contains* the keyword
+            if (lowerModelName.includes(key)) {
+              iconToUse = modelIconMap[key];
+              foundIcon = true;
+              break; // Use first match
+            }
+          }
+          // If no keyword match, use default
+          if (!foundIcon) {
+            iconToUse = defaultIcon;
+          }
         }
+
+        // Set the determined icon, with error handling
+        try {
+          setIcon(iconSpan, iconToUse);
+        } catch (e) {
+          console.warn(`Could not set icon '${iconToUse}' for model ${modelName}`);
+          iconSpan.style.minWidth = "18px"; // Ensure alignment even if icon fails
+        }
+
 
         modelOptionEl.createEl("span", { cls: "menu-option-text", text: modelName });
 
@@ -487,7 +535,7 @@ export class OllamaView extends ItemView {
             console.log(`[OllamaView] Model selected via menu: ${modelName}`);
             this.plugin.settings.modelName = modelName;
             await this.plugin.saveSettings(); // Save the new setting
-            this.plugin.emit('model-changed', modelName); // Emit event for UI updates
+            this.plugin.emit('model-changed', modelName); // Emit event for UI updates (placeholder, system message)
           }
           this.closeMenu(); // Close menu after selection
         });
@@ -515,7 +563,7 @@ export class OllamaView extends ItemView {
   public getChatContainer(): HTMLElement { return this.chatContainer; }
   private clearChatContainerInternal(): void { this.messages = []; this.messagesPairCount = 0; this.lastMessageDate = null; if (this.chatContainer) this.chatContainer.empty(); this.hideEmptyState(); }
   public clearDisplayAndState(): void { this.clearChatContainerInternal(); this.showEmptyState(); this.updateSendButtonState(); setTimeout(() => { this.inputEl?.focus(); console.log("OllamaView: Input focus attempted after clear."); }, 50); console.log("OllamaView: Display and internal state cleared."); }
-  public addLoadingIndicator(): HTMLElement { this.hideEmptyState(); const grp = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` }); this.renderAvatar(grp, false); const msgEl = grp.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` }); const dots = msgEl.createDiv({ cls: CSS_CLASS_THINKING_DOTS }); for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASS_THINKING_DOT }); this.guaranteedScrollToBottom(50, true); return grp; }
+  public addLoadingIndicator(): HTMLElement { this.hideEmptyState(); const g = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` }); this.renderAvatar(g, false); const m = g.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` }); const d = m.createDiv({ cls: CSS_CLASS_THINKING_DOTS }); for (let i = 0; i < 3; i++)d.createDiv({ cls: CSS_CLASS_THINKING_DOT }); this.guaranteedScrollToBottom(50, true); return g; }
   public removeLoadingIndicator(loadingEl: HTMLElement | null): void { if (loadingEl?.parentNode) { loadingEl.remove(); } }
   public scrollToBottom(): void { this.guaranteedScrollToBottom(50, true); }
   public clearInputField(): void { if (this.inputEl) { this.inputEl.value = ""; this.inputEl.dispatchEvent(new Event('input')); } }
