@@ -721,3 +721,128 @@
       :root { --chat-avatar-size: 24px; }
       .message-group { padding-left: 30px; padding-right: 30px;}
   }
+
+  /* ==========================================================================
+   STYLES FOR LONG MESSAGE COLLAPSING
+   ========================================================================== */
+
+   .message-content-collapsible {
+    /* Базовий стиль для вмісту, який може згортатися */
+    transition: max-height 0.3s ease-out;
+    overflow: hidden; /* Приховуємо вміст, що виходить за межі max-height */
+    position: relative; /* Для позиціонування кнопки та градієнта */
+  }
+  
+  .message-content-collapsed {
+    /* Стиль для згорнутого стану */
+    /* max-height встановлюється через JS */
+    /* Додаємо градієнт знизу для плавного обрізання */
+    -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  }
+  
+  .show-more-button {
+    display: block; /* За замовчуванням блочний */
+    margin: 8px auto 0 auto; /* Відступ зверху та центрування */
+    padding: 4px 12px;
+    font-size: 0.85em;
+    color: var(--text-accent);
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 15px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+  
+  .show-more-button:hover {
+    background-color: var(--background-modifier-hover);
+    border-color: var(--interactive-accent-translucent);
+    color: var(--text-accent-hover);
+  }
+  
+  /* Позиціонування кнопки може потребувати коригування залежно від теми */
+  /* Якщо кнопка має бути над вмістом: */
+  /*
+  .message-content-collapsed + .show-more-button {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(to top, var(--background-primary) 50%, transparent 100%); // Fade background
+    padding-top: 10px; // Space for gradient
+  }
+  */
+  
+  
+  /* ==========================================================================
+     STYLES FOR ICON SEARCH IN SETTINGS
+     ========================================================================== */
+  
+  .ollama-settings .setting-item-control .ollama-icon-search-container {
+    margin-top: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    padding: 8px;
+    background-color: var(--background-secondary);
+  }
+  
+  .ollama-settings .setting-item-control .ollama-icon-search-container input[type="text"] {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  
+  .ollama-settings .setting-item-control .ollama-icon-search-results {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    max-height: 150px; /* Обмеження висоти результатів */
+    overflow-y: auto; /* Додаємо прокрутку */
+    background-color: var(--background-primary); /* Фон для контрасту */
+    border-radius: 4px;
+    padding: 4px;
+  }
+  
+  .ollama-settings .setting-item-control .ollama-icon-search-result {
+    background-color: var(--background-modifier-hover);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px;
+    cursor: pointer;
+    transition: all 0.1s ease-out;
+    color: var(--text-muted);
+    display: flex; /* Для центрування іконки */
+    align-items: center;
+    justify-content: center;
+    min-width: 28px; /* Мінімальна ширина кнопки */
+    height: 28px;
+  }
+  
+  .ollama-settings .setting-item-control .ollama-icon-search-result:hover {
+    background-color: var(--background-modifier-border);
+    border-color: var(--interactive-accent-translucent);
+    color: var(--text-normal);
+  }
+  
+  .ollama-settings .setting-item-control .ollama-icon-search-result .svg-icon {
+     width: 16px; /* Розмір іконки всередині кнопки */
+     height: 16px;
+  }
+  
+  /* Стилізація скролбару для результатів пошуку іконок (Webkit) */
+  .ollama-icon-search-results::-webkit-scrollbar {
+    width: 6px;
+  }
+  .ollama-icon-search-results::-webkit-scrollbar-track {
+    background: var(--background-secondary);
+    border-radius: 3px;
+  }
+  .ollama-icon-search-results::-webkit-scrollbar-thumb {
+    background-color: var(--background-modifier-border);
+    border-radius: 3px;
+  }
+  .ollama-icon-search-results::-webkit-scrollbar-thumb:hover {
+    background-color: var(--interactive-accent-translucent);
+  }
+  
+  /* Додайте це до вашого існуючого styles.css */
