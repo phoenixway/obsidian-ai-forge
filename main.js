@@ -268,7 +268,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.lastMessageDate = null;
     await this.loadAndRenderHistory();
     (_a = this.inputEl) == null ? void 0 : _a.focus();
-    this.guaranteedScrollToBottom(150, true);
     (_b = this.inputEl) == null ? void 0 : _b.dispatchEvent(new Event("input"));
   }
   async onClose() {
@@ -386,10 +385,13 @@ var _OllamaView = class extends import_obsidian.ItemView {
       } else {
         this.hideEmptyState();
         this.checkAllMessagesForCollapsing();
-        this.guaranteedScrollToBottom(100, true);
+        setTimeout(() => {
+          console.log("[OllamaView] Attempting final scroll after history load.");
+          this.guaranteedScrollToBottom(100, true);
+        }, 300);
       }
     } catch (error) {
-      console.error("OllamaView: \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434 \u0447\u0430\u0441 \u043F\u0440\u043E\u0446\u0435\u0441\u0443 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", error);
+      console.error("OllamaView: Error during history loading process:", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
     }
@@ -3689,6 +3691,7 @@ var MessageService = class {
       try {
         const history = (_b = (_a = this.view) == null ? void 0 : _a.getMessages()) != null ? _b : [];
         const formattedPrompt = await this.promptService.prepareFullPrompt(content, history);
+        const requestModelName = this.plugin.settings.modelName;
         const requestBody = {
           model: this.plugin.settings.modelName,
           prompt: formattedPrompt,
@@ -3703,6 +3706,7 @@ var MessageService = class {
         if (!requestBody.system) {
           delete requestBody.system;
         }
+        console.log(`[Ollama MessageService] Sending request with model: "${requestModelName}" (Temp: ${requestBody.temperature})`);
         responseData = await this.apiService.generateResponse(requestBody);
         (_d = this.view) == null ? void 0 : _d.removeLoadingIndicator(loadingMessageEl);
         if (responseData && typeof responseData.response === "string") {

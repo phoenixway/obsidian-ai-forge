@@ -80,6 +80,7 @@ export class MessageService {
 
                 // 2. Prepare the full prompt (handles history, RAG, context management)
                 const formattedPrompt = await this.promptService.prepareFullPrompt(content, history);
+                const requestModelName = this.plugin.settings.modelName; // Зчитуємо актуальну модель
 
                 // 3. Prepare the request body
                 const requestBody = {
@@ -95,6 +96,8 @@ export class MessageService {
                 if (!requestBody.system) { delete requestBody.system; }
 
                 // 4. Call the API
+                console.log(`[Ollama MessageService] Sending request with model: "${requestModelName}" (Temp: ${requestBody.temperature})`);
+
                 responseData = await this.apiService.generateResponse(requestBody);
 
                 // 5. Process the response

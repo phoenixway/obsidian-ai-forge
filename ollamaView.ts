@@ -177,7 +177,7 @@ export class OllamaView extends ItemView {
     await this.loadAndRenderHistory(); // Завантаження історії
 
     this.inputEl?.focus();
-    this.guaranteedScrollToBottom(150, true);
+    // this.guaranteedScrollToBottom(150, true);
     this.inputEl?.dispatchEvent(new Event('input'));
   }
 
@@ -291,25 +291,29 @@ export class OllamaView extends ItemView {
   // --- Message Handling ---
   private async loadAndRenderHistory(): Promise<void> {
     this.lastMessageDate = null;
-    this.clearChatContainerInternal(); // Очищаємо перед завантаженням
+    this.clearChatContainerInternal();
     try {
-      // Завантажуємо історію. MessageService викличе internalAddMessage для кожного повідомлення.
       await this.plugin.messageService.loadMessageHistory();
 
       if (this.messages.length === 0) {
         this.showEmptyState();
       } else {
         this.hideEmptyState();
-        // --- ПЕРЕНЕСЕНО ВИКЛИК СЮДИ ---
-        // Перевіряємо всі повідомлення на необхідність згортання ПІСЛЯ їх рендерингу
+        // Запускаємо перевірку згортання
         this.checkAllMessagesForCollapsing();
-        // ---------------------------------
-        this.guaranteedScrollToBottom(100, true); // Прокрутка в кінець
-        // Збереження історії тепер обробляється MessageService після циклу завантаження
+
+        // --- ЗМІНЕНО ТУТ ---
+        // Додаємо більшу затримку перед фінальною прокруткою,
+        // щоб дати час на завершення checkAllMessagesForCollapsing
+        setTimeout(() => {
+          console.log("[OllamaView] Attempting final scroll after history load.");
+          this.guaranteedScrollToBottom(100, true); // Прокрутка в кінець
+        }, 300); // Збільшено затримку до 300ms (можна поекспериментувати)
+        // -----------------
       }
     } catch (error) {
-      console.error("OllamaView: Помилка під час процесу завантаження історії:", error);
-      this.clearChatContainerInternal(); // Забезпечуємо чистий стан при помилці
+      console.error("OllamaView: Error during history loading process:", error); // Translated error
+      this.clearChatContainerInternal();
       this.showEmptyState();
     }
   }
