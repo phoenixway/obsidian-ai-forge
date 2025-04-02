@@ -908,6 +908,7 @@ var DEFAULT_SETTINGS = {
   ollamaServerUrl: "http://localhost:11434",
   temperature: 0.1,
   contextWindow: 8192,
+  // User's default context window setting
   useAdvancedContextStrategy: false,
   // Disabled by default
   enableSummarization: false,
@@ -957,12 +958,10 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   getDisplayText() {
     return "Ollama Chat";
   }
-  // Changed display name
   getId() {
     return "ollama-chat-plugin";
   }
-  // Changed ID for clarity
-  // Helper function for icon search (remains the same)
+  // Helper function for icon search
   createIconSearch(containerEl, settingType) {
     const searchContainer = containerEl.createDiv({ cls: "ollama-icon-search-container" });
     let searchInput;
@@ -1001,10 +1000,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     containerEl.empty();
     containerEl.addClass("ollama-settings");
     containerEl.createEl("h2", { text: "Basic Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc(
-      "IP address and port where Ollama is running (e.g., http://192.168.1.10:11434)"
-      // Already English
-    ).addText(
+    new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc("IP address and port where Ollama is running (e.g., http://192.168.1.10:11434)").addText(
       (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
         this.plugin.settings.ollamaServerUrl = value.trim();
         await this.plugin.saveSettings();
@@ -1020,11 +1016,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         } catch (error) {
           new import_obsidian2.Notice(`Connection failed: ${error.message}. Check URL and server status.`);
           if (this.plugin.view) {
-            this.plugin.view.internalAddMessage(
-              "error",
-              `Failed to connect to Ollama: ${error.message}. Please check settings.`
-              // Translated
-            );
+            this.plugin.view.internalAddMessage("error", `Failed to connect to Ollama: ${error.message}. Please check settings.`);
           }
         }
       })
@@ -1064,7 +1056,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     containerEl.createEl("h2", { text: "Context Management" });
-    new import_obsidian2.Setting(containerEl).setName("Model Context Window (tokens)").setDesc("Max tokens the model can process (refer to model documentation).").addText(
+    new import_obsidian2.Setting(containerEl).setName("Model Context Window (tokens)").setDesc("User-defined maximum tokens for the model. The actual limit might be lower if detected from the model and 'Advanced Strategy' is enabled.").addText(
       (text) => text.setPlaceholder("8192").setValue(String(this.plugin.settings.contextWindow)).onChange(async (v) => {
         const n = parseInt(v);
         if (!isNaN(n) && n > 0) {
@@ -1075,16 +1067,15 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
           text.setValue(String(this.plugin.settings.contextWindow));
         }
       })
-      // Translated
     );
-    new import_obsidian2.Setting(containerEl).setName("Experimental: Advanced Context Strategy").setDesc("Use tokenizer for precise context calculation and trimming. If disabled, uses less accurate word counting.").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Experimental: Advanced Context Strategy").setDesc("Use tokenizer and attempt programmatic detection of model's context limit for precise management. If disabled or detection fails, uses the user-defined limit above with word counting.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
         this.plugin.settings.useAdvancedContextStrategy = value;
         await this.plugin.saveSettings();
         if (value) {
-          new import_obsidian2.Notice("Advanced context strategy enabled (using tokenizer).");
+          new import_obsidian2.Notice("Advanced context strategy enabled.");
         } else {
-          new import_obsidian2.Notice("Advanced context strategy disabled (using word count).");
+          new import_obsidian2.Notice("Advanced context strategy disabled.");
         }
         this.display();
       })
@@ -1114,7 +1105,6 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
             text.setValue(String(this.plugin.settings.summarizationChunkSize));
           }
         })
-        // Translated
       );
       new import_obsidian2.Setting(containerEl).setName("Keep Last N Messages").setDesc("Number of recent messages that will NEVER be summarized.").addSlider(
         (slider) => slider.setLimits(0, 20, 1).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary).setDynamicTooltip().onChange(async (v) => {
@@ -1123,7 +1113,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         })
       );
     } else {
-      containerEl.createEl("p", { text: "Using basic context management strategy (approximate word count).", cls: "setting-item-description ollama-subtle-notice" });
+      containerEl.createEl("p", { text: "Using basic context management strategy (approximate word count, respects user-defined limit).", cls: "setting-item-description ollama-subtle-notice" });
     }
     containerEl.createEl("h2", { text: "Chat History" });
     new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat history between sessions").addToggle(
@@ -1203,9 +1193,9 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     }
     new import_obsidian2.Setting(containerEl).setName("Max Message Height (px)").setDesc("Longer messages will get a 'Show More' button. Set to 0 to disable collapsing.").addText(
       (text) => text.setPlaceholder("300").setValue(String(this.plugin.settings.maxMessageHeight)).onChange(async (value) => {
-        const num = parseInt(value, 10);
-        if (!isNaN(num) && num >= 0) {
-          this.plugin.settings.maxMessageHeight = num;
+        const n = parseInt(value, 10);
+        if (!isNaN(n) && n >= 0) {
+          this.plugin.settings.maxMessageHeight = n;
           await this.plugin.saveSettings();
         } else {
           new import_obsidian2.Notice("Please enter 0 or a positive number.");
@@ -1291,7 +1281,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     );
     this.addIconSearchStyles();
   }
-  // Adds CSS styles for icon search dynamically (remains the same)
+  // Adds CSS styles for icon search dynamically
   addIconSearchStyles() {
     const styleId = "ollama-icon-search-styles";
     if (document.getElementById(styleId))
@@ -1563,9 +1553,31 @@ var ApiService = class {
       return [];
     }
   }
-  // resetState(): void { // Логіка стану, ймовірно, тут не потрібна
-  //   // ...
-  // }
+  async getModelDetails(modelName) {
+    const apiUrl = `${this.baseUrl}/api/show`;
+    console.log(`[ApiService] Fetching details for model: ${modelName} from ${apiUrl}`);
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: modelName })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[ApiService] Failed to get details for model ${modelName}. Status: ${response.status}`, errorText);
+        return null;
+      }
+      const data = await response.json();
+      console.log(`[ApiService] Received details for model ${modelName}:`, data);
+      return data;
+    } catch (error) {
+      console.error(`[ApiService] Fetch error getting model details for ${modelName}:`, error);
+      if (error.message.includes("fetch") || error.message.includes("Failed to fetch")) {
+        this.emit("connection-error", new Error(`Failed to get model details from ${this.baseUrl}. Is it running?`));
+      }
+      return null;
+    }
+  }
 };
 
 // promptService.ts
@@ -3321,11 +3333,12 @@ function countTokens2(text) {
   }
 }
 var PromptService = class {
-  // Token buffer for model response
   constructor(plugin) {
     this.systemPrompt = null;
-    // Dependency for summarization
+    // Buffer of tokens to reserve for the model's response & potential inaccuracies
     this.RESPONSE_TOKEN_BUFFER = 500;
+    // Cache for detected model context sizes { modelName: detectedContextSize | null }
+    this.modelDetailsCache = {};
     this.plugin = plugin;
     this.apiService = plugin.apiService;
   }
@@ -3335,7 +3348,82 @@ var PromptService = class {
   getSystemPrompt() {
     return this.systemPrompt;
   }
-  // --- Helper method for summarization ---
+  /**
+   * Clears the cached model details. Should be called when server URL changes or plugin reloads.
+   */
+  clearModelDetailsCache() {
+    this.modelDetailsCache = {};
+    console.log("[PromptService] Model details cache cleared.");
+  }
+  /**
+   * Determines the effective context limit by checking the model details (if enabled)
+   * and comparing with the user's setting. Returns the smaller of the two valid values.
+   */
+  async _getEffectiveContextLimit() {
+    var _a, _b;
+    const userDefinedContextSize = this.plugin.settings.contextWindow;
+    let effectiveContextLimit = userDefinedContextSize;
+    const modelName = this.plugin.settings.modelName;
+    if (this.plugin.settings.useAdvancedContextStrategy && modelName) {
+      let detectedSize = null;
+      if (this.modelDetailsCache.hasOwnProperty(modelName)) {
+        detectedSize = this.modelDetailsCache[modelName];
+      } else {
+        console.log(`[PromptService] No cache for ${modelName}, fetching details...`);
+        try {
+          const details = await this.apiService.getModelDetails(modelName);
+          if (details) {
+            let sizeStr = void 0;
+            if (details.parameters) {
+              const match = details.parameters.match(/num_ctx\s+(\d+)/);
+              if (match && match[1]) {
+                sizeStr = match[1];
+              }
+            }
+            if (!sizeStr && ((_a = details.details) == null ? void 0 : _a["llm.context_length"])) {
+              sizeStr = String(details.details["llm.context_length"]);
+            }
+            if (!sizeStr && ((_b = details.details) == null ? void 0 : _b["tokenizer.ggml.context_length"])) {
+              sizeStr = String(details.details["tokenizer.ggml.context_length"]);
+            }
+            if (sizeStr) {
+              const parsedSize = parseInt(sizeStr, 10);
+              if (!isNaN(parsedSize) && parsedSize > 0) {
+                detectedSize = parsedSize;
+                console.log(`[PromptService] Detected context size for ${modelName}: ${detectedSize}`);
+                this.modelDetailsCache[modelName] = detectedSize;
+              }
+            }
+            if (detectedSize === null) {
+              console.log(`[PromptService] Context size not found in details for ${modelName}. Using user setting.`);
+              this.modelDetailsCache[modelName] = null;
+            }
+          } else {
+            this.modelDetailsCache[modelName] = null;
+            detectedSize = null;
+          }
+        } catch (error) {
+          console.error(`[PromptService] Error fetching model details for ${modelName}:`, error);
+          this.modelDetailsCache[modelName] = null;
+          detectedSize = null;
+        }
+      }
+      if (detectedSize !== null && detectedSize > 0) {
+        effectiveContextLimit = Math.min(userDefinedContextSize, detectedSize);
+        if (effectiveContextLimit < userDefinedContextSize) {
+          console.log(`[PromptService] Using detected context limit (${effectiveContextLimit}) as it's smaller than user setting (${userDefinedContextSize}).`);
+        } else {
+        }
+      } else {
+      }
+    } else {
+    }
+    return Math.max(100, effectiveContextLimit);
+  }
+  /**
+   * Attempts to summarize a list of messages using the current LLM.
+   * Returns the summary text or null if summarization is disabled or fails.
+   */
   async _summarizeMessages(messagesToSummarize) {
     var _a;
     if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
@@ -3346,15 +3434,18 @@ var PromptService = class {
     const summarizationFullPrompt = this.plugin.settings.summarizationPrompt.replace("{text_to_summarize}", textToSummarize);
     const summaryRequestBody = {
       model: this.plugin.settings.modelName,
-      // Use the same model for now
+      // Use the same model for summarization
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.2,
-      // Low temperature for factual summary
+      // Use low temperature for more factual summary
       options: {
         num_ctx: this.plugin.settings.contextWindow
+        // Use the same context window setting
+        // Consider adding stop words specific to summarization if needed
       }
-      // No system prompt for summarization to avoid interference
+      // Explicitly DON'T pass the main system prompt to avoid influencing the summary
+      // system: "You are a text summarization assistant." // Optionally add a specific system prompt for summarization
     };
     try {
       const summaryResponse = await this.apiService.generateResponse(summaryRequestBody);
@@ -3367,19 +3458,23 @@ var PromptService = class {
         return null;
       }
     } catch (error) {
-      console.error("[Ollama] Summarization failed:", error);
+      console.error("[Ollama] Summarization API call failed:", error);
       return null;
     }
   }
-  // --- Main prompt preparation method ---
+  /**
+   * Prepares the full prompt string to be sent to the LLM,
+   * handling context management (history, RAG, truncation/summarization)
+   * based on plugin settings.
+   */
   async prepareFullPrompt(content, history) {
     if (!this.plugin) {
       console.warn("Plugin reference not set in PromptService.");
       return content.trim();
     }
     try {
-      const role = await this.getRoleDefinition();
-      this.setSystemPrompt(role);
+      const roleDefinition = await this.getRoleDefinition();
+      this.setSystemPrompt(roleDefinition);
     } catch (error) {
       console.error("Error getting role definition:", error);
       this.setSystemPrompt(null);
@@ -3398,12 +3493,12 @@ var PromptService = class {
 
 ---
 ` : "";
+    const effectiveContextLimit = await this._getEffectiveContextLimit();
+    const maxPromptTokens = Math.max(100, effectiveContextLimit - this.RESPONSE_TOKEN_BUFFER);
     let finalPrompt;
     const userInputFormatted = `User: ${content.trim()}`;
     if (this.plugin.settings.useAdvancedContextStrategy) {
-      console.log("[Ollama] Using advanced context strategy (tokens).");
-      const modelContextLimit = this.plugin.settings.contextWindow;
-      const maxContextTokens = Math.max(100, modelContextLimit - this.RESPONSE_TOKEN_BUFFER);
+      console.log(`[Ollama] Using advanced context strategy (Effective Limit: ${effectiveContextLimit} tokens, Max Prompt: ${maxPromptTokens} tokens).`);
       let currentTokens = 0;
       let promptHistoryParts = [];
       const systemPromptTokens = currentSystemPrompt ? countTokens2(currentSystemPrompt) : 0;
@@ -3412,12 +3507,12 @@ var PromptService = class {
       currentTokens += userInputTokens;
       const ragTokens = countTokens2(ragBlock);
       let finalRagBlock = "";
-      if (ragBlock && currentTokens + ragTokens <= maxContextTokens) {
+      if (ragBlock && currentTokens + ragTokens <= maxPromptTokens) {
         finalRagBlock = ragBlock;
         currentTokens += ragTokens;
         console.log(`[Ollama] RAG context included (${ragTokens} tokens).`);
       } else if (ragBlock) {
-        console.warn(`[Ollama] RAG context (${ragTokens} tokens) skipped, not enough space. Available: ${maxContextTokens - currentTokens}`);
+        console.warn(`[Ollama] RAG context (${ragTokens} tokens) skipped, not enough space. Available: ${maxPromptTokens - currentTokens}`);
       }
       const keepN = Math.min(history.length, this.plugin.settings.keepLastNMessagesBeforeSummary);
       const messagesToKeep = history.slice(-keepN);
@@ -3428,18 +3523,16 @@ var PromptService = class {
         const msg = messagesToKeep[i];
         const formattedMsg = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
         const messageTokens = countTokens2(formattedMsg);
-        if (currentTokens + messageTokens <= maxContextTokens) {
+        if (currentTokens + messageTokens <= maxPromptTokens) {
           keptMessagesStrings.push(formattedMsg);
           currentTokens += messageTokens;
           keptMessagesTokens += messageTokens;
         } else {
-          console.warn(`[Ollama] Even a message intended to be kept does not fit (message index ${history.length - messagesToKeep.length + i}). Consider increasing context window or reducing keepLastNMessages.`);
+          console.warn(`[Ollama] Message intended to be kept verbatim does not fit (index ${history.length - messagesToKeep.length + i}). Context full.`);
           break;
         }
       }
       keptMessagesStrings.reverse();
-      if (keptMessagesStrings.length > 0)
-        console.log(`[Ollama] Kept last ${keptMessagesStrings.length} messages verbatim (${keptMessagesTokens} tokens).`);
       let processedHistoryParts = [];
       let currentChunk = { messages: [], text: "", tokens: 0 };
       for (let i = messagesToProcess.length - 1; i >= 0; i--) {
@@ -3449,7 +3542,7 @@ var PromptService = class {
         if (currentChunk.tokens > 0 && currentChunk.tokens + messageTokens > this.plugin.settings.summarizationChunkSize) {
           currentChunk.messages.reverse();
           currentChunk.text = currentChunk.messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
-          if (currentTokens + currentChunk.tokens <= maxContextTokens) {
+          if (currentTokens + currentChunk.tokens <= maxPromptTokens) {
             processedHistoryParts.push(currentChunk.text);
             currentTokens += currentChunk.tokens;
           } else if (this.plugin.settings.enableSummarization) {
@@ -3458,7 +3551,7 @@ var PromptService = class {
               const summaryTokens = countTokens2(summary);
               const summaryFormatted = `[Summary of previous messages]:
 ${summary}`;
-              if (currentTokens + summaryTokens <= maxContextTokens) {
+              if (currentTokens + summaryTokens <= maxPromptTokens) {
                 processedHistoryParts.push(summaryFormatted);
                 currentTokens += summaryTokens;
                 console.log(`[Ollama] Added summary (${summaryTokens} tokens) instead of chunk (${currentChunk.tokens} tokens).`);
@@ -3479,7 +3572,7 @@ ${summary}`;
       if (currentChunk.messages.length > 0) {
         currentChunk.messages.reverse();
         currentChunk.text = currentChunk.messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
-        if (currentTokens + currentChunk.tokens <= maxContextTokens) {
+        if (currentTokens + currentChunk.tokens <= maxPromptTokens) {
           processedHistoryParts.push(currentChunk.text);
           currentTokens += currentChunk.tokens;
         } else if (this.plugin.settings.enableSummarization) {
@@ -3488,7 +3581,7 @@ ${summary}`;
             const summaryTokens = countTokens2(summary);
             const summaryFormatted = `[Summary of previous messages]:
 ${summary}`;
-            if (currentTokens + summaryTokens <= maxContextTokens) {
+            if (currentTokens + summaryTokens <= maxPromptTokens) {
               processedHistoryParts.push(summaryFormatted);
               currentTokens += summaryTokens;
               console.log(`[Ollama] Added summary (${summaryTokens} tokens) for last chunk (${currentChunk.tokens} tokens).`);
@@ -3505,13 +3598,13 @@ ${summary}`;
       processedHistoryParts.reverse();
       const finalPromptParts = [finalRagBlock, ...processedHistoryParts, ...keptMessagesStrings, userInputFormatted].filter(Boolean);
       finalPrompt = finalPromptParts.join("\n\n");
-      console.log(`[Ollama] Final prompt token count (approx. incl system & input): ${currentTokens}. Processed history parts: ${processedHistoryParts.length}, Kept verbatim: ${keptMessagesStrings.length}.`);
+      console.log(`[Ollama] Final prompt tokens (approx incl system & input): ${currentTokens}. Processed history parts: ${processedHistoryParts.length}, Kept verbatim: ${keptMessagesStrings.length}.`);
     } else {
-      console.log("[Ollama] Using basic context strategy (words).");
+      console.log(`[Ollama] Using basic context strategy (Word Limit Approx based on ${effectiveContextLimit} tokens).`);
       const systemPromptWordCount = currentSystemPrompt ? countWords(currentSystemPrompt) : 0;
       const userInputWordCount = countWords(userInputFormatted);
       const tokenApproximationFactor = 1;
-      const wordLimit = Math.max(100, this.plugin.settings.contextWindow / tokenApproximationFactor - systemPromptWordCount - userInputWordCount - 300);
+      const wordLimit = Math.max(100, effectiveContextLimit / tokenApproximationFactor - systemPromptWordCount - userInputWordCount - 300);
       let contextParts = [];
       let currentWordCount = 0;
       const ragWords = countWords(ragBlock);
@@ -3526,11 +3619,11 @@ ${summary}`;
       let addedHistoryMessages = 0;
       for (let i = history.length - 1; i >= 0; i--) {
         const msg = history[i];
-        const formattedMsg = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
-        const messageWords = countWords(formattedMsg);
-        if (currentWordCount + messageWords <= wordLimit) {
-          contextParts.push(formattedMsg);
-          currentWordCount += messageWords;
+        const fmt = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
+        const words = countWords(fmt);
+        if (currentWordCount + words <= wordLimit) {
+          contextParts.push(fmt);
+          currentWordCount += words;
           addedHistoryMessages++;
         } else {
           break;
@@ -3569,17 +3662,17 @@ ${summary}`;
         try {
           content = await adapter.read(fullPath);
         } catch (readError) {
-          console.error(`Error reading default role file at ${fullPath}:`, readError);
+          console.error(`Error reading default role file: ${fullPath}`, readError);
           return null;
         }
       } else {
-        console.log(`Default role file not found at ${fullPath}, creating it.`);
+        console.log(`Default role file not found: ${fullPath}, creating it.`);
         try {
           const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
           await adapter.write(fullPath, defaultContent);
           content = defaultContent;
         } catch (createError) {
-          console.error(`Error creating default role file at ${fullPath}:`, createError);
+          console.error(`Error creating default role file: ${fullPath}`, createError);
           return null;
         }
       }

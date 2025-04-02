@@ -18,6 +18,44 @@ export interface OllamaResponse {
   eval_duration?: number;
 }
 
+
+// Інтерфейс для відповіді Ollama /api/generate
+export interface OllamaGenerateResponse {
+  model: string;
+  created_at: string;
+  response: string;
+  done: boolean;
+  context?: number[];
+  total_duration?: number;
+  load_duration?: number;
+  prompt_eval_count?: number;
+  prompt_eval_duration?: number;
+  eval_count?: number;
+  eval_duration?: number;
+}
+
+// Інтерфейс для відповіді Ollama /api/show (ОНОВЛЕНО)
+export interface OllamaShowResponse {
+  license?: string;
+  modelfile?: string;
+  parameters?: string; // Рядок з параметрами
+  template?: string;
+  details?: { // Вкладений об'єкт details
+    format?: string;
+    family?: string;
+    families?: string[] | null;
+    parameter_size?: string;
+    quantization_level?: string;
+    // --- ДОДАНО ІНДЕКСНИЙ ПІДПИС ---
+    // Дозволяє details містити будь-які інші рядкові ключі
+    [key: string]: any;
+    // ----------------------------------
+  };
+  // Дозволяє інші поля на верхньому рівні
+  [key: string]: any;
+}
+
+
 export class ApiService {
   private baseUrl: string;
   // private stateManager: StateManager; // Ймовірно, не потрібен
@@ -181,7 +219,37 @@ export class ApiService {
     }
   }
 
-  // resetState(): void { // Логіка стану, ймовірно, тут не потрібна
-  //   // ...
-  // }
+  async getModelDetails(modelName: string): Promise<OllamaShowResponse | null> {
+    const apiUrl = `${this.baseUrl}/api/show`;
+    console.log(`[ApiService] Fetching details for model: ${modelName} from ${apiUrl}`);
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: modelName }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`[ApiService] Failed to get details for model ${modelName}. Status: ${response.status}`, errorText);
+        // Don't throw an error, just return null, as this is optional info
+        return null;
+      }
+
+      const data: OllamaShowResponse = await response.json();
+      console.log(`[ApiService] Received details for model ${modelName}:`, data);
+      return data;
+
+    } catch (error: any) {
+      console.error(`[ApiService] Fetch error getting model details for ${modelName}:`, error);
+      // Emit connection error only if it looks like a network issue
+      if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
+        this.emit('connection-error', new Error(`Failed to get model details from ${this.baseUrl}. Is it running?`));
+      }
+      return null; // Return null on any error
+    }
+  }
+
+
+
 }
