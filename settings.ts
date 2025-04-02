@@ -263,7 +263,12 @@ export class OllamaSettingTab extends PluginSettingTab {
       .setName("Clear History")
       .setDesc("Delete all chat history")
       .addButton((button) => button.setButtonText("Clear")
-        .onClick(async () => { if (confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) { await this.plugin.clearMessageHistory(); new Notice("Chat history cleared."); } })
+        .onClick(async () => {
+          // if (confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) { 
+          await this.plugin.clearMessageHistory(); new Notice("Chat history cleared.");
+        }
+          // }
+        )
       );
 
 

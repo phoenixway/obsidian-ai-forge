@@ -263,10 +263,10 @@ export class OllamaView extends ItemView {
   private handleClearChatClick = (): void => {
     this.closeMenu();
     // Використовуємо confirm для підтвердження
-    if (confirm("Ви впевнені, що хочете видалити всю історію чату? Цю дію неможливо скасувати.")) {
-      this.plugin.clearMessageHistory(); // Викликаємо метод плагіна
-      // new Notice("Історію чату очищено."); // Notice показується в plugin.clearMessageHistory
-    }
+    // if (confirm("Ви впевнені, що хочете видалити всю історію чату? Цю дію неможливо скасувати.")) {
+    this.plugin.clearMessageHistory(); // Викликаємо метод плагіна
+    // new Notice("Історію чату очищено."); // Notice показується в plugin.clearMessageHistory
+    // }
   }
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.menuDropdown.style.display === 'block' && !this.menuButton.contains(e.target as Node) && !this.menuDropdown.contains(e.target as Node)) { this.closeMenu(); } }
   private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.messages.length > 0) { this.plugin.messageService.addSystemMessage(`Модель змінено на: ${modelName}`); } }

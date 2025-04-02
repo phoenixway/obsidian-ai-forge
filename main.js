@@ -152,9 +152,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     // ID вкладки з settings.ts
     this.handleClearChatClick = () => {
       this.closeMenu();
-      if (confirm("\u0412\u0438 \u0432\u043F\u0435\u0432\u043D\u0435\u043D\u0456, \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0432\u0441\u044E \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443? \u0426\u044E \u0434\u0456\u044E \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u0441\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438.")) {
-        this.plugin.clearMessageHistory();
-      }
+      this.plugin.clearMessageHistory();
     };
     this.handleDocumentClickForMenu = (e) => {
       if (this.menuDropdown.style.display === "block" && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
@@ -1133,12 +1131,13 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
       })
     );
     new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton(
-      (button) => button.setButtonText("Clear").onClick(async () => {
-        if (confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) {
+      (button) => button.setButtonText("Clear").onClick(
+        async () => {
           await this.plugin.clearMessageHistory();
           new import_obsidian2.Notice("Chat history cleared.");
         }
-      })
+        // }
+      )
     );
     containerEl.createEl("h2", { text: "Appearance (UI/UX)" });
     containerEl.createEl("h4", { text: "User Avatar" });
