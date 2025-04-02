@@ -63,7 +63,7 @@ export default class OllamaPlugin extends Plugin {
 
     await this.loadSettings();
 
-    this.apiService = new ApiService(this.settings.ollamaServerUrl);
+    this.apiService = new ApiService(this); // Передаємо весь екземпляр плагіна
     this.ragService = new RagService(this);
     this.promptService = new PromptService(this);
     this.messageService = new MessageService(this);

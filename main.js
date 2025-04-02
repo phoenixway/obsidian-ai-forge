@@ -86,10 +86,14 @@ var CSS_CLASS_AVATAR = "message-group-avatar";
 var CSS_CLASS_AVATAR_USER = "user-avatar";
 var CSS_CLASS_AVATAR_AI = "ai-avatar";
 var CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button";
+var CSS_CLASS_CODE_BLOCK_LANGUAGE = "code-block-language";
 var CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 var CSS_CLASS_VISIBLE = "visible";
 var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 var CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
+var CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
+var CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
+var CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
 var _OllamaView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -105,8 +109,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.lastMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    // Debounced save function
     this.debouncedSaveMessageHistory = (0, import_obsidian.debounce)(this.saveMessageHistory, 300, true);
+    // --- Event Handlers ---
+    // (Без змін, крім handleClearChatClick, який тепер не викликає messageService)
     this.handleKeyDown = (e) => {
       if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) {
         e.preventDefault();
@@ -125,21 +130,26 @@ var _OllamaView = class extends import_obsidian.ItemView {
       e.stopPropagation();
       const isHidden = this.menuDropdown.style.display === "none";
       this.menuDropdown.style.display = isHidden ? "block" : "none";
+      if (!isHidden)
+        this.menuDropdown.style.animation = "menu-fade-in 0.15s ease-out";
     };
+    // Додано анімацію
     this.handleSettingsClick = async () => {
       this.closeMenu();
       const setting = this.app.setting;
       if (setting) {
         await setting.open();
-        setting.openTabById("obsidian-ollama-duet");
+        setting.openTabById("ollama-plugin");
       } else {
-        new import_obsidian.Notice("Could not open settings.");
+        new import_obsidian.Notice("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0432\u0456\u0434\u043A\u0440\u0438\u0442\u0438 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F.");
       }
     };
+    // ID вкладки з settings.ts
     this.handleClearChatClick = () => {
       this.closeMenu();
-      this.clearChatContainer();
-      new import_obsidian.Notice("Chat history cleared.");
+      if (confirm("\u0412\u0438 \u0432\u043F\u0435\u0432\u043D\u0435\u043D\u0456, \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0432\u0441\u044E \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443? \u0426\u044E \u0434\u0456\u044E \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u0441\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438.")) {
+        this.plugin.clearMessageHistory();
+      }
     };
     this.handleDocumentClickForMenu = (e) => {
       if (this.menuDropdown.style.display === "block" && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
@@ -149,7 +159,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.handleModelChange = (modelName) => {
       this.updateInputPlaceholder(modelName);
       if (this.messages.length > 0) {
-        this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+        this.plugin.messageService.addSystemMessage(`\u041C\u043E\u0434\u0435\u043B\u044C \u0437\u043C\u0456\u043D\u0435\u043D\u043E \u043D\u0430: ${modelName}`);
       }
     };
     this.handleVisibilityChange = () => {
@@ -160,13 +170,14 @@ var _OllamaView = class extends import_obsidian.ItemView {
         });
       }
     };
-    this.handleActiveLeafChange = () => {
+    this.handleActiveLeafChange = (leaf) => {
       var _a;
-      if (this.app.workspace.getActiveViewOfType(_OllamaView) === this) {
+      if ((leaf == null ? void 0 : leaf.view) === this) {
         setTimeout(() => this.guaranteedScrollToBottom(100), 100);
         (_a = this.inputEl) == null ? void 0 : _a.focus();
       }
     };
+    // Перевіряємо конкретний view
     this.handleInputForResize = () => {
       if (this.resizeTimeout)
         clearTimeout(this.resizeTimeout);
@@ -211,21 +222,27 @@ var _OllamaView = class extends import_obsidian.ItemView {
     };
     this.plugin = plugin;
     if (_OllamaView.instance && _OllamaView.instance !== this) {
-      console.warn("Replacing existing OllamaView instance.");
+      console.warn("\u0417\u0430\u043C\u0456\u043D\u0430 \u0456\u0441\u043D\u0443\u044E\u0447\u043E\u0433\u043E \u0435\u043A\u0437\u0435\u043C\u043F\u043B\u044F\u0440\u0430 OllamaView.");
     }
     _OllamaView.instance = this;
-    if (this.plugin.apiService) {
-      this.plugin.apiService.setOllamaView(this);
+    if (!import_obsidian.requireApiVersion || !(0, import_obsidian.requireApiVersion)("1.0.0")) {
+      console.warn("Ollama Plugin: \u041F\u043E\u0442\u043E\u0447\u043D\u0430 \u0432\u0435\u0440\u0441\u0456\u044F Obsidian API \u043C\u043E\u0436\u0435 \u0431\u0443\u0442\u0438 \u0437\u0430\u0441\u0442\u0430\u0440\u0456\u043B\u043E\u044E. \u0414\u0435\u044F\u043A\u0456 \u0444\u0443\u043D\u043A\u0446\u0456\u0457 \u043C\u043E\u0436\u0443\u0442\u044C \u043D\u0435 \u043F\u0440\u0430\u0446\u044E\u0432\u0430\u0442\u0438.");
     }
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian.debounce)(this.handleScroll, 150, true);
   }
+  // --- Геттери ---
   getMessagesCount() {
     return this.messages.length;
   }
   getMessagesPairCount() {
     return this.messagesPairCount;
   }
+  // Додаємо геттер для історії повідомлень
+  getMessages() {
+    return [...this.messages];
+  }
+  // ... (getViewType, getDisplayText, getIcon без змін) ...
   getViewType() {
     return VIEW_TYPE_OLLAMA;
   }
@@ -235,6 +252,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
   getIcon() {
     return "message-square";
   }
+  // Або інша іконка
   async onOpen() {
     var _a, _b;
     this.createUIElements();
@@ -249,7 +267,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     (_b = this.inputEl) == null ? void 0 : _b.dispatchEvent(new Event("input"));
   }
   async onClose() {
-    console.log("OllamaView onClose: Cleaning up resources.");
+    console.log("OllamaView onClose: \u041E\u0447\u0438\u0449\u0435\u043D\u043D\u044F \u0440\u0435\u0441\u0443\u0440\u0441\u0456\u0432.");
     if (this.speechWorker) {
       this.speechWorker.terminate();
       this.speechWorker = null;
@@ -267,6 +285,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
       _OllamaView.instance = null;
     }
   }
+  // --- UI Creation ---
   createUIElements() {
     this.contentEl.empty();
     this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
@@ -274,28 +293,29 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
     const indicatorIcon = this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" });
     (0, import_obsidian.setIcon)(indicatorIcon, "arrow-down");
-    this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+    this.newMessagesIndicatorEl.createSpan({ text: " \u041D\u043E\u0432\u0456 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F" });
     const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text to ${this.plugin.settings.modelName}...` } });
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `\u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C \u0434\u043E ${this.plugin.settings.modelName}...`, rows: 1 } });
     this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
-    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON });
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "\u041D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438" } });
     (0, import_obsidian.setIcon)(this.sendButton, "send");
-    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON });
-    (0, import_obsidian.setIcon)(this.voiceButton, "microphone");
-    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON });
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "\u0413\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434" } });
+    (0, import_obsidian.setIcon)(this.voiceButton, "mic");
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "\u041C\u0435\u043D\u044E" } });
     (0, import_obsidian.setIcon)(this.menuButton, "more-vertical");
     this.menuDropdown = inputContainer.createEl("div", { cls: CSS_CLASS_MENU_DROPDOWN });
     this.menuDropdown.style.display = "none";
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
     const clearIcon = this.clearChatOption.createEl("span", { cls: "menu-option-icon" });
     (0, import_obsidian.setIcon)(clearIcon, "trash-2");
-    this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
+    this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u0447\u0430\u0442" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
     const settingsIcon = this.settingsOption.createEl("span", { cls: "menu-option-icon" });
     (0, import_obsidian.setIcon)(settingsIcon, "settings");
-    this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
+    this.settingsOption.createEl("span", { cls: "menu-option-text", text: "\u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F" });
   }
+  // --- Event Listeners ---
   attachEventListeners() {
     this.inputEl.addEventListener("keydown", this.handleKeyDown);
     this.inputEl.addEventListener("input", this.handleInputForResize);
@@ -315,9 +335,10 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
     }
   }
+  // --- UI Update Methods ---
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {
-      this.inputEl.placeholder = `Text to ${modelName}...`;
+      this.inputEl.placeholder = `\u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C \u0434\u043E ${modelName}...`;
     }
   }
   closeMenu() {
@@ -339,8 +360,8 @@ var _OllamaView = class extends import_obsidian.ItemView {
     if (this.messages.length === 0 && !this.emptyStateEl && this.chatContainer) {
       this.chatContainer.empty();
       this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE });
-      this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" });
-      this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use voice input to chat with ${this.plugin.settings.modelName}` });
+      this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "\u041F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C \u0449\u0435 \u043D\u0435\u043C\u0430\u0454" });
+      this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `\u041D\u0430\u043F\u0438\u0448\u0456\u0442\u044C \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u0430\u0431\u043E \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u0438\u0439 \u0432\u0432\u0456\u0434 \u0434\u043B\u044F \u0441\u043F\u0456\u043B\u043A\u0443\u0432\u0430\u043D\u043D\u044F \u0437 ${this.plugin.settings.modelName}` });
     }
   }
   hideEmptyState() {
@@ -349,6 +370,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.emptyStateEl = null;
     }
   }
+  // --- Message Handling ---
   async loadAndRenderHistory() {
     this.lastMessageDate = null;
     this.clearChatContainerInternal();
@@ -358,9 +380,11 @@ var _OllamaView = class extends import_obsidian.ItemView {
         this.showEmptyState();
       } else {
         this.hideEmptyState();
+        this.checkAllMessagesForCollapsing();
+        this.guaranteedScrollToBottom(100, true);
       }
     } catch (error) {
-      console.error("OllamaView: Error during history loading process:", error);
+      console.error("OllamaView: \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
     }
@@ -377,8 +401,8 @@ var _OllamaView = class extends import_obsidian.ItemView {
     try {
       await this.plugin.saveMessageHistory(dataToSave);
     } catch (error) {
-      console.error("OllamaView: Error saving message history:", error);
-      new import_obsidian.Notice("Failed to save chat history.");
+      console.error("OllamaView: \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0431\u0435\u0440\u0435\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", error);
+      new import_obsidian.Notice("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u0431\u0435\u0440\u0435\u0433\u0442\u0438 \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443.");
     }
   }
   async sendMessage() {
@@ -393,8 +417,8 @@ var _OllamaView = class extends import_obsidian.ItemView {
     try {
       await this.plugin.messageService.sendMessage(content);
     } catch (error) {
-      console.error("OllamaView: Error sending message via MessageService:", error);
-      this.internalAddMessage("error", "Failed to send message. Please try again.");
+      console.error("OllamaView: \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043D\u0430\u0434\u0441\u0438\u043B\u0430\u043D\u043D\u044F \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u0447\u0435\u0440\u0435\u0437 MessageService:", error);
+      this.internalAddMessage("error", `\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043D\u0430\u0434\u0456\u0441\u043B\u0430\u0442\u0438 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F: ${error.message || "\u041D\u0435\u0432\u0456\u0434\u043E\u043C\u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430"}`);
       this.setLoadingState(false);
     }
   }
@@ -404,32 +428,28 @@ var _OllamaView = class extends import_obsidian.ItemView {
     if (timestamp) {
       try {
         messageTimestamp = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
-        if (isNaN(messageTimestamp.getTime())) {
-          console.warn("Invalid timestamp provided, using current time:", timestamp);
-          messageTimestamp = new Date();
-        }
+        if (isNaN(messageTimestamp.getTime()))
+          throw new Error("Invalid Date");
       } catch (e) {
-        console.warn("Error parsing timestamp, using current time:", timestamp, e);
+        console.warn("\u041D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u0430 \u043C\u0456\u0442\u043A\u0430 \u0447\u0430\u0441\u0443, \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0447\u0430\u0441:", timestamp, e);
         messageTimestamp = new Date();
       }
     } else {
       messageTimestamp = new Date();
     }
-    const message = {
-      role,
-      content,
-      timestamp: messageTimestamp
-    };
+    const message = { role, content, timestamp: messageTimestamp };
     this.messages.push(message);
     if (role === "assistant" && this.messages.length >= 2) {
       const prevMessage = this.messages[this.messages.length - 2];
-      if (prevMessage && prevMessage.role === "user") {
+      if ((prevMessage == null ? void 0 : prevMessage.role) === "user")
         this.messagesPairCount++;
-      }
     }
-    this.renderMessage(message);
+    const messageEl = this.renderMessage(message);
     this.hideEmptyState();
-    if (saveHistory) {
+    if (messageEl) {
+      this.checkMessageForCollapsing(messageEl);
+    }
+    if (saveHistory && this.plugin.settings.saveMessageHistory) {
       this.debouncedSaveMessageHistory();
     }
     if (role !== "user" && this.userScrolledUp && this.newMessagesIndicatorEl) {
@@ -439,10 +459,11 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
     }
   }
+  // --- Оновлений рендеринг повідомлення ---
   renderMessage(message) {
     const messageIndex = this.messages.indexOf(message);
     if (messageIndex === -1)
-      return;
+      return null;
     const prevMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
     const isNewDay = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
     if (isNewDay) {
@@ -479,7 +500,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
         break;
     }
     const lastElement = this.chatContainer.lastElementChild;
-    if (isFirstInGroup || !lastElement || !lastElement.classList.contains(groupClass.split(" ")[1])) {
+    if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(" ")[1]}`)) {
       messageGroup = this.chatContainer.createDiv({ cls: groupClass });
       if (showAvatar) {
         this.renderAvatar(messageGroup, isUser);
@@ -492,15 +513,17 @@ var _OllamaView = class extends import_obsidian.ItemView {
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
     switch (message.role) {
       case "assistant":
-        this.renderAssistantContent(contentEl, message.content);
-        break;
       case "user":
-        message.content.split("\n").forEach((line, index, array) => {
-          contentEl.appendText(line);
-          if (index < array.length - 1) {
-            contentEl.createEl("br");
-          }
-        });
+        contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+        if (message.role === "assistant") {
+          this.renderAssistantContent(contentEl, message.content);
+        } else {
+          message.content.split("\n").forEach((line, index, array) => {
+            contentEl.appendText(line);
+            if (index < array.length - 1)
+              contentEl.createEl("br");
+          });
+        }
         break;
       case "system":
         const sysIcon = contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON });
@@ -514,27 +537,46 @@ var _OllamaView = class extends import_obsidian.ItemView {
         break;
     }
     if (message.role !== "system") {
-      const copyButton = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
+      const copyButton = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "\u041A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438" } });
       (0, import_obsidian.setIcon)(copyButton, "copy");
       copyButton.addEventListener("click", () => this.handleCopyClick(message.content, copyButton));
     }
     messageEl.createDiv({
       cls: CSS_CLASS_TIMESTAMP,
       text: this.formatTime(message.timestamp)
-      // Format the message's timestamp
     });
     setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+    return messageEl;
   }
+  // --- Оновлений рендеринг аватара ---
+  renderAvatar(groupEl, isUser) {
+    const settings = this.plugin.settings;
+    const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
+    const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
+    const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
+    const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${avatarClass}` });
+    if (avatarType === "initials") {
+      avatarEl.textContent = avatarContent || (isUser ? "U" : "A");
+    } else if (avatarType === "icon") {
+      try {
+        (0, import_obsidian.setIcon)(avatarEl, avatarContent || (isUser ? "user" : "bot"));
+      } catch (e) {
+        console.warn(`\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0438 \u0456\u043A\u043E\u043D\u043A\u0443 "${avatarContent}", \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0430.`);
+        avatarEl.textContent = isUser ? "U" : "A";
+      }
+    } else {
+      avatarEl.textContent = isUser ? "U" : "A";
+    }
+  }
+  // --- Методи рендерингу Markdown, кнопок коду, thinking tags (з додаванням назви мови) ---
   renderDateSeparator(date) {
     if (!this.chatContainer)
       return;
     this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) });
   }
-  renderAvatar(groupEl, isUser) {
-    const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI}` });
-    avatarEl.textContent = isUser ? "U" : "A";
-  }
+  // renderAvatar оновлено вище
   renderAssistantContent(containerEl, content) {
+    var _a, _b;
     const decodedContent = this.decodeHtmlEntities(content);
     const hasThinking = this.detectThinkingTags(decodedContent);
     containerEl.empty();
@@ -542,37 +584,93 @@ var _OllamaView = class extends import_obsidian.ItemView {
       const processedHtml = this.processThinkingTags(decodedContent);
       containerEl.innerHTML = processedHtml;
       this.addThinkingToggleListeners(containerEl);
-      this.addCodeBlockCopyButtons(containerEl);
+      this.addCodeBlockEnhancements(containerEl);
     } else {
-      import_obsidian.MarkdownRenderer.renderMarkdown(content, containerEl, this.plugin.app.vault.getRoot().path, this);
-      this.addCodeBlockCopyButtons(containerEl);
+      import_obsidian.MarkdownRenderer.renderMarkdown(content, containerEl, (_b = (_a = this.plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", this);
+      this.addCodeBlockEnhancements(containerEl);
     }
   }
-  addCodeBlockCopyButtons(contentEl) {
+  // Оновлено: додає і назву мови, і кнопку копіювання
+  addCodeBlockEnhancements(contentEl) {
     const preElements = contentEl.querySelectorAll("pre");
     preElements.forEach((pre) => {
       if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`))
         return;
-      const codeContent = pre.textContent || "";
+      const codeEl = pre.querySelector("code");
+      if (!codeEl)
+        return;
+      const codeContent = codeEl.textContent || "";
+      const languageClass = Array.from(codeEl.classList).find((cls) => cls.startsWith("language-"));
+      if (languageClass) {
+        const language = languageClass.replace("language-", "");
+        if (language) {
+          pre.createEl("span", { cls: CSS_CLASS_CODE_BLOCK_LANGUAGE, text: language });
+        }
+      }
       const copyBtn = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
       (0, import_obsidian.setIcon)(copyBtn, "copy");
-      copyBtn.setAttribute("title", "Copy Code");
+      copyBtn.setAttribute("title", "\u041A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u041A\u043E\u0434");
       copyBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         navigator.clipboard.writeText(codeContent).then(() => {
           (0, import_obsidian.setIcon)(copyBtn, "check");
-          copyBtn.setAttribute("title", "Copied!");
+          copyBtn.setAttribute("title", "\u0421\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E!");
           setTimeout(() => {
             (0, import_obsidian.setIcon)(copyBtn, "copy");
-            copyBtn.setAttribute("title", "Copy Code");
+            copyBtn.setAttribute("title", "\u041A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u041A\u043E\u0434");
           }, 1500);
         }).catch((err) => {
-          console.error("Failed to copy code block:", err);
-          new import_obsidian.Notice("Failed to copy code.");
+          console.error("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0441\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u0431\u043B\u043E\u043A \u043A\u043E\u0434\u0443:", err);
+          new import_obsidian.Notice("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0441\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u043A\u043E\u0434.");
         });
       });
     });
   }
+  // --- Методи для обробки довгих повідомлень ---
+  checkMessageForCollapsing(messageEl) {
+    const contentEl = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const maxHeight = this.plugin.settings.maxMessageHeight;
+    if (!contentEl || maxHeight <= 0)
+      return;
+    requestAnimationFrame(() => {
+      const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      existingButton == null ? void 0 : existingButton.remove();
+      contentEl.style.maxHeight = "";
+      contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      const actualHeight = contentEl.scrollHeight;
+      if (actualHeight > maxHeight) {
+        contentEl.style.maxHeight = `${maxHeight}px`;
+        contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+        const showMoreButton = messageEl.createEl("button", {
+          cls: CSS_CLASS_SHOW_MORE_BUTTON,
+          text: "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0431\u0456\u043B\u044C\u0448\u0435 \u25BC"
+          // Текст кнопки
+        });
+        this.registerDomEvent(showMoreButton, "click", () => {
+          this.toggleMessageCollapse(contentEl, showMoreButton);
+        });
+      }
+    });
+  }
+  checkAllMessagesForCollapsing() {
+    this.chatContainer.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
+      this.checkMessageForCollapsing(msgEl);
+    });
+  }
+  toggleMessageCollapse(contentEl, buttonEl) {
+    const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+    if (isCollapsed) {
+      contentEl.style.maxHeight = "";
+      contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      buttonEl.setText("\u0417\u0433\u043E\u0440\u043D\u0443\u0442\u0438 \u25B2");
+    } else {
+      const maxHeight = this.plugin.settings.maxMessageHeight;
+      contentEl.style.maxHeight = `${maxHeight}px`;
+      contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+      buttonEl.setText("\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0431\u0456\u043B\u044C\u0448\u0435 \u25BC");
+    }
+  }
+  // --- Інші методи (handleCopyClick, processThinkingTags, etc. - без змін) ---
   handleCopyClick(content, buttonEl) {
     let textToCopy = content;
     if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
@@ -580,14 +678,14 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     navigator.clipboard.writeText(textToCopy).then(() => {
       (0, import_obsidian.setIcon)(buttonEl, "check");
-      buttonEl.setAttribute("title", "Copied!");
+      buttonEl.setAttribute("title", "\u0421\u043A\u043E\u043F\u0456\u0439\u043E\u0432\u0430\u043D\u043E!");
       setTimeout(() => {
         (0, import_obsidian.setIcon)(buttonEl, "copy");
-        buttonEl.setAttribute("title", "Copy");
+        buttonEl.setAttribute("title", "\u041A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438");
       }, 2e3);
     }).catch((err) => {
-      console.error("Failed to copy text: ", err);
-      new import_obsidian.Notice("Failed to copy text.");
+      console.error("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0441\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u0442\u0435\u043A\u0441\u0442: ", err);
+      new import_obsidian.Notice("\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0441\u043A\u043E\u043F\u0456\u044E\u0432\u0430\u0442\u0438 \u0442\u0435\u043A\u0441\u0442.");
     });
   }
   processThinkingTags(content) {
@@ -600,7 +698,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
         parts.push(this.markdownToHtml(content.substring(lastIndex, match.index)));
       }
       const thinkingContent = match[1];
-      const foldableHtml = `<div class="${CSS_CLASS_THINKING_BLOCK}"><div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">\u25BA</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div><div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${this.markdownToHtml(thinkingContent)}</div></div>`;
+      const foldableHtml = `<div class="${CSS_CLASS_THINKING_BLOCK}"><div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">\u25BA</div><div class="${CSS_CLASS_THINKING_TITLE}">\u0420\u043E\u0437\u0434\u0443\u043C\u0438</div></div><div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${this.markdownToHtml(thinkingContent)}</div></div>`;
       parts.push(foldableHtml);
       lastIndex = thinkingRegex.lastIndex;
     }
@@ -652,6 +750,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     return { hasThinkingTags: false, format: "none" };
   }
+  // --- Speech Recognition Placeholder Methods ---
   initSpeechWorker() {
   }
   setupSpeechWorkerHandlers() {
@@ -664,14 +763,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   stopVoiceRecording(processAudio) {
   }
+  // --- Helpers & Utilities ---
   getChatContainer() {
     return this.chatContainer;
-  }
-  clearChatContainer() {
-    this.clearChatContainerInternal();
-    this.saveMessageHistory();
-    this.updateSendButtonState();
-    this.showEmptyState();
   }
   clearChatContainerInternal() {
     this.messages = [];
@@ -682,6 +776,16 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     this.hideEmptyState();
   }
+  // --- Доданий метод для очищення ззовні (з main.ts) ---
+  clearDisplayAndState() {
+    var _a;
+    this.clearChatContainerInternal();
+    this.showEmptyState();
+    this.updateSendButtonState();
+    (_a = this.inputEl) == null ? void 0 : _a.focus();
+    console.log("OllamaView: \u0414\u0438\u0441\u043F\u043B\u0435\u0439 \u0442\u0430 \u0432\u043D\u0443\u0442\u0440\u0456\u0448\u043D\u0456\u0439 \u0441\u0442\u0430\u043D \u043E\u0447\u0438\u0449\u0435\u043D\u043E.");
+  }
+  // --- Інші хелпери (addLoadingIndicator, etc. - без змін) ---
   addLoadingIndicator() {
     this.hideEmptyState();
     const messageGroup = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
@@ -695,10 +799,11 @@ var _OllamaView = class extends import_obsidian.ItemView {
     return messageGroup;
   }
   removeLoadingIndicator(loadingEl) {
-    if (loadingEl && loadingEl.parentNode) {
+    if (loadingEl == null ? void 0 : loadingEl.parentNode) {
       loadingEl.remove();
     }
   }
+  // Додано перевірку loadingEl
   scrollToBottom() {
     this.guaranteedScrollToBottom(50, true);
   }
@@ -736,20 +841,22 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }, delay);
   }
   formatTime(date) {
-    return date.toLocaleTimeString(void 0, { hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
   }
+  // Український формат
   formatDateSeparator(date) {
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
     if (this.isSameDay(date, now)) {
-      return "Today";
+      return "\u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456";
     } else if (this.isSameDay(date, yesterday)) {
-      return "Yesterday";
+      return "\u0412\u0447\u043E\u0440\u0430";
     } else {
-      return date.toLocaleDateString(void 0, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      return date.toLocaleDateString("uk-UA", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
     }
   }
+  // Український формат
   isSameDay(date1, date2) {
     return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate();
   }
@@ -767,14 +874,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
   }
-  clearDisplayAndState() {
-    var _a;
-    this.clearChatContainerInternal();
-    this.showEmptyState();
-    this.updateSendButtonState();
-    (_a = this.inputEl) == null ? void 0 : _a.focus();
-    console.log("OllamaView: Display and internal state cleared.");
-  }
 };
 var OllamaView = _OllamaView;
 OllamaView.instance = null;
@@ -789,6 +888,7 @@ var DEFAULT_SETTINGS = {
   ragEnabled: false,
   ragFolderPath: "data",
   contextWindowSize: 5,
+  // RAG docs
   googleApiKey: "",
   speechLanguage: "uk-UA",
   maxRecordingTime: 15,
@@ -798,7 +898,16 @@ var DEFAULT_SETTINGS = {
   customRoleFilePath: "",
   systemPromptInterval: 0,
   temperature: 0.1,
-  contextWindow: 8192
+  contextWindow: 8192,
+  // Model context window
+  // --- Нові значення за замовчуванням ---
+  userAvatarType: "initials",
+  userAvatarContent: "U",
+  aiAvatarType: "icon",
+  aiAvatarContent: "bot",
+  // Іконка Obsidian
+  maxMessageHeight: 300
+  // Згортати повідомлення довші за 300px
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
@@ -811,43 +920,69 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   getId() {
     return "ollama-plugin";
   }
+  // Допоміжна функція для пошуку іконок
+  createIconSearch(containerEl, settingType) {
+    const searchContainer = containerEl.createDiv({ cls: "ollama-icon-search-container" });
+    let searchInput;
+    let resultsEl;
+    const performSearch = () => {
+      var _a, _b;
+      const query = searchInput.getValue().toLowerCase().trim();
+      resultsEl.empty();
+      if (!query)
+        return;
+      const allIcons = ((_b = (_a = window.require("obsidian")) == null ? void 0 : _a.getIconIds) == null ? void 0 : _b.call(_a)) || [];
+      const filteredIcons = allIcons.filter((icon) => icon.includes(query)).slice(0, 50);
+      if (filteredIcons.length > 0) {
+        filteredIcons.forEach((icon) => {
+          const iconEl = resultsEl.createEl("button", { cls: "ollama-icon-search-result" });
+          window.require("obsidian").setIcon(iconEl, icon);
+          iconEl.setAttribute("aria-label", icon);
+          iconEl.onClickEvent(() => {
+            if (settingType === "user") {
+              this.plugin.settings.userAvatarContent = icon;
+            } else {
+              this.plugin.settings.aiAvatarContent = icon;
+            }
+            this.plugin.saveSettings();
+            this.display();
+          });
+        });
+      } else {
+        resultsEl.setText("No icons found.");
+      }
+    };
+    searchInput = new import_obsidian2.TextComponent(searchContainer).setPlaceholder("Search Obsidian icons...").onChange(performSearch);
+    resultsEl = searchContainer.createDiv({ cls: "ollama-icon-search-results" });
+  }
   async display() {
     const { containerEl } = this;
     containerEl.empty();
+    containerEl.addClass("ollama-settings");
+    containerEl.createEl("h2", { text: "\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F" });
     new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc(
-      "IP address and port where Ollama is running (e.g. http://192.168.1.10:11434)"
+      "IP \u0430\u0434\u0440\u0435\u0441\u0430 \u0442\u0430 \u043F\u043E\u0440\u0442, \u0434\u0435 \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043E Ollama (\u043D\u0430\u043F\u0440. http://192.168.1.10:11434)"
     ).addText(
       (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
-        this.plugin.settings.ollamaServerUrl = value;
+        this.plugin.settings.ollamaServerUrl = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Server Connection").setDesc("Reconnect to local model server and refresh available models").addButton(
-      (button) => button.setButtonText("Reconnect").setIcon("refresh-cw").onClick(async () => {
+    new import_obsidian2.Setting(containerEl).setName("\u0417'\u0454\u0434\u043D\u0430\u043D\u043D\u044F \u0437 \u0441\u0435\u0440\u0432\u0435\u0440\u043E\u043C").setDesc("\u041F\u0435\u0440\u0435\u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0438\u0441\u044F \u0434\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0457 \u043C\u043E\u0434\u0435\u043B\u0456 \u0442\u0430 \u043E\u043D\u043E\u0432\u0438\u0442\u0438 \u0441\u043F\u0438\u0441\u043E\u043A \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0445 \u043C\u043E\u0434\u0435\u043B\u0435\u0439").addButton(
+      (button) => button.setButtonText("\u041F\u0435\u0440\u0435\u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0438\u0441\u044C").setIcon("refresh-cw").onClick(async () => {
         try {
-          new import_obsidian2.Notice("Connecting to Ollama server...");
-          const response = await fetch(
-            `${this.plugin.settings.ollamaServerUrl}/api/tags`,
-            {
-              method: "GET",
-              headers: { "Content-Type": "application/json" }
-            }
-          );
-          if (response.ok) {
-            new import_obsidian2.Notice("Successfully connected to Ollama server!");
-            containerEl.empty();
-            this.display();
-          } else {
-            new import_obsidian2.Notice(
-              "Failed to connect to Ollama server. Check the URL and ensure the server is running."
-            );
-            this.plugin.apiService.emit("connection-error");
-          }
+          new import_obsidian2.Notice("\u041F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F \u0434\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 Ollama...");
+          await this.plugin.apiService.getModels();
+          new import_obsidian2.Notice("\u0423\u0441\u043F\u0456\u0448\u043D\u043E \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0434\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 Ollama!");
+          this.display();
         } catch (error) {
-          new import_obsidian2.Notice(
-            "Connection error. Please check the server URL and your network connection."
-          );
-          this.plugin.apiService.emit("connection-error");
+          new import_obsidian2.Notice(`\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F: ${error.message}. \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 URL \u0442\u0430 \u0441\u0442\u0430\u043D \u0441\u0435\u0440\u0432\u0435\u0440\u0430.`);
+          if (this.plugin.view) {
+            this.plugin.view.internalAddMessage(
+              "error",
+              `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F \u0434\u043E Ollama: ${error.message}. \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F.`
+            );
+          }
         }
       })
     );
@@ -855,138 +990,232 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     try {
       availableModels = await this.plugin.apiService.getModels();
     } catch (error) {
-      console.error("Error fetching available models:", error);
-      this.plugin.apiService.emit("connection-error");
+      console.error("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043C\u043E\u0434\u0435\u043B\u0435\u0439:", error);
+      if (this.plugin.view) {
+        this.plugin.view.internalAddMessage(
+          "error",
+          `\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043E\u0442\u0440\u0438\u043C\u0430\u0442\u0438 \u0441\u043F\u0438\u0441\u043E\u043A \u043C\u043E\u0434\u0435\u043B\u0435\u0439: ${error.message}.`
+        );
+      }
     }
-    const selectedModel = availableModels.includes(
-      this.plugin.settings.modelName
-    ) ? this.plugin.settings.modelName : availableModels.length > 0 ? availableModels[0] : "";
-    const modelSetting = new import_obsidian2.Setting(containerEl).setName("Model Name").setDesc("Select the language model to use");
-    const dropdown = modelSetting.addDropdown((dropdown2) => {
-      const selectEl = dropdown2.selectEl;
-      while (selectEl.firstChild) {
-        selectEl.removeChild(selectEl.firstChild);
+    const modelSetting = new import_obsidian2.Setting(containerEl).setName("\u041D\u0430\u0437\u0432\u0430 \u041C\u043E\u0434\u0435\u043B\u0456").setDesc("\u041E\u0431\u0435\u0440\u0456\u0442\u044C \u043C\u043E\u0432\u043D\u0443 \u043C\u043E\u0434\u0435\u043B\u044C \u0434\u043B\u044F \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043D\u043D\u044F");
+    modelSetting.addDropdown((dropdown) => {
+      const selectEl = dropdown.selectEl;
+      selectEl.empty();
+      if (availableModels.length > 0) {
+        availableModels.forEach((model) => {
+          dropdown.addOption(model, model);
+        });
+        const currentModel = this.plugin.settings.modelName;
+        if (availableModels.includes(currentModel)) {
+          dropdown.setValue(currentModel);
+        } else if (availableModels.length > 0) {
+          dropdown.setValue(availableModels[0]);
+          this.plugin.settings.modelName = availableModels[0];
+          this.plugin.saveSettings();
+        }
+      } else {
+        dropdown.addOption("", "\u041C\u043E\u0434\u0435\u043B\u0456 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E");
+        dropdown.setDisabled(true);
       }
-      availableModels.forEach((model) => {
-        dropdown2.addOption(model, model);
-      });
-      if (availableModels.length === 0) {
-        dropdown2.addOption("", "No models available");
-      }
-      dropdown2.setValue(selectedModel);
-      dropdown2.onChange(async (value) => {
+      dropdown.onChange(async (value) => {
         this.plugin.settings.modelName = value;
         this.plugin.emit("model-changed", value);
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat message history between sessions").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("\u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430").setDesc("\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u044E\u0454 \u0432\u0438\u043F\u0430\u0434\u043A\u043E\u0432\u0456\u0441\u0442\u044C \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0435\u0439 \u043C\u043E\u0434\u0435\u043B\u0456 (0.0 - 1.0)").addSlider(
+      (slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
+        this.plugin.settings.temperature = value;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian2.Setting(containerEl).setName("\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u0435 \u0432\u0456\u043A\u043D\u043E \u043C\u043E\u0434\u0435\u043B\u0456").setDesc("\u0420\u043E\u0437\u043C\u0456\u0440 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u043E\u0433\u043E \u0432\u0456\u043A\u043D\u0430 \u043C\u043E\u0434\u0435\u043B\u0456 (\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E > 8192). \u0412\u043F\u043B\u0438\u0432\u0430\u0454 \u043D\u0430 \u043E\u0431\u0441\u044F\u0433 \u0456\u0441\u0442\u043E\u0440\u0456\u0457 \u0442\u0430 RAG, \u044F\u043A\u0438\u0439 \u043C\u043E\u0436\u043D\u0430 \u043F\u0435\u0440\u0435\u0434\u0430\u0442\u0438.").addText(
+      (text) => (
+        // Змінено на Text для гнучкості
+        text.setPlaceholder("8192").setValue(String(this.plugin.settings.contextWindow)).onChange(async (value) => {
+          const num = parseInt(value, 10);
+          if (!isNaN(num) && num > 0) {
+            this.plugin.settings.contextWindow = num;
+            await this.plugin.saveSettings();
+          } else {
+            new import_obsidian2.Notice("\u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u0432\u0432\u0435\u0434\u0456\u0442\u044C \u043F\u043E\u0437\u0438\u0442\u0438\u0432\u043D\u0435 \u0447\u0438\u0441\u043B\u043E\u0432\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F.");
+            text.setValue(String(this.plugin.settings.contextWindow));
+          }
+        })
+      )
+    );
+    containerEl.createEl("h2", { text: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u0427\u0430\u0442\u0443" });
+    new import_obsidian2.Setting(containerEl).setName("\u0417\u0431\u0435\u0440\u0456\u0433\u0430\u0442\u0438 \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C").setDesc("\u0417\u0431\u0435\u0440\u0456\u0433\u0430\u0442\u0438 \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443 \u043C\u0456\u0436 \u0441\u0435\u0441\u0456\u044F\u043C\u0438").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
         this.plugin.settings.saveMessageHistory = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Log File Size Limit").setDesc(
-      "Maximum size of message history log file in KB (1024 KB = 1 MB)"
+    new import_obsidian2.Setting(containerEl).setName("\u041B\u0456\u043C\u0456\u0442 \u0440\u043E\u0437\u043C\u0456\u0440\u0443 \u0444\u0430\u0439\u043B\u0443 \u0456\u0441\u0442\u043E\u0440\u0456\u0457").setDesc(
+      "\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0440\u043E\u0437\u043C\u0456\u0440 \u0444\u0430\u0439\u043B\u0443 \u0456\u0441\u0442\u043E\u0440\u0456\u0457 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C \u0432 KB (1024 KB = 1 MB)"
     ).addSlider(
       (slider) => slider.setLimits(256, 10240, 256).setValue(this.plugin.settings.logFileSizeLimit).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.logFileSizeLimit = value;
         await this.plugin.saveSettings();
       })
     ).addExtraButton(
-      (button) => button.setIcon("reset").setTooltip("Reset to default (1024 KB)").onClick(async () => {
+      (button) => button.setIcon("reset").setTooltip("\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0434\u043E \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u043E\u0433\u043E (1024 KB)").onClick(async () => {
         this.plugin.settings.logFileSizeLimit = DEFAULT_SETTINGS.logFileSizeLimit;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton(
-      (button) => button.setButtonText("Clear").onClick(async () => {
-        await this.plugin.clearMessageHistory();
-        new import_obsidian2.Notice("Chat history cleared.");
+    new import_obsidian2.Setting(containerEl).setName("\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u0406\u0441\u0442\u043E\u0440\u0456\u044E").setDesc("\u0412\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0432\u0441\u044E \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443").addButton(
+      (button) => button.setButtonText("\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438").onClick(async () => {
+        if (confirm("\u0412\u0438 \u0432\u043F\u0435\u0432\u043D\u0435\u043D\u0456, \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0432\u0441\u044E \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443? \u0426\u044E \u0434\u0456\u044E \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u0441\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438.")) {
+          await this.plugin.clearMessageHistory();
+          new import_obsidian2.Notice("\u0406\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443 \u043E\u0447\u0438\u0449\u0435\u043D\u043E.");
+        }
       })
     );
-    containerEl.createEl("h3", { text: "Role Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("Enable Role Definition").setDesc("Make Ollama follow a defined role from a file").addToggle(
+    containerEl.createEl("h2", { text: "\u0417\u043E\u0432\u043D\u0456\u0448\u043D\u0456\u0439 \u0412\u0438\u0433\u043B\u044F\u0434" });
+    containerEl.createEl("h4", { text: "\u0410\u0432\u0430\u0442\u0430\u0440 \u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430" });
+    new import_obsidian2.Setting(containerEl).setName("\u0422\u0438\u043F \u0430\u0432\u0430\u0442\u0430\u0440\u0430 \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430").addDropdown(
+      (dd) => dd.addOption("initials", "\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438").addOption("icon", "\u0406\u043A\u043E\u043D\u043A\u0430 Obsidian").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
+        this.plugin.settings.userAvatarType = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    if (this.plugin.settings.userAvatarType === "initials") {
+      new import_obsidian2.Setting(containerEl).setName("\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438 \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C 1-2 \u043B\u0456\u0442\u0435\u0440\u0438").addText(
+        (text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+          this.plugin.settings.userAvatarContent = value.substring(0, 2).toUpperCase();
+          await this.plugin.saveSettings();
+        })
+      );
+    } else {
+      new import_obsidian2.Setting(containerEl).setName("\u0406\u043A\u043E\u043D\u043A\u0430 \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043D\u0430\u0437\u0432\u0443 \u0456\u043A\u043E\u043D\u043A\u0438 Obsidian").addText(
+        (text) => text.setValue(this.plugin.settings.userAvatarContent).setPlaceholder("\u041D\u0430\u043F\u0440. user, smile, etc.").onChange(async (value) => {
+          this.plugin.settings.userAvatarContent = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+      this.createIconSearch(containerEl, "user");
+    }
+    containerEl.createEl("h4", { text: "\u0410\u0432\u0430\u0442\u0430\u0440 AI" });
+    new import_obsidian2.Setting(containerEl).setName("\u0422\u0438\u043F \u0430\u0432\u0430\u0442\u0430\u0440\u0430 AI").addDropdown(
+      (dd) => dd.addOption("initials", "\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438").addOption("icon", "\u0406\u043A\u043E\u043D\u043A\u0430 Obsidian").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
+        this.plugin.settings.aiAvatarType = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    if (this.plugin.settings.aiAvatarType === "initials") {
+      new import_obsidian2.Setting(containerEl).setName("\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438 AI").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C 1-2 \u043B\u0456\u0442\u0435\u0440\u0438").addText(
+        (text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+          this.plugin.settings.aiAvatarContent = value.substring(0, 2).toUpperCase();
+          await this.plugin.saveSettings();
+        })
+      );
+    } else {
+      new import_obsidian2.Setting(containerEl).setName("\u0406\u043A\u043E\u043D\u043A\u0430 AI").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043D\u0430\u0437\u0432\u0443 \u0456\u043A\u043E\u043D\u043A\u0438 Obsidian").addText(
+        (text) => text.setValue(this.plugin.settings.aiAvatarContent).setPlaceholder("\u041D\u0430\u043F\u0440. bot, cpu, brain, etc.").onChange(async (value) => {
+          this.plugin.settings.aiAvatarContent = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+      this.createIconSearch(containerEl, "ai");
+    }
+    new import_obsidian2.Setting(containerEl).setName("\u041C\u0430\u043A\u0441. \u0432\u0438\u0441\u043E\u0442\u0430 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u043F\u0435\u0440\u0435\u0434 \u0437\u0433\u043E\u0440\u0442\u0430\u043D\u043D\u044F\u043C").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u0432\u0438\u0441\u043E\u0442\u0443 \u0432 \u043F\u0456\u043A\u0441\u0435\u043B\u044F\u0445. \u0414\u043E\u0432\u0448\u0456 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u043C\u0430\u0442\u0438\u043C\u0443\u0442\u044C \u043A\u043D\u043E\u043F\u043A\u0443 '\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u0438 \u0431\u0456\u043B\u044C\u0448\u0435'. \u0412\u0432\u0435\u0434\u0456\u0442\u044C 0, \u0449\u043E\u0431 \u0432\u0438\u043C\u043A\u043D\u0443\u0442\u0438 \u0437\u0433\u043E\u0440\u0442\u0430\u043D\u043D\u044F.").addText(
+      (text) => text.setPlaceholder("300").setValue(String(this.plugin.settings.maxMessageHeight)).onChange(async (value) => {
+        const num = parseInt(value, 10);
+        if (!isNaN(num) && num >= 0) {
+          this.plugin.settings.maxMessageHeight = num;
+          await this.plugin.saveSettings();
+        } else {
+          new import_obsidian2.Notice("\u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u0432\u0432\u0435\u0434\u0456\u0442\u044C \u043D\u0435\u0432\u0456\u0434'\u0454\u043C\u043D\u0435 \u0447\u0438\u0441\u043B\u043E\u0432\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F.");
+          text.setValue(String(this.plugin.settings.maxMessageHeight));
+        }
+      })
+    );
+    containerEl.createEl("h2", { text: "\u041A\u043E\u043D\u0444\u0456\u0433\u0443\u0440\u0430\u0446\u0456\u044F \u0420\u043E\u043B\u0456 AI" });
+    new import_obsidian2.Setting(containerEl).setName("\u0412\u0432\u0456\u043C\u043A\u043D\u0443\u0442\u0438 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F \u0440\u043E\u043B\u0456").setDesc("\u0417\u043C\u0443\u0441\u0438\u0442\u0438 Ollama \u0441\u043B\u0456\u0434\u0443\u0432\u0430\u0442\u0438 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u0456\u0439 \u0440\u043E\u043B\u0456 \u0437 \u0444\u0430\u0439\u043B\u0443").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
         this.plugin.settings.followRole = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Use Default Role Definition").setDesc("Use the default role definition file from the plugin folder").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0432\u0430\u0442\u0438 \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0435 \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F \u0440\u043E\u043B\u0456").setDesc("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0432\u0430\u0442\u0438 \u0444\u0430\u0439\u043B default-role.md \u0437 \u043F\u0430\u043F\u043A\u0438 \u043F\u043B\u0430\u0433\u0456\u043D\u0430").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.useDefaultRoleDefinition).onChange(async (value) => {
         this.plugin.settings.useDefaultRoleDefinition = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Custom Role Definition Path").setDesc(
-      "Path to a custom role definition file (relative to vault root)"
+    new import_obsidian2.Setting(containerEl).setName("\u0428\u043B\u044F\u0445 \u0434\u043E \u0432\u043B\u0430\u0441\u043D\u043E\u0433\u043E \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F \u0440\u043E\u043B\u0456").setDesc(
+      "\u0428\u043B\u044F\u0445 \u0434\u043E \u0444\u0430\u0439\u043B\u0443 \u0437 \u0432\u043B\u0430\u0441\u043D\u0438\u043C \u0432\u0438\u0437\u043D\u0430\u0447\u0435\u043D\u043D\u044F\u043C \u0440\u043E\u043B\u0456 (\u0432\u0456\u0434\u043D\u043E\u0441\u043D\u043E \u043A\u043E\u0440\u0435\u043D\u044F \u0441\u0445\u043E\u0432\u0438\u0449\u0430)"
     ).addText(
-      (text) => text.setPlaceholder("folder/role.md").setValue(this.plugin.settings.customRoleFilePath).onChange(async (value) => {
-        this.plugin.settings.customRoleFilePath = value;
+      (text) => text.setPlaceholder("\u0448\u043B\u044F\u0445/\u0434\u043E/\u0444\u0430\u0439\u043B\u0443_\u0440\u043E\u043B\u0456.md").setValue(this.plugin.settings.customRoleFilePath).onChange(async (value) => {
+        this.plugin.settings.customRoleFilePath = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("System Prompt Interval").setDesc("Number of message pairs between system prompt resends. 0 - with every request, negative - never send").addText(
-      (text) => text.setValue(String(this.plugin.settings.systemPromptInterval || 0)).onChange(async (value) => {
-        this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
-        await this.plugin.saveSettings();
-      })
+    new import_obsidian2.Setting(containerEl).setName("\u0406\u043D\u0442\u0435\u0440\u0432\u0430\u043B \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u043C\u043F\u0442\u0443").setDesc("\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u043F\u0430\u0440 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C \u043C\u0456\u0436 \u043F\u043E\u0432\u0442\u043E\u0440\u043D\u0438\u043C\u0438 \u043D\u0430\u0434\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C\u0438 \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u043C\u043F\u0442\u0443. 0 - \u0437 \u043A\u043E\u0436\u043D\u0438\u043C \u0437\u0430\u043F\u0438\u0442\u043E\u043C, \u0432\u0456\u0434'\u0454\u043C\u043D\u0435 - \u043D\u0456\u043A\u043E\u043B\u0438").addText(
+      (text) => (
+        // Використовуємо Text для введення чисел
+        text.setValue(String(this.plugin.settings.systemPromptInterval)).onChange(async (value) => {
+          this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
+          await this.plugin.saveSettings();
+        })
+      )
     );
-    containerEl.createEl("h3", { text: "RAG Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("Enable RAG").setDesc("Use Retrieval Augmented Generation with your notes").addToggle(
+    containerEl.createEl("h2", { text: "\u041A\u043E\u043D\u0444\u0456\u0433\u0443\u0440\u0430\u0446\u0456\u044F RAG" });
+    new import_obsidian2.Setting(containerEl).setName("\u0412\u0432\u0456\u043C\u043A\u043D\u0443\u0442\u0438 RAG").setDesc("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0432\u0430\u0442\u0438 Retrieval Augmented Generation \u0437 \u0432\u0430\u0448\u0438\u043C\u0438 \u043D\u043E\u0442\u0430\u0442\u043A\u0430\u043C\u0438").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
         this.plugin.settings.ragEnabled = value;
         await this.plugin.saveSettings();
+        if (value && this.plugin.ragService) {
+          new import_obsidian2.Notice("RAG \u0443\u0432\u0456\u043C\u043A\u043D\u0435\u043D\u043E. \u0417\u0430\u043F\u0443\u0441\u043A\u0430\u0454\u0442\u044C\u0441\u044F \u0456\u043D\u0434\u0435\u043A\u0441\u0430\u0446\u0456\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432...");
+          this.plugin.ragService.indexDocuments();
+        }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("AI Assistant Path").setDesc(
-      "Path to the folder containing assistant settings. RAG documents will be loaded from 'data' subfolder (relative to vault root)"
+    new import_obsidian2.Setting(containerEl).setName("\u0428\u043B\u044F\u0445 \u0434\u043E \u043F\u0430\u043F\u043A\u0438 RAG").setDesc(
+      "\u0428\u043B\u044F\u0445 \u0434\u043E \u043F\u0430\u043F\u043A\u0438, \u0449\u043E \u043C\u0456\u0441\u0442\u0438\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0438 \u0434\u043B\u044F RAG (\u0432\u0456\u0434\u043D\u043E\u0441\u043D\u043E \u043A\u043E\u0440\u0435\u043D\u044F \u0441\u0445\u043E\u0432\u0438\u0449\u0430)"
     ).addText(
-      (text) => text.setPlaceholder("").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
-        this.plugin.settings.ragFolderPath = value;
+      (text) => text.setPlaceholder("data/rag_docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
+        this.plugin.settings.ragFolderPath = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Context Window Size").setDesc("Number of relevant documents to include in context").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 RAG \u0443 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0456").setDesc("\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448 \u0440\u0435\u043B\u0435\u0432\u0430\u043D\u0442\u043D\u0438\u0445 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u0456\u0432 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 \u0434\u043E\u0434\u0430\u0432\u0430\u0442\u0438 \u0434\u043E \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0443").addSlider(
       (slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.contextWindowSize).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.contextWindowSize = value;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Speech Recognition" });
-    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API key for Google Speech-to-Text service").addText(
-      (text) => text.setPlaceholder("Enter your Google API key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
-        this.plugin.settings.googleApiKey = value;
+    containerEl.createEl("h2", { text: "\u0420\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u041C\u043E\u0432\u043B\u0435\u043D\u043D\u044F" });
+    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API \u043A\u043B\u044E\u0447 \u0434\u043B\u044F \u0441\u0435\u0440\u0432\u0456\u0441\u0443 Google Speech-to-Text").addText(
+      (text) => text.setPlaceholder("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u0432\u0430\u0448 Google API \u043A\u043B\u044E\u0447").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+        this.plugin.settings.googleApiKey = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Speech Recognition Language").setDesc(
-      "Language code for Google Speech-to-Text (e.g., uk-UA, en-US, ru-RU)"
+    new import_obsidian2.Setting(containerEl).setName("\u041C\u043E\u0432\u0430 \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F").setDesc(
+      "\u041A\u043E\u0434 \u043C\u043E\u0432\u0438 \u0434\u043B\u044F Google Speech-to-Text (\u043D\u0430\u043F\u0440., uk-UA, en-US, pl-PL)"
     ).addText(
       (text) => text.setPlaceholder("uk-UA").setValue(this.plugin.settings.speechLanguage).onChange(async (value) => {
-        this.plugin.settings.speechLanguage = value;
+        this.plugin.settings.speechLanguage = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Maximum Recording Time").setDesc(
-      "Maximum time (in seconds) to record before automatically stopping"
+    new import_obsidian2.Setting(containerEl).setName("\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0447\u0430\u0441 \u0437\u0430\u043F\u0438\u0441\u0443").setDesc(
+      "\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0447\u0430\u0441 (\u0432 \u0441\u0435\u043A\u0443\u043D\u0434\u0430\u0445) \u0434\u043B\u044F \u0437\u0430\u043F\u0438\u0441\u0443 \u043F\u0435\u0440\u0435\u0434 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E\u044E \u0437\u0443\u043F\u0438\u043D\u043A\u043E\u044E"
     ).addSlider(
       (slider) => slider.setLimits(5, 60, 5).setValue(this.plugin.settings.maxRecordingTime).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.maxRecordingTime = value;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Advanced Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("AI context window").setDesc("Model context window size (recommended > 8192)").addText(
-      (text) => text.setValue(String(this.plugin.settings.contextWindow || 8192)).onChange(async (value) => {
-        this.plugin.settings.contextWindow = parseInt(value) || 8192;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Temperature").setDesc("Controls randomness in model responses (0.0-1.0)").addSlider(
-      (slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.temperature = value;
+    new import_obsidian2.Setting(containerEl).setName("\u0412\u0438\u044F\u0432\u043B\u0435\u043D\u043D\u044F \u0442\u0438\u0448\u0456").setDesc("\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0437\u0443\u043F\u0438\u043D\u044F\u0442\u0438 \u0437\u0430\u043F\u0438\u0441 \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0456\u043E\u0434\u0443 \u0442\u0438\u0448\u0456 (\u044F\u043A\u0449\u043E \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454\u0442\u044C\u0441\u044F)").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.silenceDetection).onChange(async (value) => {
+        this.plugin.settings.silenceDetection = value;
         await this.plugin.saveSettings();
       })
     );
@@ -1116,296 +1345,18 @@ var RagService = class {
   }
 };
 
-// stateManager.ts
-var StateManager = class {
-  constructor() {
-    this.state = {
-      currentPhase: "next goal choosing",
-      currentGoal: "Identify if there are any urgent tasks",
-      userActivity: "talking with AI",
-      hasUrgentTasks: "unknown",
-      urgentTasksList: [],
-      currentUrgentTask: null,
-      planExists: "unknown",
-      lastUpdateTime: new Date()
-    };
-  }
-  // Singleton паттерн для доступа к состоянию
-  static getInstance() {
-    if (!StateManager.instance) {
-      StateManager.instance = new StateManager();
-    }
-    return StateManager.instance;
-  }
-  // Получить текущее состояние
-  getState() {
-    this.state.lastUpdateTime = new Date();
-    return { ...this.state };
-  }
-  // Обновить состояние
-  updateState(newState) {
-    this.state = {
-      ...this.state,
-      ...newState,
-      lastUpdateTime: new Date()
-    };
-  }
-  // Добавление задачи в список срочных задач
-  addUrgentTask(task) {
-    if (!this.state.urgentTasksList.includes(task)) {
-      this.state.urgentTasksList.push(task);
-      if (!this.state.currentUrgentTask && this.state.urgentTasksList.length > 0) {
-        this.state.currentUrgentTask = this.state.urgentTasksList[0];
-      }
-      this.state.hasUrgentTasks = true;
-    }
-  }
-  // Удаление задачи из списка и обновление текущей задачи
-  completeUrgentTask(task) {
-    const index = this.state.urgentTasksList.indexOf(task);
-    if (index !== -1) {
-      this.state.urgentTasksList.splice(index, 1);
-      if (this.state.urgentTasksList.length > 0) {
-        this.state.currentUrgentTask = this.state.urgentTasksList[0];
-      } else {
-        this.state.currentUrgentTask = null;
-        this.state.hasUrgentTasks = false;
-      }
-    }
-  }
-  // Получить состояние в формате для вставки в сообщение
-  getStateFormatted() {
-    const currentTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    return `- **[day phase]** ${this.state.currentPhase}
-  - **[next goal]** ${this.state.currentGoal}
-  - **[user activity]** ${this.state.userActivity}
-  - **[AI time]** ${currentTime}`;
-  }
-  // Анализ сообщения пользователя для обновления состояния
-  processUserMessage(message) {
-  }
-  // Сохранение состояния в локальное хранилище
-  saveStateToStorage() {
-    localStorage.setItem("assistantState", JSON.stringify(this.state));
-  }
-  // Загрузка состояния из локального хранилища
-  loadStateFromStorage() {
-    const savedState = localStorage.getItem("assistantState");
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        parsedState.lastUpdateTime = new Date(parsedState.lastUpdateTime);
-        this.state = parsedState;
-        return true;
-      } catch (e) {
-        console.error("Error parsing saved state:", e);
-      }
-    }
-    return false;
-  }
-};
-
-// promptService.ts
-var import_obsidian3 = require("obsidian");
-var path = __toESM(require("path"));
-var PromptService = class {
-  // Reference to the plugin for accessing services
-  constructor(plugin) {
-    this.systemPrompt = null;
-    this.stateManager = StateManager.getInstance();
-    this.plugin = plugin;
-  }
-  /**
-   * Set plugin reference for accessing services
-   */
-  setPlugin(plugin) {
-    this.plugin = plugin;
-  }
-  /**
-   * Set system prompt to be used with each request
-   */
-  setSystemPrompt(prompt) {
-    this.systemPrompt = prompt;
-  }
-  /**
-   * Get system prompt if set
-   */
-  getSystemPrompt() {
-    return this.systemPrompt;
-  }
-  /**
-   * Format user prompt with necessary context and state information
-   */
-  formatPrompt(userInput, isNewConversation = false) {
-    this.stateManager.processUserMessage(userInput);
-    if (isNewConversation) {
-      return userInput;
-    }
-    return userInput;
-  }
-  /**
-   * Enhance prompt with RAG context if available
-   */
-  enhanceWithRagContext(prompt, ragContext) {
-    if (!ragContext) {
-      return prompt;
-    }
-    return `Context information:
-${ragContext}
-
-User message: ${prompt}`;
-  }
-  /**
-   * Prepare request body for model API call
-   */
-  prepareRequestBody(modelName, prompt, temperature = 0.2) {
-    const requestBody = {
-      model: modelName,
-      prompt,
-      stream: false,
-      temperature
-    };
-    if (this.systemPrompt) {
-      requestBody.system = this.systemPrompt;
-    }
-    return requestBody;
-  }
-  /**
-   * Process response from language model
-   */
-  processModelResponse(response) {
-    const textArea = document.createElement("textarea");
-    textArea.innerHTML = response;
-    const decodedResponse = textArea.value;
-    return decodedResponse.includes("<think>") ? decodedResponse : response;
-  }
-  /**
-   * Get default role definition from plugin folder
-   */
-  async getDefaultRoleDefinition() {
-    if (!this.plugin) {
-      return null;
-    }
-    try {
-      const pluginFolder = this.plugin.manifest.dir;
-      const rolePath = "default-role.md";
-      const fullPath = path.join(pluginFolder, rolePath);
-      let content;
-      try {
-        content = await this.plugin.app.vault.adapter.read(fullPath);
-      } catch (readError) {
-        console.log("Couldn't read file, attempting to create it");
-        try {
-          const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
-          const exists = await this.plugin.app.vault.adapter.exists(fullPath);
-          if (!exists) {
-            await this.plugin.app.vault.adapter.write(fullPath, defaultContent);
-            content = defaultContent;
-          } else {
-            console.error("File exists but couldn't be read:", fullPath);
-            return null;
-          }
-        } catch (createError) {
-          console.error("Error creating default role file:", createError);
-          return null;
-        }
-      }
-      if (content) {
-        const currentTime = new Date().toLocaleTimeString();
-        content += `
-AI time is ${currentTime} now`;
-        return content;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error handling default role definition:", error);
-      return null;
-    }
-  }
-  /**
-   * Get custom role definition from specified path
-   */
-  async getCustomRoleDefinition() {
-    if (!this.plugin || !this.plugin.settings.customRoleFilePath) {
-      return null;
-    }
-    try {
-      const customPath = this.plugin.settings.customRoleFilePath;
-      const file = this.plugin.app.vault.getAbstractFileByPath(customPath);
-      if (file instanceof import_obsidian3.TFile) {
-        let content = await this.plugin.app.vault.read(file);
-        const currentTime = new Date().toLocaleTimeString();
-        content += `
-AI time is ${currentTime} now`;
-        return content;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error reading custom role definition:", error);
-      return null;
-    }
-  }
-  /**
-   * Get role definition based on settings
-   */
-  async getRoleDefinition() {
-    if (!this.plugin || !this.plugin.settings.followRole) {
-      return null;
-    }
-    try {
-      if (this.plugin.settings.useDefaultRoleDefinition) {
-        return await this.getDefaultRoleDefinition();
-      } else if (this.plugin.settings.customRoleFilePath) {
-        return await this.getCustomRoleDefinition();
-      }
-      return null;
-    } catch (error) {
-      console.error("Error reading role definition:", error);
-      return null;
-    }
-  }
-  /**
-   * Prepare a complete prompt with all enhancements (RAG, role definition, etc.)
-   */
-  async prepareFullPrompt(content, isNewConversation = false) {
-    if (!this.plugin) {
-      return this.formatPrompt(content, isNewConversation);
-    }
-    try {
-      const roleDefinition = await this.getRoleDefinition();
-      if (roleDefinition) {
-        this.setSystemPrompt(roleDefinition);
-      }
-    } catch (error) {
-      console.error("Error getting role definition:", error);
-    }
-    let formattedPrompt = this.formatPrompt(content, isNewConversation);
-    if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
-      try {
-        if (this.plugin.ragService.findRelevantDocuments("test").length === 0) {
-          await this.plugin.ragService.indexDocuments();
-        }
-        const ragContext = this.plugin.ragService.prepareContext(content);
-        if (ragContext) {
-          formattedPrompt = this.enhanceWithRagContext(formattedPrompt, ragContext);
-        }
-      } catch (error) {
-        console.error("Error processing RAG:", error);
-      }
-    }
-    return formattedPrompt;
-  }
-};
-
 // apiServices.ts
 var ApiService = class {
-  constructor(baseUrl, plugin) {
+  // Додаємо посилання на плагін
+  constructor(plugin) {
+    // private stateManager: StateManager; // Ймовірно, не потрібен
+    // promptService не потрібен напряму, якщо MessageService керує ним
+    // private promptService: PromptService;
     this.ollamaView = null;
+    // Використовуємо конкретний тип
     this.eventHandlers = {};
-    this.baseUrl = baseUrl;
-    this.stateManager = StateManager.getInstance();
-    this.promptService = new PromptService(plugin);
-    this.stateManager.loadStateFromStorage();
+    this.plugin = plugin;
+    this.baseUrl = plugin.settings.ollamaServerUrl;
   }
   on(event, callback) {
     if (!this.eventHandlers[event]) {
@@ -1421,107 +1372,317 @@ var ApiService = class {
   emit(event, data) {
     const handlers = this.eventHandlers[event];
     if (handlers) {
-      handlers.forEach((handler) => handler(data));
+      handlers.slice().forEach((handler) => {
+        try {
+          handler(data);
+        } catch (e) {
+          console.error(`Error in API Service event handler for ${event}:`, e);
+        }
+      });
     }
   }
-  getPromptService() {
-    return this.promptService;
-  }
+  // getPromptService(): PromptService { // Ймовірно, не потрібно
+  //   return this.promptService;
+  // }
   setOllamaView(view) {
     this.ollamaView = view;
   }
-  /**
-   * Set system prompt to be used with each request
-   */
-  setSystemPrompt(prompt) {
-    this.promptService.setSystemPrompt(prompt);
-  }
-  /**
-   * Set base URL for the API
-   */
+  // setSystemPrompt(prompt: string | null): void { // Керується через PromptService
+  //   this.promptService.setSystemPrompt(prompt);
+  // }
   setBaseUrl(url) {
     this.baseUrl = url;
   }
+  // setPlugin(plugin: any): void { // Встановлюється в конструкторі
+  //   this.promptService.setPlugin(plugin);
+  // }
   /**
-   * Set plugin reference for prompt service
-   */
-  setPlugin(plugin) {
-    this.promptService.setPlugin(plugin);
-  }
-  /**
-   * Generate response from Ollama
+   * Генерує відповідь від Ollama.
+   * requestBody тепер містить model, prompt, system, options, stream, temperature.
    */
   async generateResponse(requestBody) {
-    const response = await fetch(`${this.baseUrl}/api/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(requestBody)
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! Status: ${response.status}, ${errorText}`);
+    const apiUrl = `${this.baseUrl}/api/generate`;
+    console.log("Sending request to Ollama:", apiUrl, JSON.stringify({ ...requestBody, prompt: requestBody.prompt.substring(0, 100) + "..." }));
+    try {
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      });
+      if (!response.ok) {
+        let errorText = `HTTP error! Status: ${response.status}`;
+        try {
+          const bodyText = await response.text();
+          try {
+            const errorJson = JSON.parse(bodyText);
+            errorText += `: ${errorJson.error || bodyText}`;
+          } catch (jsonError) {
+            errorText += `: ${bodyText}`;
+          }
+          if (bodyText.includes("model not found")) {
+            errorText = `Model '${requestBody.model}' not found on the Ollama server.`;
+            this.emit("error", new Error(errorText));
+          }
+        } catch (bodyError) {
+          console.error("Could not read error response body:", bodyError);
+        }
+        console.error("Ollama API Error:", errorText);
+        throw new Error(errorText);
+      }
+      const data = await response.json();
+      console.log("Received response from Ollama:", { ...data, response: data.response.substring(0, 100) + "..." });
+      return data;
+    } catch (error) {
+      console.error(`Workspace error calling Ollama API (${apiUrl}):`, error);
+      let connectionErrorMsg = `Failed to connect to Ollama server at ${this.baseUrl}. Is it running?`;
+      if (error.message.includes("fetch")) {
+        connectionErrorMsg += ` (Fetch error: ${error.message})`;
+      }
+      this.emit("connection-error", new Error(connectionErrorMsg));
+      throw new Error(connectionErrorMsg);
     }
-    const data = await response.json();
-    data.response = this.promptService.processModelResponse(data.response);
-    this.stateManager.saveStateToStorage();
-    return {
-      model: requestBody.model,
-      response: this.promptService.processModelResponse(data.response)
-    };
   }
   /**
-   * Get available models from Ollama
+   * Отримує список доступних моделей з Ollama.
    */
   async getModels() {
+    const apiUrl = `${this.baseUrl}/api/tags`;
     try {
-      const response = await fetch(`${this.baseUrl}/api/tags`, {
+      const response = await fetch(apiUrl, {
         method: "GET",
         headers: { "Content-Type": "application/json" }
       });
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`HTTP error fetching models! Status: ${response.status}`, errorText);
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       const data = await response.json();
       if (Array.isArray(data.models)) {
-        return data.models.map(
-          (model) => typeof model === "object" ? model.name : model
-        );
+        return data.models.map((model) => typeof model === "object" ? model.name : model).sort();
       }
       return [];
     } catch (error) {
-      console.error("Error fetching models:", error);
+      console.error(`Error fetching models from ${apiUrl}:`, error);
+      if (error.message.includes("fetch") || error.message.includes("Failed to fetch")) {
+        this.emit("connection-error", new Error(`Failed to fetch models from ${this.baseUrl}. Is it running?`));
+      }
       return [];
     }
   }
-  /**
-   * Reset assistant state to initial values
-   */
-  resetState() {
-    const initialState = {
-      currentPhase: "next goal choosing",
-      currentGoal: "Identify if there are any urgent tasks",
-      userActivity: "talking with AI",
-      hasUrgentTasks: "unknown",
-      urgentTasksList: [],
-      currentUrgentTask: null,
-      planExists: "unknown"
+  // resetState(): void { // Логіка стану, ймовірно, тут не потрібна
+  //   // ...
+  // }
+};
+
+// promptService.ts
+var import_obsidian3 = require("obsidian");
+var path = __toESM(require("path"));
+function countWords(text) {
+  if (!text)
+    return 0;
+  return text.trim().split(/\s+/).length;
+}
+var PromptService = class {
+  // Змінено тип на конкретний
+  // Прибираємо StateManager, якщо він не потрібен саме для формування промпту
+  // private stateManager: StateManager;
+  constructor(plugin) {
+    this.systemPrompt = null;
+    this.plugin = plugin;
+  }
+  setSystemPrompt(prompt) {
+    this.systemPrompt = prompt;
+  }
+  getSystemPrompt() {
+    return this.systemPrompt;
+  }
+  // Цей метод тепер стає менш важливим, основна логіка в prepareFullPrompt
+  formatPrompt(userInput) {
+    return userInput.trim();
+  }
+  // Об'єднаємо логіку RAG сюди
+  // enhanceWithRagContext(prompt: string, ragContext: string | null): string { ... }
+  // --- Новий метод для підготовки контексту ---
+  buildContext(history, ragContext, userInput) {
+    let promptParts = [];
+    let systemWordCount = 0;
+    let contextWordCount = 0;
+    const currentSystemPrompt = this.getSystemPrompt();
+    if (currentSystemPrompt) {
+      systemWordCount = countWords(currentSystemPrompt);
+    }
+    if (ragContext) {
+      const ragHeader = "\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u0430 \u0456\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0456\u044F \u0437 \u043D\u043E\u0442\u0430\u0442\u043E\u043A:\n```\n";
+      const ragFooter = "\n```\n\n";
+      const fullRagBlock = ragHeader + ragContext + ragFooter;
+      promptParts.push(fullRagBlock);
+      contextWordCount += countWords(fullRagBlock);
+    }
+    const historyStrings = [];
+    for (let i = history.length - 1; i >= 0; i--) {
+      const msg = history[i];
+      const formattedMsg = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`;
+      historyStrings.push(formattedMsg);
+      contextWordCount += countWords(formattedMsg);
+    }
+    promptParts = promptParts.concat(historyStrings.reverse());
+    const userMsgFormatted = `User: ${userInput}`;
+    promptParts.push(userMsgFormatted);
+    const fullPrompt = promptParts.join("\n\n");
+    return {
+      fullPrompt,
+      // Промпт без системного, але з RAG та історією
+      contextWordCount,
+      // Слова RAG + Історії
+      systemPromptWordCount: systemWordCount
+      // Слова системного промпту
     };
-    this.stateManager.updateState(initialState);
-    this.stateManager.saveStateToStorage();
-    if (this.ollamaView) {
-      this.ollamaView.messagesPairCount = 0;
+  }
+  // --- Основний метод підготовки ---
+  async prepareFullPrompt(content, history) {
+    if (!this.plugin) {
+      console.warn("Plugin reference not set in PromptService.");
+      return this.formatPrompt(content);
+    }
+    try {
+      const roleDefinition = await this.getRoleDefinition();
+      this.setSystemPrompt(roleDefinition);
+    } catch (error) {
+      console.error("Error getting role definition:", error);
+      this.setSystemPrompt(null);
+    }
+    let ragContext = null;
+    if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+      try {
+        ragContext = this.plugin.ragService.prepareContext(content);
+      } catch (error) {
+        console.error("Error processing RAG:", error);
+      }
+    }
+    let { fullPrompt, contextWordCount, systemPromptWordCount } = this.buildContext(history, ragContext, content);
+    const userInputWordCount = countWords(content);
+    const tokenApproximationFactor = 0.75;
+    const modelContextLimit = this.plugin.settings.contextWindow;
+    const wordLimit = Math.max(100, modelContextLimit / tokenApproximationFactor - systemPromptWordCount - userInputWordCount - 200);
+    if (contextWordCount > wordLimit) {
+      console.warn(`Context too long (${contextWordCount} words > limit ${wordLimit}). Trimming oldest messages/RAG.`);
+      let promptLines = fullPrompt.split("\n\n");
+      let currentWordCount = contextWordCount;
+      while (currentWordCount > wordLimit && promptLines.length > 1) {
+        const lineToRemove = promptLines.shift();
+        if (lineToRemove) {
+          currentWordCount -= countWords(lineToRemove);
+        }
+      }
+      fullPrompt = promptLines.join("\n\n");
+      console.log(`Trimmed context word count: ${currentWordCount}`);
+    }
+    if (!fullPrompt.includes(`User: ${content.trim()}`)) {
+      console.warn("User input was trimmed, re-adding it.");
+      fullPrompt += `
+
+User: ${content.trim()}`;
+    }
+    return fullPrompt;
+  }
+  // --- Методи для роботи з ролями (без змін) ---
+  async getDefaultRoleDefinition() {
+    if (!this.plugin)
+      return null;
+    try {
+      const pluginFolder = this.plugin.manifest.dir;
+      if (!pluginFolder) {
+        console.error("Cannot determine plugin folder path.");
+        return null;
+      }
+      const rolePath = "default-role.md";
+      const fullPath = normalizePath(path.join(pluginFolder, rolePath));
+      let content = null;
+      const adapter = this.plugin.app.vault.adapter;
+      if (await adapter.exists(fullPath)) {
+        try {
+          content = await adapter.read(fullPath);
+        } catch (readError) {
+          console.error(`Error reading default role file at ${fullPath}:`, readError);
+          return null;
+        }
+      } else {
+        console.log(`Default role file not found at ${fullPath}, creating it.`);
+        try {
+          const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
+          await adapter.write(fullPath, defaultContent);
+          content = defaultContent;
+        } catch (createError) {
+          console.error(`Error creating default role file at ${fullPath}:`, createError);
+          return null;
+        }
+      }
+      if (content !== null) {
+        const currentTime = new Date().toLocaleTimeString("uk-UA");
+        content += `
+
+\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0447\u0430\u0441: ${currentTime}`;
+        return content;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error handling default role definition:", error);
+      return null;
     }
   }
+  async getCustomRoleDefinition() {
+    if (!this.plugin || !this.plugin.settings.customRoleFilePath)
+      return null;
+    try {
+      const customPath = normalizePath(this.plugin.settings.customRoleFilePath);
+      const file = this.plugin.app.vault.getAbstractFileByPath(customPath);
+      if (file instanceof import_obsidian3.TFile) {
+        let content = await this.plugin.app.vault.read(file);
+        const currentTime = new Date().toLocaleTimeString("uk-UA");
+        content += `
+
+\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0447\u0430\u0441: ${currentTime}`;
+        return content;
+      } else {
+        console.warn(`Custom role file not found or is not a file: ${customPath}`);
+        return null;
+      }
+    } catch (error) {
+      console.error("Error reading custom role definition:", error);
+      return null;
+    }
+  }
+  async getRoleDefinition() {
+    if (!this.plugin || !this.plugin.settings.followRole)
+      return null;
+    try {
+      if (this.plugin.settings.useDefaultRoleDefinition) {
+        return await this.getDefaultRoleDefinition();
+      } else if (this.plugin.settings.customRoleFilePath) {
+        return await this.getCustomRoleDefinition();
+      }
+      return null;
+    } catch (error) {
+      console.error("Error reading role definition:", error);
+      return null;
+    }
+  }
+  // Цей метод більше не потрібен тут, його логіка в ApiService
+  // processModelResponse(response: string): string { ... }
+  // Цей метод теж не потрібен тут, він в ApiService або MessageService
+  // prepareRequestBody(modelName: string, prompt: string, temperature: number = 0.2): any { ... }
 };
 
 // messageService.ts
 var MessageService = class {
   constructor(plugin) {
     this.view = null;
+    // Додаємо посилання
     this.isProcessing = false;
     this.plugin = plugin;
+    this.apiService = plugin.apiService;
+    this.promptService = plugin.promptService;
   }
   setView(view) {
     this.view = view;
@@ -1539,20 +1700,28 @@ var MessageService = class {
             this.view.internalAddMessage(role, msg.content, {
               saveHistory: false,
               timestamp: msg.timestamp
-              // Pass ISO string or Date object
             });
           } else {
-            console.warn("Skipping message with missing data during history load:", msg);
+            console.warn("\u041F\u0440\u043E\u043F\u0443\u0441\u043A \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u0437 \u043D\u0435\u043F\u043E\u0432\u043D\u0438\u043C\u0438 \u0434\u0430\u043D\u0438\u043C\u0438 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", msg);
           }
         }
         historyLoaded = true;
-        this.view.guaranteedScrollToBottom(100, true);
+        setTimeout(() => {
+          var _a;
+          return (_a = this.view) == null ? void 0 : _a.guaranteedScrollToBottom(100, true);
+        }, 100);
       }
       if (historyLoaded) {
         await this.view.saveMessageHistory();
       }
     } catch (error) {
-      console.error("MessageService: Error loading message history:", error);
+      console.error("MessageService: \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", error);
+    } finally {
+      if (this.view && this.view.getMessagesCount() === 0) {
+        this.view.showEmptyState();
+      } else if (this.view) {
+        this.view.hideEmptyState();
+      }
     }
   }
   async sendMessage(content) {
@@ -1568,52 +1737,51 @@ var MessageService = class {
     const loadingMessageEl = this.view.addLoadingIndicator();
     setTimeout(async () => {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      let responseData = null;
       try {
-        let useSystemPrompt = false;
-        const messagesPairCount = (_b = (_a = this.view) == null ? void 0 : _a.getMessagesPairCount()) != null ? _b : 0;
-        const messagesCount = (_d = (_c = this.view) == null ? void 0 : _c.getMessagesCount()) != null ? _d : 0;
-        if (this.plugin.settings.followRole) {
-          const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
-          if (systemPromptInterval === 0) {
-            useSystemPrompt = true;
-          } else if (systemPromptInterval > 0) {
-            useSystemPrompt = messagesPairCount % systemPromptInterval === 0;
-          }
-        }
-        const isNewConversation = messagesCount <= 1;
-        const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
-          content,
-          isNewConversation
-          // Pass context flag to prompt service
-        );
+        const history = (_b = (_a = this.view) == null ? void 0 : _a.getMessages()) != null ? _b : [];
+        const formattedPrompt = await this.promptService.prepareFullPrompt(content, history);
         const requestBody = {
           model: this.plugin.settings.modelName,
           prompt: formattedPrompt,
           stream: false,
-          // Change to true for streaming
-          temperature: this.plugin.settings.temperature || 0.2,
+          // Поки що без стрімінгу
+          temperature: this.plugin.settings.temperature,
           options: {
-            num_ctx: this.plugin.settings.contextWindow || 8192
-          }
+            num_ctx: this.plugin.settings.contextWindow
+            // Використовуємо contextWindow
+          },
+          system: (_c = this.promptService.getSystemPrompt()) != null ? _c : void 0
+          // Додаємо системний промпт, якщо є
         };
-        if (useSystemPrompt) {
-          const systemPrompt = this.plugin.promptService.getSystemPrompt();
-          if (systemPrompt) {
-            requestBody.system = systemPrompt;
-            console.log("Using system prompt for this request.");
+        if (!requestBody.system) {
+          delete requestBody.system;
+        }
+        responseData = await this.apiService.generateResponse(requestBody);
+        (_d = this.view) == null ? void 0 : _d.removeLoadingIndicator(loadingMessageEl);
+        if (responseData && responseData.response) {
+          const textArea = document.createElement("textarea");
+          textArea.innerHTML = responseData.response;
+          const decodedResponse = textArea.value;
+          (_e = this.view) == null ? void 0 : _e.internalAddMessage("assistant", decodedResponse);
+        } else {
+          (_f = this.view) == null ? void 0 : _f.internalAddMessage("error", "\u041E\u0442\u0440\u0438\u043C\u0430\u043D\u043E \u043F\u043E\u0440\u043E\u0436\u043D\u044E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u0432\u0456\u0434 \u043C\u043E\u0434\u0435\u043B\u0456.");
+        }
+      } catch (error) {
+        console.error("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0431\u0440\u043E\u0431\u043A\u0438 \u0437\u0430\u043F\u0438\u0442\u0443 \u0434\u043E Ollama:", error);
+        (_g = this.view) == null ? void 0 : _g.removeLoadingIndicator(loadingMessageEl);
+        let errorMessage = "\u041D\u0435\u0432\u0456\u0434\u043E\u043C\u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0437\u0430\u0454\u043C\u043E\u0434\u0456\u0457 \u0437 Ollama.";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+          if (errorMessage.includes("Model") && errorMessage.includes("not found")) {
+            errorMessage += ` \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u043D\u0430\u0437\u0432\u0443 \u043C\u043E\u0434\u0435\u043B\u0456 "${this.plugin.settings.modelName}" \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.`;
+          } else if (errorMessage.includes("connect") || errorMessage.includes("fetch")) {
+            errorMessage += ` \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 URL \u0441\u0435\u0440\u0432\u0435\u0440\u0430 Ollama (${this.plugin.settings.ollamaServerUrl}) \u0442\u0430 \u043F\u0435\u0440\u0435\u043A\u043E\u043D\u0430\u0439\u0442\u0435\u0441\u044F, \u0449\u043E \u0441\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043E.`;
+          } else if (error.message.includes("context window")) {
+            errorMessage = `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u043E\u0433\u043E \u0432\u0456\u043A\u043D\u0430: ${error.message}. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0437\u043C\u0435\u043D\u0448\u0438\u0442\u0438 \u0440\u043E\u0437\u043C\u0456\u0440 \u0432\u0456\u043A\u043D\u0430 \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u0430\u0431\u043E \u0441\u043A\u043E\u0440\u043E\u0442\u0438\u0442\u0438 \u0456\u0441\u0442\u043E\u0440\u0456\u044E.`;
           }
         }
-        const data = await this.plugin.apiService.generateResponse(requestBody);
-        (_e = this.view) == null ? void 0 : _e.removeLoadingIndicator(loadingMessageEl);
-        (_f = this.view) == null ? void 0 : _f.internalAddMessage("assistant", data.response);
-      } catch (error) {
-        console.error("Error processing request with Ollama:", error);
-        (_g = this.view) == null ? void 0 : _g.removeLoadingIndicator(loadingMessageEl);
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        (_h = this.view) == null ? void 0 : _h.internalAddMessage(
-          "error",
-          `Connection error with Ollama: ${errorMessage}. Please check the settings and ensure the server is running.`
-        );
+        (_h = this.view) == null ? void 0 : _h.internalAddMessage("error", errorMessage);
       } finally {
         this.isProcessing = false;
         (_i = this.view) == null ? void 0 : _i.setLoadingState(false);
@@ -1663,7 +1831,7 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
   async onload() {
     console.log("Ollama Plugin Loaded!");
     await this.loadSettings();
-    this.apiService = new ApiService(this.settings.ollamaServerUrl);
+    this.apiService = new ApiService(this);
     this.ragService = new RagService(this);
     this.promptService = new PromptService(this);
     this.messageService = new MessageService(this);

@@ -1,25 +1,25 @@
 import { Notice } from "obsidian";
 import OllamaPlugin from "./main";
-import { OllamaView, MessageRole } from "./ollamaView";
+import { OllamaView, MessageRole, Message } from "./ollamaView"; // Додаємо Message
+import { ApiService, OllamaResponse } from "./apiServices"; // Імпортуємо ApiService та OllamaResponse
+import { PromptService } from "./promptService"; // Імпортуємо PromptService
 
-export interface RequestOptions { num_ctx?: number; }
-
-export interface OllamaRequestBody {
-    model: string;
-    prompt: string;
-    stream: boolean;
-    temperature: number;
-    system?: string;
-    options?: RequestOptions;
-}
+// Не потрібні ці інтерфейси тут, вони в інших файлах
+// export interface RequestOptions { num_ctx?: number; }
+// export interface OllamaRequestBody { ... }
 
 export class MessageService {
     private plugin: OllamaPlugin;
     private view: OllamaView | null = null;
+    private apiService: ApiService; // Додаємо посилання
+    private promptService: PromptService; // Додаємо посилання
     private isProcessing: boolean = false;
 
     constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
+        // Створюємо або отримуємо сервіси з плагіна
+        this.apiService = plugin.apiService;
+        this.promptService = plugin.promptService;
     }
 
     public setView(view: OllamaView): void {
@@ -28,130 +28,126 @@ export class MessageService {
 
     public async loadMessageHistory(): Promise<void> {
         if (!this.view) return;
-
         let historyLoaded = false;
         try {
-            const history = await this.plugin.loadMessageHistory(); // Expects array of {role, content, timestamp}
-
+            const history = await this.plugin.loadMessageHistory();
             if (Array.isArray(history) && history.length > 0) {
-                // View should already be cleared by OllamaView.loadAndRenderHistory
                 for (const msg of history) {
                     const role = msg.role as MessageRole;
                     if (role && msg.content && msg.timestamp) {
-                        // Add message to view without triggering individual saves
-                        // Pass the original timestamp
                         this.view.internalAddMessage(role, msg.content, {
                             saveHistory: false,
-                            timestamp: msg.timestamp // Pass ISO string or Date object
+                            timestamp: msg.timestamp
                         });
                     } else {
-                        console.warn("Skipping message with missing data during history load:", msg);
+                        console.warn("Пропуск повідомлення з неповними даними під час завантаження історії:", msg);
                     }
                 }
                 historyLoaded = true;
-                this.view.guaranteedScrollToBottom(100, true);
+                // Затримка перед прокруткою для рендерингу
+                setTimeout(() => this.view?.guaranteedScrollToBottom(100, true), 100);
             }
-            // If history was loaded, save the complete state once
             if (historyLoaded) {
-                await this.view.saveMessageHistory();
+                await this.view.saveMessageHistory(); // Зберігаємо раз після завантаження
             }
-            // View handles showing empty state if history is empty after this process
-
         } catch (error) {
-            console.error("MessageService: Error loading message history:", error);
-            // View's loadAndRenderHistory should handle clearing and showing empty state on error
+            console.error("MessageService: Помилка завантаження історії:", error);
+        } finally {
+            // Переконуємося, що порожній стан відображається правильно
+            if (this.view && this.view.getMessagesCount() === 0) {
+                this.view.showEmptyState();
+            } else if (this.view) {
+                this.view.hideEmptyState();
+            }
         }
     }
 
     public async sendMessage(content: string): Promise<void> {
         if (this.isProcessing || !content.trim() || !this.view) return;
-        // OllamaView handles adding the user message and clearing the input field
-
+        // OllamaView вже додав повідомлення користувача
         await this.processWithOllama(content);
     }
 
     private async processWithOllama(content: string): Promise<void> {
         if (!this.view) return;
 
-        this.isProcessing = true; // Internal flag for MessageService logic
-        this.view.setLoadingState(true); // Update View's UI state
+        this.isProcessing = true;
+        this.view.setLoadingState(true);
         const loadingMessageEl = this.view.addLoadingIndicator();
 
-        // Use setTimeout to allow UI to update before potentially long API call
+        // Використовуємо setTimeout(0) для асинхронного виконання без блокування UI
         setTimeout(async () => {
+            let responseData: OllamaResponse | null = null;
             try {
-                let useSystemPrompt = false;
-                const messagesPairCount = this.view?.getMessagesPairCount() ?? 0;
-                const messagesCount = this.view?.getMessagesCount() ?? 0; // Includes the user message just added
+                // 1. Отримуємо історію з View (або з іншого джерела, якщо потрібно)
+                // Потрібен метод для отримання історії з View
+                const history: Message[] = this.view?.getMessages() ?? []; // Потрібно додати getMessages() в OllamaView
 
-                // Logic for using system prompt (adjust as needed)
-                if (this.plugin.settings.followRole) {
-                    const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
-                    if (systemPromptInterval === 0) { // Always use if interval is 0
-                        useSystemPrompt = true;
-                    } else if (systemPromptInterval > 0) {
-                        // Check based on pairs *before* the current interaction starts
-                        // User message was added, assistant response is pending.
-                        // If interval is 1, use on every pair.
-                        // If interval is 2, use on pairs 0, 2, 4...
-                        // messagesPairCount reflects completed pairs.
-                        useSystemPrompt = (messagesPairCount % systemPromptInterval) === 0;
-                    }
-                }
+                // 2. Готуємо повний промпт, включаючи історію, RAG, обрізання контексту
+                const formattedPrompt = await this.promptService.prepareFullPrompt(content, history);
 
-                // Check if it's effectively the start of a conversation for prompt preparation
-                // messagesCount will be 1 if only the initial user message exists
-                const isNewConversation = messagesCount <= 1;
-
-                const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
-                    content,
-                    isNewConversation // Pass context flag to prompt service
-                );
-
-                const requestBody: OllamaRequestBody = {
+                // 3. Готуємо тіло запиту
+                const requestBody = {
                     model: this.plugin.settings.modelName,
                     prompt: formattedPrompt,
-                    stream: false, // Change to true for streaming
-                    temperature: this.plugin.settings.temperature || 0.2,
+                    stream: false, // Поки що без стрімінгу
+                    temperature: this.plugin.settings.temperature,
                     options: {
-                        num_ctx: this.plugin.settings.contextWindow || 8192,
-                    }
+                        num_ctx: this.plugin.settings.contextWindow, // Використовуємо contextWindow
+                    },
+                    system: this.promptService.getSystemPrompt() ?? undefined // Додаємо системний промпт, якщо є
                 };
 
-                if (useSystemPrompt) {
-                    const systemPrompt = this.plugin.promptService.getSystemPrompt();
-                    if (systemPrompt) {
-                        requestBody.system = systemPrompt;
-                        console.log("Using system prompt for this request.");
+                // Видаляємо system, якщо він порожній
+                if (!requestBody.system) {
+                    delete requestBody.system;
+                }
+
+                // 4. Викликаємо API
+                responseData = await this.apiService.generateResponse(requestBody);
+
+                // 5. Додаємо відповідь AI у View
+                this.view?.removeLoadingIndicator(loadingMessageEl);
+                if (responseData && responseData.response) {
+                    // Декодування HTML сутностей (якщо потрібно)
+                    const textArea = document.createElement("textarea");
+                    textArea.innerHTML = responseData.response;
+                    const decodedResponse = textArea.value;
+                    this.view?.internalAddMessage("assistant", decodedResponse);
+                } else {
+                    // Якщо відповідь порожня, але помилки не було
+                    this.view?.internalAddMessage("error", "Отримано порожню відповідь від моделі.");
+                }
+
+            } catch (error: any) {
+                console.error("Помилка обробки запиту до Ollama:", error);
+                this.view?.removeLoadingIndicator(loadingMessageEl);
+
+                // Формуємо більш детальне повідомлення про помилку
+                let errorMessage = "Невідома помилка під час взаємодії з Ollama.";
+                if (error instanceof Error) {
+                    errorMessage = error.message; // Використовуємо повідомлення з помилки API або Fetch
+                    // Додаємо специфічні поради
+                    if (errorMessage.includes("Model") && errorMessage.includes("not found")) {
+                        errorMessage += ` Перевірте назву моделі "${this.plugin.settings.modelName}" у налаштуваннях.`;
+                    } else if (errorMessage.includes("connect") || errorMessage.includes("fetch")) {
+                        errorMessage += ` Перевірте URL сервера Ollama (${this.plugin.settings.ollamaServerUrl}) та переконайтеся, що сервер запущено.`;
+                    } else if (error.message.includes('context window')) {
+                        errorMessage = `Помилка контекстного вікна: ${error.message}. Спробуйте зменшити розмір вікна в налаштуваннях або скоротити історію.`;
                     }
                 }
 
-                const data = await this.plugin.apiService.generateResponse(requestBody);
+                this.view?.internalAddMessage("error", errorMessage);
 
-                this.view?.removeLoadingIndicator(loadingMessageEl);
-                // Add assistant response via the view
-                this.view?.internalAddMessage("assistant", data.response);
-
-            } catch (error) {
-                console.error("Error processing request with Ollama:", error);
-                this.view?.removeLoadingIndicator(loadingMessageEl);
-                const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-                // Add error message via the view
-                this.view?.internalAddMessage(
-                    "error",
-                    `Connection error with Ollama: ${errorMessage}. Please check the settings and ensure the server is running.`
-                );
             } finally {
                 this.isProcessing = false;
-                // Update View's UI state via its method
-                this.view?.setLoadingState(false);
+                this.view?.setLoadingState(false); // Завжди знімаємо стан завантаження
             }
-        }, 0); // End of setTimeout callback
+        }, 0);
     }
 
     public addSystemMessage(content: string): void {
         if (this.view) {
-            // Add system message via the view, triggering save etc.
             this.view.internalAddMessage("system", content);
         }
     }
