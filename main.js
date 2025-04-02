@@ -175,14 +175,15 @@ var _OllamaView = class extends import_obsidian.ItemView {
         });
       }
     };
+    // private handleActiveLeafChange = (leaf: WorkspaceLeaf | null): void => { if (leaf?.view === this) { setTimeout(() => this.guaranteedScrollToBottom(100), 100); this.inputEl?.focus(); } } // Перевіряємо конкретний view
     this.handleActiveLeafChange = (leaf) => {
       var _a;
       if ((leaf == null ? void 0 : leaf.view) === this) {
-        setTimeout(() => this.guaranteedScrollToBottom(100), 100);
+        console.log("[OllamaView] View became active.");
         (_a = this.inputEl) == null ? void 0 : _a.focus();
+        setTimeout(() => this.guaranteedScrollToBottom(150, true), 100);
       }
     };
-    // Перевіряємо конкретний view
     this.handleInputForResize = () => {
       if (this.resizeTimeout)
         clearTimeout(this.resizeTimeout);
@@ -379,16 +380,19 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.lastMessageDate = null;
     this.clearChatContainerInternal();
     try {
+      console.log("[OllamaView] Starting history loading...");
       await this.plugin.messageService.loadMessageHistory();
       if (this.messages.length === 0) {
         this.showEmptyState();
+        console.log("[OllamaView] History loaded, state is empty.");
       } else {
         this.hideEmptyState();
+        console.log(`[OllamaView] History loaded (${this.messages.length} messages). Checking collapsing...`);
         this.checkAllMessagesForCollapsing();
         setTimeout(() => {
-          console.log("[OllamaView] Attempting final scroll after history load.");
-          this.guaranteedScrollToBottom(100, true);
-        }, 600);
+          console.log("[OllamaView] Attempting scroll after collapse check initiation.");
+          this.guaranteedScrollToBottom(200, true);
+        }, 150);
       }
     } catch (error) {
       console.error("OllamaView: Error during history loading process:", error);
@@ -820,16 +824,21 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.inputEl.dispatchEvent(new Event("input"));
     }
   }
+  // guaranteedScrollToBottom(delay = 50, forceScroll = false): void { if (this.scrollTimeout) { clearTimeout(this.scrollTimeout); } this.scrollTimeout = setTimeout(() => { requestAnimationFrame(() => { if (this.chatContainer) { const scrollThreshold = 100; const isScrolledUpCheck = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold; if (isScrolledUpCheck !== this.userScrolledUp) { this.userScrolledUp = isScrolledUpCheck; if (!this.userScrolledUp) { this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } } if (forceScroll || !this.userScrolledUp || this.isProcessing) { this.chatContainer.scrollTop = this.chatContainer.scrollHeight; if (forceScroll || this.isProcessing) { this.userScrolledUp = false; this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } } } }); }, delay); }
   guaranteedScrollToBottom(delay = 50, forceScroll = false) {
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null;
     }
     this.scrollTimeout = setTimeout(() => {
       requestAnimationFrame(() => {
         var _a, _b;
         if (this.chatContainer) {
           const scrollThreshold = 100;
-          const isScrolledUpCheck = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold;
+          const currentScrollTop = this.chatContainer.scrollTop;
+          const currentScrollHeight = this.chatContainer.scrollHeight;
+          const currentClientHeight = this.chatContainer.clientHeight;
+          const isScrolledUpCheck = currentScrollHeight - currentScrollTop - currentClientHeight > scrollThreshold;
           if (isScrolledUpCheck !== this.userScrolledUp) {
             this.userScrolledUp = isScrolledUpCheck;
             if (!this.userScrolledUp) {
@@ -839,12 +848,18 @@ var _OllamaView = class extends import_obsidian.ItemView {
           if (forceScroll || !this.userScrolledUp || this.isProcessing) {
             this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
             if (forceScroll || this.isProcessing) {
+              if (this.userScrolledUp) {
+              }
               this.userScrolledUp = false;
               (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
             }
+          } else {
           }
+        } else {
+          console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found during animation frame.");
         }
       });
+      this.scrollTimeout = null;
     }, delay);
   }
   formatTime(date) {

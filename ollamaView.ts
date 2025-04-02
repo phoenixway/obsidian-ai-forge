@@ -271,7 +271,20 @@ export class OllamaView extends ItemView {
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.menuDropdown.style.display === 'block' && !this.menuButton.contains(e.target as Node) && !this.menuDropdown.contains(e.target as Node)) { this.closeMenu(); } }
   private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.messages.length > 0) { this.plugin.messageService.addSystemMessage(`Модель змінено на: ${modelName}`); } }
   private handleVisibilityChange = (): void => { if (document.visibilityState === 'visible') { requestAnimationFrame(() => { this.guaranteedScrollToBottom(50); this.adjustTextareaHeight(); }); } }
-  private handleActiveLeafChange = (leaf: WorkspaceLeaf | null): void => { if (leaf?.view === this) { setTimeout(() => this.guaranteedScrollToBottom(100), 100); this.inputEl?.focus(); } } // Перевіряємо конкретний view
+  // private handleActiveLeafChange = (leaf: WorkspaceLeaf | null): void => { if (leaf?.view === this) { setTimeout(() => this.guaranteedScrollToBottom(100), 100); this.inputEl?.focus(); } } // Перевіряємо конкретний view
+
+  private handleActiveLeafChange = (leaf: WorkspaceLeaf | null): void => {
+    // Перевіряємо, чи ЦЕЙ view став активним
+    if (leaf?.view === this) {
+      console.log("[OllamaView] View became active.");
+      // Негайно фокусуємо поле вводу
+      this.inputEl?.focus();
+      // Примусово скролимо вниз з невеликою затримкою
+      // Використовуємо forceScroll = true, щоб прокрутити, навіть якщо користувач скролив раніше
+      setTimeout(() => this.guaranteedScrollToBottom(150, true), 100); // Затримка + примусовий скрол
+    }
+  }
+
   private handleInputForResize = (): void => { if (this.resizeTimeout) clearTimeout(this.resizeTimeout); this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 50); this.updateSendButtonState(); };
   private handleWindowResize = (): void => { if (this.resizeTimeout) clearTimeout(this.resizeTimeout); this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100); };
   private handleScroll = (): void => { if (!this.chatContainer) return; const scrollThreshold = 150; const isScrolledToBottom = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight < scrollThreshold; if (!isScrolledToBottom) { this.userScrolledUp = true; } else { this.userScrolledUp = false; this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } }
@@ -293,26 +306,28 @@ export class OllamaView extends ItemView {
     this.lastMessageDate = null;
     this.clearChatContainerInternal();
     try {
-      await this.plugin.messageService.loadMessageHistory();
+      console.log("[OllamaView] Starting history loading...");
+      await this.plugin.messageService.loadMessageHistory(); // Service calls internalAddMessage
 
       if (this.messages.length === 0) {
         this.showEmptyState();
+        console.log("[OllamaView] History loaded, state is empty.");
       } else {
         this.hideEmptyState();
+        console.log(`[OllamaView] History loaded (${this.messages.length} messages). Checking collapsing...`);
         // Запускаємо перевірку згортання
         this.checkAllMessagesForCollapsing();
 
-        // --- ЗМІНЕНО ТУТ ---
-        // Додаємо більшу затримку перед фінальною прокруткою,
-        // щоб дати час на завершення checkAllMessagesForCollapsing
+        // Викликаємо прокрутку з більшою затримкою ПІСЛЯ запуску перевірки згортання.
+        // Це дає шанс requestAnimationFrame всередині check... виконатись.
+        // guaranteedScrollToBottom сам використовує setTimeout + requestAnimationFrame.
         setTimeout(() => {
-          console.log("[OllamaView] Attempting final scroll after history load.");
-          this.guaranteedScrollToBottom(100, true); // Прокрутка в кінець
-        }, 600); // Збільшено затримку до 300ms (можна поекспериментувати)
-        // -----------------
+          console.log("[OllamaView] Attempting scroll after collapse check initiation.");
+          this.guaranteedScrollToBottom(200, true); // Збільшена внутрішня затримка + примусово
+        }, 150); // Невелика затримка перед викликом scroll
       }
     } catch (error) {
-      console.error("OllamaView: Error during history loading process:", error); // Translated error
+      console.error("OllamaView: Error during history loading process:", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
     }
@@ -676,7 +691,62 @@ export class OllamaView extends ItemView {
   public removeLoadingIndicator(loadingEl: HTMLElement | null): void { if (loadingEl?.parentNode) { loadingEl.remove(); } } // Додано перевірку loadingEl
   public scrollToBottom(): void { this.guaranteedScrollToBottom(50, true); }
   public clearInputField(): void { if (this.inputEl) { this.inputEl.value = ""; this.inputEl.dispatchEvent(new Event('input')); } }
-  guaranteedScrollToBottom(delay = 50, forceScroll = false): void { if (this.scrollTimeout) { clearTimeout(this.scrollTimeout); } this.scrollTimeout = setTimeout(() => { requestAnimationFrame(() => { if (this.chatContainer) { const scrollThreshold = 100; const isScrolledUpCheck = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold; if (isScrolledUpCheck !== this.userScrolledUp) { this.userScrolledUp = isScrolledUpCheck; if (!this.userScrolledUp) { this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } } if (forceScroll || !this.userScrolledUp || this.isProcessing) { this.chatContainer.scrollTop = this.chatContainer.scrollHeight; if (forceScroll || this.isProcessing) { this.userScrolledUp = false; this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } } } }); }, delay); }
+  // guaranteedScrollToBottom(delay = 50, forceScroll = false): void { if (this.scrollTimeout) { clearTimeout(this.scrollTimeout); } this.scrollTimeout = setTimeout(() => { requestAnimationFrame(() => { if (this.chatContainer) { const scrollThreshold = 100; const isScrolledUpCheck = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight > scrollThreshold; if (isScrolledUpCheck !== this.userScrolledUp) { this.userScrolledUp = isScrolledUpCheck; if (!this.userScrolledUp) { this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } } if (forceScroll || !this.userScrolledUp || this.isProcessing) { this.chatContainer.scrollTop = this.chatContainer.scrollHeight; if (forceScroll || this.isProcessing) { this.userScrolledUp = false; this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } } } }); }, delay); }
+
+  guaranteedScrollToBottom(delay = 50, forceScroll = false): void {
+    // Скасовуємо попередній таймаут, якщо він є
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = null; // Скидаємо
+    }
+    // console.log(`[OllamaView] guaranteedScrollToBottom called. Delay: ${delay}, Force: ${forceScroll}, UserScrolledUp: ${this.userScrolledUp}`);
+
+    this.scrollTimeout = setTimeout(() => {
+      requestAnimationFrame(() => {
+        if (this.chatContainer) {
+          const scrollThreshold = 100; // Поріг для визначення "нагорі"
+          const currentScrollTop = this.chatContainer.scrollTop;
+          const currentScrollHeight = this.chatContainer.scrollHeight;
+          const currentClientHeight = this.chatContainer.clientHeight;
+
+          const isScrolledUpCheck = currentScrollHeight - currentScrollTop - currentClientHeight > scrollThreshold;
+
+          // Оновлюємо стан userScrolledUp, якщо він змінився
+          if (isScrolledUpCheck !== this.userScrolledUp) {
+            // console.log(`[OllamaView] User scroll state changed: ${this.userScrolledUp} -> ${isScrolledUpCheck}`);
+            this.userScrolledUp = isScrolledUpCheck;
+            if (!this.userScrolledUp) {
+              this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+            }
+          }
+
+          // Виконуємо прокрутку, якщо:
+          // 1. forceScroll = true (примусово, напр. після завантаження або відповіді AI)
+          // 2. Користувач НЕ прокрутив вручну НАГОРУ
+          // 3. Йде процес обробки повідомлення (щоб бачити індикатор завантаження)
+          if (forceScroll || !this.userScrolledUp || this.isProcessing) {
+            // console.log(`[OllamaView] Scrolling to bottom. Force: ${forceScroll}, UserScrolledUp: ${this.userScrolledUp}, Processing: ${this.isProcessing}`);
+            this.chatContainer.scrollTop = this.chatContainer.scrollHeight;
+            // Якщо прокрутка була примусовою або під час обробки, вважаємо, що користувач тепер внизу
+            if (forceScroll || this.isProcessing) {
+              if (this.userScrolledUp) {
+                // console.log("[OllamaView] Resetting userScrolledUp flag due to forced scroll.");
+              }
+              this.userScrolledUp = false;
+              this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+            }
+          } else {
+            // console.log(`[OllamaView] Scroll skipped. Force: ${forceScroll}, UserScrolledUp: ${this.userScrolledUp}, Processing: ${this.isProcessing}`);
+          }
+        } else {
+          console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found during animation frame.");
+        }
+      });
+      this.scrollTimeout = null; // Скидаємо таймаут після виконання
+    }, delay); // Використовуємо передану затримку
+  }
+
+
   formatTime(date: Date): string { return date.toLocaleTimeString('uk-UA', { hour: "2-digit", minute: "2-digit" }); } // Український формат
   formatDateSeparator(date: Date): string { const now = new Date(); const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1); if (this.isSameDay(date, now)) { return "Сьогодні"; } else if (this.isSameDay(date, yesterday)) { return "Вчора"; } else { return date.toLocaleDateString('uk-UA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); } } // Український формат
   isSameDay(date1: Date, date2: Date): boolean { return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); }
