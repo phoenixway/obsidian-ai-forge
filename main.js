@@ -887,35 +887,50 @@ OllamaView.instance = null;
 var import_obsidian2 = require("obsidian");
 var DEFAULT_SETTINGS = {
   modelName: "mistral",
+  // Default model
   ollamaServerUrl: "http://localhost:11434",
-  logFileSizeLimit: 1024,
+  temperature: 0.1,
+  contextWindow: 8192,
+  useAdvancedContextStrategy: false,
+  // Disabled by default
+  enableSummarization: false,
+  // Disabled by default
+  summarizationPrompt: `Briefly summarize the following conversation excerpt, focusing on key decisions, questions, and outcomes. Maintain a neutral tone and stick to the facts:
+
+---
+{text_to_summarize}
+---
+
+Summary:`,
+  // Default English prompt
+  summarizationChunkSize: 1500,
+  // Approx. chunk size to summarize
+  keepLastNMessagesBeforeSummary: 6,
+  // Keep last 6 messages verbatim
   saveMessageHistory: true,
-  ragEnabled: false,
-  ragFolderPath: "data",
-  contextWindowSize: 5,
-  // RAG docs
-  googleApiKey: "",
-  speechLanguage: "uk-UA",
-  // Мова за замовчуванням - українська
-  maxRecordingTime: 15,
-  silenceDetection: true,
+  logFileSizeLimit: 1024,
+  // 1MB
   followRole: true,
   useDefaultRoleDefinition: true,
   customRoleFilePath: "",
   systemPromptInterval: 0,
-  temperature: 0.1,
-  contextWindow: 8192,
-  // Model context window
+  ragEnabled: false,
+  ragFolderPath: "data",
+  // Default RAG folder
+  contextWindowSize: 5,
+  // RAG docs count
   userAvatarType: "initials",
   userAvatarContent: "U",
   aiAvatarType: "icon",
   aiAvatarContent: "bot",
-  // Іконка Obsidian
+  // Obsidian icon name
   maxMessageHeight: 300,
-  // Згортати повідомлення довші за 300px
-  // --- Нове значення ---
-  useAdvancedContextStrategy: false
-  // За замовчуванням вимкнено
+  // Collapse messages taller than 300px
+  googleApiKey: "",
+  speechLanguage: "en-US",
+  // Default language English
+  maxRecordingTime: 15,
+  silenceDetection: true
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
@@ -923,12 +938,14 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     this.plugin = plugin;
   }
   getDisplayText() {
-    return "Ollama";
+    return "Ollama Chat";
   }
+  // Changed display name
   getId() {
-    return "ollama-plugin";
+    return "ollama-chat-plugin";
   }
-  // Допоміжна функція для пошуку іконок
+  // Changed ID for clarity
+  // Helper function for icon search (remains the same)
   createIconSearch(containerEl, settingType) {
     const searchContainer = containerEl.createDiv({ cls: "ollama-icon-search-container" });
     let searchInput;
@@ -947,48 +964,49 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
           window.require("obsidian").setIcon(iconEl, icon);
           iconEl.setAttribute("aria-label", icon);
           iconEl.onClickEvent(() => {
-            if (settingType === "user") {
+            if (settingType === "user")
               this.plugin.settings.userAvatarContent = icon;
-            } else {
+            else
               this.plugin.settings.aiAvatarContent = icon;
-            }
             this.plugin.saveSettings();
             this.display();
           });
         });
       } else {
-        resultsEl.setText("\u0406\u043A\u043E\u043D\u043E\u043A \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E.");
+        resultsEl.setText("No icons found.");
       }
     };
-    searchInput = new import_obsidian2.TextComponent(searchContainer).setPlaceholder("\u041F\u043E\u0448\u0443\u043A \u0456\u043A\u043E\u043D\u043E\u043A Obsidian...").onChange(performSearch);
+    searchInput = new import_obsidian2.TextComponent(searchContainer).setPlaceholder("Search Obsidian icons...").onChange(performSearch);
     resultsEl = searchContainer.createDiv({ cls: "ollama-icon-search-results" });
   }
   async display() {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.addClass("ollama-settings");
-    containerEl.createEl("h2", { text: "\u041E\u0441\u043D\u043E\u0432\u043D\u0456 \u041D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F" });
+    containerEl.createEl("h2", { text: "Basic Configuration" });
     new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc(
-      "IP \u0430\u0434\u0440\u0435\u0441\u0430 \u0442\u0430 \u043F\u043E\u0440\u0442, \u0434\u0435 \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043E Ollama (\u043D\u0430\u043F\u0440. http://192.168.1.10:11434)"
+      "IP address and port where Ollama is running (e.g., http://192.168.1.10:11434)"
+      // Already English
     ).addText(
       (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
         this.plugin.settings.ollamaServerUrl = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0417'\u0454\u0434\u043D\u0430\u043D\u043D\u044F \u0437 \u0441\u0435\u0440\u0432\u0435\u0440\u043E\u043C").setDesc("\u041F\u0435\u0440\u0435\u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0438\u0441\u044F \u0434\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E\u0457 \u043C\u043E\u0434\u0435\u043B\u0456 \u0442\u0430 \u043E\u043D\u043E\u0432\u0438\u0442\u0438 \u0441\u043F\u0438\u0441\u043E\u043A \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0438\u0445 \u043C\u043E\u0434\u0435\u043B\u0435\u0439").addButton(
-      (button) => button.setButtonText("\u041F\u0435\u0440\u0435\u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0438\u0441\u044C").setIcon("refresh-cw").onClick(async () => {
+    new import_obsidian2.Setting(containerEl).setName("Server Connection").setDesc("Reconnect to the local model server and refresh the list of available models").addButton(
+      (button) => button.setButtonText("Reconnect").setIcon("refresh-cw").onClick(async () => {
         try {
-          new import_obsidian2.Notice("\u041F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F \u0434\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 Ollama...");
+          new import_obsidian2.Notice("Connecting to Ollama server...");
           await this.plugin.apiService.getModels();
-          new import_obsidian2.Notice("\u0423\u0441\u043F\u0456\u0448\u043D\u043E \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E \u0434\u043E \u0441\u0435\u0440\u0432\u0435\u0440\u0430 Ollama!");
+          new import_obsidian2.Notice("Successfully connected to Ollama server!");
           this.display();
         } catch (error) {
-          new import_obsidian2.Notice(`\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F: ${error.message}. \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 URL \u0442\u0430 \u0441\u0442\u0430\u043D \u0441\u0435\u0440\u0432\u0435\u0440\u0430.`);
+          new import_obsidian2.Notice(`Connection failed: ${error.message}. Check URL and server status.`);
           if (this.plugin.view) {
             this.plugin.view.internalAddMessage(
               "error",
-              `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043D\u044F \u0434\u043E Ollama: ${error.message}. \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F.`
+              `Failed to connect to Ollama: ${error.message}. Please check settings.`
+              // Translated
             );
           }
         }
@@ -997,33 +1015,23 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     let availableModels = [];
     try {
       availableModels = await this.plugin.apiService.getModels();
-    } catch (error) {
-      console.error("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043C\u043E\u0434\u0435\u043B\u0435\u0439:", error);
-      if (this.plugin.view) {
-        this.plugin.view.internalAddMessage(
-          "error",
-          `\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043E\u0442\u0440\u0438\u043C\u0430\u0442\u0438 \u0441\u043F\u0438\u0441\u043E\u043A \u043C\u043E\u0434\u0435\u043B\u0435\u0439: ${error.message}.`
-        );
-      }
+    } catch (e) {
     }
-    const modelSetting = new import_obsidian2.Setting(containerEl).setName("\u041D\u0430\u0437\u0432\u0430 \u041C\u043E\u0434\u0435\u043B\u0456").setDesc("\u041E\u0431\u0435\u0440\u0456\u0442\u044C \u043C\u043E\u0432\u043D\u0443 \u043C\u043E\u0434\u0435\u043B\u044C \u0434\u043B\u044F \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043D\u043D\u044F");
-    modelSetting.addDropdown((dropdown) => {
+    new import_obsidian2.Setting(containerEl).setName("Model Name").setDesc("Select the language model to use").addDropdown((dropdown) => {
       const selectEl = dropdown.selectEl;
       selectEl.empty();
       if (availableModels.length > 0) {
-        availableModels.forEach((model) => {
-          dropdown.addOption(model, model);
-        });
+        availableModels.forEach((model) => dropdown.addOption(model, model));
         const currentModel = this.plugin.settings.modelName;
-        if (availableModels.includes(currentModel)) {
+        if (availableModels.includes(currentModel))
           dropdown.setValue(currentModel);
-        } else if (availableModels.length > 0) {
+        else {
           dropdown.setValue(availableModels[0]);
           this.plugin.settings.modelName = availableModels[0];
           this.plugin.saveSettings();
         }
       } else {
-        dropdown.addOption("", "\u041C\u043E\u0434\u0435\u043B\u0456 \u043D\u0435 \u0437\u043D\u0430\u0439\u0434\u0435\u043D\u043E");
+        dropdown.addOption("", "No models found");
         dropdown.setDisabled(true);
       }
       dropdown.onChange(async (value) => {
@@ -1032,160 +1040,194 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian2.Setting(containerEl).setName("\u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430").setDesc("\u041A\u043E\u043D\u0442\u0440\u043E\u043B\u044E\u0454 \u0432\u0438\u043F\u0430\u0434\u043A\u043E\u0432\u0456\u0441\u0442\u044C \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u0435\u0439 \u043C\u043E\u0434\u0435\u043B\u0456 (0.0 - 1.0)").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("Temperature").setDesc("Controls randomness in model responses (0.0 - 1.0)").addSlider(
       (slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.temperature = value;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h2", { text: "\u041A\u0435\u0440\u0443\u0432\u0430\u043D\u043D\u044F \u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043E\u043C" });
-    new import_obsidian2.Setting(containerEl).setName("\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u0435 \u0432\u0456\u043A\u043D\u043E \u043C\u043E\u0434\u0435\u043B\u0456 (\u0442\u043E\u043A\u0435\u043D\u0438)").setDesc("\u041C\u0430\u043A\u0441. \u043A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0442\u043E\u043A\u0435\u043D\u0456\u0432, \u044F\u043A\u0443 \u043C\u043E\u0434\u0435\u043B\u044C \u043C\u043E\u0436\u0435 \u043E\u0431\u0440\u043E\u0431\u0438\u0442\u0438 (\u0437 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0456\u0457 \u043C\u043E\u0434\u0435\u043B\u0456).").addText(
-      (text) => text.setPlaceholder("8192").setValue(String(this.plugin.settings.contextWindow)).onChange(async (value) => {
-        const num = parseInt(value, 10);
-        if (!isNaN(num) && num > 0) {
-          this.plugin.settings.contextWindow = num;
+    containerEl.createEl("h2", { text: "Context Management" });
+    new import_obsidian2.Setting(containerEl).setName("Model Context Window (tokens)").setDesc("Max tokens the model can process (refer to model documentation).").addText(
+      (text) => text.setPlaceholder("8192").setValue(String(this.plugin.settings.contextWindow)).onChange(async (v) => {
+        const n = parseInt(v);
+        if (!isNaN(n) && n > 0) {
+          this.plugin.settings.contextWindow = n;
           await this.plugin.saveSettings();
         } else {
-          new import_obsidian2.Notice("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043F\u043E\u0437\u0438\u0442\u0438\u0432\u043D\u0435 \u0447\u0438\u0441\u043B\u043E.");
+          new import_obsidian2.Notice("Please enter a positive number.");
           text.setValue(String(this.plugin.settings.contextWindow));
         }
       })
+      // Translated
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0415\u043A\u0441\u043F\u0435\u0440\u0438\u043C\u0435\u043D\u0442\u0430\u043B\u044C\u043D\u043E: \u041F\u0440\u043E\u0441\u0443\u043D\u0443\u0442\u0435 \u043A\u0435\u0440\u0443\u0432\u0430\u043D\u043D\u044F \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043E\u043C").setDesc("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0432\u0430\u0442\u0438 \u0442\u043E\u043A\u0435\u043D\u0456\u0437\u0430\u0442\u043E\u0440 \u0434\u043B\u044F \u0442\u043E\u0447\u043D\u043E\u0433\u043E \u043F\u0456\u0434\u0440\u0430\u0445\u0443\u043D\u043A\u0443 \u0442\u0430 \u043E\u0431\u0440\u0456\u0437\u0430\u043D\u043D\u044F \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0443. \u042F\u043A\u0449\u043E \u0432\u0438\u043C\u043A\u043D\u0435\u043D\u043E, \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043C\u0435\u043D\u0448 \u0442\u043E\u0447\u043D\u0438\u0439 \u043F\u0456\u0434\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0437\u0430 \u0441\u043B\u043E\u0432\u0430\u043C\u0438.").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Experimental: Advanced Context Strategy").setDesc("Use tokenizer for precise context calculation and trimming. If disabled, uses less accurate word counting.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
         this.plugin.settings.useAdvancedContextStrategy = value;
         await this.plugin.saveSettings();
         if (value) {
-          new import_obsidian2.Notice("\u041F\u0440\u043E\u0441\u0443\u043D\u0443\u0442\u0435 \u043A\u0435\u0440\u0443\u0432\u0430\u043D\u043D\u044F \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043E\u043C \u0443\u0432\u0456\u043C\u043A\u043D\u0435\u043D\u043E (\u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454 \u0442\u043E\u043A\u0435\u043D\u0456\u0437\u0430\u0442\u043E\u0440).");
+          new import_obsidian2.Notice("Advanced context strategy enabled (using tokenizer).");
         } else {
-          new import_obsidian2.Notice("\u041F\u0440\u043E\u0441\u0443\u043D\u0443\u0442\u0435 \u043A\u0435\u0440\u0443\u0432\u0430\u043D\u043D\u044F \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043E\u043C \u0432\u0438\u043C\u043A\u043D\u0435\u043D\u043E (\u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454 \u043F\u0456\u0434\u0440\u0430\u0445\u0443\u043D\u043E\u043A \u0441\u043B\u0456\u0432).");
+          new import_obsidian2.Notice("Advanced context strategy disabled (using word count).");
         }
+        this.display();
       })
     );
-    const noteEl = containerEl.createEl("p", { text: "\u041F\u0440\u0438\u043C\u0456\u0442\u043A\u0430: \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u0430 \u0441\u0443\u043C\u0430\u0440\u0438\u0437\u0430\u0446\u0456\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457 \u0434\u043B\u044F \u0434\u0443\u0436\u0435 \u0434\u043E\u0432\u0433\u0438\u0445 \u0440\u043E\u0437\u043C\u043E\u0432 \u043D\u0430\u0440\u0430\u0437\u0456 \u043D\u0435 \u0440\u0435\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u0430 \u0432 \u043F\u0440\u043E\u0441\u0443\u043D\u0443\u0442\u043E\u043C\u0443 \u0440\u0435\u0436\u0438\u043C\u0456.", cls: "setting-item-description ollama-subtle-notice" });
-    containerEl.createEl("h2", { text: "\u0406\u0441\u0442\u043E\u0440\u0456\u044F \u0427\u0430\u0442\u0443" });
-    new import_obsidian2.Setting(containerEl).setName("\u0417\u0431\u0435\u0440\u0456\u0433\u0430\u0442\u0438 \u0456\u0441\u0442\u043E\u0440\u0456\u044E").setDesc("\u0417\u0431\u0435\u0440\u0456\u0433\u0430\u0442\u0438 \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443 \u043C\u0456\u0436 \u0441\u0435\u0441\u0456\u044F\u043C\u0438").addToggle(
+    if (this.plugin.settings.useAdvancedContextStrategy) {
+      containerEl.createEl("h4", { text: "Automatic History Summarization (Experimental)" });
+      new import_obsidian2.Setting(containerEl).setName("Enable Summarization").setDesc("Automatically summarize older parts of the conversation if they exceed the context window. WARNING: This can significantly slow down responses!").addToggle(
+        (toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
+          this.plugin.settings.enableSummarization = value;
+          await this.plugin.saveSettings();
+        })
+      );
+      new import_obsidian2.Setting(containerEl).setName("Summarization Prompt").setDesc("Instruction for the model on how to summarize. Use {text_to_summarize} as a placeholder.").addTextArea(
+        (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
+          this.plugin.settings.summarizationPrompt = value;
+          await this.plugin.saveSettings();
+        }).inputEl.rows = 5
+      );
+      new import_obsidian2.Setting(containerEl).setName("Summarization Chunk Size (tokens)").setDesc("Approximate size of the history block (in tokens) to be summarized at once.").addText(
+        (text) => text.setPlaceholder(String(DEFAULT_SETTINGS.summarizationChunkSize)).setValue(String(this.plugin.settings.summarizationChunkSize)).onChange(async (v) => {
+          const n = parseInt(v);
+          if (!isNaN(n) && n > 100) {
+            this.plugin.settings.summarizationChunkSize = n;
+            await this.plugin.saveSettings();
+          } else {
+            new import_obsidian2.Notice("Please enter a number greater than 100.");
+            text.setValue(String(this.plugin.settings.summarizationChunkSize));
+          }
+        })
+        // Translated
+      );
+      new import_obsidian2.Setting(containerEl).setName("Keep Last N Messages").setDesc("Number of recent messages that will NEVER be summarized.").addSlider(
+        (slider) => slider.setLimits(0, 20, 1).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary).setDynamicTooltip().onChange(async (v) => {
+          this.plugin.settings.keepLastNMessagesBeforeSummary = v;
+          await this.plugin.saveSettings();
+        })
+      );
+    } else {
+      containerEl.createEl("p", { text: "Using basic context management strategy (approximate word count).", cls: "setting-item-description ollama-subtle-notice" });
+    }
+    containerEl.createEl("h2", { text: "Chat History" });
+    new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat history between sessions").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
         this.plugin.settings.saveMessageHistory = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u041B\u0456\u043C\u0456\u0442 \u0440\u043E\u0437\u043C\u0456\u0440\u0443 \u0444\u0430\u0439\u043B\u0443 \u0456\u0441\u0442\u043E\u0440\u0456\u0457 (KB)").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0440\u043E\u0437\u043C\u0456\u0440 \u0444\u0430\u0439\u043B\u0443 \u0456\u0441\u0442\u043E\u0440\u0456\u0457 (1024 KB = 1 MB)").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("Log File Size Limit (KB)").setDesc("Maximum size of the message history file (1024 KB = 1 MB)").addSlider(
       (slider) => slider.setLimits(256, 10240, 256).setValue(this.plugin.settings.logFileSizeLimit).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.logFileSizeLimit = value;
         await this.plugin.saveSettings();
       })
     ).addExtraButton(
-      (button) => button.setIcon("reset").setTooltip("\u0421\u043A\u0438\u043D\u0443\u0442\u0438 \u0434\u043E \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u043E\u0433\u043E (1024 KB)").onClick(async () => {
+      (button) => button.setIcon("reset").setTooltip("Reset to default (1024 KB)").onClick(async () => {
         this.plugin.settings.logFileSizeLimit = DEFAULT_SETTINGS.logFileSizeLimit;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u0406\u0441\u0442\u043E\u0440\u0456\u044E").setDesc("\u0412\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0432\u0441\u044E \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443").addButton(
-      (button) => button.setButtonText("\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u0438").onClick(async () => {
-        if (confirm("\u0412\u0438 \u0432\u043F\u0435\u0432\u043D\u0435\u043D\u0456, \u0449\u043E \u0445\u043E\u0447\u0435\u0442\u0435 \u0432\u0438\u0434\u0430\u043B\u0438\u0442\u0438 \u0432\u0441\u044E \u0456\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443? \u0426\u044E \u0434\u0456\u044E \u043D\u0435\u043C\u043E\u0436\u043B\u0438\u0432\u043E \u0441\u043A\u0430\u0441\u0443\u0432\u0430\u0442\u0438.")) {
+    new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton(
+      (button) => button.setButtonText("Clear").onClick(async () => {
+        if (confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) {
           await this.plugin.clearMessageHistory();
-          new import_obsidian2.Notice("\u0406\u0441\u0442\u043E\u0440\u0456\u044E \u0447\u0430\u0442\u0443 \u043E\u0447\u0438\u0449\u0435\u043D\u043E.");
+          new import_obsidian2.Notice("Chat history cleared.");
         }
       })
     );
-    containerEl.createEl("h2", { text: "\u0417\u043E\u0432\u043D\u0456\u0448\u043D\u0456\u0439 \u0412\u0438\u0433\u043B\u044F\u0434" });
-    containerEl.createEl("h4", { text: "\u0410\u0432\u0430\u0442\u0430\u0440 \u041A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430" });
-    new import_obsidian2.Setting(containerEl).setName("\u0422\u0438\u043F \u0430\u0432\u0430\u0442\u0430\u0440\u0430 \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430").addDropdown(
-      (dd) => dd.addOption("initials", "\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438").addOption("icon", "\u0406\u043A\u043E\u043D\u043A\u0430 Obsidian").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
+    containerEl.createEl("h2", { text: "Appearance (UI/UX)" });
+    containerEl.createEl("h4", { text: "User Avatar" });
+    new import_obsidian2.Setting(containerEl).setName("User Avatar Type").addDropdown(
+      (dd) => dd.addOption("initials", "Initials").addOption("icon", "Obsidian Icon").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
         this.plugin.settings.userAvatarType = value;
         await this.plugin.saveSettings();
         this.display();
       })
     );
     if (this.plugin.settings.userAvatarType === "initials") {
-      new import_obsidian2.Setting(containerEl).setName("\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438 \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C 1-2 \u043B\u0456\u0442\u0435\u0440\u0438").addText(
+      new import_obsidian2.Setting(containerEl).setName("User Initials").setDesc("Enter 1-2 letters").addText(
         (text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
           this.plugin.settings.userAvatarContent = value.substring(0, 2).toUpperCase();
           await this.plugin.saveSettings();
         })
       );
     } else {
-      new import_obsidian2.Setting(containerEl).setName("\u0406\u043A\u043E\u043D\u043A\u0430 \u043A\u043E\u0440\u0438\u0441\u0442\u0443\u0432\u0430\u0447\u0430").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043D\u0430\u0437\u0432\u0443 \u0456\u043A\u043E\u043D\u043A\u0438 Obsidian").addText(
-        (text) => text.setValue(this.plugin.settings.userAvatarContent).setPlaceholder("\u041D\u0430\u043F\u0440. user, smile, etc.").onChange(async (value) => {
+      new import_obsidian2.Setting(containerEl).setName("User Icon").setDesc("Enter an Obsidian icon name").addText(
+        (text) => text.setValue(this.plugin.settings.userAvatarContent).setPlaceholder("e.g., user, smile, etc.").onChange(async (value) => {
           this.plugin.settings.userAvatarContent = value.trim();
           await this.plugin.saveSettings();
         })
       );
       this.createIconSearch(containerEl, "user");
     }
-    containerEl.createEl("h4", { text: "\u0410\u0432\u0430\u0442\u0430\u0440 AI" });
-    new import_obsidian2.Setting(containerEl).setName("\u0422\u0438\u043F \u0430\u0432\u0430\u0442\u0430\u0440\u0430 AI").addDropdown(
-      (dd) => dd.addOption("initials", "\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438").addOption("icon", "\u0406\u043A\u043E\u043D\u043A\u0430 Obsidian").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
+    containerEl.createEl("h4", { text: "AI Avatar" });
+    new import_obsidian2.Setting(containerEl).setName("AI Avatar Type").addDropdown(
+      (dd) => dd.addOption("initials", "Initials").addOption("icon", "Obsidian Icon").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
         this.plugin.settings.aiAvatarType = value;
         await this.plugin.saveSettings();
         this.display();
       })
     );
     if (this.plugin.settings.aiAvatarType === "initials") {
-      new import_obsidian2.Setting(containerEl).setName("\u0406\u043D\u0456\u0446\u0456\u0430\u043B\u0438 AI").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C 1-2 \u043B\u0456\u0442\u0435\u0440\u0438").addText(
+      new import_obsidian2.Setting(containerEl).setName("AI Initials").setDesc("Enter 1-2 letters").addText(
         (text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
           this.plugin.settings.aiAvatarContent = value.substring(0, 2).toUpperCase();
           await this.plugin.saveSettings();
         })
       );
     } else {
-      new import_obsidian2.Setting(containerEl).setName("\u0406\u043A\u043E\u043D\u043A\u0430 AI").setDesc("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043D\u0430\u0437\u0432\u0443 \u0456\u043A\u043E\u043D\u043A\u0438 Obsidian").addText(
-        (text) => text.setValue(this.plugin.settings.aiAvatarContent).setPlaceholder("\u041D\u0430\u043F\u0440. bot, cpu, brain, etc.").onChange(async (value) => {
+      new import_obsidian2.Setting(containerEl).setName("AI Icon").setDesc("Enter an Obsidian icon name").addText(
+        (text) => text.setValue(this.plugin.settings.aiAvatarContent).setPlaceholder("e.g., bot, cpu, brain, etc.").onChange(async (value) => {
           this.plugin.settings.aiAvatarContent = value.trim();
           await this.plugin.saveSettings();
         })
       );
       this.createIconSearch(containerEl, "ai");
     }
-    new import_obsidian2.Setting(containerEl).setName("\u041C\u0430\u043A\u0441. \u0432\u0438\u0441\u043E\u0442\u0430 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F (px)").setDesc("\u0414\u043E\u0432\u0448\u0456 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u0431\u0443\u0434\u0443\u0442\u044C \u0437\u0433\u043E\u0440\u0442\u0430\u0442\u0438\u0441\u044C. 0 - \u0432\u0438\u043C\u043A\u043D\u0443\u0442\u0438.").addText(
+    new import_obsidian2.Setting(containerEl).setName("Max Message Height (px)").setDesc("Longer messages will get a 'Show More' button. Set to 0 to disable collapsing.").addText(
       (text) => text.setPlaceholder("300").setValue(String(this.plugin.settings.maxMessageHeight)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num >= 0) {
           this.plugin.settings.maxMessageHeight = num;
           await this.plugin.saveSettings();
         } else {
-          new import_obsidian2.Notice("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u043D\u0435\u0432\u0456\u0434'\u0454\u043C\u043D\u0435 \u0447\u0438\u0441\u043B\u043E.");
+          new import_obsidian2.Notice("Please enter 0 or a positive number.");
           text.setValue(String(this.plugin.settings.maxMessageHeight));
         }
       })
     );
-    containerEl.createEl("h2", { text: "\u041A\u043E\u043D\u0444\u0456\u0433\u0443\u0440\u0430\u0446\u0456\u044F \u0420\u043E\u043B\u0456 AI" });
-    new import_obsidian2.Setting(containerEl).setName("\u0412\u0432\u0456\u043C\u043A\u043D\u0443\u0442\u0438 \u0440\u043E\u043B\u044C").setDesc("\u0417\u043C\u0443\u0441\u0438\u0442\u0438 Ollama \u0441\u043B\u0456\u0434\u0443\u0432\u0430\u0442\u0438 \u0440\u043E\u043B\u0456 \u0437 \u0444\u0430\u0439\u043B\u0443").addToggle(
+    containerEl.createEl("h2", { text: "AI Role Configuration" });
+    new import_obsidian2.Setting(containerEl).setName("Enable Role").setDesc("Make Ollama follow a defined role from a file").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
         this.plugin.settings.followRole = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442. \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0443 \u0440\u043E\u043B\u044C").setDesc("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0432\u0430\u0442\u0438 default-role.md \u0437 \u043F\u0430\u043F\u043A\u0438 \u043F\u043B\u0430\u0433\u0456\u043D\u0430").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Use Default Role Definition").setDesc("Use the default-role.md file from the plugin folder").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.useDefaultRoleDefinition).onChange(async (value) => {
         this.plugin.settings.useDefaultRoleDefinition = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0428\u043B\u044F\u0445 \u0434\u043E \u0432\u043B\u0430\u0441\u043D\u043E\u0457 \u0440\u043E\u043B\u0456").setDesc("\u0428\u043B\u044F\u0445 \u0434\u043E \u0444\u0430\u0439\u043B\u0443 \u0440\u043E\u043B\u0456 (\u0432\u0456\u0434\u043D\u043E\u0441\u043D\u043E \u043A\u043E\u0440\u0435\u043D\u044F \u0441\u0445\u043E\u0432\u0438\u0449\u0430)").addText(
-      (text) => text.setPlaceholder("\u0448\u043B\u044F\u0445/\u0434\u043E/\u0444\u0430\u0439\u043B\u0443_\u0440\u043E\u043B\u0456.md").setValue(this.plugin.settings.customRoleFilePath).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName("Custom Role Definition Path").setDesc("Path to a custom role file (relative to vault root)").addText(
+      (text) => text.setPlaceholder("path/to/your_role.md").setValue(this.plugin.settings.customRoleFilePath).onChange(async (value) => {
         this.plugin.settings.customRoleFilePath = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0406\u043D\u0442\u0435\u0440\u0432\u0430\u043B \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0433\u043E \u043F\u0440\u043E\u043C\u043F\u0442\u0443").setDesc("\u041A-\u0442\u044C \u043F\u0430\u0440 \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u044C \u043C\u0456\u0436 \u043D\u0430\u0434\u0441\u0438\u043B\u0430\u043D\u043D\u044F\u043C\u0438 \u0441\u0438\u0441\u0442. \u043F\u0440\u043E\u043C\u043F\u0442\u0443 (0=\u0437\u0430\u0432\u0436\u0434\u0438, <0=\u043D\u0456\u043A\u043E\u043B\u0438)").addText(
-      (text) => (
-        // Використовуємо Text для введення чисел
-        text.setValue(String(this.plugin.settings.systemPromptInterval)).onChange(async (value) => {
-          this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
-          await this.plugin.saveSettings();
-        })
-      )
+    new import_obsidian2.Setting(containerEl).setName("System Prompt Interval").setDesc("Message pairs between system prompt resends (0=always, <0=never)").addText(
+      (text) => text.setValue(String(this.plugin.settings.systemPromptInterval)).onChange(async (value) => {
+        this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
+        await this.plugin.saveSettings();
+      })
     );
-    containerEl.createEl("h2", { text: "\u041A\u043E\u043D\u0444\u0456\u0433\u0443\u0440\u0430\u0446\u0456\u044F RAG" });
-    new import_obsidian2.Setting(containerEl).setName("\u0412\u0432\u0456\u043C\u043A\u043D\u0443\u0442\u0438 RAG").setDesc("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0432\u0430\u0442\u0438 Retrieval Augmented Generation \u0437 \u0432\u0430\u0448\u0438\u043C\u0438 \u043D\u043E\u0442\u0430\u0442\u043A\u0430\u043C\u0438").addToggle(
+    containerEl.createEl("h2", { text: "RAG Configuration" });
+    new import_obsidian2.Setting(containerEl).setName("Enable RAG").setDesc("Use Retrieval Augmented Generation with your notes").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
         this.plugin.settings.ragEnabled = value;
         await this.plugin.saveSettings();
         if (value && this.plugin.ragService) {
-          new import_obsidian2.Notice("RAG \u0443\u0432\u0456\u043C\u043A\u043D\u0435\u043D\u043E. \u0406\u043D\u0434\u0435\u043A\u0441\u0430\u0446\u0456\u044F \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432...");
+          new import_obsidian2.Notice("RAG enabled. Indexing documents...");
           setTimeout(() => {
             var _a;
             return (_a = this.plugin.ragService) == null ? void 0 : _a.indexDocuments();
@@ -1193,38 +1235,38 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0428\u043B\u044F\u0445 \u0434\u043E \u043F\u0430\u043F\u043A\u0438 RAG").setDesc("\u041F\u0430\u043F\u043A\u0430 \u0437 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u043C\u0438 \u0434\u043B\u044F RAG (\u0432\u0456\u0434\u043D\u043E\u0441\u043D\u043E \u043A\u043E\u0440\u0435\u043D\u044F \u0441\u0445\u043E\u0432\u0438\u0449\u0430)").addText(
+    new import_obsidian2.Setting(containerEl).setName("RAG Folder Path").setDesc("Folder containing documents for RAG (relative to vault root)").addText(
       (text) => text.setPlaceholder("data/rag_docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
         this.plugin.settings.ragFolderPath = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u041A\u0456\u043B\u044C\u043A\u0456\u0441\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 RAG \u0443 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0456").setDesc("\u0421\u043A\u0456\u043B\u044C\u043A\u0438 \u043D\u0430\u0439\u0431\u0456\u043B\u044C\u0448 \u0440\u0435\u043B\u0435\u0432\u0430\u043D\u0442\u043D\u0438\u0445 \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442\u0456\u0432 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0456\u0432 \u0434\u043E\u0434\u0430\u0432\u0430\u0442\u0438 \u0434\u043E \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0443").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("RAG Documents in Context").setDesc("Number of relevant document chunks to add to the context").addSlider(
       (slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.contextWindowSize).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.contextWindowSize = value;
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h2", { text: "\u0420\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u041C\u043E\u0432\u043B\u0435\u043D\u043D\u044F" });
-    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API \u043A\u043B\u044E\u0447 \u0434\u043B\u044F \u0441\u0435\u0440\u0432\u0456\u0441\u0443 Google Speech-to-Text").addText(
-      (text) => text.setPlaceholder("\u0412\u0432\u0435\u0434\u0456\u0442\u044C \u0432\u0430\u0448 Google API \u043A\u043B\u044E\u0447").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+    containerEl.createEl("h2", { text: "Speech Recognition" });
+    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API key for Google Speech-to-Text service").addText(
+      (text) => text.setPlaceholder("Enter your Google API key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
         this.plugin.settings.googleApiKey = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u041C\u043E\u0432\u0430 \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F").setDesc("\u041A\u043E\u0434 \u043C\u043E\u0432\u0438 \u0434\u043B\u044F Google Speech-to-Text (\u043D\u0430\u043F\u0440., uk-UA, en-US, pl-PL)").addText(
-      (text) => text.setPlaceholder("uk-UA").setValue(this.plugin.settings.speechLanguage).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName("Recognition Language").setDesc("Language code for Google Speech-to-Text (e.g., en-US, uk-UA, es-ES)").addText(
+      (text) => text.setPlaceholder("en-US").setValue(this.plugin.settings.speechLanguage).onChange(async (value) => {
         this.plugin.settings.speechLanguage = value.trim();
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0447\u0430\u0441 \u0437\u0430\u043F\u0438\u0441\u0443 (\u0441\u0435\u043A)").setDesc("\u041C\u0430\u043A\u0441\u0438\u043C\u0430\u043B\u044C\u043D\u0438\u0439 \u0447\u0430\u0441 \u0437\u0430\u043F\u0438\u0441\u0443 \u0433\u043E\u043B\u043E\u0441\u0443 \u043F\u0435\u0440\u0435\u0434 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E\u044E \u0437\u0443\u043F\u0438\u043D\u043A\u043E\u044E").addSlider(
+    new import_obsidian2.Setting(containerEl).setName("Max Recording Time (sec)").setDesc("Maximum voice recording time before automatic stop").addSlider(
       (slider) => slider.setLimits(5, 60, 5).setValue(this.plugin.settings.maxRecordingTime).setDynamicTooltip().onChange(async (value) => {
         this.plugin.settings.maxRecordingTime = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("\u0412\u0438\u044F\u0432\u043B\u0435\u043D\u043D\u044F \u0442\u0438\u0448\u0456").setDesc("\u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u043D\u043E \u0437\u0443\u043F\u0438\u043D\u044F\u0442\u0438 \u0437\u0430\u043F\u0438\u0441 \u043F\u0456\u0441\u043B\u044F \u043F\u0435\u0440\u0456\u043E\u0434\u0443 \u0442\u0438\u0448\u0456 (\u044F\u043A\u0449\u043E \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454\u0442\u044C\u0441\u044F)").addToggle(
+    new import_obsidian2.Setting(containerEl).setName("Silence Detection").setDesc("Automatically stop recording after a period of silence (if supported)").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.silenceDetection).onChange(async (value) => {
         this.plugin.settings.silenceDetection = value;
         await this.plugin.saveSettings();
@@ -1232,7 +1274,7 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     );
     this.addIconSearchStyles();
   }
-  // Додаємо стилі CSS для пошуку іконок динамічно
+  // Adds CSS styles for icon search dynamically (remains the same)
   addIconSearchStyles() {
     const styleId = "ollama-icon-search-styles";
     if (document.getElementById(styleId))
@@ -3257,16 +3299,18 @@ function countTokens2(text) {
   try {
     return encode(text).length;
   } catch (e) {
-    console.warn("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0442\u043E\u043A\u0435\u043D\u0456\u0437\u0430\u0446\u0456\u0457, \u043F\u043E\u0432\u0435\u0440\u0442\u0430\u0454\u0442\u044C\u0441\u044F \u043F\u0440\u0438\u0431\u043B\u0438\u0437\u043D\u0430 \u043E\u0446\u0456\u043D\u043A\u0430 \u0437\u0430 \u0441\u043B\u043E\u0432\u0430\u043C\u0438:", e);
+    console.warn("Tokenizer error, falling back to word count estimation:", e);
     return Math.ceil(countWords(text) * 1.5);
   }
 }
 var PromptService = class {
+  // Token buffer for model response
   constructor(plugin) {
     this.systemPrompt = null;
-    // Резерв токенів для відповіді моделі та можливих неточностей токенізації
+    // Dependency for summarization
     this.RESPONSE_TOKEN_BUFFER = 500;
     this.plugin = plugin;
+    this.apiService = plugin.apiService;
   }
   setSystemPrompt(prompt) {
     this.systemPrompt = prompt;
@@ -3274,15 +3318,51 @@ var PromptService = class {
   getSystemPrompt() {
     return this.systemPrompt;
   }
-  // --- Основний метод підготовки ---
+  // --- Helper method for summarization ---
+  async _summarizeMessages(messagesToSummarize) {
+    var _a;
+    if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
+      return null;
+    }
+    console.log(`[Ollama] Attempting to summarize ${messagesToSummarize.length} messages.`);
+    const textToSummarize = messagesToSummarize.map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`).join("\n");
+    const summarizationFullPrompt = this.plugin.settings.summarizationPrompt.replace("{text_to_summarize}", textToSummarize);
+    const summaryRequestBody = {
+      model: this.plugin.settings.modelName,
+      // Use the same model for now
+      prompt: summarizationFullPrompt,
+      stream: false,
+      temperature: 0.2,
+      // Low temperature for factual summary
+      options: {
+        num_ctx: this.plugin.settings.contextWindow
+      }
+      // No system prompt for summarization to avoid interference
+    };
+    try {
+      const summaryResponse = await this.apiService.generateResponse(summaryRequestBody);
+      const summaryText = (_a = summaryResponse == null ? void 0 : summaryResponse.response) == null ? void 0 : _a.trim();
+      if (summaryText) {
+        console.log(`[Ollama] Summarization successful. Original tokens: ${countTokens2(textToSummarize)}, Summary tokens: ${countTokens2(summaryText)}`);
+        return summaryText;
+      } else {
+        console.warn("[Ollama] Summarization failed: Empty response from model.");
+        return null;
+      }
+    } catch (error) {
+      console.error("[Ollama] Summarization failed:", error);
+      return null;
+    }
+  }
+  // --- Main prompt preparation method ---
   async prepareFullPrompt(content, history) {
     if (!this.plugin) {
       console.warn("Plugin reference not set in PromptService.");
       return content.trim();
     }
     try {
-      const roleDefinition = await this.getRoleDefinition();
-      this.setSystemPrompt(roleDefinition);
+      const role = await this.getRoleDefinition();
+      this.setSystemPrompt(role);
     } catch (error) {
       console.error("Error getting role definition:", error);
       this.setSystemPrompt(null);
@@ -3296,7 +3376,7 @@ var PromptService = class {
         console.error("Error processing RAG:", error);
       }
     }
-    const ragHeader = "## \u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u0430 \u0456\u043D\u0444\u043E\u0440\u043C\u0430\u0446\u0456\u044F \u0437 \u043D\u043E\u0442\u0430\u0442\u043E\u043A:\n";
+    const ragHeader = "## Contextual Information from Notes:\n";
     const ragBlock = ragContext ? `${ragHeader}${ragContext.trim()}
 
 ---
@@ -3308,47 +3388,107 @@ var PromptService = class {
       const modelContextLimit = this.plugin.settings.contextWindow;
       const maxContextTokens = Math.max(100, modelContextLimit - this.RESPONSE_TOKEN_BUFFER);
       let currentTokens = 0;
-      let promptParts = [];
+      let promptHistoryParts = [];
       const systemPromptTokens = currentSystemPrompt ? countTokens2(currentSystemPrompt) : 0;
       currentTokens += systemPromptTokens;
       const userInputTokens = countTokens2(userInputFormatted);
       currentTokens += userInputTokens;
       const ragTokens = countTokens2(ragBlock);
-      let ragAdded = false;
+      let finalRagBlock = "";
       if (ragBlock && currentTokens + ragTokens <= maxContextTokens) {
-        promptParts.push(ragBlock);
+        finalRagBlock = ragBlock;
         currentTokens += ragTokens;
-        ragAdded = true;
-        console.log(`[Ollama] RAG context added (${ragTokens} tokens).`);
+        console.log(`[Ollama] RAG context included (${ragTokens} tokens).`);
       } else if (ragBlock) {
-        console.warn(`[Ollama] RAG context (${ragTokens} tokens) too large, skipped. Available: ${maxContextTokens - currentTokens}`);
+        console.warn(`[Ollama] RAG context (${ragTokens} tokens) skipped, not enough space. Available: ${maxContextTokens - currentTokens}`);
       }
-      let addedHistoryMessages = 0;
-      for (let i = history.length - 1; i >= 0; i--) {
-        const msg = history[i];
+      const keepN = Math.min(history.length, this.plugin.settings.keepLastNMessagesBeforeSummary);
+      const messagesToKeep = history.slice(-keepN);
+      const messagesToProcess = history.slice(0, -keepN);
+      let keptMessagesTokens = 0;
+      const keptMessagesStrings = [];
+      for (let i = messagesToKeep.length - 1; i >= 0; i--) {
+        const msg = messagesToKeep[i];
         const formattedMsg = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
         const messageTokens = countTokens2(formattedMsg);
         if (currentTokens + messageTokens <= maxContextTokens) {
-          promptParts.push(formattedMsg);
+          keptMessagesStrings.push(formattedMsg);
           currentTokens += messageTokens;
-          addedHistoryMessages++;
+          keptMessagesTokens += messageTokens;
         } else {
-          console.log(`[Ollama] History trimming: Stopped at message index ${i} (${messageTokens} tokens). Total tokens: ${currentTokens}/${maxContextTokens}`);
+          console.warn(`[Ollama] Even a message intended to be kept does not fit (message index ${history.length - messagesToKeep.length + i}). Consider increasing context window or reducing keepLastNMessages.`);
           break;
         }
       }
-      let finalPromptParts = [];
-      if (ragAdded) {
-        finalPromptParts.push(promptParts.shift());
-        promptParts.reverse();
-        finalPromptParts = finalPromptParts.concat(promptParts);
-      } else {
-        promptParts.reverse();
-        finalPromptParts = promptParts;
+      keptMessagesStrings.reverse();
+      if (keptMessagesStrings.length > 0)
+        console.log(`[Ollama] Kept last ${keptMessagesStrings.length} messages verbatim (${keptMessagesTokens} tokens).`);
+      let processedHistoryParts = [];
+      let currentChunk = { messages: [], text: "", tokens: 0 };
+      for (let i = messagesToProcess.length - 1; i >= 0; i--) {
+        const msg = messagesToProcess[i];
+        const formattedMsg = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
+        const messageTokens = countTokens2(formattedMsg);
+        if (currentChunk.tokens > 0 && currentChunk.tokens + messageTokens > this.plugin.settings.summarizationChunkSize) {
+          currentChunk.messages.reverse();
+          currentChunk.text = currentChunk.messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
+          if (currentTokens + currentChunk.tokens <= maxContextTokens) {
+            processedHistoryParts.push(currentChunk.text);
+            currentTokens += currentChunk.tokens;
+          } else if (this.plugin.settings.enableSummarization) {
+            const summary = await this._summarizeMessages(currentChunk.messages);
+            if (summary) {
+              const summaryTokens = countTokens2(summary);
+              const summaryFormatted = `[Summary of previous messages]:
+${summary}`;
+              if (currentTokens + summaryTokens <= maxContextTokens) {
+                processedHistoryParts.push(summaryFormatted);
+                currentTokens += summaryTokens;
+                console.log(`[Ollama] Added summary (${summaryTokens} tokens) instead of chunk (${currentChunk.tokens} tokens).`);
+              } else {
+                console.warn(`[Ollama] Summary (${summaryTokens} tokens) still too large, discarding chunk.`);
+              }
+            } else {
+              console.warn(`[Ollama] Summarization failed for chunk, discarding.`);
+            }
+          } else {
+            console.log(`[Ollama] History chunk skipped (${currentChunk.tokens} tokens), summarization disabled or chunk too large.`);
+          }
+          currentChunk = { messages: [], text: "", tokens: 0 };
+        }
+        currentChunk.messages.push(msg);
+        currentChunk.tokens += messageTokens;
       }
-      finalPromptParts.push(userInputFormatted);
+      if (currentChunk.messages.length > 0) {
+        currentChunk.messages.reverse();
+        currentChunk.text = currentChunk.messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
+        if (currentTokens + currentChunk.tokens <= maxContextTokens) {
+          processedHistoryParts.push(currentChunk.text);
+          currentTokens += currentChunk.tokens;
+        } else if (this.plugin.settings.enableSummarization) {
+          const summary = await this._summarizeMessages(currentChunk.messages);
+          if (summary) {
+            const summaryTokens = countTokens2(summary);
+            const summaryFormatted = `[Summary of previous messages]:
+${summary}`;
+            if (currentTokens + summaryTokens <= maxContextTokens) {
+              processedHistoryParts.push(summaryFormatted);
+              currentTokens += summaryTokens;
+              console.log(`[Ollama] Added summary (${summaryTokens} tokens) for last chunk (${currentChunk.tokens} tokens).`);
+            } else {
+              console.warn(`[Ollama] Summary (${summaryTokens} tokens) still too large for last chunk.`);
+            }
+          } else {
+            console.warn(`[Ollama] Summarization failed for last chunk, discarding.`);
+          }
+        } else {
+          console.log(`[Ollama] Last history chunk skipped (${currentChunk.tokens} tokens), summarization disabled or chunk too large.`);
+        }
+      }
+      processedHistoryParts.reverse();
+      const finalPromptParts = [finalRagBlock, ...processedHistoryParts, ...keptMessagesStrings, userInputFormatted].filter(Boolean);
       finalPrompt = finalPromptParts.join("\n\n");
-      console.log(`[Ollama] Final prompt token count (approx. incl system & input): ${currentTokens}. History messages included: ${addedHistoryMessages}.`);
+      console.log(`[Ollama] Final prompt token count (approx. incl system & input): ${currentTokens}. Processed history parts: ${processedHistoryParts.length}, Kept verbatim: ${keptMessagesStrings.length}.`);
     } else {
       console.log("[Ollama] Using basic context strategy (words).");
       const systemPromptWordCount = currentSystemPrompt ? countWords(currentSystemPrompt) : 0;
@@ -3364,7 +3504,7 @@ var PromptService = class {
         currentWordCount += ragWords;
         ragAdded = true;
       } else if (ragBlock) {
-        console.warn(`[Ollama] RAG context (${ragWords} words) too large, skipped. Available: ${wordLimit - currentWordCount}`);
+        console.warn(`[Ollama] RAG context (${ragWords} words) too large, skipped.`);
       }
       let addedHistoryMessages = 0;
       for (let i = history.length - 1; i >= 0; i--) {
@@ -3390,10 +3530,11 @@ var PromptService = class {
       }
       finalPromptParts.push(userInputFormatted);
       finalPrompt = finalPromptParts.join("\n\n");
+      console.log(`[Ollama] Final prompt word count (approx): ${currentWordCount + systemPromptWordCount + userInputWordCount}. History messages included: ${addedHistoryMessages}.`);
     }
     return finalPrompt;
   }
-  // --- Методи для роботи з ролями (без змін з попередньої відповіді) ---
+  // --- Role definition methods ---
   async getDefaultRoleDefinition() {
     if (!this.plugin)
       return null;
@@ -3426,8 +3567,8 @@ var PromptService = class {
         }
       }
       if (content !== null) {
-        const currentTime = new Date().toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
-        const currentDate = new Date().toLocaleDateString("uk-UA", { year: "numeric", month: "long", day: "numeric" });
+        const currentTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+        const currentDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
         content += `
 
 Current date and time: ${currentDate}, ${currentTime}`;
@@ -3447,8 +3588,8 @@ Current date and time: ${currentDate}, ${currentTime}`;
       const file = this.plugin.app.vault.getAbstractFileByPath(customPath);
       if (file instanceof import_obsidian3.TFile) {
         let content = await this.plugin.app.vault.read(file);
-        const currentTime = new Date().toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit" });
-        const currentDate = new Date().toLocaleDateString("uk-UA", { year: "numeric", month: "long", day: "numeric" });
+        const currentTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+        const currentDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
         content += `
 
 Current date and time: ${currentDate}, ${currentTime}`;
@@ -3483,7 +3624,6 @@ Current date and time: ${currentDate}, ${currentTime}`;
 var MessageService = class {
   constructor(plugin) {
     this.view = null;
-    // Додаємо посилання
     this.isProcessing = false;
     this.plugin = plugin;
     this.apiService = plugin.apiService;
@@ -3507,7 +3647,7 @@ var MessageService = class {
               timestamp: msg.timestamp
             });
           } else {
-            console.warn("\u041F\u0440\u043E\u043F\u0443\u0441\u043A \u043F\u043E\u0432\u0456\u0434\u043E\u043C\u043B\u0435\u043D\u043D\u044F \u0437 \u043D\u0435\u043F\u043E\u0432\u043D\u0438\u043C\u0438/\u043D\u0435\u043F\u0440\u0430\u0432\u0438\u043B\u044C\u043D\u0438\u043C\u0438 \u0434\u0430\u043D\u0438\u043C\u0438 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", msg);
+            console.warn("Skipping message with incomplete/invalid data during history load:", msg);
           }
         }
         historyLoaded = true;
@@ -3523,7 +3663,7 @@ var MessageService = class {
         }, 200);
       }
     } catch (error) {
-      console.error("MessageService: \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F \u0456\u0441\u0442\u043E\u0440\u0456\u0457:", error);
+      console.error("MessageService: Error loading history:", error);
     } finally {
       if (this.view && this.view.getMessagesCount() === 0) {
         this.view.showEmptyState();
@@ -3552,18 +3692,13 @@ var MessageService = class {
         const requestBody = {
           model: this.plugin.settings.modelName,
           prompt: formattedPrompt,
-          // Результат роботи PromptService
           stream: false,
-          // Поки що без стрімінгу
+          // Streaming not implemented yet
           temperature: this.plugin.settings.temperature,
           options: {
             num_ctx: this.plugin.settings.contextWindow
-            // Використовуємо contextWindow
-            // Можна додати інші опції Ollama тут, якщо потрібно
-            // stop: ["\nUser:", "\nAssistant:"] // Наприклад, стоп-слова
           },
           system: (_c = this.promptService.getSystemPrompt()) != null ? _c : void 0
-          // Додаємо системний промпт, якщо є
         };
         if (!requestBody.system) {
           delete requestBody.system;
@@ -3573,21 +3708,21 @@ var MessageService = class {
         if (responseData && typeof responseData.response === "string") {
           (_e = this.view) == null ? void 0 : _e.internalAddMessage("assistant", responseData.response.trim());
         } else {
-          console.warn("\u041E\u0442\u0440\u0438\u043C\u0430\u043D\u043E \u043D\u0435\u043E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u0443 \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u0432\u0456\u0434 \u043C\u043E\u0434\u0435\u043B\u0456:", responseData);
-          (_f = this.view) == null ? void 0 : _f.internalAddMessage("error", "\u041E\u0442\u0440\u0438\u043C\u0430\u043D\u043E \u043D\u0435\u043E\u0447\u0456\u043A\u0443\u0432\u0430\u043D\u0443 \u0430\u0431\u043E \u043F\u043E\u0440\u043E\u0436\u043D\u044E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u0432\u0456\u0434 \u043C\u043E\u0434\u0435\u043B\u0456.");
+          console.warn("Received unexpected response from model:", responseData);
+          (_f = this.view) == null ? void 0 : _f.internalAddMessage("error", "Received an unexpected or empty response from the model.");
         }
       } catch (error) {
-        console.error("\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0431\u0440\u043E\u0431\u043A\u0438 \u0437\u0430\u043F\u0438\u0442\u0443 \u0434\u043E Ollama:", error);
+        console.error("Error processing request with Ollama:", error);
         (_g = this.view) == null ? void 0 : _g.removeLoadingIndicator(loadingMessageEl);
-        let errorMessage = "\u041D\u0435\u0432\u0456\u0434\u043E\u043C\u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0437\u0430\u0454\u043C\u043E\u0434\u0456\u0457 \u0437 Ollama.";
+        let errorMessage = "An unknown error occurred while interacting with Ollama.";
         if (error instanceof Error) {
           errorMessage = error.message;
           if (errorMessage.includes("Model") && errorMessage.includes("not found")) {
-            errorMessage += ` \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 \u043D\u0430\u0437\u0432\u0443 \u043C\u043E\u0434\u0435\u043B\u0456 "${this.plugin.settings.modelName}" \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.`;
+            errorMessage += ` Check the model name "${this.plugin.settings.modelName}" in settings.`;
           } else if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("Failed to fetch")) {
-            errorMessage += ` \u041F\u0435\u0440\u0435\u0432\u0456\u0440\u0442\u0435 URL \u0441\u0435\u0440\u0432\u0435\u0440\u0430 Ollama (${this.plugin.settings.ollamaServerUrl}) \u0442\u0430 \u043F\u0435\u0440\u0435\u043A\u043E\u043D\u0430\u0439\u0442\u0435\u0441\u044F, \u0449\u043E \u0441\u0435\u0440\u0432\u0435\u0440 \u0437\u0430\u043F\u0443\u0449\u0435\u043D\u043E.`;
+            errorMessage += ` Check the Ollama server URL (${this.plugin.settings.ollamaServerUrl}) and ensure the server is running.`;
           } else if (error.message.includes("context window") || error.message.includes("maximum context length")) {
-            errorMessage = `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u043E\u0433\u043E \u0432\u0456\u043A\u043D\u0430 (${this.plugin.settings.contextWindow} \u0442\u043E\u043A\u0435\u043D\u0456\u0432): ${error.message}. \u0421\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0437\u043C\u0435\u043D\u0448\u0438\u0442\u0438 '\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043D\u0435 \u0432\u0456\u043A\u043D\u043E \u043C\u043E\u0434\u0435\u043B\u0456' \u0430\u0431\u043E \u0443\u0432\u0456\u043C\u043A\u043D\u0443\u0442\u0438/\u0432\u0438\u043C\u043A\u043D\u0443\u0442\u0438 '\u041F\u0440\u043E\u0441\u0443\u043D\u0443\u0442\u0435 \u043A\u0435\u0440\u0443\u0432\u0430\u043D\u043D\u044F \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u043E\u043C' \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.`;
+            errorMessage = `Context window error (${this.plugin.settings.contextWindow} tokens): ${error.message}. Try reducing 'Model Context Window' or toggle 'Advanced Context Strategy' in settings.`;
           }
         }
         (_h = this.view) == null ? void 0 : _h.internalAddMessage("error", errorMessage);

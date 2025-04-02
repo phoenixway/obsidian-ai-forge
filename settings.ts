@@ -5,68 +5,79 @@ import {
   DropdownComponent,
   Notice,
   TextComponent,
+  TextAreaComponent, // Added for multi-line prompt
   ButtonComponent
 } from "obsidian";
 import OllamaPlugin from "./main";
 
-// Нові типи для налаштувань аватарів
+// Types for avatar settings
 export type AvatarType = 'initials' | 'icon';
 
 export interface OllamaPluginSettings {
+  // --- Core ---
   modelName: string;
   ollamaServerUrl: string;
-  logFileSizeLimit: number; // Size in KB
+  temperature: number;
+  // --- Context ---
+  contextWindow: number; // Model context window in tokens
+  useAdvancedContextStrategy: boolean; // Enable tokenizer?
+  enableSummarization: boolean;      // Enable summarization (only if useAdvancedContextStrategy=true)?
+  summarizationPrompt: string;       // Prompt for summarization
+  summarizationChunkSize: number;    // History chunk size for summarization (in tokens)
+  keepLastNMessagesBeforeSummary: number; // How many recent messages not to summarize
+  // --- History ---
   saveMessageHistory: boolean;
+  logFileSizeLimit: number; // Size in KB
+  // --- Role ---
+  followRole: boolean;
+  useDefaultRoleDefinition: boolean;
+  customRoleFilePath: string;
+  systemPromptInterval: number;
+  // --- RAG ---
   ragEnabled: boolean;
   ragFolderPath: string;
-  contextWindowSize: number; // Кількість документів RAG
-  googleApiKey: string; // API key for Google Speech-to-Text
-  speechLanguage: string; // Language code for speech recognition
-  maxRecordingTime: number; // Maximum recording time in seconds
-  silenceDetection: boolean; // Enable silence detection
-  followRole: boolean;
-  useDefaultRoleDefinition: boolean; // Whether to use default role file
-  customRoleFilePath: string; // Path to custom role definition file
-  systemPromptInterval: number;
-  temperature: number;
-  contextWindow: number; // Розмір контекстного вікна моделі (токени)
-
-  // --- Нові налаштування UI/UX ---
+  contextWindowSize: number; // Number of RAG documents
+  // --- UI/UX ---
   userAvatarType: AvatarType;
-  userAvatarContent: string; // Ініціали або назва іконки Obsidian
+  userAvatarContent: string; // Initials or Obsidian icon name
   aiAvatarType: AvatarType;
-  aiAvatarContent: string; // Ініціали або назва іконки Obsidian
-  maxMessageHeight: number; // Макс. висота повідомлення перед згортанням (px), 0 = вимкнено
-
-  // --- Нове налаштування ---
-  useAdvancedContextStrategy: boolean; // Перемикач для нової стратегії
+  aiAvatarContent: string; // Initials or Obsidian icon name
+  maxMessageHeight: number; // Max message height before collapsing (px), 0 = disabled
+  // --- Speech Recognition ---
+  googleApiKey: string;
+  speechLanguage: string;
+  maxRecordingTime: number;
+  silenceDetection: boolean;
 }
 
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
-  modelName: "mistral",
+  modelName: "mistral", // Default model
   ollamaServerUrl: "http://localhost:11434",
-  logFileSizeLimit: 1024,
+  temperature: 0.1,
+  contextWindow: 8192,
+  useAdvancedContextStrategy: false, // Disabled by default
+  enableSummarization: false,       // Disabled by default
+  summarizationPrompt: `Briefly summarize the following conversation excerpt, focusing on key decisions, questions, and outcomes. Maintain a neutral tone and stick to the facts:\n\n---\n{text_to_summarize}\n---\n\nSummary:`, // Default English prompt
+  summarizationChunkSize: 1500, // Approx. chunk size to summarize
+  keepLastNMessagesBeforeSummary: 6, // Keep last 6 messages verbatim
   saveMessageHistory: true,
-  ragEnabled: false,
-  ragFolderPath: "data",
-  contextWindowSize: 5, // RAG docs
-  googleApiKey: "",
-  speechLanguage: "uk-UA", // Мова за замовчуванням - українська
-  maxRecordingTime: 15,
-  silenceDetection: true,
+  logFileSizeLimit: 1024, // 1MB
   followRole: true,
   useDefaultRoleDefinition: true,
   customRoleFilePath: "",
   systemPromptInterval: 0,
-  temperature: 0.1,
-  contextWindow: 8192, // Model context window
+  ragEnabled: false,
+  ragFolderPath: "data", // Default RAG folder
+  contextWindowSize: 5, // RAG docs count
   userAvatarType: 'initials',
   userAvatarContent: 'U',
   aiAvatarType: 'icon',
-  aiAvatarContent: 'bot', // Іконка Obsidian
-  maxMessageHeight: 300, // Згортати повідомлення довші за 300px
-  // --- Нове значення ---
-  useAdvancedContextStrategy: false, // За замовчуванням вимкнено
+  aiAvatarContent: 'bot', // Obsidian icon name
+  maxMessageHeight: 300, // Collapse messages taller than 300px
+  googleApiKey: "",
+  speechLanguage: "en-US", // Default language English
+  maxRecordingTime: 15,
+  silenceDetection: true,
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -77,30 +88,21 @@ export class OllamaSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
-  getDisplayText(): string {
-    return "Ollama";
-  }
+  getDisplayText(): string { return "Ollama Chat"; } // Changed display name
+  getId(): string { return "ollama-chat-plugin"; } // Changed ID for clarity
 
-  getId(): string {
-    // Повертає унікальний ID для вкладки налаштувань
-    return "ollama-plugin";
-  }
-
-  // Допоміжна функція для пошуку іконок
+  // Helper function for icon search (remains the same)
   private createIconSearch(containerEl: HTMLElement, settingType: 'user' | 'ai') {
     const searchContainer = containerEl.createDiv({ cls: 'ollama-icon-search-container' });
     let searchInput: TextComponent;
     let resultsEl: HTMLElement;
-
     const performSearch = () => {
       const query = searchInput.getValue().toLowerCase().trim();
       resultsEl.empty();
       if (!query) return;
-
-      // @ts-ignore - Доступ до всіх іконок Obsidian (неофіційний API)
+      // @ts-ignore
       const allIcons = window.require('obsidian')?.getIconIds?.() || [];
-      const filteredIcons = allIcons.filter((icon: string) => icon.includes(query)).slice(0, 50); // Обмеження результатів
-
+      const filteredIcons = allIcons.filter((icon: string) => icon.includes(query)).slice(0, 50);
       if (filteredIcons.length > 0) {
         filteredIcons.forEach((icon: string) => {
           const iconEl = resultsEl.createEl('button', { cls: 'ollama-icon-search-result' });
@@ -108,40 +110,29 @@ export class OllamaSettingTab extends PluginSettingTab {
           window.require('obsidian').setIcon(iconEl, icon);
           iconEl.setAttribute('aria-label', icon);
           iconEl.onClickEvent(() => {
-            if (settingType === 'user') {
-              this.plugin.settings.userAvatarContent = icon;
-            } else {
-              this.plugin.settings.aiAvatarContent = icon;
-            }
-            this.plugin.saveSettings();
-            this.display(); // Оновити UI налаштувань
+            if (settingType === 'user') this.plugin.settings.userAvatarContent = icon;
+            else this.plugin.settings.aiAvatarContent = icon;
+            this.plugin.saveSettings(); this.display();
           });
         });
-      } else {
-        resultsEl.setText('Іконок не знайдено.');
-      }
+      } else { resultsEl.setText('No icons found.'); } // Translated
     };
-
-    searchInput = new TextComponent(searchContainer)
-      .setPlaceholder('Пошук іконок Obsidian...')
-      .onChange(performSearch);
-
+    searchInput = new TextComponent(searchContainer).setPlaceholder('Search Obsidian icons...').onChange(performSearch); // Translated
     resultsEl = searchContainer.createDiv({ cls: 'ollama-icon-search-results' });
   }
-
 
   async display(): Promise<void> {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass('ollama-settings'); // Додаємо клас для стилізації
+    containerEl.addClass('ollama-settings');
 
     // --- Basic Configuration ---
-    containerEl.createEl("h2", { text: "Основні Налаштування" });
+    containerEl.createEl("h2", { text: "Basic Configuration" }); // Translated
 
     new Setting(containerEl)
-      .setName("Ollama Server URL")
+      .setName("Ollama Server URL") // Already English
       .setDesc(
-        "IP адреса та порт, де запущено Ollama (напр. http://192.168.1.10:11434)"
+        "IP address and port where Ollama is running (e.g., http://192.168.1.10:11434)" // Already English
       )
       .addText((text) =>
         text
@@ -154,82 +145,57 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("З'єднання з сервером")
-      .setDesc("Перепідключитися до сервера локальної моделі та оновити список доступних моделей")
+      .setName("Server Connection") // Translated
+      .setDesc("Reconnect to the local model server and refresh the list of available models") // Translated
       .addButton((button) =>
         button
-          .setButtonText("Перепідключитись")
+          .setButtonText("Reconnect") // Already English
           .setIcon("refresh-cw")
           .onClick(async () => {
             try {
-              new Notice("Підключення до сервера Ollama...");
-              await this.plugin.apiService.getModels(); // Просто перевіряємо з'єднання
-              new Notice("Успішно підключено до сервера Ollama!");
-              this.display(); // Перемалювати налаштування для оновлення списку моделей
+              new Notice("Connecting to Ollama server..."); // Translated
+              await this.plugin.apiService.getModels(); // Check connection
+              new Notice("Successfully connected to Ollama server!"); // Translated
+              this.display(); // Redraw settings to update model list
             } catch (error: any) {
-              new Notice(`Помилка підключення: ${error.message}. Перевірте URL та стан сервера.`);
+              new Notice(`Connection failed: ${error.message}. Check URL and server status.`); // Translated
               if (this.plugin.view) {
                 this.plugin.view.internalAddMessage(
                   "error",
-                  `Помилка підключення до Ollama: ${error.message}. Перевірте налаштування.`
+                  `Failed to connect to Ollama: ${error.message}. Please check settings.` // Translated
                 );
               }
             }
           })
       );
 
-    // Fetch available models
     let availableModels: string[] = [];
-    try {
-      availableModels = await this.plugin.apiService.getModels();
-    } catch (error: any) {
-      console.error("Помилка отримання моделей:", error);
-      if (this.plugin.view) {
-        this.plugin.view.internalAddMessage(
-          "error",
-          `Не вдалося отримати список моделей: ${error.message}.`
-        );
-      }
-    }
-
-    const modelSetting = new Setting(containerEl)
-      .setName("Назва Моделі")
-      .setDesc("Оберіть мовну модель для використання");
-
-    modelSetting.addDropdown((dropdown) => {
-      const selectEl = dropdown.selectEl;
-      selectEl.empty(); // Очищуємо перед додаванням
-
-      if (availableModels.length > 0) {
-        availableModels.forEach((model) => {
-          dropdown.addOption(model, model);
-        });
-        // Встановлюємо значення тільки якщо є моделі
-        const currentModel = this.plugin.settings.modelName;
-        if (availableModels.includes(currentModel)) {
-          dropdown.setValue(currentModel);
-        } else if (availableModels.length > 0) {
-          // Якщо поточна модель не знайдена, оберіть першу доступну
-          dropdown.setValue(availableModels[0]);
-          this.plugin.settings.modelName = availableModels[0];
-          this.plugin.saveSettings(); // Зберегти автоматично обрану модель
-        }
-      } else {
-        dropdown.addOption("", "Моделі не знайдено");
-        dropdown.setDisabled(true);
-      }
-
-
-      dropdown.onChange(async (value) => {
-        this.plugin.settings.modelName = value;
-        this.plugin.emit('model-changed', value);
-        await this.plugin.saveSettings();
-      });
-    });
+    try { availableModels = await this.plugin.apiService.getModels(); } catch (e) { /* error handled above */ }
 
     new Setting(containerEl)
-      .setName("Температура")
-      .setDesc("Контролює випадковість відповідей моделі (0.0 - 1.0)")
+      .setName("Model Name") // Already English
+      .setDesc("Select the language model to use") // Already English
+      .addDropdown((dropdown) => {
+        const selectEl = dropdown.selectEl; selectEl.empty();
+        if (availableModels.length > 0) {
+          availableModels.forEach((model) => dropdown.addOption(model, model));
+          const currentModel = this.plugin.settings.modelName;
+          if (availableModels.includes(currentModel)) dropdown.setValue(currentModel);
+          else { dropdown.setValue(availableModels[0]); this.plugin.settings.modelName = availableModels[0]; this.plugin.saveSettings(); }
+        } else {
+          dropdown.addOption("", "No models found"); // Translated
+          dropdown.setDisabled(true);
+        }
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.modelName = value;
+          this.plugin.emit('model-changed', value);
+          await this.plugin.saveSettings();
+        });
+      });
+
+    new Setting(containerEl)
+      .setName("Temperature") // Already English
+      .setDesc("Controls randomness in model responses (0.0 - 1.0)") // Already English
       .addSlider((slider) =>
         slider
           .setLimits(0, 1, 0.1)
@@ -241,53 +207,90 @@ export class OllamaSettingTab extends PluginSettingTab {
           })
       );
 
-    // --- Контекстне вікно ТА НОВА СТРАТЕГІЯ ---
-    containerEl.createEl("h2", { text: "Керування Контекстом" });
+    // --- Context Management ---
+    containerEl.createEl("h2", { text: "Context Management" }); // Translated
 
     new Setting(containerEl)
-      .setName("Контекстне вікно моделі (токени)")
-      .setDesc("Макс. кількість токенів, яку модель може обробити (з документації моделі).")
-      .addText((text) =>
-        text
-          .setPlaceholder("8192")
-          .setValue(String(this.plugin.settings.contextWindow))
-          .onChange(async (value) => {
-            const num = parseInt(value, 10);
-            if (!isNaN(num) && num > 0) {
-              this.plugin.settings.contextWindow = num;
-              await this.plugin.saveSettings();
-            } else {
-              new Notice("Введіть позитивне число.");
-              text.setValue(String(this.plugin.settings.contextWindow));
-            }
-          })
+      .setName("Model Context Window (tokens)") // Translated
+      .setDesc("Max tokens the model can process (refer to model documentation).") // Translated
+      .addText((text) => text.setPlaceholder("8192").setValue(String(this.plugin.settings.contextWindow))
+        .onChange(async v => { const n = parseInt(v); if (!isNaN(n) && n > 0) { this.plugin.settings.contextWindow = n; await this.plugin.saveSettings(); } else { new Notice("Please enter a positive number."); text.setValue(String(this.plugin.settings.contextWindow)); } }) // Translated
       );
 
     new Setting(containerEl)
-      .setName("Експериментально: Просунуте керування контекстом")
-      .setDesc("Використовувати токенізатор для точного підрахунку та обрізання контексту. Якщо вимкнено, використовується менш точний підрахунок за словами.")
+      .setName("Experimental: Advanced Context Strategy") // Translated
+      .setDesc("Use tokenizer for precise context calculation and trimming. If disabled, uses less accurate word counting.") // Translated
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.useAdvancedContextStrategy)
         .onChange(async value => {
           this.plugin.settings.useAdvancedContextStrategy = value;
           await this.plugin.saveSettings();
           if (value) {
-            new Notice("Просунуте керування контекстом увімкнено (використовує токенізатор).");
+            new Notice("Advanced context strategy enabled (using tokenizer)."); // Translated
           } else {
-            new Notice("Просунуте керування контекстом вимкнено (використовує підрахунок слів).");
+            new Notice("Advanced context strategy disabled (using word count)."); // Translated
           }
+          this.display(); // Redraw to show/hide summarization settings
         })
       );
-    // Пояснення щодо сумаризації (поки не реалізовано)
-    const noteEl = containerEl.createEl('p', { text: 'Примітка: Автоматична сумаризація історії для дуже довгих розмов наразі не реалізована в просунутому режимі.', cls: 'setting-item-description ollama-subtle-notice' });
+
+    // Show summarization settings only if advanced strategy is enabled
+    if (this.plugin.settings.useAdvancedContextStrategy) {
+      containerEl.createEl("h4", { text: "Automatic History Summarization (Experimental)" }); // Translated
+
+      new Setting(containerEl)
+        .setName("Enable Summarization") // Translated
+        .setDesc("Automatically summarize older parts of the conversation if they exceed the context window. WARNING: This can significantly slow down responses!") // Translated
+        .addToggle(toggle => toggle
+          .setValue(this.plugin.settings.enableSummarization)
+          .onChange(async value => {
+            this.plugin.settings.enableSummarization = value;
+            await this.plugin.saveSettings();
+          })
+        );
+
+      new Setting(containerEl)
+        .setName("Summarization Prompt") // Translated
+        .setDesc("Instruction for the model on how to summarize. Use {text_to_summarize} as a placeholder.") // Translated
+        .addTextArea(text => text
+          .setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt)
+          .setValue(this.plugin.settings.summarizationPrompt)
+          .onChange(async value => {
+            this.plugin.settings.summarizationPrompt = value;
+            await this.plugin.saveSettings();
+          })
+          .inputEl.rows = 5
+        );
+
+      new Setting(containerEl)
+        .setName("Summarization Chunk Size (tokens)") // Translated
+        .setDesc("Approximate size of the history block (in tokens) to be summarized at once.") // Translated
+        .addText(text => text
+          .setPlaceholder(String(DEFAULT_SETTINGS.summarizationChunkSize))
+          .setValue(String(this.plugin.settings.summarizationChunkSize))
+          .onChange(async v => { const n = parseInt(v); if (!isNaN(n) && n > 100) { this.plugin.settings.summarizationChunkSize = n; await this.plugin.saveSettings(); } else { new Notice("Please enter a number greater than 100."); text.setValue(String(this.plugin.settings.summarizationChunkSize)); } }) // Translated
+        );
+
+      new Setting(containerEl)
+        .setName("Keep Last N Messages") // Translated
+        .setDesc("Number of recent messages that will NEVER be summarized.") // Translated
+        .addSlider(slider => slider
+          .setLimits(0, 20, 1)
+          .setValue(this.plugin.settings.keepLastNMessagesBeforeSummary)
+          .setDynamicTooltip()
+          .onChange(async v => { this.plugin.settings.keepLastNMessagesBeforeSummary = v; await this.plugin.saveSettings(); })
+        );
+    } else {
+      containerEl.createEl('p', { text: 'Using basic context management strategy (approximate word count).', cls: 'setting-item-description ollama-subtle-notice' }); // Translated
+    }
 
 
     // --- Chat History & Persistence ---
-    containerEl.createEl("h2", { text: "Історія Чату" });
+    containerEl.createEl("h2", { text: "Chat History" }); // Translated
 
     new Setting(containerEl)
-      .setName("Зберігати історію")
-      .setDesc("Зберігати історію чату між сесіями")
+      .setName("Save Message History") // Translated
+      .setDesc("Save chat history between sessions") // Translated
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.saveMessageHistory)
@@ -298,8 +301,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Ліміт розміру файлу історії (KB)")
-      .setDesc("Максимальний розмір файлу історії (1024 KB = 1 MB)")
+      .setName("Log File Size Limit (KB)") // Translated
+      .setDesc("Maximum size of the message history file (1024 KB = 1 MB)") // Translated
       .addSlider((slider) =>
         slider
           .setLimits(256, 10240, 256) // 256KB to 10MB
@@ -313,81 +316,79 @@ export class OllamaSettingTab extends PluginSettingTab {
       .addExtraButton((button) =>
         button
           .setIcon("reset")
-          .setTooltip("Скинути до стандартного (1024 KB)")
+          .setTooltip("Reset to default (1024 KB)") // Translated
           .onClick(async () => {
             this.plugin.settings.logFileSizeLimit =
               DEFAULT_SETTINGS.logFileSizeLimit;
             await this.plugin.saveSettings();
-            this.display(); // Перемалювати для оновлення слайдера
+            this.display();
           })
       );
 
     new Setting(containerEl)
-      .setName("Очистити Історію")
-      .setDesc("Видалити всю історію чату")
+      .setName("Clear History") // Translated
+      .setDesc("Delete all chat history") // Translated
       .addButton((button) =>
-        button.setButtonText("Очистити").onClick(async () => {
-          // Додаємо підтвердження
-          if (confirm("Ви впевнені, що хочете видалити всю історію чату? Цю дію неможливо скасувати.")) {
+        button.setButtonText("Clear").onClick(async () => { // Translated
+          if (confirm("Are you sure you want to delete all chat history? This action cannot be undone.")) { // Translated
             await this.plugin.clearMessageHistory();
-            new Notice("Історію чату очищено.");
+            new Notice("Chat history cleared."); // Translated
           }
         })
       );
 
 
     // --- UI/UX Settings ---
-    containerEl.createEl("h2", { text: "Зовнішній Вигляд" });
+    containerEl.createEl("h2", { text: "Appearance (UI/UX)" }); // Translated
 
     // User Avatar Settings
-    containerEl.createEl("h4", { text: "Аватар Користувача" });
+    containerEl.createEl("h4", { text: "User Avatar" }); // Translated
     new Setting(containerEl)
-      .setName("Тип аватара користувача")
+      .setName("User Avatar Type") // Translated
       .addDropdown(dd => dd
-        .addOption('initials', 'Ініціали')
-        .addOption('icon', 'Іконка Obsidian')
+        .addOption('initials', 'Initials') // Translated
+        .addOption('icon', 'Obsidian Icon') // Translated
         .setValue(this.plugin.settings.userAvatarType)
         .onChange(async (value: AvatarType) => {
           this.plugin.settings.userAvatarType = value;
           await this.plugin.saveSettings();
-          this.display(); // Перемалювати, щоб показати/сховати поле вмісту
+          this.display();
         })
       );
 
     if (this.plugin.settings.userAvatarType === 'initials') {
       new Setting(containerEl)
-        .setName("Ініціали користувача")
-        .setDesc("Введіть 1-2 літери")
+        .setName("User Initials") // Translated
+        .setDesc("Enter 1-2 letters") // Translated
         .addText(text => text
           .setValue(this.plugin.settings.userAvatarContent)
           .onChange(async (value) => {
-            this.plugin.settings.userAvatarContent = value.substring(0, 2).toUpperCase(); // Обмеження до 2 літер
+            this.plugin.settings.userAvatarContent = value.substring(0, 2).toUpperCase();
             await this.plugin.saveSettings();
-            // Не потрібно перемальовувати тут
           })
         );
     } else { // type === 'icon'
       new Setting(containerEl)
-        .setName("Іконка користувача")
-        .setDesc("Введіть назву іконки Obsidian")
+        .setName("User Icon") // Translated
+        .setDesc("Enter an Obsidian icon name") // Translated
         .addText(text => text
           .setValue(this.plugin.settings.userAvatarContent)
-          .setPlaceholder('Напр. user, smile, etc.')
+          .setPlaceholder('e.g., user, smile, etc.') // Translated
           .onChange(async (value) => {
             this.plugin.settings.userAvatarContent = value.trim();
             await this.plugin.saveSettings();
           })
         );
-      this.createIconSearch(containerEl, 'user'); // Додаємо пошук іконок
+      this.createIconSearch(containerEl, 'user'); // Icon search helper
     }
 
     // AI Avatar Settings
-    containerEl.createEl("h4", { text: "Аватар AI" });
+    containerEl.createEl("h4", { text: "AI Avatar" }); // Translated
     new Setting(containerEl)
-      .setName("Тип аватара AI")
+      .setName("AI Avatar Type") // Translated
       .addDropdown(dd => dd
-        .addOption('initials', 'Ініціали')
-        .addOption('icon', 'Іконка Obsidian')
+        .addOption('initials', 'Initials') // Translated
+        .addOption('icon', 'Obsidian Icon') // Translated
         .setValue(this.plugin.settings.aiAvatarType)
         .onChange(async (value: AvatarType) => {
           this.plugin.settings.aiAvatarType = value;
@@ -398,8 +399,8 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     if (this.plugin.settings.aiAvatarType === 'initials') {
       new Setting(containerEl)
-        .setName("Ініціали AI")
-        .setDesc("Введіть 1-2 літери")
+        .setName("AI Initials") // Translated
+        .setDesc("Enter 1-2 letters") // Translated
         .addText(text => text
           .setValue(this.plugin.settings.aiAvatarContent)
           .onChange(async (value) => {
@@ -409,23 +410,23 @@ export class OllamaSettingTab extends PluginSettingTab {
         );
     } else { // type === 'icon'
       new Setting(containerEl)
-        .setName("Іконка AI")
-        .setDesc("Введіть назву іконки Obsidian")
+        .setName("AI Icon") // Translated
+        .setDesc("Enter an Obsidian icon name") // Translated
         .addText(text => text
           .setValue(this.plugin.settings.aiAvatarContent)
-          .setPlaceholder('Напр. bot, cpu, brain, etc.')
+          .setPlaceholder('e.g., bot, cpu, brain, etc.') // Translated
           .onChange(async (value) => {
             this.plugin.settings.aiAvatarContent = value.trim();
             await this.plugin.saveSettings();
           })
         );
-      this.createIconSearch(containerEl, 'ai'); // Додаємо пошук іконок
+      this.createIconSearch(containerEl, 'ai'); // Icon search helper
     }
 
     // Max Message Height Setting
     new Setting(containerEl)
-      .setName("Макс. висота повідомлення (px)")
-      .setDesc("Довші повідомлення будуть згортатись. 0 - вимкнути.")
+      .setName("Max Message Height (px)") // Translated
+      .setDesc("Longer messages will get a 'Show More' button. Set to 0 to disable collapsing.") // Translated
       .addText(text => text
         .setPlaceholder("300")
         .setValue(String(this.plugin.settings.maxMessageHeight))
@@ -435,7 +436,7 @@ export class OllamaSettingTab extends PluginSettingTab {
             this.plugin.settings.maxMessageHeight = num;
             await this.plugin.saveSettings();
           } else {
-            new Notice("Введіть невід'ємне число.");
+            new Notice("Please enter 0 or a positive number."); // Translated
             text.setValue(String(this.plugin.settings.maxMessageHeight));
           }
         })
@@ -443,11 +444,11 @@ export class OllamaSettingTab extends PluginSettingTab {
 
 
     // --- Role Configuration ---
-    containerEl.createEl("h2", { text: "Конфігурація Ролі AI" });
+    containerEl.createEl("h2", { text: "AI Role Configuration" }); // Translated
 
     new Setting(containerEl)
-      .setName("Ввімкнути роль")
-      .setDesc("Змусити Ollama слідувати ролі з файлу")
+      .setName("Enable Role") // Translated
+      .setDesc("Make Ollama follow a defined role from a file") // Translated
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.followRole)
@@ -458,8 +459,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Використ. стандартну роль")
-      .setDesc("Використовувати default-role.md з папки плагіна")
+      .setName("Use Default Role Definition") // Translated
+      .setDesc("Use the default-role.md file from the plugin folder") // Translated
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.useDefaultRoleDefinition)
@@ -470,11 +471,11 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Шлях до власної ролі")
-      .setDesc("Шлях до файлу ролі (відносно кореня сховища)")
+      .setName("Custom Role Definition Path") // Translated
+      .setDesc("Path to a custom role file (relative to vault root)") // Translated
       .addText((text) =>
         text
-          .setPlaceholder("шлях/до/файлу_ролі.md")
+          .setPlaceholder("path/to/your_role.md") // Translated
           .setValue(this.plugin.settings.customRoleFilePath)
           .onChange(async (value) => {
             this.plugin.settings.customRoleFilePath = value.trim();
@@ -483,13 +484,12 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Інтервал системного промпту")
-      .setDesc("К-ть пар повідомлень між надсиланнями сист. промпту (0=завжди, <0=ніколи)")
-      .addText((text) => // Використовуємо Text для введення чисел
+      .setName("System Prompt Interval") // Translated
+      .setDesc("Message pairs between system prompt resends (0=always, <0=never)") // Translated
+      .addText((text) =>
         text
           .setValue(String(this.plugin.settings.systemPromptInterval))
           .onChange(async (value) => {
-            // Дозволяємо від'ємні значення
             this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
             await this.plugin.saveSettings();
           })
@@ -497,11 +497,11 @@ export class OllamaSettingTab extends PluginSettingTab {
 
 
     // --- RAG Configuration ---
-    containerEl.createEl("h2", { text: "Конфігурація RAG" });
+    containerEl.createEl("h2", { text: "RAG Configuration" }); // Translated
 
     new Setting(containerEl)
-      .setName("Ввімкнути RAG")
-      .setDesc("Використовувати Retrieval Augmented Generation з вашими нотатками")
+      .setName("Enable RAG") // Already English
+      .setDesc("Use Retrieval Augmented Generation with your notes") // Already English
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.ragEnabled)
@@ -509,19 +509,18 @@ export class OllamaSettingTab extends PluginSettingTab {
             this.plugin.settings.ragEnabled = value;
             await this.plugin.saveSettings();
             if (value && this.plugin.ragService) {
-              new Notice("RAG увімкнено. Індексація документів...");
-              // Потенційно запускаємо індексацію асинхронно, щоб не блокувати UI
+              new Notice("RAG enabled. Indexing documents..."); // Translated
               setTimeout(() => this.plugin.ragService?.indexDocuments(), 100);
             }
           })
       );
 
     new Setting(containerEl)
-      .setName("Шлях до папки RAG")
-      .setDesc("Папка з документами для RAG (відносно кореня сховища)")
+      .setName("RAG Folder Path") // Translated
+      .setDesc("Folder containing documents for RAG (relative to vault root)") // Translated
       .addText((text) =>
         text
-          .setPlaceholder("data/rag_docs") // Приклад
+          .setPlaceholder("data/rag_docs") // Example path
           .setValue(this.plugin.settings.ragFolderPath)
           .onChange(async (value) => {
             this.plugin.settings.ragFolderPath = value.trim();
@@ -530,29 +529,29 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Кількість документів RAG у контексті")
-      .setDesc("Скільки найбільш релевантних фрагментів документів додавати до контексту")
+      .setName("RAG Documents in Context") // Translated
+      .setDesc("Number of relevant document chunks to add to the context") // Translated
       .addSlider((slider) =>
         slider
           .setLimits(1, 10, 1)
-          .setValue(this.plugin.settings.contextWindowSize) // Використовуємо contextWindowSize
+          .setValue(this.plugin.settings.contextWindowSize) // Uses contextWindowSize for RAG docs
           .setDynamicTooltip()
           .onChange(async (value) => {
-            this.plugin.settings.contextWindowSize = value; // Зберігаємо в contextWindowSize
+            this.plugin.settings.contextWindowSize = value; // Saves to contextWindowSize
             await this.plugin.saveSettings();
           })
       );
 
 
     // --- Speech Recognition ---
-    containerEl.createEl("h2", { text: "Розпізнавання Мовлення" });
+    containerEl.createEl("h2", { text: "Speech Recognition" }); // Translated
 
     new Setting(containerEl)
-      .setName("Google API Key")
-      .setDesc("API ключ для сервісу Google Speech-to-Text")
+      .setName("Google API Key") // Already English
+      .setDesc("API key for Google Speech-to-Text service") // Already English
       .addText((text) =>
         text
-          .setPlaceholder("Введіть ваш Google API ключ")
+          .setPlaceholder("Enter your Google API key") // Translated
           .setValue(this.plugin.settings.googleApiKey)
           .onChange(async (value) => {
             this.plugin.settings.googleApiKey = value.trim();
@@ -561,11 +560,11 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Мова розпізнавання")
-      .setDesc("Код мови для Google Speech-to-Text (напр., uk-UA, en-US, pl-PL)")
+      .setName("Recognition Language") // Translated
+      .setDesc("Language code for Google Speech-to-Text (e.g., en-US, uk-UA, es-ES)") // Translated
       .addText((text) =>
         text
-          .setPlaceholder("uk-UA")
+          .setPlaceholder("en-US") // Default English
           .setValue(this.plugin.settings.speechLanguage)
           .onChange(async (value) => {
             this.plugin.settings.speechLanguage = value.trim();
@@ -574,8 +573,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Максимальний час запису (сек)")
-      .setDesc("Максимальний час запису голосу перед автоматичною зупинкою")
+      .setName("Max Recording Time (sec)") // Translated
+      .setDesc("Maximum voice recording time before automatic stop") // Translated
       .addSlider((slider) =>
         slider
           .setLimits(5, 60, 5)
@@ -588,8 +587,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Виявлення тиші")
-      .setDesc("Автоматично зупиняти запис після періоду тиші (якщо підтримується)")
+      .setName("Silence Detection") // Translated
+      .setDesc("Automatically stop recording after a period of silence (if supported)") // Translated
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.silenceDetection)
         .onChange(async value => {
@@ -598,18 +597,13 @@ export class OllamaSettingTab extends PluginSettingTab {
         })
       );
 
-    // Додаємо стилі для пошуку іконок при відображенні
+    // Add styles for icon search when displayed
     this.addIconSearchStyles();
   }
 
-  // Додаємо стилі CSS для пошуку іконок динамічно
+  // Adds CSS styles for icon search dynamically (remains the same)
   private addIconSearchStyles() {
-    const styleId = 'ollama-icon-search-styles';
-    if (document.getElementById(styleId)) return;
-
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.textContent = `
+    const styleId = 'ollama-icon-search-styles'; if (document.getElementById(styleId)) return; const style = document.createElement('style'); style.id = styleId; style.textContent = `
         .ollama-settings .setting-item-control .ollama-icon-search-container { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 8px; background-color: var(--background-secondary); }
         .ollama-settings .setting-item-control .ollama-icon-search-container input[type="text"] { width: 100%; margin-bottom: 8px; }
         .ollama-settings .setting-item-control .ollama-icon-search-results { display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow-y: auto; background-color: var(--background-primary); border-radius: 4px; padding: 4px; }
@@ -621,7 +615,6 @@ export class OllamaSettingTab extends PluginSettingTab {
         .ollama-settings .setting-item-control .ollama-icon-search-result:hover { background-color: var(--background-modifier-border); border-color: var(--interactive-accent-translucent); color: var(--text-normal); }
         .ollama-settings .setting-item-control .ollama-icon-search-result .svg-icon { width: 16px; height: 16px; }
         .ollama-subtle-notice { opacity: 0.7; font-size: var(--font-ui-smaller); margin-top: 5px; margin-bottom: 10px; padding-left: 10px; border-left: 2px solid var(--background-modifier-border); }
-        `;
-    document.head.appendChild(style);
+        `; document.head.appendChild(style);
   }
 }
