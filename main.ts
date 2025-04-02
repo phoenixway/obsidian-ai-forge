@@ -224,94 +224,68 @@ export default class OllamaPlugin extends Plugin {
   }
   // main.ts (within OllamaPlugin class)
 
-  /**
-   * Saves the provided message history (as a JSON string) to the history file.
-   * Handles backup creation (only when saving non-empty history),
-   * history trimming based on size limit, and file writing.
-   * This function is primarily called by OllamaView when its internal state changes,
-   * or internally by clearMessageHistory (now deprecated for clearing, uses _deleteHistoryFile instead).
-   */
   async saveMessageHistory(messagesJsonString: string) {
-    // 1. Check if saving is enabled in settings
-    if (!this.settings.saveMessageHistory) {
-      // console.log("[Ollama Save] Saving history disabled in settings.");
-      return; // Exit if saving is disabled
-    }
+    if (!this.settings.saveMessageHistory) return;
 
-    // 2. Get necessary variables (adapter, paths)
     const adapter = this.app.vault.adapter;
     const pluginConfigDir = this.manifest.dir;
     if (!pluginConfigDir) {
-      console.error("OllamaPlugin: Could not determine plugin directory path for saving."); // English error
-      new Notice("Error: Cannot determine plugin directory path for saving history."); // English notice
+      console.error("OllamaPlugin: Could not determine plugin directory path for saving.");
+      new Notice("Error: Cannot determine plugin directory path for saving history.");
       return;
     }
     const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
-    const logPath = normalizePath(relativeLogPath); // Use normalizePath
+    const logPath = normalizePath(relativeLogPath);
 
-    console.log(`[Ollama Save] Preparing to save history to ${logPath}`); // English log
-    // console.log(`[Ollama Save] Received data string (length ${messagesJsonString.length}):`, messagesJsonString.substring(0, 200) + "...");
+    console.log(`[Ollama Save] Preparing to save history to ${logPath}`);
 
     try {
       let dataToWrite = messagesJsonString;
       let finalSizeKB = dataToWrite.length / 1024;
+      const isClearing = dataToWrite.trim() === "[]"; // Визначаємо, чи це операція очищення
 
-      // 3. Handle potential trimming ONLY if NOT clearing history
-      // (The check for "[]" is implicitly handled as it won't exceed the limit)
-      if (dataToWrite.trim() !== "[]" && finalSizeKB > this.settings.logFileSizeLimit) {
-        console.log(`[Ollama Save] History size (${finalSizeKB.toFixed(2)}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`); // English log
+      // Handle potential trimming ONLY if NOT clearing history
+      if (!isClearing && finalSizeKB > this.settings.logFileSizeLimit) {
+        console.log(`[Ollama Save] History size (${finalSizeKB.toFixed(2)}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming.`);
         try {
-          let parsedMessages = JSON.parse(dataToWrite);
-          if (!Array.isArray(parsedMessages)) {
-            throw new Error("History data is not an array."); // English error
-          }
-
-          // Trim oldest messages (from the beginning of the array) until size limit is met
-          while ((JSON.stringify(parsedMessages).length / 1024) > this.settings.logFileSizeLimit && parsedMessages.length > 1) {
-            parsedMessages.shift(); // Remove the oldest message
-          }
-          // Ensure we don't save an empty array if trimming removed everything but shouldn't have
-          dataToWrite = parsedMessages.length > 0 ? JSON.stringify(parsedMessages) : "[]";
+          let parsed = JSON.parse(dataToWrite);
+          if (!Array.isArray(parsed)) throw new Error("History not array.");
+          while ((JSON.stringify(parsed).length / 1024) > this.settings.logFileSizeLimit && parsed.length > 1) { parsed.shift(); }
+          dataToWrite = parsed.length > 0 ? JSON.stringify(parsed) : "[]";
           finalSizeKB = dataToWrite.length / 1024;
-          console.log(`[Ollama Save] History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`); // English log
+          console.log(`[Ollama Save] History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`);
         } catch (e) {
-          console.error("[Ollama Save] Error parsing history for trimming. Resetting history file content:", e); // English error
-          // If parsing/trimming fails, maybe reset to empty to prevent corrupted state? Or just skip saving?
-          // For safety, let's reset. User might lose history, but avoids corrupted file.
-          dataToWrite = "[]";
+          console.error("[Ollama Save] Error parsing history for trimming. Resetting:", e);
+          dataToWrite = "[]"; // Reset to empty on error
           finalSizeKB = dataToWrite.length / 1024;
-          new Notice("Error trimming history file. History might be reset."); // English notice
+          new Notice("Error trimming history file. History might be reset.");
         }
       }
 
-      // 4. Backup Logic: Backup *before* overwriting, ONLY if file exists AND we are saving actual content (not "[]")
+      // Backup Logic: Backup *before* overwriting, ONLY if file exists AND we are saving actual content (NOT clearing)
       const fileExists = await adapter.exists(logPath);
-      if (fileExists && dataToWrite.trim() !== "[]") { // Do not backup when clearing
+      if (fileExists && !isClearing) { // <-- ДОДАНО УМОВУ !isClearing
         try {
-          // console.log("[Ollama Save] Backing up old history file before overwriting.");
-          const relativeBackupPath = relativeLogPath + ".backup";
-          const backupPath = normalizePath(relativeBackupPath); // Normalize backup path
-          if (await adapter.exists(backupPath)) {
-            await adapter.remove(backupPath); // Remove old backup first
-          }
-          await adapter.copy(logPath, backupPath); // Create new backup
-          // console.log("[Ollama Save] Backup created successfully.");
+          const backupPath = normalizePath(relativeLogPath + ".backup");
+          if (await adapter.exists(backupPath)) await adapter.remove(backupPath);
+          await adapter.copy(logPath, backupPath);
+          console.log("[Ollama Save] Backup created.");
         } catch (backupError) {
-          console.error("[Ollama Save] Failed to create history backup:", backupError); // English error
-          // Continue saving even if backup fails? Yes, probably better than losing current state.
-          new Notice("Warning: Failed to create history backup."); // English notice
+          console.error("[Ollama Save] Failed to create history backup:", backupError);
+          new Notice("Warning: Failed to create history backup.");
         }
+      } else if (isClearing) {
+        console.log("[Ollama Save] Skipping backup because history is being cleared.");
       }
 
-      // 5. Write final data (original, cleared, or trimmed)
-      // console.log(`[Ollama Save] Writing history (size: ${finalSizeKB.toFixed(2)}KB) to ${logPath}`);
-      // console.log(`[Ollama Save] Final data to write (length ${dataToWrite.length}):`, dataToWrite.substring(0, 200) + "...");
-      await adapter.write(logPath, dataToWrite);
-      console.log("[Ollama Save] Write operation completed."); // English log
+      // Write final data (original, cleared, or trimmed)
+      // console.log(`[Ollama Save] Writing data (length ${dataToWrite.length}, Clearing: ${isClearing})`);
+      await adapter.write(logPath, dataToWrite); // Write the data ("[]" if clearing)
+      console.log("[Ollama Save] Write operation completed.");
 
     } catch (error) {
-      console.error("[Ollama Save] Failed to save message history:", error); // English error
-      new Notice("Error saving chat history."); // English notice
+      console.error("[Ollama Save] Failed to save message history:", error);
+      new Notice("Error saving chat history.");
     }
   }
 
@@ -360,65 +334,30 @@ export default class OllamaPlugin extends Plugin {
     }
   }
 
-  private async _deleteHistoryFile(): Promise<boolean> {
-    const adapter = this.app.vault.adapter;
-    const pluginConfigDir = this.manifest.dir;
-    if (!pluginConfigDir) {
-      console.error("OllamaPlugin: Could not determine plugin directory path for deletion.");
-      new Notice("Error: Cannot determine plugin directory for history deletion.");
-      return false;
-    }
-    const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
-    const logPath = normalizePath(relativeLogPath);
-
-    try {
-      if (await adapter.exists(logPath)) {
-        console.log(`[Ollama Clear] Deleting history file: ${logPath}`);
-        await adapter.remove(logPath);
-        // Також видаляємо бекап, якщо він є
-        const backupPath = normalizePath(relativeLogPath + ".backup");
-        if (await adapter.exists(backupPath)) {
-          await adapter.remove(backupPath);
-          console.log(`[Ollama Clear] Deleted backup file: ${backupPath}`);
-        }
-        console.log(`[Ollama Clear] History file deleted successfully.`);
-        return true; // Успіх
-      } else {
-        console.log(`[Ollama Clear] History file not found, nothing to delete: ${logPath}`);
-        return true; // Вважаємо успіхом, бо файлу немає
-      }
-    } catch (error) {
-      console.error(`[Ollama Clear] Failed to delete history file ${logPath}:`, error);
-      new Notice("Error deleting chat history file.");
-      return false; // Помилка
-    }
-  }
-
   async clearMessageHistory() {
-    console.log("[Ollama Clear] Clearing message history initiated.");
-    // 1. Видаляємо файл історії швидко і без бекапу
-    const deleted = await this._deleteHistoryFile();
+    console.log("[Ollama Clear] Clearing message history initiated."); // English log
+    try {
+      // 1. Викликаємо saveMessageHistory з порожнім масивом.
+      // Модифікована функція НЕ буде робити бекап у цьому випадку,
+      // а просто запише "[]" у файл.
+      await this.saveMessageHistory("[]");
+      console.log("[Ollama Clear] History file overwrite with '[]' requested."); // English log
 
-    // 2. Очищаємо стан і дисплей у View, ЯКЩО файл успішно видалено (або його не було)
-    // if (deleted && this.view) {
-    //   this.view.clearDisplayAndState(); // Викликаємо метод View для очищення UI та пам'яті
-    //   console.log("[Ollama Clear] Cleared active view display and state.");
-    //   new Notice("Chat history cleared."); // Повідомлення про успіх
-    // } else if (!deleted) {
-    //   new Notice("Failed to clear chat history file. Please check console logs."); // Повідомлення про помилку видалення
-    // } else {
-    //   console.log("[Ollama Clear] History file operation completed, view not active.");
-    //   new Notice("Chat history cleared."); // Якщо View не активний, але файл видалено
-    // }
-    // 3. Показуємо повідомлення (Notice)
-    if (deleted) {
-      new Notice("Chat history file deleted (View not updated yet)."); // Змінено текст для діагностики
-      // Якщо View активний, він все ще показуватиме стару історію до перезавантаження
+      // 2. Очищаємо стан і дисплей у View, якщо він активний
       if (this.view) {
-        console.warn("[Ollama Clear] History file deleted, but view was not updated for diagnostics.");
+        this.view.clearDisplayAndState(); // Викликаємо метод View для очищення UI та пам'яті
+        console.log("[Ollama Clear] Cleared active view display and state."); // English log
+      } else {
+        console.log("[Ollama Clear] History file overwrite done, view not active."); // English log
       }
-    } else {
-      new Notice("Failed to clear chat history file. Please check console logs.");
+      new Notice("Chat history cleared."); // Повідомлення про успіх (English notice)
+
+    } catch (error) {
+      // Помилки запису/доступу обробляються всередині saveMessageHistory
+      console.error("[Ollama Clear] Failed to clear message history (error likely logged in saveMessageHistory):", error); // English error
+      // Notice про помилку вже має бути показана з saveMessageHistory
+      // Можна додати додатковий Notice тут, якщо потрібно
+      // new Notice("An error occurred while trying to clear history.");
     }
   }
 }
