@@ -335,29 +335,35 @@ export default class OllamaPlugin extends Plugin {
   }
 
   async clearMessageHistory() {
-    console.log("[Ollama Clear] Clearing message history initiated."); // English log
+    console.log("[Ollama Clear] Clearing message history initiated.");
     try {
-      // 1. Викликаємо saveMessageHistory з порожнім масивом.
-      // Модифікована функція НЕ буде робити бекап у цьому випадку,
-      // а просто запише "[]" у файл.
+      // 1. Викликаємо saveMessageHistory з порожнім масивом (перезапис).
       await this.saveMessageHistory("[]");
-      console.log("[Ollama Clear] History file overwrite with '[]' requested."); // English log
+      console.log("[Ollama Clear] History file overwrite requested.");
+
+      // --- ДОДАНО ЗАТРИМКУ ---
+      // Додаємо паузу (напр., 1 секунда) ПІСЛЯ запису файлу,
+      // ПЕРЕД оновленням UI та показом Notice.
+      console.log("[Ollama Clear] Waiting briefly before updating UI...");
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Затримка 1000ms = 1 секунда
+      console.log("[Ollama Clear] Proceeding with UI update.");
+      // ----------------------
 
       // 2. Очищаємо стан і дисплей у View, якщо він активний
       if (this.view) {
-        this.view.clearDisplayAndState(); // Викликаємо метод View для очищення UI та пам'яті
-        console.log("[Ollama Clear] Cleared active view display and state."); // English log
+        this.view.clearDisplayAndState();
+        console.log("[Ollama Clear] Cleared active view display and state.");
       } else {
-        console.log("[Ollama Clear] History file overwrite done, view not active."); // English log
+        console.log("[Ollama Clear] History file overwrite done, view not active.");
       }
-      new Notice("Chat history cleared."); // Повідомлення про успіх (English notice)
+
+      // 3. Показуємо повідомлення ПІСЛЯ затримки та оновлення UI
+      new Notice("Chat history cleared.");
 
     } catch (error) {
-      // Помилки запису/доступу обробляються всередині saveMessageHistory
-      console.error("[Ollama Clear] Failed to clear message history (error likely logged in saveMessageHistory):", error); // English error
-      // Notice про помилку вже має бути показана з saveMessageHistory
-      // Можна додати додатковий Notice тут, якщо потрібно
-      // new Notice("An error occurred while trying to clear history.");
+      console.error("[Ollama Clear] Failed to clear message history:", error);
+      // Notice про помилку показується з saveMessageHistory, якщо запис не вдався
     }
   }
+
 }

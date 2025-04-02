@@ -4122,7 +4122,10 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     console.log("[Ollama Clear] Clearing message history initiated.");
     try {
       await this.saveMessageHistory("[]");
-      console.log("[Ollama Clear] History file overwrite with '[]' requested.");
+      console.log("[Ollama Clear] History file overwrite requested.");
+      console.log("[Ollama Clear] Waiting briefly before updating UI...");
+      await new Promise((resolve) => setTimeout(resolve, 1e3));
+      console.log("[Ollama Clear] Proceeding with UI update.");
       if (this.view) {
         this.view.clearDisplayAndState();
         console.log("[Ollama Clear] Cleared active view display and state.");
@@ -4131,7 +4134,7 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       }
       new import_obsidian4.Notice("Chat history cleared.");
     } catch (error) {
-      console.error("[Ollama Clear] Failed to clear message history (error likely logged in saveMessageHistory):", error);
+      console.error("[Ollama Clear] Failed to clear message history:", error);
     }
   }
 };
