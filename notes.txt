@@ -1,0 +1,2 @@
+Advanced Context Management: Implement more sophisticated logic in PromptService.prepareFullPrompt to manage the context window effectively.
+UI/UX: Avatar customization, clearer error states, potentially better handling of very long messages.
