@@ -1,18 +1,9 @@
 import { Notice } from "obsidian";
 import OllamaPlugin from "./main";
-import { OllamaView } from "./ollamaView"; // Припускаємо, що MessageType визначено в ollamaView.ts або імпортовано туди
+import { OllamaView, MessageRole } from "./ollamaView";
 
-// --- Видалено імпорти, пов'язані з рендерингом ---
-// import { setIcon, MarkdownRenderer } from "obsidian";
-
-// --- Визначення типів (можна перенести в ollamaView.ts або спільний файл) ---
-export enum MessageType {
-    USER = "user",
-    ASSISTANT = "assistant",
-    ERROR = "error",
-    SYSTEM = "system"
-}
 export interface RequestOptions { num_ctx?: number; }
+
 export interface OllamaRequestBody {
     model: string;
     prompt: string;
@@ -20,15 +11,12 @@ export interface OllamaRequestBody {
     temperature: number;
     system?: string;
     options?: RequestOptions;
-}// --- Кінець визначення типів ---
+}
 
 export class MessageService {
     private plugin: OllamaPlugin;
     private view: OllamaView | null = null;
-    // --- Видалено внутрішній стан ---
-    // private messages: Message[] = [];
     private isProcessing: boolean = false;
-    // private messagesPairCount: number = 0; // Тепер керується в OllamaView
 
     constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
@@ -38,100 +26,92 @@ export class MessageService {
         this.view = view;
     }
 
-    // Load message history and populate the VIEW
     public async loadMessageHistory(): Promise<void> {
         if (!this.view) return;
 
+        let historyLoaded = false;
         try {
-            const history = await this.plugin.loadMessageHistory(); // Завантажує масив об'єктів
+            const history = await this.plugin.loadMessageHistory(); // Expects array of {role, content, timestamp}
 
-            // --- Оновлена логіка ---
             if (Array.isArray(history) && history.length > 0) {
-                // Очищаємо поточний View перед заповненням
-                this.view.clearChatContainer(); // Це очистить і this.view.messages
-                // Додаємо повідомлення через View, який сам збереже фінальний стан
+                // View should already be cleared by OllamaView.loadAndRenderHistory
                 for (const msg of history) {
-                    // Перетворюємо збережену роль на MessageType enum або рядок, який розуміє internalAddMessage
-                    // Припускаємо, що internalAddMessage приймає 'user' | 'assistant' | 'system' | 'error'
-                    const role = msg.role as "user" | "assistant" | "system" | "error"; // Потрібно привести тип
-                    if (role) {
-                        // Передаємо ТІЛЬКИ роль і контент. Час генерується в internalAddMessage
-                        this.view.internalAddMessage(role, msg.content /*, new Date(msg.timestamp)*/); // Передаємо лише роль та контент
+                    const role = msg.role as MessageRole;
+                    if (role && msg.content && msg.timestamp) {
+                        // Add message to view without triggering individual saves
+                        // Pass the original timestamp
+                        this.view.internalAddMessage(role, msg.content, {
+                            saveHistory: false,
+                            timestamp: msg.timestamp // Pass ISO string or Date object
+                        });
                     } else {
-                        console.warn("Skipping message with unknown role during history load:", msg);
+                        console.warn("Skipping message with missing data during history load:", msg);
                     }
                 }
-                // Прокрутка та ініціалізація блоків тепер мають відбуватись у View після додавання
-                this.view.guaranteedScrollToBottom(100, true); // Прокрутка після завантаження
-                // this.view.initializeThinkingBlocks(); // Цей метод має бути в OllamaView, якщо потрібен
-            } else {
-                // Якщо історія порожня, просто показуємо порожній стан (view вже очищено)
-                this.view.showEmptyState();
+                historyLoaded = true;
+                this.view.guaranteedScrollToBottom(100, true);
             }
-            // Не викликаємо saveMessageHistory тут, бо internalAddMessage викликає його для кожного повідомлення
-            // Це може бути неефективно, краще викликати збереження ОДИН раз в кінці циклу в OllamaView
-            // TODO: Оптимізувати збереження при завантаженні історії в OllamaView
+            // If history was loaded, save the complete state once
+            if (historyLoaded) {
+                await this.view.saveMessageHistory();
+            }
+            // View handles showing empty state if history is empty after this process
+
         } catch (error) {
-            console.error("Error loading message history:", error);
-            this.view.clearChatContainer(); // Очищаємо у випадку помилки
-            this.view.showEmptyState();
+            console.error("MessageService: Error loading message history:", error);
+            // View's loadAndRenderHistory should handle clearing and showing empty state on error
         }
     }
 
-    // --- Видалено saveMessageHistory з MessageService ---
-
-    // Send a message from the user to Ollama
     public async sendMessage(content: string): Promise<void> {
         if (this.isProcessing || !content.trim() || !this.view) return;
-        // --- Не додаємо повідомлення тут, це робить OllamaView ---
-        // this.view.clearInputField(); // Це теж має робити OllamaView перед викликом sendMessage
-        // this.view.hideEmptyState(); // І це
+        // OllamaView handles adding the user message and clearing the input field
 
         await this.processWithOllama(content);
     }
 
-    // --- Видалено addMessage з MessageService ---
-    // --- Видалено renderMessage та пов'язані хелпери з MessageService ---
-    // --- Видалено clearChatMessages з MessageService (використовуємо OllamaView.clearChatContainer) ---
-
-
-    // Process request with Ollama
     private async processWithOllama(content: string): Promise<void> {
         if (!this.view) return;
 
-        // Встановлюємо стан завантаження через View
-        this.view.setLoadingState(true);
+        this.isProcessing = true; // Internal flag for MessageService logic
+        this.view.setLoadingState(true); // Update View's UI state
         const loadingMessageEl = this.view.addLoadingIndicator();
 
-        // Використовуємо setTimeout(..., 0) для негайного повернення контролю UI
+        // Use setTimeout to allow UI to update before potentially long API call
         setTimeout(async () => {
             try {
-                // --- Логіка визначення системного промпту (залишається) ---
                 let useSystemPrompt = false;
-                // TODO: messagesPairCount тепер в OllamaView, треба отримати його звідти
-                // Потрібно або передати messagesPairCount в processWithOllama,
-                // або зробити messagesPairCount публічним геттером в OllamaView.
-                // Приклад з геттером (потрібно додати getMessagesPairCount() в OllamaView):
-                // const messagesPairCount = this.view?.getMessagesPairCount() ?? 0;
-                // if (this.plugin.settings.followRole) {
-                //     const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
-                //     if (systemPromptInterval === 0) { useSystemPrompt = true; }
-                //     else if (systemPromptInterval > 0) { useSystemPrompt = messagesPairCount % systemPromptInterval === 0;}
-                // }
-                // const isNewConversation = (this.view?.getMessagesCount() ?? 0) <= 1; // Потрібен getMessagesCount()
+                const messagesPairCount = this.view?.getMessagesPairCount() ?? 0;
+                const messagesCount = this.view?.getMessagesCount() ?? 0; // Includes the user message just added
 
-                // --- Припустимо, що логіка useSystemPrompt і isNewConversation реалізована ---
-                // const isNewConversation = (this.view?.messages.length ?? 0) <=1; // НЕПРАВИЛЬНО - не маємо доступу до messages
-                const isNewConversation = true; // Тимчасова заглушка
+                // Logic for using system prompt (adjust as needed)
+                if (this.plugin.settings.followRole) {
+                    const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
+                    if (systemPromptInterval === 0) { // Always use if interval is 0
+                        useSystemPrompt = true;
+                    } else if (systemPromptInterval > 0) {
+                        // Check based on pairs *before* the current interaction starts
+                        // User message was added, assistant response is pending.
+                        // If interval is 1, use on every pair.
+                        // If interval is 2, use on pairs 0, 2, 4...
+                        // messagesPairCount reflects completed pairs.
+                        useSystemPrompt = (messagesPairCount % systemPromptInterval) === 0;
+                    }
+                }
+
+                // Check if it's effectively the start of a conversation for prompt preparation
+                // messagesCount will be 1 if only the initial user message exists
+                const isNewConversation = messagesCount <= 1;
 
                 const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
                     content,
-                    isNewConversation
+                    isNewConversation // Pass context flag to prompt service
                 );
+
                 const requestBody: OllamaRequestBody = {
                     model: this.plugin.settings.modelName,
                     prompt: formattedPrompt,
-                    stream: false,
+                    stream: false, // Change to true for streaming
                     temperature: this.plugin.settings.temperature || 0.2,
                     options: {
                         num_ctx: this.plugin.settings.contextWindow || 8192,
@@ -142,42 +122,37 @@ export class MessageService {
                     const systemPrompt = this.plugin.promptService.getSystemPrompt();
                     if (systemPrompt) {
                         requestBody.system = systemPrompt;
+                        console.log("Using system prompt for this request.");
                     }
-                }                // --- Кінець логіки системного промпту ---
-
+                }
 
                 const data = await this.plugin.apiService.generateResponse(requestBody);
 
                 this.view?.removeLoadingIndicator(loadingMessageEl);
-                // --- Викликаємо метод View для додавання повідомлення ---
+                // Add assistant response via the view
                 this.view?.internalAddMessage("assistant", data.response);
-                // this.initializeThinkingBlocks(); // Має викликатись у View, якщо потрібно
 
             } catch (error) {
                 console.error("Error processing request with Ollama:", error);
                 this.view?.removeLoadingIndicator(loadingMessageEl);
                 const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-                // --- Викликаємо метод View для додавання помилки ---
+                // Add error message via the view
                 this.view?.internalAddMessage(
-                    "error", // Використовуємо рядковий літерал
+                    "error",
                     `Connection error with Ollama: ${errorMessage}. Please check the settings and ensure the server is running.`
                 );
             } finally {
-                // Знімаємо стан завантаження через View
+                this.isProcessing = false;
+                // Update View's UI state via its method
                 this.view?.setLoadingState(false);
             }
-        }, 0); // setTimeout 0 для асинхронного виконання без блокування UI
+        }, 0); // End of setTimeout callback
     }
 
-    // Додавання системного повідомлення тепер теж через View
     public addSystemMessage(content: string): void {
         if (this.view) {
-            this.view.internalAddMessage("system", content); // Використовуємо рядковий літерал
+            // Add system message via the view, triggering save etc.
+            this.view.internalAddMessage("system", content);
         }
     }
-
-    // --- Видалено приватні хелпери для рендерингу ---
-
 }
-
-// --- Видалено isAssistant ---

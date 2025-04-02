@@ -93,27 +93,20 @@ var CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
 var _OllamaView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
-    // --- Єдине джерело правди для повідомлень ---
     this.messages = [];
     this.isProcessing = false;
     this.scrollTimeout = null;
-    // Speech Recognition related
     this.speechWorker = null;
     this.mediaRecorder = null;
     this.audioStream = null;
-    // --- Стан, що керується в View ---
     this.messagesPairCount = 0;
     this.emptyStateEl = null;
-    // MessageService більше не потрібен як поле класу
-    // private readonly messageService: MessageService;
-    // Debounce/Throttle timers
     this.resizeTimeout = null;
-    // State Variables for UI Improvements
     this.lastMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    // --- Event Handlers ---
-    // (Без змін, крім handleClearChatClick, який тепер не викликає messageService)
+    // Debounced save function
+    this.debouncedSaveMessageHistory = (0, import_obsidian.debounce)(this.saveMessageHistory, 300, true);
     this.handleKeyDown = (e) => {
       if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) {
         e.preventDefault();
@@ -148,7 +141,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.clearChatContainer();
       new import_obsidian.Notice("Chat history cleared.");
     };
-    // Більше не викликає messageService
     this.handleDocumentClickForMenu = (e) => {
       if (this.menuDropdown.style.display === "block" && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
         this.closeMenu();
@@ -160,7 +152,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
         this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
       }
     };
-    // Виклик через plugin.messageService
     this.handleVisibilityChange = () => {
       if (document.visibilityState === "visible") {
         requestAnimationFrame(() => {
@@ -229,14 +220,12 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian.debounce)(this.handleScroll, 150, true);
   }
-  // --- Getters for State (можуть знадобитися для MessageService) ---
   getMessagesCount() {
     return this.messages.length;
   }
   getMessagesPairCount() {
     return this.messagesPairCount;
   }
-  // --- Obsidian View Lifecycle Methods ---
   getViewType() {
     return VIEW_TYPE_OLLAMA;
   }
@@ -278,7 +267,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
       _OllamaView.instance = null;
     }
   }
-  // --- UI Creation and Management ---
   createUIElements() {
     this.contentEl.empty();
     this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
@@ -327,8 +315,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
     }
   }
-  // --- UI Update Methods ---
-  // (Без змін)
   updateInputPlaceholder(modelName) {
     if (this.inputEl) {
       this.inputEl.placeholder = `Text to ${modelName}...`;
@@ -363,9 +349,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.emptyStateEl = null;
     }
   }
-  // --- Message Handling ---
   async loadAndRenderHistory() {
     this.lastMessageDate = null;
+    this.clearChatContainerInternal();
     try {
       await this.plugin.messageService.loadMessageHistory();
       if (this.messages.length === 0) {
@@ -374,12 +360,11 @@ var _OllamaView = class extends import_obsidian.ItemView {
         this.hideEmptyState();
       }
     } catch (error) {
-      console.error("Error loading message history:", error);
+      console.error("OllamaView: Error during history loading process:", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
     }
   }
-  // Зберігає ПОТОЧНИЙ стан this.messages
   async saveMessageHistory() {
     if (!this.plugin.settings.saveMessageHistory)
       return;
@@ -396,7 +381,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
       new import_obsidian.Notice("Failed to save chat history.");
     }
   }
-  // Відправка повідомлення користувача
   async sendMessage() {
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled)
@@ -414,18 +398,27 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.setLoadingState(false);
     }
   }
-  /**
-   * Внутрішній метод для додавання повідомлення до стану View, рендерингу та збереження.
-   * Викликається як для повідомлень користувача, так і для повідомлень від MessageService.
-   * @param role Роль повідомлення
-   * @param content Вміст повідомлення
-   * @param options Додаткові опції (напр., чи зберігати історію після цього додавання)
-   */
-  internalAddMessage(role, content, options = { saveHistory: true }) {
+  internalAddMessage(role, content, options = {}) {
+    const { saveHistory = true, timestamp } = options;
+    let messageTimestamp;
+    if (timestamp) {
+      try {
+        messageTimestamp = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
+        if (isNaN(messageTimestamp.getTime())) {
+          console.warn("Invalid timestamp provided, using current time:", timestamp);
+          messageTimestamp = new Date();
+        }
+      } catch (e) {
+        console.warn("Error parsing timestamp, using current time:", timestamp, e);
+        messageTimestamp = new Date();
+      }
+    } else {
+      messageTimestamp = new Date();
+    }
     const message = {
       role,
       content,
-      timestamp: new Date()
+      timestamp: messageTimestamp
     };
     this.messages.push(message);
     if (role === "assistant" && this.messages.length >= 2) {
@@ -436,8 +429,8 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     this.renderMessage(message);
     this.hideEmptyState();
-    if (options.saveHistory) {
-      (0, import_obsidian.debounce)(this.saveMessageHistory, 300, true).call(this);
+    if (saveHistory) {
+      this.debouncedSaveMessageHistory();
     }
     if (role !== "user" && this.userScrolledUp && this.newMessagesIndicatorEl) {
       this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
@@ -446,16 +439,16 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
     }
   }
-  // --- Rendering Logic (Розширено для system/error) ---
   renderMessage(message) {
     const messageIndex = this.messages.indexOf(message);
     if (messageIndex === -1)
       return;
     const prevMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
-    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role;
     const isNewDay = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
-    if (isNewDay && (messageIndex === 0 || isFirstInGroup)) {
+    if (isNewDay) {
       this.renderDateSeparator(message.timestamp);
+      this.lastMessageDate = message.timestamp;
+    } else if (messageIndex === 0) {
       this.lastMessageDate = message.timestamp;
     }
     let messageGroup = null;
@@ -463,6 +456,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
     let showAvatar = false;
     let isUser = false;
+    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
     switch (message.role) {
       case "user":
         groupClass += ` ${CSS_CLASS_USER_GROUP}`;
@@ -527,10 +521,10 @@ var _OllamaView = class extends import_obsidian.ItemView {
     messageEl.createDiv({
       cls: CSS_CLASS_TIMESTAMP,
       text: this.formatTime(message.timestamp)
+      // Format the message's timestamp
     });
+    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
   }
-  // --- Методи рендерингу (Date Separator, Avatar, Assistant Content, Code Buttons) ---
-  // (Залишаються без змін від попередньої версії)
   renderDateSeparator(date) {
     if (!this.chatContainer)
       return;
@@ -658,8 +652,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     return { hasThinkingTags: false, format: "none" };
   }
-  // --- Speech Recognition ---
-  // (Без змін)
   initSpeechWorker() {
   }
   setupSpeechWorkerHandlers() {
@@ -672,8 +664,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   stopVoiceRecording(processAudio) {
   }
-  // --- Helpers & Utilities ---
-  // (Без змін, крім clearChatContainer)
   getChatContainer() {
     return this.chatContainer;
   }
@@ -681,6 +671,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.clearChatContainerInternal();
     this.saveMessageHistory();
     this.updateSendButtonState();
+    this.showEmptyState();
   }
   clearChatContainerInternal() {
     this.messages = [];
@@ -689,6 +680,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     if (this.chatContainer) {
       this.chatContainer.empty();
     }
+    this.hideEmptyState();
   }
   addLoadingIndicator() {
     this.hideEmptyState();
@@ -774,6 +766,14 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.menuButton.disabled = isLoading;
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
+  }
+  clearDisplayAndState() {
+    var _a;
+    this.clearChatContainerInternal();
+    this.showEmptyState();
+    this.updateSendButtonState();
+    (_a = this.inputEl) == null ? void 0 : _a.focus();
+    console.log("OllamaView: Display and internal state cleared.");
   }
 };
 var OllamaView = _OllamaView;
@@ -1518,76 +1518,79 @@ var ApiService = class {
 
 // messageService.ts
 var MessageService = class {
-  // private messagesPairCount: number = 0; // Тепер керується в OllamaView
   constructor(plugin) {
     this.view = null;
-    // --- Видалено внутрішній стан ---
-    // private messages: Message[] = [];
     this.isProcessing = false;
     this.plugin = plugin;
   }
   setView(view) {
     this.view = view;
   }
-  // Load message history and populate the VIEW
   async loadMessageHistory() {
     if (!this.view)
       return;
+    let historyLoaded = false;
     try {
       const history = await this.plugin.loadMessageHistory();
       if (Array.isArray(history) && history.length > 0) {
-        this.view.clearChatContainer();
         for (const msg of history) {
           const role = msg.role;
-          if (role) {
-            this.view.internalAddMessage(
-              role,
-              msg.content
-              /*, new Date(msg.timestamp)*/
-            );
+          if (role && msg.content && msg.timestamp) {
+            this.view.internalAddMessage(role, msg.content, {
+              saveHistory: false,
+              timestamp: msg.timestamp
+              // Pass ISO string or Date object
+            });
           } else {
-            console.warn("Skipping message with unknown role during history load:", msg);
+            console.warn("Skipping message with missing data during history load:", msg);
           }
         }
+        historyLoaded = true;
         this.view.guaranteedScrollToBottom(100, true);
-      } else {
-        this.view.showEmptyState();
+      }
+      if (historyLoaded) {
+        await this.view.saveMessageHistory();
       }
     } catch (error) {
-      console.error("Error loading message history:", error);
-      this.view.clearChatContainer();
-      this.view.showEmptyState();
+      console.error("MessageService: Error loading message history:", error);
     }
   }
-  // --- Видалено saveMessageHistory з MessageService ---
-  // Send a message from the user to Ollama
   async sendMessage(content) {
     if (this.isProcessing || !content.trim() || !this.view)
       return;
     await this.processWithOllama(content);
   }
-  // --- Видалено addMessage з MessageService ---
-  // --- Видалено renderMessage та пов'язані хелпери з MessageService ---
-  // --- Видалено clearChatMessages з MessageService (використовуємо OllamaView.clearChatContainer) ---
-  // Process request with Ollama
   async processWithOllama(content) {
     if (!this.view)
       return;
+    this.isProcessing = true;
     this.view.setLoadingState(true);
     const loadingMessageEl = this.view.addLoadingIndicator();
     setTimeout(async () => {
-      var _a, _b, _c, _d, _e;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
       try {
         let useSystemPrompt = false;
-        const isNewConversation = true;
+        const messagesPairCount = (_b = (_a = this.view) == null ? void 0 : _a.getMessagesPairCount()) != null ? _b : 0;
+        const messagesCount = (_d = (_c = this.view) == null ? void 0 : _c.getMessagesCount()) != null ? _d : 0;
+        if (this.plugin.settings.followRole) {
+          const systemPromptInterval = this.plugin.settings.systemPromptInterval || 0;
+          if (systemPromptInterval === 0) {
+            useSystemPrompt = true;
+          } else if (systemPromptInterval > 0) {
+            useSystemPrompt = messagesPairCount % systemPromptInterval === 0;
+          }
+        }
+        const isNewConversation = messagesCount <= 1;
         const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(
           content,
           isNewConversation
+          // Pass context flag to prompt service
         );
         const requestBody = {
           model: this.plugin.settings.modelName,
           prompt: formattedPrompt,
           stream: false,
+          // Change to true for streaming
           temperature: this.plugin.settings.temperature || 0.2,
           options: {
             num_ctx: this.plugin.settings.contextWindow || 8192
@@ -1597,32 +1600,31 @@ var MessageService = class {
           const systemPrompt = this.plugin.promptService.getSystemPrompt();
           if (systemPrompt) {
             requestBody.system = systemPrompt;
+            console.log("Using system prompt for this request.");
           }
         }
         const data = await this.plugin.apiService.generateResponse(requestBody);
-        (_a = this.view) == null ? void 0 : _a.removeLoadingIndicator(loadingMessageEl);
-        (_b = this.view) == null ? void 0 : _b.internalAddMessage("assistant", data.response);
+        (_e = this.view) == null ? void 0 : _e.removeLoadingIndicator(loadingMessageEl);
+        (_f = this.view) == null ? void 0 : _f.internalAddMessage("assistant", data.response);
       } catch (error) {
         console.error("Error processing request with Ollama:", error);
-        (_c = this.view) == null ? void 0 : _c.removeLoadingIndicator(loadingMessageEl);
+        (_g = this.view) == null ? void 0 : _g.removeLoadingIndicator(loadingMessageEl);
         const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-        (_d = this.view) == null ? void 0 : _d.internalAddMessage(
+        (_h = this.view) == null ? void 0 : _h.internalAddMessage(
           "error",
-          // Використовуємо рядковий літерал
           `Connection error with Ollama: ${errorMessage}. Please check the settings and ensure the server is running.`
         );
       } finally {
-        (_e = this.view) == null ? void 0 : _e.setLoadingState(false);
+        this.isProcessing = false;
+        (_i = this.view) == null ? void 0 : _i.setLoadingState(false);
       }
     }, 0);
   }
-  // Додавання системного повідомлення тепер теж через View
   addSystemMessage(content) {
     if (this.view) {
       this.view.internalAddMessage("system", content);
     }
   }
-  // --- Видалено приватні хелпери для рендерингу ---
 };
 
 // main.ts
@@ -1630,15 +1632,11 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
-    // Simple event emitter
     this.eventHandlers = {};
-    // RAG data (consider moving to RagService or separate storage later)
     this.documents = [];
     this.embeddings = [];
-    // --- Debounce Indexing ---
     this.indexUpdateTimeout = null;
   }
-  // --- Event Emitter Methods ---
   on(event, callback) {
     if (!this.eventHandlers[event]) {
       this.eventHandlers[event] = [];
@@ -1662,7 +1660,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       });
     }
   }
-  // --- End Event Emitter Methods ---
   async onload() {
     console.log("Ollama Plugin Loaded!");
     await this.loadSettings();
@@ -1683,9 +1680,7 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       console.error("Ollama connection error event received:", error);
       if (this.view) {
         this.view.internalAddMessage(
-          // <-- FIX: Call view's method
           "error",
-          // Use string literal for role
           `Failed to connect to Ollama: ${error.message}. Please check settings.`
         );
       } else {
@@ -1705,7 +1700,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     });
     this.addCommand({
       id: "change-model",
-      // Example command
       name: "Change Ollama Model (Example)",
       callback: async () => {
         const newModel = "llama3:latest";
@@ -1727,7 +1721,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       name: "Clear Ollama Chat History",
       callback: async () => {
         await this.clearMessageHistory();
-        new import_obsidian4.Notice("Ollama chat history cleared.");
       }
     });
     this.settingTab = new OllamaSettingTab(this.app, this);
@@ -1748,7 +1741,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       })
     );
   }
-  // Called when plugin is unloaded
   onunload() {
     console.log("Ollama Plugin Unloaded!");
     this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA).forEach((leaf) => {
@@ -1758,8 +1750,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       clearTimeout(this.indexUpdateTimeout);
     }
   }
-  // --- Service Updates ---
-  // Update API service when settings change (called from saveSettings)
   updateApiService() {
     if (this.apiService) {
       this.apiService.setBaseUrl(this.settings.ollamaServerUrl);
@@ -1775,7 +1765,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       this.indexUpdateTimeout = null;
     }, 3e4);
   }
-  // --- View Activation ---
   async activateView() {
     var _a;
     const { workspace } = this.app;
@@ -1807,7 +1796,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       console.error("OllamaPlugin: Failed to get or create a leaf for the view.");
     }
   }
-  // --- Settings Management ---
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
@@ -1816,8 +1804,6 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     this.updateApiService();
     console.log("OllamaPlugin: Settings saved.");
   }
-  // --- History Persistence --- (Using corrected logic)
-  // Overwrites the history file with the provided complete history string (or clears it)
   async saveMessageHistory(messagesJsonString) {
     if (!this.settings.saveMessageHistory) {
       return;
@@ -1826,18 +1812,19 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     const pluginConfigDir = this.manifest.dir;
     if (!pluginConfigDir) {
       console.error("OllamaPlugin: Could not determine plugin directory path.");
+      new import_obsidian4.Notice("Error: Could not determine plugin directory path for saving history.");
       return;
     }
-    const logPath = `${pluginConfigDir}/chat_history.json`;
-    console.log(`OllamaPlugin: Preparing to save history to ${logPath}`);
-    console.log(`OllamaPlugin: Received data string (length ${messagesJsonString.length}):`, messagesJsonString.substring(0, 200) + "...");
+    const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
+    const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
+    console.log(`OllamaPlugin: Preparing to save history to vault path: ${logPath}`);
     try {
       let dataToWrite = messagesJsonString;
       let finalSizeKB = dataToWrite.length / 1024;
       if (dataToWrite.trim() === "[]") {
         console.log("OllamaPlugin: Clear operation detected. Writing empty array.");
       } else if (finalSizeKB > this.settings.logFileSizeLimit) {
-        console.log(`OllamaPlugin: New history size (${finalSizeKB}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`);
+        console.log(`OllamaPlugin: New history size (${finalSizeKB.toFixed(2)}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`);
         try {
           let parsedMessages = JSON.parse(dataToWrite);
           if (!Array.isArray(parsedMessages)) {
@@ -1848,7 +1835,7 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
           }
           dataToWrite = parsedMessages.length > 0 ? JSON.stringify(parsedMessages) : "[]";
           finalSizeKB = dataToWrite.length / 1024;
-          console.log(`OllamaPlugin: History trimmed. New size: ${finalSizeKB}KB`);
+          console.log(`OllamaPlugin: History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`);
         } catch (e) {
           console.error("OllamaPlugin: Error parsing history for trimming. Resetting history:", e);
           dataToWrite = "[]";
@@ -1858,8 +1845,8 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       const fileExists = await adapter.exists(logPath);
       if (fileExists) {
         try {
-          console.log("OllamaPlugin: Backing up old history file before overwriting.");
-          const backupPath = logPath + ".backup";
+          const relativeBackupPath = relativeLogPath + ".backup";
+          const backupPath = (0, import_obsidian4.normalizePath)(relativeBackupPath);
           if (await adapter.exists(backupPath)) {
             await adapter.remove(backupPath);
           }
@@ -1868,16 +1855,13 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
           console.error("OllamaPlugin: Failed to create history backup:", backupError);
         }
       }
-      console.log(`OllamaPlugin: Writing history (size: ${finalSizeKB}KB) to ${logPath}`);
-      console.log(`OllamaPlugin: Final data to write (length ${dataToWrite.length}):`, dataToWrite.substring(0, 200) + "...");
       await adapter.write(logPath, dataToWrite);
-      console.log("OllamaPlugin: Write operation completed.");
+      console.log(`OllamaPlugin: Write operation completed for ${logPath}.`);
     } catch (error) {
-      console.error("OllamaPlugin: Failed to save message history:", error);
+      console.error(`OllamaPlugin: Failed to save message history to ${logPath}:`, error);
       new import_obsidian4.Notice("Error saving chat history.");
     }
   }
-  // Loads history, returns array of objects or empty array
   async loadMessageHistory() {
     if (!this.settings.saveMessageHistory) {
       return [];
@@ -1888,41 +1872,36 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       console.error("OllamaPlugin: Could not determine plugin directory path for loading.");
       return [];
     }
-    const logPath = `${pluginConfigDir}/chat_history.json`;
-    console.log(`OllamaPlugin: Attempting to load history from ${logPath}`);
+    const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
+    const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
     try {
       if (!await adapter.exists(logPath)) {
-        console.log("OllamaPlugin: History file does not exist.");
         return [];
       }
       const data = await adapter.read(logPath);
       if (!data || data.trim() === "" || data.trim() === "[]") {
-        console.log("OllamaPlugin: History file is empty or contains only '[]'.");
         return [];
       }
-      console.log(`OllamaPlugin: Loaded history data (length ${data.length}):`, data.substring(0, 200) + "...");
       const parsedData = JSON.parse(data);
       if (Array.isArray(parsedData)) {
-        console.log(`OllamaPlugin: Successfully parsed ${parsedData.length} messages from history.`);
+        console.log(`OllamaPlugin: Successfully parsed ${parsedData.length} messages from history file: ${logPath}.`);
         return parsedData;
       } else {
-        console.warn("OllamaPlugin: Parsed history data is not an array. Returning empty history.");
+        console.warn(`OllamaPlugin: Parsed history data from ${logPath} is not an array. Returning empty history.`);
         return [];
       }
     } catch (error) {
-      console.error("OllamaPlugin: Failed to load/parse message history:", error);
+      console.error(`OllamaPlugin: Failed to load/parse message history from ${logPath}:`, error);
       return [];
     }
   }
-  // --- Refined Clear History Method ---
-  // Clears history in view AND triggers save of empty state
   async clearMessageHistory() {
     console.log("OllamaPlugin: Clearing message history initiated.");
     try {
       await this.saveMessageHistory("[]");
       if (this.view) {
-        this.view.clearChatContainer();
-        console.log("OllamaPlugin: Called view.clearChatContainer.");
+        this.view.clearDisplayAndState();
+        console.log("OllamaPlugin: Cleared active view display and state.");
       } else {
         console.log("OllamaPlugin: View not active, history file cleared/reset.");
       }
@@ -1932,5 +1911,4 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       new import_obsidian4.Notice("Error clearing chat history.");
     }
   }
-  // --- End History Persistence ---
 };

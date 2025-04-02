@@ -7,11 +7,7 @@ import {
   debounce
 } from "obsidian";
 import OllamaPlugin from "./main";
-// MessageService більше не потрібен тут напряму, якщо всі дії йдуть через plugin або view
-// import { MessageService } from "./messageService";
 
-// --- Constants ---
-// (Визначення констант залишаються такими ж, як у вашому файлі)
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 const CSS_CLASS_CONTAINER = "ollama-container";
 const CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
@@ -27,23 +23,17 @@ const CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
 const CSS_CLASS_MESSAGE_GROUP = "message-group";
 const CSS_CLASS_USER_GROUP = "user-message-group";
 const CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
-// --- Нові константи для System/Error ---
 const CSS_CLASS_SYSTEM_GROUP = "system-message-group";
 const CSS_CLASS_ERROR_GROUP = "error-message-group";
 const CSS_CLASS_MESSAGE = "message";
 const CSS_CLASS_USER_MESSAGE = "user-message";
 const CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
-// --- Нові константи для System/Error ---
 const CSS_CLASS_SYSTEM_MESSAGE = "system-message";
 const CSS_CLASS_ERROR_MESSAGE = "error-message";
 const CSS_CLASS_SYSTEM_ICON = "system-icon";
 const CSS_CLASS_ERROR_ICON = "error-icon";
 const CSS_CLASS_SYSTEM_TEXT = "system-message-text";
 const CSS_CLASS_ERROR_TEXT = "error-message-text";
-// --- Кінець нових констант ---
-// const CSS_CLASS_BUBBLE = "bubble"; // Можливо, не використовується
-// const CSS_CLASS_USER_BUBBLE = "user-bubble";
-// const CSS_CLASS_OLLAMA_BUBBLE = "ollama-bubble";
 const CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
 const CSS_CLASS_CONTENT = "message-content";
 const CSS_CLASS_THINKING_DOTS = "thinking-dots";
@@ -69,7 +59,6 @@ const CSS_CLASS_VISIBLE = "visible";
 const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
 
-// Типи ролей тепер як рядкові літерали
 export type MessageRole = "user" | "assistant" | "system" | "error";
 
 interface Message {
@@ -78,8 +67,10 @@ interface Message {
   timestamp: Date;
 }
 
-// Не використовується напряму в View, але може бути корисним
-interface RequestOptions { num_ctx?: number; }
+interface AddMessageOptions {
+  saveHistory?: boolean;
+  timestamp?: Date | string;
+}
 
 export class OllamaView extends ItemView {
   private readonly plugin: OllamaPlugin;
@@ -89,72 +80,60 @@ export class OllamaView extends ItemView {
   private sendButton!: HTMLButtonElement;
   private voiceButton!: HTMLButtonElement;
   private menuButton!: HTMLButtonElement;
-
   private menuDropdown!: HTMLElement;
   private clearChatOption!: HTMLElement;
   private settingsOption!: HTMLElement;
   private buttonsContainer!: HTMLElement;
 
-  // --- Єдине джерело правди для повідомлень ---
   private messages: Message[] = [];
   private isProcessing: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
   static instance: OllamaView | null = null;
 
-  // Speech Recognition related
   private speechWorker: Worker | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private audioStream: MediaStream | null = null;
 
-  // --- Стан, що керується в View ---
   private messagesPairCount: number = 0;
   private emptyStateEl: HTMLElement | null = null;
-  // MessageService більше не потрібен як поле класу
-  // private readonly messageService: MessageService;
 
-  // Debounce/Throttle timers
   private resizeTimeout: NodeJS.Timeout | null = null;
   private scrollListenerDebounced: () => void;
 
-  // State Variables for UI Improvements
   private lastMessageDate: Date | null = null;
   private newMessagesIndicatorEl: HTMLElement | null = null;
   private userScrolledUp: boolean = false;
+
+  // Debounced save function
+  private debouncedSaveMessageHistory = debounce(this.saveMessageHistory, 300, true);
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
 
-    // Singleton Logic
     if (OllamaView.instance && OllamaView.instance !== this) {
       console.warn("Replacing existing OllamaView instance.");
+      // Optionally close the previous instance gracefully if needed
+      // OllamaView.instance.leaf.detach();
     }
     OllamaView.instance = this;
 
-    // MessageService більше не створюється тут і не зберігається
-    // this.messageService = new MessageService(plugin);
-    // this.messageService.setView(this); // Тепер MessageService отримує View як параметр методу, якщо потрібно
-
-    // API service link (якщо використовується напряму, інакше через plugin)
     if (this.plugin.apiService) {
-      this.plugin.apiService.setOllamaView(this); // MessageService більше не посередник
+      this.plugin.apiService.setOllamaView(this);
     }
 
     this.initSpeechWorker();
     this.scrollListenerDebounced = debounce(this.handleScroll, 150, true);
   }
 
-  // --- Getters for State (можуть знадобитися для MessageService) ---
   public getMessagesCount(): number {
     return this.messages.length;
   }
+
   public getMessagesPairCount(): number {
-    // Логіка підрахунку пар тепер має бути тут, якщо вона потрібна деінде
-    // Поточна логіка messagesPairCount в internalAddMessage оновлює поле класу
     return this.messagesPairCount;
   }
 
-  // --- Obsidian View Lifecycle Methods ---
   getViewType(): string { return VIEW_TYPE_OLLAMA; }
   getDisplayText(): string { return "Ollama Chat"; }
   getIcon(): string { return "message-square"; }
@@ -167,15 +146,14 @@ export class OllamaView extends ItemView {
     this.updateSendButtonState();
 
     this.lastMessageDate = null;
-    await this.loadAndRenderHistory(); // Тепер завантаження має викликати internalAddMessage
+    await this.loadAndRenderHistory();
 
     this.inputEl?.focus();
     this.guaranteedScrollToBottom(150, true);
-    this.inputEl?.dispatchEvent(new Event('input'));
+    this.inputEl?.dispatchEvent(new Event('input')); // Trigger initial size calculation
   }
 
   async onClose(): Promise<void> {
-    // Cleanup (без змін)
     console.log("OllamaView onClose: Cleaning up resources.");
     if (this.speechWorker) { this.speechWorker.terminate(); this.speechWorker = null; }
     this.stopVoiceRecording(false);
@@ -185,20 +163,16 @@ export class OllamaView extends ItemView {
     if (OllamaView.instance === this) { OllamaView.instance = null; }
   }
 
-  // --- UI Creation and Management ---
   private createUIElements(): void {
-    // (Без суттєвих змін, використовує ті ж константи)
     this.contentEl.empty();
     this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
 
-    // New Message Indicator
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
     const indicatorIcon = this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" });
     setIcon(indicatorIcon, "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
-    // Input Container
     const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
     this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text to ${this.plugin.settings.modelName}...` } });
     this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
@@ -209,7 +183,6 @@ export class OllamaView extends ItemView {
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON });
     setIcon(this.menuButton, "more-vertical");
 
-    // Menu Dropdown
     this.menuDropdown = inputContainer.createEl("div", { cls: CSS_CLASS_MENU_DROPDOWN });
     this.menuDropdown.style.display = "none";
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
@@ -224,7 +197,6 @@ export class OllamaView extends ItemView {
   }
 
   private attachEventListeners(): void {
-    // (Без суттєвих змін, всі слухачі залишаються)
     this.inputEl.addEventListener("keydown", this.handleKeyDown);
     this.inputEl.addEventListener('input', this.handleInputForResize);
     this.sendButton.addEventListener("click", this.handleSendClick);
@@ -244,16 +216,14 @@ export class OllamaView extends ItemView {
     }
   }
 
-  // --- Event Handlers ---
-  // (Без змін, крім handleClearChatClick, який тепер не викликає messageService)
   private handleKeyDown = (e: KeyboardEvent): void => { if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) { e.preventDefault(); this.sendMessage(); } }
   private handleSendClick = (): void => { if (!this.isProcessing && !this.sendButton.disabled) { this.sendMessage(); } }
   private handleVoiceClick = (): void => { this.toggleVoiceRecognition(); }
   private handleMenuClick = (e: MouseEvent): void => { e.stopPropagation(); const isHidden = this.menuDropdown.style.display === "none"; this.menuDropdown.style.display = isHidden ? "block" : "none"; }
   private handleSettingsClick = async (): Promise<void> => { this.closeMenu(); const setting = (this.app as any).setting; if (setting) { await setting.open(); setting.openTabById("obsidian-ollama-duet"); } else { new Notice("Could not open settings."); } }
-  private handleClearChatClick = (): void => { this.closeMenu(); this.clearChatContainer(); new Notice("Chat history cleared."); } // Більше не викликає messageService
+  private handleClearChatClick = (): void => { this.closeMenu(); this.clearChatContainer(); new Notice("Chat history cleared."); }
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.menuDropdown.style.display === 'block' && !this.menuButton.contains(e.target as Node) && !this.menuDropdown.contains(e.target as Node)) { this.closeMenu(); } }
-  private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.messages.length > 0) { this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`); } } // Виклик через plugin.messageService
+  private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.messages.length > 0) { this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`); } }
   private handleVisibilityChange = (): void => { if (document.visibilityState === 'visible') { requestAnimationFrame(() => { this.guaranteedScrollToBottom(50); this.adjustTextareaHeight(); }); } }
   private handleActiveLeafChange = (): void => { if (this.app.workspace.getActiveViewOfType(OllamaView) === this) { setTimeout(() => this.guaranteedScrollToBottom(100), 100); this.inputEl?.focus(); } }
   private handleInputForResize = (): void => { if (this.resizeTimeout) clearTimeout(this.resizeTimeout); this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 50); this.updateSendButtonState(); };
@@ -261,8 +231,6 @@ export class OllamaView extends ItemView {
   private handleScroll = (): void => { if (!this.chatContainer) return; const scrollThreshold = 150; const isScrolledToBottom = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight < scrollThreshold; if (!isScrolledToBottom) { this.userScrolledUp = true; } else { this.userScrolledUp = false; this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); } }
   private handleNewMessageIndicatorClick = (): void => { this.guaranteedScrollToBottom(50, true); this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); }
 
-  // --- UI Update Methods ---
-  // (Без змін)
   private updateInputPlaceholder(modelName: string): void { if (this.inputEl) { this.inputEl.placeholder = `Text to ${modelName}...`; } }
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
@@ -271,32 +239,27 @@ export class OllamaView extends ItemView {
   public showEmptyState(): void { if (this.messages.length === 0 && !this.emptyStateEl && this.chatContainer) { this.chatContainer.empty(); this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE }); this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" }); this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use voice input to chat with ${this.plugin.settings.modelName}` }); } }
   public hideEmptyState(): void { if (this.emptyStateEl) { this.emptyStateEl.remove(); this.emptyStateEl = null; } }
 
-  // --- Message Handling ---
-
   private async loadAndRenderHistory(): Promise<void> {
-    this.lastMessageDate = null;
+    this.lastMessageDate = null; // Reset date tracking before loading
+    this.clearChatContainerInternal(); // Clear view state without saving
     try {
-      // Викликаємо завантаження через MessageService, який тепер має викликати internalAddMessage
-      await this.plugin.messageService.loadMessageHistory();
-      // Перевірка стану після завантаження (якщо messageService не показав empty state сам)
+      await this.plugin.messageService.loadMessageHistory(); // Service will call internalAddMessage
+
       if (this.messages.length === 0) {
         this.showEmptyState();
       } else {
         this.hideEmptyState();
-        // TODO: Оптимізувати - викликати saveMessageHistory один раз тут після циклу в MessageService.loadMessageHistory
-        // Поки що збереження викликається після кожного internalAddMessage
+        // Note: Saving is handled by MessageService *after* the loop
       }
     } catch (error) {
-      console.error("Error loading message history:", error);
-      // Переконуємося, що View очищено у випадку помилки завантаження
-      this.clearChatContainerInternal(); // Використовуємо внутрішній метод без збереження
+      console.error("OllamaView: Error during history loading process:", error);
+      this.clearChatContainerInternal(); // Ensure clean state on error
       this.showEmptyState();
     }
   }
 
-  // Зберігає ПОТОЧНИЙ стан this.messages
   async saveMessageHistory(): Promise<void> {
-    if (!this.plugin.settings.saveMessageHistory) return; // Перевірка налаштувань
+    if (!this.plugin.settings.saveMessageHistory) return;
 
     const messagesToSave = this.messages.map((msg) => ({
       role: msg.role,
@@ -306,7 +269,6 @@ export class OllamaView extends ItemView {
     const dataToSave = JSON.stringify(messagesToSave);
 
     try {
-      // Викликаємо метод плагіна для збереження
       await this.plugin.saveMessageHistory(dataToSave);
     } catch (error) {
       console.error("OllamaView: Error saving message history:", error);
@@ -314,124 +276,131 @@ export class OllamaView extends ItemView {
     }
   }
 
-  // Відправка повідомлення користувача
   async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled) return;
 
-    const messageContent = this.inputEl.value; // Зберігаємо оригінал для показу
-    this.clearInputField(); // Очищує поле, викликає updateSendButtonState
+    const messageContent = this.inputEl.value;
+    this.clearInputField();
     this.setLoadingState(true);
     this.hideEmptyState();
 
-    // Додаємо повідомлення користувача до нашого стану
     this.internalAddMessage("user", messageContent);
 
     try {
-      // Передаємо запит до MessageService (через plugin)
       await this.plugin.messageService.sendMessage(content);
     } catch (error) {
       console.error("OllamaView: Error sending message via MessageService:", error);
-      // Додаємо повідомлення про помилку до нашого стану
       this.internalAddMessage("error", "Failed to send message. Please try again.");
-      this.setLoadingState(false); // Знімаємо завантаження при помилці відправки
+      this.setLoadingState(false);
     }
-    // setLoadingState(false) тепер викликається в finally блоці MessageService.processWithOllama
   }
 
-  /**
-   * Внутрішній метод для додавання повідомлення до стану View, рендерингу та збереження.
-   * Викликається як для повідомлень користувача, так і для повідомлень від MessageService.
-   * @param role Роль повідомлення
-   * @param content Вміст повідомлення
-   * @param options Додаткові опції (напр., чи зберігати історію після цього додавання)
-   */
-  public internalAddMessage(role: MessageRole, content: string, options: { saveHistory?: boolean } = { saveHistory: true }): void {
+  public internalAddMessage(role: MessageRole, content: string, options: AddMessageOptions = {}): void {
+    const { saveHistory = true, timestamp } = options;
+
+    // Determine the timestamp: use provided one (parsing if string), otherwise now
+    let messageTimestamp: Date;
+    if (timestamp) {
+      try {
+        messageTimestamp = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+        // Basic validation: Check if the parsed date is valid
+        if (isNaN(messageTimestamp.getTime())) {
+          console.warn("Invalid timestamp provided, using current time:", timestamp);
+          messageTimestamp = new Date();
+        }
+      } catch (e) {
+        console.warn("Error parsing timestamp, using current time:", timestamp, e);
+        messageTimestamp = new Date();
+      }
+    } else {
+      messageTimestamp = new Date();
+    }
+
+
     const message: Message = {
       role,
       content,
-      timestamp: new Date(),
+      timestamp: messageTimestamp,
     };
     this.messages.push(message);
 
-    // Оновлення лічильника пар (якщо потрібно)
     if (role === "assistant" && this.messages.length >= 2) {
       const prevMessage = this.messages[this.messages.length - 2];
       if (prevMessage && prevMessage.role === "user") { this.messagesPairCount++; }
     }
 
-    this.renderMessage(message);
+    this.renderMessage(message); // Render uses message.timestamp
     this.hideEmptyState();
 
-    // Зберігаємо історію, якщо опція не вимкнена (для оптимізації завантаження)
-    if (options.saveHistory) {
-      // Додамо невелику затримку перед збереженням, щоб згрупувати кілька швидких викликів
-      debounce(this.saveMessageHistory, 300, true).call(this);
-      // this.saveMessageHistory();
+    if (saveHistory) {
+      // Use the debounced save for regular additions
+      this.debouncedSaveMessageHistory();
     }
 
-
-    // Логіка індикатора нових повідомлень та прокрутки
+    // Scroll/Indicator Logic
     if (role !== "user" && this.userScrolledUp && this.newMessagesIndicatorEl) {
       this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
     } else if (!this.userScrolledUp) {
-      const forceScroll = role !== "user"; // Прокручуємо примусово для повідомлень не від користувача
+      const forceScroll = role !== "user";
       this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
     }
   }
 
-  // --- Rendering Logic (Розширено для system/error) ---
   renderMessage(message: Message): void {
     const messageIndex = this.messages.indexOf(message);
     if (messageIndex === -1) return;
 
     const prevMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
-    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role;
+
+    // Use the message's actual timestamp for date separation logic
     const isNewDay = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
 
-    // --- Date Separator ---
-    if (isNewDay && (messageIndex === 0 || isFirstInGroup)) {
+    if (isNewDay) {
+      // Render separator only if it's truly a new day compared to the *last rendered* date
       this.renderDateSeparator(message.timestamp);
-      this.lastMessageDate = message.timestamp; // Оновлюємо дату після сепаратора
+      this.lastMessageDate = message.timestamp; // Update last rendered date
+    } else if (messageIndex === 0) {
+      // Always set the lastMessageDate for the very first message rendered
+      // Prevents showing "Today" separator if history starts > 1 day ago
+      this.lastMessageDate = message.timestamp;
     }
 
 
     let messageGroup: HTMLElement | null = null;
-    // --- Визначення CSS класів ---
     let groupClass = CSS_CLASS_MESSAGE_GROUP;
-    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`; // Завжди додаємо анімацію
+    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
     let showAvatar = false;
     let isUser = false;
+
+    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+
 
     switch (message.role) {
       case "user":
         groupClass += ` ${CSS_CLASS_USER_GROUP}`;
         messageClass += ` ${CSS_CLASS_USER_MESSAGE}`;
-        showAvatar = true; // Показуємо аватар для user
+        showAvatar = true;
         isUser = true;
         break;
       case "assistant":
         groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`;
         messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`;
-        showAvatar = true; // Показуємо аватар для assistant
+        showAvatar = true;
         break;
       case "system":
         groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`;
         messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`;
-        // Не показуємо аватар для system
         break;
       case "error":
         groupClass += ` ${CSS_CLASS_ERROR_GROUP}`;
         messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`;
-        // Не показуємо аватар для error
         break;
     }
 
-    // --- Створення або знаходження групи ---
     const lastElement = this.chatContainer.lastElementChild as HTMLElement;
-    if (isFirstInGroup || !lastElement || !lastElement.classList.contains(groupClass.split(' ')[1])) { // Порівнюємо основний клас групи
+    if (isFirstInGroup || !lastElement || !lastElement.classList.contains(groupClass.split(' ')[1])) {
       messageGroup = this.chatContainer.createDiv({ cls: groupClass });
-      // Додаємо аватар, якщо потрібно і це перше повідомлення групи
       if (showAvatar) {
         this.renderAvatar(messageGroup, isUser);
       }
@@ -439,12 +408,10 @@ export class OllamaView extends ItemView {
       messageGroup = lastElement;
     }
 
-    // --- Створення елемента повідомлення ---
     const messageEl = messageGroup.createDiv({ cls: messageClass });
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
 
-    // --- Рендеринг вмісту залежно від ролі ---
     switch (message.role) {
       case "assistant":
         this.renderAssistantContent(contentEl, message.content);
@@ -467,22 +434,22 @@ export class OllamaView extends ItemView {
         break;
     }
 
-    // --- Кнопка копіювання (не для system) ---
     if (message.role !== "system") {
       const copyButton = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
       setIcon(copyButton, "copy");
       copyButton.addEventListener("click", () => this.handleCopyClick(message.content, copyButton));
     }
 
-    // --- Timestamp ---
     messageEl.createDiv({
       cls: CSS_CLASS_TIMESTAMP,
-      text: this.formatTime(message.timestamp),
+      text: this.formatTime(message.timestamp), // Format the message's timestamp
     });
+
+    // Remove animation class after a short delay
+    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
   }
 
-  // --- Методи рендерингу (Date Separator, Avatar, Assistant Content, Code Buttons) ---
-  // (Залишаються без змін від попередньої версії)
+
   private renderDateSeparator(date: Date): void { if (!this.chatContainer) return; this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) }); }
   private renderAvatar(groupEl: HTMLElement, isUser: boolean): void { const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI}` }); avatarEl.textContent = isUser ? "U" : "A"; }
   private renderAssistantContent(containerEl: HTMLElement, content: string): void { const decodedContent = this.decodeHtmlEntities(content); const hasThinking = this.detectThinkingTags(decodedContent); containerEl.empty(); if (hasThinking.hasThinkingTags) { const processedHtml = this.processThinkingTags(decodedContent); containerEl.innerHTML = processedHtml; this.addThinkingToggleListeners(containerEl); this.addCodeBlockCopyButtons(containerEl); } else { MarkdownRenderer.renderMarkdown(content, containerEl, this.plugin.app.vault.getRoot().path, this); this.addCodeBlockCopyButtons(containerEl); } }
@@ -494,32 +461,31 @@ export class OllamaView extends ItemView {
   private decodeHtmlEntities(text: string): string { if (typeof document === 'undefined') return text; const textArea = document.createElement("textarea"); textArea.innerHTML = text; return textArea.value; }
   private detectThinkingTags(content: string): { hasThinkingTags: boolean; format: string } { if (/<think>[\s\S]*?<\/think>/gi.test(content)) { return { hasThinkingTags: true, format: "standard" }; } return { hasThinkingTags: false, format: "none" }; }
 
-
-  // --- Speech Recognition ---
-  // (Без змін)
-  private initSpeechWorker(): void { /* ... */ }
-  private setupSpeechWorkerHandlers(): void { /* ... */ }
-  private insertTranscript(transcript: string): void { /* ... */ }
-  private async toggleVoiceRecognition(): Promise<void> { /* ... */ }
-  private async startVoiceRecognition(): Promise<void> { /* ... */ }
-  private stopVoiceRecording(processAudio: boolean): void { /* ... */ }
+  private initSpeechWorker(): void { /* ... placeholder ... */ }
+  private setupSpeechWorkerHandlers(): void { /* ... placeholder ... */ }
+  private insertTranscript(transcript: string): void { /* ... placeholder ... */ }
+  private async toggleVoiceRecognition(): Promise<void> { /* ... placeholder ... */ }
+  private async startVoiceRecognition(): Promise<void> { /* ... placeholder ... */ }
+  private stopVoiceRecording(processAudio: boolean): void { /* ... placeholder ... */ }
 
 
-  // --- Helpers & Utilities ---
-  // (Без змін, крім clearChatContainer)
   public getChatContainer(): HTMLElement { return this.chatContainer; }
-  public clearChatContainer(): void { // Викликається ззовні (напр. кнопкою меню)
-    this.clearChatContainerInternal(); // Викликаємо внутрішній метод очищення
-    this.saveMessageHistory(); // Зберігаємо порожній стан
+
+  public clearChatContainer(): void {
+    this.clearChatContainerInternal();
+    this.saveMessageHistory(); // Save the now-empty state
     this.updateSendButtonState();
+    this.showEmptyState(); // Explicitly show empty state after clearing
   }
-  private clearChatContainerInternal(): void { // Внутрішній метод без збереження
+
+  private clearChatContainerInternal(): void {
     this.messages = [];
     this.messagesPairCount = 0;
     this.lastMessageDate = null;
     if (this.chatContainer) { this.chatContainer.empty(); }
-    // Не викликаємо showEmptyState тут, бо це може бути частиною завантаження
+    this.hideEmptyState(); // Ensure empty state element is removed if present
   }
+
   public addLoadingIndicator(): HTMLElement { this.hideEmptyState(); const messageGroup = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` }); this.renderAvatar(messageGroup, false); const messageEl = messageGroup.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` }); const dotsContainer = messageEl.createDiv({ cls: CSS_CLASS_THINKING_DOTS }); for (let i = 0; i < 3; i++) { dotsContainer.createDiv({ cls: CSS_CLASS_THINKING_DOT }); } this.guaranteedScrollToBottom(50, true); return messageGroup; }
   public removeLoadingIndicator(loadingEl: HTMLElement | null): void { if (loadingEl && loadingEl.parentNode) { loadingEl.remove(); } }
   public scrollToBottom(): void { this.guaranteedScrollToBottom(50, true); }
@@ -529,5 +495,13 @@ export class OllamaView extends ItemView {
   formatDateSeparator(date: Date): string { const now = new Date(); const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1); if (this.isSameDay(date, now)) { return "Today"; } else if (this.isSameDay(date, yesterday)) { return "Yesterday"; } else { return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); } }
   isSameDay(date1: Date, date2: Date): boolean { return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); }
   public setLoadingState(isLoading: boolean): void { this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } }
+
+  public clearDisplayAndState(): void {
+    this.clearChatContainerInternal(); // Clears messages array, resets count/date, empties chat container
+    this.showEmptyState(); // Shows the "No messages yet" state
+    this.updateSendButtonState(); // Disables send button etc.
+    this.inputEl?.focus(); // Focus input field
+    console.log("OllamaView: Display and internal state cleared.");
+  }
 
 }
