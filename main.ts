@@ -400,15 +400,25 @@ export default class OllamaPlugin extends Plugin {
     const deleted = await this._deleteHistoryFile();
 
     // 2. Очищаємо стан і дисплей у View, ЯКЩО файл успішно видалено (або його не було)
-    if (deleted && this.view) {
-      this.view.clearDisplayAndState(); // Викликаємо метод View для очищення UI та пам'яті
-      console.log("[Ollama Clear] Cleared active view display and state.");
-      new Notice("Chat history cleared."); // Повідомлення про успіх
-    } else if (!deleted) {
-      new Notice("Failed to clear chat history file. Please check console logs."); // Повідомлення про помилку видалення
+    // if (deleted && this.view) {
+    //   this.view.clearDisplayAndState(); // Викликаємо метод View для очищення UI та пам'яті
+    //   console.log("[Ollama Clear] Cleared active view display and state.");
+    //   new Notice("Chat history cleared."); // Повідомлення про успіх
+    // } else if (!deleted) {
+    //   new Notice("Failed to clear chat history file. Please check console logs."); // Повідомлення про помилку видалення
+    // } else {
+    //   console.log("[Ollama Clear] History file operation completed, view not active.");
+    //   new Notice("Chat history cleared."); // Якщо View не активний, але файл видалено
+    // }
+    // 3. Показуємо повідомлення (Notice)
+    if (deleted) {
+      new Notice("Chat history file deleted (View not updated yet)."); // Змінено текст для діагностики
+      // Якщо View активний, він все ще показуватиме стару історію до перезавантаження
+      if (this.view) {
+        console.warn("[Ollama Clear] History file deleted, but view was not updated for diagnostics.");
+      }
     } else {
-      console.log("[Ollama Clear] History file operation completed, view not active.");
-      new Notice("Chat history cleared."); // Якщо View не активний, але файл видалено
+      new Notice("Failed to clear chat history file. Please check console logs.");
     }
   }
 }

@@ -4159,15 +4159,13 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
   async clearMessageHistory() {
     console.log("[Ollama Clear] Clearing message history initiated.");
     const deleted = await this._deleteHistoryFile();
-    if (deleted && this.view) {
-      this.view.clearDisplayAndState();
-      console.log("[Ollama Clear] Cleared active view display and state.");
-      new import_obsidian4.Notice("Chat history cleared.");
-    } else if (!deleted) {
-      new import_obsidian4.Notice("Failed to clear chat history file. Please check console logs.");
+    if (deleted) {
+      new import_obsidian4.Notice("Chat history file deleted (View not updated yet).");
+      if (this.view) {
+        console.warn("[Ollama Clear] History file deleted, but view was not updated for diagnostics.");
+      }
     } else {
-      console.log("[Ollama Clear] History file operation completed, view not active.");
-      new import_obsidian4.Notice("Chat history cleared.");
+      new import_obsidian4.Notice("Failed to clear chat history file. Please check console logs.");
     }
   }
 };
