@@ -291,24 +291,28 @@ export class OllamaView extends ItemView {
   // --- Message Handling ---
   private async loadAndRenderHistory(): Promise<void> {
     this.lastMessageDate = null;
-    this.clearChatContainerInternal();
+    this.clearChatContainerInternal(); // Очищаємо перед завантаженням
     try {
-      await this.plugin.messageService.loadMessageHistory(); // Service calls internalAddMessage
+      // Завантажуємо історію. MessageService викличе internalAddMessage для кожного повідомлення.
+      await this.plugin.messageService.loadMessageHistory();
+
       if (this.messages.length === 0) {
         this.showEmptyState();
       } else {
         this.hideEmptyState();
-        // Перевіряємо висоту всіх повідомлень після завантаження
+        // --- ПЕРЕНЕСЕНО ВИКЛИК СЮДИ ---
+        // Перевіряємо всі повідомлення на необхідність згортання ПІСЛЯ їх рендерингу
         this.checkAllMessagesForCollapsing();
-        this.guaranteedScrollToBottom(100, true); // Прокрутка в кінець після завантаження
+        // ---------------------------------
+        this.guaranteedScrollToBottom(100, true); // Прокрутка в кінець
+        // Збереження історії тепер обробляється MessageService після циклу завантаження
       }
     } catch (error) {
-      console.error("OllamaView: Помилка під час завантаження історії:", error);
-      this.clearChatContainerInternal();
+      console.error("OllamaView: Помилка під час процесу завантаження історії:", error);
+      this.clearChatContainerInternal(); // Забезпечуємо чистий стан при помилці
       this.showEmptyState();
     }
   }
-
   async saveMessageHistory(): Promise<void> {
     if (!this.plugin.settings.saveMessageHistory) return;
     const messagesToSave = this.messages.map((msg) => ({

@@ -4,8 +4,8 @@ import {
   Setting,
   DropdownComponent,
   Notice,
-  TextComponent, // Додано для пошуку іконок
-  ButtonComponent // Додано для кнопки пошуку
+  TextComponent,
+  ButtonComponent
 } from "obsidian";
 import OllamaPlugin from "./main";
 
@@ -29,7 +29,7 @@ export interface OllamaPluginSettings {
   customRoleFilePath: string; // Path to custom role definition file
   systemPromptInterval: number;
   temperature: number;
-  contextWindow: number; // Розмір контекстного вікна моделі (токени/слова)
+  contextWindow: number; // Розмір контекстного вікна моделі (токени)
 
   // --- Нові налаштування UI/UX ---
   userAvatarType: AvatarType;
@@ -37,6 +37,9 @@ export interface OllamaPluginSettings {
   aiAvatarType: AvatarType;
   aiAvatarContent: string; // Ініціали або назва іконки Obsidian
   maxMessageHeight: number; // Макс. висота повідомлення перед згортанням (px), 0 = вимкнено
+
+  // --- Нове налаштування ---
+  useAdvancedContextStrategy: boolean; // Перемикач для нової стратегії
 }
 
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
@@ -48,7 +51,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   ragFolderPath: "data",
   contextWindowSize: 5, // RAG docs
   googleApiKey: "",
-  speechLanguage: "uk-UA",
+  speechLanguage: "uk-UA", // Мова за замовчуванням - українська
   maxRecordingTime: 15,
   silenceDetection: true,
   followRole: true,
@@ -57,12 +60,13 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   systemPromptInterval: 0,
   temperature: 0.1,
   contextWindow: 8192, // Model context window
-  // --- Нові значення за замовчуванням ---
   userAvatarType: 'initials',
   userAvatarContent: 'U',
   aiAvatarType: 'icon',
   aiAvatarContent: 'bot', // Іконка Obsidian
   maxMessageHeight: 300, // Згортати повідомлення довші за 300px
+  // --- Нове значення ---
+  useAdvancedContextStrategy: false, // За замовчуванням вимкнено
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -78,6 +82,7 @@ export class OllamaSettingTab extends PluginSettingTab {
   }
 
   getId(): string {
+    // Повертає унікальний ID для вкладки налаштувань
     return "ollama-plugin";
   }
 
@@ -113,12 +118,12 @@ export class OllamaSettingTab extends PluginSettingTab {
           });
         });
       } else {
-        resultsEl.setText('No icons found.');
+        resultsEl.setText('Іконок не знайдено.');
       }
     };
 
     searchInput = new TextComponent(searchContainer)
-      .setPlaceholder('Search Obsidian icons...')
+      .setPlaceholder('Пошук іконок Obsidian...')
       .onChange(performSearch);
 
     resultsEl = searchContainer.createDiv({ cls: 'ollama-icon-search-results' });
@@ -133,7 +138,6 @@ export class OllamaSettingTab extends PluginSettingTab {
     // --- Basic Configuration ---
     containerEl.createEl("h2", { text: "Основні Налаштування" });
 
-    // ... (Ollama Server URL, Reconnect Button - залишаються без змін) ...
     new Setting(containerEl)
       .setName("Ollama Server URL")
       .setDesc(
@@ -164,7 +168,6 @@ export class OllamaSettingTab extends PluginSettingTab {
               this.display(); // Перемалювати налаштування для оновлення списку моделей
             } catch (error: any) {
               new Notice(`Помилка підключення: ${error.message}. Перевірте URL та стан сервера.`);
-              // Ви можете також викликати emit тут, якщо потрібно
               if (this.plugin.view) {
                 this.plugin.view.internalAddMessage(
                   "error",
@@ -224,7 +227,6 @@ export class OllamaSettingTab extends PluginSettingTab {
       });
     });
 
-    // ... (Інші базові налаштування: Temperature, Context Window - залишаються без змін) ...
     new Setting(containerEl)
       .setName("Температура")
       .setDesc("Контролює випадковість відповідей моделі (0.0 - 1.0)")
@@ -239,10 +241,13 @@ export class OllamaSettingTab extends PluginSettingTab {
           })
       );
 
+    // --- Контекстне вікно ТА НОВА СТРАТЕГІЯ ---
+    containerEl.createEl("h2", { text: "Керування Контекстом" });
+
     new Setting(containerEl)
-      .setName("Контекстне вікно моделі")
-      .setDesc("Розмір контекстного вікна моделі (рекомендовано > 8192). Впливає на обсяг історії та RAG, який можна передати.")
-      .addText((text) => // Змінено на Text для гнучкості
+      .setName("Контекстне вікно моделі (токени)")
+      .setDesc("Макс. кількість токенів, яку модель може обробити (з документації моделі).")
+      .addText((text) =>
         text
           .setPlaceholder("8192")
           .setValue(String(this.plugin.settings.contextWindow))
@@ -252,20 +257,36 @@ export class OllamaSettingTab extends PluginSettingTab {
               this.plugin.settings.contextWindow = num;
               await this.plugin.saveSettings();
             } else {
-              new Notice("Будь ласка, введіть позитивне числове значення.");
-              // Можна відновити попереднє значення або залишити як є
+              new Notice("Введіть позитивне число.");
               text.setValue(String(this.plugin.settings.contextWindow));
             }
           })
       );
 
+    new Setting(containerEl)
+      .setName("Експериментально: Просунуте керування контекстом")
+      .setDesc("Використовувати токенізатор для точного підрахунку та обрізання контексту. Якщо вимкнено, використовується менш точний підрахунок за словами.")
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.useAdvancedContextStrategy)
+        .onChange(async value => {
+          this.plugin.settings.useAdvancedContextStrategy = value;
+          await this.plugin.saveSettings();
+          if (value) {
+            new Notice("Просунуте керування контекстом увімкнено (використовує токенізатор).");
+          } else {
+            new Notice("Просунуте керування контекстом вимкнено (використовує підрахунок слів).");
+          }
+        })
+      );
+    // Пояснення щодо сумаризації (поки не реалізовано)
+    const noteEl = containerEl.createEl('p', { text: 'Примітка: Автоматична сумаризація історії для дуже довгих розмов наразі не реалізована в просунутому режимі.', cls: 'setting-item-description ollama-subtle-notice' });
+
 
     // --- Chat History & Persistence ---
     containerEl.createEl("h2", { text: "Історія Чату" });
 
-    // ... (Save History Toggle, Log File Size Limit, Clear History Button - залишаються без змін) ...
     new Setting(containerEl)
-      .setName("Зберігати історію повідомлень")
+      .setName("Зберігати історію")
       .setDesc("Зберігати історію чату між сесіями")
       .addToggle((toggle) =>
         toggle
@@ -277,10 +298,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Ліміт розміру файлу історії")
-      .setDesc(
-        "Максимальний розмір файлу історії повідомлень в KB (1024 KB = 1 MB)"
-      )
+      .setName("Ліміт розміру файлу історії (KB)")
+      .setDesc("Максимальний розмір файлу історії (1024 KB = 1 MB)")
       .addSlider((slider) =>
         slider
           .setLimits(256, 10240, 256) // 256KB to 10MB
@@ -405,8 +424,8 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     // Max Message Height Setting
     new Setting(containerEl)
-      .setName("Макс. висота повідомлення перед згортанням")
-      .setDesc("Введіть висоту в пікселях. Довші повідомлення матимуть кнопку 'Показати більше'. Введіть 0, щоб вимкнути згортання.")
+      .setName("Макс. висота повідомлення (px)")
+      .setDesc("Довші повідомлення будуть згортатись. 0 - вимкнути.")
       .addText(text => text
         .setPlaceholder("300")
         .setValue(String(this.plugin.settings.maxMessageHeight))
@@ -416,7 +435,7 @@ export class OllamaSettingTab extends PluginSettingTab {
             this.plugin.settings.maxMessageHeight = num;
             await this.plugin.saveSettings();
           } else {
-            new Notice("Будь ласка, введіть невід'ємне числове значення.");
+            new Notice("Введіть невід'ємне число.");
             text.setValue(String(this.plugin.settings.maxMessageHeight));
           }
         })
@@ -426,10 +445,9 @@ export class OllamaSettingTab extends PluginSettingTab {
     // --- Role Configuration ---
     containerEl.createEl("h2", { text: "Конфігурація Ролі AI" });
 
-    // ... (Follow Role, Use Default, Custom Path, System Prompt Interval - залишаються без змін) ...
     new Setting(containerEl)
-      .setName("Ввімкнути визначення ролі")
-      .setDesc("Змусити Ollama слідувати визначеній ролі з файлу")
+      .setName("Ввімкнути роль")
+      .setDesc("Змусити Ollama слідувати ролі з файлу")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.followRole)
@@ -440,8 +458,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Використовувати стандартне визначення ролі")
-      .setDesc("Використовувати файл default-role.md з папки плагіна")
+      .setName("Використ. стандартну роль")
+      .setDesc("Використовувати default-role.md з папки плагіна")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.useDefaultRoleDefinition)
@@ -452,10 +470,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Шлях до власного визначення ролі")
-      .setDesc(
-        "Шлях до файлу з власним визначенням ролі (відносно кореня сховища)"
-      )
+      .setName("Шлях до власної ролі")
+      .setDesc("Шлях до файлу ролі (відносно кореня сховища)")
       .addText((text) =>
         text
           .setPlaceholder("шлях/до/файлу_ролі.md")
@@ -468,7 +484,7 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Інтервал системного промпту")
-      .setDesc("Кількість пар повідомлень між повторними надсиланнями системного промпту. 0 - з кожним запитом, від'ємне - ніколи")
+      .setDesc("К-ть пар повідомлень між надсиланнями сист. промпту (0=завжди, <0=ніколи)")
       .addText((text) => // Використовуємо Text для введення чисел
         text
           .setValue(String(this.plugin.settings.systemPromptInterval))
@@ -483,7 +499,6 @@ export class OllamaSettingTab extends PluginSettingTab {
     // --- RAG Configuration ---
     containerEl.createEl("h2", { text: "Конфігурація RAG" });
 
-    // ... (Enable RAG, RAG Folder Path, Context Window Size (RAG docs) - залишаються без змін) ...
     new Setting(containerEl)
       .setName("Ввімкнути RAG")
       .setDesc("Використовувати Retrieval Augmented Generation з вашими нотатками")
@@ -493,19 +508,17 @@ export class OllamaSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.ragEnabled = value;
             await this.plugin.saveSettings();
-            // Опційно: Запустити індексацію при ввімкненні RAG
             if (value && this.plugin.ragService) {
-              new Notice("RAG увімкнено. Запускається індексація документів...");
-              this.plugin.ragService.indexDocuments();
+              new Notice("RAG увімкнено. Індексація документів...");
+              // Потенційно запускаємо індексацію асинхронно, щоб не блокувати UI
+              setTimeout(() => this.plugin.ragService?.indexDocuments(), 100);
             }
           })
       );
 
     new Setting(containerEl)
       .setName("Шлях до папки RAG")
-      .setDesc(
-        "Шлях до папки, що містить документи для RAG (відносно кореня сховища)"
-      )
+      .setDesc("Папка з документами для RAG (відносно кореня сховища)")
       .addText((text) =>
         text
           .setPlaceholder("data/rag_docs") // Приклад
@@ -534,7 +547,6 @@ export class OllamaSettingTab extends PluginSettingTab {
     // --- Speech Recognition ---
     containerEl.createEl("h2", { text: "Розпізнавання Мовлення" });
 
-    // ... (Google API Key, Language, Max Recording Time, Silence Detection - залишаються без змін) ...
     new Setting(containerEl)
       .setName("Google API Key")
       .setDesc("API ключ для сервісу Google Speech-to-Text")
@@ -550,9 +562,7 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Мова розпізнавання")
-      .setDesc(
-        "Код мови для Google Speech-to-Text (напр., uk-UA, en-US, pl-PL)"
-      )
+      .setDesc("Код мови для Google Speech-to-Text (напр., uk-UA, en-US, pl-PL)")
       .addText((text) =>
         text
           .setPlaceholder("uk-UA")
@@ -564,10 +574,8 @@ export class OllamaSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Максимальний час запису")
-      .setDesc(
-        "Максимальний час (в секундах) для запису перед автоматичною зупинкою"
-      )
+      .setName("Максимальний час запису (сек)")
+      .setDesc("Максимальний час запису голосу перед автоматичною зупинкою")
       .addSlider((slider) =>
         slider
           .setLimits(5, 60, 5)
@@ -590,5 +598,30 @@ export class OllamaSettingTab extends PluginSettingTab {
         })
       );
 
+    // Додаємо стилі для пошуку іконок при відображенні
+    this.addIconSearchStyles();
+  }
+
+  // Додаємо стилі CSS для пошуку іконок динамічно
+  private addIconSearchStyles() {
+    const styleId = 'ollama-icon-search-styles';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+        .ollama-settings .setting-item-control .ollama-icon-search-container { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 8px; background-color: var(--background-secondary); }
+        .ollama-settings .setting-item-control .ollama-icon-search-container input[type="text"] { width: 100%; margin-bottom: 8px; }
+        .ollama-settings .setting-item-control .ollama-icon-search-results { display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow-y: auto; background-color: var(--background-primary); border-radius: 4px; padding: 4px; }
+        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar { width: 6px; }
+        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 3px; }
+        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+        .ollama-settings .setting-item-control .ollama-icon-search-result { background-color: var(--background-modifier-hover); border: 1px solid transparent; border-radius: 4px; padding: 4px; cursor: pointer; transition: all 0.1s ease-out; color: var(--text-muted); display: flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; }
+        .ollama-settings .setting-item-control .ollama-icon-search-result:hover { background-color: var(--background-modifier-border); border-color: var(--interactive-accent-translucent); color: var(--text-normal); }
+        .ollama-settings .setting-item-control .ollama-icon-search-result .svg-icon { width: 16px; height: 16px; }
+        .ollama-subtle-notice { opacity: 0.7; font-size: var(--font-ui-smaller); margin-top: 5px; margin-bottom: 10px; padding-left: 10px; border-left: 2px solid var(--background-modifier-border); }
+        `;
+    document.head.appendChild(style);
   }
 }

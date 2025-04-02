@@ -1,24 +1,38 @@
-import { TFile } from "obsidian";
-import * as path from 'path'; // Залишаємо для роботи зі шляхами
-import OllamaPlugin from "./main"; // Потрібен для доступу до налаштувань
-import { Message } from "./ollamaView"; // Імпортуємо тип повідомлення
+import { TFile, normalizePath } from "obsidian"; // Додаємо normalizePath
+import * as path from 'path';
+import OllamaPlugin from "./main";
+import { Message } from "./ollamaView";
+import { encode } from 'gpt-tokenizer'; // Імпортуємо токенізатор
 
-// Простий лічильник слів
+// Простий лічильник слів (для базової стратегії)
 function countWords(text: string): number {
     if (!text) return 0;
-    return text.trim().split(/\s+/).length;
+    // Більш надійний підрахунок слів, що ігнорує зайві пробіли
+    return text.trim().split(/\s+/).filter(Boolean).length;
 }
+
+// Функція токенізації (для просунутої стратегії)
+function countTokens(text: string): number {
+    if (!text) return 0;
+    try {
+        // Використовуємо encode з бібліотеки gpt-tokenizer
+        return encode(text).length;
+    } catch (e) {
+        console.warn("Помилка токенізації, повертається приблизна оцінка за словами:", e);
+        // Повертаємо приблизну оцінку у разі помилки токенізатора
+        return Math.ceil(countWords(text) * 1.5); // Збільшуємо коефіцієнт для безпеки
+    }
+}
+
 
 export class PromptService {
     private systemPrompt: string | null = null;
-    private plugin: OllamaPlugin; // Змінено тип на конкретний
+    private plugin: OllamaPlugin;
+    // Резерв токенів для відповіді моделі та можливих неточностей токенізації
+    private readonly RESPONSE_TOKEN_BUFFER = 500;
 
-    // Прибираємо StateManager, якщо він не потрібен саме для формування промпту
-    // private stateManager: StateManager;
-
-    constructor(plugin: OllamaPlugin) { // Отримуємо плагін одразу
+    constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
-        // this.stateManager = StateManager.getInstance();
     }
 
     setSystemPrompt(prompt: string | null): void {
@@ -29,70 +43,6 @@ export class PromptService {
         return this.systemPrompt;
     }
 
-    // Цей метод тепер стає менш важливим, основна логіка в prepareFullPrompt
-    formatPrompt(userInput: string): string {
-        // Можливо, додати просте форматування, якщо потрібно
-        return userInput.trim();
-    }
-
-    // Об'єднаємо логіку RAG сюди
-    // enhanceWithRagContext(prompt: string, ragContext: string | null): string { ... }
-
-    // --- Новий метод для підготовки контексту ---
-    private buildContext(
-        history: Message[],
-        ragContext: string | null,
-        userInput: string
-    ): { fullPrompt: string, contextWordCount: number, systemPromptWordCount: number } {
-        let promptParts: string[] = [];
-        let systemWordCount = 0;
-        let contextWordCount = 0; // Без системного промпту та нового вводу
-
-        // 1. Системний промпт (якщо є) - обробляється окремо в API запиті
-        const currentSystemPrompt = this.getSystemPrompt(); // Отримуємо актуальний
-        if (currentSystemPrompt) {
-            systemWordCount = countWords(currentSystemPrompt);
-            // НЕ додаємо його сюди, він піде в `requestBody.system`
-        }
-
-        // 2. RAG контекст (якщо є)
-        if (ragContext) {
-            const ragHeader = "Контекстна інформація з нотаток:\n```\n";
-            const ragFooter = "\n```\n\n";
-            const fullRagBlock = ragHeader + ragContext + ragFooter;
-            promptParts.push(fullRagBlock);
-            contextWordCount += countWords(fullRagBlock);
-        }
-
-        // 3. Історія повідомлень (з найновіших до найстаріших)
-        // Додаємо історію "знизу вверх", щоб потім легше обрізати старі
-        const historyStrings: string[] = [];
-        for (let i = history.length - 1; i >= 0; i--) {
-            const msg = history[i];
-            // Форматуємо повідомлення для включення в промпт
-            const formattedMsg = `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`;
-            historyStrings.push(formattedMsg);
-            contextWordCount += countWords(formattedMsg);
-        }
-        // Додаємо історію в зворотньому порядку (новіші перші)
-        promptParts = promptParts.concat(historyStrings.reverse());
-
-
-        // 4. Поточне повідомлення користувача
-        const userMsgFormatted = `User: ${userInput}`;
-        promptParts.push(userMsgFormatted);
-        // Слово поточного повідомлення НЕ враховуємо в contextWordCount для обрізання
-
-        const fullPrompt = promptParts.join("\n\n"); // Роздільник між частинами
-        // console.log("Initial context word count (excl. system/user input):", contextWordCount);
-        return {
-            fullPrompt: fullPrompt, // Промпт без системного, але з RAG та історією
-            contextWordCount: contextWordCount, // Слова RAG + Історії
-            systemPromptWordCount: systemWordCount // Слова системного промпту
-        };
-    }
-
-
     // --- Основний метод підготовки ---
     async prepareFullPrompt(
         content: string, // Поточне повідомлення користувача
@@ -100,7 +50,7 @@ export class PromptService {
     ): Promise<string> {
         if (!this.plugin) {
             console.warn("Plugin reference not set in PromptService.");
-            return this.formatPrompt(content);
+            return content.trim(); // Повертаємо лише ввід користувача
         }
 
         // 1. Оновлюємо системний промпт (якщо потрібно)
@@ -112,133 +62,207 @@ export class PromptService {
             console.error("Error getting role definition:", error);
             this.setSystemPrompt(null); // Скидаємо, якщо помилка
         }
+        const currentSystemPrompt = this.getSystemPrompt();
 
         // 2. Отримуємо RAG контекст
         let ragContext: string | null = null;
         if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
             try {
-                // Переконуємось, що є індекс, ЯКЩО RAG увімкнено
-                // Перевірка на порожній індекс може бути неефективною, краще покладатись на те, що він є
-                // if (this.plugin.ragService.isIndexEmpty?.()) { // Потрібен метод isIndexEmpty
-                //     await this.plugin.ragService.indexDocuments();
-                // }
-                ragContext = this.plugin.ragService.prepareContext(content); // Готуємо контекст для поточного запиту
+                ragContext = this.plugin.ragService.prepareContext(content);
             } catch (error) {
                 console.error("Error processing RAG:", error);
             }
         }
+        // Додаємо заголовки та форматування до RAG блоку
+        const ragHeader = "## Контекстна інформація з нотаток:\n";
+        const ragBlock = ragContext ? `${ragHeader}${ragContext.trim()}\n\n---\n` : "";
 
-        // 3. Будуємо початковий контекст (історія + RAG + userInput)
-        let { fullPrompt, contextWordCount, systemPromptWordCount } = this.buildContext(history, ragContext, content);
-        const userInputWordCount = countWords(content);
 
-        // 4. Перевіряємо та обрізаємо контекст (за словами, приблизно)
-        // Припускаємо, що 1 токен ~ 0.75 слова (дуже грубо!)
-        const tokenApproximationFactor = 0.75;
-        // Ліміт контексту моделі з налаштувань
-        const modelContextLimit = this.plugin.settings.contextWindow;
-        // Розраховуємо приблизний ліміт у словах
-        // Залишаємо трохи місця для відповіді моделі та системного промпту
-        const wordLimit = Math.max(100, modelContextLimit / tokenApproximationFactor - systemPromptWordCount - userInputWordCount - 200); // Резерв 200 слів/токенів
+        // 3. Вибираємо стратегію і готуємо промпт
+        let finalPrompt: string;
+        const userInputFormatted = `User: ${content.trim()}`; // Останнє повідомлення користувача
 
-        // console.log(`Word Limit: ${wordLimit}, Context Words: ${contextWordCount}, System Words: ${systemPromptWordCount}, Input Words: ${userInputWordCount}`);
+        if (this.plugin.settings.useAdvancedContextStrategy) {
+            // --- Просунута стратегія (Токени) ---
+            console.log("[Ollama] Using advanced context strategy (tokens).");
+            // Ліміт контекстного вікна моделі з налаштувань
+            const modelContextLimit = this.plugin.settings.contextWindow;
+            // Максимальна кількість токенів для промпту (з буфером для відповіді)
+            const maxContextTokens = Math.max(100, modelContextLimit - this.RESPONSE_TOKEN_BUFFER); // Залишаємо мінімум 100 токенів
+            let currentTokens = 0;
+            let promptParts: string[] = []; // Масив частин промпту (RAG, історія)
 
-        if (contextWordCount > wordLimit) {
-            console.warn(`Context too long (${contextWordCount} words > limit ${wordLimit}). Trimming oldest messages/RAG.`);
-            // Проста стратегія: обрізаємо початок `fullPrompt`, де знаходяться найстаріші повідомлення / RAG
-            let promptLines = fullPrompt.split("\n\n");
-            let currentWordCount = contextWordCount; // Починаємо з повного контексту
+            // Рахуємо токени системного промпту (він піде окремо, але враховується в ліміті)
+            const systemPromptTokens = currentSystemPrompt ? countTokens(currentSystemPrompt) : 0;
+            currentTokens += systemPromptTokens;
 
-            // Видаляємо найстаріші частини (з початку масиву), доки не вліземо в ліміт
-            // Першим елементом може бути RAG блок
-            while (currentWordCount > wordLimit && promptLines.length > 1) { // Залишаємо хоча б останнє повідомлення user
-                const lineToRemove = promptLines.shift(); // Видаляємо перший (найстаріший) елемент
-                if (lineToRemove) {
-                    currentWordCount -= countWords(lineToRemove);
+            // Рахуємо токени поточного вводу користувача (завжди включається)
+            const userInputTokens = countTokens(userInputFormatted);
+            currentTokens += userInputTokens;
+
+            // Спочатку пробуємо додати RAG, якщо він влазить
+            const ragTokens = countTokens(ragBlock);
+            let ragAdded = false;
+            if (ragBlock && currentTokens + ragTokens <= maxContextTokens) {
+                promptParts.push(ragBlock); // Додаємо RAG на початок масиву
+                currentTokens += ragTokens;
+                ragAdded = true;
+                console.log(`[Ollama] RAG context added (${ragTokens} tokens).`);
+            } else if (ragBlock) {
+                console.warn(`[Ollama] RAG context (${ragTokens} tokens) too large, skipped. Available: ${maxContextTokens - currentTokens}`);
+            }
+
+
+            // Додаємо історію (з найновіших) доки влазить
+            let addedHistoryMessages = 0;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const msg = history[i];
+                // Формуємо рядок повідомлення (можна додати мітки часу, якщо потрібно)
+                const formattedMsg = `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content.trim()}`;
+                const messageTokens = countTokens(formattedMsg);
+
+                if (currentTokens + messageTokens <= maxContextTokens) {
+                    promptParts.push(formattedMsg); // Додаємо в кінець масиву (буде перевернуто)
+                    currentTokens += messageTokens;
+                    addedHistoryMessages++;
+                } else {
+                    console.log(`[Ollama] History trimming: Stopped at message index ${i} (${messageTokens} tokens). Total tokens: ${currentTokens}/${maxContextTokens}`);
+                    // --- Місце для потенційної сумаризації ---
+                    // Тут можна було б спробувати узагальнити `msg` або групу старих повідомлень.
+                    // -------------------------------------------
+                    break; // Зупиняємось, коли місце закінчилось
                 }
             }
-            fullPrompt = promptLines.join("\n\n");
-            console.log(`Trimmed context word count: ${currentWordCount}`);
+
+            // Якщо RAG було додано на початку, він вже на своєму місці.
+            // Історія додавалася в кінець, тому її треба перевернути.
+            // Розділяємо RAG та історію, перевертаємо історію, з'єднуємо.
+            let finalPromptParts: string[] = [];
+            if (ragAdded) {
+                finalPromptParts.push(promptParts.shift()!); // Беремо RAG
+                promptParts.reverse(); // Перевертаємо історію
+                finalPromptParts = finalPromptParts.concat(promptParts); // Додаємо історію після RAG
+            } else {
+                promptParts.reverse(); // Просто перевертаємо історію
+                finalPromptParts = promptParts;
+            }
+
+
+            finalPromptParts.push(userInputFormatted); // Додаємо поточний ввід в самий кінець
+            finalPrompt = finalPromptParts.join("\n\n"); // Збираємо промпт
+            console.log(`[Ollama] Final prompt token count (approx. incl system & input): ${currentTokens}. History messages included: ${addedHistoryMessages}.`);
+
+        } else {
+            // --- Базова стратегія (Слова) ---
+            console.log("[Ollama] Using basic context strategy (words).");
+            const systemPromptWordCount = currentSystemPrompt ? countWords(currentSystemPrompt) : 0;
+            const userInputWordCount = countWords(userInputFormatted);
+            // Приблизний ліміт слів
+            const tokenApproximationFactor = 1.0; // Припускаємо 1 слово = 1 токен (дуже грубо)
+            const wordLimit = Math.max(100, (this.plugin.settings.contextWindow / tokenApproximationFactor) - systemPromptWordCount - userInputWordCount - 300); // Більший буфер для слів
+
+            let contextParts: string[] = [];
+            let currentWordCount = 0;
+
+            // Додаємо RAG
+            const ragWords = countWords(ragBlock);
+            let ragAdded = false;
+            if (ragBlock && currentWordCount + ragWords <= wordLimit) {
+                contextParts.push(ragBlock);
+                currentWordCount += ragWords;
+                ragAdded = true;
+                // console.log(`[Ollama] RAG context added (${ragWords} words).`);
+            } else if (ragBlock) {
+                console.warn(`[Ollama] RAG context (${ragWords} words) too large, skipped. Available: ${wordLimit - currentWordCount}`);
+            }
+
+            // Додаємо історію (з найновіших)
+            let addedHistoryMessages = 0;
+            for (let i = history.length - 1; i >= 0; i--) {
+                const msg = history[i];
+                const formattedMsg = `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content.trim()}`;
+                const messageWords = countWords(formattedMsg);
+
+                if (currentWordCount + messageWords <= wordLimit) {
+                    contextParts.push(formattedMsg); // Додаємо в кінець (буде перевернуто)
+                    currentWordCount += messageWords;
+                    addedHistoryMessages++;
+                } else {
+                    // console.log(`[Ollama] History trimming (words): Stopped at message index ${i}. Total words: ${currentWordCount}/${wordLimit}`);
+                    break;
+                }
+            }
+
+            // Перевертаємо та збираємо, як у просунутій стратегії
+            let finalPromptParts: string[] = [];
+            if (ragAdded) {
+                finalPromptParts.push(contextParts.shift()!);
+                contextParts.reverse();
+                finalPromptParts = finalPromptParts.concat(contextParts);
+            } else {
+                contextParts.reverse();
+                finalPromptParts = contextParts;
+            }
+
+            finalPromptParts.push(userInputFormatted);
+            finalPrompt = finalPromptParts.join("\n\n");
+            // console.log(`[Ollama] Final prompt word count (approx. incl system & input): ${currentWordCount + systemPromptWordCount + userInputWordCount}. History messages included: ${addedHistoryMessages}.`);
         }
 
-        // Повертаємо фінальний промпт (без системного, він йде окремо)
-        // Переконуємось, що останнє повідомлення користувача завжди є
-        if (!fullPrompt.includes(`User: ${content.trim()}`)) {
-            console.warn("User input was trimmed, re-adding it.");
-            fullPrompt += `\n\nUser: ${content.trim()}`; // Додаємо, якщо зникло
-        }
 
-        return fullPrompt;
+        // Повертаємо фінальний промпт (системний промпт буде додано окремо в тіло запиту)
+        // console.log("[Ollama] Prepared prompt:", finalPrompt.substring(0, 300) + "..."); // Логуємо початок промпту
+        return finalPrompt;
     }
 
-    // --- Методи для роботи з ролями (без змін) ---
+
+    // --- Методи для роботи з ролями (без змін з попередньої відповіді) ---
     async getDefaultRoleDefinition(): Promise<string | null> {
         if (!this.plugin) return null;
         try {
             const pluginFolder = this.plugin.manifest.dir;
-            if (!pluginFolder) {
-                console.error("Cannot determine plugin folder path.");
-                return null;
-            }
+            if (!pluginFolder) { console.error("Cannot determine plugin folder path."); return null; }
             const rolePath = 'default-role.md';
-            // Використовуємо normalizePath для коректного шляху
-            const fullPath = normalizePath(path.join(pluginFolder, rolePath));
-
+            const fullPath = normalizePath(path.join(pluginFolder, rolePath)); // Використовуємо normalizePath
             let content: string | null = null;
             const adapter = this.plugin.app.vault.adapter;
 
             if (await adapter.exists(fullPath)) {
-                try {
-                    content = await adapter.read(fullPath);
-                } catch (readError) {
-                    console.error(`Error reading default role file at ${fullPath}:`, readError);
-                    // Не створюємо файл, якщо не можемо прочитати існуючий
-                    return null;
-                }
+                try { content = await adapter.read(fullPath); }
+                catch (readError) { console.error(`Error reading default role file at ${fullPath}:`, readError); return null; }
             } else {
-                // Файл не існує, створюємо
                 console.log(`Default role file not found at ${fullPath}, creating it.`);
                 try {
                     const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
                     await adapter.write(fullPath, defaultContent);
                     content = defaultContent;
-                } catch (createError) {
-                    console.error(`Error creating default role file at ${fullPath}:`, createError);
-                    return null;
-                }
+                } catch (createError) { console.error(`Error creating default role file at ${fullPath}:`, createError); return null; }
             }
 
             if (content !== null) {
-                const currentTime = new Date().toLocaleTimeString('uk-UA'); // Український формат часу
-                content += `\n\nПоточний час: ${currentTime}`;
-                return content;
+                const currentTime = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }); // Формат часу
+                // Додаємо поточну дату та час
+                const currentDate = new Date().toLocaleDateString('uk-UA', { year: 'numeric', month: 'long', day: 'numeric' });
+                content += `\n\nCurrent date and time: ${currentDate}, ${currentTime}`; // Додано дату
+                return content.trim(); // Забираємо зайві пробіли
             }
             return null;
-        } catch (error) {
-            console.error("Error handling default role definition:", error);
-            return null;
-        }
+        } catch (error) { console.error("Error handling default role definition:", error); return null; }
     }
 
     async getCustomRoleDefinition(): Promise<string | null> {
         if (!this.plugin || !this.plugin.settings.customRoleFilePath) return null;
         try {
-            const customPath = normalizePath(this.plugin.settings.customRoleFilePath); // Нормалізуємо шлях
+            const customPath = normalizePath(this.plugin.settings.customRoleFilePath); // Нормалізуємо
             const file = this.plugin.app.vault.getAbstractFileByPath(customPath);
-
             if (file instanceof TFile) {
                 let content = await this.plugin.app.vault.read(file);
-                const currentTime = new Date().toLocaleTimeString('uk-UA');
-                content += `\n\nПоточний час: ${currentTime}`;
-                return content;
-            } else {
-                console.warn(`Custom role file not found or is not a file: ${customPath}`);
-                return null;
-            }
-        } catch (error) {
-            console.error("Error reading custom role definition:", error);
-            return null;
-        }
+                const currentTime = new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+                const currentDate = new Date().toLocaleDateString('uk-UA', { year: 'numeric', month: 'long', day: 'numeric' });
+                content += `\n\nCurrent date and time: ${currentDate}, ${currentTime}`; // Додано дату
+                return content.trim();
+            } else { console.warn(`Custom role file not found: ${customPath}`); return null; }
+        } catch (error) { console.error("Error reading custom role definition:", error); return null; }
     }
 
     async getRoleDefinition(): Promise<string | null> {
@@ -250,21 +274,6 @@ export class PromptService {
                 return await this.getCustomRoleDefinition();
             }
             return null;
-        } catch (error) {
-            console.error("Error reading role definition:", error);
-            return null;
-        }
+        } catch (error) { console.error("Error reading role definition:", error); return null; }
     }
-
-    // Цей метод більше не потрібен тут, його логіка в ApiService
-    // processModelResponse(response: string): string { ... }
-
-    // Цей метод теж не потрібен тут, він в ApiService або MessageService
-    // prepareRequestBody(modelName: string, prompt: string, temperature: number = 0.2): any { ... }
 }
-
-// Потрібно імпортувати normalizePath з obsidian у файлі, де використовується PromptService
-// Наприклад, у main.ts: import { ..., normalizePath } from "obsidian";
-// Або передавати normalizePath як залежність в PromptService.
-// Для простоти, припустимо, що normalizePath імпортовано глобально або в main.ts
-declare function normalizePath(path: string): string; // Повідомляємо TS про існування функції

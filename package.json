@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"faiss-node": "^0.5.1",
+		"gpt-tokenizer": "^2.9.0",
 		"marked": "^15.0.7",
 		"node-fetch": "^3.3.2",
 		"pdf-parse": "^1.1.1"
