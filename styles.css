@@ -1,4 +1,728 @@
 /* ==========================================================================
+   GLOBAL & VARIABLES (Якщо потрібні специфічні змінні)
+   ========================================================================== */
+
+   :root {
+    --chat-avatar-size: 30px; /* Розмір аватарів */
+    --chat-spacing-unit: 4px; /* Базова одиниця відступу */
+    --chat-message-max-width: 82%; /* Збільшена макс. ширина повідомлень */
+  }
+  
+  
+  /* ==========================================================================
+     MAIN LAYOUT & CONTAINERS
+     ========================================================================== */
+  
+  .ollama-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    background-color: var(--background-secondary-alt); /* Фон для всього контейнера */
+  }
+  
+  .ollama-chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: calc(var(--chat-spacing-unit) * 4); /* 16px */
+    padding-bottom: calc(var(--chat-spacing-unit) * 2); /* 8px */
+    box-sizing: border-box;
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+    position: relative; /* Для позиціонування індикатора нових повідомлень */
+  }
+  
+  /* Стилізація скролбару (Webkit browsers) */
+  .ollama-chat-container::-webkit-scrollbar {
+    width: 8px;
+  }
+  .ollama-chat-container::-webkit-scrollbar-track {
+    background: var(--background-secondary);
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+  .ollama-chat-container::-webkit-scrollbar-thumb {
+    background-color: var(--background-modifier-border);
+    border-radius: 4px;
+    border: 2px solid var(--background-secondary); /* Створює ефект відступу */
+  }
+  .ollama-chat-container::-webkit-scrollbar-thumb:hover {
+    background-color: var(--interactive-accent-translucent);
+  }
+  
+  /* Забезпечує правильне розтягування контейнера в Obsidian */
+  .workspace-leaf-content[data-type='ollama-chat-view'] {
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace-leaf-content[data-type='ollama-chat-view'] .view-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Важливо, щоб контейнер не виходив за межі */
+  }
+  
+  /* --- Роздільник Дат (Потребує додавання елемента в TS) --- */
+  .chat-date-separator {
+    text-align: center;
+    margin: calc(var(--chat-spacing-unit) * 5) 0; /* 20px */
+    font-size: 0.8em;
+    color: var(--text-muted);
+    font-weight: 500;
+    background-color: var(--background-modifier-border);
+    padding: calc(var(--chat-spacing-unit) * 0.5) calc(var(--chat-spacing-unit) * 2);
+    border-radius: 10px;
+    display: inline-block; /* Щоб не займав всю ширину */
+    margin-left: 50%; /* Центрування */
+    transform: translateX(-50%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  
+  /* --- Індикатор Нових Повідомлень (Потребує додавання елемента та логіки в TS) --- */
+  .new-message-indicator {
+    position: absolute; /* Або sticky, якщо батьківський елемент дозволяє */
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 3);
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(var(--interactive-accent-rgb), 0.3);
+    z-index: 15; /* Над повідомленнями, під полем вводу */
+    opacity: 0; /* Прихований за замовчуванням */
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    /* Можна додати іконку */
+  }
+  .new-message-indicator.visible { /* Клас додається через TS */
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .new-message-indicator:hover {
+      background-color: var(--interactive-accent-hover);
+      box-shadow: 0 4px 10px rgba(var(--interactive-accent-rgb), 0.4);
+  }
+  
+  
+  /* Empty state styling */
+  .ollama-empty-state {
+    /* (Стилі залишаються переважно ті ж самі) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 1;
+    background-color: var(--background-secondary-alt);
+  }
+  .empty-state-message {
+    font-size: 18px;
+    margin-bottom: 10px;
+    opacity: 0.7;
+  }
+  .empty-state-tip {
+    font-size: 14px;
+    opacity: 0.5;
+    max-width: 80%;
+  }
+  
+  
+  /* ==========================================================================
+     CHAT INPUT SECTION (Refined Styles)
+     ========================================================================== */
+  
+  .chat-input-container {
+    display: flex;
+    align-items: flex-end; /* Вирівнюємо елементи по низу для кращого вигляду при зміні висоти textarea */
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3); /* 8px 12px */
+    border-top: 1px solid var(--divider-color);
+    background-color: var(--background-secondary-alt);
+    z-index: 20; /* Найвищий z-index */
+    border-radius: 12px;
+    margin: calc(var(--chat-spacing-unit) * 2); /* 8px */
+    margin-top: 0; /* Прибираємо верхній відступ */
+    box-sizing: border-box;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    position: relative; /* Залишаємо для позиціонування кнопок і меню */
+    transition: box-shadow 0.2s; /* Анімація тіні при фокусі */
+  }
+  .chat-input-container:focus-within {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); /* Посилена тінь при фокусі */
+  }
+  
+  
+  .chat-input-container textarea {
+    flex: 1;
+    resize: none;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 15px;
+    /* Динамічний відступ справа */
+    padding-right: 125px; /* Орієнтовно для 3 кнопок (32+8)*3 + 25 */
+    margin-right: 0;
+    min-height: 40px;
+    max-height: 50vh; /* Зменшено максимальну висоту */
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    line-height: 1.5;
+    transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; /* Швидша анімація висоти */
+    overflow-y: auto;
+    width: 100%;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    box-sizing: border-box;
+  }
+  .chat-input-container textarea:focus {
+    outline: none;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 0 2px var(--interactive-accent-translucent);
+  }
+  
+  .buttons-container {
+    display: flex;
+    position: absolute;
+    /* Позиціонуємо точно внизу справа */
+    bottom: calc(var(--chat-spacing-unit) * 2); /* 8px */
+    right: calc(var(--chat-spacing-unit) * 3); /* 12px */
+    align-items: center;
+    z-index: 21; /* Над textarea */
+    gap: calc(var(--chat-spacing-unit) * 2); /* 8px */
+  }
+  
+  /* --- Базовий стиль для всіх кнопок --- */
+  .buttons-container button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background-color: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.15s ease-in-out;
+    opacity: 0.7;
+    outline: none;
+    flex-shrink: 0;
+  }
+  .buttons-container button:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  .buttons-container button:focus-visible {
+    opacity: 1;
+    background-color: var(--background-modifier-hover);
+    box-shadow: 0 0 0 2px var(--interactive-accent-translucent);
+  }
+  /* Стиль для неактивних кнопок (додати клас .disabled через TS) */
+  .buttons-container button.disabled {
+      opacity: 0.4 !important;
+      cursor: not-allowed;
+      background-color: transparent !important; /* Перевизначення hover */
+      transform: none !important; /* Заборона scale */
+      box-shadow: none !important; /* Заборона focus-visible shadow */
+  }
+  
+  /* --- Кнопка Відправки (Send) --- */
+  .buttons-container .send-button {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    opacity: 1;
+    box-shadow: 0 1px 3px rgba(var(--interactive-accent-rgb), 0.2);
+  }
+  .buttons-container .send-button:hover {
+    background-color: var(--interactive-accent-hover);
+    transform: scale(1.08);
+    box-shadow: 0 2px 6px rgba(var(--interactive-accent-rgb), 0.3);
+  }
+  .buttons-container .send-button:active {
+    transform: scale(1.02);
+    background-color: var(--interactive-accent);
+  }
+  /* Стиль для неактивної кнопки Send (коли textarea порожня) */
+  .buttons-container .send-button.disabled {
+    background-color: var(--background-modifier-border) !important; /* Сірий фон */
+    color: var(--text-muted) !important;
+    opacity: 0.6 !important;
+    box-shadow: none !important;
+  }
+  
+  /* --- Кнопка Голосового Вводу (Voice) --- */
+  .buttons-container .voice-button.recording {
+    background-color: var(--text-error);
+    color: white;
+    opacity: 1;
+    animation: pulse-recording 1.5s infinite ease-in-out;
+    box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5);
+  }
+  @keyframes pulse-recording { /* (Залишаємо попередню) */
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); }
+    70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(var(--text-error-rgb), 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); }
+  }
+  /* TODO: Додати стилі для візуалізатора голосу, якщо реалізовано */
+  
+  
+  /* ==========================================================================
+     REGULAR MESSAGE STYLING (Refined)
+     ========================================================================== */
+  
+  /* --- Анімація появи повідомлення (Клас додається через TS) --- */
+  @keyframes message-appear {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  .message.message-arriving {
+    animation: message-appear 0.3s ease-out forwards;
+  }
+  
+  .ollama-chat-container .message-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    /* Збільшений відступ між групами повідомлень */
+    margin-bottom: calc(var(--chat-spacing-unit) * 4); /* Стало 12px (або оберіть інше значення, наприклад * 4 = 16px) */
+    position: relative;
+    padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+    padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+  
+  .ollama-chat-container .user-message-group {
+    align-items: flex-end;
+  }
+  .ollama-chat-container .ollama-message-group {
+    align-items: flex-start;
+  }
+  
+  /* --- Аватари (Потребує додавання елемента в TS) --- */
+  .message-group-avatar {
+      position: absolute;
+      bottom: calc(var(--chat-spacing-unit) * 2.5); /* 10px - вирівнюємо з останнім повідомленням */
+      width: var(--chat-avatar-size);
+      height: var(--chat-avatar-size);
+      border-radius: 50%;
+      background-color: var(--background-modifier-hover);
+      color: var(--text-muted);
+      font-size: calc(var(--chat-avatar-size) * 0.5); /* Розмір літери/іконки */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      /* Додати іконку чи літеру через TS */
+  }
+  .ollama-message-group .message-group-avatar {
+      left: 0;
+      /* background-image: url(path/to/ai-avatar.png); */
+  }
+  .user-message-group .message-group-avatar {
+      right: 0;
+      background-color: var(--interactive-accent-translucent); /* Фон аватара користувача */
+      color: var(--interactive-accent);
+      /* background-image: url(path/to/user-avatar.png); */
+  }
+  
+  
+  .ollama-chat-container .message {
+    /* Збільшений (але менше, ніж між групами) відступ між повідомленнями в одній групі */
+    margin-bottom: calc(var(--chat-spacing-unit) * 1); /* Стало 4px (або * 1.5 = 6px) */
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+    border-radius: 18px;
+    max-width: var(--chat-message-max-width);
+    word-wrap: break-word;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    font-size: var(--font-ui-small);
+    line-height: 1.5;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  }
+  
+  /* Стилізація послідовних повідомлень */
+  .message-group .message:not(:last-child) {
+    margin-bottom: calc(var(--chat-spacing-unit) * 4); /* Синхронізуйте з .message */
+    /* border-radius стилі залишаються */
+}
+.user-message-group .message:not(:last-child) { border-bottom-right-radius: 5px; }
+.ollama-message-group .message:not(:last-child) { border-bottom-left-radius: 5px; }
+  
+  /* Останнє повідомлення в групі */
+  .message-group:last-of-type .message:last-child {
+     /* Не додаємо додатковий відступ, бо він є у контейнера */
+  }
+  
+  
+  /* User messages */
+  .ollama-chat-container .user-message {
+    background-color: var(--interactive-accent);
+    background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
+    color: var(--text-on-accent);
+    align-self: flex-end;
+    border-top-left-radius: 18px; border-bottom-left-radius: 18px;
+    border-top-right-radius: 18px; border-bottom-right-radius: 5px;
+    box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
+  }
+  .ollama-chat-container .user-message-group .message:last-child.user-message { border-bottom-right-radius: 18px; }
+  .ollama-chat-container .user-message:hover {
+    box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
+    transform: translateY(-1px) scale(1.01); /* Додаємо легкий scale */
+  }
+  .ollama-chat-container .user-message .message-timestamp { color: var(--text-on-accent); opacity: 0.8; }
+  .ollama-chat-container .user-message .copy-button { color: var(--text-on-accent) !important; opacity: 0.6 !important; }
+  .ollama-chat-container .user-message .copy-button:hover { opacity: 1 !important; }
+  
+  
+  /* AI messages */
+  .ollama-chat-container .ollama-message {
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    align-self: flex-start;
+    border-top-right-radius: 18px; border-bottom-right-radius: 18px;
+    border-top-left-radius: 18px; border-bottom-left-radius: 5px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  }
+  .ollama-chat-container .ollama-message-group .message:last-child.ollama-message { border-bottom-left-radius: 18px; }
+  .ollama-chat-container .ollama-message:hover {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px) scale(1.01);
+  }
+  
+  /* Вміст повідомлення та метадані */
+  .message-content-container {
+    /* Переконайтеся, що тут немає display: flex */
+    align-items: flex-start;
+    width: 100%;
+    position: relative; /* Важливо для position:absolute дочірнього елемента */
+  }
+  
+  .message-content {
+    flex: 1;
+    /* Відновіть або встановіть padding-right, щоб звільнити місце для кнопки */
+    /* Наприклад, для кнопки 18px + відступи: */
+    padding-right: 26px;
+  }
+  
+  .message-timestamp {
+      font-size: 0.75em; /* Ще менший шрифт */
+      color: var(--text-faint); /* Дуже приглушений колір */
+      margin-top: var(--chat-spacing-unit); /* 4px */
+      text-align: right;
+      display: block;
+      width: 100%;
+      opacity: 0.9;
+  }
+  .user-message .message-timestamp { color: var(--text-on-accent); opacity: 0.75; }
+  
+  
+  /* ==========================================================================
+     SYSTEM & ERROR MESSAGES (Refined)
+     ========================================================================== */
+  
+  /* System messages */
+  .system-message-group { display: flex; flex-direction: column; align-items: center; margin: calc(var(--chat-spacing-unit) * 4) 0; }
+  .system-message {
+    background: var(--background-secondary);
+    color: var(--text-muted);
+    border-left: 3px solid var(--interactive-accent);
+    font-style: italic;
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); /* 6px 10px */
+    border-radius: 8px;
+    max-width: 90%;
+    display: flex !important; align-items: center !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    position: relative; font-size: 0.9em;
+  }
+  .system-icon { color: var(--interactive-accent); margin-right: 8px; font-size: 1em; }
+  .system-message-text { line-height: 1.4; }
+  
+  /* Error messages */
+  .error-message-group { margin: calc(var(--chat-spacing-unit) * 4) 0 !important; display: flex; flex-direction: column; align-items: center; }
+  .error-message {
+    background: var(--background-modifier-error) !important;
+    color: var(--text-on-error) !important;
+    border-left: 3px solid var(--text-error) !important;
+    font-weight: 500 !important;
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3) !important; /* 8px 12px */
+    max-width: 90% !important; position: relative;
+    box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2) !important;
+    border-radius: 8px !important; display: flex !important; align-items: center !important;
+    font-size: 0.95em !important;
+  }
+  .error-icon { color: var(--text-error) !important; margin-right: 10px !important; font-size: 1.1em !important; flex-shrink: 0; }
+  .error-message-text { line-height: 1.4 !important; color: var(--text-on-error) !important; font-weight: normal !important; }
+  @keyframes error-pulse { /* (Залишаємо попередню) */
+    0% { box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2); }
+    50% { box-shadow: 0 3px 10px 2px rgba(var(--text-error-rgb), 0.35); }
+    100% { box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2); }
+  }
+  .error-message-group:last-child .error-message { animation: error-pulse 1.5s ease-out 1 !important; }
+  
+  
+  /* ==========================================================================
+     COPY BUTTON (Refined)
+     ========================================================================== */
+     .copy-button {
+      /* ... position, size, etc ... */
+      border: none;
+      outline: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      /* --- Зміни тут --- */
+      background-color: transparent; /* Явно вказуємо прозорий фон */
+      /* Повертаємо background-color до transition */
+      transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out, visibility 0s 0.15s;
+      /* --- Кінець змін --- */
+      /* ... інші стилі ... */
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 2px;
+      font-size: 11px;
+      z-index: 1;
+    }
+    
+/* Показуємо кнопку, коли курсор наведено на БАТЬКІВСЬКЕ повідомлення */
+.message:hover .copy-button {
+  opacity: 0.6; /* Знову використовуємо часткову прозорість, раз попередні кроки не допомогли з артефактом */
+  visibility: visible;
+  transition-delay: 0s;
+  /* background-color: transparent; НЕ встановлюємо фон тут */
+}
+    
+.copy-button:hover {
+  opacity: 1;
+  background-color: var(--background-modifier-hover); /* Фон для AI повідомлень */
+  transform: scale(1.1);
+}
+    .user-message:hover .copy-button {
+      color: var(--text-on-accent);
+      /* Встановлюємо фон, який має з'явитися */
+      background-color: var(--interactive-accent);
+      /* opacity (0.6) та visibility (visible) застосовуються від .message:hover... */
+    }
+    
+    /* Коли наведено БЕЗПОСЕРЕДНЬО на кнопку всередині ПОВІДОМЛЕННЯ КОРИСТУВАЧА */
+    .user-message .copy-button:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+      opacity: 1; /* Повна непрозорість при прямому наведенні */
+    }
+            
+      
+  
+  /* ==========================================================================
+     LOADING & THINKING INDICATORS (Refined)
+     ========================================================================== */
+  
+  /* Thinking dots */
+  .thinking-dots { display: flex; align-items: center; justify-content: center; padding: 8px 0; }
+  .thinking-dot { width: 7px; height: 7px; border-radius: 50%; background-color: var(--text-muted); margin: 0 3px; opacity: 0.6; animation: dot-pulse 1.4s infinite ease-in-out; }
+  .thinking-dot:nth-child(1) { animation-delay: 0s; } .thinking-dot:nth-child(2) { animation-delay: 0.2s; } .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-pulse { 0%, 80%, 100% { transform: scale(0.8); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
+  
+  /* Thinking block */
+  .thinking-block { border: 1px solid var(--background-modifier-border); border-radius: 6px; margin: 10px 0; background-color: var(--background-secondary-alt); overflow: hidden; }
+  .thinking-header { background-color: var(--background-modifier-hover); color: var(--text-muted); padding: 6px 10px; display: flex; align-items: center; cursor: pointer; user-select: none; transition: background-color 0.2s; }
+  .thinking-header:hover { background-color: var(--background-modifier-border); }
+  .thinking-toggle { margin-right: 6px; font-weight: bold; transition: transform 0.2s ease-in-out; font-size: 0.9em; }
+  .thinking-header[data-fold-state="expanded"] .thinking-toggle { transform: rotate(90deg); }
+  .thinking-title { font-weight: 500; font-size: 0.9em; }
+  .thinking-content { padding: 10px 12px; white-space: pre-wrap; overflow-x: auto; line-height: 1.5; border-top: 1px solid var(--background-modifier-border); background-color: var(--background-primary); font-size: 0.9em; color: var(--text-normal); }
+  .thinking-content pre { background-color: var(--background-secondary) !important; } .thinking-content code { background-color: var(--background-modifier-hover) !important; }
+  
+  
+  /* ==========================================================================
+     MARKDOWN CONTENT IN MESSAGES (Refined)
+     ========================================================================== */
+  
+  .ollama-message .message-content { width: 100%; }
+  .ollama-message .message-content > *:first-child { margin-top: 0; }
+  .ollama-message .message-content > *:last-child { margin-bottom: 0; }
+  .ollama-message .message-content p { margin: 0.6em 0; line-height: 1.55; /* Трохи збільшено для читабельності */ }
+  .ollama-message .message-content ul, .ollama-message .message-content ol { margin: 0.6em 0; padding-left: 1.8em; }
+  .ollama-message .message-content li { margin-bottom: 0.3em; }
+  
+  /* Покращені блоки коду */
+  .ollama-message .message-content pre {
+    background-color: var(--background-secondary);
+    border-radius: 6px;
+    margin: 0.8em 0;
+    border: 1px solid var(--background-modifier-border);
+    font-size: 0.9em;
+    position: relative; /* Для позиціонування дод. елементів */
+    padding: 0; /* Скидаємо основний padding */
+  }
+  .ollama-message .message-content pre > code { /* Стилі для самого коду всередині */
+      display: block; /* Щоб зайняти весь блок */
+      padding: 12px; /* Внутрішній відступ для коду */
+      overflow-x: auto;
+      background-color: transparent !important; /* Фон вже є у pre */
+      border-radius: 0; /* Не потрібен тут */
+  }
+  /* Стилізація для назви мови (потребує span в TS) */
+  .code-block-language {
+      position: absolute;
+      top: 0;
+      right: 10px;
+      font-size: 0.75em;
+      color: var(--text-faint);
+      padding: 2px 5px;
+      background-color: var(--background-modifier-hover);
+      border-radius: 0 0 4px 4px;
+      z-index: 1;
+  }
+  /* Стилізація для кнопки копіювання коду (потребує button в TS) */
+  .code-block-copy-button {
+      position: absolute;
+      bottom: 6px;
+      right: 6px;
+      background-color: var(--background-modifier-hover) !important;
+      color: var(--text-muted) !important;
+      border: 1px solid var(--background-modifier-border) !important;
+      border-radius: 4px;
+      padding: 3px 5px !important;
+      font-size: 0.8em !important;
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0.6;
+      transition: all 0.2s ease;
+      z-index: 1;
+  }
+  .code-block-copy-button:hover {
+      opacity: 1;
+      background-color: var(--background-modifier-border) !important;
+      color: var(--text-normal) !important;
+  }
+  /* Переконайтеся, що вбудований код все ще виглядає добре */
+  .ollama-message .message-content p code,
+  .ollama-message .message-content li code { /* Стилізуємо inline code окремо */
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+    background-color: var(--background-modifier-hover);
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    word-break: break-word;
+  }
+  
+  .ollama-message .message-content blockquote { border-left: 3px solid var(--interactive-accent); margin: 0.8em 0; padding: 0.5em 1.2em; color: var(--text-muted); background-color: var(--background-secondary-alt); border-radius: 0 6px 6px 0; }
+  .ollama-message .message-content blockquote p { margin: 0.4em 0; }
+  
+  /* Стилізація посилань */
+  .ollama-message .message-content a,
+  .thinking-content a { /* Додаємо стилі і для посилань у thinking */
+      color: var(--text-accent);
+      text-decoration: none;
+      border-bottom: 1px solid var(--text-accent-translucent);
+      transition: color 0.2s, border-color 0.2s;
+  }
+  .ollama-message .message-content a:hover,
+  .thinking-content a:hover {
+      color: var(--text-accent-hover);
+      border-bottom-color: var(--text-accent-hover);
+  }
+  
+  
+  /* ==========================================================================
+     MENU DROPDOWN (Refined)
+     ========================================================================== */
+  
+  .menu-dropdown {
+    position: absolute;
+    right: calc(var(--chat-spacing-unit) * 3); /* 12px */
+    bottom: calc(100% + var(--chat-spacing-unit)); /* Розміщуємо над кнопками */
+    background-color: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    min-width: 200px; /* Трохи ширше */
+    overflow: hidden;
+    animation: menu-fade-in 0.15s ease-out;
+    padding: calc(var(--chat-spacing-unit) * 1) 0; /* Вертикальні відступи */
+  }
+  @keyframes menu-fade-in { from { opacity: 0; transform: translateY(5px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  
+  .menu-option {
+    display: flex; align-items: center;
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3); /* 8px 12px */
+    cursor: pointer; transition: background-color 0.15s ease-out;
+    color: var(--text-normal);
+    margin: 0 calc(var(--chat-spacing-unit) * 1); /* Горизонтальні відступи для створення ефекту рамки */
+    border-radius: 5px; /* Заокруглення для опцій */
+  }
+  .menu-option:hover { background-color: var(--background-modifier-hover); }
+  .menu-option-icon { margin-right: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; }
+  .menu-option-text { font-size: var(--font-ui-small); line-height: 1.3; }
+  
+  /* Розділювач у меню (потребує <hr> або div з класом в TS) */
+  .menu-separator {
+      height: 1px;
+      background-color: var(--background-modifier-border);
+      margin: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 1); /* 6px 4px */
+  }
+  
+  
+  /* ==========================================================================
+     RESPONSIVE DESIGN (Refined)
+     ========================================================================== */
+  
+  @media screen and (max-width: 600px) { /* Збільшено точку перелому */
+    .ollama-chat-container .message { max-width: 90%; }
+    :root { --chat-message-max-width: 90%; } /* Оновлюємо змінну */
+  }
+  
+  
+  @media screen and (max-width: 480px) { /* Нова точка перелому */
+    :root { --chat-spacing-unit: 3px; --chat-avatar-size: 26px; } /* Зменшуємо базові розміри */
+  
+    .ollama-chat-container { padding: 10px; padding-bottom: 5px; }
+  
+    .chat-input-container { margin: 5px 8px; padding: 6px 10px; }
+    .chat-input-container textarea { font-size: 13px; padding-right: 100px; /* Перерахувати під менші кнопки */}
+    .buttons-container { gap: 6px; right: 10px; bottom: 6px; }
+    .buttons-container button { width: 28px; height: 28px; }
+  
+    .ollama-chat-container .message { font-size: 13px; padding: 6px 10px;}
+    .message-group { padding-left: 34px; padding-right: 34px;} /* Перерахувати під менші аватари */
+  
+    .menu-dropdown { min-width: 180px; }
+    .menu-option { padding: 8px 10px; }
+    .menu-option-text { font-size: 13px; }
+  }
+  
+  
+  @media screen and (max-width: 360px) {
+      .buttons-container { gap: 4px; }
+      .buttons-container button { width: 26px; height: 26px; }
+      .chat-input-container textarea { padding-right: 90px; /* (26+4)*3 + 6 */ }
+      :root { --chat-avatar-size: 24px; }
+      .message-group { padding-left: 30px; padding-right: 30px;}
+  }
+
+  /* ==========================================================================
    STYLES FOR LONG MESSAGE COLLAPSING
    ========================================================================== */
 
