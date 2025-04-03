@@ -220,47 +220,73 @@
      ========================================================================== */
 
   .menu-dropdown.ollama-chat-menu { /* Target specific menu */
-      position: absolute; right: calc(var(--chat-spacing-unit) * 3); bottom: calc(100% + var(--chat-spacing-unit)); background-color: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); z-index: 100; min-width: 200px; overflow: hidden; animation: menu-fade-in 0.15s ease-out; padding: calc(var(--chat-spacing-unit) * 1) 0;
+      position: absolute; right: calc(var(--chat-spacing-unit) * 3); bottom: calc(100% + var(--chat-spacing-unit)); background-color: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); z-index: 100; min-width: 220px; /* Slightly wider */ overflow: hidden; animation: menu-fade-in 0.15s ease-out; padding: calc(var(--chat-spacing-unit) * 1) 0; display: flex; flex-direction: column;
   }
   @keyframes menu-fade-in { from { opacity: 0; transform: translateY(5px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
   /* General style for all menu options within this specific menu */
   .ollama-chat-menu .menu-option { display: flex; align-items: center; padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3); cursor: pointer; transition: background-color 0.15s ease-out; color: var(--text-normal); margin: 0 calc(var(--chat-spacing-unit) * 1); border-radius: 5px; }
   .ollama-chat-menu .menu-option:hover { background-color: var(--background-modifier-hover); }
-  .ollama-chat-menu .menu-option-icon { margin-right: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; min-width: 18px; font-size: 1em; /* Ensure icon size is consistent */ }
-  .ollama-chat-menu .menu-option-text { font-size: var(--font-ui-small); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ollama-chat-menu .menu-option-icon { margin-right: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; min-width: 18px; font-size: 1em; }
+  .ollama-chat-menu .menu-option-text { font-size: var(--font-ui-small); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
 
   /* Menu Separator */
   .ollama-chat-menu .menu-separator { height: 1px; background-color: var(--background-modifier-border); margin: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 1); }
 
-  /* --- Styles for Model Selection in Menu --- */
+  /* Section Header in Menu */
   .ollama-chat-menu .menu-header { padding: 8px 12px 4px 12px; font-size: 0.8em; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-  .ollama-chat-menu .model-list-container { max-height: 250px; overflow-y: auto; margin-bottom: 4px; padding: 0 4px; }
-  .ollama-chat-menu .model-list-container::-webkit-scrollbar { width: 6px; }
-  .ollama-chat-menu .model-list-container::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
-  .ollama-chat-menu .model-list-container::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-  .ollama-chat-menu .model-list-container::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-  /* Reduce vertical padding/margin for model options specifically */
-  .ollama-chat-menu .model-option {
-      padding-top: 3px;    /* Reduced from default */
-      padding-bottom: 3px; /* Reduced from default */
-      margin-top: 0;       /* Removed top margin */
-      margin-bottom: 0;    /* Removed bottom margin */
-      /* Inherit other styles from .menu-option if needed, or repeat */
+
+  /* Container for scrollable lists (Models & Roles) */
+  .ollama-chat-menu .model-list-container,
+  .ollama-chat-menu .role-list-container {
+      max-height: 250px; /* Limit height */
+      overflow-y: auto; /* Add scrollbar if needed */
+      margin-bottom: 4px;
+      padding: 0 4px; /* Padding for scrollbar */
+      border: 1px solid transparent;
+  }
+   /* Scrollbar styling for lists */
+  .ollama-chat-menu .model-list-container::-webkit-scrollbar,
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar { width: 6px; }
+  .ollama-chat-menu .model-list-container::-webkit-scrollbar-track,
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+  .ollama-chat-menu .model-list-container::-webkit-scrollbar-thumb,
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+  .ollama-chat-menu .model-list-container::-webkit-scrollbar-thumb:hover,
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+  /* Text for Loading/Error/Empty states */
+  .ollama-chat-menu .model-list-container span,
+  .ollama-chat-menu .role-list-container span { display: block; padding: 8px 12px; font-size: var(--font-ui-small); color: var(--text-muted); font-style: italic; }
+
+  /* Styling for individual Model and Role options */
+  .ollama-chat-menu .model-option,
+  .ollama-chat-menu .role-option {
+      padding-top: 3px;    /* Reduced vertical padding */
+      padding-bottom: 3px; /* Reduced vertical padding */
+      margin-top: 0;       /* Remove vertical margin */
+      margin-bottom: 0;    /* Remove vertical margin */
+      /* Inherit/apply other styles */
        padding-left: calc(var(--chat-spacing-unit) * 3);
        padding-right: calc(var(--chat-spacing-unit) * 3);
        margin-left: calc(var(--chat-spacing-unit) * 1);
        margin-right: calc(var(--chat-spacing-unit) * 1);
        display: flex; align-items: center; cursor: pointer; transition: background-color 0.15s ease-out; color: var(--text-normal); border-radius: 5px;
   }
-  .ollama-chat-menu .model-option .menu-option-icon { /* Ensure icon style is consistent */
-        margin-right: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; min-width: 18px; font-size: 1em;
+  .ollama-chat-menu .model-option .menu-option-icon,
+  .ollama-chat-menu .role-option .menu-option-icon {
+       margin-right: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; min-width: 18px; font-size: 1em;
   }
-  .ollama-chat-menu .model-option .menu-option-icon .svg-icon { width: 16px; height: 16px; } /* Adjust icon size if needed */
-  .ollama-chat-menu .model-option.is-selected .menu-option-text { font-weight: 600; color: var(--text-normal); }
-  .ollama-chat-menu .model-option.is-selected .menu-option-icon { color: var(--interactive-accent); }
-  .ollama-chat-menu .model-list-container span { display: block; padding: 8px 12px; font-size: var(--font-ui-small); color: var(--text-muted); font-style: italic; }
-  /* --- END Model Selection Styles --- */
+  .ollama-chat-menu .model-option .menu-option-icon .svg-icon,
+  .ollama-chat-menu .role-option .menu-option-icon .svg-icon {
+       width: 16px; height: 16px; /* Icon size */
+  }
+  /* Styling for the selected item */
+  .ollama-chat-menu .model-option.is-selected .menu-option-text,
+  .ollama-chat-menu .role-option.is-selected .menu-option-text { font-weight: 600; color: var(--text-normal); }
+  .ollama-chat-menu .model-option.is-selected .menu-option-icon,
+  .ollama-chat-menu .role-option.is-selected .menu-option-icon { color: var(--interactive-accent); }
+   /* Style for icon indicating a custom role (if needed, requires class added in TS) */
+  .ollama-chat-menu .role-option.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) { color: var(--text-faint); /* Example: make default icon faint */ }
 
 
 /* ==========================================================================
@@ -293,7 +319,8 @@
     .message-group { padding-left: 34px; padding-right: 34px; /* Recalculate based on avatar size */}
     .menu-dropdown.ollama-chat-menu { min-width: 180px; }
     .ollama-chat-menu .menu-option { padding: 6px 10px; } /* Adjusted general menu option padding */
-    .ollama-chat-menu .model-option { padding-top: 3px; padding-bottom: 3px; } /* Further reduced for models */
+    .ollama-chat-menu .model-option,
+    .ollama-chat-menu .role-option { padding-top: 3px; padding-bottom: 3px; } /* Further reduced for models/roles */
     .ollama-chat-menu .menu-option-text { font-size: 13px; }
   }
 

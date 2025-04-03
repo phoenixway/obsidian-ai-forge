@@ -76,11 +76,6 @@ var CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
 var CSS_CLASS_CONTENT = "message-content";
 var CSS_CLASS_THINKING_DOTS = "thinking-dots";
 var CSS_CLASS_THINKING_DOT = "thinking-dot";
-var CSS_CLASS_THINKING_BLOCK = "thinking-block";
-var CSS_CLASS_THINKING_HEADER = "thinking-header";
-var CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
-var CSS_CLASS_THINKING_TITLE = "thinking-title";
-var CSS_CLASS_THINKING_CONTENT = "thinking-content";
 var CSS_CLASS_TIMESTAMP = "message-timestamp";
 var CSS_CLASS_COPY_BUTTON = "copy-button";
 var CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
@@ -101,6 +96,8 @@ var CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
 var CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
 var CSS_CLASS_MODEL_OPTION = "model-option";
 var CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
+var CSS_CLASS_ROLE_OPTION = "role-option";
+var CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 var CSS_CLASS_MENU_HEADER = "menu-header";
 var _OllamaView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
@@ -108,7 +105,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.messages = [];
     this.isProcessing = false;
     this.scrollTimeout = null;
-    // Speech Recognition related (Placeholders)
+    // Speech Recognition (Placeholders)
     this.speechWorker = null;
     this.mediaRecorder = null;
     this.audioStream = null;
@@ -136,16 +133,22 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.handleVoiceClick = () => {
       this.toggleVoiceRecognition();
     };
-    // Placeholder call
+    // Placeholder
     this.handleMenuClick = (e) => {
       e.stopPropagation();
       const isHidden = this.menuDropdown.style.display === "none";
       if (isHidden) {
-        this.renderModelList();
+        Promise.all([this.renderModelList(), this.renderRoleList()]);
         this.menuDropdown.style.display = "block";
         this.menuDropdown.style.animation = "menu-fade-in 0.15s ease-out";
       } else {
         this.menuDropdown.style.display = "none";
+      }
+    };
+    this.handleRolesUpdated = () => {
+      if (this.isMenuOpen()) {
+        console.log("[OllamaView] Roles updated event received, refreshing menu list.");
+        this.renderRoleList();
       }
     };
     this.handleSettingsClick = async () => {
@@ -158,13 +161,12 @@ var _OllamaView = class extends import_obsidian.ItemView {
         new import_obsidian.Notice("Could not open settings.");
       }
     };
-    // Use updated ID
     this.handleClearChatClick = () => {
       this.closeMenu();
       this.plugin.clearMessageHistory();
     };
     this.handleDocumentClickForMenu = (e) => {
-      if (this.menuDropdown.style.display === "block" && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
+      if (this.isMenuOpen() && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
         this.closeMenu();
       }
     };
@@ -174,6 +176,16 @@ var _OllamaView = class extends import_obsidian.ItemView {
         this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
       }
     };
+    // --- NEW: Handler for Role Change ---
+    this.handleRoleChange = (roleName) => {
+      const displayRole = roleName || "Default";
+      if (this.messages.length > 0) {
+        this.plugin.messageService.addSystemMessage(`Role changed to: ${displayRole}`);
+      } else {
+        new import_obsidian.Notice(`Role set to: ${displayRole}`);
+      }
+    };
+    // ------------------------------------
     this.handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && this.leaf.view === this) {
         requestAnimationFrame(() => {
@@ -238,7 +250,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     _OllamaView.instance = this;
     if (!import_obsidian.requireApiVersion || !(0, import_obsidian.requireApiVersion)("1.0.0")) {
-      console.warn("Ollama Plugin: Current Obsidian API version might be outdated. Some features may not work correctly.");
+      console.warn("Ollama Plugin: Current Obsidian API version might be outdated.");
     }
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian.debounce)(this.handleScroll, 150, true);
@@ -254,6 +266,11 @@ var _OllamaView = class extends import_obsidian.ItemView {
     return [...this.messages];
   }
   // Return a copy
+  // Helper to check if the custom menu is currently open
+  isMenuOpen() {
+    var _a;
+    return ((_a = this.menuDropdown) == null ? void 0 : _a.style.display) === "block";
+  }
   // --- Obsidian View Methods ---
   getViewType() {
     return VIEW_TYPE_OLLAMA;
@@ -264,7 +281,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
   getIcon() {
     return "message-square";
   }
-  // Or choose another icon
   async onOpen() {
     var _a, _b;
     this.createUIElements();
@@ -275,8 +291,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.lastMessageDate = null;
     await Promise.all([
       this.loadAndRenderHistory(),
-      this.renderModelList()
-      // Render model list on open
+      this.renderModelList(),
+      this.renderRoleList()
+      // Render role list on open
     ]);
     (_a = this.inputEl) == null ? void 0 : _a.focus();
     (_b = this.inputEl) == null ? void 0 : _b.dispatchEvent(new Event("input"));
@@ -323,6 +340,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.menuDropdown.createEl("div", { text: "Select Model", cls: CSS_CLASS_MENU_HEADER });
     this.modelListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_MODEL_LIST_CONTAINER });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    this.menuDropdown.createEl("div", { text: "Select Role", cls: CSS_CLASS_MENU_HEADER });
+    this.roleListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_ROLE_LIST_CONTAINER });
+    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
     const clearIcon = this.clearChatOption.createEl("span", { cls: "menu-option-icon" });
     (0, import_obsidian.setIcon)(clearIcon, "trash-2");
@@ -346,6 +366,8 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
     this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
     this.register(this.plugin.on("model-changed", this.handleModelChange));
+    this.register(this.plugin.on("role-changed", this.handleRoleChange));
+    this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
     this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
@@ -397,18 +419,18 @@ var _OllamaView = class extends import_obsidian.ItemView {
       await this.plugin.messageService.loadMessageHistory();
       if (this.messages.length === 0) {
         this.showEmptyState();
-        console.log("[OllamaView] History loaded, state is empty.");
+        console.log("[OllamaView] History loaded, empty.");
       } else {
         this.hideEmptyState();
-        console.log(`[OllamaView] History loaded (${this.messages.length} messages). Checking collapsing...`);
+        console.log(`[OllamaView] History loaded (${this.messages.length} msgs). Checking collapsing...`);
         this.checkAllMessagesForCollapsing();
         setTimeout(() => {
-          console.log("[OllamaView] Attempting scroll after collapse check initiation.");
+          console.log("[OllamaView] Attempting scroll after load.");
           this.guaranteedScrollToBottom(200, true);
         }, 150);
       }
     } catch (error) {
-      console.error("OllamaView: Error during history loading process:", error);
+      console.error("OllamaView: Error loading history:", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
     }
@@ -416,58 +438,58 @@ var _OllamaView = class extends import_obsidian.ItemView {
   async saveMessageHistory() {
     if (!this.plugin.settings.saveMessageHistory)
       return;
-    const messagesToSave = this.messages.map((msg) => ({ role: msg.role, content: msg.content, timestamp: msg.timestamp.toISOString() }));
-    const dataToSave = JSON.stringify(messagesToSave);
+    const m = this.messages.map((msg) => ({ role: msg.role, content: msg.content, timestamp: msg.timestamp.toISOString() }));
+    const d = JSON.stringify(m);
     try {
-      await this.plugin.saveMessageHistory(dataToSave);
-    } catch (error) {
-      console.error("OllamaView: Error saving history:", error);
+      await this.plugin.saveMessageHistory(d);
+    } catch (e) {
+      console.error("OllamaView: Error saving history:", e);
       new import_obsidian.Notice("Failed to save chat history.");
     }
   }
   async sendMessage() {
-    const content = this.inputEl.value.trim();
-    if (!content || this.isProcessing || this.sendButton.disabled)
+    const c = this.inputEl.value.trim();
+    if (!c || this.isProcessing || this.sendButton.disabled)
       return;
-    const messageContent = this.inputEl.value;
+    const m = this.inputEl.value;
     this.clearInputField();
     this.setLoadingState(true);
     this.hideEmptyState();
-    this.internalAddMessage("user", messageContent);
+    this.internalAddMessage("user", m);
     try {
-      await this.plugin.messageService.sendMessage(content);
-    } catch (error) {
-      console.error("OllamaView: Error sending message:", error);
-      this.internalAddMessage("error", `Failed to send: ${error.message || "Unknown error"}`);
+      await this.plugin.messageService.sendMessage(c);
+    } catch (e) {
+      console.error("OllamaView: Error sending message:", e);
+      this.internalAddMessage("error", `Failed to send: ${e.message || "Unknown error"}`);
       this.setLoadingState(false);
     }
   }
   internalAddMessage(role, content, options = {}) {
     const { saveHistory = true, timestamp } = options;
-    let messageTimestamp;
+    let msgTs;
     if (timestamp) {
       try {
-        messageTimestamp = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
-        if (isNaN(messageTimestamp.getTime()))
+        msgTs = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
+        if (isNaN(msgTs.getTime()))
           throw new Error("Invalid Date");
       } catch (e) {
         console.warn("Invalid timestamp, using current:", timestamp, e);
-        messageTimestamp = new Date();
+        msgTs = new Date();
       }
     } else {
-      messageTimestamp = new Date();
+      msgTs = new Date();
     }
-    const message = { role, content, timestamp: messageTimestamp };
+    const message = { role, content, timestamp: msgTs };
     this.messages.push(message);
     if (role === "assistant" && this.messages.length >= 2) {
       const prev = this.messages[this.messages.length - 2];
       if ((prev == null ? void 0 : prev.role) === "user")
         this.messagesPairCount++;
     }
-    const messageEl = this.renderMessage(message);
+    const msgEl = this.renderMessage(message);
     this.hideEmptyState();
-    if (messageEl) {
-      this.checkMessageForCollapsing(messageEl);
+    if (msgEl) {
+      this.checkMessageForCollapsing(msgEl);
     }
     if (saveHistory && this.plugin.settings.saveMessageHistory) {
       this.debouncedSaveMessageHistory();
@@ -481,105 +503,105 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   // --- Rendering Logic ---
   renderMessage(message) {
-    const messageIndex = this.messages.indexOf(message);
-    if (messageIndex === -1)
+    const i = this.messages.indexOf(message);
+    if (i === -1)
       return null;
-    const prevMessage = messageIndex > 0 ? this.messages[messageIndex - 1] : null;
-    const isNewDay = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
-    if (isNewDay) {
+    const p = i > 0 ? this.messages[i - 1] : null;
+    const d = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
+    if (d) {
       this.renderDateSeparator(message.timestamp);
       this.lastMessageDate = message.timestamp;
-    } else if (messageIndex === 0) {
+    } else if (i === 0) {
       this.lastMessageDate = message.timestamp;
     }
-    let messageGroup = null;
-    let groupClass = CSS_CLASS_MESSAGE_GROUP;
-    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
-    let showAvatar = false;
-    let isUser = false;
-    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+    let g = null;
+    let gc = CSS_CLASS_MESSAGE_GROUP;
+    let mc = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
+    let sa = false;
+    let iu = false;
+    const f = !p || p.role !== message.role || d;
     switch (message.role) {
       case "user":
-        groupClass += ` ${CSS_CLASS_USER_GROUP}`;
-        messageClass += ` ${CSS_CLASS_USER_MESSAGE}`;
-        showAvatar = true;
-        isUser = true;
+        gc += ` ${CSS_CLASS_USER_GROUP}`;
+        mc += ` ${CSS_CLASS_USER_MESSAGE}`;
+        sa = true;
+        iu = true;
         break;
       case "assistant":
-        groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`;
-        messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`;
-        showAvatar = true;
+        gc += ` ${CSS_CLASS_OLLAMA_GROUP}`;
+        mc += ` ${CSS_CLASS_OLLAMA_MESSAGE}`;
+        sa = true;
         break;
       case "system":
-        groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`;
-        messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`;
+        gc += ` ${CSS_CLASS_SYSTEM_GROUP}`;
+        mc += ` ${CSS_CLASS_SYSTEM_MESSAGE}`;
         break;
       case "error":
-        groupClass += ` ${CSS_CLASS_ERROR_GROUP}`;
-        messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`;
+        gc += ` ${CSS_CLASS_ERROR_GROUP}`;
+        mc += ` ${CSS_CLASS_ERROR_MESSAGE}`;
         break;
     }
-    const lastElement = this.chatContainer.lastElementChild;
-    if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(" ")[1]}`)) {
-      messageGroup = this.chatContainer.createDiv({ cls: groupClass });
-      if (showAvatar) {
-        this.renderAvatar(messageGroup, isUser);
+    const le = this.chatContainer.lastElementChild;
+    if (f || !le || !le.matches(`.${gc.split(" ")[1]}`)) {
+      g = this.chatContainer.createDiv({ cls: gc });
+      if (sa) {
+        this.renderAvatar(g, iu);
       }
     } else {
-      messageGroup = lastElement;
+      g = le;
     }
-    const messageEl = messageGroup.createDiv({ cls: messageClass });
-    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-    const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+    const me = g.createDiv({ cls: mc });
+    const cc = me.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const ce = cc.createDiv({ cls: CSS_CLASS_CONTENT });
     switch (message.role) {
       case "assistant":
       case "user":
-        contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+        ce.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
         if (message.role === "assistant") {
-          this.renderAssistantContent(contentEl, message.content);
+          this.renderAssistantContent(ce, message.content);
         } else {
-          message.content.split("\n").forEach((line, i, arr) => {
-            contentEl.appendText(line);
-            if (i < arr.length - 1)
-              contentEl.createEl("br");
+          message.content.split("\n").forEach((l, idx, a) => {
+            ce.appendText(l);
+            if (idx < a.length - 1)
+              ce.createEl("br");
           });
         }
         break;
       case "system":
-        (0, import_obsidian.setIcon)(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
-        contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+        (0, import_obsidian.setIcon)(ce.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+        ce.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
         break;
       case "error":
-        (0, import_obsidian.setIcon)(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
-        contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+        (0, import_obsidian.setIcon)(ce.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+        ce.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
         break;
     }
     if (message.role !== "system") {
-      const copyBtn = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
-      (0, import_obsidian.setIcon)(copyBtn, "copy");
-      copyBtn.addEventListener("click", () => this.handleCopyClick(message.content, copyBtn));
+      const cb = cc.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
+      (0, import_obsidian.setIcon)(cb, "copy");
+      cb.addEventListener("click", () => this.handleCopyClick(message.content, cb));
     }
-    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
-    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
-    return messageEl;
+    me.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+    setTimeout(() => me.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+    return me;
   }
   renderAvatar(groupEl, isUser) {
-    const settings = this.plugin.settings;
-    const type = isUser ? settings.userAvatarType : settings.aiAvatarType;
-    const content = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
-    const cls = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
-    const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${cls}` });
-    if (type === "initials") {
-      avatarEl.textContent = content || (isUser ? "U" : "A");
-    } else if (type === "icon") {
+    const s = this.plugin.settings;
+    const t = isUser ? s.userAvatarType : s.aiAvatarType;
+    const c = isUser ? s.userAvatarContent : s.aiAvatarContent;
+    const l = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
+    const a = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${l}` });
+    if (t === "initials") {
+      a.textContent = c || (isUser ? "U" : "A");
+    } else if (t === "icon") {
       try {
-        (0, import_obsidian.setIcon)(avatarEl, content || (isUser ? "user" : "bot"));
+        (0, import_obsidian.setIcon)(a, c || (isUser ? "user" : "bot"));
       } catch (e) {
-        console.warn(`Failed to set icon "${content}", using default.`, e);
-        avatarEl.textContent = isUser ? "U" : "A";
+        console.warn(`Icon "${c}" failed.`, e);
+        a.textContent = isUser ? "U" : "A";
       }
     } else {
-      avatarEl.textContent = isUser ? "U" : "A";
+      a.textContent = isUser ? "U" : "A";
     }
   }
   renderDateSeparator(date) {
@@ -589,12 +611,12 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   renderAssistantContent(containerEl, content) {
     var _a, _b;
-    const decoded = this.decodeHtmlEntities(content);
-    const thinking = this.detectThinkingTags(decoded);
+    const d = this.decodeHtmlEntities(content);
+    const t = this.detectThinkingTags(d);
     containerEl.empty();
-    if (thinking.hasThinkingTags) {
-      const html = this.processThinkingTags(decoded);
-      containerEl.innerHTML = html;
+    if (t.hasThinkingTags) {
+      const h = this.processThinkingTags(d);
+      containerEl.innerHTML = h;
       this.addThinkingToggleListeners(containerEl);
       this.addCodeBlockEnhancements(containerEl);
     } else {
@@ -603,31 +625,31 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
   }
   addCodeBlockEnhancements(contentEl) {
-    const pres = contentEl.querySelectorAll("pre");
-    pres.forEach((pre) => {
+    const p = contentEl.querySelectorAll("pre");
+    p.forEach((pre) => {
       if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`))
         return;
-      const code = pre.querySelector("code");
-      if (!code)
+      const c = pre.querySelector("code");
+      if (!c)
         return;
-      const text = code.textContent || "";
-      const langClass = Array.from(code.classList).find((c) => c.startsWith("language-"));
-      if (langClass) {
-        const lang = langClass.replace("language-", "");
+      const t = c.textContent || "";
+      const l = Array.from(c.classList).find((cls) => cls.startsWith("language-"));
+      if (l) {
+        const lang = l.replace("language-", "");
         if (lang)
           pre.createEl("span", { cls: CSS_CLASS_CODE_BLOCK_LANGUAGE, text: lang });
       }
-      const btn = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
-      (0, import_obsidian.setIcon)(btn, "copy");
-      btn.setAttribute("title", "Copy Code");
-      btn.addEventListener("click", (e) => {
+      const b = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
+      (0, import_obsidian.setIcon)(b, "copy");
+      b.setAttribute("title", "Copy Code");
+      b.addEventListener("click", (e) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(text).then(() => {
-          (0, import_obsidian.setIcon)(btn, "check");
-          btn.setAttribute("title", "Copied!");
+        navigator.clipboard.writeText(t).then(() => {
+          (0, import_obsidian.setIcon)(b, "check");
+          b.setAttribute("title", "Copied!");
           setTimeout(() => {
-            (0, import_obsidian.setIcon)(btn, "copy");
-            btn.setAttribute("title", "Copy Code");
+            (0, import_obsidian.setIcon)(b, "copy");
+            b.setAttribute("title", "Copy Code");
           }, 1500);
         }).catch((err) => {
           console.error("Copy failed:", err);
@@ -638,153 +660,67 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   // --- Methods for handling long messages ---
   checkMessageForCollapsing(messageEl) {
-    const contentEl = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
-    const maxHeight = this.plugin.settings.maxMessageHeight;
-    if (!contentEl || maxHeight <= 0)
+    const c = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const h = this.plugin.settings.maxMessageHeight;
+    if (!c || h <= 0)
       return;
     requestAnimationFrame(() => {
-      const btn = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-      btn == null ? void 0 : btn.remove();
-      contentEl.style.maxHeight = "";
-      contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      const h = contentEl.scrollHeight;
-      if (h > maxHeight) {
-        contentEl.style.maxHeight = `${maxHeight}px`;
-        contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        const showMoreBtn = messageEl.createEl("button", { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: "Show More \u25BC" });
-        this.registerDomEvent(showMoreBtn, "click", () => this.toggleMessageCollapse(contentEl, showMoreBtn));
+      const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      b == null ? void 0 : b.remove();
+      c.style.maxHeight = "";
+      c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      const sh = c.scrollHeight;
+      if (sh > h) {
+        c.style.maxHeight = `${h}px`;
+        c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+        const smb = messageEl.createEl("button", { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: "Show More \u25BC" });
+        this.registerDomEvent(smb, "click", () => this.toggleMessageCollapse(c, smb));
       }
     });
   }
-  // Check all messages (e.g., after history load)
   checkAllMessagesForCollapsing() {
     var _a;
     (_a = this.chatContainer) == null ? void 0 : _a.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
       this.checkMessageForCollapsing(msgEl);
     });
   }
-  // Toggle visibility of long message content
   toggleMessageCollapse(contentEl, buttonEl) {
-    const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
-    if (isCollapsed) {
+    const i = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+    if (i) {
       contentEl.style.maxHeight = "";
       contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show Less \u25B2");
     } else {
-      const maxHeight = this.plugin.settings.maxMessageHeight;
-      contentEl.style.maxHeight = `${maxHeight}px`;
+      const h = this.plugin.settings.maxMessageHeight;
+      contentEl.style.maxHeight = `${h}px`;
       contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show More \u25BC");
     }
   }
   // --- Other Rendering Helpers ---
   handleCopyClick(content, buttonEl) {
-    let t = content;
-    if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
-      t = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-    }
-    navigator.clipboard.writeText(t).then(() => {
-      (0, import_obsidian.setIcon)(buttonEl, "check");
-      buttonEl.setAttribute("title", "Copied!");
-      setTimeout(() => {
-        (0, import_obsidian.setIcon)(buttonEl, "copy");
-        buttonEl.setAttribute("title", "Copy");
-      }, 2e3);
-    }).catch((err) => {
-      console.error("Copy failed:", err);
-      new import_obsidian.Notice("Failed to copy.");
-    });
   }
   processThinkingTags(content) {
-    const r = /<think>([\s\S]*?)<\/think>/g;
-    let i = 0;
-    const p = [];
-    let m;
-    while ((m = r.exec(content)) !== null) {
-      if (m.index > i)
-        p.push(this.markdownToHtml(content.substring(i, m.index)));
-      const c = m[1];
-      const h = `<div class="${CSS_CLASS_THINKING_BLOCK}"><div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">\u25BA</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div><div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${this.markdownToHtml(c)}</div></div>`;
-      p.push(h);
-      i = r.lastIndex;
-    }
-    if (i < content.length)
-      p.push(this.markdownToHtml(content.substring(i)));
-    return p.join("");
+    return "";
   }
   markdownToHtml(markdown) {
-    var _a, _b;
-    if (!(markdown == null ? void 0 : markdown.trim()))
-      return "";
-    const d = document.createElement("div");
-    import_obsidian.MarkdownRenderer.renderMarkdown(markdown, d, (_b = (_a = this.app.workspace.getActiveFile()) == null ? void 0 : _a.path) != null ? _b : "", this);
-    return d.innerHTML;
+    return "";
   }
   addThinkingToggleListeners(contentEl) {
-    const h = contentEl.querySelectorAll(`.${CSS_CLASS_THINKING_HEADER}`);
-    h.forEach((hdr) => {
-      hdr.addEventListener("click", () => {
-        const c = hdr.nextElementSibling;
-        const t = hdr.querySelector(`.${CSS_CLASS_THINKING_TOGGLE}`);
-        if (!c || !t)
-          return;
-        const f = hdr.getAttribute("data-fold-state") === "folded";
-        if (f) {
-          c.style.display = "block";
-          t.textContent = "\u25BC";
-          hdr.setAttribute("data-fold-state", "expanded");
-        } else {
-          c.style.display = "none";
-          t.textContent = "\u25BA";
-          hdr.setAttribute("data-fold-state", "folded");
-        }
-      });
-    });
   }
   decodeHtmlEntities(text) {
-    if (typeof document === "undefined")
-      return text;
-    const ta = document.createElement("textarea");
-    ta.innerHTML = text;
-    return ta.value;
+    return text;
   }
   detectThinkingTags(content) {
-    return /<think>[\s\S]*?<\/think>/gi.test(content) ? { hasThinkingTags: true, format: "standard" } : { hasThinkingTags: false, format: "none" };
+    return { hasThinkingTags: false, format: "none" };
   }
   // --- NEW METHOD: Renders the model list in the menu ---
   async renderModelList() {
-    if (!this.modelListContainerEl) {
-      console.warn("[OllamaView] Model list container not found during render.");
+    if (!this.modelListContainerEl)
       return;
-    }
     this.modelListContainerEl.empty();
     const loadingEl = this.modelListContainerEl.createEl("span", { text: "Loading models..." });
-    const modelIconMap = {
-      "llama": "box-minimal",
-      // Generic box for Llama family
-      "mistral": "wind",
-      "mixtral": "blend",
-      "codellama": "code",
-      "code": "code",
-      // For models just named 'code...'
-      "phi": "sigma",
-      // Greek letter Phi
-      "phi3": "sigma",
-      "gemma": "gem",
-      "command-r": "terminal",
-      // Command prompt icon
-      "llava": "image",
-      // For multi-modal
-      "star": "star",
-      // For Starcoder etc.
-      "wizard": "wand",
-      // For WizardLM etc.
-      "hermes": "message-circle",
-      // For Hermes etc.
-      "dolphin": "anchor"
-      // For Dolphin etc. (just an example)
-      // Add more mappings here as needed
-    };
+    const modelIconMap = { "llama": "box-minimal", "mistral": "wind", "mixtral": "blend", "codellama": "code", "code": "code", "phi": "sigma", "phi3": "sigma", "gemma": "gem", "command-r": "terminal", "llava": "image", "star": "star", "wizard": "wand", "hermes": "message-circle", "dolphin": "anchor" };
     const defaultIcon = "box";
     try {
       const models2 = await this.plugin.apiService.getModels();
@@ -795,39 +731,29 @@ var _OllamaView = class extends import_obsidian.ItemView {
         return;
       }
       models2.forEach((modelName) => {
-        const modelOptionEl = this.modelListContainerEl.createDiv({
-          cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}`
-          // Add specific class
-        });
-        const iconSpan = modelOptionEl.createEl("span", { cls: "menu-option-icon" });
+        const optEl = this.modelListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}` });
+        const iconSpan = optEl.createEl("span", { cls: "menu-option-icon" });
         let iconToUse = defaultIcon;
         if (modelName === currentModel) {
           iconToUse = "check";
-          modelOptionEl.addClass("is-selected");
+          optEl.addClass("is-selected");
         } else {
-          const lowerModelName = modelName.toLowerCase();
-          let foundIcon = false;
+          const lmn = modelName.toLowerCase();
           for (const key in modelIconMap) {
-            if (lowerModelName.includes(key)) {
+            if (lmn.includes(key)) {
               iconToUse = modelIconMap[key];
-              foundIcon = true;
               break;
             }
-          }
-          if (!foundIcon) {
-            iconToUse = defaultIcon;
           }
         }
         try {
           (0, import_obsidian.setIcon)(iconSpan, iconToUse);
         } catch (e) {
-          console.warn(`Could not set icon '${iconToUse}' for model ${modelName}`);
           iconSpan.style.minWidth = "18px";
         }
-        modelOptionEl.createEl("span", { cls: "menu-option-text", text: modelName });
-        this.registerDomEvent(modelOptionEl, "click", async () => {
+        optEl.createEl("span", { cls: "menu-option-text", text: modelName });
+        this.registerDomEvent(optEl, "click", async () => {
           if (modelName !== this.plugin.settings.modelName) {
-            console.log(`[OllamaView] Model selected via menu: ${modelName}`);
             this.plugin.settings.modelName = modelName;
             await this.plugin.saveSettings();
             this.plugin.emit("model-changed", modelName);
@@ -839,6 +765,71 @@ var _OllamaView = class extends import_obsidian.ItemView {
       console.error("Error loading models for menu:", error);
       this.modelListContainerEl.empty();
       this.modelListContainerEl.createEl("span", { text: "Error loading models." });
+    }
+  }
+  // --- END NEW METHOD ---
+  // --- NEW METHOD: Renders the role list in the menu ---
+  async renderRoleList() {
+    if (!this.roleListContainerEl)
+      return;
+    this.roleListContainerEl.empty();
+    const loadingEl = this.roleListContainerEl.createEl("span", { text: "Loading roles..." });
+    try {
+      const roles = await this.plugin.listRoleFiles(false);
+      const currentRolePath = this.plugin.settings.selectedRolePath;
+      this.roleListContainerEl.empty();
+      const noRoleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+      const noRoleIconSpan = noRoleOptionEl.createEl("span", { cls: "menu-option-icon" });
+      if (!currentRolePath) {
+        (0, import_obsidian.setIcon)(noRoleIconSpan, "check");
+        noRoleOptionEl.addClass("is-selected");
+      } else {
+        (0, import_obsidian.setIcon)(noRoleIconSpan, "slash");
+        noRoleIconSpan.style.minWidth = "18px";
+      }
+      noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default Assistant)" });
+      this.registerDomEvent(noRoleOptionEl, "click", async () => {
+        if (this.plugin.settings.selectedRolePath !== "") {
+          this.plugin.settings.selectedRolePath = "";
+          await this.plugin.saveSettings();
+          this.plugin.emit("role-changed", "Default Assistant");
+        }
+        this.closeMenu();
+      });
+      if (roles.length === 0 && !this.plugin.settings.userRolesFolderPath) {
+        this.roleListContainerEl.createEl("span", { text: "No custom roles found. Add path in settings." });
+        return;
+      } else if (roles.length === 0 && this.plugin.settings.userRolesFolderPath) {
+        this.roleListContainerEl.createEl("span", { text: `No roles found in specified folders.` });
+        return;
+      }
+      roles.forEach((roleInfo) => {
+        const roleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+        if (roleInfo.isCustom) {
+          roleOptionEl.addClass("is-custom");
+        }
+        const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
+        if (roleInfo.path === currentRolePath) {
+          (0, import_obsidian.setIcon)(iconSpan, "check");
+          roleOptionEl.addClass("is-selected");
+        } else {
+          (0, import_obsidian.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "box");
+        }
+        roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
+        this.registerDomEvent(roleOptionEl, "click", async () => {
+          if (roleInfo.path !== this.plugin.settings.selectedRolePath) {
+            console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${roleInfo.path})`);
+            this.plugin.settings.selectedRolePath = roleInfo.path;
+            await this.plugin.saveSettings();
+            this.plugin.emit("role-changed", roleInfo.name);
+          }
+          this.closeMenu();
+        });
+      });
+    } catch (error) {
+      console.error("Error loading roles for menu:", error);
+      this.roleListContainerEl.empty();
+      this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
     }
   }
   // --- END NEW METHOD ---
@@ -978,16 +969,14 @@ OllamaView.instance = null;
 // settings.ts
 var import_obsidian2 = require("obsidian");
 var DEFAULT_SETTINGS = {
+  // --- Core ---
   modelName: "mistral",
-  // Default model
   ollamaServerUrl: "http://localhost:11434",
   temperature: 0.1,
   contextWindow: 8192,
-  // User's default context window setting
+  // --- Context ---
   useAdvancedContextStrategy: false,
-  // Disabled by default
   enableSummarization: false,
-  // Disabled by default
   summarizationPrompt: `Briefly summarize the following conversation excerpt, focusing on key decisions, questions, and outcomes. Maintain a neutral tone and stick to the facts:
 
 ---
@@ -995,35 +984,39 @@ var DEFAULT_SETTINGS = {
 ---
 
 Summary:`,
-  // Default English prompt
   summarizationChunkSize: 1500,
-  // Approx. chunk size to summarize
   keepLastNMessagesBeforeSummary: 6,
-  // Keep last 6 messages verbatim
+  // --- Role ---
+  followRole: true,
+  // useDefaultRoleDefinition: false, // REMOVED
+  // customRoleFilePath: "", // REMOVED
+  selectedRolePath: "",
+  // Default to no role selected
+  userRolesFolderPath: "ollama/roles",
+  // Example default path for user roles
+  systemPromptInterval: 0,
+  // --- History ---
   saveMessageHistory: true,
   logFileSizeLimit: 1024,
-  // 1MB
-  followRole: true,
-  useDefaultRoleDefinition: true,
-  customRoleFilePath: "",
-  systemPromptInterval: 0,
+  // --- RAG ---
   ragEnabled: false,
   ragFolderPath: "data",
-  // Default RAG folder
   contextWindowSize: 5,
   // RAG docs count
+  // --- UI/UX ---
   userAvatarType: "initials",
   userAvatarContent: "U",
   aiAvatarType: "icon",
   aiAvatarContent: "bot",
-  // Obsidian icon name
   maxMessageHeight: 300,
-  // Collapse messages taller than 300px
+  // --- Speech ---
   googleApiKey: "",
   speechLanguage: "en-US",
-  // Default language English
   maxRecordingTime: 15,
-  silenceDetection: true
+  silenceDetection: true,
+  // --- Service ---
+  ollamaRestartCommand: ""
+  // Empty by default for safety
 };
 var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   constructor(app, plugin) {
@@ -1036,103 +1029,71 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
   getId() {
     return "ollama-chat-plugin";
   }
-  // Helper function for icon search
+  // Icon search helper (без змін)
   createIconSearch(containerEl, settingType) {
-    const searchContainer = containerEl.createDiv({ cls: "ollama-icon-search-container" });
-    let searchInput;
-    let resultsEl;
-    const performSearch = () => {
-      var _a, _b;
-      const query = searchInput.getValue().toLowerCase().trim();
-      resultsEl.empty();
-      if (!query)
-        return;
-      const allIcons = ((_b = (_a = window.require("obsidian")) == null ? void 0 : _a.getIconIds) == null ? void 0 : _b.call(_a)) || [];
-      const filteredIcons = allIcons.filter((icon) => icon.includes(query)).slice(0, 50);
-      if (filteredIcons.length > 0) {
-        filteredIcons.forEach((icon) => {
-          const iconEl = resultsEl.createEl("button", { cls: "ollama-icon-search-result" });
-          window.require("obsidian").setIcon(iconEl, icon);
-          iconEl.setAttribute("aria-label", icon);
-          iconEl.onClickEvent(() => {
-            if (settingType === "user")
-              this.plugin.settings.userAvatarContent = icon;
-            else
-              this.plugin.settings.aiAvatarContent = icon;
-            this.plugin.saveSettings();
-            this.display();
-          });
-        });
-      } else {
-        resultsEl.setText("No icons found.");
-      }
-    };
-    searchInput = new import_obsidian2.TextComponent(searchContainer).setPlaceholder("Search Obsidian icons...").onChange(performSearch);
-    resultsEl = searchContainer.createDiv({ cls: "ollama-icon-search-results" });
   }
+  // Додаємо стилі CSS для пошуку іконок динамічно (без змін)
+  // private addIconSearchStyles() { /* ... */ }
   async display() {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.addClass("ollama-settings");
-    containerEl.createEl("h2", { text: "Basic Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc("IP address and port where Ollama is running (e.g., http://192.168.1.10:11434)").addText(
-      (text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
-        this.plugin.settings.ollamaServerUrl = value.trim();
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Server Connection").setDesc("Reconnect to the local model server and refresh the list of available models").addButton(
-      (button) => button.setButtonText("Reconnect").setIcon("refresh-cw").onClick(async () => {
-        try {
-          new import_obsidian2.Notice("Connecting to Ollama server...");
-          await this.plugin.apiService.getModels();
-          new import_obsidian2.Notice("Successfully connected to Ollama server!");
-          this.display();
-        } catch (error) {
-          new import_obsidian2.Notice(`Connection failed: ${error.message}. Check URL and server status.`);
-          if (this.plugin.view) {
-            this.plugin.view.internalAddMessage("error", `Failed to connect to Ollama: ${error.message}. Please check settings.`);
-          }
-        }
-      })
-    );
+    containerEl.createEl("h2", { text: "Core Ollama Settings" });
+    new import_obsidian2.Setting(containerEl).setName("Ollama Server URL").setDesc("IP address and port where Ollama is running (e.g., http://localhost:11434)").addText((text) => text.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaServerUrl).onChange(async (v) => {
+      this.plugin.settings.ollamaServerUrl = v.trim();
+      await this.plugin.saveSettings();
+      this.plugin.promptService.clearModelDetailsCache();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Server Connection").setDesc("Reconnect to the server and refresh available models").addButton((button) => button.setButtonText("Reconnect").setIcon("refresh-cw").onClick(async () => {
+      this.plugin.promptService.clearModelDetailsCache();
+      try {
+        new import_obsidian2.Notice("Connecting...");
+        await this.plugin.apiService.getModels();
+        new import_obsidian2.Notice("Successfully connected!");
+        this.display();
+      } catch (e) {
+        new import_obsidian2.Notice(`Connection failed: ${e.message}.`);
+        if (this.plugin.view)
+          this.plugin.view.internalAddMessage("error", `Connection failed: ${e.message}.`);
+      }
+    }));
     let availableModels = [];
     try {
       availableModels = await this.plugin.apiService.getModels();
     } catch (e) {
     }
-    new import_obsidian2.Setting(containerEl).setName("Model Name").setDesc("Select the language model to use").addDropdown((dropdown) => {
-      const selectEl = dropdown.selectEl;
-      selectEl.empty();
+    new import_obsidian2.Setting(containerEl).setName("Chat Model").setDesc("Select the default language model for the chat").addDropdown((dd) => {
+      const s = dd.selectEl;
+      s.empty();
       if (availableModels.length > 0) {
-        availableModels.forEach((model) => dropdown.addOption(model, model));
-        const currentModel = this.plugin.settings.modelName;
-        if (availableModels.includes(currentModel))
-          dropdown.setValue(currentModel);
+        availableModels.forEach((m) => dd.addOption(m, m));
+        const c = this.plugin.settings.modelName;
+        if (availableModels.includes(c))
+          dd.setValue(c);
         else {
-          dropdown.setValue(availableModels[0]);
+          dd.setValue(availableModels[0]);
           this.plugin.settings.modelName = availableModels[0];
           this.plugin.saveSettings();
         }
       } else {
-        dropdown.addOption("", "No models found");
-        dropdown.setDisabled(true);
+        dd.addOption("", "No models found");
+        dd.setDisabled(true);
       }
-      dropdown.onChange(async (value) => {
-        this.plugin.settings.modelName = value;
-        this.plugin.emit("model-changed", value);
+      dd.onChange(async (v) => {
+        this.plugin.settings.modelName = v;
+        this.plugin.emit("model-changed", v);
         await this.plugin.saveSettings();
       });
     });
-    new import_obsidian2.Setting(containerEl).setName("Temperature").setDesc("Controls randomness in model responses (0.0 - 1.0)").addSlider(
-      (slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.temperature = value;
+    new import_obsidian2.Setting(containerEl).setName("Temperature").setDesc("Controls response randomness (0.0 = deterministic, 1.0 = creative)").addSlider(
+      (slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (v) => {
+        this.plugin.settings.temperature = v;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h2", { text: "Context Management" });
-    new import_obsidian2.Setting(containerEl).setName("Model Context Window (tokens)").setDesc("User-defined maximum tokens for the model. The actual limit might be lower if detected from the model and 'Advanced Strategy' is enabled.").addText(
-      (text) => text.setPlaceholder("8192").setValue(String(this.plugin.settings.contextWindow)).onChange(async (v) => {
+    new import_obsidian2.Setting(containerEl).setName("Model Context Window (tokens)").setDesc("User-defined max tokens for the model. The effective limit might be lower if detected from the model when 'Advanced Strategy' is enabled.").addText(
+      (text) => text.setPlaceholder(String(DEFAULT_SETTINGS.contextWindow)).setValue(String(this.plugin.settings.contextWindow)).onChange(async (v) => {
         const n = parseInt(v);
         if (!isNaN(n) && n > 0) {
           this.plugin.settings.contextWindow = n;
@@ -1143,221 +1104,215 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Experimental: Advanced Context Strategy").setDesc("Use tokenizer and attempt programmatic detection of model's context limit for precise management. If disabled or detection fails, uses the user-defined limit above with word counting.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
-        this.plugin.settings.useAdvancedContextStrategy = value;
+    new import_obsidian2.Setting(containerEl).setName("Experimental: Advanced Context Strategy").setDesc("Use tokenizer and attempt programmatic context limit detection. If disabled or detection fails, uses user-defined limit with word counting.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (v) => {
+        this.plugin.settings.useAdvancedContextStrategy = v;
         await this.plugin.saveSettings();
-        if (value) {
+        if (v)
           new import_obsidian2.Notice("Advanced context strategy enabled.");
-        } else {
+        else
           new import_obsidian2.Notice("Advanced context strategy disabled.");
-        }
         this.display();
       })
     );
     if (this.plugin.settings.useAdvancedContextStrategy) {
       containerEl.createEl("h4", { text: "Automatic History Summarization (Experimental)" });
-      new import_obsidian2.Setting(containerEl).setName("Enable Summarization").setDesc("Automatically summarize older parts of the conversation if they exceed the context window. WARNING: This can significantly slow down responses!").addToggle(
-        (toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
-          this.plugin.settings.enableSummarization = value;
+      new import_obsidian2.Setting(containerEl).setName("Enable Summarization").setDesc("Automatically summarize older parts of the conversation. WARNING: Can significantly slow down responses!").addToggle((t) => t.setValue(this.plugin.settings.enableSummarization).onChange(async (v) => {
+        this.plugin.settings.enableSummarization = v;
+        await this.plugin.saveSettings();
+      }));
+      new import_obsidian2.Setting(containerEl).setName("Summarization Prompt").setDesc("Instruction for the model. Use {text_to_summarize} as placeholder.").addTextArea((t) => {
+        t.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (v) => {
+          this.plugin.settings.summarizationPrompt = v;
           await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian2.Setting(containerEl).setName("Summarization Prompt").setDesc("Instruction for the model on how to summarize. Use {text_to_summarize} as a placeholder.").addTextArea(
-        (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
-          this.plugin.settings.summarizationPrompt = value;
+        });
+        t.inputEl.rows = 5;
+      });
+      new import_obsidian2.Setting(containerEl).setName("Summarization Chunk Size (tokens)").setDesc("Approximate history block size (tokens) to summarize at once.").addText((t) => t.setPlaceholder(String(DEFAULT_SETTINGS.summarizationChunkSize)).setValue(String(this.plugin.settings.summarizationChunkSize)).onChange(async (v) => {
+        const n = parseInt(v);
+        if (!isNaN(n) && n > 100) {
+          this.plugin.settings.summarizationChunkSize = n;
           await this.plugin.saveSettings();
-        }).inputEl.rows = 5
-      );
-      new import_obsidian2.Setting(containerEl).setName("Summarization Chunk Size (tokens)").setDesc("Approximate size of the history block (in tokens) to be summarized at once.").addText(
-        (text) => text.setPlaceholder(String(DEFAULT_SETTINGS.summarizationChunkSize)).setValue(String(this.plugin.settings.summarizationChunkSize)).onChange(async (v) => {
-          const n = parseInt(v);
-          if (!isNaN(n) && n > 100) {
-            this.plugin.settings.summarizationChunkSize = n;
-            await this.plugin.saveSettings();
-          } else {
-            new import_obsidian2.Notice("Please enter a number greater than 100.");
-            text.setValue(String(this.plugin.settings.summarizationChunkSize));
-          }
-        })
-      );
-      new import_obsidian2.Setting(containerEl).setName("Keep Last N Messages").setDesc("Number of recent messages that will NEVER be summarized.").addSlider(
-        (slider) => slider.setLimits(0, 20, 1).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary).setDynamicTooltip().onChange(async (v) => {
-          this.plugin.settings.keepLastNMessagesBeforeSummary = v;
-          await this.plugin.saveSettings();
-        })
-      );
+        } else {
+          new import_obsidian2.Notice("Enter number > 100.");
+          t.setValue(String(this.plugin.settings.summarizationChunkSize));
+        }
+      }));
+      new import_obsidian2.Setting(containerEl).setName("Keep Last N Messages").setDesc("Number of recent messages never summarized.").addSlider((s) => s.setLimits(0, 20, 1).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary).setDynamicTooltip().onChange(async (v) => {
+        this.plugin.settings.keepLastNMessagesBeforeSummary = v;
+        await this.plugin.saveSettings();
+      }));
     } else {
       containerEl.createEl("p", { text: "Using basic context management strategy (approximate word count, respects user-defined limit).", cls: "setting-item-description ollama-subtle-notice" });
     }
-    containerEl.createEl("h2", { text: "Chat History" });
-    new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat history between sessions").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
-        this.plugin.settings.saveMessageHistory = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Log File Size Limit (KB)").setDesc("Maximum size of the message history file (1024 KB = 1 MB)").addSlider(
-      (slider) => slider.setLimits(256, 10240, 256).setValue(this.plugin.settings.logFileSizeLimit).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.logFileSizeLimit = value;
-        await this.plugin.saveSettings();
-      })
-    ).addExtraButton(
-      (button) => button.setIcon("reset").setTooltip("Reset to default (1024 KB)").onClick(async () => {
-        this.plugin.settings.logFileSizeLimit = DEFAULT_SETTINGS.logFileSizeLimit;
+    containerEl.createEl("h2", { text: "AI Role Configuration" });
+    new import_obsidian2.Setting(containerEl).setName("Enable Role").setDesc("Make Ollama follow a defined role from a file.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (v) => {
+        this.plugin.settings.followRole = v;
         await this.plugin.saveSettings();
         this.display();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton(
-      (button) => button.setButtonText("Clear").onClick(
-        async () => {
-          await this.plugin.clearMessageHistory();
-          new import_obsidian2.Notice("Chat history cleared.");
-        }
-        // }
-      )
-    );
+    if (this.plugin.settings.followRole) {
+      new import_obsidian2.Setting(containerEl).setName("User Roles Folder Path").setDesc("Path to a folder within your vault containing custom '.md' role files. Leave empty to only use default roles. No folder picker available, please type the path.").addText(
+        (text) => text.setPlaceholder(DEFAULT_SETTINGS.userRolesFolderPath).setValue(this.plugin.settings.userRolesFolderPath).onChange(async (value) => {
+          var _a, _b;
+          this.plugin.settings.userRolesFolderPath = value.trim();
+          await this.plugin.saveSettings();
+          (_b = (_a = this.plugin.promptService).clearRoleCache) == null ? void 0 : _b.call(_a);
+          if (this.plugin.view)
+            this.plugin.view.renderRoleList();
+        })
+      );
+      new import_obsidian2.Setting(containerEl).setName("System Prompt Interval").setDesc("Message pairs between system prompt resends (0=always, <0=never). Applies to the selected role.").addText(
+        (text) => text.setValue(String(this.plugin.settings.systemPromptInterval)).onChange(async (v) => {
+          this.plugin.settings.systemPromptInterval = parseInt(v) || 0;
+          await this.plugin.saveSettings();
+        })
+      );
+      containerEl.createEl("p", { text: `Selected Role: ${this.plugin.settings.selectedRolePath || "None"}. Select roles via the chat input menu.`, cls: "setting-item-description ollama-subtle-notice" });
+    }
+    containerEl.createEl("h2", { text: "Chat History" });
+    new import_obsidian2.Setting(containerEl).setName("Save Message History").setDesc("Save chat history between sessions").addToggle((t) => t.setValue(this.plugin.settings.saveMessageHistory).onChange(async (v) => {
+      this.plugin.settings.saveMessageHistory = v;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Log File Size Limit (KB)").setDesc("Maximum history file size (1024 KB = 1 MB)").addSlider((s) => s.setLimits(256, 10240, 256).setValue(this.plugin.settings.logFileSizeLimit).setDynamicTooltip().onChange(async (v) => {
+      this.plugin.settings.logFileSizeLimit = v;
+      await this.plugin.saveSettings();
+    })).addExtraButton((b) => b.setIcon("reset").setTooltip("Reset (1024 KB)").onClick(async () => {
+      this.plugin.settings.logFileSizeLimit = DEFAULT_SETTINGS.logFileSizeLimit;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Clear History").setDesc("Delete all chat history").addButton((b) => b.setButtonText("Clear").onClick(async () => {
+      await this.plugin.clearMessageHistory();
+    }));
+    containerEl.createEl("h2", { text: "RAG Configuration" });
+    new import_obsidian2.Setting(containerEl).setName("Enable RAG").setDesc("Use Retrieval Augmented Generation with your notes").addToggle((t) => t.setValue(this.plugin.settings.ragEnabled).onChange(async (v) => {
+      this.plugin.settings.ragEnabled = v;
+      await this.plugin.saveSettings();
+      if (v && this.plugin.ragService) {
+        new import_obsidian2.Notice("RAG enabled. Indexing...");
+        setTimeout(() => {
+          var _a;
+          return (_a = this.plugin.ragService) == null ? void 0 : _a.indexDocuments();
+        }, 100);
+      }
+    }));
+    new import_obsidian2.Setting(containerEl).setName("RAG Folder Path").setDesc("Folder with documents for RAG (relative to vault root)").addText((t) => t.setPlaceholder("data/rag_docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (v) => {
+      this.plugin.settings.ragFolderPath = v.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("RAG Documents in Context").setDesc("Number of relevant document chunks to add").addSlider((s) => s.setLimits(1, 10, 1).setValue(this.plugin.settings.contextWindowSize).setDynamicTooltip().onChange(async (v) => {
+      this.plugin.settings.contextWindowSize = v;
+      await this.plugin.saveSettings();
+    }));
     containerEl.createEl("h2", { text: "Appearance (UI/UX)" });
     containerEl.createEl("h4", { text: "User Avatar" });
-    new import_obsidian2.Setting(containerEl).setName("User Avatar Type").addDropdown(
-      (dd) => dd.addOption("initials", "Initials").addOption("icon", "Obsidian Icon").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
-        this.plugin.settings.userAvatarType = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
+    new import_obsidian2.Setting(containerEl).setName("Type").addDropdown((dd) => dd.addOption("initials", "Initials").addOption("icon", "Obsidian Icon").setValue(this.plugin.settings.userAvatarType).onChange(async (v) => {
+      this.plugin.settings.userAvatarType = v;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
     if (this.plugin.settings.userAvatarType === "initials") {
-      new import_obsidian2.Setting(containerEl).setName("User Initials").setDesc("Enter 1-2 letters").addText(
-        (text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
-          this.plugin.settings.userAvatarContent = value.substring(0, 2).toUpperCase();
-          await this.plugin.saveSettings();
-        })
-      );
+      new import_obsidian2.Setting(containerEl).setName("Initials").setDesc("1-2 letters").addText((t) => t.setValue(this.plugin.settings.userAvatarContent).onChange(async (v) => {
+        this.plugin.settings.userAvatarContent = v.substring(0, 2).toUpperCase();
+        await this.plugin.saveSettings();
+      }));
     } else {
-      new import_obsidian2.Setting(containerEl).setName("User Icon").setDesc("Enter an Obsidian icon name").addText(
-        (text) => text.setValue(this.plugin.settings.userAvatarContent).setPlaceholder("e.g., user, smile, etc.").onChange(async (value) => {
-          this.plugin.settings.userAvatarContent = value.trim();
-          await this.plugin.saveSettings();
-        })
-      );
+      new import_obsidian2.Setting(containerEl).setName("Icon").setDesc("Obsidian icon name").addText((t) => t.setValue(this.plugin.settings.userAvatarContent).setPlaceholder("e.g. user").onChange(async (v) => {
+        this.plugin.settings.userAvatarContent = v.trim();
+        await this.plugin.saveSettings();
+      }));
       this.createIconSearch(containerEl, "user");
     }
     containerEl.createEl("h4", { text: "AI Avatar" });
-    new import_obsidian2.Setting(containerEl).setName("AI Avatar Type").addDropdown(
-      (dd) => dd.addOption("initials", "Initials").addOption("icon", "Obsidian Icon").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
-        this.plugin.settings.aiAvatarType = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
+    new import_obsidian2.Setting(containerEl).setName("Type").addDropdown((dd) => dd.addOption("initials", "Initials").addOption("icon", "Obsidian Icon").setValue(this.plugin.settings.aiAvatarType).onChange(async (v) => {
+      this.plugin.settings.aiAvatarType = v;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
     if (this.plugin.settings.aiAvatarType === "initials") {
-      new import_obsidian2.Setting(containerEl).setName("AI Initials").setDesc("Enter 1-2 letters").addText(
-        (text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
-          this.plugin.settings.aiAvatarContent = value.substring(0, 2).toUpperCase();
-          await this.plugin.saveSettings();
-        })
-      );
+      new import_obsidian2.Setting(containerEl).setName("Initials").setDesc("1-2 letters").addText((t) => t.setValue(this.plugin.settings.aiAvatarContent).onChange(async (v) => {
+        this.plugin.settings.aiAvatarContent = v.substring(0, 2).toUpperCase();
+        await this.plugin.saveSettings();
+      }));
     } else {
-      new import_obsidian2.Setting(containerEl).setName("AI Icon").setDesc("Enter an Obsidian icon name").addText(
-        (text) => text.setValue(this.plugin.settings.aiAvatarContent).setPlaceholder("e.g., bot, cpu, brain, etc.").onChange(async (value) => {
-          this.plugin.settings.aiAvatarContent = value.trim();
-          await this.plugin.saveSettings();
-        })
-      );
+      new import_obsidian2.Setting(containerEl).setName("Icon").setDesc("Obsidian icon name").addText((t) => t.setValue(this.plugin.settings.aiAvatarContent).setPlaceholder("e.g. bot").onChange(async (v) => {
+        this.plugin.settings.aiAvatarContent = v.trim();
+        await this.plugin.saveSettings();
+      }));
       this.createIconSearch(containerEl, "ai");
     }
-    new import_obsidian2.Setting(containerEl).setName("Max Message Height (px)").setDesc("Longer messages will get a 'Show More' button. Set to 0 to disable collapsing.").addText(
-      (text) => text.setPlaceholder("300").setValue(String(this.plugin.settings.maxMessageHeight)).onChange(async (value) => {
-        const n = parseInt(value, 10);
-        if (!isNaN(n) && n >= 0) {
-          this.plugin.settings.maxMessageHeight = n;
-          await this.plugin.saveSettings();
-        } else {
-          new import_obsidian2.Notice("Please enter 0 or a positive number.");
-          text.setValue(String(this.plugin.settings.maxMessageHeight));
-        }
-      })
-    );
-    containerEl.createEl("h2", { text: "AI Role Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("Enable Role").setDesc("Make Ollama follow a defined role from a file").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
-        this.plugin.settings.followRole = value;
+    new import_obsidian2.Setting(containerEl).setName("Max Message Height (px)").setDesc("Longer messages collapse. 0 disables collapsing.").addText((t) => t.setPlaceholder("300").setValue(String(this.plugin.settings.maxMessageHeight)).onChange(async (v) => {
+      const n = parseInt(v);
+      if (!isNaN(n) && n >= 0) {
+        this.plugin.settings.maxMessageHeight = n;
         await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Use Default Role Definition").setDesc("Use the default-role.md file from the plugin folder").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.useDefaultRoleDefinition).onChange(async (value) => {
-        this.plugin.settings.useDefaultRoleDefinition = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Custom Role Definition Path").setDesc("Path to a custom role file (relative to vault root)").addText(
-      (text) => text.setPlaceholder("path/to/your_role.md").setValue(this.plugin.settings.customRoleFilePath).onChange(async (value) => {
-        this.plugin.settings.customRoleFilePath = value.trim();
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("System Prompt Interval").setDesc("Message pairs between system prompt resends (0=always, <0=never)").addText(
-      (text) => text.setValue(String(this.plugin.settings.systemPromptInterval)).onChange(async (value) => {
-        this.plugin.settings.systemPromptInterval = parseInt(value) || 0;
-        await this.plugin.saveSettings();
-      })
-    );
-    containerEl.createEl("h2", { text: "RAG Configuration" });
-    new import_obsidian2.Setting(containerEl).setName("Enable RAG").setDesc("Use Retrieval Augmented Generation with your notes").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
-        this.plugin.settings.ragEnabled = value;
-        await this.plugin.saveSettings();
-        if (value && this.plugin.ragService) {
-          new import_obsidian2.Notice("RAG enabled. Indexing documents...");
-          setTimeout(() => {
-            var _a;
-            return (_a = this.plugin.ragService) == null ? void 0 : _a.indexDocuments();
-          }, 100);
-        }
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("RAG Folder Path").setDesc("Folder containing documents for RAG (relative to vault root)").addText(
-      (text) => text.setPlaceholder("data/rag_docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
-        this.plugin.settings.ragFolderPath = value.trim();
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("RAG Documents in Context").setDesc("Number of relevant document chunks to add to the context").addSlider(
-      (slider) => slider.setLimits(1, 10, 1).setValue(this.plugin.settings.contextWindowSize).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.contextWindowSize = value;
-        await this.plugin.saveSettings();
-      })
-    );
+      } else {
+        new import_obsidian2.Notice("Enter 0 or a positive number.");
+        t.setValue(String(this.plugin.settings.maxMessageHeight));
+      }
+    }));
     containerEl.createEl("h2", { text: "Speech Recognition" });
-    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API key for Google Speech-to-Text service").addText(
-      (text) => text.setPlaceholder("Enter your Google API key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
-        this.plugin.settings.googleApiKey = value.trim();
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Recognition Language").setDesc("Language code for Google Speech-to-Text (e.g., en-US, uk-UA, es-ES)").addText(
-      (text) => text.setPlaceholder("en-US").setValue(this.plugin.settings.speechLanguage).onChange(async (value) => {
-        this.plugin.settings.speechLanguage = value.trim();
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Max Recording Time (sec)").setDesc("Maximum voice recording time before automatic stop").addSlider(
-      (slider) => slider.setLimits(5, 60, 5).setValue(this.plugin.settings.maxRecordingTime).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.maxRecordingTime = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian2.Setting(containerEl).setName("Silence Detection").setDesc("Automatically stop recording after a period of silence (if supported)").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.silenceDetection).onChange(async (value) => {
-        this.plugin.settings.silenceDetection = value;
-        await this.plugin.saveSettings();
+    new import_obsidian2.Setting(containerEl).setName("Google API Key").setDesc("API key for Google Speech-to-Text").addText((t) => t.setPlaceholder("Enter Google API key").setValue(this.plugin.settings.googleApiKey).onChange(async (v) => {
+      this.plugin.settings.googleApiKey = v.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Recognition Language").setDesc("Language code (e.g., en-US, uk-UA)").addText((t) => t.setPlaceholder("en-US").setValue(this.plugin.settings.speechLanguage).onChange(async (v) => {
+      this.plugin.settings.speechLanguage = v.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Max Recording Time (sec)").setDesc("Maximum recording time").addSlider((s) => s.setLimits(5, 60, 5).setValue(this.plugin.settings.maxRecordingTime).setDynamicTooltip().onChange(async (v) => {
+      this.plugin.settings.maxRecordingTime = v;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Silence Detection").setDesc("Stop recording after silence").addToggle((t) => t.setValue(this.plugin.settings.silenceDetection).onChange(async (v) => {
+      this.plugin.settings.silenceDetection = v;
+      await this.plugin.saveSettings();
+    }));
+    containerEl.createEl("h2", { text: "Service Management (Advanced)" });
+    new import_obsidian2.Setting(containerEl).setName("Ollama Service Restart Command").setDesc("Enter the system command to restart the Ollama service (e.g., 'systemctl restart ollama' or 'sudo systemctl restart ollama'). WARNING: Executing system commands is risky. Ensure the command is correct and understand the security implications. This will likely not work on Windows or macOS without specific setup. Requires Node.js 'child_process'.").addText((text) => text.setPlaceholder("e.g., systemctl restart ollama").setValue(this.plugin.settings.ollamaRestartCommand).onChange(async (value) => {
+      this.plugin.settings.ollamaRestartCommand = value.trim();
+      await this.plugin.saveSettings();
+    }).inputEl.style.width = "100%");
+    new import_obsidian2.Setting(containerEl).setName("Restart Ollama Service").setDesc("Attempt to execute the command defined above to restart the service.").addButton(
+      (button) => button.setButtonText("Restart Service").setIcon("refresh-ccw-dot").setWarning().onClick(async () => {
+        const command = this.plugin.settings.ollamaRestartCommand;
+        if (!command) {
+          new import_obsidian2.Notice("No restart command entered in settings.");
+          return;
+        }
+        if (!confirm(`Are you sure you want to execute this command?
+
+'${command}'
+
+This could have unintended consequences.`)) {
+          return;
+        }
+        new import_obsidian2.Notice(`Attempting to execute: ${command}`);
+        try {
+          const result = await this.plugin.executeSystemCommand(command);
+          console.log("Ollama restart command stdout:", result.stdout);
+          console.error("Ollama restart command stderr:", result.stderr);
+          if (result.error) {
+            new import_obsidian2.Notice(`Command execution failed: ${result.error.message}`);
+          } else if (result.stderr) {
+            new import_obsidian2.Notice(`Command executed with errors (check console): ${result.stderr.split("\n")[0]}`);
+          } else {
+            new import_obsidian2.Notice("Command executed successfully. Check console for output. You might need to reconnect.");
+            this.plugin.promptService.clearModelDetailsCache();
+          }
+        } catch (e) {
+          console.error("Error executing system command:", e);
+          new import_obsidian2.Notice(`Error executing command: ${e.message}`);
+        }
       })
     );
     this.addIconSearchStyles();
   }
-  // Adds CSS styles for icon search dynamically
+  // Adds CSS styles for icon search dynamically (без змін)
   addIconSearchStyles() {
     const styleId = "ollama-icon-search-styles";
     if (document.getElementById(styleId))
@@ -1365,18 +1320,8 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     const style = document.createElement("style");
     style.id = styleId;
     style.textContent = `
-        .ollama-settings .setting-item-control .ollama-icon-search-container { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 8px; background-color: var(--background-secondary); }
-        .ollama-settings .setting-item-control .ollama-icon-search-container input[type="text"] { width: 100%; margin-bottom: 8px; }
-        .ollama-settings .setting-item-control .ollama-icon-search-results { display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow-y: auto; background-color: var(--background-primary); border-radius: 4px; padding: 4px; }
-        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar { width: 6px; }
-        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 3px; }
-        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-        .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-        .ollama-settings .setting-item-control .ollama-icon-search-result { background-color: var(--background-modifier-hover); border: 1px solid transparent; border-radius: 4px; padding: 4px; cursor: pointer; transition: all 0.1s ease-out; color: var(--text-muted); display: flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; }
-        .ollama-settings .setting-item-control .ollama-icon-search-result:hover { background-color: var(--background-modifier-border); border-color: var(--interactive-accent-translucent); color: var(--text-normal); }
-        .ollama-settings .setting-item-control .ollama-icon-search-result .svg-icon { width: 16px; height: 16px; }
-        .ollama-subtle-notice { opacity: 0.7; font-size: var(--font-ui-smaller); margin-top: 5px; margin-bottom: 10px; padding-left: 10px; border-left: 2px solid var(--background-modifier-border); }
-        `;
+      .ollama-settings .setting-item-control .ollama-icon-search-container { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: 6px; padding: 8px; background-color: var(--background-secondary); } .ollama-settings .setting-item-control .ollama-icon-search-container input[type="text"] { width: 100%; margin-bottom: 8px; } .ollama-settings .setting-item-control .ollama-icon-search-results { display: flex; flex-wrap: wrap; gap: 4px; max-height: 150px; overflow-y: auto; background-color: var(--background-primary); border-radius: 4px; padding: 4px; } .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar { width: 6px; } .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 3px; } .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; } .ollama-settings .setting-item-control .ollama-icon-search-results::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); } .ollama-settings .setting-item-control .ollama-icon-search-result { background-color: var(--background-modifier-hover); border: 1px solid transparent; border-radius: 4px; padding: 4px; cursor: pointer; transition: all 0.1s ease-out; color: var(--text-muted); display: flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; } .ollama-settings .setting-item-control .ollama-icon-search-result:hover { background-color: var(--background-modifier-border); border-color: var(--interactive-accent-translucent); color: var(--text-normal); } .ollama-settings .setting-item-control .ollama-icon-search-result .svg-icon { width: 16px; height: 16px; } .ollama-subtle-notice { opacity: 0.7; font-size: var(--font-ui-smaller); margin-top: 5px; margin-bottom: 10px; padding-left: 10px; border-left: 2px solid var(--background-modifier-border); }
+      `;
     document.head.appendChild(style);
   }
 };
@@ -1658,7 +1603,6 @@ var ApiService = class {
 
 // promptService.ts
 var import_obsidian3 = require("obsidian");
-var path = __toESM(require("path"));
 
 // node_modules/gpt-tokenizer/esm/bpeRanks/cl100k_base.js
 var c0 = ["!", '"', "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~", [161], [162], [163], [164], [165], [166], [167], [168], [169], [170], [171], [172], [174], [175], [176], [177], [178], [179], [180], [181], [182], [183], [184], [185], [186], [187], [188], [189], [190], [191], [192], [193], [194], [195], [196], [197], [198], [199], [200], [201], [202], [203], [204], [205], [206], [207], [208], [209], [210], [211], [212], [213], [214], [215], [216], [217], [218], [219], [220], [221], [222], [223], [224], [225], [226], [227], [228], [229], [230], [231], [232], [233], [234], [235], [236], [237], [238], [239], [240], [241], [242], [243], [244], [245], [246], [247], [248], [249], [250], [251], [252], [253], [254], [255], "\0", "", "", "", "", "", "", "\x07", "\b", "	", "\n", "\v", "\f", "\r", "", "", "", "", "", "", "", "", "", "", "", "", "", "\x1B", "", "", "", "", " ", "\x7F", [128], [129], [130], [131], [132], [133], [134], [135], [136], [137], [138], [139], [140], [141], [142], [143], [144], [145], [146], [147], [148], [149], [150], [151], [152], [153], [154], [155], [156], [157], [158], [159], [160], [173], "  ", "    ", "in", " t", "        ", "er", "   ", "on", " a", "re", "at", "st", "en", "or", " th", "\n\n", " c", "le", " s", "it", "an", "ar", "al", " the", ";\n", " p", " f", "ou", " =", "is", "       ", "ing", "es", " w", "ion", "ed", "ic", " b", " d", "et", " m", " o", "		", "ro", "as", "el", "ct", "nd", " in", " h", "ent", "id", " n", "am", "           ", " to", " re", "--", " {", " of", "om", ");\n", "im", "\r\n", " (", "il", "//", " and", "ur", "se", " l", "ex", " S", "ad", ' "', "ch", "ut", "if", "**", " }", "em", "ol", "                ", "th", ")\n", " {\n", " g", "ig", "iv", ",\n", "ce", "od", " v", "ate", " T", "ag", "ay", " *", "ot", "us", " C", " st", " I", "un", "ul", "ue", " A", "ow", " '", "ew", " <", "ation", "()", " for", "ab", "ort", "um", "ame", " is", "pe", "tr", "ck", [226, 128], " y", "ist", "----", ".\n\n", "he", " e", "lo", " M", " be", "ers", " on", " con", "ap", "ub", " P", "               ", "ass", "int", ">\n", "ly", "urn", " $", ";\n\n", "av", "port", "ir", "->", "nt", "ction", "end", " de", "00", "ith", "out", "turn", "our", "     ", "lic", "res", "pt", "==", " this", " wh", " if", " D", "ver", "age", " B", "ht", "ext", '="', " that", "****", " R", " it", "ess", " F", " r", "os", "and", " as", "ect", "ke", "rom", " //", "con", " L", '("', "qu", "lass", " with", "iz", "de", " N", " al", "op", "up", "get", " }\n", "ile", " an", "ata", "ore", "ri", " pro", ";\r\n", "				", "ter", "ain", " W", " E", " com", " return", "art", " H", "ack", "import", "ublic", " or", "est", "ment", " G", "able", " -", "ine", "ill", "ind", "ere", "::", "ity", " +", " tr", "elf", "ight", "('", "orm", "ult", "str", "..", '",', " you", "ype", "pl", " new", " j", "                   ", " from", " ex", " O", "20", "ld", " [", "oc", ":\n", " se", " le", "--------", ".s", "{\n", "',", "ant", " at", "ase", ".c", " ch", "</", "ave", "ang", " are", " int", "\u2019", "_t", "ert", "ial", "act", "}\n", "ive", "ode", "ost", " class", " not", "og", "ord", "alue", "all", "ff", "();\n", "ont", "ime", "are", " U", " pr", " :", "ies", "ize", "ure", " by", "ire", " }\n\n", ".p", " sh", "ice", "ast", "ption", "tring", "ok", "__", "cl", "##", " he", "ard", ").", " @", "iew", "			", " was", "ip", "this", " u", " The", "ide", "ace", "ib", "ac", "rou", " we", "ject", " public", "ak", "ve", "ath", "oid", " =>", "ust", "que", " res", "))", "'s", " k", "ans", "yst", "unction", "********", " i", " us", "pp", "10", "one", "ail", "====", "name", " str", " /", " &", "ach", "div", "ystem", "ell", " have", "err", "ould", "ull", "pon", " J", "_p", " ==", "ign", "St", ".\n", " pl", ");\n\n", "form", "put", "ount", "}\n\n", "dd", "ite", " get", "rr", "ome", [32, 226, 128], "aram", "cc", " */", "ER", "In", "les", "_s", "ong", "ie", " can", " V", "erv", "pr", " un", "row", "ber", " do", "ll", " el", " self", "ated", "ary", " .", "']", "ud", " en", " Th", "                       ", "te", "_c", "uct", " ab", "ork", ".get", " #", "aw", "ress", "ob", "Name", "201", "app", "['", " all", "ory", "ition", "ance", "ear", " cont", "vent", "ia", " will", "IN", "         ", "return", " </", "data", ")\n\n", "Re", "ple", "ild", "ther", " your", '"\n', "($", " out", "),", " has", "String", "so", " up", "ax", " def", " bo", "ge", "alse", "ON", "per", "12", "ich", " but", " \n", " _", "_m", "add", "quest", "odel", "self", "ery", "ft", "ens", "////", "ake", ".C", " go", " function", " K", "ivate", " im", " const", ".t", " */\n", ");\r\n", " void", " set", " System", "cri", "()\n", "li", "	if", ".m", "ally", "set", "ep", "\u2019s", "bo", "def", "',\n", " me", " !", "atch", '">', '",\n', "ec", " In", "ph", " |", "_f", " var", "ence", "Id", "ree", "ink", "lect", "ug", "eth", " else", "----------------", "19", "cont", " so", "atic", " lo", "pro", "ton", "ss", "own", "abel", "oint", "ous", "eld", "ST", "The", "                                ", "RE", '":', "olor", "tp", "eg", "key", "ude", " St", "ound", " ar", '");\n', "ener", "ser", "11", "bject", "essage", "fer", " more", "ations", "ents", " his", " they", ".S", " Y", "use", "ne", "ish", "old", "_d", "io", "ield", " per", "Cont", "ings", "####", " data", " sa", "ef", "fo", " one", "eng", " dis", "AT", " name", " true", "val", "led", ".f", " ne", " end", "32", ".T", "16", "cre", "ark", "log", "Ex", "error", "_id", "urre", "ange", " null", "rray", " my", "pan", "ict", "ator", "View", "List", "	return", "\u201D", " pre", " x", "clude", "arg", "15", "ov", ".h", " >", " their", "')", "irst", "ick", "gh", "LE", "OR", " private", "tem", "\r\n\r\n", "user", " )", "com", ".A", '";\n', " id", "read", " who", "_b", '">\n', " time", " man", "ry", "========", "roup", "rop", "public", "vel", "umber", "ble", " which", "****************", " any", " false", "we", " value", " li", '")', "nder", "gr", " no", "param", "25", "fig", ".com", " app", "_l", "ions", ".D", " Ch", " about", " add", " su", " string", "ID", " over", "string", ".l", "ource", "000", "_C", "]\n", " qu", " String", "ca", "SE", " ro", "sh", "ual", "Type", "son", "new", "ern", " ag", "AR", "];\n", "].", " ?", "ical", " des", "uth", "ix", "ays", " type", "'t", "ault", " inter", "var", ".b", " part", ".d", "urrent", "IT", "EN", "30", "enc", "(f", "ra", "value", "cho", "18", "utton", "ose", "14", " !=", "ater", "\xE9", "reate", "oll", "pos", "yle", "ng", "AL", "using", "ames", " {\r\n", "ates", "ely", " work", " em", "inal", " sp", " when", ".set", "      ", "):\n", "to", "quire", "indow", "lement", "pect", "ash", "[i", " use", ".F", "pec", " ad", "ove", "ception", "ength", "include", "ader", "                           ", "atus", "Th", "itle", "rit", "void", "().", "(\n", " off", " other", " &&", "';\n", "ms", " been", " te", "ml", "co", "nc", "13", "ervice", " %", "**\n", "ann", "ade", "\n\n\n\n", "lock", "const", "100", "ponse", " sup", "++", "date", " acc", " had", " bu", "200", " Re", " were", " file", " would", " \u201C", "ven", "iss", " our", "class", "raw", " year", "Data", " val", " some", "fter", "ys", " ///", "round", "view", " pe", " there", " said", "du", "of", "line", "/*", "duct", " her", "             ", "Res", " co", " comm", "ise", "min", "    \n", "#include", "ethod", ".P", "ute", " ass", "Int", "ask", "loc", " like", "ody", " let", "load", " am", "rol", " gr", "yp", " also", " It", "url", "ific", "ors", "_P", "_n", "igh", " than", "Com", "AN", "UL", "ating", "17", " This", "ref", "_S", " static", "roll", " just", " result", "ian", "idth", " them", "));\n", "der", "reak", "Con", "://", "ule", "...", "arch", "ement", " <<", "50", "ush", "ense", "arr", " into", "cess", "amp", "ied", "ument", " \\", "],", "wo", "als", " what", "anc", "Value", "='", "olum", " pos", "ages", "ayer", " sc", "ues", '")\n', "_T", " list", "(s", " case", "Ch", "					", "////////", "ponent", " z", " kn", "let", "DE", "red", " fe", " },\n", " ,", "(t", " first", "');\n", "word", " import", " act", " char", "CT", " Tr", "ople", "={", "	f", "24", "ient", "cent", ".j", "lection", "))\n", " only", " print", "mer", ".W", "ock", " --", "Text", " op", "ank", " its", " back", '["', " need", " cl", " sub", " la", "((", '."', "Object", " start", "file", "(self", "ner", "ey", " user", " ent", " Com", "its", " Con", "ouble", "ower", "item", "very", " We", "64", "lick", " Q", "php", "ttp", "':", "ics", " under", " *\n", ".L", ");", "ices", " reg", ")\r\n", "	public", "SS", " then", "reat", "ious", ".G", "ek", "irect", "heck", "cript", "ning", " Un", " may", " Wh", "Bo", "Item", "struct", ".st", "ream", "ible", "loat", " org", "und", "sum", "_in", "../", "_M", " how", "rite", "'\n", "To", "40", "ww", " people", "index", ".n", "http", "(m", "ector", " ind", " jav", "],\n", " He", "_st", "ful", "ole", "){\n", " should", "opy", "elp", "ier", "_name", "erson", "ION", "ote", " test", " bet", "rror", "ular", [227, 128], [32, 208], "bs", "ting", " make", "Tr", " after", "arget", "RO", "olumn", "rc", "_re", "define", "22", " right", "right", "day", " long", "[]", "(p", "td", "cond", " Pro", " rem", "ptions", "vid", ".g", " ext", " __", "')\n", "pace", "mp", " min", "stance", "air", "action", "wh", "type", "util", "ait", "<?", "IC", "text", " ph", " fl", ".M", "ccess", "br", "fore", "ersion", "),\n", ".re", "ateg", " loc", "ins", "-s", "trib", " Int", " array", ',"', "Pro", "(c", "ession", ">\n\n", " she", '"]', "aph", " exp", "erty", " Se", " par", "unc", "ET", " read", "print", " rel", " form", " dr", "Exception", "input", " trans", "########", "order", "By", " aw", "ities", "uff", "play", ".add", " \u2013", " want", " comp", "ments", " ||", "az", "be", " number", " require", " Ex", "60", " col", " key", "ember", " two", " size", " where", "UT", "result", "                               ", "ough", "orld", "ood", "uch", "ative", "ger", "arent", " /*", " arg", " while", "23", "(this", " rec", " dif", "State", " spec", "ride", "_F", " look", "AM", "ility", "eter", "\u2019t", "\n\n\n", "ayout", "--------------------------------", "ager", " could", " br", "ends", "ures", " know", "ets", " If", " Sh", ".w", "back", " ser", " +=", " fr", "());\n", " hand", "Ind", "ULL", "Im", "();\n\n", " most", " try", " now", "rough", ">\r\n", "ackage", " him", "._", "ify", " break", " );\n", "ren", "#define", "itt", " ap", "	c", "(n", " You", ":\n\n", "-m", " every", "ustom", "lient", "ocument", "cription", "Error", "-b", "\u043E", "][", "99", "trans", " point", " std", " fil", "Time", "80", " mod", " ->", " error", "ah", " text", "roller", "lose", "ql", " pol", "></", " show", "User", "ased", " {\n\n", " find", "\u0430", "ED", "span", "enu", " current", " used", "cept", "clud", " play", " log", "ution", "fl", " see", "indows", " help", " these", " pass", " down", " even", "ason", "uild", "from", "(d", " bl", "label", "else", "\u0435", " (!", "ized", "(),", " ob", " item", "ump", "UR", "orn", " don", "Se", "man", "27", "ample", "tn", "================", "He", "gram", " did", "wn", "_h", "iver", " sm", " through", " An", "che", " inv", "ouse", " es", " New", "export", "mary", "uto", "ler", " last", " event", "try", [239, 188], "ily", "igned", "ines", "ollow", "icense", "sole", "lear", "(int", " again", " high", "html", "Index", "uthor", " /**\n", " line", "Event", "_D", " does", "itial", " cr", "ars", "28", " tem", "cause", "face", " `", "_A", "Button", "ature", "ected", "ES", "ister", "	\n", " before", "ale", "other", " because", "roid", " ed", "ik", "reg", " De", " dist", "},\n", " state", " cons", "rint", "att", " here", "ined", " final", ' ""', "Key", "LO", " del", "pty", "thing", "26", " And", " run", " X", "ym", ".app", " very", "ces", "_N", "ared", "ward", "list", "ited", "olog", "itch", "Box", "ife", "33", " ac", " model", " mon", " way", "lete", " call", " att", " cal", "vert", " dec", "lease", "oun", " });\n", "fr", "formation", "etail", " num", "aj", "query", " well", " object", " As", " years", "Color", "IS", " default", "Wh", " ins", "aint", " java", " sim", " Ar", "mon", "til", "();\r\n", "):", "Set", "29", "atter", " view", " pres", "array", "We", "At", " bel", " many", "21", "Man", "ender", " being", " good", "						", "ational", "ware", ".log", "{\r\n", " using", "_B", " :=", "_w", "ists", "lish", " stud", " Al", " gu", "config", "uring", "time", "oken", "amespace", " request", " child", [32, 195], "lob", " param", " }\r\n", "01", " echo", "function", "********************************", "ps", "Element", "alk", "lication", "by", "Size", "rawing", " person", "                 ", "\\n", "object", "ince", "En", "File", "uf", "ffect", "AC", " style", "summary", " que", "_r", " ($", "Model", "ident", " method", "IL", "ott", "less", "ING", " ()", " expect", "ync", "package", "35", "urs", " prot", "./", "pre", " )\n", "ma", " sur", " found", "Info", "par", "imes", ".e", "ains", " post", "-d", "45", "olean", " sl", "PE", " such", "select", "ainer", " think", " differ", ".r", "/**\n", "FF", "ool", "plate", "qual", " For", " much", "uc", "(new", "odule", " som", " http", " List", " count", " inst", "char", "mit", ".id", "aking", " gener", "px", "vice", "37", "_data", " NULL", "}\r\n", "idd", "\u3002", " med", "org", "ider", "ache", "work", " check", "ween", " ((", "the", "ants", "><", ".B", "-c", " open", " est", "        \n", " next", "IM", "\u0442", "OT", "\xF3", " follow", "content", "            ", " includ", "HE", " Res", " href", "\u0438", " car", "ypes", "image", "Un", " bool", "AD", " game", ".Form", "rows", "*/", "velop", ".Drawing", " path", "ision", " each", " Pl", "_type", "Path", "nection", " av", "').", " support", "ENT", "rem", '").', " own", " cor", "count", "miss", "ually", " mem", "std", "ience", "search", '"\n\n', "Form", " sex", "ename", " sign", " et", "          ", "','", " App", " those", "off", " err", " system", " best", "code", " same", " di", "uss", " create", "ather", "Array", ".in", "fe", "Service", "UN", "ats", " Z", "alth", " made", "true", "AB", " mark", "rid", "ified", ",\r\n", "yn", "press", " group", " fin", " License", "Field", "eger", " world", "iness", "ty", " process", "(b", " cre", "arn", "ives", " main", "ideo", "36", "_g", "AG", "valid", "img", "PI", " color", " report", " take", "rib", "OM", " day", "Request", " sk", "bers", "	s", ".Add", "oot", "Image", " comple", "ollection", " top", " free", "AS", "De", " On", "IG", "90", "eta", "Date", " action", "34", "Over", "itor", "                                   ", "not", " index", "her", "icon", "On", ";\r\n\r\n", "ivity", "mand", ".Windows", "OL", " real", " max", "land", "....", "raph", " build", "leg", "assword", "?\n\n", "\u2026", "ook", "uck", " message", "test", "ivers", "38", " input", " art", " between", "Get", "enter", "ground", "ene", "\xE1", ".length", "Node", "(i", "Class", "for", " \u2014", "ten", "oin", " ke", "ui", " IN", " table", "sub", " Le", " head", " must", "////////////////", ".util", "Context", " order", " mov", "over", " contin", " say", "static", ".Text", " className", "pany", " ter", "head", "rg", " product", "This", ".\u201D", " But", "70", "loy", " double", "sg", " place", ".x", "message", " information", "private", " oper", "ced", "db", '"></', "Param", "icle", " week", " prop", "table", "idget", "place", "Prop", " All", "els", "box", ".\n\n\n\n", ".R", " To", "iter", "Sh", "uration", "older", "_list", "come", " sw", "ization", "	for", "bl", " program", "(e", "ape", "check", ".Forms", " und", "ategory", "75", "ags", " response", "US", "request", " struct", "escription", " code", "_H", "uffer", " without", "lobal", "Manager", "ilter", "PO", "	this", "option", " sol", " ===", "akes", "Controller", "44", "Message", " ref", "ever", " So", "aining", ".append", " still", " provid", " assert", "med", " cap", "usiness", " rep", "tings", "ved", ".N", "api", "OD", " field", "iven", "oto", "\u201C", "col", "(x", "ght", "Result", "Code", ".is", "link", " cour", "An", " team", "	int", "ift", "55", " second", " going", " range", "_E", "ness", "39", " fam", " nil", " Cont", "ailable", "utes", "atab", " fact", " vis", "(&", " AN", "31", "Al", "title", " android", "CE", '\\"', "irt", " writ", "\u043D", "	m", "ftware", "ond", " ret", "osition", " home", " left", "args", "meric", "48", " direct", "oci", "Pl", "As", "ret", "ado", "Of", "chn", " Get", "ee", "ross", "();", "____", ".ph", "It", "oute", " exper", "chool", "www", "},", " allow", [32, 194], "())", "size", "ism", "ai", "tract", "ane", "...\n\n", "context", " beg", "CH", " page", "hip", "no", "core", "sp", " different", "iable", " Me", "_IN", "button", " Is", "ervices", " ca", " around", "App", "ration", " rece", " really", " image", " target", " dep", "opyright", "tra", "ingle", "ital", "Layout", " both", "Override", "arm", "=>", "aterial", "iled", " put", "Qu", "\u0440", "ung", "map", "								", " level", "Component", "book", "creen", "_RE", " config", [227, 129], "Or", ".data", " document", '","', "tribute", "ux", "Log", "ference", "post", "_e", " local", "andom", "assert", "Val", "lected", "ina", "atabase", "Add", " content", ".print", "signed", "ric", '."\n\n', " fa", "!\n\n", "-f", "ived", " quest", ".ex", " float", " develop", [208, 190, 208], "Map", "ading", " poss", "UE", "namespace", "_O", "	b", ".Get", ">(", "json", "etails", "66", " too", " extends", " None", " fore", "(String", "format", " great", "inter", "cale", "\u0441", "ron", "iving", "Ent", "ency", "xt", "oy", "05", " month", " happ", " super", "bar", "default", "_de", "ords", "ln", "({\n", " Ind", "ases", " title", " context", "08", "oh", "-p", "Em", " met", "Test", " life", "_v", " US", "UI", "ocation", "md", " [\n", " ]", "sw", " incre", "script", "ential", "ways", ".de", " src", " catch", " Americ", "//\n", "              ", " pay", "plit", "\u2014", " coun", "obj", ".php", " change", "ething", "'re", "aster", "los", "lation", "  \n", "Le", "\xE4", "({", "ready", " No", " position", " old", " book", "abled", "bug", "202", "Hand", "};\n\n", "isplay", "aving", "04", " gover", " version", "System", "nect", "response", "Style", "Up", "angu", " three", "init", "ero", " law", "endif", " base", "email", "(l", "_V", " conf", "ATE", " during", "tes", " console", " Pr", " spe", "ves", "65", "path", "ialog", "dition", "_to", "ards", " against", "etwork", " Ph", "_L", "cur", "imit", "With", " power", "ium", "';\n\n", " wom", "left", "ources", "atri", " Im", " Man", "orth", "${", "88", "quals", "ese", "_size", " iss", "otal", "-g", "ique", "rame", " width", "erg", ")(", "ittle", "TR", " They", "ences", "02", "rl", "ons", " label", ".y", "-t", "update", "anel", "sc", ".to", " project", "\xFC", " element", " success", "		\n", ".sh", "ram", "ched", "())\n", " (\n", " date", " tot", "_ST", "All", "ification", "	var", " tri", "chem", "my", " big", " Ad", " At", "ots", "num", "Act", " map", "era", "cope", ".$", ",\u201D", " pop", " few", " len", "uid", "eters", "ules", "\xED", "source", "https", " dem", " ear", "################", " match", "ories", "49", "aces", " Cl", " node", "78", "irc", "local", "unity", "};\n", " another", "<<", "ogle", " sit", "ework", "TE", ".I", "NS", "ology", "ought", ".Cont", ">>", " care", "state", "	private", " effect", "++)", "_file", "ending", "Line", "For", "ior", " Sc", " fun", ".Size", "	else", "])", "start", "vious", " },", "ours", " leg", " service", " since", "iron", "Label", " non", " los", "iction", " full", "acter", "board", "gress", " turn", "ither", "09", ".size", " body", "resh", "eturn", "199", "(_", "yles", "ormal", "pi", " something", "!--", "uint", " produ", " stand", " proble", " available", "mt", " Bl", " ...", " block", "Input", " keep", "Count", "open", " ['", " throw", "uilder", "Action", " things", "True", " url", " Bo", "printf", " red", "js", ".create", " Or", "Status", "Instance", " control", " come", " custom", "location", "07", "model", " \r\n", " source", " eas", ".out", "]\n\n", "oney", " await", " partic", "AP", "ublish", "odes", "_pro", "ply", "riter", " prov", " mill", "HT", "])\n", " chang", " ask", "                     ", " output", " email", "68", ".push", " }\r\n\r\n", "ination", "47", "atrix", "Table", "uccess", "]);\n", "                                       ", " disc", "([", " business", "height", ".html", "ta", "field", " required", "_R", " govern", "}\r\n\r\n", "lex", "500", ".,", " Set", "urch", "///", "ts", "af", " might", "istory", "Str", " never", "Response", "arse", "ada", " How", " *)", " ;", " hard", "Ad", " intern", "used", "(data", "mod", "annel", " np", "ugg", " />\n", " called", "body", " cho", "(r", "_set", "ird", " >=", " };\n", " options", " Gener", " height", "Point", "You", "ety", "Click", " small", " ide", " access", "anguage", " protected", " job", " There", "Def", " address", " uint", "Not", "oo", "aps", "<div", "ained", "atur", " sum", "-w", " Date", " little", " fri", "YPE", " port", "eh", "pring", "_path", " status", "06", "aim", "bool", " appe", " os", ".name", "ension", "_G", " update", "Config", "aff", "ERR", " <=", "ately", "#if", "uction", "95", " Te", " link", " User", ".find", ".org", "me", " given", "Out", "#endif", " better", "Page", " feel", "enn", "ML", " already", " including", "oogle", "ru", "ically", "prop", "lean", "outer", " always", "ording", "If", "orage", " parent", "vis", "							", " got", "stand", " less", "/s", " Ass", "apt", "ired", " Add", " account", "ploy", " der", "resent", " lot", " valid", "	d", " bit", "ponents", " following", "_ex", "SON", " sure", "ocial", " prom", "erties", "header", ".pro", " boolean", " search", "ken", " orig", " er", "Ed", "EM", "aut", "ling", "ality", "ById", "bed", "	case", "46", "ether", "posit", " invest", " OR", " says", "mission", "AME", " temp", "oad", " rest", "info", " interest", "Arg", " perform", "pons", " View", " ver", "lib", "(const", "Util", "Listener", "arge", "77", " mult", " die", " site", "../../", "EL", " values", " })\n", "pen", "No", "icro", " beh", " './", "acy", "rec", "()->", "	   ", '"))', "Content", "_W", "plement", " won", " video", "adi", "point", "%%", "03", " gl", "erved", "viron", "IF", "uted", [227, 131], "'m", " cert", " prof", " cell", "ari", " player", "ais", " cost", " hum", "(R", " offic", "ks", ".text", "atures", " total", " */\n\n", "ope", " stat", "UM", " load", "ights", " clear", "uro", " techn", "upport", "IR", " row", " seem", " q", " short", " Not", "ipp", "Group", "section", "max", "irl", " override", " company", " done", '");\r\n', " gre", ".Re", " belie", "rist", " health", "ANT", "()\n\n", " Be", ".value", " Gr", "ottom", " args", "PT", "status", "func", "uments", "-h", "Number", ":\r\n", " Log", "erver", " ),\n", "ament", " obj", "inc", " children", "icy", "IZ", "ands", "ably", " distrib", " cur", "erial", " days", "reated", "rect", "-l", "irm", "idden", "omb", " initial", ".js", [32, 226], "Query", " online", "imal", ".con", "au", "Url", "control", "irection", " instance", "ORT", " Fr", "where", " javax", " organ", "apter", " reason", "options", "59", " Mar", "(a", " within", ".\u201D\n\n", "ODE", "_DE", "admin", "ended", " design", " Data", "une", " File", "root", " cent", " arr", "_add", "len", "page", ",'", "_str", " bro", "ability", "outh", "58", "/c", "pose", "irtual", "earch", "_url", "argin", "Http", " school", "ava", " consider", ".label", " Array", "42", "web", "opt", ".println", "ulation", " func", "PL", ' "\\', " Text", "actory", "(function", "null", " eng", "down", " include", " En", " Dr", " db", "!!", "side", " init", "quired", " She", "Column", "react", " ann", " stop", " later", " That", "ention", "df", "UG", "ILE", " client", "raft", "ffer", "POST", "elper", " love", "quote", "oud", " json", " able", " men", "AX", " Copyright", "\xF6", "avig", "req", "Client", "});\n", ".Com", "erc", "ilt", "pecial", "_com", "room", ".Name", " give", "amb", "ike", " condition", "client", "ators", ':"', " copy", "uture", "iversity", "ernal", "{{", " Can", "ounc", "do", " occ", " appro", "thers", "ze", " either", " Fl", " important", " lead", "attr", "ART", "Equal", " da", "etch", "entity", " family", "adding", " option", " exist", "ica", " Object", "69", "'ve", "vers", "itional", "67", "output", " True", " OF", "_time", " offer", " });\n\n", "HER", "egin", '""', " water", " che", " My", "ored", " step", "ances", "CK", "AY", [224, 184], "struction", "(C", "300", "ouch", "Stream", "active", "ama", "Entity", "product", "(){\n", " government", " ID", "ajor", "And", " display", "\u043B", " times", " four", " far", " present", " NS", " \\\n", "uest", " bas", "echo", "child", "ifier", "Handler", " lib", "Property", "translation", " room", " once", " []", "center", "================================", " results", " continue", " talk", "_get", " grow", ".sw", "eb", " Public", "OP", "ecute", "ols", " **", '");\n\n', " mass", "ured", ".class", "omic", " mean", "ips", " aut", ");\r\n\r\n", " until", " market", " area", "uit", " length", " With", "structor", "event", '"><', " Sp", "IV", " mus", "iff", " kind", "author", "ounds", "mb", "_key", "41", "width", "pository", " light", "uk", "Row", "ohn", "alf", "vironment", "apper", "ollections", " side", "_info", " example", "imary", " wr", " camp", "cribe", "255", '"/', " miss", "way", " based", " plan", "Vis", "omain", "unk", " away", "UP", "<T", "OS", "iod", " Mon", "\u2019re", " lik", "\xE7", "ively", ".v", "imer", "izer", "Sub", " button", " Up", " experience", "CL", " render", "_value", " near", "URL", "alt", " country", "ibility", "57", "(),\n", "ead", " author", " specific", "base", "(name", "ones", " Do", " along", "year", " express", ".'", "env", " begin", " software", " imp", " win", "\xF3n", " thing", "Trans", " THE", " <?", " why", " doesn", "ij", "ging", "	g", " single", "offset", "arning", "ograph", "ley", "_count", " anal", "create", "/m", " Reg", "98", "unch", "=$", "isk", " rights", "(M", ' """\n', "aper", ".model", " po", "empty", "artment", " ant", " When", " women", " Ed", " season", " dest", "\xE3", "(h", " possible", " sever", " btn", " didn", " sent", " enc", " command", " ],\n", "_x", " recent", "olution", "vector", " By", " May", " Act", [187, 191], " money", "INT", "bsite", "	p", ".\r\n", [239, 187, 191], "sl", "attern", " Class", " told", "udio", "current", " equ", " auto", " State", "da", "msg", "));\n\n", " working", " query", " Br", " window", "auth", "only", "	t", " least", "agn", " expl", "itter", "aring", " column", " General", '":"', "eral", "rior", " record", "IB", "EX", " dat", " making", "ued", " Car", "emp", '".', " Med", " close", " percent", " past", "(g", ":(", " write", " move", " pat", "Control", ".To", " vi", "*/\n", "inate", "'ll", "aged", "Null", " special", "IZE", " city", "/*\n", " Eng", "ixed", "inary", "py", " eff", "ario", " tell", "avor", " select", "level", "imum", "oper", "Builder", "IP", "'),\n", "esc", " font", '";\n\n', " Am", "ished", "ills", "Inter", "OW", " course", " late", "iddle", "43", " amount", " async", "ino", "cul", [32, 236], "andle", "_user", " ben", " Cal", " $_", " Rep", " enough", "Token", ".user", "(j", "Sc", "Width", "now", "atform", " looking", " hold", "Module", "ITY", "vo", "ison", ".Data", "yc", " pot", " Trump", "idual", "ides", "rt", " property", "                                           ", "amework", "go", " low", " para", " price", "ury", " today", "roy", " '/", " polit", " ''", "ymb", "Ph", " adv", " attack", " Ste", "ROM", "400", "ana", " means", " story", "ids", "aken", " meet", " mom", " \u2018", " ?>", " den", "obile", "change", "            \n", "ici", "na", " Form", " sort", "Select", "pare", " thought", "_con", " task", "ocus", " DE", " Min", " opt", "	break", "umer", "KE", "then", " det", " Test", "ports", " review", "('/", "move", " switch", "ERT", "patch", "annot", [227, 130], " above", "itive", "56", " question", " Qu", "\u3002\n\n", "gle", " word", " provide", " Return", " research", "\xE3o", "ustr", " publish", "chema", "}}", " CON", "-in", "allback", " cover", "\\\\", "color", " IS", " whether", "imate", "isc", "Bar", " div", "Be", "ourn", " having", "lem", "player", "abs", "amera", "ney", " exc", "gether", "plied", "ao", "[$", " ++", "ipe", "show", "/d", "[:", "agement", "lev", "_ID", "97", "rary", "ades", "_se", "ause", " employ", " */\r\n", " fre", " '@", " complet", " large", "ral", "\\x", " fac", "<String", " created", "uper", ".state", " host", "eneric", "/b", "(!", "while", "ias", "BUG", " );\n\n", " role", "Reg", " Color", "Start", " porn", "top", " web", " dev", " deal", "++)\n", "Integer", "position", ".on", ' ("', [228, 184], " problem", "sv", " press", "ABLE", "ATION", " See", "anch", " though", "leep", " <!--", " points", "                         ", ".J", " ::", "ptr", "DB", "++;\n", ".png", "node", "soft", "pond", " ever", "----------------------------------------------------------------", "Menu", "('#", " services", "pg", "})\n", "params", " actually", ' "/', "Empty", "Method", " ident", "unic", " million", " aff", "style", " conc", "ios", "ignment", "ULT", "Pr", '";\r\n', " understand", "uary", " happen", " server", " Co", "SC", " les", " files", "Grid", "sql", " often", " info", "_tr", "src", "ony", " space", "umb", " password", " store", ",\n\n", " What", "ged", " False", "Us", "swer", "_index", " format", "most", "sm", "New", " details", " prob", " AND", "()\r\n", "ilar", " ${", "rypt", ".Collections", "$this", " Free", "_of", "(false", "dated", " >>", " face", "CTION", " save", " typ", "dev", '("#', "AGE", "container", "edit", "QL", " items", " social", "ien", " React", ").\n\n", " mar", " redu", " RE", ".put", " major", "Cell", "next", " expected", " yet", " indiv", "tributes", "atis", "amed", " food", "Source", "(string", " +\n", "ites", "dr", " members", " comb", "items", " Per", "TH", "=True", " bar", "_SE", "comm", "(w", ")\n\n\n", " send", " inc", "unsigned", "FA", " params", "apping", "ros", "ugin", "fa", " connection", " };\n\n", " become", "Mode", " ev", " diff", " United", "Height", "fully", "images", " makes", " global", " contact", "':\n", " abs", [208, 176, 208], "float", " except", " Pol", "Child", "typ", " certain", "i\xF3n", "OUT", " impro", "iles", " -->\n", " Part", "values", "oss", "/**", "ilit", " Event", "curity", "ster", " character", "198", " news", ' ",', " device", "cel", "login", "heet", "Default", '@"', "	 ", "click", "(value", " Ab", " previous", "ERROR", "ocal", " material", " below", " Christ", " media", "cover", " UI", " fail", " black", " component", " American", " added", " buy", "stit", " came", " delete", "property", "oding", " card", "rops", " https", " root", " handle", "CC", "Back", "emplate", " getting", "_by", "mail", "_sh", ".assert", " Dec", "(true", " comput", " claim", "'=>", " Sub", " air", "ops", "nav", "ements", "(id", " enter", "anged", "End", " location", " night", " doing", " Red", "lin", "}\n\n\n", "vider", " pick", " watch", "essages", " human", " dam", "pend", "dir", " tax", " girl", "reet", " box", " strong", "(v", "rel", " interface", " msg", "fect", "_at", " house", " track", "');\n\n", "je", " John", "istr", "(S", "ube", " ce", "itted", "VER", "*)", "parent", " application", "any", ".swing", " pack", "\\u", " pract", " section", "ctx", " unsigned", ".Point", " One", "\u0131", "iple", "aid", "\u0443", "Vector", "byte", " wait", " \xE0", "\xE5", " together", " throws", "FO", "'))", "host", "ising", ".view", " terms", "framework", "-r", " apply", " session", "Options", "uggest", " others", "witter", " fund", "Init", "__(", "ensor", "GET", " several", "ii", "[j", "IO", " template", "Position", " econ", "achine", " il", ".spring", "main", "elt", "iment", "Rec", "mm", " University", "ursor", "                    ", "GL", "icture", "ithub", "cer", "cast", "From", "ales", " subject", "password", "ny", " esc", ".write", "\uFF0C", "What", ".H", " history", " Fe", " individual", "unit", " -->", " du", "IST", " users", "fs", "false", "unt", "Title", " mot", " future", "ached", " started", " mode", " '<", "_array", " ax", "'];\n", "ires", "There", "ught", "tml", "posed", "icult", " took", " games", " }}", " ?>\n", " products", "Is", " bad", " Des", ".path", "'\n\n", " Post", "avel", "(:", "150", " needs", " known", "Fl", " exec", " seen", "51", "ume", " border", " live", "temp", "Per", " variable", "iet", " Def", " ge", "eme", "_back", "first", " provided", "////////////////////////////////", " filename", " hope", "uly", "auto", "find", "_string", "btn", "itude", "Attribute", " young", ".txt", " website", " Prop", " ey", ">();\n", "ional", "ARR", "ictionary", "urther", ".</", "ALL", " study", "ili", " network", "yl", "istance", "OK", "NU", "rest", " ST", "icrosoft", " limit", " cut", "():\n", " cou", "ogn", " sizeof", "ival", " went", ".z", "Link", " fire", " across", " community", "region", "NE", "Ref", " official", " visit", "olve", " received", " token", " months", " anim", " particular", "styles", "ico", " ess", "87", ".Control", " \xE9", "ball", " learn", "inding", "Var", " decl", "(err", "LECT", "One", "pha", " ~", "fort", "asure", " mind", " End", "Check", " quick", '"),', "AND", "utions", "Base", "________", " comment", "INE", "\u2019ve", "But", " El", " Us", " admin", "mark", " Name", "`\n", " Type", "amic", "pc", "loor", "FT", " opp", "cket", ")->", "tx", " pur", "uel", "ymbol", "uation", "anger", " background", "ecess", "efined", "........", " description", " represent", '"));\n', "pression", "rowser", " series", "wards", "52", "($_", "aise", " hot", "acity", "ries", "actions", "Create", "adio", "amples", " original", "ensive", "font", "stream", [239, 187, 191, 117, 115, 105, 110, 103], ".springframework", "001", "server", " bill", "ACK", "ilename", " frame", " =\n", "Edit", "adius", " draw", "anks", " deter", " comes", "_int", " foreach", "angle", " elect", "pected", "Header", "istration", "False", " Game", " filter", "Activity", " larg", "inition", ' "<', "256", "ised", " remove", " Trans", "met", "see", "Format", "Command", " EX", "None", " front", "ASE", " Rec", "oundation", " vo", "96", '=\\"', "(*", "Change", ".Write", "group", "ients", "uy", "****************************************************************", " dig", "hr", "(-", " gen", "number", "vec", "urope", "entry", "LL", " ste", "Valid", "'],", "_param", " selected", " according", " Dis", " util", "Buffer", "_error", " associ", "_SIZE", " wor", " printf", "rag", "\xA0", "DD", " Val", " activ", "Eng", "etime", " virtual", "aign", "aur", " Pres", " Exception", " anything", " Off", " hours", " war", "Args", "aging", " models", " Time", "Ob", "ams", "joy", " early", ".read", "86", " center", " Initial", " language", "length", "xy", " sn", " inf", "Post", " ago", " easy", "_code", " ANY", "_ch", " download", "(T", "aved", "\u2013", " students", " fig", "light", "xx", " buffer", " Dep", " Math", "ITH", " vari", " due", "Factory", " por", " ep", "otype", " cannot", " white", "<int", "tern", " register", " pred", "clus", "_date", " /**", " auth", " []\n", " period", "nown", " vot", " screen", "'d", "Types", " tmp", [208, 181, 208], "ural", " benef", "_y", " net", " States", "']['", " Ne", " NOT", " neg", "102", " common", "scope", " cred", "ges", "_TYPE", " suggest", "oom", ".\n\n\n", " accept", " random", "erm", " Vector", "with", "TER", "(str", " respons", " hit", ".Set", "grid", "ria", " click", "undle", "Case", "insert", "Utils", ' """', " implement", "atal", "tempt", "template", "ocr", "returns", " players", "users", "edef", " These", " among", " deb", "ha", ".getElement", " circ", " answer", " walk", " treat", " Ge", " Create", " age", " req", "OST", "angular", "\u044F", " five", "53", " distributed", " friend", "TP", " clean", "ows", ".Controls", "dis", " words", ".io", "zy", " header", " Check", "\u2019m", "just", "holder", '="<?', " GNU", " Col", "imest", "entic", "{\n\n", " tre", "last", "la", " York", "Lo", " discuss", " God", " issue", "rew", "Window", " land", "120", " stream", " Par", " quality", "Par", "_num", "54", " sal", "elves", "ORD", "(user", " works", " half", "enses", "vas", " police", '("/', "ua", " simple", "Address", " empty", "esh", "128", "Update", " Created", "('.", ").\n", "                  ", " agre", " FROM", " cook", " everything", "ilities", ".status", " relations", "extern", " nothing", " running", "	void", "RI", "_a", "_CON", "por", ".sub", "require", " City", " West", " mor", "store", "Equals", "oder", " na", " [[", " ('", " Don", "ERS", "/p", ".json", "abor", " someone", "_text", ".css", ".Tab", " Some", "ato", "double", " share", "(void", "_dir", " ur", "Stack", " World", ".X", "stract", "How", ".Generic", "icles", " entry", " changes", " personal", "(A", " offset", "_ptr", " pie", " Jan", "-group", "module", "Items", " However", "verage", ".Font", " events", ".min", " invol", "za", " whole", " needed", " likely", "rief", "ORM", "version", " fight", " ein", "Frame", "197", "gen", " Out", "avigation", "Length", "illed", "quence", " !==", " Software", " writing", " rate", "'],\n", "Panel", "inner", ' ["', " tw", "cd", " ;\n", "_state", " Sm", " Mark", "))\n\n", "prot", " Mr", "method", "ustomer", "Icon", " correct", "(object", " More", " fall", " vol", " development", "ently", " si", "medi", "ving", "PP", "aker", " indu", " elif", " pret", " believe", "ns", "omet", "123", " Intern", "Rect", "So", ".error", "Read", " features", " minutes", "---", "asing", "cret", '">\r\n', ".annot", " collection", "'.", " similar", " taken", '("%', "Order", "']\n", "-md", " TH", "aced", " isn", "/j", " son", "graph", " Integer", " necess", "reen", " um", " \\<", " moment", " bring", " indic", "ysis", "Level", "verse", "urrenc", "_test", " entire", "Down", " }\n\n\n", "(result", " Read", "\xE8", "Mod", " trying", '"),\n', " member", " Cor", "ODO", "-control", "untime", " Sim", "Dialog", "plot", "_on", " phys", "}/", " namespace", "	\r\n", "acc", "Player", "ARE", "89", " foot", " board", "part", " sus", "wise", " Mc", " push", "ATA", " please", "ried", "weet", "bit", "ided", "VE", " Sw", "UB", " types", "edia", " clos", "acebook", "When", " edit", "igger", " energ", "Container", " phot", " Count", " Europe", ".Is", " Russ", "peed", " Str", " py", " cult", " defined", "ccount", " obt", ".Location", " thread", "ille", " instead", "strong", " Sec", "URE", " idea", ".se", "emy", "selected", "Connection", "acing", "thread", ".next", " coll", " film", "istic", " compet", " conn", "though", " compan", "ocket", " teach", "=(", " phone", " active", "79", "delete", "101", "tries", " mo", " death", "});\n\n", "ocol", "Widget", " article", "rodu", "andid", "\u044B", " Cr", "ka", "():", "lood", "			\n", " almost", " sell", "ervlet", "rip", "Unit", " applic", " connect", " feature", " via", "'),", " lim", "                                               ", " Gu", "Engine", " ens", " environment", "block", "HERE", "NULL", "gy", "tag", ")).", "exp", " compl", " install", " complete", "queue", "atural", " general", "thon", " asked", "ores", "(res", " reserved", "SP", " \u2026", "\u0142", " signific", "Off", "                             ", " Ag", " Just", " Error", " infl", "adata", " icon", "asks", "''", "_LO", "?.", "account", " (*", "')\n\n", "rap", "_var", " FOR", " party", " Your", "cat", "stry", ".new", "boot", " Nov", " vector", " normal", " further", "Repository", "800", " database", "attle", " music", " speed", " doc", "process", "IGHT", ".parse", " taking", " viol", "ceed", " After", " forward", " crit", '"/>\n', "rot", " failed", "efore", " concern", "oe", "ba", " sender", " term", "has", '="#', " potential", "Num", " published", ".close", " Image", "straint", "UD", " Ob", " probably", "lim", '":\n', "olume", " consum", "76", "ague", "ensions", " investig", "-year", "');", "-sm", " enjoy", "orig", "ering", "cp", "leased", "plements", " returns", "pat", "BO", " House", ".Label", " weight", "ighb", " conditions", " exception", "description", " trad", "-to", " {}", " module", "END", ".ap", ".props", " constructor", "aves", " favor", " Now", ";i", " Main", "_k", "eries", "\u2019ll", "transform", "imestamp", "Pre", " mer", ".res", "stant", "Location", "_NAME", " loss", " \n\n", "net", " engine", "Block", " issues", " parse", " Bar", " stay", " JSON", " dom", "airs", "wner", " lower", '",\r\n', " Dem", "ufact", " ps", " perfect", "RL", " educ", "ls", "emory", "ARRANT", "uge", " exact", ".key", "alled", "ech", "ief", "\\/", "oke", " former", "alloc", " six", "ida", " margin", " heart", "ald", "pack", ".getElementById", " WARRANT", " rather", " building", "erman", "lice", " questions", "izes", "lege", "irectory", " je", " cas", "props", "utf", " security", " however", "weight", " inside", " president", "Char", " WITH", ".map", " graph", " tag", "_status", " attempt", "opp", "uses", "	const", " round", ",$", " friends", "Email", "?>", "Resource", "KEY", "osp", ".query", " North", "ables", "istrib", "_class", "ello", "That", "\u043A", "pecially", " President", " campaign", " alt", "area", " chall", " opport", ".Con", " energy", "like", ".string", "ington", ")*", "yy", " profession", "irth", " seg", [230, 156], " hor", "iers", "can", " behind", "Product", "fg", " Sk", ".jpg", "?:", "];\n\n", " callback", " Http", "\u044C", "long", "MS", "ATH", " raise", " wanted", "rown", "utor", "lt", "]=", "eline", "MA", " separ", "cs", "semb", "Dis", "bserv", " Will", " policy", " third", "phone", " bed", "/g", ".__", " Inc", "izing", ".remove", "instance", ".type", " serv", "Each", " har", " Message", "(key", "SELECT", "Pos", "));\r\n", " recomm", " training", " Ent", " Char", "icht", "(file", " prior", "Game", " exit", "Params", ".core", "PC", "nes", "anced", "(request", "Password", "}>\n", " mag", " release", " shall", "udent", " South", "ando", ":'", ".TabIndex", "sk", "anner", "isset", " outside", "ledge", [32, 229], " Rob", " imm", "!\n", " Web", "Des", "BC", "ancial", "Route", "Dec", "ferences", " purch", " Model", "ctor", "gn", "_start", "_un", ".*", "ises", " ground", " unique", " beaut", '{"', " pour", " Oct", " tree", "sets", "_res", "')->", "_reg", '("\\', " byte", "Bl", " dating", " matter", " Rem", " '../", " Aug", " La", " $(", "ournal", "111", "iam", " shows", "write", " ball", " simply", " fast", " memory", "ASS", " Of", "oved", "ante", "aul", "istry", ")));\n", " fit", "<string", " political", "ancel", "_.", "card", ".current", "och", "_image", "\\t", "#\n", "(L", " industry", "coming", " extra", "600", " reported", ".start", " resources", " img", "flow", "_EX", "(null", " Pre", " wrong", "interface", "Parameter", "ners", [225, 187], "ture", "ersist", "ountry", " seems", "alance", "dest", "	String", " maint", " unit", "acters", " TR", "iful", "exports", "project", "Application", "legate", " takes", "term", " etc", "uster", " appear", "address", " fem", "hs", " hom", ",-", " difficult", " coming", "Open", " settings", " War", " Then", " autom", " Foundation", " quite", "Description", " blog", "iqu", "PS", "110", "_field", "Json", "SSION", " Sch", " LO", " descri", " everyone", " pretty", " longer", " menu", " currently", "sec", " relationship", "################################", " Map", "aset", " parameters", " crush", '"\r\n', "ILITY", "igration", " cout", "total", " names", "ndef", '");', "riend", "ynamic", " effort", " actual", " fields", "OUN", "ters", "250", " fix", "_model", " cases", "CA", "My", "Interface", " SE", "196", "]]", "alle", " National", " ArrayList", "inline", ".V", "ara", "refix", "asc", "Reader", " \u043F", "astic", "(()", "Cl", ".annotation", " performance", "aily", ".toString", ".net", "views", ".end", "ayers", "late", " Apr", "ederal", "'])", ".body", " higher", "_fl", "cr", "alert", "_node", " Google", " itself", "Auth", "urrency", " significant", "append", " respect", "strap", " una", "riteria", "PORT", ".apache", "Output", " progress", " mid", " Microsoft", " resource", "ablish", " dim", ".load", ".App", " direction", " additional", "                        ", " numbers", " companies", ".Th", " sound", "username", " statement", " alert", " contract", "home", "_length", ".Component", "ev", ".Ex", "\uFF1A", '";', " High", " )\n\n", " Point", "oph", " lines", "->_", '")\n\n', "ox", "application", " ]\n", "\n\n\n\n\n\n", "180", " soon", "ctions", "inger", " join", " Pe", [32, 235], " las", ".E", "css", "/or", " Start", " TO", " subs", "conn", "components", "DEBUG", "quare", "Function", "endar", ".index", " fill", "\u0119", " choose", "how", " America", "assets", "------------", " Value", " office", " veh", " transform", " Art", " inde", " fn", " implements", "ango", "plete", '+"', "tmp", "amily", " hash", "missions", "EST", "gt", "Provider", "                      ", " flag", " particip", "den", " Returns", " note", "\xFCr", "pm", "ideos", " specified", " EN", "ester", "olid", " upon", "(std", "	v", " '\\", "uz", " vert", " vict", "	self", ' "$', "85", ".k", " groups", "github", "lang", " mut", "TO", " ve", " Please", ";\n\n\n", "access", ' {"', "rea", " risk", "icker", "oggle", "	while", "ANG", ".send", "72", " woman", " gets", " ign", " Id", "_log", "ONE", " evid", " Har", "_sub", " endl", " included", "());\n\n", " Ap", "igr", " sem", " Black", "doc", "_table", "                                                                ", "-up", " cause", " ..", " van", "_dict", " focus", "IND", "CESS", ".Log", " multiple", "ido", " regard", "-M", "andler", "ourse", " deg", ".U", " addition", " various", " receive", "\u0435\u043D", " HT", "Obj", "DF", " increase", " Open", "];", " commit", "?\n", "ategories", "atory", "ship", " Mich", " html", "romise", " leave", " strateg", "aven", " Console", "known", "-n", "_LE", ".component", " bre", "Session", "iance", " align", "typedef", "_result", " WHERE", ".split", " reading", "FAULT", " clo", " notice", "_pr", "arter", " lock", " standard", "etic", "ellow", " padding", " His", " states", "_cast", "(P", "aa", " internal", "ean", " PRO", " Key", " especially", "ming", " cross", " national", "_object", "filter", " script", ".update", "_i", " Assert", "/core", "%%%%", " problems", "istor", " .=", " arch", " written", " milit", "MENT", ".ch", "cape", " Mus", "_config", " API", "foot", " images", "endl", ".In", "First", " platform", ".prot", "Option", "ste", " TODO", " force", ".cont", "	echo", " Dav", "Ptr", "(B", "RT", " Base", "]['", " announc", "console", " Py", "ds", ".as", " prevent", "apan", " {'", "}</", " Service", " Sen", "ador", "profile", "Top", " iter", "po", "IES", "JSON", "IE", "iant", "\u3001", "_j", " Sept", "_map", "bum", "(context", " Home", "ians", "GB", "63", " living", " pattern", "(input", "icient", "999", "Core", " entity", " integ", "Changed", " useful", ".info", " tool", "(item", " ok", " feed", "IX", "\xE9s", " News", "remove", "erry", "									", "ipment", "ares", "Do", "Current", ".content", ".Group", "ustral", " \u0441", "})", " popular", " stre", " methods", "_ERROR", "Left", "cal", "bsp", ".ToString", " dir", " allowed", " impact", '")]\n', "62", ".config", " elements", " prote", " train", ".tr", "rs", " Republic", " Task", "61", "aries", "(D", "(get", "\u2026\n\n", " related", " vers", " sil", ' "";\n', " cmd", " technology", ".width", "Float", " Use", "Body", "should", ".join", "Font", "llum", "ycle", " Brit", " mit", " scale", " (_", "ernel", '"))\n', " score", "/v", " student", "UC", ".show", " average", "Enabled", "(ex", "common", "imation", ':@"', "chie", " ...\n\n", "river", " March", "category", "fin", " court", "\u0432", "Server", " container", "-st", "_for", " parts", " decision", "obs", "oub", "mitted", " $('#", " saw", " approach", "ICE", " saying", " anyone", "meta", "SD", " song", "display", "Oper", "outes", " channel", " changed", "\xEA", " finally", "_number", "Please", [224, 164], "oring", "-re", " kill", " drug", "window", " convert", "ombre", " ways", "Helper", " First", "(__", "urity", " Windows", "ees", " mat", "rapper", " plus", "anges", '"].', "azon", "/t", "lat", "aste", " profile", " ready", "#ifndef", "rote", " sense", "Gener", " Config", "omy", " June", " latest", " saf", " region", " deep", "witch", " Park", "}`", " From", "II", " cv", " reach", " counter", " Work", " URL", " Update", "',\r\n", " immedi", "close", "ados", "ferred", " weeks", "urg", " damage", " lost", "ani", "_lo", " himself", " dog", ")]\n", [239, 191], "pir", "tt", " paper", " thems", "second", " staff", " Input", '"+', " Facebook", " alloc", " sched", "ACE", " themselves", " Component", " driver", "ja", "(path", " category", "alls", "pu", "lluminate", " Action", ".button", " GL", "istics", " oil", " stock", ">'", " dead", "VAL", "QUE", "************************************************************************", " charg", "Return", " ful", "dom", " rules", " modify", " eval", "ham", "atement", "\\<", "ula", "=False", "RA", " contains", "74", " stack", "mar", " {}\n", " undefined", "Ass", " China", "vey", "*\n", " playing", ")/", "actor", " bottom", "lier", " Number", " couple", "DC", " SO", "gor", ".setText", "success", "command", "Filter", " Our", "_item", " ctx", " road", "Version", "case", "urt", "avior", "ych", "sembly", " Product", " held", "afe", " includes", "<quote", " avoid", " Fin", " Mod", " tab", "ano", "\xF1", "ipping", "-e", " insert", "target", "chan", ".Model", "IME", "\\\n", " machine", "avy", " NO", " Inter", " operation", "modal", "Tag", "]:", " production", " areas", " ren", "_from", "nbsp", " operator", "men", "apped", "_per", "zen", '(".', ".save", '="{{', " tor", "(response", " candid", " conv", "ailed", " Lib", "comp", "ura", "\uFFFD", " Here", " argument", "hood", " establish", "ography", " onClick", "ambda", " sch", " movie", " sec", " activity", "\u0627", " sql", "_all", "incip", " provides", " sys", "acket", " wasn", " uses", " Function", ".google", " Result", "84", "Visible", "agma", "elcome", " Sy", " Cent", "ALSE", "aci\xF3n", "EXT", " license", " Long", " accom", " ability", ".height", "Active", "ological", "oly", ")),", ".Se", " parameter", "prite", "ABILITY", ".service", " Group", "_query", " Item", "ining", " jud", "ims", "fix", "inder", "agram", " functions", " experi", " Em", " rot", " pen", ".btn", " AS", "#ifdef", " choice", " Page", "_PRO", "QU", [229, 143], "antity", "\xAD", "words", " readonly", " flex", "protected", " Any", " characters", "enced", " July", "iler", "Card", "urance", " rev", ".event", "aly", "130", " wonder", " Port", " legal", "role", " ten", " goes", "MP", "white", "):\r\n", "))\r\n", " reference", " mis", " Project", "icks", ">&", "CON", " repl", " regular", "Storage", "ramework", " goal", " touch", ".widget", " built", "des", "Part", "(re", " worth", "hib", "game", "91", "192", " \u0432", "acion", " White", "(type", "(`", "81", " natural", " inj", " calcul", " April", ".List", " associated", "	System", "~~", "=[", " storage", " bytes", " travel", " sou", " passed", "!=", "ascript", ".open", " grid", " bus", " recogn", "Ab", " hon", " Center", " prec", "build", "73", "HTML", " San", " countries", "aled", "token", "kt", " qual", "Last", "adow", " manufact", "idad", "jango", "Next", "xf", ".a", " porno", " PM", "erve", "iting", "_th", "ci", "=None", "gs", " login", "atives", "']);\n", "\u0105", " ill", "IA", "children", "DO", " levels", " {{", " looks", ' "#', "ToString", " necessary", "   \n", "cell", "Entry", " '#", " extrem", "Selector", " placeholder", "Load", " released", "ORE", "Enumer", " TV", "SET", "inq", "Press", " Department", " properties", " respond", "Search", "ael", " requ", " Book", "/\n", "(st", " financial", "icket", "_input", " threat", "(in", "Strip", [236, 157], "\xE7\xE3o", "71", " evidence", "));", " Bro", " [];\n", " ou", "buf", "Script", "dat", " rule", "#import", '="/', "Serial", " starting", "[index", "ae", " contrib", "session", "_new", "utable", "ober", ' "./', " logger", " recently", " returned", "\r\r\n", ")))\n", "itions", " seek", " communic", ' ".', " username", "ECT", "DS", " otherwise", " German", ".aw", "Adapter", "ixel", " systems", " drop", "83", " structure", ' $("#', "encies", "anning", " Link", " Response", " stri", "\u017C", " DB", [230, 151], "android", "submit", "otion", "92", "(@", ".test", "82", "\n\n\n\n\n\n\n\n", "];\r\n", " directly", ' "%', "ris", "elta", "AIL", "){\r\n", "mine", "                          ", "(k", "bon", "asic", "pite", "___", "Max", " errors", " While", " arguments", " ensure", "Right", "-based", "Web", " -=", " introdu", " Inst", " Wash", "ordin", "join", "Database", " grad", " usually", "ITE", "Props", "?>\n", " Go", "@Override", "REF", " ip", " Austral", " ist", "ViewById", " serious", " customer", ".prototype", "odo", "cor", " door", " WITHOUT", " plant", " began", " distance", "()).", " chance", " ord", "came", "pragma", " protect", "ragment", " Node", "ening", "\u0447", " route", " School", "hi", " neighb", "After", "licit", " contr", " primary", "AA", ".WriteLine", "utils", " bi", "Red", ".Linq", ".object", " leaders", "unities", " gun", "onth", " Dev", "FILE", " comments", "_len", "arrow", "amount", "Range", "sert", "GridView", " updated", " Mo", " inform", "ociety", "ala", "Access", " hab", " creat", "_arg", " January", " Day", '")\r\n', "uple", "document", "gorith", "menu", " Over", "bb", ".title", "_out", " led", "uri", " ?></", "gl", " bank", "ayment", "	printf", "MD", " sample", " hands", " Version", "uario", " offers", "ityEngine", " shape", " sleep", "_point", "Settings", " achie", " sold", "ota", ".bind", "Am", " safe", "Store", " shared", " priv", "_VAL", " sens", "){", " remember", "shared", "element", " shoot", "Vert", "cout", " env", "_label", " >\n", "run", " scene", "(array", "device", "_title", "agon", "]\r\n", "aby", " became", "boolean", " park", " Code", "upload", "riday", " September", "Fe", " sen", "cing", "FL", "Col", "uts", "_page", "inn", " implied", "aling", " yourself", ".Count", "conf", " aud", "_init", ".)", " wrote", "003", "NG", ".Error", [228, 187], ".for", " equal", " Request", " serial", " allows", "XX", " middle", "chor", "195", "94", "\xF8", "erval", ".Column", "reading", " escort", " August", " quickly", " weap", " CG", "ropri", "ho", " cop", "(struct", " Big", " vs", " frequ", ".Value", " actions", " proper", " inn", " objects", " matrix", "avascript", " ones", ".group", " green", " paint", "ools", "ycl", "encode", "olt", "comment", ".api", "Dir", " une", "izont", ".position", " designed", "_val", "avi", "iring", "tab", " layer", " views", " reve", "rael", " ON", "rics", "160", "np", " core", "());\r\n", "Main", " expert", "		\r\n", "_en", " />", "utter", "IAL", "ails", " King", "*/\n\n", " Met", "_end", "addr", "ora", " ir", "Min", " surpr", " repe", " directory", "PUT", "-S", " election", "haps", ".pre", "cm", "Values", ' "\n', "column", "ivil", "Login", "inue", "93", " beautiful", " secret", "(event", " chat", "ums", " origin", " effects", " management", "illa", "tk", " setting", " Cour", " massage", "	end", " happy", " finish", " camera", " Ver", " Democr", " Her", "(Q", "cons", "ita", " '.", "{}", "	C", " stuff", "194", " :\n", " AR", "Task", "hidden", "eros", "IGN", "atio", " Health", "olute", "Enter", "'>", " Twitter", " County", "scribe", " =>\n", " hy", "fit", " military", " sale", "required", "non", "bootstrap", "hold", "rim", "-old", " Down", " mention", "contact", "_group", "oday", " town", " solution", "uate", "elling", "]->", "otes", "ental", "omen", "ospital", " Sup", "_EN", " slow", "SESSION", " blue", "ago", " lives", " ^", ".un", "inst", "enge", " customers", " cast", "udget", "\uFF01", "icens", " determin", "Selected", "_pl", "ueue", " dark", "//\n\n", "si", "thern", " Japan", "/w", "PU", " East", "ovie", " package", " nor", " api", "bot", '"];\n', "_post", "ulate", " club", "'));\n", " loop", "PIO", "ione", "shot", "Initial", " played", "register", "rought", "_max", "acement", "match", "raphics", "AST", " existing", " complex", "DA", ".Ch", ".common", "mo", " '../../", "ito", " analysis", " deliver", "                \n", "idx", "\xE0", "ongo", " English", "<!--", " computer", "ENSE", " pas", " rais", "Hash", " mobile", " owner", "FIG", "                                                   ", "thes", " attr", "wd", ".time", "awn", " treatment", " Ac", ".View", "impl", "more", "pass", " ha", ".from", " leading", "FFFF", "(error", ".ui", "atar", "aders", "dates", " zu", " flow", "Target", " involved", " io", "parse", "$_", "hest", ".int", "-item", "asy", "Sp", " shift", "NT", " tf", "_TR", ".web", "CS", " })", " eyes", "125", "105", "_z", "');\r\n", "iforn", " {@", " nice", ".list", "    \r\n", " floor", " redirect", " UK", "(['", " wish", " capt", "legal", " IO", " stage", ".String", " Afr", "igen", " SH", "Delete", "ells", " solid", " meeting", " worked", " editor", "iny", "\u043C", "_read", ".Id", "eff", "Offset", "cha", "USER", "		   ", "ipped", " dict", " Run", ".hpp", " ang", "xml", "imple", " medical", "_token", "connect", " hour", " controller", "_message", "UID", "Gr", "anded", "_CH", " books", " speak", "aming", " mount", "Record", "	struct", ".Web", "ondon", " //\n", " felt", ".Auto", "idge", "_pos", "PR", " modern", "Collection", "_msg", "CD", " Lo", " seconds", "ibly", ".equals", " international", "#pragma", "ooth", "Writer", "iate", " cele", " Bit", "ivo", "ivery", "rd", "HECK", " cache", ".count", " roll", ".Read", "108", "RED", " setup", "izontal", "models", "argv", " considered", '="../', "settings", " Rel", " growth", " mix", " Washington", " plt", " IM", [225, 186], " turned", " DateTime", " Wed", "(url", ' "-', " letter", "Async", "                            ", " October", "_line", " attention", " collect", " Hash", " imag", "Tree", " situation", "ette", "_no", "IVE", " von", ".target", " knowledge", " drive", ".post", " blood", " cit", "primary", " configuration", "tee", " photo", "isode", "Trace", " gave", " shot", " Air", " mother", "price", " morning", ")){\n", "-x", " trade", " desc", " &&\n", " parents", "Api", [229, 136], "ted", "wer", [32, 230], " sy", " Ke", "Parser", [229, 133], "ancy", " piece", "ifornia", "toString", "ran", "iding", "PTION", "comes", "/lic", ".client", "El", "Long", " professional", "rupt", "va", " completely", " practice", "002", " selection", "Rem", "ini", " cam", "REE", " sites", "pa", "ATUS", "\u0441\u0442", "arrant", "*(", "_KEY", " Button", " Friday", "sequ", " reader", " messages", [232, 175], " buf", "Ke", " nov", "HP", "Msg", "align", "arily", " ',", "_with", " das", " heard", "atomic", "rial", ")[", " dise", "@end", " gold", " fair", " sales", ".Button", "strict", "save", " measure", ' "+', "ecause", "ViewController", " Table", ".param", " decided", "(((", "INFO", " opportunity", "Te", "ICENSE", "ccording", "ki", " UN", " contain", " manager", " pain", " Fire", "rome", " plans", "Found", "lay", " December", " influ", "\xFA", "rench", "                                 ", "azing", "brief", "call", "wood", " loaded", " grand", "/f", "imp", "_U", "127", "STR", "\u2022", " credit", ".Color", "orge", "QUEST", " difference", " PC", "wargs", " pub", "unday", " fra", ".max", " tried", "annels", "send", " reports", " adult", [228, 186], " consist", " Street", " Program", "SQL", "Matrix", "ouncil", "-A", "	w", " whose", " relig", " Sex", " gives", "none", ".message", "(G", ".awt", "-right", " November", "ellig", "360", "utive", "\u0103", "overn", " easily", " ideas", "104", " \u043D", "/css", "lying", "elle", "Can", "_color", "\u043E\u0432", " pair", "ngth", " split", "140", "drop", "arty", "ona", " capital", " hear", " exists", "	log", "emo", "Run", "oi", " parser", " Method", " education", "[k", " library", '>";\n', "_UN", "	std", "oded", " calls", "here", "Rel", " brand", "background", "ga", "_address", "_params", "Category", "103", " India", "_event", " ing", "Render", ".cl", "umpy", " pet", "FC", " Ant", "Ext", " charge", "ened", "grad", "EO", " depend", " .\n\n", "frame", " df", " huge", " PART", "eds", ";;", " AM", " basic", " Let", "lich", " arm", " star", " federal", "Work", " carry", " Israel", "(obj", "={{", " saved", " syn", " constant", "VENT", " positive", " conduct", " skin", " earlier", " layout", " IP", "OUR", " tim", "stylesheet", "_cl", " Card", "++){\n", " temper", " David", "	try", ".dart", " wants", " picture", " videos", " Comm", "isions", "_MAX", "Mapping", "-content", " Ear", "-de", " prem", "bruary", " components", " throughout", " pull", " pages", "ente", "respond", " gas", "criptor", " edge", " bound", "ACT", "******", " creating", " CH", " nullptr", "Br", "+'", ".co", ">::", " learning", ".Length", "_SH", " patients", "AIN", " kids", " comfort", " shown", "ugins", " Back", "ella", "_CL", " lat", " dispatch", " classes", ".at", ".begin", " successful", "ban", " obtain", " Sl", " lack", "iterator", "Thread", "(size", " none", ".has", "_X", "sort", "nap", "pet", "bin", "700", " Canada", "They", " dans", " Mat", "<td", " hair", " '',\n", " cu", " laws", "leted", "ped", " pow", " knew", "_COM", "_,", " Mag", "idents", "(req", " ),", "-center", "190", " wide", " Author", "stants", " jobs", " math", "etimes", "Boolean", " scope", "_is", " meas", " keys", "elay", " exactly", "'=>'", " Paul", "mas", "	print", "(len", "fd", " );", ".Event", "qli", "irit", "ields", "oman", " Top", " vote", " mask", " theme", "-\n", " props", " fine", " writer", "_offset", "car", " altern", " copyright", " destroy", "pper", " generate", "pped", "\u2019d", "      \n", "make", " Show", " browser", " favorite", " career", " happened", "(char", " recommend", " liter", ".filter", "grade", " \xA3", "Phone", "oms", " named", "-label", "ipo", " Other", " panel", " rock", "Scale", "	assert", "\u0434", " trust", "front", " demon", "Ar", "Net", " economic", "footer", " race", "(node", " Option", "split", " physical", "ifest", " removed", ".http", ")),\n", " looked", "';", "ding", "gest", "aturday", "/licenses", "Price", " dro", " towards", " uns", " CL", "	static", " rows", " define", ".replace", " father", " Design", "assign", "mut", "Device", "Did", "'))\n", "ometry", "ayload", " histor", " Param", " Boolean", " nature", " js", " nation", "ih", " discover", "sem", "Handle", "	r", " Techn", " wall", "{$", "@property", ' "../', " exam", ".draw", "opping", " nearly", " cool", " independ", "RES", " handler", " Monday", " sun", "Styles", "ously", " 	", "vest", "Display", "(y", "atically", " predict", "ying", " sometimes", '"]\n', " drink", " bul", "ifications", ".insert", ".reg", " tests", "Alignment", " alleg", " attribute", " Note", " myself", "arts", "Now", " interesting", "lients", " population", " California", '"I', [229, 185], " greater", "uesday", " thous", " costs", " launch", "\\Http", "ker", "band", " Play", " band", ".shape", "esome", "article", ".rf", " wer", "\xE1s", "embers", "usr", "BA", "ican", "ett", "validate", "ulti", " immediately", "zer", " figure", "oes", "eller", "ircle", " Sign", ".db", " rank", "Bytes", " projects", "_rec", "ULAR", "API", " Line", "Port", " poll", " giving", "idence", "--\n", " plot", "icial", " warrant", "ITION", " Double", " billion", "gorithm", " equipment", "DATE", ' @"', "EE", " ple", "iation", " headers", " proced", ".ComponentModel", " Obama", " pa", " Best", "imately", ".getString", ".\\", "mploy", " raw", "_block", "undred", '"},\n', "112", ".GroupLayout", " brought", "NSString", "throw", "created", ".New", "_view", "CP", "eps", "Op", " gratis", ` '"`, " interview", '"""\n', " partial", " aria", "bing", "Author", "Book", " Pat", "uman", "Users", "plus", "193", " Direct", "venue", "alpha", "UCCESS", " Call", " );\r\n", "imated", " remain", " anti", " London", " safety", "POSE", "oles", "controller", "Byte", " Court", " Phil", " Associ", "ena", [229, 144], "_STR", "coin", "reshold", " batch", "_Click", "entication", ">';\n", "enty", " beginning", " zero", " Convert", " terr", " paid", " increased", "catch", "-size", "115", "activity", "equals", " queue", ` "'`, " International", " f\xFCr", "ursday", " scient", "allow", "axis", " appropri", "edge", " idx", "Success", "entifier", ":\\", "xis", " maximum", "arks", " birth", "(index", " maybe", ".py", "files", " limited", "_check", "look", "plies", " movement", "'].", " broad", " BE", " UnityEngine", ".cpp", " Every", "Admin", " fans", "pared", "\n    \n", " foreign", " pan", " tour", " Order", " moving", " auf", "Call", "cb", "\u015F", "ventory", " Sql", " fully", "ClickListener", "WORD", " announced", ")\r\n\r\n", " agreed", "rie", " earn", "_link", ".array", "(text", " materials", ",p", "ffff", "vg", " \xA9", " unless", "ajax", "LOG", " sexual", ' \\"', "-time", " coach", " supported", " photos", "iform", ".Create", ")]", "rier", " dialog", "aver", "ige", ")+", "_idx", ":[", "_min", " Cong", " pressure", " teams", "Sign", "begin", "rian", "NESS", "LS", " improve", " Sunday", " definition", "iger", "rollers", " thinking", "Template", "-F", " emerg", "plates", " USA", ".setState", " Also", "rev", " enable", " CO", "PECT", " concept", ")-", " \u2022", " sets", " meaning", "emon", " Cons", "cmp", "eder", "anned", "icensed", " Super", " daily", " multi", "_u", " challeng", "_mode", " Promise", " strict", "jo", "inton", "(list", "Only", ">{", " vehicle", [237, 149], " Player", "106", " Del", " pool", ".url", "nesday", "();\r\n\r\n", "900", ' ");\n', "Local", '.");\n', " organization", "render", " Application", " summer", "expected", "NA", " rap", "_obj", " surface", " PUR", " },\n\n", " variables", "(message", " opin", ".back", "\u0430\u043D", " workers", "vm", "Co", "ughter", " master", ' "",', " stories", ".User", " celebr", "inese", "BS", " Command", "ashboard", " og", "kg", ".image", ".style", " steps", " Ben", "(args", "404", " Person", ",y", " officials", "|\n", " skills", "vc", " builder", " gar", "Account", " Auth", [231, 148], "'])\n", " AT", "nn", ".Int", "SSERT", " effective", "LETE", " tools", "ARD", " digital", "191", "Double", " Find", "RC", " inline", "/r", "ARAM", "ASK", " intent", "aight", "_addr", " requests", ".first", " debug", " spent", "()));\n", "\u015B", " princip", "Logger", "cludes", ".use", " surv", "media", " February", " Mac", " missing", " wife", " talking", " Make", " cart", " located", "Enc", "-a", "chron", " cards", " guy", " pers", " Yes", "atever", " Ang", "olar", " Even", " accur", " Power", " Gold", "clear", "Process", " records", " killed", ".clear", " WARRANTIES", " purpose", "panel", "JECT", "\xEDa", " exerc", "WS", "/L", ".exports", " ___", " sin", "Servlet", " d\xE9", ".delete", "roke", "Sl", "ugh", "ears", " pointer", " hop", "allery", " obs", "covery", "	char", "										", "	def", "ocity", "itchen", "ulations", " FIT", " ).", "straints", "vention", " requires", " Oper", "ME", "OUNT", "allet", " norm", "IRE", "exas", " programs", " weak", "'.$", "uing", "	       ", " mil", " firm", "initely", "_VALUE", "apse", "atisf", " demand", "_mod", " described", " places", "VID", " alone", " export", " vec", " Max", " activities", "ictures", "gener", " ma", [130, 172], " expression", "Callback", "_content", " Most", " testing", "EC", "CHANT", " adjust", ".Threading", "(ctx", " agree", "ighest", " ui", " Law", ".Y", "><?", " pod", "-lg", "\u201D\n\n", " describe", " European", "-sh", " PURPOSE", "ORY", " convers", " Illuminate", " Av", "(ch", '?"', "chen", "ima", "Document", " operations", "win", "	function", ".Image", " scen", "/h", " SC", " explo", ":%", "/**\r\n", "NAME", [230, 136], "(var", " director", "ONG", " yield", " feet", " Search", " Il", " restaur", "duc", " integer", "107", " '';\n", " highly", "checked", " PARTIC", "ERCHANT", "\uFF09", " optim", "Queue", " LI", "itation", " transport", "ission", "fill", "usion", "                              ", "	bool", "-th", "upt", " essential", "anted", " benefits", "	S", "';\r\n", "iki", " girls", "iced", "buffer", "]+", " socket", " prices", " Fre", " sat", " wood", "MenuItem", "ARG", " Admin", "OWN", "dk", " reset", " forms", " \u0438", [230, 150], " Tuesday", "109", " Initialized", "_train", "orary", "ategor", " dt", "Total", "construct", "ilies", " guys", "\u0435\u0440", " instruction", "010", "yled", " internet", "etadata", "ady", "faces", "jection", " Jack", " rect", "[-", " Leg", " devices", "OC", " *\r\n", "oration", "ertain", " guard", "ostream", " enum", ".layout", ' ";\n', "voke", " Ok", "Home", "(tr", "ETH", " delay", " purchase", "dc", " aren", "_once", "				\n", "ror", "draw", ".run", "(model", "Timeout", "lik", " Arg", ".en", " fish", "cpy", "_fe", "ERCHANTABILITY", "(X", "_output", "??", " jo", "andard", " doll", "errors", "_base", " PARTICULAR", " leader", " compar", " doub", " Vis", "StackTrace", "-C", " Stud", "stitute", "More", " Description", "WARE", "ads", " \u043A", "bind", "=self", "employ", "[n", ".all", "-B", "&&", "alm", " culture", "house", " suffer", " '%", " straight", " Star", "udo", " ded", " COM", " confirm", " Good", ".sc", "________________", "DR", "Configuration", "DateTime", " advert", " couldn", "async", "stack", "')\r\n", "Kit", " hous", " mechan", "rate", "204", " audio", "	cout", "cores", " spot", " increasing", " ##", ")))", "points", " compared", "lig", " behavior", " BY", " Att", "craft", "headers", "ete", "endregion", " detail", "ULE", " Common", "	protected", "ston", " FITNESS", " fresh", '">\n\n', ".example", "berg", " moved", "	e", " Saturday", " payload", "\u0107", "):\n\n", " bey", "urer", "<script", " symbol", " assum", " pul", "Effect", " hundred", "Tool", "aked", "connection", " voice", " pd", " transaction", " links", "Err", " Indian", "TC", "atalog", "ni", "sign", '<<"', "ji", "ya", " demonstr", "ulated", ".St", " instit", " boost", " cells", "olic", ".Pro", ":</", "EventListener", "ifying", " Di", "orrow", ".execute", " college", "Your", " largest", ".dis", " qui", " individuals", "_buffer", " ng", "SA", " Control", " sing", " suit", "    	", "SG", " jump", " smart", "oma", " Exp", " '-", " assist", " successfully", "sys", " Cre", "_ref", " Thursday", " bur", " \u0434", " beyond", " nodes", "Details", "inct", " James", " affect", "exception", " typeof", "(\r\n", "-se", " fetch", "`,", " crusher", "}.", " BO", "Show", " rates", " bon", "-icon", " Media", "RESS", " Valid", "\u043E\u043B", " fuck", "acks", " studies", "Me", " owners", "}else", " growing", "Variable", " Bel", ".random", "vement", "onym", "(F", " FALSE", " torch", "(row", "igo", "structure", "121", " certainly", "Dep", " Green", "question", " adding", " Develop", "_def", " mach", "=%", "		 ", "conds", "Project", " reject", [32, 206], " poor", " aware", "114", " Build", " British", " NE", " numer", "rees", "claim", " mock", " om", " scre", "OLD", ".pl", "eler", " correspond", "_HE", " binary", "116", "_order", " SQL", " advant", " prev", ".[", ".assertEqual", "plier", "arp", " closed", " encour", " QString", "aud", " developed", " permission", ".debug", "operator", " '\n", " sym", "atively", "\xE9e", "-color", " GET", "ky", " although", "_request", "_element", "................", "_DATA", " amazing", " sb", " Default", "Events", " failure", "acle", "Properties", " dream", " distr", " au", " generated", [230, 149], " Team", "USE", " income", " eye", "_not", '"],', "_form", "Support", "orders", ".Print", "ville", " Wednesday", "olver", " oppos", "isation", "ola", "Close", "<p", "_width", "Invalid", "xb", " strugg", "_action", " txt", " Path", "alar", " MERCHANTABILITY", "service", " Michael", "ableView", "Debug", "okes", "She", " guess", " Java", "_PATH", " particularly", " II", " domain", "\u5E74", " reduce", "-left", "real", " appears", " como", " Unit", " Govern", "ali", "allel", " Jew", "_I", " cos", ".color", " Global", " tele", "ben", "_trans", " reasons", " emb", "ensity", "lines", "omin", "Screen", "\u0430\u0442", "pects", "clip", "foo", "rent", " af", " danger", "iling", "Names", "Our", " distribution", "While", "SL", "Write", " goto", " colors", " powerful", "kin", " depth", "ercial", " Congress", " Market", "Db", "under", " Last", "\xDF", "greg", " posts", "_URL", "otos", "Don", " micro", " arrest", "\u043F", " (@", " Hot", " Index", ";&", "#!", " Nor", " Cap", "-(", " interested", "pear", " rent", " album", "olicy", ".lang", ".trans", ".format", " {\r\n\r\n", "phere", " axis", " Business", "ersistence", "urr", " minimum", "endor", " SD", "113", " Internet", [229, 164], "Exp", "iverse", "MM", " obvious", " basis", " science", " budget", "izations", "PA", " flags", "pret", "LOCK", " variety", " truth", "dt", " gone", " battle", "<std", " Sil", "rf", "uda", " erot", " Cam", " station", " '</", "cheme", " Sun", " finished", " shop", " Kore", " eight", "_REG", "ND", ">,", '"><?', "(num", "	inline", "Transaction", ".On", " mail", "rey", "results", " nav", "IMIT", "_ids", "Make", [229, 138], "Modal", " LOG", " Sur", " instanceof", " overall", " Information", " construction", "_FILE", "but", " medic", " duration", "itness", "agent", "AV", " seven", "olf", " }}\n", '"],\n', "170", "122", " calling", " ans", "throws", "orizontal", " useState", ".fl", " Status", " Online", "RR", " Rich", " Hill", " brain", " followed", "240", "emic", " slight", " insurance", ".Array", " abstract", " Sum", "redirect", "owner", "(msg", " Clinton", "Non", "	ex", " volume", " EventArgs", "-L", " Dim", " Mart", " cursor", " implementation", "urred", " larger", ");\n\n\n", "'+", ".transform", " upload", "                                                       ", "Draw", "nel", "	float", "qrt", " Network", " tit", "Axis", ".android", " completed", " mur", " columns", "xc", " supply", "iminal", " spr", "================================================================", " units", "(u", "mi", "replace", "[key", [224, 185], "antic", " payment", ",B", " Apple", "gin", "Required", "#+", "lands", " squ", " factor", "dec", " strength", " boy", " balance", " sources", "screen", "-top", " Amazon", " hidden", "\u0435\u0442", "_client", " eat", ".display", " \xBB", " trigger", "anager", " tro", " claims", "ford", " Company", " gift", ",:", "_app", "handle", " produce", "/lib", "512", " -*", "	set", "'];", "arc", "ander", " Engine", " attributes", "task", "<=", "(N", " warm", "which", " Fore", "agnost", "mys", " tal", " Sal", "gi", " Print", " TRUE", " \u043E", ".UI", " flash", "roperty", ".location", " Mill", "bi", "contr", ".request", " Sam", " negative", "kit", " sett", ".printStackTrace", "abe", "	i", " burn", " society", "Cache", " Security", ".models", " WARRANTY", "_up", "ceive", " clients", ".Tr", " providing", " rout", "material", " ||\n", " Ser", " Office", "FTWARE", " '$", " foc", " excell", " cat", "normal", " determine", "	uint", "Pane", " employees", " Texas", " traff", " Report", "anta", " Box", " django", " partner", "EB", "LINE", " feeling", " civil", "(float", "Sql", " wouldn", ".init", ".left", "-v", "_level", "'}", "AF", " loading", " Only", " cookies", " Gl", "CO", " strategy", "('./", " ship", "poses", " signal", " alpha", ".pop", "Radius", " replace", "_DIR", "counter", "bservable", "ela", "Weight", "hash", "bose", "fx", " Email", " refer", "localhost", "_RO", "iques", "Step", " ahead", "(View", " Services", " Json", "essor", " pun", " appropriate", "akers", "osen", "posing", " agent", "fc", " transfer", " invalid", " Research", "Vertex", " gay", " journal", "[x", ' "",\n', " Well", ".Tasks", "Spec", " ol", " spend", " Australia", "Match", ".junit", "                                     ", " MAX", "izable", "clusive", "_valid", " quarter", "yan", "005", " Edit", "arden", "=new", " frag", "Bit", "zi", "aine", "udd", ".Object", "debug", " cash", "_IM", " een", " commercial", " Video", "loader", " fixed", " applications", " _,", " Russia", "itect", "_(", " Block", " san", " Tom", " perhaps", " sig", "levant", " corpor", "ataset", "ronic", "xe", " eth", "Some", "pop", "_OK", " tend", ".Res", "_and", " reviews", " wild", "117", " degree", ".O", ".objects", "_args", "nil", " disabled", "Parent", " notes", ' ""\n', "(state", "istrict", " logging", ".IO", " Mal", "DM", " xml", " Robert", "elen", "layout", "fol", "']))", ",b", " Jer", "filename", " fan", " Custom", '=""', " Die", "Bundle", ".utils", " trip", "MB", " soft", "_MODE", " applicable", " upper", "ERVER", "_al", "_LOG", "Here", "wp", " Server", " Client", " chem", "Scroll", " highest", " Select", ' "@', " Why", "Sec", "heel", "Operation", " connected", "irmed", " citiz", " Che", " forces", " www", "Root", "ANCE", "Many", "icip", "rgan", "220", " Tor", " Press", " Mor", "-line", "uled", ">\\", " thus", " Register", "hol", " Chinese", " posted", " magn", "abilities", " disease", " remains", " Prof", "-form", " cin", "organ", "icate", " stress", "]*", " ----------------------------------------------------------------", "_context", "orry", " died", "mat", " starts", ".Message", " runs", " guide", " warranty", "entials", "dict", " Size", "uler", " responsible", "_SET", " containing", " Price", "||", "350", "FS", " emp", "_button", "(uint", " suff", "pth", " definitely", "pute", " marketing", " WH", " Sie", "+=", "OLOR", " consult", " signed", " sequence", "lee", " requirements", "hy", "Express", "MT", "sey", " ult", [229, 174], "elligence", " analy", " dress", "engine", " Great", " Android", " Alex", "mode", "Dictionary", ".Date", [228, 189], "VICE", " families", " Russian", " Times", ".call", "$(", "Profile", " folder", "ches", " legis", "_row", "unes", "\u0644", " }).", "Assert", "agen", " Hand", "Iter", " biggest", "oreach", " polic", " permissions", " showed", " Element", " topic", "\u2014\u2014", "road", " Bank", "record", " partners", " Ref", "essions", " assess", "UST", " Party", "produ", "LC", " ul", ".form", "hide", "copy", "UTF", " SOFTWARE", "\r\n\r\n\r\n", " Lin", "una", "ugar", " administration", " opening", " scan", " continued", "component", ".sp", " happens", "ummy", " PR", ".File", " Download", "Loading", "di", " waiting", "_ADD", "Tab", ".querySelector", " economy", " French", "txt", " fant", "_;\n", "Holder", "SH", "004", " numpy", " street", " male", "\\Model", "anging", "333", " Bill", " previously", "BI", " Secret", " mist", " Field", "ups", " Process", " kept", " OT", " traditional", ".i", "amin", " helps", "Any", "origin", "ilters", "ju", "desc", " Account", " )\r\n", "ktop", "olly", " fs", [32, 234], " ut", " central", "(test", ".An", " satisf", "GR", " Full", " heat", "iber", " onto", "mos", "Schema", " factory", '".$', "aws", "Statement", "(target", "	new", ".be", " guest", " mal", "ARY", " reached", " mouse", " challenge", "	double", " Tem", " terror", " extract", "_TO", " separate", " mir", "help", " capacity", " Property", "kan", "_create", " Light", ".parent", " understanding", " easier", " |=", " enh", " fat", " protest", "amm", "_AT", "-of", "ils", " Oh", " psych", " $.", "inds", " relative", "shop", "short", " Sand", "210", "uestion", " fear", "/\n\n", ".context", " schools", " serve", "zone", "_db", " majority", "example", " lang", "	  ", "Register", "endo", " processing", "_template", "-user", " eg", "COM", " Blue", "iro", " remote", " IT", "#!/", " redistrib", "124", "raz", " Since", " Tur", "135", "Background", "===", " reflect", " pros", "cmd", " whom", "Compat", " Are", "Identifier", " Thom", "_port", "gu", " monitor", "rm", " patient", "verter", " gain", "-ui", "Inst", " dies", "118", "Area", "_filter", " grat", " reality", "ordinate", "olved", "Contact", " compliance", "_or", " Var", "dl", " append", "GER", "(max", ".render", " dynamic", "ordinates", "_options", "_column", " batter", "space", "La", " Source", "/bin", " dos", " Board", " Thread", " AL", "(config", "144", " Mer", " miles", "_header", "ETHOD", "izz", " benefit", " integr", "(current", "ulo", ".default", " Div", " ton", "oth", "ervation", "edom", " baby", "ceived", ".top", "riority", " Local", "riage", " attacks", " hospital", "168", " female", " Login", " Flor", " chain", "ashion", "Texture", "Save", " farm", ".contains", ".Test", " knows", " generally", "ipeline", " meant", "encia", " nicht", " contents", "PM", "chedule", "(line", "CG", "job", " Real", "uer", "firm", [32, 216], "etro", '"`\n', " speech", " thr", "foreach", " warn", "	l", " heavy", "<li", "Ne", " investigation", "Math", "-title", " church", " despite", "chain", " whatever", "arian", "fn", " meta", "})\n\n", "UFF", " regarding", "_SUCCESS", "mes", " Intent", " resolve", "poss", "ira", "force", "oice", "\xE2", " pm", " updates", "Arr", [32, 209], "testing", " toward", "ntax", [235, 139], " listen", " goals", "InstanceState", "Dr", " rare", " trail", "Keys", "Cal", "Car", " People", "	local", "classes", "Reference", ".forEach", "emb", "activ", " prim", "redict", " rad", "\u6570", ".Back", " spread", " clock", " vir", "editor", " efforts", " branch", " indust", " motor", " amb", " datetime", " rencont", " Christian", " Americans", "full", " fmt", ".main", " caused", "_update", " Content", "ATCH", " bath", " Each", " radio", "achment", "uzz", "Submit", " restrict", "abin", " Load", " extension", " essay", " hat", "aviour", "toBe", '":[', " offered", " vill", "(double", "119", "\u65E5", "bc", "_free", " Miss", " Ber", [32, 232], " Like", " helped", ".getName", "_AL", " spirit", " Apache", "ws", " therefore", "(params", "_img", " peace", " incor", " EXPECT", " minor", "ipes", "	data", "selector", "city", "trie", ".base", "_frame", " opened", "/json", "LY", "nu", ".De", "tf", "margin", ".Parse", " pi", " eq", "bd", "Fields", " Tree", " ban", "istan", "\n        \n", "	gl", " produced", "system", "Mark", "_hash", " bg", " constit", " League", " mission", "_format", "([\n", "clusion", '!"', "\u0437", "break", "	switch", " ther", "Transform", " football", "-link", "route", ".auth", " bag", "overs", " enabled", " rac", "(I", "CR", "ancing", " managed", "_q", "NGTH", " mac", " Auto", "amente", " '',", ".Append", " pin", ".item", "acking", " occas", "person", " ti", ".Reg", " haven", " glass", ' "</', " Simple", "Print", " surround", "NO", "\u3002\n", "        \r\n", " Many", ' "_', " weekend", " somew", ".params", "small", "ATED", " plugin", "fields", " Initialize", "oon", "atile", "ye", " vous", "LAG", " older", " gam", " extremely", " het", "enum", " SET", "xff", " timer", "/index", " critical", "Rows", "_argument", " execute", " showing", ".xml", "-list", "Role", "typename", "_method", "that", "cher", [32, 226, 134], "XT", " thousands", "	n", " resp", "_price", "olut", "Ag", " Two", " becomes", " hus", ".Use", "theme", "urb", " /*\n", "erialize", "ARN", " lose", "Lower", " vel", " defense", "condition", " bes", " dry", " scroll", ".Show", "IEL", "\u043E\u0440", " Rest", "Where", "oods", " Jes", " wire", "_INFO", " strings", "gment", " matches", " electric", " excellent", " Council", "idade", " wx", "push", "_entry", " tasks", " rich", "sa", " Smith", "UNCTION", "Pointer", "pective", "131", " widget", "ista", " agency", " sich", "ologies", " trial", "alysis", ".check", "ARK", " onChange", "about", "',$", "(val", " placed", "_NO", " dan", ".equal", "	     ", " weather", ".game", " destination", "_USER", "iece", " provider", ".last", "plex", "Note", "/js", " p\xE5", " planning", "attribute", "PRO", "atches", " <-", " seeing", " cancel", "_ind", ".keys", " visual", " Current", " College", " Rock", " agreement", " Store", "oving", " corner", "ampions", "ISE", "Fin", " protection", " fi", "Play", "plugin", ")}", ".frame", "-z", " transition", "igin", " candidate", " Union", "_values", "(map", "cle", " trend", "wide", "aren", "Loc", "UTH", " Bay", " smaller", "ius", "141", "well", " criminal", " conflic", "bert", "_INT", " investment", "custom", " Session", "_write", "ania", " Mass", "_EQ", "_NOT", " violence", "Argument", "_email", " belong", "_function", " enemy", "ema", " Address", ".empty", " inner", " Contact", "Loader", "<input", " CA", "lot", " pictures", " Support", "_names", "188", "Layer", " Click", "Sum", "\xE6", " Look", "uous", "Lib", "Flags", "team", "EP", "189", "hat", "override", "apsed", " labels", "quis", " Stream", "_device", " Commit", "(root", '"}', ".isEmpty", "126", "	M", " angle", " Because", "%%%%%%%%", " aim", " stick", "stmt", "agraph", "answer", " clin", " Isl", ".ext", " INT", " styles", " born", " scr", " expand", " raised", "TextBox", "ILL", "------------------------------------------------", "HTTP", "132", ">)", "_char", "resource", " episode", " '_", " Es", " Earth", "\xA0\xA0", "UPDATE", "133", " Sou", "uis", "types", " mas", " fav", " construct", "_rate", "eras", " |\n", "roperties", " external", " applied", " prefix", "oted", "lers", " cold", " SP", " Church", " Output", "losed", [231, 154], "ificate", "operation", "herit", "xFF", ".env", "_err", "osh", "Direction", "Cancel", " Frank", " finding", ".)\n\n", " router", "\u30FB", "ses", " crow", "=='", " sand", " rid", "iture", " entre", " observ", " vac", [240, 159], "-T", "Art", "night", ".search", " exchange", " district", ".os", " department", " documents", " century", " Next", "Host", " KIND", " susp", "-P", "rend", ".em", "uite", "isters", "(json", " Ann", "wt", "ati", " HTML", "when", "Directory", " shut", "<a", "edy", " healthy", " temperature", " Gen", " metal", " submit", " DO", " attract", " {};\n", " Word", " ll", " seemed", "ko", "IED", " labor", ".Context", " asset", "you", " cars", " Column", " r\xE9", " square", " NSString", "\u201D,", "apes", "...\n", " thanks", "(props", " tick", " experiment", " prison", "tree", "-text", " IOException", "-width", "_STATUS", "fast", "-body", "-header", " guar", "crete", " Tim", " clearly", " Republican", " justify", "\u0438\u0442", "	    ", "cache", ";//", " presence", " factors", " employee", "]))", "Member", " selector", "bor", " Mex", "\u7684", "utex", "_tag", "ailure", " Net", " reli", "EG", " fprintf", " teen", "loss", " leaving", "134", "Delegate", " beat", " minute", "subscribe", " redistribute", "Constants", " cancer", "/{", "BL", " span", " Child", "Center", " earth", "YS", " Level", " sea", ".support", ".inner", ".Item", "illing", "    \n    \n", " Label", "320", " Est", "(arg", "145", "boBox", "	foreach", "cos", "Failed", "swers", "Editor", "ront", " MP", "expr", " Life", " ??", "\xF6r", " attend", " Que", " species", "-D", " aus", "Struct", " advantage", "oston", "-block", "initial", "CRE", " truly", " compare", "orney", " spect", "Full", "bes", " visible", " mess", "stances", " cloud", "_version", " furn", "icago", "LOW", " traffic", " fol", "rypto", " declar", " slot", " Ext", " England", " Under", " ta", "letter", "203", " officer", " Donald", "Yes", "_json", "ITableView", " USE", "mployee", " opinion", " Aut", "border", " advice", " automatically", "isco", " mm", ".vis", "aml", " initialize", " ({", " ;\n\n", " generation", " bits", "clipse", " unf", "utors", "plt", " delta", "estroy", "isis", "<br", " limitations", " ended", " Mad", "ilm", "These", "187", " Minister", " chart", "Fragment", " independent", "Year", " instr", " tags", "AVE", " Arch", "stop", "Progress", " mi", " learned", "Ge", " hotel", "151", "SM", "TYPE", " cy", "ERSION", "unately", "limit", "sel", " movies", " steel", "oz", "gb", " Camp", "site", " Logger", "PLE", "\u043E\u0434", ".right", " Core", " mixed", "step", " puts", "super", "Router", "186", ".Http", "222", "lyph", " Colors", " androidx", ".str", " innov", " deck", "'>\n", "apers", "](", "continue", "spec", " Road", "ASH", "iliar", " continues", " appoint", " #\n", " Vir", ' ?>"', " bin", '}",', "going", "each", "BD", "185", " Access", "Doc", " Management", "BER", "asket", ".getInstance", "129", " established", "socket", "INS", "	virtual", "	result", "READ", "_height", "152", " Font", " ();\n", "_html", " neighbor", "lor", " gather", " })\n\n", " identity", " fab", "padding", " Route", "Enumerable", "\xF4", " forced", "/jquery", ".\n\n\n\n\n\n", "resents", "_left", ".Param", "	throw", " Ham", " eventually", "acer", "pub", " tra", "unique", "del", " Florida", " Clean", "xa", " \xB7", " validate", "Visual", "Expression", "_func", "member", "	h", "trl", "136", "	G", "napshot", " PropTypes", "vin", "153", "])\n\n", "owl", "ifies", " $('.", " Context", " Toast", ".Key", " officers", "/n", "sn", "undefined", ".items", "utow", "amage", " accounts", "ookie", "Section", "icians", " advis", "(is", "[:,", " France", "Func", "icious", " tok", "Channel", " AD", "_NUM", " timeout", "lemma", "reme", "uj", ".Al", "uclear", "(os", '("<', "[\n", "fetch", " bal", " guid", "-align", " Write", " Once", "utowired", "ODULE", " pitch", "CF", "bytes", " Commission", " incred", "PER", "_response", " Los", "parser", " assume", ".Request", " Token", "_position", " nom", "-term", " remaining", "iostream", " pieces", "apy", " Less", "range", "umbn", "prise", "_option", "230", "Impl", "kwargs", " businesses", "Alert", " parties", " Container", " Private", " Plan", " registered", " jour", "acker", "\u0435\u043D\u0438", "/>", "chat", "sect", " creation", "olutely", " instant", " delivery", "icken", "yes", "163", " Franc", "bling", "enda", "[(", "_range", "                                  ", " schedule", "Conn", " thank", "xd", " hook", " documentation", "Parameters", "Hello", "vt", " articles", " west", "defined", ".select", "okens", " VAL", ".file", "reset", " mys", " MA", "]),", " cities", "related", [229, 155], " appeared", " wid", ".panel", " Ins", ".entity", " decre", " Lou", "(time", " Thank", ".createElement", " mentioned", "ounce", " Try", " Wall", "/images", " Menu", "'\r\n", " Er", " critic", " Year", "(param", " flo", "NN", "ooter", " ];\n", " Aff", '"github', "rooms", " hyp", "global", " avec", "\u6708", " completion", " cond", "onymous", "(temp", " stars", " relevant", " covered", " elim", "_types", "(bool", " tu", "_exists", " secure", " stored", "]/", "xF", " Controller", " migr", "MI", " Den", " annual", "UIL", "-and", " crime", "bel", " kitchen", "@g", "_ph", "ournament", " Social", " Special", "logger", " tail", " unknown", "ded", " apprec", "(db", "cf", "155", " assign", "-out", " Mont", "dp", "widget", " stone", "-primary", ".grid", "Results", "azz", " daughter", " curr", "175", " lin", " south", "forms", " OUT", "lette", "aks", "igure", " EU", "variable", " brief", " Scott", " conference", "anda", "_lock", "oral", " eine", "ORS", "////////////////////////////////////////////////////////////////", "esso", " ris", " gender", "estic", "License", "(out", " ms", "See", " willing", "aze", " sports", " yes", "lu", " purs", "/javascript", "-pro", "navbar", "_product", "/bootstrap", " driving", [32, 196], " propos", "ultip", "uplic", ".email", " approx", "(cl", " wear", " reply", "asset", " ice", " tx", "kr", " Germany", " George", " cb", "	err", "Move", " poly", "voice", '}"', " animal", "Av", " Location", " native", ']["', "<double", " mais", ",int", " prepar", " interval", "plementation", "_ERR", " bug", '>"', "stat", " },\r\n", "<span", " faith", " rom", "prev", " Elect", "Find", " god", "otor", "//----------------------------------------------------------------", "original", "Cpp", " Senate", " positions", " weapons", " coff", " purposes", "pol", " impress", " animals", ".Entity", "(np", " murder", " ``", "flag", " solutions", " Active", " bright", ".date", " situ", "\uFF08", ".ID", " sie", "),\r\n", "akt", "Space", ".dat", ".indexOf", "han", "azine", " Ze", " crash", "(/", ">=", "\u0431", "139", "iva", ".AutoSize", " Lat", "_ext", "Initialize", ".register", "156", "OPY", " reverse", "_dis", "'][", " prompt", "onto", " Journal", "router", " mysqli", "#else", ')"', "-xs", "lets", "phan", ".LE", "137", "Will", " afford", " skill", "-toggle", "NC", "Bind", "TS", "Just", "iteral", "YP", "	unsigned", " wind", "149", ")):\n", " warning", " Water", " draft", " cm", " sam", " holding", "zip", " Science", " supposed", "Gen", " diet", "<h", " Pass", "vi", " husband", "\uFFFD\uFFFD", "note", " About", " Institute", " climate", ".Format", " nut", "ested", " apparent", " holds", "fi", "news", "CM", "video", "':'", "DITION", "ping", " senior", "wa", "-->\n", "_default", " Database", "rep", "ESS", "nergy", ".Find", "_mask", " rise", " kernel", "::$", ".Q", " offering", "decl", " CS", " listed", " mostly", "enger", " blocks", "olo", " governing", "\\F", " concent", ".getText", " mb", " occurred", " changing", "Scene", "_CODE", "Beh", '"The', " tile", " Association", "	P", "alty", "_ad", "odies", "iated", " prepared", "possible", " mort", "TEST", "142", " ignore", " calc", " rs", " assertEquals", " sz", " THIS", '."\n', " canvas", "java", " dut", "VALID", ".sql", ".input", " aux", "Sup", " artist", "Vec", "_TIME", ".stringify", "etween", " Category", " [-", " DevExpress", " Jul", " ring", ".ed", "YY", "Let", "TextField", " flat", "_print", " OTHER", "adian", " checked", "ele", "Align", "standing", " [],", " lab", "ucky", " Christmas", "(image", ".module", " lots", " slightly", "(final", "erge", [232, 191], "147", " Police", "143", " Right", " award", " OS", " {}\n\n", " ptr", "oves", "icated", "\u0435\u043C", " manage", "oliday", "Amount", "oolStrip", "tbody", "Nav", "wrap", "BB", " watching", "arios", " optional", "_K", " Licensed", ".Map", "Timer", " AP", " Rev", "(o", ",c", "umin", "etailed", " Hy", " blank", "agger", " Self", "()[", ".make", "earn", "channel", "<pre", "blem", "_password", "_sp", "icing", "ez", " theory", " Ter", "184", ",n", "logo", " HTTP", "()))", ".handle", ">;\n", "World", " python", " lif", " trav", " conven", "company", " Club", "138", "Ver", "Btn", " zone", "products", " Educ", " verify", " Mil", "ono", "]);\n\n", "ENCE", " packet", " cer", " enumer", " pars", "formed", " occup", "tre", " exercise", "Day", "_sum", " asking", "aption", " orders", " spending", " ERR", ".Dis", " Util", "\u201CI", "\\'", "?)", "/>\n", " emot", " influence", " Africa", "atters", "\u0645", ".session", " chief", "											", " tom", "cluded", "serial", "_handler", ".Type", "aped", " policies", "-ex", "-tr", "blank", "merce", " coverage", " rc", "_matrix", "_box", " charges", " Boston", "Pe", " circum", " filled", "148", " north", "ictureBox", "	res", [232, 174], " termin", " [\u2026", "IRECT", " ber", ' "../../', "retch", ".code", "_col", " Government", " argv", " Lord", "asi", "Exec", "	let", "vertis", " discussion", "enance", "outube", "typeof", " served", " Put", "	x", " sweet", "Before", "ategy", ".of", " Material", "Sort", "ONT", "igital", "Why", " sust", [32, 231], "abet", " segment", " [],\n", " Muslim", " findViewById", "cut", "_TEXT", " Mary", " loved", " lie", " JO", " isset", "month", " prime", "ti", " Carol", "Use", "146", " Pop", " Save", "Interval", "execute", "dy", " Iran", "_cont", "	T", " phase", "checkbox", "week", " hide", " til", " ju", "Custom", "burg", "/M", "TON", " quant", " rub", "ixels", " installed", " dump", " properly", "(List", " decide", "apply", "Has", " keeping", " citizens", " joint", "pool", "Socket", "_op", " weapon", "gnore", " Exec", "otten", " MS", " (-", " Review", " examples", " tight", "!(", "DP", " MessageBox", " photograph", "164", "URI", "\xE9t", "low", " Grand", ".persistence", " maintain", " nums", " zip", "ials", " Gets", "peg", " Buffer", "~~~~", "rastructure", " PL", "uen", "obby", "sizeof", " pic", " seed", " experienced", " odd", " kick", " procedure", "avigator", "-on", ",j", " Although", " userId", "accept", "Blue", "IColor", "layer", "available", " ends", ".table", " dataset", "bus", " explain", "(pro", " Committee", " noted", "]:\n", "Dim", "stdio", "154", '.",\n', "_source", "181", " Week", " Edge", " operating", " este", "ipl", "330", "agination", " proceed", " animation", ".Models", " Watch", "iat", " oppon", "/A", "Report", " sounds", "_buf", "IELD", " bund", "	get", ".pr", "(tmp", " kid", ">\n\n\n", " yang", "NotFound", "\u0446", "math", "@gmail", " LIMIT", "redients", " vent", "avigate", "Look", " religious", " rand", "rio", "(GL", "_ip", "uan", "iciency", " Change", ">\r\n\r\n", " Entity", " rencontre", " Ret", "plan", "\xE9n", "BOOL", "uries", "train", "Definition", "============", "zz", "450", "Animation", " OK", "_menu", ".bl", "_score", " acad", "(System", " refresh", "'=>$", ".Graphics", "amento", "pid", "tc", " tips", " homes", " fuel", [226, 150], "_helper", "  \r\n", " Room", ".Close", "_attr", " Mount", " Ev", "arser", "_top", "eah", " Delete", "\u300D", "uke", " usage", "aria", "_dev", " texture", " conversation", "eper", "Bean", "done", "nonatomic", " Second", " shooting", "_pre", "Components", " ]\n\n", "__,", "stitution", ".Char", ">();\n\n", " presented", " wa", "oker", "-\n\n", "iner", " becoming", " incident", "Att", "162", " revealed", "forc", " boot", ".page", "Enumerator", "165", "_->", "Photo", " spring", '.",', " Dictionary", "BJECT", " locations", " samples", "InputStream", " Brown", " stats", "quality", "\u0445", "-dis", " helping", " ped", "224", "(se", " Who", "alian", "internal", " ft", ">().", "->{", " mine", " sector", " gro", " opportunities", " \xFC", " mp", " alleged", " doubt", "Mouse", "About", "_part", " chair", " stopped", "161", "loop", "entities", " apps", "ansion", " mental", "                                         ", "FR", " defend", "care", " ideal", "/api", "urface", "011", " ele", "ulator", " Rights", "anguages", " funds", " adapt", "Attributes", " deploy", "opts", " validation", " concerns", "uce", ".num", "ulture", "ila", " cup", " pure", ".Fore", "183", " HashMap", ".valueOf", "asm", "MO", " cs", " stores", " ************************************************************************", " communication", "mem", ".EventHandler", ".Status", "_right", ".setOn", "Sheet", " identify", "enerated", "ordered", ' "[', " swe", "Condition", " According", " prepare", " rob", "Pool", " sport", "rv", " Router", " alternative", "([]", " Chicago", "ipher", "ische", " Director", "kl", " Wil", "keys", " mysql", " welcome", "king", " Manager", " caught", ")}\n", "Score", "_PR", " survey", "hab", "Headers", "ADER", " decor", " turns", " radius", "errupt", "Cor", " mel", " intr", "(q", " AC", "amos", "MAX", " Grid", " Jesus", "                                    ", ".DE", " ts", " linked", "free", " Qt", " /**\r\n", " faster", "ctr", "_J", "DT", ".Check", " combination", " intended", "-the", "-type", "182", "ectors", "ami", "uting", " uma", "XML", "UCT", "Ap", " Random", " ran", ".sort", " sorted", ".Un", "401", "_PER", "itory", " priority", " Gal", " Old", "hot", " Display", "(sub", "_TH", "_Y", " Care", "loading", "Kind", "_handle", ",,", "rase", "_replace", ".addEventListener", " RT", "172", " entered", "gers", " ich", "(start", "205", "/app", " brother", "Memory", "Outlet", " utf", "prec", " navigation", "ORK", " dst", "Detail", " audience", " dur", " cluster", "unched", " ],", " comfortable", ".values", " Total", " snap", " standards", " performed", "hand", '("@', [229, 173], " phil", "ibr", "trim", " forget", "157", " doctor", ".TextBox", "377", "icons", ",s", " Op", "Sm", "Stop", "	List", "	u", "Comment", "_VERSION", ".Xtra", "Person", "rb", "LOB", "                    \n", " Central", "270", "ICK", "raq", " putting", " md", " Love", "Program", "Border", "oor", " allowing", "after", " entries", " Maybe", "]).", " Short", ")\\", ".now", "friend", " prefer", " GPIO", "osis", " GameObject", " skip", " competition", "_match", "lications", "_CONT", ".groupBox", " als", "666", '"We', "_eq", "lan", "_search", " Music", "asis", " bind", " Island", "rum", "(E", " seat", "Video", " ack", "reek", "={()", " rating", " restaurant", "456", "DEX", "(buf", "pping", "uality", " league", "176", " focused", "apon", "$data", "CLUD", "CLUDING", " absolute", "(query", " tells", "Ang", " communities", " honest", "oking", " apart", "arity", "/$", "_module", " Enc", ".an", ".Config", "Cre", " shock", " Arab", "IENT", "/re", " retrie", "ycler", "isa", " Organ", ".graph", [32, 237], " BAS", "Enum", " possibly", [209, 128, 208, 176, 208], " Japanese", " craft", " Place", " talent", " funding", " confirmed", " cycle", "/x", "GE", " hearing", " plants", " mouth", "pages", "oria", " Remove", "_total", " od", "ollapse", "door", " bought", " addr", "ARCH", "_dim", "dden", " decades", "REQUEST", " versions", "fire", "006", " moves", "fb", " coffee", ".connect", " Row", " schema", "Scope", "-Type", " fighting", " retail", " modified", "TF", "Files", "nie", "_command", "stone", " \u0442", "_thread", " bond", " Development", " pt", "FORM", "plet", " identified", "cpp", "206", "225", " coding", "oked", " Master", "IDTH", " residents", "redit", " Photo", "=-", "unte", "ateur", "159", "_STATE", " Sing", " sheet", ".val", "orse", " hers", " determined", "Common", " wed", "_queue", "PH", " Atl", "cred", "/LICENSE", " mes", " advanced", ".java", ".Sh", "Go", "kill", "fp", "_settings", " pal", " truck", " combined", ' "${', " Corpor", " joined", " Jose", " Cup", "uns", "estival", "levision", " broken", " marriage", " Western", " represents", " Title", " ss", ".Ass", "ongoose", "iento", "<>();\n", " absolutely", " smooth", "TERN", " Unless", "Word", " merge", "igan", " Vol", " nn", ".getId", " \u0437", "171", " sexy", " seeking", "Single", ".this", "179", " kom", "bound", ';"', " fontSize", "_df", " injury", "(H", " issued", "_END", ":self", "020", " patch", " leaves", " adopt", "FileName", "\u3010", " executive", " Byte", "]))\n", " nu", "outing", "cluding", "-R", ".options", " substant", "avax", " BUT", " technical", " twice", " m\xE1s", " univers", "yr", " drag", " DC", " sed", " bot", " Pal", " Hall", "forcement", " auch", ".mod", "notation", "_files", ".line", "_flag", "[name", " resolution", " bott", '("[', "ende", "(arr", "Free", '(@"', " District", "PEC", ":-", "Picker", " Jo", "     \n", " River", "_rows", " helpful", " massive", "---\n", " measures", "007", " Runtime", " worry", " Spec", "	D", "\u3011", " ){\n", " worse", "(filename", " lay", " magic", " Their", "oul", "stroy", " Where", "280", " sudden", " defe", " binding", " flight", " OnInit", " Women", " Policy", " drugs", "ishing", "('../", " Mel", "peat", "tor", " proposed", " stated", "_RES", " east", "212", " CONDITION", "_desc", " winning", "folio", "Mapper", " Pan", " Ange", ".servlet", " copies", "LM", " vm", [229, 141], " dictionary", "Seg", "177", "elines", " Send", " iron", " Fort", "166", ".domain", " debate", "NotNull", "eq", "acher", "lf", "	fmt", " lawy", "178", "\u011F", " Men", " trim", "(NULL", " !!", " pad", " follows", '"]["', "requ", " Ep", ".github", "(img", "eto", "('\\", "Services", "umbnail", "_main", "pleted", "fortunately", " windows", " plane", " Connection", ".local", "uard", "}\\", '=="', "andon", " Roy", "west", "158", "iginal", "emies", "itz", "'):\n", " Peter", " tough", " reduced", " calculate", " rapid", "customer", " efficient", " medium", " fell", ".ref", " Cas", " feedback", "Speed", "(output", "aje", " categories", " fee", "};", " deleted", "reh", " proof", "Desc", "Build", " sides", ".ArrayList", "-%", "                                      ", "\u0631", ".match", "\u043B\u0438", " feels", " achieve", " clim", "_ON", " CD", " teacher", "_current", "bn", "_PL", "isting", "Enable", "GEN", " tv", " sock", " plays", " discount", " KE", " Debug", "Fore", " Iraq", " appearance", "Mon", " styled", " Human", "iot", " History", " sac", " Collection", " recommended", ".Selected", " organizations", " discovered", "cohol", "adas", " Thomas", "May", " conserv", " domin", " Follow", " Section", " Thanks", "Username", " recipe", " wonderful", ".sleep", "_if", "	\n	\n", "orno", " ru", "_target", '.""', [224, 166], "EventArgs", " inputs", " fif", " vision", "cy", " Series", ")(((", " trading", " marker", "Begin", " typically", " causes", "dropdown", "_DEBUG", "260", " detect", "country", '!");\n', "	R", "appy", " cref", "('<", '"=>', " LE", "reader", " administr", "\xF5", "ucket", " fashion", ".char", "izar", " disable", " suc", " Live", "issue", " metadata", "flags", [32, 240, 159], " committed", " va", " rough", " '''\n", " highlight", "_vars", "VO", " encoding", "-Z", "_sign", '$("#', " rain", "reatest", " END", "Selection", " candidates", " sav", ".Empty", " decisions", " collabor", "ridge", "feed", "ression", " persons", "VM", "008", "ega", "_BIT", "According", "acked", " dollars", "_loss", " Cost", '}"\n', "Notification", " prostit", " authority", ".rec", " spokes", " Today", "istant", " Head", "\u201D.", "ertainment", "cean", "culate", " ven", "However", "_arr", " tokens", "Graph", " Jud", " Virgin", " Serial", "unning", "Mutable", "agers", ".csv", " developing", " instructions", " promise", " requested", "_encode", '/"', " Icon", "uilt", "-day", " intelligence", ".IS", " Observable", " Hard", "Bool", "211", "idential", ".Anchor", " selling", "CI", "AGES", "tle", "bur", "UFFER", "RY", " bigger", " rat", " famous", " typename", " explained", "}}\n", " nuclear", "-N", " crisis", " Enter", " answers", "/${", "/pl", " sequ", "_next", "mask", " standing", " plenty", " Cross", "	ret", "dro", " Cast", "167", "=true", " Chris", "icio", " Mike", "Decimal", "addComponent", "Len", " cock", " #{", "URN", "<tr", " authorities", "Resources", "-H", "Bottom", "012", "_qu", "puter", "esterday", "Dispatch", "since", " familiar", ",i", "VC", " ment", ",C", " freedom", " routes", " Buy", " commands", " mesh", "/C", " Settings", "-style", " witness", " cle", " union", "efault", "aret", " thoughts", " ----", "_process", "_us", "ingly", "UES", "Touch", " \u043C", "_open", " Vec", " reward", ".Click", "/:", " nie", "Changes", "Month", "\uFF1F", " execution", " beach", "(Integer", "	a", "/'", ".FontStyle", " abort", " Single", "(isset", " dp", " }}</", " Ma", "214", ".Rows", " Pet", "%)", "rand", [233, 128], "Rule", " hel", "021", "RITE", " quiet", " ratio", " CONDITIONS", "osoph", " IL", " advent", "cap", ";</", " USB", "Driver", " ours", " Johnson", ".K", "_delete", ".q", "	str", "/common", "	string", " PDF", "acts", ".Action", " Query", ".response", " Girl", " processes", "<Integer", "imo", " adds", " entirely", " wash", "/************************************************************************", " animated", " profit", "encing", "/S", " Sym", " manual", "Download", " (!$", " motion", "webpack", "-bottom", " gratuit", "PG", "(:,", " era", " ho", " Jim", "quir", " BASIS", "\xE1n", "DER", " expensive", "_co", "Bounds", "Well", " Democratic", " \u2192", ".Rem", "_SY", "names", " Vi", " isinstance", '\\">', " *=", " PS", " dangerous", "[p", "OME", "Other", " StringBuilder", "Points", "heading", " currency", " percentage", "_API", " classic", "thead", " MO", "FE", "Idx", "await", " \xE8", " accident", " variant", " myst", " Land", " Bre", " harm", " Acc", " charged", "iones", "Visibility", "arry", " Language", " walking", '".\n\n', "ifer", " leadership", ".From", "ynam", " timestamp", "ipt", " Has", "REFER", " Its", " listener", "UTE", "213", "_description", " experiences", " creates", "RS", "cart", "black", " choices", "war", "750", " '''", " ordered", " evening", " pil", " tun", " Bad", "(app", "random", " explicit", " arrived", " fly", " econom", "-mail", " lists", " architect", "234", " Pay", " ds", " Sol", " vehicles", "Hz", "-com", " king", "_equal", " Help", " abuse", "480", "169", "--;\n", " extr", " chemical", [228, 191], " orient", " breath", " Space", "(element", "wait", "DED", "igma", " entr", " sob", "-name", " affected", "ika", " coal", "_work", " hundreds", " politics", "subject", " consumer", "ANGE", " repeated", "Send", " #[", " protocol", " leads", "useum", "Every", "808", "174", "Import", "(count", " challenges", " novel", " depart", "bits", ".Current", " `${", "oting", "(\\", " creative", " buff", " introduced", "usic", "modules", "Are", "-doc", "language", "_cache", " tod", "?></", "omething", " hun", [229, 186], "aters", "Intent", " implemented", " Case", "Children", " notification", "Renderer", "Wrapper", "Objects", "tl", ".Contains", "Plugin", ".row", " forg", " permit", " targets", " IF", " tip", "sex", " supports", " fold", "photo", "},\r\n", " google", "$('#", " sharing", " goods", "vs", " Dan", "Rate", " Martin", " manner", "lie", ".The", "Internal", " CONTR", "Mock", "RIGHT", " '{", " controls", "Mat", " mand", " extended", "Ok", " embed", " planet", " Non", "-ch", ')",', "epar", " believed", " Environment", " Friend", "-res", " handling", "nic", "-level", "scri", "Xml", "BE", "ungen", " alter", "[idx", "Pop", "cam", " (((", " shipping", " battery", "iddleware", "MC", " impl", "otation", " Lab", "<form", "	name", " Games", "ray", "Extra", "Two", "(player", " Les", "\xB0", " charset", " journey", "eting", [230, 152], [226, 148], "\u7528", " din", " perman", " solve", " launched", " nine", " sending", " telling", ".password", " Matrix", "eric", " grab", ".u", " Library", " debt", "INK", ".findViewById", " frequency", ".ad", "_TEST", " negot", " African", "sender", "\u0161", "Global", "173", " experts", "++)\r\n", " depending", "gray", " judge", " sentence", "losure", "Ac", " trace", "Edge", " friendly", " concerned", "blog", " claimed", "}'", "integer", "_tree", "	continue", "xi", " accepted", "_one", " Education", "ublished", "gon", "appoint", "outs", " mining", " songs", " herself", " granted", " passion", " Lake", " loan", "uent", "chant", " detailed", "except", "_cmd", " HE", "Related", "zt", "'},\n", " specifically", "Static", " carried", "ANS", '\\":', "Created", " cul", "]-", "_api", "FP", " sitting", ' "")', "	goto", " Equ", " assault", "kins", "ancer", "ogen", " voters", " Prot", "Descriptor", "\u30FC", ".Assert", "bsites", "oster", "-menu", " arms", ".Client", ".background", "avity", " vul", "_MASK", " housing", " bear", "_iter", "pired", " markets", " Student", " ticket", " millions", "flater", ")=", " recover", " Force", " Both", " victim", " Disc", "report", " fourth", " Assembly", "/user", "NullOr", "textarea", " ath", " ([", " channels", " Justice", "choice", "LOBAL", "exec", "emale", " elem", "_le", " responsibility", " Tw", "ICATION", " elseif", " fo", "asts", " treated", "sen", " Vict", "sumer", "_BASE", " ast", ">{{", " Resource", " Standard", " Prem", "updated", "ivalent", " assets", "_temp", " interests", " hardware", " Rom", " Share", " ''\n", " *,", " Take", " Images", "_CHECK", "(typeof", " Jun", "\\<^", " liqu", " worst", "ymbols", "			   ", " drivers", " Document", "eno", " Technology", " approved", "umps", " snow", "formance", "_ASSERT", "uits", "207", "\u0646", " differences", ".Visible", "			\r\n", " Ps", "_fetch", " todo", ".',\n", " sel", "urers", "invalid", " tweet", "VEL", " researchers", " sprintf", " RO", " pel", ".Trans", " illegal", "dialog", "smarty", "lg", "_MIN", " hero", "final", " pp", ".Le", " ci", "	RT", " suggested", "pdf", "aching", " Ro", " Properties", " Si", " buying", " mu", " lands", "ifiers", " FILE", "ROUP", " holder", " Son", " sympt", ".route", ")?", " argc", " fort", " casino", "_category", " forum", "215", "prefix", "apture", "Tube", "ems", "imize", " nue", "aus", "course", "ATOR", "()),", "Advertis", "INGS", " acknow", " Korea", "pling", " worker", "PLIED", "hal", " Richard", "Elements", "			 ", "star", " relationships", " cheap", "ACH", " XML", ",&", " Louis", " ride", "_FAIL", " chunk", "[s", "_OUT", " chosen", "_[", "/(", " Jeff", "_sl", "priv", " Canadian", " unable", "_FLAG", " nos", "high", " lift", "fun", "(){", "elly", "yclerView", "_as", "_LIST", " radi", ".getValue", "304", " Angeles", " Span", "_instance", "itors", "208", " migration", "AK", "Oh", "\xAE", ".selected", " GT", " advance", " Style", ".DataGridView", "ection", "\u044E", "pio", "rog", " shopping", " Rect", "Illuminate", "OU", "	array", " substantial", " pregn", " promote", "IEW", ".Layout", " signs", "/.", " letters", "Board", "ctrl", '"\\', " Jones", " vertex", " ja", " affili", " wealth", "	default", " significantly", " ec", " xs", "actual", ".per", "_step", "anvas", "mac", " transl", "                                                           ", "Iterator", " och", "agnostic", " During", " DEFAULT", " till", " signature", " bird", " Ol", "310", " Ir", "HS", "avatar", "ESSAGE", " elev", " mt", " Nav", " relax", " plate", "ITEM", "(date", ".not", " grade", " }),\n", '?"\n\n', "iences", "High", " DIS", "231", "disabled", "QUI", " noise", "aux", " UP", "888", "osa", " voc", " ))", "ocom", "_OFF", " Db", "Lock", ".eclipse", ",d", " Draw", ' "(', " visited", [32, 226, 136], " succeed", " impossible", "aire", " Turn", " dish", "FG", " sensor", "ANN", "aba", " surg", "]);\r\n", " fp", "_an", "-J", "-G", " Job", "Convert", " KEY", " authors", "_server", "\\r", " -*-", "flex", " soc", "Ret", " salt", " \u2026\n\n", " Clear", "(page", "-danger", " rooms", "conv", "#{", ".op", " Area", "_SC", "hen", " begins", "-y", " excited", " ignored", " bonus", "student", " Member", " relatively", " Low", " Produ", "ateway", "posure", " thick", "aniel", "(view", " Crush", "Extension", "Il", "eed", "LOC", ".im", ".Items", " conflict", ".prevent", "252", " onCreate", "uv", "iser", " wave", "Mar", " Community", "iche", " Nothing", "[m", " Lee", "riends", "232", "\xE8re", "!!!", "anz", ".result", " SK", "_PARAM", " democr", "BackColor", ".exists", '"It', "(options", "razy", "aser", "\\Database", "alendar", "_ass", ";}\n", "vertex", "inecraft", "Warning", "argo", " actor", " Instead", " Using", "Self", "@interface", " speaking", " Paris", " LICENSE", ".node", " Food", "EIF", " Bi", ".Start", " IB", " university", "254", " Header", ".product", "409", "Copy", "etc", "rical", " >>>", "books", " algorithm", " '__", "(javax", " numerous", "Share", "Have", " recru", " prove", ".substring", "health", "\u0435\u043B", " decimal", " commission", "scription", "xC", " summary", "atted", " closer", "finished", "()){\n", " Wood", "301", "_fields", "ku", "_items", "Flag", " confidence", " Federal", "dux", " compat", " vertical", "\u0439", "\xE8s", ';">\n', "_manager", "()))\n", "IDE", ':",', "235", "__\n", " Way", "221", "\u0448", "Temp", " STR", "ritten", "Sync", " AV", " CEO", " Guid", " environmental", " corresponding", "	console", " justice", " JS", " lived", "gar", " Graph", " Stat", " iPhone", ".al", " HD", " occur", " threshold", "509", " onclick", "REG", ".GraphicsUnit", "Meta", "\u017E", " cum", ".gnu", "\xEB", " obtained", " complaint", " eating", " tar", "_task", " opts", "216", "(to", "Pass", " plastic", "tility", " Win", ".preventDefault", "pile", " Gar", " quantity", "_last", " greatest", "Dao", "_DIS", " Used", " HP", "riting", "SION", "blue", "domain", " scores", "Normal", "_admin", " ASSERT", "Then", "***", "dist", "lon", " hate", "shal", "ImageView", "database", " pand", " logic", "=false", "bg", " Configuration", " nur", "OG", " married", ":+", " dropped", "040", " registration", "\u043E\u043C", "ultiple", "izers", "shape", ".copy", " wearing", " Cath", " dedicated", " ...\n", " advoc", " Family", " statements", "ematic", "ampionship", " motiv", " Have", " blow", "Job", "cert", "_vector", "install", " COPY", "embed", "DIR", " Spring", " exhib", "223", "cdn", " Comment", " Optional", ".player", " Dark", "(pos", " Should", " centre", " Guard", "\xF3w", " trouble", "ENER", "(unsigned", "_service", " ns", "uling", " Mexico", " NY", "mysql", " lic", [229, 156], "Mr", "-fl", " Customer", "idi", " ?>\n\n", "rible", " \u043F\u0440", " sizes", "_STRING", "validation", " Jon", "(Http", "addClass", "Nodes", " fragment", " spoke", " waste", "Join", " illustr", "eli", "cient", " aid", " prosec", "'){\n", " passing", " faces", "Shape", "_Z", "iti", " alle", " robot", "       \n", " Spe", " receiving", " Details", ' ")', "mg", "_REF", " comparison", "*,", " Found", "_session", "(U", "/F", " xxx", "Network", "ders", " capture", " corre", " Ltd", " Adv", "[@", " clip", "Mill", " Profile", " endif", " oblig", "describe", ".element", "riterion", "LD", "ered", " favour", "score", " Filter", "attributes", " checks", "Inflater", " Plus", " scientific", " privacy", "Head", " feat", " degrees", " Pale", ';">', " films", " Audio", " Tag", " Energy", "itar", "parator", " fellow", " evt", " Tri", " DAM", "cloud", " Password", " Democrats", " Acad", "$lang", " reb", "())\n\n", "\u043D\u044B", " Bur", "readcr", " hex", "209", "Console", "ctl", "ousel", " William", " az", "_PORT", " practices", " anywhere", " Position", " ->\n", "iams", ".username", "placeholder", " oder", " Secretary", " iT", "mond", "events", "?\u201D", ".Sub", " attached", " n\xE3o", " estate", "365", ".action", " figures", " });\r\n", " subscri", ".tag", "nam", ".plot", "noon", "liament", "Character", ".tab", " winter", " Variable", " trees", " proud", "(V", "_load", " hier", " Econ", " fd", " victims", "Rest", "iana", " fake", ".Println", " strlen", " sad", " ble", "Prot", " buttons", " television", " logo", "extension", "	j", "stein", "aciones", ' """\n\n', " simp", " recorded", " brings", " principal", " fees", "(source", "kdir", " utils", " correctly", "fil", " wel", "Pair", "-button", "scale", "verify", "[c", " ---", " escape", "ikes", "LowerCase", "ician", " chapter", " TYPE", " shadow", " awesome", "WE", "elif", " lambda", " distinct", " bare", "-off", " colour", ".appendChild", "olec", "aga", ".fill", "	super", " adj", "(position", ".getItem", "242", "Short", " totally", "VD", " Tre", "_ep", "vements", " Solution", " fundament", "Follow", " facility", " happening", "OF", ".textBox", "Span", " \xAB", "iden", " exceed", "(parent", " cp", [231, 187], " hasn", " pri", " consequ", "nen", " INTO", "Ignore", " Future", " carbon", " Steel", "fmt", "okie", " spl", "(title", "-info", " deals", " fixture", "ea", "Div", " tested", "_return", ")\n\n\n\n", "upported", " Cook", " paying", " Ill", " arrested", " Prime", "_callback", ">,\n", "driver", "Once", "abb", "_bytes", " Sets", "(Object", " cc", " shell", "alo", ");//", "(log", "264", "ctors", ")</", " neighborhood", "420", "ailability", "vol", " youth", " techniques", " Schema", "uh", "mente", " repository", "imm", " cookie", "JS", "ovies", ":{", "Complete", "Since", " laugh", "_BO", "enable", " Does", " Walk", "what", "kes", " multip", "iments", "eur", " victory", "Generator", " Mos", "rovers", " compute", " providers", " Medic", "LP", "_CONFIG", " veter", "sters", "_window", "umeric", "					\n", ".Response", " replaced", ".root", "-free", "-container", " matching", " Editor", "=${", " Saf", " sind", "(buffer", [229, 135], ".edu", ")];\n", " NFL", "aya", " dogs", " desire", " Middle", "Cart", "306", "Theme", " mob", " displayed", "igit", " adults", '"""', " delivered", "visible", '":{\n', "<<<", " GO", "scroll", "xE", " assigned", " Bool", " wp", " combat", " Haw", ".-", " supporting", ".Content", "345", "ircraft", " spin", " CR", ".my", [224, 165], "tpl", " spaces", "?,", "384", " Syria", " patterns", "-box", " framework", "/%", "(long", " teaching", "ARNING", "_keys", " tables", "UNC", "inations", "-weight", "radio", " Pac", ".server", ".CharField", "ring", " quote", "anna", " werden", " cream", " machines", "-k", "375", " stim", " Stock", "rick", " importance", "rx", "\xF5es", "\u0648", " stroke", "agra", " taste", " DEBUG", "Thanks", " Required", "ova", "Media", " si\u0119", "(base", "posts", " fileName", "Checked", " interrupt", " ()\n", "python", "pair", " circle", " initi", "_stream", " compreh", "learn", "Public", " humans", " bringing", "ographic", "_layer", "-like", "upportInitialize", "idebar", " votes", " desired", "Mask", " relation", ".Instance", "Help", " inspir", " Mono", "ViewModel", "ometimes", " backgroundColor", " rotation", " mari", "/test", "INSERT", "Star", "phy", "Ids", "_GET", " increases", "_close", "233", "_FORM", " [\u2026]\n\n", "aza", "TEXT", " \xE4", " Van", " lights", " Guide", " dates", ".Command", "aman", " paths", ".edit", "	add", "dx", " reaction", " Beach", ".getMessage", "Environment", "interest", " minister", " readers", "	F", " domestic", " filed", "City", " mapping", " DES", " repair", "tics", "ixture", " nombre", ".ISupportInitialize", "zo", ".IsNullOr", " Carolina", " Der", " EVENT", " gest", " hist", "resources", " orphan", ".Are", " Invest", "REFERRED", ".Logger", " Roman", " cultural", "feature", "pts", "bt", " dot", " diam", "uspend", "_access", "(){\r\n", " surprise", "abil", " virt", " bomb", "aron", "_IS", " vast", "Real", "epend", "icted", " picked", " FL", " Republicans", ".zeros", "Pressed", "sup", ".Core", "Microsoft", "services", "agic", "iveness", " pdf", " roles", "403", "ras", " industrial", " facilities", "245", [232, 161], " ni", " ba", " cls", "	B", "Customer", " imagine", " exports", "OutputStream", " mad", "(de", "){\n\n", " fro", "hus", " committee", "\uC774", ",x", " division", "(client", "(java", "optional", ".Equal", " Phys", "ingu", "033", "720", " sync", " Na", "}}</", "OLUM", "it\xE9", " identifier", "owed", " extent", " hur", "VA", "clar", " edges", "Criteria", " indeed", "inherit", " Night", "302", " reporting", " encounter", " kinds", "_pred", " considering", ".(", " protein", "Typ", "gricult", " Ball", "@Component", " Ess", " Rub", "802", "ulp", "                                        ", "itud", ".attr", "iente", " spell", " Joe", "ENTER", "_host", "itan", " matters", " emergency", "uated", " Chat", "={'", "contri", "arker", "\u6210", "iper", " scheme", "(stderr", " *(", "ceiver", ".column", " marked", "_ATTR", " bodies", " IMPLIED", "Gap", " POST", " corporate", " dimension", " contrast", "erview", " ERROR", " capable", " advertising", "urchase", " PA", " Francisco", " facing", "\u300C", "git", " beer", " sky", "download", " Cur", "mc", "anny", ".floor", " criteria", " parseInt", "`,\n", " aspect", " bundle", "Could", " tank", "-id", " hurt", " broadcast", "OKEN", "ownt", "nullable", "Cap", " alcohol", " Coll", " Helper", " Af", ".method", " planned", "pler", " Site", " resc", "oment", " JavaScript", "SERVER", " rhs", "eres", '(",', "ifi", ".fields", " parking", " island", " sister", "_\n", "Constraints", " Aust", "dim", "_points", " gap", "_active", " voor", " PO", "Bag", "-scale", "lambda", ".Dispose", "rule", " owned", " Medical", "303", "entries", " solar", " resulting", " estimated", " improved", "Duration", "employee", "$.", "Actions", "Like", ",(", "(Request", "%s", ".Open", ')"\n', " pixel", " adapter", " revenue", "ogram", " LA", " Machine", " \u0627", " fle", " bike", "Insets", " disp", " consistent", "a\xE7\xE3o", "gender", " Those", "perience", ".BackColor", ".play", " rush", " axios", " neck", "_mem", ".PREFERRED", "_first", "CB", " Widget", " seq", "har", " hits", " \u20AC", " contained", "rient", "water", "LOAD", " Virginia", " Arm", " ./", "\xBB", "_root", " assistance", "[],", "sync", " veget", "escape", "icer", "boost", " Float", "-W", "*/\r\n", "*>", "218", ' $(".', ".pos", " boys", " wedding", " agents", '="_', " Army", " hint", "vision", " tech", " Connect", " legend", " Bet", ".Base", "Subject", " lit", "Remove", ' ":', " Final", "pearance", " iTunes", " participants", " Python", " busy", "iel", "vertices", " templateUrl", " Close", "Img", " Corporation", "timestamp", " extend", " websites", " possibility", "\u043E\u0442", " k\xF6", " meat", " representation", "241", " 		", "_START", ".apply", " Valley", " Success", "Hi", " nob", " IEnumerable", "_select", "geo", '.")\n', " turning", " fabric", '("");\n', " perspective", [233, 151], " Sn", "Thank", ";j", ".Parameters", "	           ", " facts", "305", " unt", ".instance", "################################################################", "-end", " JOIN", " Hen", " uri", "\u540D", " \u043D\u0430", " Info", " conducted", " \xE5", "OURCE", " wine", "John", ".Errorf", " Age", "ounded", " realize", "312", " ];", " subsequ", ",m", "(User", "iano", " accompl", "isp", ".std", [233, 135], " Bed", ".setAttribute", "BR", "keep", " ALL", " isol", "amma", "Package", " occasion", "-success", "\u0435\u0434", " LIMITED", "strip", "()\n\n\n", "istribution", "Colors", " +:+", "DidLoad", "aler", " tid", " LED", " Linked", " Cart", "())\r\n", "_READ", " killing", " PHP", "fection", " instances", "cv", '"/>', " sf", " taxes", "_location", " Bitcoin", "uable", "rank", "ignore", "track", "\u043A\u0430", " shouldn", " OP", "=>{\n", " km", " helper", "_head", " Whether", "oco", "_bl", " statistics", " beauty", " tog", "tip", "\uB2E4", " csv", "(sql", "stdlib", "weak", " likes", "\u010D", " repeat", " apartment", " emph", "_edit", " vit", "	type", "217", "Even", "uten", " circumstances", "bian", " sugar", "Windows", [236, 158], " observed", "/data", " calendar", " strike", " RES", "_sc", "fony", "orem", "(z", "power", "etect", " Sat", ".description", " gang", " Sports", "ongs", " Bundle", ".sum", "once", " accused", " explore", " approximately", " losing", "thesis", " Fund", " diagn", "Autowired", "properties", " _.", " cnt", "cedure", " yy", " grant", "sock", ".innerHTML", " ]);\n", " CONFIG", "='$", "550", "]];\n", "UND", " glob", " dire", "uffle", "_MEM", " authentic", '>("', " decade", " Import", " originally", " jQuery", " indicate", " ourselves", "Sw", ".lbl", "enerate", " basically", " Hom", " +#+", " Britain", " Kar", "toEqual", ".stop", " modal", "isi", " suggests", " dtype", " tur", "bf", " connections", " Before", "isted", "mouse", " pulled", ".build", " legislation", " forth", "pad", "ego", ".Now", " exciting", "}\n\n\n\n", " compr", " shares", " rig", "green", "_vec", " enumerate", "Auto", "icator", " Ray", "asse", " holiday", " nullable", "gun", "_details", " wrapper", "seq", " Young", "juana", ' "__', "license", "serve", "^(", "iders", ".Remove", "ropdown", "'S", "pin", "(token", ".Default", " reasonable", "ampion", " Society", " bei", "erves", "rad", " Fox", "_images", " wheel", "')[", " cfg", "(By", "Constructor", " vary", ".swift", " proxy", "	H", " Another", " Pen", " checking", " jest", "manager", "Origin", "ugs", "oir", "><!--", " expressed", " moder", " agencies", " ih", "-hidden", "iously", " Rod", " sole", "Med", ".Any", " pc", "bal", "Example", " Sale", " strip", " Comp", " presidential", "Most", "putation", "(ref", " Four", "_filename", " enforcement", "\u062F", " Georg", "weights", "/l", " aggress", " drawing", "andy", "<I", "-j", "aka", "href", " teachers", "_Q", "(it", " MB", " temporary", "irebase", "stra", "\u65F6", [232, 180], "(label", "oup", " topics", " portion", "idos", " Jewish", " recovery", "650", " stands", "#[", " afternoon", " Article", "_att", " explan", " Pak", ".setOnClickListener", ".children", " ik", "+(", "lag", " disk", " controvers", '">&', "asp", " wie", " Australian", " YouTube", "Attr", "contains", "duce", " Matt", "340", "atern", " volunte", " newsp", "VP", "oltip", " delegate", "_meta", " accurate", " Example", "%,", " Daily", " cabin", " SW", " limits", "kip", " army", " ending", " boss", " Dialog", "Also", '="#"', "ordan", "rowse", "-min", ' "&', "_loc", "UX", " developers", " accuracy", " maintenance", " heav", " filters", ".ToolStrip", " narr", " Emp", "ORDER", " Mobile", ".Serial", ".output", "244", ".col", "Material", "uma", " consumers", "shift", " pued", " mini", "collection", " kan", ".center", "History", " bench", "());", "itories", " crowd", "_call", " powers", "-E", " dismiss", " talks", " Channel", "forward", "_control", "/src", "iest", "************************", " beta", "(color", "_OBJECT", " Api", " effectively", "Camera", "sd", "ussy", "290", "Dict", " Effect", "ibilities", " returning", " Far", " '')", " modules", "219", "ilation", " (%", "TRGL", " storm", "onna", " EXP", " spons", " displ", "                                             ", "fall", [229, 140], "ignKey", "_US", "etrics", " handles", "TL", "_amount", "owa", "brand", " Tool", " usual", ".Z", "crement", "adium", "stock", " serving", " Bon", " linear", " Target", " Radio", "HL", "Shader", "omatic", "agues", "inity", "diff", "_iterator", "quot", " ,\n", "callback", " symptoms", "[_", " Bul", " Feb", "undo", "_account", " typedef", "\u0438\u0441", "tras", "UserId", " Penn", " Supreme", "}>", "userId", "327", " Kim", " ga", " artists", [229, 184], " Abstract", "okemon", " ham", "oval", " cha", "aten", [229, 134], "Fixed", " vulner", " Parameters", "quantity", ".Clear", "ServletRequest", " ya", " soul", "080", "transaction", " solo", " pairs", [230, 148], " Gre", "_word", " CC", " gi", "zie", " scheduled", "rotation", "gypt", "ulous", "::_", " Ell", "<!", "		  ", "lp", "aha", "Copyright", "009", " dram", "251", " diagram", " Mem", " garden", "Comp", " attempts", "uffix", ">()", " philosoph", "_rel", [229, 188], " sv", ".second", "anto", ".Json", " Tele", "_local", "_send", " aspects", [236, 151], "IBLE", " rail", " widely", "ashed", "iar", "inf", "upper", "django", "_results", "issing", " equivalent", "OUND", " ty", " potentially", "Advertisement", "238", " Record", "380", "resentation", "_widget", "ounding", " religion", " consc", " Lim", ".am", "Html", " ':", "PATH", "_spec", "orted", "idades", "_shape", " keeps", ".Save", " Loc", "ori", " TEST", "unicip", " regions", " believes", "/en", "posite", "{'", "prepare", "_const", "sample", " Williams", " strt", "_Get", " Andrew", ".active", " layers", "VisualStyle", "azy", " Kn", " acid", " Asia", " excess", "	my", " keyboard", "ensus", " crew", " missed", "master", " Wild", " newly", " winner", " stub", "icode", ".move", "Domain", " Sar", " forest", "LED", "claimer", ".exit", " Window", " resistance", " CHECK", '("-', " Ryan", " pipe", " coast", "DEF", "//!", "_off", "exit", " ultimately", "imitive", " Keep", " historical", " anyway", " Jackson", "ocker", "ERN", " UINT", "yntax", "ERY", "isms", " cn", " occurs", " ;;", "TextView", "AE", "/img", " yesterday", "-default", " tiny", " proc", " alive", " REG", ".th", "earing", ".getLogger", "<link", "_login", "Folder", "abc", "lyphicon", "\u043D\u043E", " noticed", "odigo", " edition", "imator", ".Enabled", ".parseInt", " yards", "												", " verbose", "\u043B\u044F", "_BY", ".login", ".*;\n", " Mid", "\xE9es", " glo", " buildings", " ze", " Iter", " tube", " Pot", "\\M", "253", "<th", "bridge", " Script", " Module", " vacc", " installation", "vy", "VisualStyleBackColor", " SM", ".total", "640", "bat", " finds", " atmos", "Subview", "izard", " replacement", "licated", "apis", " logged", " Left", "Gui", "_Type", "tm", "Pad", " household", " rele", " proposal", "_CLASS", "243", "::::", " infrastructure", "Inject", "/html", "226", " ads", "izza", " mg", "ctrine", "%\n", "<html", "-image", " attorney", "<m", "(',", " cann", " println", "oose", " yellow", ".exp", "payment", " tableView", "away", " opposition", " Again", " Handle", " exclusive", "inar", "\xE9r", "\u043E\u0431", " CODE", "emporary", " react", "pipe", "236", "cz", ".activity", " largely", " diss", "axy", "esis", " Ren", " corn", ".UseVisualStyleBackColor", "days", " fruit", "Insert", "_enc", "Est", "_dec", " Luc", " \xFCber", "parameters", "PERT", "express", "_profile", "Unknown", " revolution", ".address", "_require", " uniform", " Pack", "lar", " UITableView", " depends", "Validation", "confirm", "Owner", " trib", "het", " Ide", "ansas", "247", "Language", "uet", " Po", " Steve", " contest", "_DEFAULT", " apparently", "REEN", " frequently", " tradition", "ocolate", "SI", " Argument", "Focus", "erte", " Layout", " dx", " generator", " Wait", "Policy", "lights", ".Execute", "555", "Py", " bedroom", "eda", "raid", "	size", " ancient", " pump", " dw", " (!(", " specify", "(status", " FBI", ".exception", " remark", "lymp", "antee", "Upload", "ernet", [233, 161], "inent", " Render", "dm", " Memory", "rich", " Tools", " kne", " perm", "bad", " dinner", ".reset", " jLabel", "Feature", ".Service", " ({\n", " referred", ".classList", "248", " initWith", " TextView", " neither", " county", ' "{', [231, 167], " tack", "className", " USER", " renew", "``", "getName", " brown", "Errors", "erto", " sustain", "SO", "letes", " Invalid", "246", "227", " enemies", "unge", " existence", "erra", "\n  \n", "utorial", "#a", "pay", "charge", " Ire", "atest", " explos", " fired", "NER", " Ty", "icion", "Uri", " obviously", " Colum", " '+", " Device", "-related", "_ARG", " vor", " Lesser", "_OP", "Serializer", " upgrade", "Light", " codes", "++;\r\n", " writes", "food", " \xE9t", "@section", " tracks", " seriously", "cht", "430", "(sizeof", " immediate", " scientists", " {$", "_ne", ".AnchorStyles", " accommod", " Harry", " sight", " Palest", "ersistent", " \u0443", "-input", " coordinates", "\xB7", "228", "Welcome", ".conf", " grew", " bold", " CPU", "(my", " perfectly", " moments", " Movie", "-data", "ystal", "_WIDTH", "262", " Screen", [230, 157], " disap", " reduction", ".GetComponent", "_MODULE", " generic", " dy", "aller", " curl", " Body", " banks", ",t", "avg", " evil", " manufacturer", " receiver", "Columns", " ingredients", "	out", "ques", ".Load", " slowly", " Town", " Cell", "_normal", "_prefix", " Alert", '("{', "\xE4r", "\u201CThe", " MD", " courses", "athan", [233, 153], "occ", " SER", "esign", "Addr", "=['", '("./', "]}", ".font", " Instagram", " Border", "oda", " hall", " rum", "_bit", " saving", "_down", "Random", "_register", "(Context", " opposite", "Room", "YES", "\u0430\u043D\u0438", " enjoyed", "_run", "Clear", "\u2018", " Ford", "onic", "osten", '"])', "_auth", "//\r\n", " sufficient", "LES", " phen", " oh", "_csv", " routine", ".AreEqual", "aylor", " basket", "_COMM", "rypted", "Sim", " Shop", " studio", "atos", "(W", "[string", "\xE4t", "oga", " shr", " sick", "Another", " doors", "_NE", " THREE", ".order", "razil", " maps", "_TRUE", "translate", " nearby", "265", " nach", "LOAT", "batch", "229", " lux", "ashes", "angers", "\u2026\u2026", "_EVENT", "_UP", " acts", "inv", "_METHOD", "ccion", " retain", "utch", " \u0431", " knowing", " representing", "NOT", "png", "Contract", " trick", " Edition", "uplicate", " controlled", "cfg", "javascript", " milk", "White", "Sequence", "awa", " discussed", "501", " Bush", " YES", ".factory", "tags", " tact", " sid", "$$", " Enum", "275", " frames", "});", " regul", "'];\r\n", "Region", "321", "fff", " cro", "(com", '="+', "Student", " disappoint", "RESULT", "Counter", " butter", " Ha", " Digital", " bid", '">{{', "ingers", " Country", "_tpl", '"])\n', "/k", "dating", ":#", " DATA", "ynchron", "_body", "ollywood", " valor", "ipient", "oft", "UBL", "docs", " synchron", " formed", "ruption", " lista", "RequestMapping", " village", " knock", "ocs", '"{', "_flags", " transactions", " habit", " Je", "eden", " aircraft", "irk", " AB", " fairly", ".inter", ".Act", " instrument", "removeClass", ".command", "\u0449", "	mem", "(min", " ot", " colle", "=s", "timeout", " ids", " Match", "ijn", "zero", "410", " networks", ".gov", " intel", " sections", "outine", "(cmd", "(dir", " LIABILITY", " Blog", " bridge", "308", " CV", "convert", ' ")\n', " Bern", "_PO", "eval", "(set", "tool", " payments", "Behaviour", " concrete", " elig", " acceler", " hole", "_o", "TEGER", " graphics", "Own", "Formatter", "onder", " packages", "/a", " Know", "OrDefault", " duty", "Wait", "\u043D\u0430", "_record", "[t", "Mesh", " ongoing", ".beans", " tan", " interpret", "asters", "QUAL", " legs", "\\Request", "-file", "_mutex", " Saint", "//#", " prohib", "(info", ":=", "linux", " blo", "otic", "	final", "_exp", " Stop", "aping", "(saved", "_push", " ease", "_FR", "ponsive", "strcmp", ":\n\n\n\n", "\u4EF6", "oli", " extreme", " professor", "Images", ".IOException", " addresses", "plemented", " incorpor", " useEffect", "_OF", " Da", "nombre", "IRST", " discrim", " compens", "gregate", "ancell", "aches", " Criteria", "$result", "Destroy", " secondary", "Watch", " Sem", " McC", " academic", "Upper", "::~", "utral", " Dog", "aded", "237", "Validator", " derived", " setTimeout", " Ken", " typical", " Bob", " bounds", " Season", " crazy", "                                          ", "-router", "ittest", " Mir", " emotional", ",v", "cn", "/st", [229, 189], "onom", " declared", ">.", "ailing", " /*<<<", " normally", "(Me", "evin", "likely", " pointed", " Stack", " walls", ".Vector", "mean", "]]\n", " listening", "adv", " swap", "IFT", "\u062A", ".argv", "uls", "<option", "notations", " emails", " Ukr", "asta", " Thus", " Stone", " appeal", ".\u2019", " regulations", "Preferences", " Phone", "ulf", " DR", " technologies", " paragraph", " necessarily", "370", "030", ".each", "<float", "resa", " underst", " finger", "pressed", "-by", "iffer", "watch", " Ba", "AIM", " weights", " Ron", "')}}", "[self", "----------\n", "periment", " toString", "xic", " Camera", "!\n\n\n\n", "aurant", "Prefix", " institutions", ":int", " exposure", "pattern", " Linux", ".number", "redient", "ArgumentException", " Chief", '"},', " electronic", "rong", "erd", "spNet", "rait", "/',", " Ohio", "Controllers", " continuing", " Template", " Eth", "sz", "/env", "Env", "%.", "arters", ")((", " TABLE", " \xEE", "perature", "progress", "Pres", [234, 176], "implementation", " bien", " streets", "_MSG", "News", "###", ":/", " cutting", "xB", "ressed", "_ENABLE", "lab", " causing", "]));\n", "bra", "xFFFF", "illy", "pletion", "will", "_bar", " structures", " Imp", "\u06CC", " <>", " ----------------", "_BUFFER", ".dir", " plain", " peer", "249", "gg", "oints", " somewhat", " wet", " employment", " tickets", "irms", " tuple", "sis", "$sql", "rig", " conversion", " ges", " configure", "egr", " Ca", " __('", "ouston", ".token", "Black", " magazine", "AW", ".IN", "osing", " broke", " Cru", "DELETE", " destroyed", "(Math", " approval", "-dom", " III", "tableView", " designs", " crushing", " consent", "dirname", "omp", " crypt", "?(", "orough", "307", ".o", "	list", "amsung", '."""\n', "erring", "Google", "_pair", "_INIT", "remarks", " gear", "Fill", "life", '}")\n', " suitable", " surprised", "_REQUEST", " manifest", "atten", " frustr", "ovement", ".click", " ii", " expansion", "igs", "Parse", ".Regular", "Rob", "_layout", [236, 160], " translation", " Beaut", "Best", "_COLOR", "<label", " liquid", "ITS", " prod", "239", " operate", "UIKit", " natur", "argument", "_detail", " Centre", ' "--', ' }}"', "locale", ".tv", "_seq", " upcoming", "Chart", " Division", " clinical", "Company", "Separ", "las", " Hun", ":s", " heading", "\u043E\u0433", ' "");\n', "[id", "bia", " stretch", "icide", " reprodu", ".project", "legend", "enders", " responses", " ont", "ritical", " refuge", " Li", " :\n\n", " Three", ".controller", "_INDEX", "_FOR", "\\Models", "jax", "	exit", [32, 226, 150], " covers", "	y", "-.", "INDOW", " fails", "includes", " fault", "440", " ly", "444", "\xF1o", ".slice", "ILED", " Pur", " Asian", "_batch", ".Max", "vl", " COPYRIGHT", " giant", " Manual", " Copy", "ClassName", "Health", "Cursor", "IBOutlet", " twe", [230, 179], "_labels", " collected", " furniture", " dealing", "Controls", " Hotel", "cks", " chose", "\u2500", "odd", "SR", "\u064A", [236, 132], " accord", " Move", " Mode", " Mock", " threads", "++++", " Options", "Refresh", " Did", "']->", "ucc", "_channel", ".abs", " {},\n", " Wal", "erior", " mainly", " Driver", "NotFoundException", " counts", "eam", " &=", "Question", " Ali", " anymore", "detail", "tail", " mile", " Fair", " sorry", " surrounding", " adm", "Dev", " marijuana", " Sound", " Ash", "FD", "Team", ".port", " []\n\n", "ubble", " asc", " intention", "Acc", "chi", "usters", " inspired", "seg", "CLU", " manip", "Metadata", "Connect", " Beh", " findings", " assembly", "world", " remained", " uid", "(.", " mx", "Loop", "\n\n\n\n\n", " fantastic", "who", "aki", " Basic", " Yet", " Users", "ikip", " heads", " Michigan", "_it", " Toronto", " recording", " submitted", "_variable", "mediate", ".graphics", " stood", " rear", "velocity", "_MESSAGE", "                                                                           ", "roles", " Tour", "_year", "endment", "amps", " Ireland", "mal", " younger", " struggle", " cable", " SDL", "('-", "anes", " Need", ".Row", "Pol", " PH", "_script", "agem", " Bas", "_space", ".loc", ":i", "adr", " engineering", "iten", ")&", " uk", " Little", "_COUNT", "xA", "ArrayList", [230, 141], ' "")\n', "Anchor", " hang", "twitter", " competitive", ".src", "\u3057", " translate", " Creates", "ooks", " Roll", "'''\n", "/sh", "some", "Encoding", ".resolve", " designer", " Storage", " za", " Never", " somewhere", " boxes", ".source", " pygame", " grown", ".tw", "()),\n", "',['", " opponent", "(src", ".layer", "APP", " Activ", " guests", " VALUES", "};\n\n\n", ".native", " amounts", ".RE", " clone", " weren", ' "<<', "_ac", " breaking", " reliable", ".POST", " Sky", " '&", " savedInstanceState", "asting", "illion", "comments", "ulty", ".menu", "/config", " \n\n\n", "TODO", " purchased", "_cor", "	auto", "CompatActivity", "complete", "_graph", "isodes", " situations", " Hor", "Receive", "\u201CWe", " entities", ".assertEquals", "\u043E\u043A", " Sans", "vince", "rompt", "=\n", " /.", ".Select", "ylv", " batt", "Audio", " increasingly", ".Bundle", " explains", "060", "theast", ".offset", " hal", " technique", "_limit", " drawn", "AYER", " featured", "yyyy", "atin", "phen", "achel", "!\\", "lower", " GR", " pag", " Parse", " tou", "\u4E00", "Distance", "IndexPath", " hell", "sim", "UTTON", "Usage", "elenium", " Fall", ' ".$', " Mu", " cruc", " sont", "REFIX", "311", " interior", " Olymp", ".AutoScale", "para", "AxisAlignment", " river", "Dto", " withdraw", "React", "-class", "before", "_alloc", "Contents", " Was", "ICT", " formula", " indicates", "    \n\n", "_store", "itting", " Italian", "_Set", "_report", " pid", "_VER", " wins", " Cloud", '"){\n', "chester", " denied", " wird", " Step", " investors", "bold", "_display", "ouver", "orer", "Reset", " surgery", " strategies", "/material", "_unit", " council", ".Per", " \u201E", " reform", "Framework", " listing", "_btn", " bis", "%d", "egas", " suddenly", "_SER", "315", " ao", "_directory", "fas", " premium", " tracking", " BL", " mature", " bathroom", " '/'", " \u0111", "Performed", " soldiers", "arnings", " walked", "-con", "bottom", " surprising", " gene", "Usuario", ".DEFAULT", " MIT", "CODE", " Egypt", "picker", "ysql", "ATURE", "details", " Conference", "Information", " Mail", "-down", "raries", "bro", " subjects", " '*", "\u8BF7", "orient", ":@", "verbose", "EF", " toler", "313", "engers", " endpoint", " strange", " colon", " preferred", "dep", " EV", "ARRAY", " whe", " pup", "_nodes", " talked", " institution", "dbc", " exposed", "teen", " Front", "TT", "_NONE", "\\/\\/", "program", " encourage", ".`", "shire", " Islam", "325", "een", "NI", `'"`, ".Width", " liked", " {...", " Systems", " votre", " manufacturing", "Converter", " Inf", [236, 154], "DTO", " inches", [32, 224, 164], "\xF9", " Charles", "BU", '"));\n\n', " Labor", "unn", " estim", "mobile", " Learn", "281", "_CALL", [226, 132], " indices", " tub", "288", "ikipedia", "Cost", "rowable", [235, 161], "gage", " functionality", "uzzle", "emos", ".lib", " dass", "\u0435\u043A", "enna", " shots", " restore", "/D", "ForKey", "],[", "alias", "lint", ".stream", [230, 160], "_FORMAT", " silver", ".repository", " legisl", ".Border", "_features", "Permission", " houses", " Wars", "_COMP", " injuries", " constantly", "flutter", "ENU", " Conf", " recognized", " practical", " decent", "BJ", "]);", "asty", " Activity", "-mode", " slide", ".IsNullOrEmpty", " YOU", "Power", "indices", " qualified", " thrown", "hello", "316", " Nick", "lah", "assembly", " Small", "olding", "Should", " Silver", "(savedInstanceState", " toggle", ".Not", "Ctrl", ":nil", " Continue", " Boot", [230, 137], " Mur", "don", " FA", "Snapshot", " association", "fox", ",a", "azione", "])\r\n", "CTYPE", " fade", " Dar", ".navigation", " luck", "SCRI", " Dead", " terminal", "_LENGTH", " efficiency", " unw", " narrow", "imento", "(Color", " Sea", "_area", ",A", "_opt", " Hillary", ".task", " Jac", "asted", " Adam", " Illegal", " searching", "InstanceOf", "Java", " Format", " realized", " Children", " kil", "(frame", "\u201D.\n\n", " scenario", '"]);\n', " incredible", "lix", "IOException", " Quest", "ilty", " unlock", "\u20AC", " references", " Vert", "Binding", "egative", " wrap", ".database", "(content", "Buf", " Trad", " Aud", "trace", ".mock", " therapy", "	L", ".ToInt", " Kingdom", "Bus", "haust", '"""\n\n', "(end", ".drawable", "[];\n", " Hospital", " pharm", "-----", " AG", "\xE9d", '>");\n', " wallet", "atable", ")$", " monthly", " diagnostic", "Symbol", " iterator", "unfinished", " immigration", "sr", "ROW", "(game", " clothes", " Unt", " activation", "_Con", "273", ".hash", " initially", ".Hash", " cuts", "found", " Story", "\u0446\u0438", "acao", "_TYP", "proto", "estr", "-page", "ahr", " incorrect", " Joseph", "TextBoxColumn", "_style", " Daniel", "sheet", " liv", "lined", " ra", "Runtime", "_empty", "slug", "_struct", [235, 138], "mu", " permitted", " regional", " sobre", " Such", " [_", " roof", ".Alignment", "times", ".msg", " chest", " Tab", " esta", "\xE4n", " subscription", "(command", "special", " meal", '"):\n', "_ctx", " closely", "309", "etry", "-be", "adel", " Ram", "igest", " Spanish", " commitment", " wake", "*>(", "PHP", "_{", "cker", "<List", "_null", "390", " Reserved", " inher", ".Columns", ".AspNet", "_INVALID", " Parameter", " expr", "}{", "CellStyle", " valuable", " funny", "Inv", " stable", "*t", " pill", "299", "pliers", " CSS", " Condition", " Speed", "ublisher", "259", " offensive", "cest", "icas", " spark", " Prote", "setup", "IFY", " Tax", "Who", "Family", "-for", ".uk", " fasc", "svg", '")).', " birthday", "\u2588", "veh", "elled", " imports", " Islamic", "TA", " Stan", "weather", " suspect", "eature", "ennes", "WM", ".minecraft", "avid", [232, 189], ".security", "inos", "Good", " march", "655", "257", " possess", "usuario", "Cons", "amber", "cheduler", " horse", [231, 189], "(body", " Transform", "_decode", ".svg", " foo", " della", "extends", "amer", " processed", " Harr", " AI", " ko", "CHAR", "(%", " tap", "({'", "croll", "DOM", " tea", " rein", "261", " worldwide", "_fn", "sha", " bir", "\xE7\xF5es", '="#">', " represented", "iller", "(expected", " dance", " visitors", ".concat", "-bit", "URRE", " Rog", "vp", "iph", " LLC", "itled", "iami", "Coll", "_real", "_show", "_folder", " dar", "                                                               ", " latter", "archy", " bow", " outcome", "510", " Posted", " risks", " Therefore", " ownership", " parallel", " pending", "geometry", " recognize", "STEM", " CP", " immigr", "ITLE", "    		", "connected", " smile", "(document", "\\Component", "vertical", " consumption", " shoes", ".impl", "unks", '.";\n', " foods", "_);\n", ".assertTrue", " pipeline", " collections", " earned", " Cert", " partnership", "(action", "263", " cd", " Very", "Optional", " screens", " titles", "enerator", " abandon", "kind", "ILTER", " closing", "lica", "_inter", " campus", "setting", "Sprite", "\u306F", "_reply", "ToList", ":\\/\\/", "ede", " folks", " boat", "(argv", " permanent", " carrying", " conservative", "important", ".img", " Imm", " dimensions", "aland", "single", "Exit", "----------", "ariant", "ternal", "Seconds", " Italy", "otlin", ".Resume", `='"`, ")==", "ceptor", " sca", "/main", "Security", "_dat", " lets", " aqu", " whenever", "berry", " acting", "anti", "pd", "&gt", [230, 173], "Zone", "Today", "!.", "323", "ToProps", "abis", "itable", " gal", "]{", "izona", " incontri", "NET", "///\n", "[in", "_save", " exem", " Kenn", " evolution", "272", "vars", "_stats", "-only", " Colorado", " watched", "bour", " severe", " professionals", "portion", " guarante", "\u0433", " pushed", " Gi", [239, 189], " tum", " Az", " EdgeInsets", '"));\r\n', "isse", ".ac", "Setting", " appreciate", " ValueError", " surve", " Role", ".Inter", "plotlib", "jet", "dam", " platforms", "tele", "UTO", " Internal", "+:", "};\r\n", "General", "\\Entity", " lawyer", "quiv", " Posts", "iso", " accum", "obe", " marks", " ];\n\n", "	text", ".success", "curr", "asa", "                                            ", " thin", "_over", "016", "arest", " Os", "(address", " velocity", " [];\n\n", '="../../', " Priv", "bow", " guarantee", "%\n\n", "322", " evaluate", ".LENGTH", " inventory", "qa", "_debug", ".OnClickListener", " lies", " assessment", "datetime", ".backgroundColor", " */\r\n\r\n", "raf", "unwrap", " Foot", " notify", " lowest", "DOCTYPE", " languages", "extra", "-back", " einen", "templates", "271", "_pass", "520", "777", " Must", " est\xE1", "_core", " Scot", "AI", " bias", "ationship", "Constant", " programming", "Ins", "uspendLayout", " PROVID", "antes", " shirt", "inated", ".OK", "[a", " thinks", "?\n\n\n\n", " regardless", " Magic", "ulating", "	class", "addGroup", "REATE", " SU", " simpl", "copyright", " bunch", " universe", "950", " Err", " presentation", "categories", " attach", ".sign", "_AC", " discipl", " regularly", " primarily", "inks", "[[", ".rand", ".should", "owntown", `="'`, " sans", " supporters", "sequence", "GO", "..\n\n", " Spr", " carefully", "UIColor", "destroy", " todos", " ORDER", "otted", " dont", "audi", "_player", "gre", "625", " Oil", "<body", "_stack", ".Padding", " Products", " privile", "014", " injured", " Further", " alias", ".ResumeLayout", "_LEN", " ses", "'];\n\n", "creens", " directed", ".SuspendLayout", "odge", ".At", "marks", " Univers", "erts", " Esc", " navbar", " utility", "agnostics", " inject", " DNA", ' ","', "amar", " eu", " restaurants", "_put", "uters", "ToolStrip", "tw", "istro", " zoom", " legit", "pecific", "285", " Come", " localStorage", " absor", ".Panel", " Designer", " ow", "ICAL", "_uri", "(field", " superv", "Exists", " respectively", " Stand", "Conf", "ussian", "364", " arc", " nd", "ucks", " restr", " seasons", " Chapter", " Switch", "pic", " hi", "loaded", " fluid", "-btn", " runtime", ".it", "258", "BN", "Opacity", "asant", "ryption", "-native", " taught", [229, 175], "agment", " mul", "Registry", "_grid", " Brook", ":Set", " mongoose", "AMES", "innerHTML", " soci", " Intel", "getId", "Cmd", " accessible", "rames", "leton", " __(", "	delete", " Square", '"\n\n\n', " bucket", "avorite", " Break", "++]", " brush", "266", " tensor", "/http", "Tile", " functional", ' "*', "whel", " tent", " Character", " sees", ".ST", "Big", " extern", "Urls", ")))),", " Jr", ".Builder", ".;", "nl", "_Init", " HER", "\u017Ce", "mysqli", "_icon", "van", " feelings", " lean", " hoping", "TV", '="<?=', " curve", "_std", "_LINE", "dst", " moral", "emes", "ogy", " urban", "015", " aside", " editing", "ADD", "Second", "Track", " voting", " honor", ".',", "ellen", "Chat", " improvement", "']\n\n", [160, 129], " parsed", "         \n", " lazy", " falling", "Serialize", " Pa", "_gr", " forever", ".white", ".Query", "Bed", " Du", " resume", " papers", " Init", " suffering", "\u200B", " declarations", "()-", " executed", " Hol", ".block", "\u30F3", "SK", " stuck", " Lock", "incipal", "Nullable", " sessions", "uni", " coup", "appro", "ghan", "_pool", "283", "	id", " slots", " medicine", " glad", " MonoBehaviour", "atre", " $('", "merican", "agg", " kann", "_connect", " brands", " ske", " digit", "<n", " backup", " personally", ".Property", "314", ".commit", " cry", "_counter", " malloc", " gran", " Drop", "platform", "redentials", "inking", " UIL", "ubs", " ml", "lessly", "Generated", "ereotype", " bat", "LayoutPanel", "LOT", '");\r\n\r\n', " muscle", " certificate", "ANDLE", " harder", " pixels", ')",\n', ".Header", " developer", " Las", "egan", ".<", " explode", " participate", "Pattern", "(table", " TEXT", "constants", "xD", "thew", "},\n\n", "\u306E", "_des", " substr", " Smart", " scala", "gent", "-bar", "essional", "umbs", ".exec", "'\\", "TK", "unist", "proof", "cial", "proc", '={"', ".href", "=$(", " lunch", "iscal", " Entry", " outdoor", "semble", " essentially", "/G", "[])", '%"', "sten", "USED", " dust", [229, 176], "	\n\n", " retire", " fib", "Although", " loves", " reads", "ycles", " Hel", "_uint", " '.$", "_initial", "Named", " fundamental", "ADING", " tow", " ADD", " Academy", "050", ":String", " comprehensive", ".scal", " Meta", "Messages", ".annotations", "\\Response", " acknowled", " ARE", "]==", " cleaning", [232, 190], "Entities", " Sales", " Wis", ".extend", "allenge", " gaming", "$query", "ICES", "ETCH", "Horizontal", "quential", "850", "BACK", "develop", "isor", "(code", "-K", "_PIN", "requency", " Question", "_container", "_modules", " Jersey", "_diff", ".el", " *((", "cnt", " Sa", "CPP", "inite", " unus", "-white", "etary", " involving", " ?>\r\n", "best", "allas", "ented", "                        \n", "_connection", " repo", "enabled", "\u0430\u043A", " sha", " membership", "StatusCode", "inating", "_sm", "_custom", "_weight", " css", "Stat", "_env", "links", "TRL", " Hit", ",r", "upid", " opens", " gent", "_vis", " joy", "<w", "_cost", " PyObject", "rence", " Georgia", " Broad", "mma", [226, 130], "pf", ' "\\"', " (&", "omo", " literally", [136, 152], "metric", " bars", "zed", "(window", " Israeli", " formal", "identifier", ".dao", " Death", "%;\n", " declare", "arms", "REAM", "PERTY", " consequences", "tools", "People", " Which", ">();\r\n", ".decode", "_ACT", "Buttons", ".float", ".First", [235, 165], " Polit", " XCT", "Tags", " CGFloat", "=str", " leaf", "-check", " Iss", ".system", "logout", "acht", "Angle", "sin", "chart", "INTER", " NUM", "Basic", ".Properties", "\u4E2D", "_change", " Brazil", "Abstract", " :+:", "_use", "\u0430\u043B", "268", " Ly", "IBUT", " outer", " -->\r\n", " relief", "lap", "quer", "_parent", "heap", "LOSE", " combine", " Rose", "owers", " procedures", " Sort", "anim", "variant", "ehicle", " signing", "Primary", "currency", " sexe", "oen", "theta", "eman", " impressive", "('_", "	U", " TextStyle", "_cnt", " slice", "(':", " understood", "His", "277", "013", " informed", " nick", "429", "(TAG", "hd", " elections", "esture", " Santa", " Coast", ".pdf", "inciple", ".clone", "born", "uta", " licensed", "Cr", " bread", " Houston", " nod", " hopes", " CGRect", " guilty", ".gif", " rose", ".Common", "Tip", "ANK", " FC", "During", " Symfony", " defensive", "km", ")>", "archive", " URI", "ycling", "-o", " Website", "AMP", "405", "ishment", " doctors", "Direct", "ARI", " Redirect", "ieren", "960", "_dist", "yo", " Progress", " zum", " memor", " ED", " jur", "\u636E", "_TABLE", " uuid", "Expr", ".head", "('%", "pointer", " estimate", " Greg", " loader", " iOS", " mens", "[y", " refused", " precision", "isch", " ACTION", "Cloud", "sWith", "(ret", "292", "_ADDR", "_conf", "(df", " locked", " rising", "\u30FB\u30FB", " Ms", " scenes", "_EXT", "_raw", "_the", "people", " recon", " Fun", " bless", " Updated", "422", "\xFCn", "            \r\n", "pection", "Release", ".logger", " SY", " counsel", "urd", "_true", " everybody", "ivot", " hence", " NAS", "789", " opposed", "unknown", " DESC", " Chair", "failed", " INCLUDING", "386", "352", " writers", "{}\n", "\xEDt", "_copy", "}:", " Bat", " converted", "eding", "placement", " Host", "Sound", "\u0438\u043C", " sought", "402", "mid", " salary", "ogg", "\u2122", "bul", " wir", "validator", "_STAT", ".store", " Battle", "\u0131n", " -->\n\n", "Trump", "dot", " CONT", ".fetch", " continu", "was", " fraud", "_tmp", "mitter", ".pictureBox", "GA", " tournament", ".Input", "343", "[r", "exion", "centage", " Korean", "undef", " Available", "reshape", " kit", " Struct", " SUB", "Answer", "_lib", ".twitter", " ore", " Dragon", ".Ext", ",k", " explanation", "refs", " Drive", " Training", "282", ".Has", "341", "intage", "big", "ologist", "ennis", "460", "\u0647", " chicken", "          \n", [231, 155], "\u3067", " peak", " drinking", " encode", " NEW", "malloc", "	fprintf", " =================================================================", "including", " principles", " Mah", "267", "storage", "-key", " keyword", "%;", " trained", ".contrib", " kv", "__':\n", " Boy", "parameter", " suite", " thousand", " coordinate", "-generated", "\uD558", "generated", " admitted", " pussy", "#w", " swim", "union", "Na", "274", " Royal", ".channel", "Updated", "_ROOT", " vital", "335", "raction", " Crusher", " preced", " horizontal", "Blueprint", " attrs", " smoke", "\u0412", ".Equals", "FB", " Resources", "rolling", " passes", " Num", "rotate", "etype", '\\",', " sensitive", " tall", "?\u201D\n\n", "Proxy", "iy", "_section", "\u2014\u2014\u2014\u2014", "brid", " circuit", "atan", "ENC", " driven", " voted", " educational", " interaction", "abetes", " tone", " InitializeComponent", " merely", [32, 236, 158], "cookie", "_div", " UILabel", "vely", "});\r\n", "_ENT", "#+#+", "articles", " Southern", " stronger", " Given", " Eric", " IR", "abstract", "Under", "nable", " increment", "oven", " coin", "_timer", " suffered", " FREE", `']."`, " Queen", "stats", " meetings", "276", " entering", " alongside", "(session", "itals", " foundation", " Credit", ".div", "_ALL", "pcion", "_stat", "icking", "Defaults", "_src", " outputs", "/B", " enthus", "-bl", ".ForeColor", "	temp", "Face", " interact", " weird", "Mount", "rell", "udents", " requirement", " Sus", "IER", " elected", "reference", " ME", " servers", ".wait", " snapshot", "ilton", " tries", " tipo", ".Time", ">w", " mountain", " pounds", " [...", "exists", " ngOn", "_MAP", " flying", "331", "xiety", "	value", "_DB", "uno", " seats", "TURN", ".author", "!)", "orce", " indicated", "317", ".sin", " assignment", "imiento", " Frame", "324", "_gen", "inery", "_)", "messages", ".settings", " Mean", " Museum", "irq", "attach", " Palestin", "_QU", "_tags", " casual", "emen", "ASSWORD", "432", "$s", " Circ", "\u043E\u0439", "etric", "/P", "018", " epoch", "<head", "_CMD", " git", " penalty", "orph", "_users", "ourses", ".DateTime", "aternion", "_project", " superior", " Dam", " Seattle", "XY", ">The", " Ak", " grass", "/*\r\n", "(dis", " guns", " tb", " Kevin", ".args", " Ah", "oped", "(J", "columns", "arguments", " WithEvents", "_full", " Defense", "Simple", " deaths", "295", " extensive", " Still", " Expression", " Agency", " performing", "FX", " usuario", "UAL", "Side", "odos", "aptop", " credentials", "_cap", "atient", " Disney", " ai", " chip", " volt", ".makeText", "%%%%%%%%%%%%%%%%", " belief", "_LOC", " Civil", "Navigation", " reveal", " violent", " Fil", " catalog", "emed", "scan", ".control", " constitution", "Country", "Separator", "_APP", "topic", "uetooth", "MIN", " descriptor", "yt", "ETHER", " distribute", "'}\n", ".trim", ".Line", " lbl", "assertEquals", " Det", "ombok", "(width", " tort", " EXPRESS", "aco", "Using", " Brand", "wall", "EMENT", " Communic", "<uint", " GUI", "EGIN", " Range", "/i", " Taylor", "cost", " responded", " Theme", "nce", "ISH", " featuring", "Returns", " Kr", " .\n", " nam", "_cb", "Testing", " {},", "yal", ".field", " /=", "_SHORT", "mates", "TestCase", "ainless", " evaluation", "_ITEM", " Pacific", "	k", " cant", " Ros", ")s", " fet", "STRING", "319", " Dispose", "gal", " Join", " Porn", " Catholic", "ARGET", "cpu", "\u7801", ".scroll", "328", "ISING", "ifestyle", "ancement", " merc", " Browser", "etermin", " overflow", "Available", " bottle", ":UI", "ificial", " coord", "claration", " conj", "GLOBAL", "oku", " kwargs", "conditions", "ulum", " genu", " Hero", [229, 142], " unexpected", " DAMAGES", " ka", " Could", "UPPORT", " Photos", " confident", " detected", "deg", "rgb", " strongly", " };\r\n", " ):", " lect", "ursive", "ROL", " Weight", " entertainment", " ));\n", " gonna", " bb", ".do", "GS", " mistake", "DL", " PROVIDED", "earning", "Limit", "issions", "[v", "\u4E0D", "irty", "Del", " underlying", "prene", " jaw", " DI", "peer", " objective", " deposit", " kon", " esp", "278", ".setVisibility", "/login", "<typename", " franch", "/e", "269", "Parallel", " scored", " Hon", " Vill", "iga", " anticip", "_assert", " Opt", " describes", "wan", "mount", " monitoring", " tout", "\uB294", "},{", "................................", "=int", " cust", "------", " atmosphere", "PAR", "orte", "ISIBLE", " Iron", " Notification", ".logging", " BOOL", "-point", " afraid", "enta", " tomorrow", "@implementation", " engage", " Anth", " Floor", " Ul", "Tools", " bab", " careful", "\u3044", " crucial", " calculated", " SA", " wy", "911", "DX", "_TAG", "inded", " jet", " Engineering", ".MAX", "enz", "vd", " publication", " ###", " faced", "raham", " Capt", "336", "Asset", " Constants", " loans", "_IP", " Fish", "Reduc", "_mat", "DateFormat", "_me", "[][]", " integrity", " Course", "lobals", " facilit", " embr", " Ng", ".System", " manufacturers", " proven", ".onCreate", " alarm", " \xA7", " commonly", "icos", "\u65B0", " Station", "}).", " Film", "wi", [231, 137], " engaged", "Stats", " governments", "540", " affordable", "_property", " ages", "('--", " f\xF6r", " Professor", " hydro", "Push", " organized", "284", "Accept", "\xE9m", "_cell", " nb", "pb", "Article", " removal", " authentication", " FR", "lide", " pleasure", "apol", " partition", " Side", " crimes", " demo", "holders", " Pakistan", "Instruction", " expectations", "332", ".scene", " ')", "hes", "inois", "_Pro", " molec", "andal", "_short", " defaults", " nations", "inen", " rt", "OCK", "Packet", "SB", " SHALL", "_contents", "iseconds", "verty", "\xE1t", "Guid", "nom", " conclusion", ".Update", " lovely", " emit", "bec", "				 ", " intellect", " brew", "ecycle", "Fire", "358", " admit", " arbit", " arrang", " MIN", "Mail", " Native", "Cur", " convent", ".Runtime", '"}\n', ".Run", " printed", " convenient", ".ar", "mock", " Administration", "\u307E", " electron", "flate", " lombok", " javafx", "nh", " supplies", " visiting", "ahl", " powder", " ultimate", " orientation", "utas", "_scale", "Confirm", "phones", " Operation", "/T", "443", "_INTER", " airport", " metrics", " phenomen", "audio", "334", " mai", "(K", "hu", "alling", "roduction", " Transport", " NOTE", "\u6587", " fewer", "_TIM", [236, 167], "\u043A\u0438", "Age", "FIN", "294", [32, 236, 157], " Attribute", "groups", "erk", "atto", ".define", ".AspNetCore", "ategoria", " Sir", "(form", "<User", ".round", "_day", ".All", "ServletResponse", ".No", "large", "IGH", "quent", " virus", " retro", " imper", "Bitmap", " vice", " offense", "iste", " AUTH", [32, 234, 176], "ToolStripMenuItem", "Gu", " rape", " Davis", " overwhel", ":flutter", "-table", " Constructor", "Private", "even", "chr", " applies", "_attribute", " contribute", "EVER", "289", "Lines", " Afghan", "Visitor", " SL", "season", "CU", " introduction", " matplotlib", "\u0151", " newspaper", "\u2014and", "<tag", " ini", " diverse", "IgnoreCase", "353", " Ur", "Agent", " bull", ".emit", "(Exception", "arLayout", " incredibly", " Trust", "={(", "-nav", " equals", " lady", " Pod", "disc", "alam", " IV", [226, 153], "ividual", "phi", "017", "added", " difficulty", " compact", "530", " ActionResult", "cers", "_classes", "NonNull", " quit", " pou", "Switch", "irs", "-test", " Kind", " Calendar", "406", " streaming", "}',", "279", "SW", " stead", "oca", " province", "978", " colspan", " personnel", " Employee", " producer", " everywhere", "odb", "\u041F", "bsolute", "activate", " grinding", " Building", " Sanders", "(sc", " Offset", "////////////", "};\r\n\r\n", '({"', " scanf", " YY", "	defer", " jew", " restrictions", ".mp", "[l", "\u4E0B", "labels", "redicate", "awesome", " waves", " confront", " measured", " datas", "_exit", "355", "otton", " shoulder", "aska", "+#", "        \n        \n", " troops", "293", " Und", "_card", "wich", " nous", ' "/"', "sb", " communications", "Export", " decode", "ths", "interpret", "ByName", " Spirit", "edges", "OLE", " EM", "tit", " Through", " bio", " Package", "orne", "291", " }.", "411", "`;\n", " okay", " Zealand", "identity", "(next", " Bang", "Library", " heavily", "ilon", " dipl", " rotate", "puts", ")',\n", " DataTable", " mayor", ".toLowerCase", " somehow", " Northern", "alc", " capabilities", " vibr", "+\n", " Su", "286", " Reset", "_mean", " cig", ".cloud", " Band", " Factory", " Arizona", "_io", "opher", " conscious", " \xF6", "\\Controllers", "_speed", " Fac", "_Com", " Bible", "wen", "EDIT", " unn", " Staff", " Inn", " mechanism", " Members", " migrationBuilder", "'].'", ".getInt", "<void", "	free", "oids", "\\Support", " automatic", " chances", "\u0436", " complicated", "[row", "ahoo", " }\n\n\n\n", "Models", "Win", " tape", "irus", "izon", "onomy", '("_', ":.", ".stereotype", "296", "(env", "_rect", "(with", " assertThat", " constraints", "puty", "Employee", "620", "TD", " guitar", "875", " Jews", ".process", " fiction", " Shared", "\u2500\u2500", " propag", ".Net", " achieved", "	Q", " nurs", "Shared", "_FAILURE", " behaviour", " cols", "ismo", " femin", " challenging", " posting", "encil", " captured", " Dou", "(word", " Turkey", "panies", " reputation", "ORMAL", " eligible", "protocol", "414", "idas", "(from", "344", " finance", "-per", " gotten", "HA", "duration", " Parent", "678", " invent", " restart", "\u043E\u043B\u044C", "rition", "(rs", "<bool", "iert", " modification", " TX", "readcrumb", "bank", "326", "$/", " Miller", "]),\n", ".Checked", " sacr", "security", " pose", " Brad", " fitness", " announcement", "ationToken", " serves", "need", " geometry", "ARS", [230, 128], "andidate", " sprite", "_split", "Week", "adies", ">(\n", '?>"', " ///\n", " einer", " weekly", "	logger", "_pop", "_man", " migrations", " asks", " bs", " falls", ".Where", "-height", "_feature", ".Min", " hyper", " volatile", " twenty", "Typography", "Unable", "Det", ",f", "-mod", " settlement", " contracts", "nome", "Bad", " Brian", "768", "(username", "!!!!", " hack", ".Field", "HR", " Jordan", "iza", " \xA0", " Sher", ".header", "(other", " Dub", "(op", " Round", " vie", " appl", "	J", " Insert", " LP", "regon", " MPI", " anchor", "aca", "\xF8r", " ade", "anchor", "quee", " TreeNode", " targeted", " laid", "ABEL", "vet", " Origin", "Ant", ".');\n", "expect", "edReader", " Major", " inch", "Compar", " preview", " illness", " CONTRACT", " Independ", "uuid", " nome", " tc", " Avenue", "isan", " phrase", "_move", '")[', "412", " provision", " concentr", "_IR", " Ut", "()+", " nas", "!,", " Robin", "iations", "atitude", " px", " Without", "/bash", "ekt", "reement", "342", "Observer", "318", " Region", "UBLIC", " {//", "KN", [229, 183], "GameObject", [229, 190], "encoding", " ***", "projects", " tk", " cheese", "EMPL", "aro", " \u0627\u0644", "610", "337", " consists", "refresh", "ureau", " Scanner", " soil", " flavor", "DataSource", "Execute", "\u0435\u043D\u0438\u0435", " shit", "\u5206", "<any", " retrieve", " belongs", ".strip", "absolute", " expanded", "boy", "):-", " rescue", ".JLabel", " rely", " alignment", "-family", " rend", "OLUMN", " borrow", " quotes", " Lew", " shower", " DELETE", "_loop", '!"\n\n', "	re", " attempted", "average", " Paint", "quisition", "olen", " literature", " Reference", "_TEXTURE", " Seg", " Indust", "ctype", "DUCT", "_HOST", " Trade", " plugins", " breast", "ulse", " creature", "372", "\u3059", " Wi", " supplied", "coll", '!("', " fucking", " Chrome", " Uri", " Nation", " vertices", "THE", " Original", "onde", " sharp", " cooking", "347", " {/*", " Psych", " Hollywood", "=$_", ".Dock", " ger", " bone", "_conn", "_sec", "ysics", ' ="', "298", "Sal", "sf", " deeply", "angles", "Term", "bell", " Quick", "560", "eneration", "adioButton", "\u5165", "}\r\n\r\n\r\n", " caption", "lc", " EL", ",[", "      \r\n", "rett", "(method", " Flash", "470", "                                              ", "WISE", ".scale", " roughly", "_child", "memory", "aying", " initialized", "inator", "\u0430\u0440", " scalar", " Ho", "aires", "(column", ".destroy", "PACK", " hem", "angel", "_SUB", ".qu", [32, 215], "DEFAULT", "positories", "503", " Length", " Fast", " signals", " //$", "riers", " dummy", "ANY", " personality", " agricult", "Platform", "ERO", " Tra", " enorm", "	W", "ActionResult", " aver", "[str", " '--", ".Sprintf", " debut", " \u0447", "hex", "_utils", " pb", "UITableView", " zur", ".encode", "416", " vag", ".errors", "\u043E\u043D", " mr", " Award", " cpu", " pressed", "'est", " Festival", "'T", " ak", "resolve", "043", ".me", " nic", " genre", " attrib", " Moon", " arrive", " Dating", " tm", ".Configuration", "505", ".red", " glm", " stations", "switch", " tied", "\u4EBA", " /></", "Quantity", "quiry", "_tab", " alg", "Toast", "resize", "questions", "schema", "Literal", "(entity", "NECTION", "changed", "_FIELD", "_HEIGHT", " organic", "PRE", " Cat", ".Draw", "Es", " loud", "680", "        	", " Kat", " heap", "\u201CIt", "070", "etr", " unlikely", "erals", "/auth", "502", "todo", "Place", "Posted", "Comments", " Tech", " Finally", "egration", " minimal", " Files", " tamb", "\uB85C", " Release", "425", ".resize", [32, 207], "collect", "=p", " LIABLE", " producing", "-wrapper", " singles", " NBA", "orr", "eren", ".addAction", " thesis", "dn", "PTY", ".des", " bacter", " Express", " *)\n", [229, 145], "/admin", "seconds", "\u529F", "ussion", "abeth", " Computer", " ruling", '("../', ".GET", " Medal", "itionally", "commit", "focus", "_LEVEL", "inda", "Fact", "=np", '="">\n', " subsequent", "posable", "-fluid", " thorough", " publicly", "apters", " Wilson", "_PRE", "yard", [228, 188], "	in", "339", " revers", " bullet", "cribed", "nesota", " ($_", "annon", "cursor", " clothing", " Multi", "287", ":',", " vess", "ordinator", " einem", "Cannot", " armed", "	V", "\u4E0A", ".Flat", " Sep", " Subject", "_font", " characteristics", "Done", "eln", "############", "POS", " density", " Platform", "-items", " overs", " pushing", [231, 164], ".Connection", "_term", " initialization", "________________________________", [231, 172], ".document", "lesh", "	document", " Pin", "\xE7a", " definitions", ".Path", "_WRITE", " 	\n", "?>\n\n", " terrible", "bean", "ickets", " SV", "Buy", "(task", " regime", "google", " crack", ".visit", "NUM", "energy", " struck", "_sample", ".payload", " revis", " Scene", " pg", " breakfast", "URRENT", ".charAt", "_exception", " Anton", " guidelines", " exhaust", " Financial", " indent", " desktop", "Hidden", "Failure", " principle", " iv", " seks", "network", " numberOf", " Albert", "	long", "801", ",.", " zeros", "fade", " Typ", " Term", " Arts", ".Application", " behalf", "\u6237", " mere", "(`${", " awareness", "elpers", "flix", " weigh", " estimates", ".child", "/O", " Bitmap", ".bottom", " **************************************************************************", "Expect", "ento", " Forum", "veral", " jail", " abilities", " HOLD", " Cit", " dynam", " gray", "													", ".nextInt", "antly", " ARISING", "(private", " rejected", " Nic", " leather", "={\n", "alytics", "thetic", ".Top", "373", ".Page", "={`", " ;\r\n", "depth", "mann", "WD", " Som", ".Right", " )}\n", " trait", "\xD7", "iac", " rv", "Sample", ".Xml", "opped", " \u0444", "lists", " tear", "iversary", ".collection", " Constitution", " HttpResponse", " brill", " Prom", "hover", "366", " Miami", " argue", "_float", "504", [32, 227, 130], " nat", " Tal", " integration", "(cur", " removing", " coeff", " Though", " forecast", "408", " Vegas", "Site", "346", " trab", " Henry", "-i", " involves", "BT", " slo", "Invoke", " lucky", "025", "rat", " ?\n", " handled", "(fd", "contents", " OFF", "RF", " sty", " Motor", "tery", "tax", "MAP", " Mrs", " phones", " UIView", '")));\n', "(dev", " Irish", "019", " ws", "DI", "_OFFSET", " Events", " stages", " }//", " haben", "STANCE", " Sin", " Money", "(top", " appointment", "VERSION", "metadata", "_comment", " colleagues", "maps", [226, 152], "\n	\n", "(al", "_req", " fut", " architecture", "351", " WHETHER", "                                                 ", "_screen", " styleUrls", " monster", ".up", "phia", " processor", " Terr", "=',", " Manufact", " NT", "kel", "ibern", "	file", "Ali", "rientation", " //!", "apore", "aneous", " Creat", "folder", "415", " hay", "Suppress", "(left", " euro", " disclaimer", "ustry", "ships", "_fd", " Fa", "_insert", " rol", "ifting", " Comments", "_br", " losses", " Added", "charg", " \u043F\u043E", "_system", " Sometimes", " Spain", "(group", "ialis", " dollar", " Args", "499", "297", "quires", " Ten", ".scss", " survive", "usage", " jun", "imiter", "\uFF01\n\n", " fifth", "toggle", " decline", '($"', "(Long", "inge", " pilot", "-light", "-radius", " podcast", " naturally", "Pages", "\u4E3A", " Despite", " lighting", " crate", " Binary", " reducing", " eleg", " Mouse", " TestBed", " beforeEach", "_ARRAY", "Redirect", "329", " flood", " ships", "363", " electricity", ")*(", [234, 184], " Viet", "hero", " dia", " Kent", "heart", " threats", "_acc", " symbols", "ischen", "_inst", "Criterion", " TIM", ".Height", "580", " \u2019", "();\n\n\n", "Products", "_SP", " Cy", " dependent", "este", " datos", "dit", "\u0430\u0432", "IGNAL", " lesson", `">'`, " Cover", " Hope", " Timer", " dad", "viders", " Phot", "/?", "ropy", "oming", "asion", " \\(", " ET", " Reading", " episodes", "lm", "421", "echa", " neuro", "820", " harmon", " liberal", "-ind", "393", "DATA", " everyday", " divided", " ActiveRecord", "figure", "UA", [228, 185], "riendly", "tech", "601", ".gameObject", "\u0438\u0442\u044C", "374", " moon", "ftime", " noch", " TORT", " VM", ".initial", "(child", " musical", " oc", "bas", " Hay", "361", "_long", " memset", "iley", "adelphia", "SV", "roat", "_tx", " lon", " ngOnInit", "bp", " Golden", "ACHE", " worried", "azi", "Ear", "Take", "(fp", "burgh", "_Data", "gres", " Ont", "pus", " transparent", " pocket", " ram", "igrations", ".\r\n\r\n", " [(", " adopted", " reportedly", " Dream", " }));\n", "losing", " teeth", " Books", '",&', "enny", "LEMENT", " gel", " Plant", "437", "!\u201D", ".host", " Reply", "376", "rength", " recognition", " }}>\n", "LA", " mirror", " assistant", "(device", " spiritual", "builder", "\xA7", " outr", " tt", " PER", " radical", "Methods", " pace", "udy", " gut", " Greek", " nonatomic", " Paper", "_GPIO", " obst", ".Ad", "vironments", " Sov", "356", "(con", " Transaction", ".assign", "	catch", "elter", " bitcoin", "_GR", " <?=", "_lang", "\uC744", "Browser", " consideration", " Executive", "\u95F4", ";\\", " JSONObject", " Bell", " spokesman", "~~~~~~~~", "ockey", " Gro", " Aw", "Constraint", " Pract", " Ever", "prim", ":{\n", "_im", "PN", "Millis", "UMENT", " bags", "\xE5r", "ANNEL", "354", " ic", " transportation", " Saudi", "handler", "Drag", " hd", "collapse", "_PH", " ub", "ARM", " APP", " tonight", " dining", "Recogn", " bc", "igt", "(number", "Boot", " elsewhere", " arrow", "arga", " delicious", " SN", "WR", "Validate", " Quality", "(email", " interpre", "igation", " chocolate", "525", "_edge", " stops", ":function", ")|", " thai", " Loading", "Story", "Trigger", "branch", " td", "enticated", " adventure", " blockchain", "EventHandler", " sqrt", ".Pr", "Lng", "Because", " viv", " ocean", "ylvania", "\u0430\u0441", " Utils", " desper", " defer", "	require", "hl", "Require", "]\\", " directions", "_resource", " subscribe", " \xFA", " Heart", "ests", "-sub", " Rh", "forEach", " delight", " territory", ".concurrent", " (+", "jpg", " preparation", " rounded", "Comm", ".Left", " opinions", " Navigation", "(first", '",$', " hire", " detection", ".getElements", " eps", " sklearn", " cz", " />\r\n", "metic", " transformation", "\u53F7", " rgb", "istributions", " implicit", "/in", "destination", "\u0430\u0442\u044C", "Zero", " unset", "920", ".where", ".go", " formation", " declaration", "()\r\n\r\n", " Expl", "			  ", "/pro", ".JSON", "441", " desk", ".substr", "//----------------------------------------------------------------------------", "lyn", "pson", "407", "disable", " Func", "	Assert", " MARK", " defeat", " blind", " constants", "362", ".headers", "UILD", " expenses", "Pixel", " hr", " fel", " Eastern", "424", "490", "_del", "357", " Cub", " sq", "	count", " Directory", " exclus", " historic", " ------------------------------------------------", " composition", " dataGridView", " Burn", " BC", "Master", " spawn", " bearing", ".SetActive", "ilo", " gallery", " founded", " availability", ".sqrt", " pes", " DOM", "mate", "Oct", " matched", "itivity", " anxiety", ".price", " Instant", [236, 138], " tut", "ICollection", ".shared", "_sql", "tbl", "library", "_destroy", "ermal", " Notes", " Ein", " southern", " OTHERWISE", " macro", ".lower", "cls", "ContentView", ".link", "constant", " Bes", " somebody", "nb", "399", '">{', "(local", ".....", " Null", "mx", " \xE7", " pause", "-----------", "_MO", " CM", " forKey", " DVD", " closest", "_DEVICE", " Stephen", " BBC", " Travel", "Paint", " Results", " Rule", " tp", " ratings", "cin", "csv", ">/", " GOP", "lad", " \u0440", " indexPath", "matrix", "=f", "arsed", " });", " Cos", " Score", " tak", " ESP", " INC", "_NULL", "-flex", '"][', "into", "eland", "Authorization", "_FALSE", " gate", " vid", "istent", "TIME", " rewrite", " tie", " archive", "511", ".events", ".getParameter", " Permission", " programme", [32, 233], "jud", " cameras", "338", "349", "(sys", " Syrian", " improvements", " hip", " suicide", " scholar", " compatible", "022", "remote", ".down", "FUNCTION", " managing", " UIKit", ".raw", ">>>>", "371", " demands", "ellite", " dent", " Micro", "\u53D6", "'][$", " IE", "imension", " trem", "630", " gained", ".with", ".ok", "hou", " bom", "ampaign", " joining", "fish", " addSubview", "860", " northern", ".cor", "oret", "Die", "inish", "_comp", " attended", " collapse", " SS", "acent", "_EQUAL", " Deep", "RGB", "	test", "olves", "uset", "UnityEngine", "writer", "Resolver", ",%", "ifference", "_remove", "onda", " femme", "385", "decode", "Branch", " flush", " innovative", "Tests", " ['./", " covering", ".admin", "ultipart", "(lambda", [239, 187, 191, 110, 97, 109, 101, 115, 112, 97, 99, 101], " Sport", " !(", "acles", " depression", " Kong", "570", " pert", " Conn", " Otherwise", "/home", "supported", " pink", " invited", "\xF1os", "_enabled", " -\n", "FW", "eners", " MY", " suggestions", "Canvas", " fer", " Marketing", "@Test", "untu", " Ven", " Cou", "ivals", "Donald", "limited", "						\n", " analyst", "(entry", " representative", "_attributes", " fur", ".hide", "resp", "adores", "rides", " Josh", "robot", " NAT", " sesso", " integrated", ":true", "parts", " stupid", ":event", "@endsection", " pu", ".Table", " Yii", "`;\n\n", " clang", '="">', "engan", "_parameters", ".internal", " Modern", " metric", " semi", "={{\n", "707", ".amazon", " BB", "ainty", "viewport", "367", " startActivity", "dispatch", "*****", " flav", "ifferent", "382", "[this", " stake", " argued", "viously", ".work", " Oak", "Old", "(async", "notes", " flip", " disag", " TE", "	error", "<'", " \xBB\n\n", " filtered", " Mach", " hung", "_dump", "_samples", "-dismiss", " ray", "Implemented", "DK", " jed", "090", " breaks", " fits", ".gr", " Zero", "oro", " equally", " '[", " concerning", "<meta", "players", "_POS", "_sim", "Jan", " yours", "	N", " spir", " champion", " Analysis", "apa", " NSLog", "_lines", "\xF1a", "		       ", "819", ".Sc", "Rep", "etroit", "urable", "MIT", "compat", "owned", "_indices", "],\r\n", " discovery", " Diego", "obi", ".Index", " trends", "PLAY", ".no", " lens", "_cfg", " anno", "agan", " periods", "terms", "yz", " attacked", "ibration", "PECIAL", "_grad", " accordance", ".ReadLine", ".device", "rix", ".container", "may", "ercise", " Lu", " rg", " \u0441\u0442", "		\n		\n", "(un", "TERNAL", " lessons", " allegations", " transmission", ".Ref", "Mobile", " Tournament", " Nut", " Ga", " Capital", "definition", "-exp", "clean", " fantasy", " enhance", "entence", "031", "']:\n", "ackets", " celebrate", '@",', "SerializeField", " arrays", "tb", "	st", "[assembly", "(reg", ".category", " improving", " salope", "ByteArray", "Original", " [{\n", "\u56DE", " Clin", "oenix", " Samsung", " maintained", " agenda", "fail", " presents", " timing", ".mark", "'><", " promot", " incl", "_only", "\uB97C", " Attorney", "-date", " landscape", " fu", "SY", ".prop", " Arr", "pag", "ParallelGroup", "':\r\n", " logs", "aunch", "unci", "nama", "TableCell", "issues", ".{", "ecurity", "_exec", "olds", " hosts", " proto", "_import", "_sort", " Bow", " Normal", " Farm", ".createParallelGroup", "Rotation", ".err", " pleased", "itage", ".Wh", "		    ", "MR", " MORE", " Natural", "_transform", "BASE", "eneral", "utdown", ".commons", "WT", " aan", ".Result", "dog", " clicking", "),\n\n", "#line", "Operator", " civ", " merg", "obuf", "ngthen", " [{", " cancell", "trigger", ".:", "WORK", "declare", " decrease", "\u015Bci", "loom", ".None", " MI", " Jason", " healthcare", "iamond", "sylvania", "*x", " Ra", "[b", " printing", "phabet", " Labour", "opper", " zijn", "-target", "_FUNCTION", " oct", "\u0435\u043D\u0438\u044F", "\u5728", " western", " computers", " RET", "HashMap", "[String", "getValue", "_DATE", ".Next", " Fif", "\xE9l", "icked", [230, 142], "-MM", " {\n\n\n", " contacts", " digits", "Produ", " unusual", " rapidly", "tures", " angry", "cancel", "xxxx", "_parser", "idity", "_PREFIX", "710", " mehr", " rarely", "ethe", "opes", " %.", "works", " theta", " contribution", " Tony", " squad", "537", "\u0430\u0439", " \xEEn", "there", "outed", "	q", [153, 130], "good", "LI", "\u9875", " Living", "izabeth", " kt", " Dallas", "]],\n", " />\n\n", " raising", "/router", "_game", "368", " CUR", "zens", ".es", " fontWeight", "(func", "notification", " '../../../", " blame", "\u3002\n\n\n\n", "anco", "980", "Identity", "follow", " arts", "xs", " officially", " Studio", " recommendations", " locale", " amateur", " Enable", " caps", ".End", "388", "-add", "_gshared", " CT", "Force", "\n            \n", " orange", " lp", " answered", ".Grid", " dual", " strategic", " nobody", " fatal", "_est", "(el", [32, 236, 160], " Budd", "AIT", "_factor", "-one", " HAVE", '"\r\n\r\n', "760", "Prof", " \xE4r", "strings", " dirty", " Face", " Begin", " Bus", " wis", "\u5B57", " speaker", " carrier", " Om", " hadn", "Allow", "::__", " verb", " Complete", " Easy", " bills", "  \n\n", "Vertical", " pron", " Define", " lookup", "variables", " pandas", "umes", " innoc", " setUp", " Championship", "artist", " CType", "Foundation", "\u0E48", " Setup", "428", " recipes", " UIColor", " Fight", " authorized", "_click", "990", "_success", "angan", " Mountain", " Doctor", " egg", " Medicine", "cles", "`.\n", "[int", "dashboard", " Appro", "-dr", " produces", " rental", " reload", "381", " arrival", "spot", " undert", "378", " equipped", " proved", " centers", " defines", "also", " opacity", " Unfortunately", " Illinois", " \u043D\u0435", " Temple", " Trail", " Kelly", " measurement", " separated", "-circle", "Hey", " READ", "igits", " ib", " MOD", "attery", "\u0430\u0437", " vend", "\u0435\u043D\u0442", " HttpClient", "359", "safe", "_ASS", "icit", " Construct", " Clo", " Six", "_TOKEN", "(block", " warned", "/*!", "!</", "acades", " marg", "erase", " displays", "istrator", "gets", " gtk", "_GENER", "ned", "_%", " favourite", " Bru", " \xE1", "secondary", " mast", " soph", " Safety", "hard", "062", "raise", " Exchange", " contemporary", " dreams", " tel", " neighbors", " Holy", "383", ".mean", "810", "emit", " Mess", "Cast", "NECT", "plugins", " rb", "wr", " hub", " Studies", "562", " possession", "$('.", "ensitive", " addCriterion", "__.", " expertise", "Arch", " cub", "ervers", " particles", "uar", " boundary", ")',", "ajo", " pref", ":`", " harass", "iu", " reaching", " meg", " zo", "(ID", "_required", " s\xE9", " Queue", "AO", " gem", "812", "pton", "880", "                                                ", "660", "ijk", "({\r\n", " collision", " Ukraine", " -*-\n", "NSInteger", "_BLOCK", "567", " Texture", " declined", "nan", "_wait", " politicians", "413", " coins", " deriv", "helper", " Perhaps", ".rect", " Poly", "abling", "}/>\n", " innovation", '_"', " );\r\n\r\n", " spots", " choosing", ".cs", " flexible", "UInt", "435", "930", " scratch", "-al", " festival", " outstanding", "================================================", "Mean", " Oregon", "symbol", ".account", "dney", "'''", '!",', "901", " particle", "\xC3", "[MAX", "IVER", "ERENCE", "NSMutable", " Columbia", "_\n\n", ".fr", " cogn", "VR", " Methods", " Made", " BR", " Else", " eggs", " swing", " Inv", " diseases", " firms", " lemma", "}`);\n", "lings", " gym", "uminum", ".Trim", "Mem", " criticism", "ibernate", "_TX", "ioni", " guidance", " repeatedly", " supplier", " painting", "864", ".Fragment", "edException", " wiring", " courts", "WEB", "\u6709", "\\.", "illance", " brows", " Pattern", "PLICATION", " Summer", "Chain", " cute", "mercial", " dil", " Franklin", "	global", "INCLUDING", "history", " lst", "Qt", "SDL", "alia", "iere", "(...", "	cin", "iffs", "velope", " Root", "cluster", "UserName", "igne", "<S", " fest", "419", " indicating", "keeper", " cada", "\xE9g", "consin", " GB", " lb", "emony", "-icons", "_doc", "Actor", "elem", ".Delete", " infection", " Privacy", " greatly", " Pos", " Treat", "Flow", " attractive", " Marc", "sudo", "tesy", "-an", "998", "abama", " Would", " suck", "indexPath", " Et", "Times", "780", " clubs", "_assoc", " acquired", '(":', " intense", ".maps", "Expected", "Toggle", " ay", " lifestyle", "-called", " Snow", "Volume", " cannabis", " Direction", " Limited", "-specific", " downtown", "/icons", " reven", "Leg", "885", "=null", "496", "Keyboard", "')).", ' "";\r\n', " attitude", ".navigate", "-error", "AMPLE", " Jay", "vr", "cow", ".compile", " memories", "_mark", " Minnesota", " kosten", " probability", "warning", " genetic", "Fixture", " HashSet", "Nombre", "_month", "\u01B0", "-start", "xygen", "	ft", "iagnostics", " Matthew", " concepts", " constr", ".State", "\u0438\u043D", "Nov", "\u03B1", " Panel", "\u4E2A", "compare", ">()\n", " applying", " promised", " ox", "ncia", " Validation", "orts", "_cur", "elect", "eye", "(Data", " reporter", " Buff", "395", " sr", ' ";', "icky", " tempor", "SN", " resident", "pires", "ysical", " endorse", " Song", "isEmpty", "leet", "_util", " distingu", " Talk", " Mot", "(default", ".Arg", "gorithms", "_words", "immer", "_reset", "family", "WW", " savings", " \u201D", "_enable", "sidebar", "Running", " ali", " testim", " warnings", " Chem", " Exit", " founder", "pector", " rm", "_dataset", " Das", " han", "Getty", "\xE1l", " ny", " poverty", " resulted", ".by", " Visit", " obtaining", "/'.$", "           \n", "shall", "_LEFT", "UIImage", "_Name", "have", " Nob", "lr", "-footer", " naked", " Garden", "\\Facades", " graduate", "417", " franchise", "plane", " contributions", " stringWith", " crypto", " movements", "athers", " lifetime", " communicate", "jar", " Fragment", "_IF", " Navy", " Figure", " simulation", "_stop", " reporters", " versus", "aja", " \u03B1", " governor", "ListItem", " sealed", ".Background", "edi", "ashing", " lip", " Ih", "merge", " nec", "024", "elocity", "ATEG", " seeds", " floating", "701", "_FA", "walk", "	user", "_depth", " wage", "@app", "Nil", '(["', "(vector", " secretary", "461", " jPanel", "vez", "\xA0\xA0\xA0\xA0", "direction", " EP", " hunt", "396", "JsonProperty", " PORT", ']",', "\u0430\u043F", " Foreign", "panic", " trials", " Ale", " rural", "-value", "authorized", " Scotland", ".drop", " MT", [231, 177], "391", "rowth", "515", "FilePath", " recall", "ifle", " cel", " SELECT", "kn", "_case", " crop", "543", "sure", "pot", "ICS", " stem", " industries", "Put", " aber", "roadcast", "Icons", ')")\n', "\u6210\u529F", "gui", " assumed", " rx", "EA", [232, 167], "ELL", " dose", " ine", " deeper", "lider", " ordinary", " golf", "605", "_IMAGE", " NAME", "(module", " atom", " belt", " offices", "506", "beta", " philosophy", "(JSON", "-field", " introduce", " convenience", "optim", '>"\n', "athy", " employer", "quate", " edited", "Arguments", " Nations", "__)", " nose", " Sample", "')\n\n\n", " cake", ".getAttribute", "HD", "392", "Modified", "445", " predicted", "\u0144", "anie", "Sorry", "(doc", "wind", "ieve", " provisions", "ATER", "OTE", "MY", ".Autowired", " Bath", "423", ".Boolean", " backend", ".Mouse", "ateral", "paper", "Const", " VR", "_entity", "_CTRL", " Protection", " GM", " Study", " soup", "otime", "'use", ']"', "/users", "aug", " Hong", "_norm", "\u3068", " secre", "(Build", " Contract", "olas", " sauce", " aggressive", " racial", "character", "@@", " compile", " Void", "_rem", "_memory", "348", "kk", " mic", "Same", "Utility", " Html", " Xml", "Ready", " gall", " allegedly", "				   ", " Metal", " Personal", " borderRadius", "rxjs", "objects", " wanting", " bowl", "vendor", "offsetof", " Rs", " Rating", " rally", "_NODE", "418", " Mix", " advertis", "485", "667", " narrative", "sal", " mc", "SError", " fingers", " accompany", " tired", " stride", " gui", "elist", "Locale", " releases", "iking", " anger", ")))\n\n", "allest", "Summary", "(O", "(for", " basketball", " roads", " Install", " Fab", "itmap", "475", " ))\n", " intersection", "ighbor", " Bry", " HERE", "Software", "elfare", "acs", "622", " trailer", ".getClass", "chars", " regulation", " refers", " destruction", " continuous", " Austin", [233, 162], "akan", ".window", " Templates", " absence", ":n", " disorder", "flash", " delet", "boards", "  	", "ROP", "                                                                   ", " acqu", " lawsuit", " Reviews", " garage", "timer", " ej", " Rectangle", " flowers", "398", "ilst", " Instance", "Super", "det", "disposing", " ES", " IC", "vere", "Sk", "_channels", "puted", "/null", "nnen", "431", " Gallery", "_global", "Authentication", " Rank", " blocked", " calm", "market", "	val", " aug", "period", " Constant", ' ?>">\n', " lobby", "pal", "379", " sink", "508", "iah", "\u0421", "urname", " conver", " investigate", "Christ", "Hub", " IND", " Ped", "uras", "	url", " Tro", " preferences", " guaranteed", "`\n\n", " portions", " evalu", "'></", "(){\n\n", "encoded", "zilla", ".Class", " *_", "_'", " viewed", " Philadelphia", ".rows", "Added", " Touch", "840", ".delegate", "queeze", "slide", " Senior", "(tag", " interviews", " sua", "atas", "@\n\n", "distance", " sein", "latest", " Prince", " luxury", " refr", " Kitchen", "\u0444", "(at", "Final", "\xFCck", "_zero", " ABC", " Manchester", " cow", "COL", "_NUMBER", "changes", "generate", ".Printf", "369", "share", "Stock", " PT", "Anim", "anga", " ig", "uploads", " packed", " }];\n", "(sender", " Wire", "isons", " playoff", "\\E", "608", "/R", " headed", "Alpha", "(order", " opponents", "ackson", "_member", "Turn", " Soviet", "\uC5D0", "auge", "448", " incoming", " jak", "-game", " Male", " Month", "Stage", ".exe", "OwnProperty", ".setItem", " dc", "\u4F5C", " brut", " attempting", ".len", " judgment", " sab", " cad", " Items", "comfort", "elize", "/log", " entreprene", " compiler", "_validation", "review", " textBox", " fraction", " Bal", ">;\n\n", ".AutoScaleMode", " cats", "465", " registry", "ulus", "FI", "payload", "-search", " staying", "acious", "Decoration", "Review", "Inf", "Keep", "itis", ",String", "Coord", " pero", "Sex", " Atlanta", "uesta", "Argb", ">*", "}_", "Footer", " employed", "_bound", "vide", ".func", "$scope", " spo", " Anal", "ounced", "around", " restriction", " shops", [229, 128], " Latin", "-col", " barely", " Euro", "Er", " faire", "_distance", "_unlock", "Quote", "IVATE", [32, 229, 136], " aimed", " Retrie", ".iter", " wrapped", " agreements", "strument", "(product", " studied", ".setValue", " ye", " Cache", "MBOL", " quarterback", " syntax", ".getElementsBy", ".version", "website", "Runner", "_single", "ativ", " Altern", " Beautiful", "rightarrow", " diversity", "plash", "(co", ".Fill", " typing", "387", "023", " clar", "Hit", "OO", "acco", "507", "worth", " scripts", " Muslims", " LL", "erving", "(boolean", " baseball", " CAN", "394", "044", "MAIL", "depend", " respective", " constexpr", ".*;\n\n", "']))\n", " yard", " identical", "ifecycle", "USH", "upiter", ".validate", "cli", "ISTER", "Indicator", "Fail", " democracy", ".var", " satisfied", "-------------", "encer", "hor", " rounds", "DAO", "oa", " flask", "=c", "[]\n", "/dist", " parte", " confirmation", "eron", "aware", "<?>", " dependencies", " Videos", "-row", " **/\n", " nou", " hover", [230, 158], " nin", " USD", "Mac", "_Load", " outcomes", "_socket", " queries", "wm", "592", " hitting", "inux", "Mich", "udge", "ATAB", " vulnerable", [228, 190], " portfolio", ":YES", "	map", "Bound", " iteration", "incess", " actors", " Qual", "_clean", "\u3011\u3010", "MSG", "Green", " Officer", " smoking", ">',", " Flo", "++;", "433", "olygon", " bulk", " drama", " exceptions", "osed", " +\r\n", " legacy", "CV", " contributed", " Terms", " bt", "434", " untuk", " alien", "===\n", "	Vector", " ls", "Online", ".facebook", "numeric", "ockets", "Aut", "bury", "-redux", " Redistributions", "GLOBALS", "urrencies", " tons", "\u2019,", " \xEA", "(col", " Symbol", " stayed", " ML", " municip", " sexo", "Sen", "nr", " gains", " shortly", ".Menu", "\xFD", "KNOWN", " operators", "-V", " Patrick", "/add", "_CO", "iration", "(post", "Posts", "/_", " plug", " intellectual", " metab", " pregnancy", " Premier", "nm", " prediction", "606", " Ministry", "Three", "valuate", " Mini", "bu", "\u043E\u0437", "<ul", " dd", "olving", " Cut", "602", " schem", ".train", "itate", " rice", " birds", "\u306B", "middle", "structions", " nerv", "aque", "453", " flu", " survival", " Galaxy", " Fant", ".Order", "Attrib", "irts", "\xE9c", "Movie", " conce", "quarters", " mood", ".AddRange", "942", " resolved", "\u30C8", " burning", "702", "				\r\n", " WE", " hosting", "LAB", " managers", " strengthen", "<const", " Firebase", "oned", " Jean", "'</", " :=\n", "algorithm", " Arc", " frozen", "_events", " overse", "goods", " fait", " viagra", "oses", "922", " compiled", " Ath", " substance", "animated", "PF", "previous", " roots", "(filter", "olumes", " intro", "(evt", " Bag", " Definition", " Features", "Annotation", " avg", "(sum", "QUIRE", " renderer", " Fix", ".datetime", "=device", "Spe", "getInstance", " extensions", "_net", " Parliament", " comic", "468", " Pick", "arma", "	model", " --------------------------------", " meng", "manual", "adapter", "}-", "edback", " electrical", " Counter", "ApplicationContext", "_byte", "(byte", " Autom", " terrorist", [231, 144], "through", " fiscal", "oning", "455", " spectrum", " bitmap", " sle", "prod", " aged", " bene", " Spi", " brilliant", " stability", " diabetes", " configured", "bone", "748", "484", "ouses", ".googleapis", "FACE", " inspiration", " Detroit", "ench", "\u0440\u0443", "vehicle", "Station", " holes", " durch", ".Media", " CNN", "inning", "604", " Pennsylvania", " emotion", "Secret", "\xE1rio", " Rate", "451", "Depth", " modes", "426", "(idx", " hes", " grey", "Standard", "Quest", "buy", "sur", " Track", "omm", ".gl", " (\\", "two", "_IO", "osex", "_role", "\u793A", "routes", "Shop", " ASC", " memcpy", "direct", "446", " *\n\n", " BM", " Por", "_history", " ResponseEntity", ".setFont", " engagement", ",h", " WordPress", "fecha", " entrance", "Despite", "IDENT", " sanit", " Generate", '("",', "_video", "Strategy", "_ok", " ties", " logical", " Bron", "(File", " Moh", ".Split", ".Try", " Hind", " scoring", " approaches", " flour", "VRT", "804", "USTOM", "467", "scripts", " Episode", "389", " Amb", "_OR", " frauen", " unlike", " riding", " pit", " transf", "arte", "\u0E49", "rape", "retval", "_after", '"<<', "703", " Berlin", " tissue", ".Intent", " \u0434\u043B\u044F", " stunning", " Hal", ".Integer", " whereas", " deleg", " userName", " formats", " compensation", " Hum", "arring", " unsafe", "Pin", "club", "keyword", "_theme", " caller", " ghost", " entitled", " Mas", "561", " demonstrate", " Howard", "Drop", "#undef", "427", " invoke", " Bridge", "enden", "ibling", "Slot", "ATABASE", " temperatures", "series", " Remember", "Calendar", "BF", "=?", "064", " AF", "(http", "makers", "finity", "precated", "WH", "olidays", "-un", "iale", "\\User", "reason", "',\n\n", "OWER", " predictions", "prob", ".nn", " ';\n", ".FromArgb", "_LONG", " troub", " unittest", "elihood", "	is", "442", " consec", "LEASE", " clicked", " templates", "BY", "perm", "matches", "law", "(tf", "_ratio", "itempty", " creator", "Bits", "Encoder", "*.", " UIT", " Mask", "curl", "-go", " Occ", "correct", " Ger", "(layout", "unct", ".dispatch", ";amp", ".isRequired", "	do", "mir", " pthread", "-auto", " Ice", " violation", " concluded", " vars", "canvas", " Temp", " Philipp", [136, 235, 139, 164], "crease", " fishing", "abbit", " concentration", "irthday", " gross", " ki", " Handler", " immigrants", [232, 128], "Und", "pn", "rac", "454", " Consult", "fold", " struggling", "heat", "Generic", " ridic", " COVID", "omitempty", "_OPTION", "\uAC00", " creatures", "_PAGE", "ei", "(host", "_HPP", "516", " XXX", " awk", "ascade", " preg", "provider", "Pal", "egen", "clone", ".Register", " attachment", "beit", "theless", "(Date", " Forest", "CGRect", " childhood", "amine", "axes", "']=", "Navigator", " replied", "_inv", ",T", " Feature", "438", "{-", "LANG", " convey", "\u7528\u6237", " Serif", " Aus", "liche", " unused", " mont", "nodes", " seu", ".className", "norm", "_SERVER", " wing", "inx", "Raw", " Jam", "590", " insight", "471", "535", " NG", " Interface", " stmt", " nan", "culator", "-app", "(Bundle", "MessageBox", [224, 174], " meets", "uby", "OptionPane", "itarian", " collaboration", "movie", " armor", "_bits", " Having", " nude", " Setting", " succ", "Delay", ".components", "achuset", " Alexander", "\xA9", " meters", " preparing", " incent", [229, 147], " k\xF6nnen", " Conserv", " numero", "achusetts", "-int", " emphas", "layouts", "Excel", "IBAction", " residential", "eling", " NC", " Allen", " cette", " minds", ".required", "\u0633", " Girls", " };", " stringWithFormat", " addressed", "they", " Blood", "poser", " jam", "\u0219", "\u6570\u636E", " stdout", " UTF", "Classes", '>";\r\n', " Sav", ".Bold", " enables", "	tmp", " manually", " Squ", "userid", ".function", ".cache", "LOPT", ".Services", "588", "ddit", "tim", "<img", " Things", " Everything", " apt", "397", "emand", " rolling", [235, 166], ".level", " stom", " Winter", " viewing", "(values", "ocomplete", "via", "upo", " abortion", "532", "i\xE8re", "\uFF11", "_BUTTON", "_domain", " bra", " Ast", "inas", " statist", "cod", "LR", " drives", " followers", " allies", "	current", "ecessary", " damaged", "_pt", "andles", "ountries", " simult", "eu", " controversial", "_GROUP", " rib", ".Info", ":mm", ".normal", "_ADDRESS", [32, 237, 149], "addle", " Dur", ".Element", "656", "Warnings", " credits", " inhib", " emissions", "545", " haz", ".youtube", "ugged", " bother", " Kansas", " Fixed", " Tests", " FIX", "576", "Uniform", " kont", ">>>", "station", "lore", "atype", "ishop", "/****************************************************************", "521", "ComboBox", " vacation", " initiative", " defaultValue", "770", "concat", " Kh", "632", " Welcome", "izedName", "Migration", " gradient", "Hot", " hardly", "elo", " Students", " loose", "730", "atz", ".Send", "'/", " universal", " enterprise", " regex", " visitor", " Fly", "Seq", "\u0E19", " Visual", " libraries", "atoes", "Payment", "447", " pent", " gathered", "VRTX", " DM", "Split", " letting", "\u041D", "_errors", "epoch", "PARAM", "cu", "\u0441\u0442\u0432", "olutions", "Editing", "fonts", " allocated", " Based", "(Y", " Judge", " brothers", "FILES", "\xE7o", "531", "wb", "_PI", "'^", " sword", ".services", " nl", "Tim", "igg", " Moore", " cryptoc", "\u51FA", "_posts", "otate", "?'", "....\n\n", " kl", '="$', " decoration", "\u1EA1", " DIRECT", "GUI", ")=>{\n", " newsletter", " precis", "(point", " Equipment", "uty", " Dave", " participation", "uarios", "xit", ".As", "ETER", "orous", " shield", "[]>", "ilitary", ".origin", " promotion", "Unt", " ct", "TRA", "556", "ViewHolder", " sigma", "delta", "arehouse", "contract", "(Vector", "721", " compete", "/form", "/components", " nr", " Indones", " \u043E\u0442", " Volume", ".files", "(resp", "/models", " surf", "standard", "/o", " XCTAssert", "VICES", ".Code", "SED", " activate", "Delta", " limitation", "rij", " pregnant", ":^(", " sour", "pie", "803", " expense", "ication", " Large", " \xB1", " Bowl", "(models", "/N", "857", "Pa", ".reload", " wondering", "462", "Execution", "	      ", " Graphics", " Contin", "_job", " getName", " Magn", " DWORD", "mad", " nh", "features", '}");\n', "heets", "(train", "zn", " recruit", ".connection", " barrel", " steam", "_setting", " angular", "aneously", " bil", " Norm", "522", "(!$", "ibt", "%(", " posit", " Father", "intendo", "565", "Live", "041", " ports", " mej", " landing", "ponder", " cod", "_HEADER", ".Margin", " balls", " discussions", " blend", "Hex", " farmers", " maintaining", "   \r\n", "syn", "[T", "rus", "439", "uffers", " contributors", "_sys", ".Debug", " constructed", "omes", "?id", "slider", " suppliers", "611", "scriber", "pes", "\u041E", '":\r\n', "\\Controller", "))\n\n\n", " lua", "Multi", "ENS", "Src", " petition", " slave", "looking", "VERT", "	vector", "Special", "hh", "anne", " Niger", "/views", "zing", "endant", "<C", "speed", "514", " {};\n\n", "BeginInit", " fopen", "@RequestMapping", "EndInit", " punch", "Sender", "603", [233, 148], "getMessage", "/types", ".PI", "('');\n", "ocused", "(all", " dropdown", ").__", " Vin", ".ForeignKey", "612", "canf", "oured", " Organization", " \u0430", " Culture", "(cls", ",_", "902", "rgba", "\uC758", ".dataGridView", " dozen", " Ges", "805", "464", "_shared", "nick", " hosp", "ometer", "495", " claiming", "032", "ibles", "rik", "\u662F", "enario", " dengan", "obb", "mont", "_rank", "('/',", " apolog", "Ps", "_power", " Gree", " fulfill", " firebase", "910", " fare", " Him", " bean", "\u2026.", " SPI", "_RX", " perception", "relative", "compile", "uum", "utos", "auc", " Ask", " indicator", "/th", ".setString", " Wisconsin", ".Domain", " artificial", "Develop", " Sarah", " lying", "(search", " Empire", "urring", "\u65F6\u95F4", '="${', " getId", " Payment", "transition", " ].", "ixin", "VT", "-select", " demonstrated", " lastName", "employment", ".getProperty", " fought", "fileName", " Pers", "452", "-card", "astr", "attrs", " prominent", "Design", "ancouver", [227, 129, 151, 227, 129], "ardo", "secret", " rag", " poison", "-man", ",omitempty", "740", "	un", "itzer", " Casino", " Ross", "-foot", "(results", "Plan", " laser", "\uAE30", "_DR", "523", "Facebook", "449", " boards", "sta", "]],", "675", " tiles", "SIZE", " =~", "970", " premier", "ocab", " encoded", " reserve", "609", " Afghanistan", " ListNode", "urls", " submission", " neu", "477", " #+#", "_POST", " moist", "elli", "elligent", ".alert", "\xF3d", "bre", " Collect", " graphic", " longitude", " Provid", " Calculate", "xffff", "criteria", " waters", "rock", "loquent", " Trib", "513", " burst", " suffix", ".Extensions", "ishes", "ivel", " LIKE", " Getty", ".ActionEvent", ".slf", " HAL", "upal", "EAR", "524", "udi", "_timeout", "UF", " Singapore", " Advent", "_interval", "chaft", " Emer", " telephone", " Turk", "_interface", " Own", " encouraged", "<Object", "_Text", " Ontario", " Apply", ".firebase", " antib", "Priority", "enez", "Days", "cid", "urrence", ";/", "inned", "\u0441\u044F", " vez", "fw", "//$", "attack", "458", " startup", "ainers", ".fragment", "opacity", "(conn", "heim", ".network", "(stream", "670", " NON", "tol", "830", " Xbox", " DS", " cached", " prostitutas", " Balt", "('[", "575", " noexcept", `"'`, " sd", ".valid", "_ag", " races", "481", " rod", "itudes", "<>(", "544", ".Product", "Forms", "NEW", "Pay", "	boolean", "_contact", " Electric", "skip", " wur", " chronic", "_driver", "940", " Sab", " Ult", " Rad", "STATUS", " Lewis", "OB", " gifts", ".Rec", "TRUE", " intensity", "Marker", ".compare", "ffic", "Cookie", " Baby", " BigDecimal", "ilet", " HOLDERS", " Lady", " lung", " Alabama", " dess", "`);\n", " Builder", "_region", " neutral", "909", "Both", " hp", " horn", " segments", " EC", '"=>"', "(rec", " Pi", "GM", " laptop", "Scalar", "463", "isd", "-dialog", " Anderson", " mistakes", "708", " Han", "jes", "estination", "436", " promises", "bid", " Scient", "GIN", " Performance", "bage", ".users", "leading", " oral", "Graphics", "488", "_PTR", "518", "hang", " inev", "processing", "Factor", " NA", "$string", " grounds", ".SaveChanges", "clock", "941", "cripcion", " Newton", "gc", ".includes", " blast", " '-'", " puede", "469", ".Session", " grep", "_final", " Gay", " Give", "iri", "-star", " UIImage", "_epoch", "ubb", "enth", " elite", " campaigns", " Porno", "_assign", "Protocol", " Being", " Airport", " conventional", " Wat", " CI", "ETA", " Anthony", " tablet", "(format", " consistently", " Iowa", "474", " avatar", "027", ".cursor", "![", " hanging", "Her", "Such", "';\n\n\n", "orgeous", "()==", " viewModel", [32, 227, 131], " els", " Agent", "Fetch", "apor", " cx", "pread", " Pier", "oeff", "616", "Sn", "890", " Virtual", "Apr", ".White", "615", "_MOD", " Points", "\u5931", " genes", " vendor", " mainstream", "<src", " Elizabeth", "Decoder", "-state", " Glass", "ncy", "adians", "_mon", " Remote", " wireless", " Mi", [229, 137], "466", "\u8868", "stage", " Tile", "llib", "Variant", "==\n", " golden", "(QString", ".putExtra", " Dom", " Animation", " interactive", "ifact", "\u9664", "LET", " frequent", " <>\n", "Filename", " sne", " Football", " rival", " disaster", "ionic", " Damage", ".Resource", "-en", " Types", "getString", "(board", " bol", "plain", "zym", "\u0E32", " scanner", "ilder", "_msgs", [230, 143], "(intent", " destruct", " bust", " Employ", "oni", " UIViewController", " odds", "earer", "Geometry", " yii", "_EXPORT", " Attack", " niet", " impression", " Gil", "_prob", "528", " CF", " Experience", "/plugins", ".Method", " beliefs", "Native", "_build", " vig", " ranks", "covered", "705", "such", "Guard", ".pack", "adder", "809", "ivia", "lng", " \u0432\u044B", "552", "Timestamp", "_now", " poker", " unc", " shapes", "-types", "_period", "pk", " veteran", " sono", " appointed", "overflow", ".driver", "_cat", "utt", "plant", "imb", " Accept", " concert", "	node", "	z", "?>\r\n", " banned", "	               ", " toxic", " disappe", "473", "\u021B", " grace", "ateful", "Reply", " Cruz", "486", " scrap", " keywords", "simp", " mortgage", " cyber", " Execute", " latitude", "ifu", ".COM", "dbo", " sorts", " Gas", "omial", ".Local", "Cells", ".Replace", "Strings", ".fit", " Third", '%",\n', ' {}".', " Sony", " [:", "585", " fallen", ".')\n", "inh", " MC", " redis", "Codes", " profiles", "hook", "Reducer", "_FUNC", " navigate", "strlen", " horm", [225, 158], " SR", ".boot", " digest", "	header", ".findOne", [230, 129], "DbType", "nia", "_merge", " donne", "/Getty", "_CHAR", " bands", ".URL", "artial", " freq", " sist", "Ng", " rendering", "\\Core", "Widgets", " VA", " activists", "Ste", "=_", "alla", "Stamp", " loads", " xx", " Learning", ".Mvc", "uir", '("$', " connecting", "ReadOnly", "uru", " Eag", "BIT", "_DEL", [229, 167], "arrass", "external", " YOUR", " Brew", " Five", " resize", "igid", "eration", "653", " \u044D", "536", "\u52A0", "039", " Catch", "\u0641", " Leon", "amil", ".Body", "Clip", "/list", ".br", "EditText", "	db", ".Game", "(BuildContext", "backend", ".Red", "facebook", "529", ".urls", "mr", "rolled", "-------", " intervention", " retirement", " Kit", " PRE", "UpperCase", " Socket", " :-", " studying", " Metro", "arded", " conversations", "Called", " examine", "ertificate", ".gz", "-responsive", " refund", "_network", "026", "allowed", "empt", " meals", "Categories", " traveling", " kg", " shame", "                                                     ", " explicitly", " mathematic", " Suite", " RGB", "******/", " mixture", "learning", ".template", "atts", "wx", "	ctx", ".properties", " drinks", " Either", "setText", ".getData", ".zip", " reveals", "<table", ".HashMap", " Hur", ')");\n', ".framework", " START", "feedback", "457", " safely", ".icon", "configure", ".lock", ".layers", "/>.\n", " ranked", "_impl", " Handles", " hosted", " updating", "album", [233, 157], " shader", "Editors", "-round", "[]{", " sep", " Hi", "TEM", "lookup", ".man", "_INPUT", " threatened", "_IMPORT", " drops", "ruit", "sid", "both", " Excel", " jer", "ordinary", "\u0435\u0439", "VIEW", "reply", " ):\n", "colors", "verified", "_Tr", "_parse", " congress", "617", "Promise", "ints", " Mother", ".Api", " Duration", " firstName", "inheritdoc", " Mars", " apr", "ODY", " visits", "631", " healing", "letters", ")));\r\n", "future", ".Framework", " kiss", " involve", " silent", "adows", " anybody", "sch", "690", " solely", "-img", " propri", " instruct", " licenses", " meth", " condem", " Domain", " Harris", " s\xE5", "CEPT", "Batch", "@extends", " CONTRIBUT", ".DataFrame", "472", "_packet", "recision", " focusing", ".ht", '__":\n', ":Get", " KC", " passage", "Segment", "_center", "-zA", "_BL", " convin", " classified", " NSMutable", "_ap", "tile", "Rectangle", "492", "(nums", "vens", " UIButton", " Feder", "amo", " outline", " Parser", [32, 226, 137], " Works", ".Schema", " engines", "637", "563", "_common", "542", "_old", " setContentView", " ///<", " BT", "fm", " divers", "_weights", "emark", " ACT", " proportion", "overlay", ".dirname", " Git", "_REFERENCE", "<>", "lb", "_rule", "\u8D25", " Putin", " sleeping", "():\r\n", " preserve", " parliament", " Looking", " picking", " Dispatch", " slip", [235, 147], " Lyn", "_signal", "configuration", " Pitt", "491", "aden", "procedure", " enthusi", "fight", " Consider", " torn", "Connected", ".cos", "_groups", " Think", " deliber", " resid", "working", ".columns", " Called", " eslint", '>",', "_DOWN", "hist", " Advanced", " rewards", "actors", " silence", "479", " myth", " neur", "519", " auction", ".GetString", "eks", "(project", "598", "	msg", "	output", " complaints", "551", ",S", " tbl", " ,\n\n", "riors", "ahren", " lawyers", "redux", "_symbol", "offee", "_RESULT", "(Name", "UTC", ".currentTime", " organis", ".arg", "533", " minim", "wick", " receives", "Balance", " speaks", " Days", " Below", "483", "tipo", "Present", " reserv", "hp", " rit", "_RIGHT", "--)", " chairman", "781", "DIS", " BOOST", " experiments", "687", "__);\n", " stamp", " fert", " fond", "Ter", "elve", "uren", "+i", "endency", " virtually", '..."', "\uFF5E", "925", "-cent", "_unique", " pricing", "mic", "RESH", " :::", " annotation", " Circle", "ongodb", "itas", " %(", "(component", " \u043E\u0431", "(port", "-hour", ".obj", "LBL", " jury", "GBT", " spy", " Professional", ' "";\n\n', " striking", " discrimination", " pays", "937", "lict", "entes", " throwing", " Plugin", "(def", " RuntimeException", " Migration", "599", " dic", "bag", "onia", " corruption", "704", "(Map", " prz", ".dto", " acquire", "StateToProps", " loving", "\u043E\u0436", "_pattern", " emotions", " publisher", "_be", " couples", "498", "oj", " Chart", " trop", ".tool", " establishment", " dol", "654", " tower", " lane", " Sydney", " filling", "claimed", "644", " dialogue", " convention", "booking", "parency", [230, 177], " Generic", "718", "\\Schema", "482", "618", " ranges", "/ch", " panels", " ruled", "\u751F", ".ts", "_sets", " cleanup", "Previous", " Animal", "607", "($(", " Ave", "ollar", "028", "_eval", "	Name", "(tree", ' "]', "571", " duties", "='/", "Clicked", " differently", " Clark", " dit", "ologists", " synd", " sends", "-known", "kb", " Modal", "itative", " racing", " highlights", " Simon", " Captain", "\u4FE1", " CB", "contin", "aran", " physics", "retty", "etal", ".md", "axios", " speakers", " prep", " awarded", "\uC9C0", " Corn", " Nature", "UDIO", "737", " proj", "-pre", "[u", "Features", " isEqual", "Binary", "sig", " confusion", "546", "568", " Hat", " kt\xF3", ".configure", "MON", "494", "/edit", "_Add", ",true", "541", " cli", "ErrorMessage", "-loader", "Dimensions", "ultiply", " {!!", " SqlCommand", " spoken", " pics", " toy", "(Key", " Loop", "\u0628", "EATURE", "inction", "_setup", "wrapper", " tong", "cular", "Opt", ".Pl", '=",', "(length", "umn", " chrom", " sevent", " IllegalArgumentException", "478", "	start", " begun", "CEPTION", "dataset", "825", " Failed", "cols", "459", " knee", "imore", ".splice", "shell", "iggers", " themes", "995", " DJ", " Assistant", "-$", "Maybe", " ordering", " Intelligence", " Massachusetts", " failing", "elson", "Great", "=i", ".rest", " invite", "-disable", ".GroupBox", "\u2019est", " tackle", "gv", "etter", " ),\r\n", "_rules", ".warn", "functions", " Christians", " backed", " slider", " enjoying", "nest", " hij", "_ms", "//*", "Annotations", " Variables", "<V", "(server", " Oracle", "elements", " organisation", "_pointer", " Headers", "[d", " deadline", "issa", " knife", " NASA", " Height", "784", " Async", " venue", ".dom", "bourne", " Hawai", " memo", "ictions", " surveillance", "omi", "/assets", "587", " edu", "\u011B", " roster", " hired", " Tok", " placement", "urations", " setState", " Magazine", " horror", "Try", " lag", " Everyone", "thur", "));\r\n\r\n", ".return", " symp", "\u2588\u2588", " nights", "worker", " ale", "ennessee", ".step", " synchronized", "487", "ouri", "Does", ".change", "fon", ".setBackground", "ircular", "476", "+-", " CIA", "729", " Jane", " Similar", "-I", "leveland", " prospect", "_found", "	color", ".Diagnostics", " announce", " assumes", "/tr", " bd", "987", " Carbon", " analys", "564", ".dest", "nik", " Lie", "-index", "Drawable", " TAG", " triangle", "_FLOAT", "		     ", ".black", "vue", "curacy", " affects", "906", " surely", "Slider", "uki", "cery", " unter", ".profile", "ordon", "                                                  ", "leave", " smartphone", "gie", " conspir", " tutorial", "\u7C7B", " cab", "765", " Summary", "*\n\n", "\xE4h", '"This', " slides", '"</', ".dev", "'<", " Ring", "\u0142a", " kotlin", ".dumps", " bass", [236, 139], "POINT", " utter", " \xE9s", ".full", "OLL", " ceremony", "slot", " aims", "tooltip", ".score", "-dd", "642", " prox", "Recognizer", "dynamic", "\xE4nd", "/std", "DU", " NotImplemented", '("--', "RAW", "635", " ethnic", "anno", " championship", ",self", " acceptable", " Sprite", "[type", "\xFCh", " VK", "(jPanel", "548", "itr", [235, 160], "aura", " faculty", "avers", " Records", ".Security", " constraint", ".Bl", "Uint", "balance", " comme", " Nik", "SuppressWarnings", " Ocean", "554", "_Id", "DataSet", " inserted", '";\r\n\r\n', "\u2033", "ippet", " anniversary", " retired", "orch", " perpet", "\\Form", " involvement", "_username", "alem", "_SERVICE", " Indiana", " cigaret", "artz", " RC", " measurements", "\u7F6E", " affiliate", "acional", "-section", "_controller", "vard", "_el", " Toy", "<P", "Machine", "\xFAmer", " Yeah", '"You', " mol", ".Cl", "controllers", " suspended", "++;\n\n", "ATT", " projection", "Padding", "586", ".math", "686", "factory", "042", " gamma", "()>", "cycle", " Bull", "paths", " unp", " viewDidLoad", "_Model", " assertTrue", " rated", "Decl", "verted", " Dat", "brew", " pointing", "Ms", " Pointer", ")'", "_non", "527", " SEC", " yeah", "gency", "initialize", "fly", "711", "[pos", ",g", "Tele", "034", " joke", " clause", ".findById", "enes", "(instance", "626", "\xA3", "915", " slic", "_home", " */}\n", "_pages", "(service", "905", "RP", " Among", ".getCurrent", "806", "\u30B9", " slee", "=<?", "_prop", "flush", " MM", "Bel", "Notes", " */\n\n\n", "035", " rh", "Tables", " Ju", " \\\r\n", "lichen", " Insurance", "]\n\n\n", " cooper", "\u2014the", ".mat", "489", " foi", "(auto", "Margin", "636", " residence", "559", " Histor", " ~=", "Di", " ')\n", " exclude", ".Drop", `'";
@@ -3415,6 +3359,8 @@ var PromptService = class {
     this.RESPONSE_TOKEN_BUFFER = 500;
     // Cache for detected model context sizes { modelName: detectedContextSize | null }
     this.modelDetailsCache = {};
+    // Cache for role file content { roleFilePath: content | null }
+    this.roleContentCache = {};
     this.plugin = plugin;
     this.apiService = plugin.apiService;
   }
@@ -3432,7 +3378,14 @@ var PromptService = class {
     console.log("[PromptService] Model details cache cleared.");
   }
   /**
-   * Determines the effective context limit by checking the model details (if enabled)
+   * Clears the cached role file contents. Should be called when role folder path changes or files are modified.
+   */
+  clearRoleCache() {
+    this.roleContentCache = {};
+    console.log("[PromptService] Role content cache cleared.");
+  }
+  /**
+   * Determines the effective context limit by checking the model details (if advanced strategy enabled)
    * and comparing with the user's setting. Returns the smaller of the two valid values.
    */
   async _getEffectiveContextLimit() {
@@ -3468,10 +3421,13 @@ var PromptService = class {
                 detectedSize = parsedSize;
                 console.log(`[PromptService] Detected context size for ${modelName}: ${detectedSize}`);
                 this.modelDetailsCache[modelName] = detectedSize;
+              } else {
+                console.warn(`[PromptService] Parsed context size for ${modelName} is invalid: ${sizeStr}`);
+                detectedSize = null;
               }
             }
             if (detectedSize === null) {
-              console.log(`[PromptService] Context size not found in details for ${modelName}. Using user setting.`);
+              console.log(`[PromptService] Context size parameter not found in details for ${modelName}. Using user setting.`);
               this.modelDetailsCache[modelName] = null;
             }
           } else {
@@ -3539,9 +3495,9 @@ var PromptService = class {
     }
   }
   /**
-   * Prepares the full prompt string to be sent to the LLM,
+   * Prepares the full prompt string to be sent to the LLM's 'prompt' field,
    * handling context management (history, RAG, truncation/summarization)
-   * based on plugin settings.
+   * based on plugin settings. The system prompt is handled separately.
    */
   async prepareFullPrompt(content, history) {
     if (!this.plugin) {
@@ -3549,8 +3505,8 @@ var PromptService = class {
       return content.trim();
     }
     try {
-      const roleDefinition = await this.getRoleDefinition();
-      this.setSystemPrompt(roleDefinition);
+      const roleContent = await this.getRoleDefinition();
+      this.setSystemPrompt(roleContent);
     } catch (error) {
       console.error("Error getting role definition:", error);
       this.setSystemPrompt(null);
@@ -3570,25 +3526,23 @@ var PromptService = class {
 ---
 ` : "";
     const effectiveContextLimit = await this._getEffectiveContextLimit();
-    const maxPromptTokens = Math.max(100, effectiveContextLimit - this.RESPONSE_TOKEN_BUFFER);
+    const systemPromptTokens = currentSystemPrompt ? countTokens2(currentSystemPrompt) : 0;
+    const maxPromptTokens = Math.max(100, effectiveContextLimit - systemPromptTokens - this.RESPONSE_TOKEN_BUFFER);
     let finalPrompt;
     const userInputFormatted = `User: ${content.trim()}`;
     if (this.plugin.settings.useAdvancedContextStrategy) {
-      console.log(`[Ollama] Using advanced context strategy (Effective Limit: ${effectiveContextLimit} tokens, Max Prompt: ${maxPromptTokens} tokens).`);
-      let currentTokens = 0;
+      console.log(`[Ollama] Using advanced context strategy (Effective Limit: ${effectiveContextLimit} tokens, Max Prompt Field: ${maxPromptTokens} tokens).`);
+      let currentPromptTokens = 0;
       let promptHistoryParts = [];
-      const systemPromptTokens = currentSystemPrompt ? countTokens2(currentSystemPrompt) : 0;
-      currentTokens += systemPromptTokens;
       const userInputTokens = countTokens2(userInputFormatted);
-      currentTokens += userInputTokens;
+      currentPromptTokens += userInputTokens;
       const ragTokens = countTokens2(ragBlock);
       let finalRagBlock = "";
-      if (ragBlock && currentTokens + ragTokens <= maxPromptTokens) {
+      if (ragBlock && currentPromptTokens + ragTokens <= maxPromptTokens) {
         finalRagBlock = ragBlock;
-        currentTokens += ragTokens;
-        console.log(`[Ollama] RAG context included (${ragTokens} tokens).`);
+        currentPromptTokens += ragTokens;
       } else if (ragBlock) {
-        console.warn(`[Ollama] RAG context (${ragTokens} tokens) skipped, not enough space. Available: ${maxPromptTokens - currentTokens}`);
+        console.warn(`[Ollama] RAG context (${ragTokens} tokens) skipped, not enough space in prompt field. Available: ${maxPromptTokens - currentPromptTokens}`);
       }
       const keepN = Math.min(history.length, this.plugin.settings.keepLastNMessagesBeforeSummary);
       const messagesToKeep = history.slice(-keepN);
@@ -3599,9 +3553,9 @@ var PromptService = class {
         const msg = messagesToKeep[i];
         const formattedMsg = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
         const messageTokens = countTokens2(formattedMsg);
-        if (currentTokens + messageTokens <= maxPromptTokens) {
+        if (currentPromptTokens + messageTokens <= maxPromptTokens) {
           keptMessagesStrings.push(formattedMsg);
-          currentTokens += messageTokens;
+          currentPromptTokens += messageTokens;
           keptMessagesTokens += messageTokens;
         } else {
           console.warn(`[Ollama] Message intended to be kept verbatim does not fit (index ${history.length - messagesToKeep.length + i}). Context full.`);
@@ -3618,18 +3572,18 @@ var PromptService = class {
         if (currentChunk.tokens > 0 && currentChunk.tokens + messageTokens > this.plugin.settings.summarizationChunkSize) {
           currentChunk.messages.reverse();
           currentChunk.text = currentChunk.messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
-          if (currentTokens + currentChunk.tokens <= maxPromptTokens) {
+          if (currentPromptTokens + currentChunk.tokens <= maxPromptTokens) {
             processedHistoryParts.push(currentChunk.text);
-            currentTokens += currentChunk.tokens;
+            currentPromptTokens += currentChunk.tokens;
           } else if (this.plugin.settings.enableSummarization) {
             const summary = await this._summarizeMessages(currentChunk.messages);
             if (summary) {
               const summaryTokens = countTokens2(summary);
               const summaryFormatted = `[Summary of previous messages]:
 ${summary}`;
-              if (currentTokens + summaryTokens <= maxPromptTokens) {
+              if (currentPromptTokens + summaryTokens <= maxPromptTokens) {
                 processedHistoryParts.push(summaryFormatted);
-                currentTokens += summaryTokens;
+                currentPromptTokens += summaryTokens;
                 console.log(`[Ollama] Added summary (${summaryTokens} tokens) instead of chunk (${currentChunk.tokens} tokens).`);
               } else {
                 console.warn(`[Ollama] Summary (${summaryTokens} tokens) still too large, discarding chunk.`);
@@ -3648,18 +3602,18 @@ ${summary}`;
       if (currentChunk.messages.length > 0) {
         currentChunk.messages.reverse();
         currentChunk.text = currentChunk.messages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
-        if (currentTokens + currentChunk.tokens <= maxPromptTokens) {
+        if (currentPromptTokens + currentChunk.tokens <= maxPromptTokens) {
           processedHistoryParts.push(currentChunk.text);
-          currentTokens += currentChunk.tokens;
+          currentPromptTokens += currentChunk.tokens;
         } else if (this.plugin.settings.enableSummarization) {
           const summary = await this._summarizeMessages(currentChunk.messages);
           if (summary) {
             const summaryTokens = countTokens2(summary);
             const summaryFormatted = `[Summary of previous messages]:
 ${summary}`;
-            if (currentTokens + summaryTokens <= maxPromptTokens) {
+            if (currentPromptTokens + summaryTokens <= maxPromptTokens) {
               processedHistoryParts.push(summaryFormatted);
-              currentTokens += summaryTokens;
+              currentPromptTokens += summaryTokens;
               console.log(`[Ollama] Added summary (${summaryTokens} tokens) for last chunk (${currentChunk.tokens} tokens).`);
             } else {
               console.warn(`[Ollama] Summary (${summaryTokens} tokens) still too large for last chunk.`);
@@ -3674,7 +3628,7 @@ ${summary}`;
       processedHistoryParts.reverse();
       const finalPromptParts = [finalRagBlock, ...processedHistoryParts, ...keptMessagesStrings, userInputFormatted].filter(Boolean);
       finalPrompt = finalPromptParts.join("\n\n");
-      console.log(`[Ollama] Final prompt tokens (approx incl system & input): ${currentTokens}. Processed history parts: ${processedHistoryParts.length}, Kept verbatim: ${keptMessagesStrings.length}.`);
+      console.log(`[Ollama] Final prompt field tokens: ${currentPromptTokens}. Total context tokens (incl. system): ${currentPromptTokens + systemPromptTokens}.`);
     } else {
       console.log(`[Ollama] Using basic context strategy (Word Limit Approx based on ${effectiveContextLimit} tokens).`);
       const systemPromptWordCount = currentSystemPrompt ? countWords(currentSystemPrompt) : 0;
@@ -3690,7 +3644,7 @@ ${summary}`;
         currentWordCount += ragWords;
         ragAdded = true;
       } else if (ragBlock) {
-        console.warn(`[Ollama] RAG context (${ragWords} words) too large, skipped.`);
+        console.warn(`[Ollama] RAG context (${ragWords} words) skipped.`);
       }
       let addedHistoryMessages = 0;
       for (let i = history.length - 1; i >= 0; i--) {
@@ -3716,62 +3670,29 @@ ${summary}`;
       }
       finalPromptParts.push(userInputFormatted);
       finalPrompt = finalPromptParts.join("\n\n");
-      console.log(`[Ollama] Final prompt word count (approx): ${currentWordCount + systemPromptWordCount + userInputWordCount}. History messages included: ${addedHistoryMessages}.`);
+      console.log(`[Ollama] Final prompt word count (approx): ${currentWordCount + userInputWordCount}. History messages: ${addedHistoryMessages}.`);
     }
     return finalPrompt;
   }
   // --- Role definition methods ---
-  async getDefaultRoleDefinition() {
-    if (!this.plugin)
+  /**
+   * Reads the content of the currently selected role file based on settings.
+   * Uses a simple cache.
+   */
+  async getRoleDefinition() {
+    if (!this.plugin || !this.plugin.settings.followRole)
       return null;
-    try {
-      const pluginFolder = this.plugin.manifest.dir;
-      if (!pluginFolder) {
-        console.error("Cannot determine plugin folder path.");
-        return null;
-      }
-      const rolePath = "default-role.md";
-      const fullPath = (0, import_obsidian3.normalizePath)(path.join(pluginFolder, rolePath));
-      let content = null;
-      const adapter = this.plugin.app.vault.adapter;
-      if (await adapter.exists(fullPath)) {
-        try {
-          content = await adapter.read(fullPath);
-        } catch (readError) {
-          console.error(`Error reading default role file: ${fullPath}`, readError);
-          return null;
-        }
-      } else {
-        console.log(`Default role file not found: ${fullPath}, creating it.`);
-        try {
-          const defaultContent = "# Default AI Role\n\nYou are a helpful assistant.";
-          await adapter.write(fullPath, defaultContent);
-          content = defaultContent;
-        } catch (createError) {
-          console.error(`Error creating default role file: ${fullPath}`, createError);
-          return null;
-        }
-      }
-      if (content !== null) {
-        const currentTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
-        const currentDate = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-        content += `
-
-Current date and time: ${currentDate}, ${currentTime}`;
-        return content.trim();
-      }
-      return null;
-    } catch (error) {
-      console.error("Error handling default role definition:", error);
+    const selectedRolePath = this.plugin.settings.selectedRolePath;
+    if (!selectedRolePath || selectedRolePath.trim() === "") {
       return null;
     }
-  }
-  async getCustomRoleDefinition() {
-    if (!this.plugin || !this.plugin.settings.customRoleFilePath)
-      return null;
+    if (this.roleContentCache.hasOwnProperty(selectedRolePath)) {
+      return this.roleContentCache[selectedRolePath];
+    }
+    console.log(`[PromptService] Reading role file content: ${selectedRolePath}`);
     try {
-      const customPath = (0, import_obsidian3.normalizePath)(this.plugin.settings.customRoleFilePath);
-      const file = this.plugin.app.vault.getAbstractFileByPath(customPath);
+      const normalizedPath = (0, import_obsidian3.normalizePath)(selectedRolePath);
+      const file = this.plugin.app.vault.getAbstractFileByPath(normalizedPath);
       if (file instanceof import_obsidian3.TFile) {
         let content = await this.plugin.app.vault.read(file);
         const currentTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
@@ -3779,31 +3700,22 @@ Current date and time: ${currentDate}, ${currentTime}`;
         content += `
 
 Current date and time: ${currentDate}, ${currentTime}`;
-        return content.trim();
+        const finalContent = content.trim();
+        this.roleContentCache[selectedRolePath] = finalContent;
+        return finalContent;
       } else {
-        console.warn(`Custom role file not found: ${customPath}`);
+        console.warn(`[PromptService] Selected role path is not a file or not found: ${selectedRolePath}`);
+        this.roleContentCache[selectedRolePath] = null;
         return null;
       }
     } catch (error) {
-      console.error("Error reading custom role definition:", error);
+      console.error(`[PromptService] Error reading selected role file ${selectedRolePath}:`, error);
+      this.roleContentCache[selectedRolePath] = null;
+      new import_obsidian3.Notice(`Error reading role file: ${selectedRolePath}`);
       return null;
     }
   }
-  async getRoleDefinition() {
-    if (!this.plugin || !this.plugin.settings.followRole)
-      return null;
-    try {
-      if (this.plugin.settings.useDefaultRoleDefinition) {
-        return await this.getDefaultRoleDefinition();
-      } else if (this.plugin.settings.customRoleFilePath) {
-        return await this.getCustomRoleDefinition();
-      }
-      return null;
-    } catch (error) {
-      console.error("Error reading role definition:", error);
-      return null;
-    }
-  }
+  // Removed getDefaultRoleDefinition and getCustomRoleDefinition as they are replaced by getRoleDefinition
 };
 
 // messageService.ts
@@ -3928,24 +3840,38 @@ var MessageService = class {
 };
 
 // main.ts
+var import_child_process = require("child_process");
+var path = __toESM(require("path"));
 var OllamaPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
+    // Simple event emitter
     this.eventHandlers = {};
+    // Cache for the list of available roles
+    this.roleListCache = null;
+    // Debounce timer for clearing role cache on file changes
+    this.roleCacheClearTimeout = null;
+    // Debounce timer for RAG index updates
+    this.indexUpdateTimeout = null;
+    // RAG data (Placeholders, consider moving to RagService)
     this.documents = [];
     this.embeddings = [];
-    this.indexUpdateTimeout = null;
   }
+  // --- Event Emitter Methods ---
   on(event, callback) {
     if (!this.eventHandlers[event]) {
       this.eventHandlers[event] = [];
     }
     this.eventHandlers[event].push(callback);
     return () => {
-      this.eventHandlers[event] = this.eventHandlers[event].filter(
+      var _a, _b;
+      this.eventHandlers[event] = (_a = this.eventHandlers[event]) == null ? void 0 : _a.filter(
         (handler) => handler !== callback
       );
+      if (((_b = this.eventHandlers[event]) == null ? void 0 : _b.length) === 0) {
+        delete this.eventHandlers[event];
+      }
     };
   }
   emit(event, data) {
@@ -3955,13 +3881,14 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
         try {
           handler(data);
         } catch (e) {
-          console.error(`Error in event handler for ${event}:`, e);
+          console.error(`[OllamaPlugin] Error in event handler for ${event}:`, e);
         }
       });
     }
   }
+  // --- End Event Emitter Methods ---
   async onload() {
-    console.log("Ollama Plugin Loaded!");
+    console.log("Loading Ollama Plugin...");
     await this.loadSettings();
     this.apiService = new ApiService(this);
     this.ragService = new RagService(this);
@@ -3971,21 +3898,20 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       console.log("OllamaPlugin: Registering new view instance.");
       this.view = new OllamaView(leaf, this);
       this.messageService.setView(this.view);
-      if (this.apiService) {
-        this.apiService.setOllamaView(this.view);
-      }
+      this.apiService.setOllamaView(this.view);
       return this.view;
     });
     this.apiService.on("connection-error", (error) => {
-      console.error("Ollama connection error event received:", error);
+      console.error("[OllamaPlugin] Ollama connection error event received:", error);
       if (this.view) {
         this.view.internalAddMessage(
           "error",
           `Failed to connect to Ollama: ${error.message}. Please check settings.`
+          // English Message
         );
       } else {
         new import_obsidian4.Notice(`Failed to connect to Ollama: ${error.message}`);
-        console.log("Ollama connection error: View not available to display message.");
+        console.log("[OllamaPlugin] Ollama connection error: View not available to display message.");
       }
     });
     this.addRibbonIcon("message-square", "Open Ollama Chat", () => {
@@ -3994,24 +3920,15 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     this.addCommand({
       id: "open-ollama-view",
       name: "Open Ollama Chat",
+      // English Command Name
       callback: () => {
         this.activateView();
       }
     });
     this.addCommand({
-      id: "change-model",
-      name: "Change Ollama Model (Example)",
-      callback: async () => {
-        const newModel = "llama3:latest";
-        console.log(`Changing model to ${newModel}`);
-        this.settings.modelName = newModel;
-        await this.saveSettings();
-        this.emit("model-changed", newModel);
-      }
-    });
-    this.addCommand({
       id: "index-rag-documents",
       name: "Index documents for RAG",
+      // English Command Name
       callback: async () => {
         await this.ragService.indexDocuments();
       }
@@ -4019,8 +3936,18 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     this.addCommand({
       id: "clear-ollama-history",
       name: "Clear Ollama Chat History",
+      // English Command Name
       callback: async () => {
         await this.clearMessageHistory();
+      }
+    });
+    this.addCommand({
+      id: "refresh-ollama-roles",
+      name: "Refresh Ollama Roles List",
+      callback: async () => {
+        await this.listRoleFiles(true);
+        this.emit("roles-updated");
+        new import_obsidian4.Notice("Role list refreshed.");
       }
     });
     this.settingTab = new OllamaSettingTab(this.app, this);
@@ -4028,43 +3955,87 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     this.app.workspace.onLayoutReady(async () => {
       if (this.settings.ragEnabled) {
         setTimeout(() => {
-          console.log("OllamaPlugin: RAG enabled, starting initial index.");
-          this.ragService.indexDocuments();
+          var _a;
+          console.log("[OllamaPlugin] RAG enabled, starting initial index.");
+          (_a = this.ragService) == null ? void 0 : _a.indexDocuments();
         }, 5e3);
       }
     });
-    this.registerEvent(
-      this.app.vault.on("modify", (file) => {
-        if (this.settings.ragEnabled) {
-          this.debounceIndexUpdate();
-        }
-      })
-    );
+    const debouncedRoleClear = (0, import_obsidian4.debounce)(() => {
+      console.log("[Ollama] Role directory changed (debounced), clearing role cache and emitting event.");
+      this.roleListCache = null;
+      this.emit("roles-updated");
+    }, 1500, true);
+    const handleModify = (file) => {
+      this.handleFileChange(file.path, debouncedRoleClear);
+    };
+    const handleDelete = (file) => {
+      this.handleFileChange(file.path, debouncedRoleClear);
+    };
+    const handleRename = (file, oldPath) => {
+      this.handleFileChange(file.path, debouncedRoleClear);
+      this.handleFileChange(oldPath, debouncedRoleClear);
+    };
+    const handleCreate = (file) => {
+      this.handleFileChange(file.path, debouncedRoleClear);
+    };
+    this.registerEvent(this.app.vault.on("modify", handleModify));
+    this.registerEvent(this.app.vault.on("delete", handleDelete));
+    this.registerEvent(this.app.vault.on("rename", handleRename));
+    this.registerEvent(this.app.vault.on("create", handleCreate));
   }
+  handleFileChange(changedPath, debouncedRoleClear) {
+    const normalizedChangedPath = (0, import_obsidian4.normalizePath)(changedPath);
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian4.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const defaultRolesPath = (0, import_obsidian4.normalizePath)(this.manifest.dir + "/roles");
+    if (userRolesPath && normalizedChangedPath.startsWith(userRolesPath + "/") || normalizedChangedPath.startsWith(defaultRolesPath + "/")) {
+      if (normalizedChangedPath.toLowerCase().endsWith(".md")) {
+        debouncedRoleClear();
+      }
+    }
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian4.normalizePath)(this.settings.ragFolderPath) : null;
+    if (this.settings.ragEnabled && ragFolderPath && normalizedChangedPath.startsWith(ragFolderPath + "/")) {
+      this.debounceIndexUpdate();
+    }
+  }
+  // Called when plugin is unloaded
   onunload() {
-    console.log("Ollama Plugin Unloaded!");
+    var _a, _b;
+    console.log("Unloading Ollama Plugin...");
     this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA).forEach((leaf) => {
       leaf.detach();
     });
     if (this.indexUpdateTimeout) {
       clearTimeout(this.indexUpdateTimeout);
     }
+    if (this.roleCacheClearTimeout) {
+      clearTimeout(this.roleCacheClearTimeout);
+    }
+    (_b = (_a = this.promptService) == null ? void 0 : _a.clearModelDetailsCache) == null ? void 0 : _b.call(_a);
+    this.roleListCache = null;
   }
+  // --- Service Updates ---
+  // Update API service when settings change (called from saveSettings)
   updateApiService() {
+    var _a;
     if (this.apiService) {
       this.apiService.setBaseUrl(this.settings.ollamaServerUrl);
+      (_a = this.promptService) == null ? void 0 : _a.clearModelDetailsCache();
     }
   }
+  // --- Debounce Indexing ---
   debounceIndexUpdate() {
     if (this.indexUpdateTimeout) {
       clearTimeout(this.indexUpdateTimeout);
     }
     this.indexUpdateTimeout = setTimeout(() => {
-      console.log("OllamaPlugin: Debounced RAG index update triggered.");
-      this.ragService.indexDocuments();
+      var _a;
+      console.log("[OllamaPlugin] Debounced RAG index update triggered.");
+      (_a = this.ragService) == null ? void 0 : _a.indexDocuments();
       this.indexUpdateTimeout = null;
     }, 3e4);
   }
+  // --- View Activation ---
   async activateView() {
     var _a;
     const { workspace } = this.app;
@@ -4072,12 +4043,18 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
     const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA);
     if (existingLeaves.length > 0) {
       leaf = existingLeaves[0];
-      console.log("OllamaPlugin: Found existing view leaf.");
+      console.log("[OllamaPlugin] Found existing view leaf.");
     } else {
-      console.log("OllamaPlugin: No existing view leaf found, creating new one.");
+      console.log("[OllamaPlugin] No existing view leaf found, creating new one.");
       leaf = (_a = workspace.getRightLeaf(false)) != null ? _a : workspace.getLeaf(true);
-      await leaf.setViewState({ type: VIEW_TYPE_OLLAMA, active: true });
-      console.log("OllamaPlugin: New view leaf created.");
+      if (leaf) {
+        await leaf.setViewState({ type: VIEW_TYPE_OLLAMA, active: true });
+        console.log("[OllamaPlugin] New view leaf created.");
+      } else {
+        console.error("[OllamaPlugin] Failed to get or create a leaf.");
+        new import_obsidian4.Notice("Failed to open Ollama Chat view.");
+        return;
+      }
     }
     if (leaf) {
       workspace.revealLeaf(leaf);
@@ -4085,78 +4062,76 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
       if (viewInstance instanceof OllamaView) {
         this.view = viewInstance;
         this.messageService.setView(this.view);
-        if (this.apiService) {
-          this.apiService.setOllamaView(this.view);
-        }
-        console.log("OllamaPlugin: View activated and services linked.");
+        this.apiService.setOllamaView(this.view);
+        console.log("[OllamaPlugin] View activated and services linked.");
       } else {
-        console.error("OllamaPlugin: Leaf revealed, but view instance is not of type OllamaView?");
+        console.error("[OllamaPlugin] Leaf revealed, but view instance is not OllamaView?");
       }
-    } else {
-      console.error("OllamaPlugin: Failed to get or create a leaf for the view.");
     }
   }
+  // --- Settings Management ---
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    if (this.settings.customRoleFilePath && !this.settings.selectedRolePath) {
+      console.log("[Ollama] Migrating 'customRoleFilePath' to 'selectedRolePath'.");
+      this.settings.selectedRolePath = this.settings.customRoleFilePath;
+    }
+    delete this.settings.customRoleFilePath;
+    delete this.settings.useDefaultRoleDefinition;
   }
   async saveSettings() {
+    var _a, _b;
+    delete this.settings.customRoleFilePath;
+    delete this.settings.useDefaultRoleDefinition;
     await this.saveData(this.settings);
     this.updateApiService();
+    this.roleListCache = null;
+    (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
     console.log("OllamaPlugin: Settings saved.");
   }
-  // main.ts (within OllamaPlugin class)
-  /**
-   * Saves the provided message history (as a JSON string) to the history file.
-   * Handles backup creation (only when saving non-empty history),
-   * history trimming based on size limit, and file writing.
-   * This function is primarily called by OllamaView when its internal state changes,
-   * or internally by clearMessageHistory (now deprecated for clearing, uses _deleteHistoryFile instead).
-   */
+  // --- History Persistence ---
+  // saveMessageHistory: Handles saving actual history content, includes trimming and backup (modified to skip backup on clear)
   async saveMessageHistory(messagesJsonString) {
-    if (!this.settings.saveMessageHistory) {
+    if (!this.settings.saveMessageHistory)
       return;
-    }
     const adapter = this.app.vault.adapter;
     const pluginConfigDir = this.manifest.dir;
     if (!pluginConfigDir) {
-      console.error("OllamaPlugin: Could not determine plugin directory path for saving.");
-      new import_obsidian4.Notice("Error: Cannot determine plugin directory path for saving history.");
+      console.error("[Ollama Save] Cannot determine plugin directory.");
+      new import_obsidian4.Notice("Error saving history: Cannot find plugin directory.");
       return;
     }
     const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
     const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
-    console.log(`[Ollama Save] Preparing to save history to ${logPath}`);
     try {
       let dataToWrite = messagesJsonString;
       let finalSizeKB = dataToWrite.length / 1024;
-      if (dataToWrite.trim() !== "[]" && finalSizeKB > this.settings.logFileSizeLimit) {
-        console.log(`[Ollama Save] History size (${finalSizeKB.toFixed(2)}KB) exceeds limit (${this.settings.logFileSizeLimit}KB). Trimming oldest messages.`);
+      const isClearing = dataToWrite.trim() === "[]";
+      if (!isClearing && finalSizeKB > this.settings.logFileSizeLimit) {
+        console.log(`[Ollama Save] History size (${finalSizeKB.toFixed(2)}KB) > limit (${this.settings.logFileSizeLimit}KB). Trimming.`);
         try {
-          let parsedMessages = JSON.parse(dataToWrite);
-          if (!Array.isArray(parsedMessages)) {
-            throw new Error("History data is not an array.");
+          let parsed = JSON.parse(dataToWrite);
+          if (!Array.isArray(parsed))
+            throw new Error("History not array.");
+          while (JSON.stringify(parsed).length / 1024 > this.settings.logFileSizeLimit && parsed.length > 1) {
+            parsed.shift();
           }
-          while (JSON.stringify(parsedMessages).length / 1024 > this.settings.logFileSizeLimit && parsedMessages.length > 1) {
-            parsedMessages.shift();
-          }
-          dataToWrite = parsedMessages.length > 0 ? JSON.stringify(parsedMessages) : "[]";
+          dataToWrite = parsed.length > 0 ? JSON.stringify(parsed) : "[]";
           finalSizeKB = dataToWrite.length / 1024;
           console.log(`[Ollama Save] History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`);
         } catch (e) {
-          console.error("[Ollama Save] Error parsing history for trimming. Resetting history file content:", e);
+          console.error("[Ollama Save] Error parsing/trimming history. Resetting:", e);
           dataToWrite = "[]";
           finalSizeKB = dataToWrite.length / 1024;
-          new import_obsidian4.Notice("Error trimming history file. History might be reset.");
+          new import_obsidian4.Notice("Error trimming history file. History may be reset.");
         }
       }
       const fileExists = await adapter.exists(logPath);
-      if (fileExists && dataToWrite.trim() !== "[]") {
+      if (fileExists && !isClearing) {
         try {
-          const relativeBackupPath = relativeLogPath + ".backup";
-          const backupPath = (0, import_obsidian4.normalizePath)(relativeBackupPath);
-          if (await adapter.exists(backupPath)) {
+          const backupPath = (0, import_obsidian4.normalizePath)(relativeLogPath + ".backup");
+          if (await adapter.exists(backupPath))
             await adapter.remove(backupPath);
-          }
           await adapter.copy(logPath, backupPath);
         } catch (backupError) {
           console.error("[Ollama Save] Failed to create history backup:", backupError);
@@ -4164,88 +4139,146 @@ var OllamaPlugin = class extends import_obsidian4.Plugin {
         }
       }
       await adapter.write(logPath, dataToWrite);
-      console.log("[Ollama Save] Write operation completed.");
     } catch (error) {
       console.error("[Ollama Save] Failed to save message history:", error);
       new import_obsidian4.Notice("Error saving chat history.");
     }
   }
+  // loadMessageHistory: Loads history from file
   async loadMessageHistory() {
-    if (!this.settings.saveMessageHistory) {
+    if (!this.settings.saveMessageHistory)
       return [];
-    }
     const adapter = this.app.vault.adapter;
     const pluginConfigDir = this.manifest.dir;
     if (!pluginConfigDir) {
-      console.error("OllamaPlugin: Could not determine plugin directory path for loading.");
+      console.error("[Ollama Load] Cannot determine plugin directory.");
       return [];
     }
     const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
     const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
     try {
-      if (!await adapter.exists(logPath)) {
+      if (!await adapter.exists(logPath))
         return [];
-      }
       const data = await adapter.read(logPath);
-      if (!data || data.trim() === "" || data.trim() === "[]") {
+      if (!(data == null ? void 0 : data.trim()) || data.trim() === "[]")
         return [];
-      }
       const parsedData = JSON.parse(data);
       if (Array.isArray(parsedData)) {
-        console.log(`OllamaPlugin: Successfully parsed ${parsedData.length} messages from history file: ${logPath}.`);
         return parsedData;
       } else {
-        console.warn(`OllamaPlugin: Parsed history data from ${logPath} is not an array. Returning empty history.`);
+        console.warn("[Ollama Load] Parsed history data is not an array.");
         return [];
       }
     } catch (error) {
-      console.error(`OllamaPlugin: Failed to load/parse message history from ${logPath}:`, error);
+      console.error("[Ollama Load] Failed to load/parse message history:", error);
+      new import_obsidian4.Notice("Error loading chat history. File might be corrupt.");
       return [];
     }
   }
-  async _deleteHistoryFile() {
-    const adapter = this.app.vault.adapter;
-    const pluginConfigDir = this.manifest.dir;
-    if (!pluginConfigDir) {
-      console.error("OllamaPlugin: Could not determine plugin directory path for deletion.");
-      new import_obsidian4.Notice("Error: Cannot determine plugin directory for history deletion.");
-      return false;
-    }
-    const relativeLogPath = `${pluginConfigDir}/chat_history.json`;
-    const logPath = (0, import_obsidian4.normalizePath)(relativeLogPath);
-    try {
-      if (await adapter.exists(logPath)) {
-        console.log(`[Ollama Clear] Deleting history file: ${logPath}`);
-        await adapter.remove(logPath);
-        const backupPath = (0, import_obsidian4.normalizePath)(relativeLogPath + ".backup");
-        if (await adapter.exists(backupPath)) {
-          await adapter.remove(backupPath);
-          console.log(`[Ollama Clear] Deleted backup file: ${backupPath}`);
-        }
-        console.log(`[Ollama Clear] History file deleted successfully.`);
-        return true;
-      } else {
-        console.log(`[Ollama Clear] History file not found, nothing to delete: ${logPath}`);
-        return true;
-      }
-    } catch (error) {
-      console.error(`[Ollama Clear] Failed to delete history file ${logPath}:`, error);
-      new import_obsidian4.Notice("Error deleting chat history file.");
-      return false;
-    }
-  }
+  // clearMessageHistory: Clears history by overwriting file with "[]" and clearing view state
   async clearMessageHistory() {
     console.log("[Ollama Clear] Clearing message history initiated.");
-    const deleted = await this._deleteHistoryFile();
-    if (deleted && this.view) {
-      this.view.clearDisplayAndState();
-      console.log("[Ollama Clear] Cleared active view display and state.");
+    try {
+      await this.saveMessageHistory("[]");
+      console.log("[Ollama Clear] History file overwrite with '[]' completed.");
+      if (this.view) {
+        this.view.clearDisplayAndState();
+        console.log("[Ollama Clear] Cleared active view display and state.");
+      } else {
+        console.log("[Ollama Clear] Overwrite done, view not active.");
+      }
       new import_obsidian4.Notice("Chat history cleared.");
-    } else if (!deleted) {
-      new import_obsidian4.Notice("Failed to clear chat history file. Please check console logs.");
-    } else {
-      console.log("[Ollama Clear] History file operation completed, view not active.");
-      new import_obsidian4.Notice("Chat history cleared.");
+    } catch (error) {
+      console.error("[Ollama Clear] Failed to clear message history (error likely logged in saveMessageHistory):", error);
+      new import_obsidian4.Notice("Failed to clear chat history.");
     }
   }
+  // --- End History Persistence ---
+  // --- NEW METHOD: List Role Files ---
+  async listRoleFiles(forceRefresh = false) {
+    var _a, _b, _c;
+    if (this.roleListCache && !forceRefresh) {
+      return this.roleListCache;
+    }
+    console.log("[Ollama] Fetching and caching role list...");
+    const roles = [];
+    const adapter = this.app.vault.adapter;
+    const defaultRolesDir = (0, import_obsidian4.normalizePath)(this.manifest.dir + "/roles");
+    try {
+      if (await adapter.exists(defaultRolesDir) && ((_a = await adapter.stat(defaultRolesDir)) == null ? void 0 : _a.type) === "folder") {
+        const defaultFiles = await adapter.list(defaultRolesDir);
+        for (const filePath of defaultFiles.files) {
+          if (filePath.toLowerCase().endsWith(".md")) {
+            const fileName = path.basename(filePath);
+            const roleName = fileName.substring(0, fileName.length - 3);
+            roles.push({ name: roleName, path: filePath, isCustom: false });
+          }
+        }
+      } else {
+        console.log(`[Ollama] Default roles directory not found or not a folder: ${defaultRolesDir}`);
+      }
+    } catch (error) {
+      console.error(`[Ollama] Error listing default roles in ${defaultRolesDir}:`, error);
+    }
+    const userRolesDir = (_b = this.settings.userRolesFolderPath) == null ? void 0 : _b.trim();
+    if (userRolesDir) {
+      const normalizedUserDir = (0, import_obsidian4.normalizePath)(userRolesDir);
+      try {
+        if (await adapter.exists(normalizedUserDir) && ((_c = await adapter.stat(normalizedUserDir)) == null ? void 0 : _c.type) === "folder") {
+          const userFiles = await adapter.list(normalizedUserDir);
+          const addedRoleNames = new Set(roles.map((r) => r.name));
+          for (const filePath of userFiles.files) {
+            if (filePath.toLowerCase().endsWith(".md")) {
+              const fileName = path.basename(filePath);
+              const roleName = fileName.substring(0, fileName.length - 3);
+              if (!addedRoleNames.has(roleName)) {
+                roles.push({ name: roleName, path: filePath, isCustom: true });
+                addedRoleNames.add(roleName);
+              } else {
+                console.log(`[Ollama] Skipping user role '${roleName}' as a default role with the same name exists.`);
+              }
+            }
+          }
+        } else {
+          console.warn(`[Ollama] User roles folder path does not exist or is not a folder: ${normalizedUserDir}`);
+        }
+      } catch (error) {
+        console.error(`[Ollama] Error listing user roles in ${normalizedUserDir}:`, error);
+      }
+    }
+    roles.sort((a, b) => a.name.localeCompare(b.name));
+    this.roleListCache = roles;
+    console.log(`[Ollama] Found ${roles.length} roles.`);
+    return roles;
+  }
+  // --- END List Role Files Method ---
+  // --- NEW METHOD: Execute System Command ---
+  async executeSystemCommand(command) {
+    var _a;
+    console.log(`[Ollama] Executing system command: ${command}`);
+    if (!command || command.trim().length === 0) {
+      console.warn("[Ollama] Attempted to execute empty command.");
+      return { stdout: "", stderr: "Empty command provided.", error: new Error("Empty command") };
+    }
+    if (typeof process === "undefined" || !((_a = process == null ? void 0 : process.versions) == null ? void 0 : _a.node)) {
+      console.error("[Ollama] Node.js environment not detected. Cannot execute system commands.");
+      new import_obsidian4.Notice("Cannot execute system commands in this environment.");
+      return { stdout: "", stderr: "Node.js environment not available.", error: new Error("Node.js not available") };
+    }
+    return new Promise((resolve) => {
+      (0, import_child_process.exec)(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`[Ollama] exec error for command "${command}": ${error}`);
+        }
+        if (stderr) {
+          console.error(`[Ollama] exec stderr for command "${command}": ${stderr}`);
+        }
+        if (stdout) {
+          console.log(`[Ollama] exec stdout for command "${command}": ${stdout}`);
+        }
+        resolve({ stdout: stdout.toString(), stderr: stderr.toString(), error });
+      });
+    });
+  }
+  // --- END Execute System Command Method ---
 };
