@@ -57,18 +57,46 @@ var CSS_CLASS_MENU_BUTTON = "menu-button";
 var CSS_CLASS_MENU_DROPDOWN = "menu-dropdown";
 var CSS_CLASS_MENU_OPTION = "menu-option";
 var CSS_CLASS_SETTINGS_OPTION = "settings-option";
+var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
 var CSS_CLASS_MESSAGE_GROUP = "message-group";
+var CSS_CLASS_USER_GROUP = "user-message-group";
 var CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
+var CSS_CLASS_SYSTEM_GROUP = "system-message-group";
+var CSS_CLASS_ERROR_GROUP = "error-message-group";
 var CSS_CLASS_MESSAGE = "message";
+var CSS_CLASS_USER_MESSAGE = "user-message";
 var CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
+var CSS_CLASS_SYSTEM_MESSAGE = "system-message";
+var CSS_CLASS_ERROR_MESSAGE = "error-message";
+var CSS_CLASS_SYSTEM_ICON = "system-icon";
+var CSS_CLASS_ERROR_ICON = "error-icon";
+var CSS_CLASS_SYSTEM_TEXT = "system-message-text";
+var CSS_CLASS_ERROR_TEXT = "error-message-text";
+var CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
+var CSS_CLASS_CONTENT = "message-content";
 var CSS_CLASS_THINKING_DOTS = "thinking-dots";
 var CSS_CLASS_THINKING_DOT = "thinking-dot";
+var CSS_CLASS_TIMESTAMP = "message-timestamp";
+var CSS_CLASS_COPY_BUTTON = "copy-button";
+var CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
 var CSS_CLASS_DISABLED = "disabled";
+var CSS_CLASS_MESSAGE_ARRIVING = "message-arriving";
+var CSS_CLASS_DATE_SEPARATOR = "chat-date-separator";
+var CSS_CLASS_AVATAR = "message-group-avatar";
+var CSS_CLASS_AVATAR_USER = "user-avatar";
+var CSS_CLASS_AVATAR_AI = "ai-avatar";
+var CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button";
+var CSS_CLASS_CODE_BLOCK_LANGUAGE = "code-block-language";
 var CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 var CSS_CLASS_VISIBLE = "visible";
 var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 var CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
+var CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
+var CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
+var CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
+var CSS_CLASS_MODEL_OPTION = "model-option";
 var CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
+var CSS_CLASS_ROLE_OPTION = "role-option";
 var CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 var CSS_CLASS_MENU_HEADER = "menu-header";
 var CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option";
@@ -93,38 +121,31 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.debouncedSaveMessageHistory = (0, import_obsidian.debounce)(this.saveMessageHistory, 300, true);
     // --- Event Handlers ---
     this.handleKeyDown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) {
+        e.preventDefault();
+        this.sendMessage();
+      }
     };
     this.handleSendClick = () => {
+      if (!this.isProcessing && !this.sendButton.disabled) {
+        this.sendMessage();
+      }
     };
     this.handleVoiceClick = () => {
+      this.toggleVoiceRecognition();
     };
+    // Placeholder
     this.handleMenuClick = (e) => {
+      e.stopPropagation();
+      const isHidden = this.menuDropdown.style.display === "none";
+      if (isHidden) {
+        Promise.all([this.renderModelList(), this.renderRoleList()]);
+        this.menuDropdown.style.display = "block";
+        this.menuDropdown.style.animation = "menu-fade-in 0.15s ease-out";
+      } else {
+        this.menuDropdown.style.display = "none";
+      }
     };
-    this.handleSettingsClick = async () => {
-    };
-    this.handleClearChatClick = () => {
-    };
-    this.handleDocumentClickForMenu = (e) => {
-    };
-    this.handleModelChange = (modelName) => {
-    };
-    this.handleRoleChange = (roleName) => {
-    };
-    this.handleRolesUpdated = () => {
-    };
-    this.handleVisibilityChange = () => {
-    };
-    this.handleActiveLeafChange = (leaf) => {
-    };
-    this.handleInputForResize = () => {
-    };
-    this.handleWindowResize = () => {
-    };
-    this.handleScroll = () => {
-    };
-    this.handleNewMessageIndicatorClick = () => {
-    };
-    // --- NEW: Handler for Export Chat ---
     this.handleExportChatClick = async () => {
       this.closeMenu();
       console.log("[OllamaView] Export to Markdown initiated.");
@@ -149,7 +170,104 @@ var _OllamaView = class extends import_obsidian.ItemView {
         new import_obsidian.Notice("Error exporting chat. Check console for details.");
       }
     };
+    this.handleRolesUpdated = () => {
+      if (this.isMenuOpen()) {
+        console.log("[OllamaView] Roles updated event received, refreshing menu list.");
+        this.renderRoleList();
+      }
+    };
+    this.handleSettingsClick = async () => {
+      this.closeMenu();
+      const setting = this.app.setting;
+      if (setting) {
+        await setting.open();
+        setting.openTabById("ollama-chat-plugin");
+      } else {
+        new import_obsidian.Notice("Could not open settings.");
+      }
+    };
+    this.handleClearChatClick = () => {
+      this.closeMenu();
+      this.plugin.clearMessageHistory();
+    };
+    this.handleDocumentClickForMenu = (e) => {
+      if (this.isMenuOpen() && !this.menuButton.contains(e.target) && !this.menuDropdown.contains(e.target)) {
+        this.closeMenu();
+      }
+    };
+    this.handleModelChange = (modelName) => {
+      this.updateInputPlaceholder(modelName);
+      if (this.messages.length > 0) {
+        this.plugin.messageService.addSystemMessage(`Model changed to: ${modelName}`);
+      }
+    };
+    // --- NEW: Handler for Role Change ---
+    this.handleRoleChange = (roleName) => {
+      const displayRole = roleName || "Default";
+      if (this.messages.length > 0) {
+        this.plugin.messageService.addSystemMessage(`Role changed to: ${displayRole}`);
+      } else {
+        new import_obsidian.Notice(`Role set to: ${displayRole}`);
+      }
+    };
+    // ------------------------------------
+    this.handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && this.leaf.view === this) {
+        requestAnimationFrame(() => {
+          this.guaranteedScrollToBottom(50, true);
+          this.adjustTextareaHeight();
+        });
+      }
+    };
+    this.handleActiveLeafChange = (leaf) => {
+      var _a;
+      if ((leaf == null ? void 0 : leaf.view) === this) {
+        console.log("[OllamaView] View became active.");
+        (_a = this.inputEl) == null ? void 0 : _a.focus();
+        setTimeout(() => this.guaranteedScrollToBottom(150, true), 100);
+      }
+    };
+    this.handleInputForResize = () => {
+      if (this.resizeTimeout)
+        clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 50);
+      this.updateSendButtonState();
+    };
+    this.handleWindowResize = () => {
+      if (this.resizeTimeout)
+        clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100);
+    };
+    this.handleScroll = () => {
+      var _a;
+      if (!this.chatContainer)
+        return;
+      const t = 150;
+      const bottom = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight < t;
+      if (!bottom)
+        this.userScrolledUp = true;
+      else {
+        this.userScrolledUp = false;
+        (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
+      }
+    };
+    this.handleNewMessageIndicatorClick = () => {
+      var _a;
+      this.guaranteedScrollToBottom(50, true);
+      (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
+    };
     this.adjustTextareaHeight = () => {
+      requestAnimationFrame(() => {
+        if (!this.inputEl || !this.buttonsContainer)
+          return;
+        const vh = this.contentEl.clientHeight;
+        const mh = Math.max(100, vh * 0.5);
+        this.inputEl.style.height = "auto";
+        const sh = this.inputEl.scrollHeight;
+        const nh = Math.min(sh, mh);
+        this.inputEl.style.height = `${nh}px`;
+        this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, sh > mh);
+      });
     };
     this.plugin = plugin;
     if (_OllamaView.instance && _OllamaView.instance !== this) {
@@ -157,7 +275,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     _OllamaView.instance = this;
     if (!import_obsidian.requireApiVersion || !(0, import_obsidian.requireApiVersion)("1.0.0")) {
-      console.warn("Ollama Plugin: Obsidian API version might be outdated.");
+      console.warn("Ollama Plugin: Current Obsidian API version might be outdated.");
     }
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian.debounce)(this.handleScroll, 150, true);
@@ -173,6 +291,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     return [...this.messages];
   }
   // Return a copy
+  // Helper to check if the custom menu is currently open
   isMenuOpen() {
     var _a;
     return ((_a = this.menuDropdown) == null ? void 0 : _a.style.display) === "block";
@@ -195,7 +314,12 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.autoResizeTextarea();
     this.updateSendButtonState();
     this.lastMessageDate = null;
-    await Promise.all([this.loadAndRenderHistory(), this.renderModelList(), this.renderRoleList()]);
+    await Promise.all([
+      this.loadAndRenderHistory(),
+      this.renderModelList(),
+      this.renderRoleList()
+      // Render role list on open
+    ]);
     (_a = this.inputEl) == null ? void 0 : _a.focus();
     (_b = this.inputEl) == null ? void 0 : _b.dispatchEvent(new Event("input"));
   }
@@ -207,7 +331,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     this.stopVoiceRecording(false);
     if (this.audioStream) {
-      this.audioStream.getTracks().forEach((t) => t.stop());
+      this.audioStream.getTracks().forEach((track) => track.stop());
       this.audioStream = null;
     }
     if (this.scrollTimeout)
@@ -224,7 +348,8 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
-    (0, import_obsidian.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+    const indicatorIcon = this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" });
+    (0, import_obsidian.setIcon)(indicatorIcon, "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
     const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
     this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text to ${this.plugin.settings.modelName}...`, rows: 1 } });
@@ -244,14 +369,16 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.roleListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_ROLE_LIST_CONTAINER });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
-    (0, import_obsidian.setIcon)(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
+    const clearIcon = this.clearChatOption.createEl("span", { cls: "menu-option-icon" });
+    (0, import_obsidian.setIcon)(clearIcon, "trash-2");
     this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     (0, import_obsidian.setIcon)(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download");
     this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
-    (0, import_obsidian.setIcon)(this.settingsOption.createEl("span", { cls: "menu-option-icon" }), "settings");
+    const settingsIcon = this.settingsOption.createEl("span", { cls: "menu-option-icon" });
+    (0, import_obsidian.setIcon)(settingsIcon, "settings");
     this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
   }
   // --- Event Listeners ---
@@ -277,48 +404,329 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
     }
   }
-  // ----------------------------------
   // --- UI Update Methods ---
   updateInputPlaceholder(modelName) {
+    if (this.inputEl) {
+      this.inputEl.placeholder = `Text to ${modelName}...`;
+    }
   }
   closeMenu() {
+    if (this.menuDropdown) {
+      this.menuDropdown.style.display = "none";
+    }
   }
   autoResizeTextarea() {
+    this.adjustTextareaHeight();
   }
   updateSendButtonState() {
+    if (!this.inputEl || !this.sendButton)
+      return;
+    const d = this.inputEl.value.trim() === "" || this.isProcessing;
+    this.sendButton.disabled = d;
+    this.sendButton.classList.toggle(CSS_CLASS_DISABLED, d);
   }
   showEmptyState() {
+    if (this.messages.length === 0 && !this.emptyStateEl && this.chatContainer) {
+      this.chatContainer.empty();
+      this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE });
+      this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" });
+      this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use voice input to chat with ${this.plugin.settings.modelName}` });
+    }
   }
   hideEmptyState() {
+    if (this.emptyStateEl) {
+      this.emptyStateEl.remove();
+      this.emptyStateEl = null;
+    }
   }
   // --- Message Handling ---
   async loadAndRenderHistory() {
+    this.lastMessageDate = null;
+    this.clearChatContainerInternal();
+    try {
+      console.log("[OllamaView] Starting history loading...");
+      await this.plugin.messageService.loadMessageHistory();
+      if (this.messages.length === 0) {
+        this.showEmptyState();
+        console.log("[OllamaView] History loaded, empty.");
+      } else {
+        this.hideEmptyState();
+        console.log(`[OllamaView] History loaded (${this.messages.length} msgs). Checking collapsing...`);
+        this.checkAllMessagesForCollapsing();
+        setTimeout(() => {
+          console.log("[OllamaView] Attempting scroll after load.");
+          this.guaranteedScrollToBottom(200, true);
+        }, 150);
+      }
+    } catch (error) {
+      console.error("OllamaView: Error loading history:", error);
+      this.clearChatContainerInternal();
+      this.showEmptyState();
+    }
   }
   async saveMessageHistory() {
+    if (!this.plugin.settings.saveMessageHistory)
+      return;
+    const m = this.messages.map((msg) => ({ role: msg.role, content: msg.content, timestamp: msg.timestamp.toISOString() }));
+    const d = JSON.stringify(m);
+    try {
+      await this.plugin.saveMessageHistory(d);
+    } catch (e) {
+      console.error("OllamaView: Error saving history:", e);
+      new import_obsidian.Notice("Failed to save chat history.");
+    }
   }
   async sendMessage() {
+    const c = this.inputEl.value.trim();
+    if (!c || this.isProcessing || this.sendButton.disabled)
+      return;
+    const m = this.inputEl.value;
+    this.clearInputField();
+    this.setLoadingState(true);
+    this.hideEmptyState();
+    this.internalAddMessage("user", m);
+    try {
+      await this.plugin.messageService.sendMessage(c);
+    } catch (e) {
+      console.error("OllamaView: Error sending message:", e);
+      this.internalAddMessage("error", `Failed to send: ${e.message || "Unknown error"}`);
+      this.setLoadingState(false);
+    }
   }
   internalAddMessage(role, content, options = {}) {
+    const { saveHistory = true, timestamp } = options;
+    let msgTs;
+    if (timestamp) {
+      try {
+        msgTs = typeof timestamp === "string" ? new Date(timestamp) : timestamp;
+        if (isNaN(msgTs.getTime()))
+          throw new Error("Invalid Date");
+      } catch (e) {
+        console.warn("Invalid timestamp, using current:", timestamp, e);
+        msgTs = new Date();
+      }
+    } else {
+      msgTs = new Date();
+    }
+    const message = { role, content, timestamp: msgTs };
+    this.messages.push(message);
+    if (role === "assistant" && this.messages.length >= 2) {
+      const prev = this.messages[this.messages.length - 2];
+      if ((prev == null ? void 0 : prev.role) === "user")
+        this.messagesPairCount++;
+    }
+    const msgEl = this.renderMessage(message);
+    this.hideEmptyState();
+    if (msgEl) {
+      this.checkMessageForCollapsing(msgEl);
+    }
+    if (saveHistory && this.plugin.settings.saveMessageHistory) {
+      this.debouncedSaveMessageHistory();
+    }
+    if (role !== "user" && this.userScrolledUp && this.newMessagesIndicatorEl) {
+      this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
+    } else if (!this.userScrolledUp) {
+      const forceScroll = role !== "user";
+      this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+    }
   }
   // --- Rendering Logic ---
   renderMessage(message) {
-    return null;
+    const i = this.messages.indexOf(message);
+    if (i === -1)
+      return null;
+    const p = i > 0 ? this.messages[i - 1] : null;
+    const d = !this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp);
+    if (d) {
+      this.renderDateSeparator(message.timestamp);
+      this.lastMessageDate = message.timestamp;
+    } else if (i === 0) {
+      this.lastMessageDate = message.timestamp;
+    }
+    let g = null;
+    let gc = CSS_CLASS_MESSAGE_GROUP;
+    let mc = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
+    let sa = false;
+    let iu = false;
+    const f = !p || p.role !== message.role || d;
+    switch (message.role) {
+      case "user":
+        gc += ` ${CSS_CLASS_USER_GROUP}`;
+        mc += ` ${CSS_CLASS_USER_MESSAGE}`;
+        sa = true;
+        iu = true;
+        break;
+      case "assistant":
+        gc += ` ${CSS_CLASS_OLLAMA_GROUP}`;
+        mc += ` ${CSS_CLASS_OLLAMA_MESSAGE}`;
+        sa = true;
+        break;
+      case "system":
+        gc += ` ${CSS_CLASS_SYSTEM_GROUP}`;
+        mc += ` ${CSS_CLASS_SYSTEM_MESSAGE}`;
+        break;
+      case "error":
+        gc += ` ${CSS_CLASS_ERROR_GROUP}`;
+        mc += ` ${CSS_CLASS_ERROR_MESSAGE}`;
+        break;
+    }
+    const le = this.chatContainer.lastElementChild;
+    if (f || !le || !le.matches(`.${gc.split(" ")[1]}`)) {
+      g = this.chatContainer.createDiv({ cls: gc });
+      if (sa) {
+        this.renderAvatar(g, iu);
+      }
+    } else {
+      g = le;
+    }
+    const me = g.createDiv({ cls: mc });
+    const cc = me.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const ce = cc.createDiv({ cls: CSS_CLASS_CONTENT });
+    switch (message.role) {
+      case "assistant":
+      case "user":
+        ce.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+        if (message.role === "assistant") {
+          this.renderAssistantContent(ce, message.content);
+        } else {
+          message.content.split("\n").forEach((l, idx, a) => {
+            ce.appendText(l);
+            if (idx < a.length - 1)
+              ce.createEl("br");
+          });
+        }
+        break;
+      case "system":
+        (0, import_obsidian.setIcon)(ce.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+        ce.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+        break;
+      case "error":
+        (0, import_obsidian.setIcon)(ce.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+        ce.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+        break;
+    }
+    if (message.role !== "system") {
+      const cb = cc.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
+      (0, import_obsidian.setIcon)(cb, "copy");
+      cb.addEventListener("click", () => this.handleCopyClick(message.content, cb));
+    }
+    me.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+    setTimeout(() => me.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+    return me;
   }
-  // Placeholder implementation
   renderAvatar(groupEl, isUser) {
+    const s = this.plugin.settings;
+    const t = isUser ? s.userAvatarType : s.aiAvatarType;
+    const c = isUser ? s.userAvatarContent : s.aiAvatarContent;
+    const l = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
+    const a = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${l}` });
+    if (t === "initials") {
+      a.textContent = c || (isUser ? "U" : "A");
+    } else if (t === "icon") {
+      try {
+        (0, import_obsidian.setIcon)(a, c || (isUser ? "user" : "bot"));
+      } catch (e) {
+        console.warn(`Icon "${c}" failed.`, e);
+        a.textContent = isUser ? "U" : "A";
+      }
+    } else {
+      a.textContent = isUser ? "U" : "A";
+    }
   }
   renderDateSeparator(date) {
+    if (!this.chatContainer)
+      return;
+    this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) });
   }
   renderAssistantContent(containerEl, content) {
+    var _a, _b;
+    const d = this.decodeHtmlEntities(content);
+    const t = this.detectThinkingTags(d);
+    containerEl.empty();
+    if (t.hasThinkingTags) {
+      const h = this.processThinkingTags(d);
+      containerEl.innerHTML = h;
+      this.addThinkingToggleListeners(containerEl);
+      this.addCodeBlockEnhancements(containerEl);
+    } else {
+      import_obsidian.MarkdownRenderer.renderMarkdown(content, containerEl, (_b = (_a = this.plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", this);
+      this.addCodeBlockEnhancements(containerEl);
+    }
   }
   addCodeBlockEnhancements(contentEl) {
+    const p = contentEl.querySelectorAll("pre");
+    p.forEach((pre) => {
+      if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`))
+        return;
+      const c = pre.querySelector("code");
+      if (!c)
+        return;
+      const t = c.textContent || "";
+      const l = Array.from(c.classList).find((cls) => cls.startsWith("language-"));
+      if (l) {
+        const lang = l.replace("language-", "");
+        if (lang)
+          pre.createEl("span", { cls: CSS_CLASS_CODE_BLOCK_LANGUAGE, text: lang });
+      }
+      const b = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
+      (0, import_obsidian.setIcon)(b, "copy");
+      b.setAttribute("title", "Copy Code");
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(t).then(() => {
+          (0, import_obsidian.setIcon)(b, "check");
+          b.setAttribute("title", "Copied!");
+          setTimeout(() => {
+            (0, import_obsidian.setIcon)(b, "copy");
+            b.setAttribute("title", "Copy Code");
+          }, 1500);
+        }).catch((err) => {
+          console.error("Copy failed:", err);
+          new import_obsidian.Notice("Failed to copy code.");
+        });
+      });
+    });
   }
+  // --- Methods for handling long messages ---
   checkMessageForCollapsing(messageEl) {
+    const c = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const h = this.plugin.settings.maxMessageHeight;
+    if (!c || h <= 0)
+      return;
+    requestAnimationFrame(() => {
+      const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      b == null ? void 0 : b.remove();
+      c.style.maxHeight = "";
+      c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      const sh = c.scrollHeight;
+      if (sh > h) {
+        c.style.maxHeight = `${h}px`;
+        c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+        const smb = messageEl.createEl("button", { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: "Show More \u25BC" });
+        this.registerDomEvent(smb, "click", () => this.toggleMessageCollapse(c, smb));
+      }
+    });
   }
   checkAllMessagesForCollapsing() {
+    var _a;
+    (_a = this.chatContainer) == null ? void 0 : _a.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
+      this.checkMessageForCollapsing(msgEl);
+    });
   }
   toggleMessageCollapse(contentEl, buttonEl) {
+    const i = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+    if (i) {
+      contentEl.style.maxHeight = "";
+      contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      buttonEl.setText("Show Less \u25B2");
+    } else {
+      const h = this.plugin.settings.maxMessageHeight;
+      contentEl.style.maxHeight = `${h}px`;
+      contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+      buttonEl.setText("Show More \u25BC");
+    }
   }
+  // --- Other Rendering Helpers ---
   handleCopyClick(content, buttonEl) {
   }
   processThinkingTags(content) {
@@ -335,12 +743,131 @@ var _OllamaView = class extends import_obsidian.ItemView {
   detectThinkingTags(content) {
     return { hasThinkingTags: false, format: "none" };
   }
-  // --- Menu List Rendering ---
+  // --- NEW METHOD: Renders the model list in the menu ---
   async renderModelList() {
+    if (!this.modelListContainerEl)
+      return;
+    this.modelListContainerEl.empty();
+    const loadingEl = this.modelListContainerEl.createEl("span", { text: "Loading models..." });
+    const modelIconMap = { "llama": "box-minimal", "mistral": "wind", "mixtral": "blend", "codellama": "code", "code": "code", "phi": "sigma", "phi3": "sigma", "gemma": "gem", "command-r": "terminal", "llava": "image", "star": "star", "wizard": "wand", "hermes": "message-circle", "dolphin": "anchor" };
+    const defaultIcon = "box";
+    try {
+      const models2 = await this.plugin.apiService.getModels();
+      const currentModel = this.plugin.settings.modelName;
+      this.modelListContainerEl.empty();
+      if (models2.length === 0) {
+        this.modelListContainerEl.createEl("span", { text: "No models available." });
+        return;
+      }
+      models2.forEach((modelName) => {
+        const optEl = this.modelListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}` });
+        const iconSpan = optEl.createEl("span", { cls: "menu-option-icon" });
+        let iconToUse = defaultIcon;
+        if (modelName === currentModel) {
+          iconToUse = "check";
+          optEl.addClass("is-selected");
+        } else {
+          const lmn = modelName.toLowerCase();
+          for (const key in modelIconMap) {
+            if (lmn.includes(key)) {
+              iconToUse = modelIconMap[key];
+              break;
+            }
+          }
+        }
+        try {
+          (0, import_obsidian.setIcon)(iconSpan, iconToUse);
+        } catch (e) {
+          iconSpan.style.minWidth = "18px";
+        }
+        optEl.createEl("span", { cls: "menu-option-text", text: modelName });
+        this.registerDomEvent(optEl, "click", async () => {
+          if (modelName !== this.plugin.settings.modelName) {
+            this.plugin.settings.modelName = modelName;
+            await this.plugin.saveSettings();
+            this.plugin.emit("model-changed", modelName);
+          }
+          this.closeMenu();
+        });
+      });
+    } catch (error) {
+      console.error("Error loading models for menu:", error);
+      this.modelListContainerEl.empty();
+      this.modelListContainerEl.createEl("span", { text: "Error loading models." });
+    }
   }
+  // --- END NEW METHOD ---
+  focusInput() {
+    setTimeout(() => {
+      var _a;
+      (_a = this.inputEl) == null ? void 0 : _a.focus();
+    }, 0);
+  }
+  // --- NEW METHOD: Renders the role list in the menu ---
   async renderRoleList() {
+    if (!this.roleListContainerEl)
+      return;
+    this.roleListContainerEl.empty();
+    const loadingEl = this.roleListContainerEl.createEl("span", { text: "Loading roles..." });
+    try {
+      const roles = await this.plugin.listRoleFiles(false);
+      const currentRolePath = this.plugin.settings.selectedRolePath;
+      this.roleListContainerEl.empty();
+      const noRoleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+      const noRoleIconSpan = noRoleOptionEl.createEl("span", { cls: "menu-option-icon" });
+      if (!currentRolePath) {
+        (0, import_obsidian.setIcon)(noRoleIconSpan, "check");
+        noRoleOptionEl.addClass("is-selected");
+      } else {
+        (0, import_obsidian.setIcon)(noRoleIconSpan, "slash");
+        noRoleIconSpan.style.minWidth = "18px";
+      }
+      noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default Assistant)" });
+      this.registerDomEvent(noRoleOptionEl, "click", async () => {
+        if (this.plugin.settings.selectedRolePath !== "") {
+          this.plugin.settings.selectedRolePath = "";
+          await this.plugin.saveSettings();
+          this.plugin.emit("role-changed", "Default Assistant");
+        }
+        this.closeMenu();
+      });
+      if (roles.length === 0 && !this.plugin.settings.userRolesFolderPath) {
+        this.roleListContainerEl.createEl("span", { text: "No custom roles found. Add path in settings." });
+        return;
+      } else if (roles.length === 0 && this.plugin.settings.userRolesFolderPath) {
+        this.roleListContainerEl.createEl("span", { text: `No roles found in specified folders.` });
+        return;
+      }
+      roles.forEach((roleInfo) => {
+        const roleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+        if (roleInfo.isCustom) {
+          roleOptionEl.addClass("is-custom");
+        }
+        const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
+        if (roleInfo.path === currentRolePath) {
+          (0, import_obsidian.setIcon)(iconSpan, "check");
+          roleOptionEl.addClass("is-selected");
+        } else {
+          (0, import_obsidian.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "box");
+        }
+        roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
+        this.registerDomEvent(roleOptionEl, "click", async () => {
+          if (roleInfo.path !== this.plugin.settings.selectedRolePath) {
+            console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${roleInfo.path})`);
+            this.plugin.settings.selectedRolePath = roleInfo.path;
+            await this.plugin.saveSettings();
+            this.plugin.emit("role-changed", roleInfo.name);
+          }
+          this.closeMenu();
+        });
+      });
+    } catch (error) {
+      console.error("Error loading roles for menu:", error);
+      this.roleListContainerEl.empty();
+      this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
+    }
   }
-  // Make public if needed by main.ts still, otherwise private
+  // --- END NEW METHOD ---
   // --- Speech Recognition Placeholders ---
   initSpeechWorker() {
   }
@@ -355,56 +882,7 @@ var _OllamaView = class extends import_obsidian.ItemView {
   }
   stopVoiceRecording(processAudio) {
   }
-  // --- NEW HELPER: Format chat history to Markdown ---
-  formatChatToMarkdown() {
-    let markdown = `# Ollama Chat Export - ${new Date().toLocaleString("en-US")}
-
-`;
-    let lastDate = null;
-    this.messages.forEach((message) => {
-      if (!this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp)) {
-        markdown += `***
-**${this.formatDateSeparator(message.timestamp)}**
-***
-
-`;
-        this.lastMessageDate = message.timestamp;
-      } else if (!lastDate) {
-        this.lastMessageDate = message.timestamp;
-      }
-      lastDate = message.timestamp;
-      const time = this.formatTime(message.timestamp);
-      switch (message.role) {
-        case "user":
-          markdown += `**User (${time}):**
-`;
-          break;
-        case "assistant":
-          markdown += `**Assistant (${time}):**
-`;
-          break;
-        case "system":
-          markdown += `> [System (${time})] 
-> `;
-          break;
-        case "error":
-          markdown += `> [!ERROR] Error (${time}):
-> `;
-          break;
-      }
-      let content = message.content;
-      if (content.includes("```")) {
-        markdown += content + "\n\n";
-      } else if (message.role === "system" || message.role === "error") {
-        markdown += content.split("\n").join("\n> ") + "\n\n";
-      } else {
-        markdown += content + "\n\n";
-      }
-    });
-    return markdown.trim();
-  }
-  // --- END NEW HELPER ---
-  // --- Other Helpers & Utilities ---
+  // --- Helpers & Utilities ---
   getChatContainer() {
     return this.chatContainer;
   }
@@ -519,11 +997,52 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
   }
-  focusInput() {
-    setTimeout(() => {
-      var _a;
-      (_a = this.inputEl) == null ? void 0 : _a.focus();
-    }, 0);
+  formatChatToMarkdown() {
+    let markdown = `# Ollama Chat Export - ${new Date().toLocaleString("en-US")}
+
+`;
+    let lastDate = null;
+    this.messages.forEach((message) => {
+      if (!this.lastMessageDate || !this.isSameDay(this.lastMessageDate, message.timestamp)) {
+        markdown += `***
+**${this.formatDateSeparator(message.timestamp)}**
+***
+
+`;
+        this.lastMessageDate = message.timestamp;
+      } else if (!lastDate) {
+        this.lastMessageDate = message.timestamp;
+      }
+      lastDate = message.timestamp;
+      const time = this.formatTime(message.timestamp);
+      switch (message.role) {
+        case "user":
+          markdown += `**User (${time}):**
+`;
+          break;
+        case "assistant":
+          markdown += `**Assistant (${time}):**
+`;
+          break;
+        case "system":
+          markdown += `> [System (${time})] 
+> `;
+          break;
+        case "error":
+          markdown += `> [!ERROR] Error (${time}):
+> `;
+          break;
+      }
+      let content = message.content;
+      if (content.includes("```")) {
+        markdown += content + "\n\n";
+      } else if (message.role === "system" || message.role === "error") {
+        markdown += content.split("\n").join("\n> ") + "\n\n";
+      } else {
+        markdown += content + "\n\n";
+      }
+    });
+    return markdown.trim();
   }
 };
 var OllamaView = _OllamaView;
