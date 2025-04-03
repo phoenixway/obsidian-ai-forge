@@ -424,6 +424,14 @@ export class OllamaView extends ItemView {
   // --- END NEW METHOD ---
 
 
+  public focusInput(): void {
+    // Невелика затримка гарантує, що поле вже enabled і готове до фокусу
+    setTimeout(() => {
+      this.inputEl?.focus();
+      // console.log("[OllamaView] Input focused after response."); // Optional log
+    }, 0); // setTimeout 0 або невелика затримка (напр. 10)
+  }
+
   // --- NEW METHOD: Renders the role list in the menu ---
   public async renderRoleList(): Promise<void> {
     if (!this.roleListContainerEl) return; // Guard clause

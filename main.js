@@ -768,6 +768,12 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
   }
   // --- END NEW METHOD ---
+  focusInput() {
+    setTimeout(() => {
+      var _a;
+      (_a = this.inputEl) == null ? void 0 : _a.focus();
+    }, 0);
+  }
   // --- NEW METHOD: Renders the role list in the menu ---
   async renderRoleList() {
     if (!this.roleListContainerEl)
@@ -3782,7 +3788,7 @@ var MessageService = class {
     this.view.setLoadingState(true);
     const loadingMessageEl = this.view.addLoadingIndicator();
     setTimeout(async () => {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
       let responseData = null;
       try {
         const history = (_b = (_a = this.view) == null ? void 0 : _a.getMessages()) != null ? _b : [];
@@ -3829,6 +3835,7 @@ var MessageService = class {
       } finally {
         this.isProcessing = false;
         (_i = this.view) == null ? void 0 : _i.setLoadingState(false);
+        (_j = this.view) == null ? void 0 : _j.focusInput();
       }
     }, 0);
   }

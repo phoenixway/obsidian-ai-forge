@@ -130,6 +130,7 @@ export class MessageService {
             } finally { // Always execute
                 this.isProcessing = false;
                 this.view?.setLoadingState(false); // Always release loading state
+                this.view?.focusInput();
             }
         }, 0); // setTimeout 0 for async execution without blocking UI
     }
