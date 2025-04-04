@@ -21,7 +21,6 @@ interface AddMessageOptions { saveHistory?: boolean; timestamp?: Date | string; 
 
 
 export class OllamaView extends ItemView {
-  // --- Properties ---
   private readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
@@ -38,7 +37,6 @@ export class OllamaView extends ItemView {
   private buttonsContainer!: HTMLElement;
 
   // --- State ---
-  // messages array is REMOVED - data comes from ChatManager
   private isProcessing: boolean = false; // State for send/receive cycle
   private scrollTimeout: NodeJS.Timeout | null = null;
   static instance: OllamaView | null = null;

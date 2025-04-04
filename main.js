@@ -610,7 +610,6 @@ var _OllamaView = class extends import_obsidian2.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     // --- State ---
-    // messages array is REMOVED - data comes from ChatManager
     this.isProcessing = false;
     // State for send/receive cycle
     this.scrollTimeout = null;
