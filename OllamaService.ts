@@ -1,7 +1,7 @@
 // src/ollamaService.ts
 import OllamaPlugin from './main';
 import { OllamaView } from './OllamaView'; // May not be needed directly anymore
-import { PromptService } from './PromptService';
+// import { PromptService } from './PromptService';
 import { Chat } from './Chat'; // Needs Chat object for context
 import { Message, MessageRole } from './OllamaView'; // Needs Message types
 
@@ -11,7 +11,7 @@ export interface OllamaShowResponse { /* ... as defined in previous ApiService .
 
 export class OllamaService {
     private plugin: OllamaPlugin;
-    private promptService: PromptService;
+    // private promptService: PromptService;
     // No direct view reference needed now
     // private ollamaView: OllamaView | null = null;
     private eventHandlers: Record<string, Array<(data: any) => any>> = {}; // Keep event emitter for connection errors
@@ -19,7 +19,7 @@ export class OllamaService {
     constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
         // PromptService is now a dependency needed by OllamaService
-        this.promptService = plugin.promptService;
+        // this.promptService = plugin.promptService;
         // Ensure PromptService also has a reference back if needed for summarization calls
         // (This creates a potential circular dependency - consider passing generateResponse as a callback instead)
         // For now, we assume PromptService gets the ApiService instance if needed.
@@ -81,10 +81,9 @@ export class OllamaService {
             if (!lastUserMessage) { console.warn("[OllamaService] No user message in history for response."); return null; }
 
             // Prepare prompt (this now also sets the system prompt in PromptService via getRoleDefinition)
-            const formattedPrompt = await this.promptService.prepareFullPrompt(history, chat.metadata); // Pass metadata
-            const systemPrompt = this.promptService.getSystemPrompt(); // Get the potentially updated system prompt
-
-            // Prepare request body for generateRaw
+            const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(history, chat.metadata);
+            // Отримуємо системний промпт ТАКОЖ через promptService плагіна
+            const systemPrompt = this.plugin.promptService.getSystemPrompt();            // Prepare request body for generateRaw
             const requestBody = {
                 model: modelName,
                 prompt: formattedPrompt,

@@ -1903,11 +1903,11 @@ var RagService = class {
 var OllamaService = class {
   // Keep event emitter for connection errors
   constructor(plugin) {
+    // private promptService: PromptService;
     // No direct view reference needed now
     // private ollamaView: OllamaView | null = null;
     this.eventHandlers = {};
     this.plugin = plugin;
-    this.promptService = plugin.promptService;
   }
   // --- Event Emitter for internal errors (like connection) ---
   on(event, callback) {
@@ -1980,8 +1980,8 @@ var OllamaService = class {
         console.warn("[OllamaService] No user message in history for response.");
         return null;
       }
-      const formattedPrompt = await this.promptService.prepareFullPrompt(history, chat.metadata);
-      const systemPrompt = this.promptService.getSystemPrompt();
+      const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(history, chat.metadata);
+      const systemPrompt = this.plugin.promptService.getSystemPrompt();
       const requestBody = {
         model: modelName,
         prompt: formattedPrompt,
@@ -3835,6 +3835,8 @@ function countTokens2(text) {
 var PromptService = class {
   constructor(plugin) {
     this.systemPrompt = null;
+    // Reference to OllamaService needed for summarization calls and model details
+    // private ollamaService: OllamaService;
     // Buffer of tokens to reserve for the model's response & potential inaccuracies
     this.RESPONSE_TOKEN_BUFFER = 500;
     // Cache for detected model context sizes { modelName: detectedContextSize | null }
@@ -3842,7 +3844,6 @@ var PromptService = class {
     // Cache for role file content { roleFilePath: content | null }
     this.roleContentCache = {};
     this.plugin = plugin;
-    this.ollamaService = plugin.ollamaService;
   }
   setSystemPrompt(prompt2) {
     this.systemPrompt = prompt2;
@@ -3873,7 +3874,7 @@ var PromptService = class {
       } else {
         console.log(`[PromptService] No cache for ${modelName}, fetching details...`);
         try {
-          const details = await this.ollamaService.getModelDetails(modelName);
+          const details = await this.plugin.ollamaService.getModelDetails(modelName);
           if (details) {
             let sizeStr = void 0;
             if (details.parameters) {
@@ -3931,7 +3932,7 @@ var PromptService = class {
       // НЕ передаємо сюди основний системний промпт ролі
     };
     try {
-      const summaryResponse = await this.ollamaService.generateRaw(summaryRequestBody);
+      const summaryResponse = await this.plugin.ollamaService.generateRaw(summaryRequestBody);
       const summaryText = (_a = summaryResponse == null ? void 0 : summaryResponse.response) == null ? void 0 : _a.trim();
       if (summaryText) {
         console.log(`[Ollama] Summarization successful.`);
