@@ -13,3 +13,291 @@ UI/UX: Avatar customization, clearer error states, potentially better handling o
 "Створити нову нотатку з повідомлення чату".
 Виклик Функцій / Інструменти (Function Calling / Tool Use): Якщо моделі Ollama підтримуватимуть це в майбутньому, дозволити моделі викликати зовнішні інструменти або функції плагіна для отримання інформації чи виконання дій.
 Агентна Поведінка: Дозволити моделі ставити собі підзадачі та ініціювати дії для досягнення складної мети, поставленої користувачем.
+
+
+
+  private initSpeechWorker(): void { /* ... same as before ... */
+    // Use try-catch for robustness, especially with Blob URLs and Workers
+    try {
+      // Optimized Base64 encoding helper function
+      const bufferToBase64 = (buffer: ArrayBuffer): string => {
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+      };
+
+      // Worker code as a template literal for better readability
+      const workerCode = `
+          // Worker Scope
+          self.onmessage = async (event) => {
+            const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+
+            if (!apiKey || apiKey.trim() === '') {
+              self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
+              return;
+            }
+
+            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+
+            try {
+              const arrayBuffer = await audioBlob.arrayBuffer();
+
+              // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
+              // Simpler approach: pass buffer directly if API allows, or use efficient base64:
+              let base64Audio;
+              if (typeof TextDecoder !== 'undefined') { // Browser environment check
+                   // Modern approach (often faster if native)
+                   const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                   base64Audio = base64String;
+
+              } else {
+                   // Fallback (similar to original, ensure correctness)
+                   base64Audio = btoa(
+                     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                   );
+              }
+
+
+              const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify({
+                  config: {
+                    encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
+                    sampleRateHertz: 48000, // Match sample rate if possible
+                    languageCode: languageCode,
+                    model: 'latest_long', // Consider other models if needed
+                    enableAutomaticPunctuation: true,
+                  },
+                  audio: { content: base64Audio },
+                }),
+                headers: { 'Content-Type': 'application/json' },
+              });
+
+              const responseData = await response.json();
+
+              if (!response.ok) {
+                console.error("Google Speech API Error:", responseData);
+                self.postMessage({
+                  error: true,
+                  message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
+                });
+                return;
+              }
+
+              if (responseData.results && responseData.results.length > 0) {
+                const transcript = responseData.results
+                  .map(result => result.alternatives[0].transcript)
+                  .join(' ')
+                  .trim();
+                self.postMessage(transcript); // Send back only the transcript string
+              } else {
+                 // Handle cases where API returns ok but no results (e.g., silence)
+                 self.postMessage({ error: true, message: 'No speech detected or recognized.' });
+              }
+            } catch (error) {
+               console.error("Error in speech worker processing:", error);
+               self.postMessage({
+                 error: true,
+                 message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
+               });
+            }
+          };
+        `;
+
+      const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(workerBlob);
+      this.speechWorker = new Worker(workerUrl);
+      URL.revokeObjectURL(workerUrl); // Revoke URL immediately after worker creation
+
+      this.setupSpeechWorkerHandlers(); // Setup message/error handlers
+      console.log("Speech worker initialized.");
+
+    } catch (error) {
+      console.error("Failed to initialize speech worker:", error);
+      new Notice("Speech recognition feature failed to initialize.");
+      this.speechWorker = null; // Ensure worker is null if init fails
+    }
+  }
+  private setupSpeechWorkerHandlers(): void { /* ... same as before ... */
+    if (!this.speechWorker) return;
+
+    this.speechWorker.onmessage = (event) => {
+      const data = event.data;
+
+      // Check for error object from worker
+      if (data && typeof data === 'object' && data.error) {
+        console.error("Speech recognition error:", data.message);
+        new Notice(`Speech Recognition Error: ${data.message}`);
+        this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder on error
+        this.updateSendButtonState(); // Update button state as well
+        return;
+      }
+
+      // Process valid transcript (should be a string)
+      if (typeof data === 'string' && data.trim()) {
+        const transcript = data.trim();
+        this.insertTranscript(transcript);
+      } else if (typeof data !== 'string') {
+        console.warn("Received unexpected data format from speech worker:", data);
+      }
+      // If data is an empty string, do nothing (might happen with short silence)
+      this.updateSendButtonState(); // Update button state after processing
+    };
+
+    this.speechWorker.onerror = (error) => {
+      console.error("Unhandled worker error:", error);
+      new Notice("An unexpected error occurred in the speech recognition worker.");
+      this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder
+      // Attempt to gracefully stop recording if it was active
+      this.stopVoiceRecording(false); // This also updates placeholder and button state
+    };
+  }
+  private insertTranscript(transcript: string): void { /* ... same as before ... */
+    if (!this.inputEl) return;
+
+    const currentVal = this.inputEl.value;
+    const start = this.inputEl.selectionStart ?? currentVal.length; // Use length if null
+    const end = this.inputEl.selectionEnd ?? currentVal.length;
+
+    // Add spacing intelligently
+    let textToInsert = transcript;
+    const precedingChar = start > 0 ? currentVal[start - 1] : null;
+    const followingChar = end < currentVal.length ? currentVal[end] : null;
+
+    if (precedingChar && precedingChar !== ' ' && precedingChar !== '\n') {
+      textToInsert = ' ' + textToInsert;
+    }
+    if (followingChar && followingChar !== ' ' && followingChar !== '\n' && !textToInsert.endsWith(' ')) {
+      textToInsert += ' ';
+    }
+
+
+    const newValue = currentVal.substring(0, start) + textToInsert + currentVal.substring(end);
+    this.inputEl.value = newValue;
+
+    // Update cursor position
+    const newCursorPos = start + textToInsert.length;
+    this.inputEl.setSelectionRange(newCursorPos, newCursorPos);
+
+    this.inputEl.focus();
+    this.inputEl.dispatchEvent(new Event('input')); // Trigger resize calculation AND send button update
+  }
+  private async toggleVoiceRecognition(): Promise<void> { /* ... same as before ... */
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      this.stopVoiceRecording(true); // Stop and process
+    } else {
+      await this.startVoiceRecognition(); // Start new recording
+    }
+  }
+  private async startVoiceRecognition(): Promise<void> { /* ... same as before ... */
+    // Перевірка наявності worker'а для розпізнавання
+    if (!this.speechWorker) {
+      new Notice("Функція розпізнавання мовлення недоступна (worker не ініціалізовано).");
+      console.error("Спроба розпочати розпізнавання голосу без ініціалізованого worker'а.");
+      return;
+    }
+    // Перевірка наявності ключа Google API
+    if (!this.plugin.settings.googleApiKey) {
+      new Notice("Ключ Google API не налаштовано. Будь ласка, додайте його в налаштуваннях плагіна для використання голосового вводу.");
+      return;
+    }
+
+    // Disable send button while recording? Maybe not necessary.
+
+    try {
+      // Запит доступу до мікрофона
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Визначення опцій для MediaRecorder залежно від підтримки mimeType
+      let recorderOptions: MediaRecorderOptions | undefined; // Використовуємо конкретний тип або undefined
+      const preferredMimeType = 'audio/webm;codecs=opus'; // Бажаний формат
+
+      if (MediaRecorder.isTypeSupported(preferredMimeType)) {
+        console.log(`Використовується підтримуваний mimeType: ${preferredMimeType}`);
+        recorderOptions = { mimeType: preferredMimeType }; // Призначаємо об'єкт опцій, якщо підтримується
+      } else {
+        console.warn(`${preferredMimeType} не підтримується, використовується стандартний браузера.`);
+        recorderOptions = undefined; // Явно використовуємо undefined для стандартних налаштувань браузера
+      }
+
+      // Створення екземпляру MediaRecorder з визначеними опціями
+      this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
+
+      const audioChunks: Blob[] = []; // Масив для зберігання шматків аудіо
+
+      // --- Оновлення UI для стану запису ---
+      this.voiceButton?.classList.add(CSS_CLASS_RECORDING); // Додати клас для стилізації
+      setIcon(this.voiceButton, "stop-circle"); // Змінити іконку на "стоп"
+      this.inputEl.placeholder = "Recording... Speak now."; // Оновити плейсхолдер (English for consistency)
+
+      // --- Налаштування слухачів подій MediaRecorder ---
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) { audioChunks.push(event.data); }
+      };
+      this.mediaRecorder.onstop = () => {
+        console.log("MediaRecorder stopped.");
+        if (this.speechWorker && audioChunks.length > 0) {
+          const audioBlob = new Blob(audioChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
+          console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
+          this.inputEl.placeholder = "Processing speech..."; // Update placeholder
+          this.speechWorker.postMessage({
+            apiKey: this.plugin.settings.googleApiKey,
+            audioBlob,
+            languageCode: this.plugin.settings.speechLanguage || 'uk-UA'
+          });
+        } else if (audioChunks.length === 0) {
+          console.log("No audio data recorded.");
+          this.updateInputPlaceholder(this.plugin.settings.modelName); // Restore placeholder if nothing was recorded
+          this.updateSendButtonState(); // Ensure button state is correct
+        }
+      };
+      this.mediaRecorder.onerror = (event) => {
+        console.error("MediaRecorder Error:", event);
+        new Notice("An error occurred during recording.");
+        this.stopVoiceRecording(false); // Stop without processing on error
+      };
+
+      // --- Старт запису ---
+      this.mediaRecorder.start();
+      console.log("Recording started. MimeType:", this.mediaRecorder?.mimeType ?? 'default');
+
+    } catch (error) {
+      console.error("Error accessing microphone or starting recording:", error);
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        new Notice("Microphone access denied. Please grant permission.");
+      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+        new Notice("Microphone not found. Please ensure it's connected and enabled.");
+      } else {
+        new Notice("Could not start voice recording.");
+      }
+      this.stopVoiceRecording(false); // Ensure cleanup even if start failed
+    }
+  }
+  private stopVoiceRecording(processAudio: boolean): void { /* ... same as before ... */
+    console.log(`Stopping voice recording. Process audio: ${processAudio}`);
+    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+      // onstop handler will be triggered eventually to process if processAudio is true
+      this.mediaRecorder.stop();
+    } else if (!processAudio && this.mediaRecorder?.state === 'inactive') {
+      // If already stopped and asked not to process, just clean up UI/stream
+    }
+
+    // UI Cleanup & Resource Release
+    this.voiceButton?.classList.remove(CSS_CLASS_RECORDING);
+    setIcon(this.voiceButton, "microphone");
+    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    this.updateSendButtonState(); // Update button state
+
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach(track => track.stop());
+      this.audioStream = null;
+      console.log("Audio stream tracks stopped.");
+    }
+    this.mediaRecorder = null;
+  }
+
+

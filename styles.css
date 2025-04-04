@@ -46,8 +46,8 @@
   .chat-date-separator { text-align: center; margin: calc(var(--chat-spacing-unit) * 5) 0; font-size: 0.8em; color: var(--text-muted); font-weight: 500; background-color: var(--background-modifier-border); padding: calc(var(--chat-spacing-unit) * 0.5) calc(var(--chat-spacing-unit) * 2); border-radius: 10px; display: inline-block; margin-left: 50%; transform: translateX(-50%); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
   /* --- New Message Indicator --- */
-  .new-message-indicator { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); background-color: var(--interactive-accent); color: var(--text-on-accent); padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 3); border-radius: 20px; font-size: 0.85em; font-weight: 500; cursor: pointer; box-shadow: 0 3px 8px rgba(var(--interactive-accent-rgb), 0.3); z-index: 15; opacity: 0; transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; }
-  .new-message-indicator.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .new-message-indicator { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); background-color: var(--interactive-accent); color: var(--text-on-accent); padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 3); border-radius: 20px; font-size: 0.85em; font-weight: 500; cursor: pointer; box-shadow: 0 3px 8px rgba(var(--interactive-accent-rgb), 0.3); z-index: 15; opacity: 0; transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out; visibility: hidden; }
+  .new-message-indicator.visible { opacity: 1; transform: translateX(-50%) translateY(0); visibility: visible; }
   .new-message-indicator:hover { background-color: var(--interactive-accent-hover); box-shadow: 0 4px 10px rgba(var(--interactive-accent-rgb), 0.4); }
   .new-message-indicator .indicator-icon { margin-right: 4px; vertical-align: middle; }
 
@@ -66,13 +66,12 @@
   .chat-input-container:focus-within { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
 
 
-  .chat-input-container textarea { flex: 1; resize: none; border: none; border-radius: 8px; padding: 10px 15px; padding-right: 125px; /* Space for 3 buttons */ margin-right: 0; min-height: 40px; max-height: 50vh; background-color: var(--background-primary); color: var(--text-normal); font-size: 14px; line-height: 1.5; transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; overflow-y: auto; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); box-sizing: border-box; }
+  .chat-input-container textarea { flex: 1; resize: none; border: none; border-radius: 8px; padding: 10px 15px; padding-right: 160px; /* Space for 4 buttons: (32+8)*4 = 160 ? Adjust if needed */ margin-right: 0; min-height: 40px; max-height: 50vh; background-color: var(--background-primary); color: var(--text-normal); font-size: 14px; line-height: 1.5; transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; overflow-y: auto; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); box-sizing: border-box; }
   .chat-input-container textarea:focus { outline: none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 0 2px var(--interactive-accent-translucent); }
 
-  .buttons-container { display: flex; position: absolute; bottom: calc(var(--chat-spacing-unit) * 2); right: calc(var(--chat-spacing-unit) * 3); align-items: center; z-index: 21; gap: calc(var(--chat-spacing-unit) * 2); }
+  .buttons-container { display: flex; position: absolute; bottom: calc(var(--chat-spacing-unit) * 2); right: calc(var(--chat-spacing-unit) * 3); align-items: center; z-index: 21; gap: calc(var(--chat-spacing-unit) * 2); /* Gap between buttons */ }
 
-  /* Base button style */
-  input */
+  /* Base button style in input area */
   .buttons-container button {
     width: 32px;
     height: 32px;
@@ -88,7 +87,7 @@
     transition: all 0.15s ease-in-out;
     opacity: 0.7;
     outline: none;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent shrinking */
    }
   .buttons-container button:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); opacity: 1; transform: scale(1.05); }
   .buttons-container button:focus-visible { opacity: 1; background-color: var(--background-modifier-hover); box-shadow: 0 0 0 2px var(--interactive-accent-translucent); }
@@ -103,6 +102,25 @@
   /* Voice Button */
   .buttons-container .voice-button.recording { background-color: var(--text-error); color: white; opacity: 1; animation: pulse-recording 1.5s infinite ease-in-out; box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); }
   @keyframes pulse-recording { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); } 70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(var(--text-error-rgb), 0); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); } }
+
+  /* --- NEW: Translate Input Button --- */
+  .buttons-container .translate-input-button {
+    /* Styles are inherited from base button */
+  }
+  /* Loading state for input translate button */
+  .buttons-container .translate-input-button.translating-input .svg-icon {
+    animation: spin 1s linear infinite; /* Reuse spin animation */
+  }
+  .buttons-container .translate-input-button.translating-input {
+      cursor: default;
+      opacity: 0.5; /* Reduce opacity while loading */
+  }
+  /* ----------------------------------- */
+
+  /* Menu Button */
+  .buttons-container .menu-button {
+      /* Styles are inherited */
+  }
 
 
 /* ==========================================================================
@@ -145,7 +163,7 @@
 
   /* Message Content & Meta */
   .message-content-container { position: relative; /* Needed for absolute positioning of buttons */ width: 100%; }
-  .message-content { padding-bottom: calc(var(--chat-spacing-unit) * 2); /* Space below text before timestamp/translation */ }
+  .message-content { padding-bottom: calc(var(--chat-spacing-unit) * 2); /* Space below text before timestamp/translation */ box-sizing: border-box; width: 100%; /* Ensure it spans width for padding */ }
   .message-timestamp { font-size: 0.75em; color: var(--text-faint); margin-top: var(--chat-spacing-unit); text-align: right; display: block; width: 100%; opacity: 0.9; clear: both; /* Ensure it doesn't overlap floated elements */ }
   .user-message .message-timestamp { color: var(--text-on-accent); opacity: 0.75; }
 
@@ -235,7 +253,7 @@
   }
   .translate-button.translation-pending {
     cursor: default;
-    opacity: 0.6;
+    opacity: 0.6 !important; /* Override hover opacity */
   }
 
   @keyframes spin {
@@ -283,11 +301,13 @@
      LOADING & THINKING INDICATORS
      ========================================================================== */
 
+  /* Loading dots shown when waiting for AI response */
   .thinking-dots { display: flex; align-items: center; justify-content: center; padding: 8px 0; }
   .thinking-dot { width: 7px; height: 7px; border-radius: 50%; background-color: var(--text-muted); margin: 0 3px; opacity: 0.6; animation: dot-pulse 1.4s infinite ease-in-out; }
   .thinking-dot:nth-child(1) { animation-delay: 0s; } .thinking-dot:nth-child(2) { animation-delay: 0.2s; } .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
   @keyframes dot-pulse { 0%, 80%, 100% { transform: scale(0.8); opacity: 0.4; } 40% { transform: scale(1.2); opacity: 1; } }
 
+  /* Styling for <think> tag content */
   .thinking-block { border: 1px solid var(--background-modifier-border); border-radius: 6px; margin: 10px 0; background-color: var(--background-secondary-alt); overflow: hidden; }
   .thinking-header { background-color: var(--background-modifier-hover); color: var(--text-muted); padding: 6px 10px; display: flex; align-items: center; cursor: pointer; user-select: none; transition: background-color 0.2s; }
   .thinking-header:hover { background-color: var(--background-modifier-border); }
@@ -352,10 +372,11 @@
   /* Section Header in Menu */
   .ollama-chat-menu .menu-header { padding: 8px 12px 4px 12px; font-size: 0.8em; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
-  /* Container for scrollable lists (Models & Roles) */
+  /* Container for scrollable lists (Models, Roles, Chats) */
   .ollama-chat-menu .model-list-container,
-  .ollama-chat-menu .role-list-container {
-      max-height: 250px; /* Limit height */
+  .ollama-chat-menu .role-list-container,
+  .ollama-chat-menu .chat-list-container { /* Added .chat-list-container */
+      max-height: 200px; /* Adjusted height */
       overflow-y: auto; /* Add scrollbar if needed */
       margin-bottom: 4px;
       padding: 0 4px; /* Padding for scrollbar */
@@ -363,46 +384,99 @@
   }
    /* Scrollbar styling for lists */
   .ollama-chat-menu .model-list-container::-webkit-scrollbar,
-  .ollama-chat-menu .role-list-container::-webkit-scrollbar { width: 6px; }
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar,
+  .ollama-chat-menu .chat-list-container::-webkit-scrollbar { width: 6px; } /* Added .chat-list-container */
   .ollama-chat-menu .model-list-container::-webkit-scrollbar-track,
-  .ollama-chat-menu .role-list-container::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar-track,
+  .ollama-chat-menu .chat-list-container::-webkit-scrollbar-track { background: transparent; margin: 4px 0; } /* Added .chat-list-container */
   .ollama-chat-menu .model-list-container::-webkit-scrollbar-thumb,
-  .ollama-chat-menu .role-list-container::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar-thumb,
+  .ollama-chat-menu .chat-list-container::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; } /* Added .chat-list-container */
   .ollama-chat-menu .model-list-container::-webkit-scrollbar-thumb:hover,
-  .ollama-chat-menu .role-list-container::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-  /* Text for Loading/Error/Empty states */
-  .ollama-chat-menu .model-list-container span,
-  .ollama-chat-menu .role-list-container span { display: block; padding: 8px 12px; font-size: var(--font-ui-small); color: var(--text-muted); font-style: italic; }
+  .ollama-chat-menu .role-list-container::-webkit-scrollbar-thumb:hover,
+  .ollama-chat-menu .chat-list-container::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); } /* Added .chat-list-container */
 
-  /* Styling for individual Model and Role options */
+  /* Text for Loading/Error/Empty states in lists */
+  .ollama-chat-menu .model-list-container span,
+  .ollama-chat-menu .role-list-container span,
+  .ollama-chat-menu .chat-list-container span { display: block; padding: 8px 12px; font-size: var(--font-ui-small); color: var(--text-muted); font-style: italic; } /* Added .chat-list-container */
+
+  /* Styling for individual Model, Role and Chat options */
   .ollama-chat-menu .model-option,
-  .ollama-chat-menu .role-option {
-      padding-top: 3px;    /* Reduced vertical padding */
-      padding-bottom: 3px; /* Reduced vertical padding */
-      margin-top: 0;       /* Remove vertical margin */
-      margin-bottom: 0;    /* Remove vertical margin */
-      /* Inherit/apply other styles */
+  .ollama-chat-menu .role-option,
+  .ollama-chat-menu .chat-option { /* Added .chat-option */
+       padding-top: 5px;    /* Adjusted vertical padding */
+       padding-bottom: 5px; /* Adjusted vertical padding */
+       margin-top: 1px;
+       margin-bottom: 1px;
+       display: flex; align-items: center; cursor: pointer; transition: background-color 0.15s ease-out; color: var(--text-normal); border-radius: 5px;
        padding-left: calc(var(--chat-spacing-unit) * 3);
        padding-right: calc(var(--chat-spacing-unit) * 3);
        margin-left: calc(var(--chat-spacing-unit) * 1);
        margin-right: calc(var(--chat-spacing-unit) * 1);
-       display: flex; align-items: center; cursor: pointer; transition: background-color 0.15s ease-out; color: var(--text-normal); border-radius: 5px;
   }
   .ollama-chat-menu .model-option .menu-option-icon,
-  .ollama-chat-menu .role-option .menu-option-icon {
+  .ollama-chat-menu .role-option .menu-option-icon,
+  .ollama-chat-menu .chat-option .menu-option-icon { /* Added .chat-option */
        margin-right: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); flex-shrink: 0; min-width: 18px; font-size: 1em;
   }
   .ollama-chat-menu .model-option .menu-option-icon .svg-icon,
-  .ollama-chat-menu .role-option .menu-option-icon .svg-icon {
+  .ollama-chat-menu .role-option .menu-option-icon .svg-icon,
+  .ollama-chat-menu .chat-option .menu-option-icon .svg-icon { /* Added .chat-option */
        width: 16px; height: 16px; /* Icon size */
   }
   /* Styling for the selected item */
   .ollama-chat-menu .model-option.is-selected .menu-option-text,
-  .ollama-chat-menu .role-option.is-selected .menu-option-text { font-weight: 600; color: var(--text-normal); }
+  .ollama-chat-menu .role-option.is-selected .menu-option-text,
+  .ollama-chat-menu .chat-option.is-selected .menu-option-text { /* Added .chat-option */
+       font-weight: 600;
+       color: var(--text-normal);
+  }
+   .ollama-chat-menu .chat-option.is-selected { /* Style for selected chat */
+        background-color: var(--background-modifier-hover); /* Light background */
+   }
   .ollama-chat-menu .model-option.is-selected .menu-option-icon,
-  .ollama-chat-menu .role-option.is-selected .menu-option-icon { color: var(--interactive-accent); }
+  .ollama-chat-menu .role-option.is-selected .menu-option-icon,
+  .ollama-chat-menu .chat-option.is-selected .menu-option-icon { /* Added .chat-option */
+        color: var(--interactive-accent);
+  }
    /* Style for icon indicating a custom role (if needed, requires class added in TS) */
   .ollama-chat-menu .role-option.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) { color: var(--text-faint); /* Example: make default icon faint */ }
+
+  /* Styles for text within chat option (name + date) */
+  .ollama-chat-menu .chat-option .menu-option-text {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+      flex-grow: 1;
+      overflow: hidden; /* Clip overflowing text */
+  }
+  .ollama-chat-menu .chat-option .chat-option-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis; /* Add ellipsis for long names */
+      font-size: var(--font-ui-small);
+      margin-bottom: 2px;
+  }
+  .ollama-chat-menu .chat-option .chat-option-date {
+      font-size: 0.8em;
+      color: var(--text-faint);
+      white-space: nowrap;
+  }
+
+  /* Info/Error text styling within menu lists */
+  .ollama-chat-menu .menu-info-text {
+      padding: 8px 12px;
+      font-style: italic;
+      color: var(--text-muted);
+      font-size: 0.85em;
+  }
+   .ollama-chat-menu .menu-error-text {
+      padding: 8px 12px;
+      color: var(--text-error);
+      font-style: italic;
+      font-size: 0.85em;
+  }
 
 
 /* ==========================================================================
@@ -422,13 +496,16 @@
   @media screen and (max-width: 600px) {
     .ollama-chat-container .message { max-width: 90%; }
     :root { --chat-message-max-width: 90%; }
+    .message-actions-wrapper { opacity: 0.6; visibility: visible; /* Make buttons visible by default on touch */ }
+    .message:hover .message-actions-wrapper { opacity: 1; } /* Full opacity on hover still */
+
   }
 
   @media screen and (max-width: 480px) {
     :root { --chat-spacing-unit: 3px; --chat-avatar-size: 26px; }
     .ollama-chat-container { padding: 10px; padding-bottom: 5px; }
     .chat-input-container { margin: 5px 8px; padding: 6px 10px; }
-    .chat-input-container textarea { font-size: 13px; padding-right: 100px; /* Recalculate if button sizes change */ }
+    .chat-input-container textarea { font-size: 13px; padding-right: 135px; /* Adjust right padding for 4 smaller buttons: (28+6)*4 = 136? */ }
     .buttons-container { gap: 6px; right: 10px; bottom: 6px; }
     .buttons-container button { width: 28px; height: 28px; }
     .ollama-chat-container .message { font-size: 13px; padding: 6px 10px;}
@@ -436,28 +513,20 @@
     .menu-dropdown.ollama-chat-menu { min-width: 180px; }
     .ollama-chat-menu .menu-option { padding: 6px 10px; } /* Adjusted general menu option padding */
     .ollama-chat-menu .model-option,
-    .ollama-chat-menu .role-option { padding-top: 3px; padding-bottom: 3px; } /* Further reduced for models/roles */
+    .ollama-chat-menu .role-option,
+    .ollama-chat-menu .chat-option { padding-top: 4px; padding-bottom: 4px; } /* Adjusted model/role/chat padding */
     .ollama-chat-menu .menu-option-text { font-size: 13px; }
     /* Adjust action button size on mobile */
     .message-actions-wrapper button { padding: 1px 3px; }
     .message-actions-wrapper button .svg-icon { width: 12px; height: 12px; }
+    .message-actions-wrapper { top: 2px; right: 3px; gap: 3px; } /* Adjust position/gap */
   }
 
   @media screen and (max-width: 360px) {
       .buttons-container { gap: 4px; }
       .buttons-container button { width: 26px; height: 26px; }
-      .chat-input-container textarea { padding-right: 90px; /* (26+4)*3 + 6 */ }
+      .chat-input-container textarea { padding-right: 125px; /* (26+4)*4 = 120? Adjust as needed */ }
       :root { --chat-avatar-size: 24px; }
       .message-group { padding-left: 30px; padding-right: 30px;}
+      .message-actions-wrapper button .svg-icon { width: 11px; height: 11px; }
   }
-
-
-
-/* Стиль для кнопки перекладу вводу під час завантаження */
-.buttons-container .translate-input-button.translating-input .svg-icon {
-  animation: spin 1s linear infinite; /* Використовуємо ту ж анімацію */
-}
-.buttons-container .translate-input-button.translating-input {
-    cursor: default;
-    opacity: 0.5; /* Зменшуємо прозорість під час завантаження */
-}

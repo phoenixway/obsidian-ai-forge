@@ -147,7 +147,7 @@ export class RagService {
       return "";
     }
 
-    const limit = this.plugin.settings.contextWindowSize;
+    const limit = this.plugin.settings.contextWindow;
     const relevantDocs = this.findRelevantDocuments(query, limit);
 
     if (relevantDocs.length === 0) {
