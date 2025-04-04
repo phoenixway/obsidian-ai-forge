@@ -6,500 +6,210 @@ import {
   normalizePath,
   TFile,
   TFolder,
-  Vault, // Vault might be implicitly used via app.vault
-  DataAdapter,
-  debounce,
+  DataAdapter, // Потрібен для типів адаптера
+  debounce, // Потрібен для debounce
+  SuggestModal, // Потенційно для майбутньої реалізації
+  FuzzySuggestModal // Потенційно для майбутньої реалізації
 } from "obsidian";
-import { OllamaView, VIEW_TYPE_OLLAMA, MessageRole } from "./ollamaView"; // Assuming MessageRole is needed elsewhere or view exports it
+import { OllamaView, VIEW_TYPE_OLLAMA, Message, MessageRole } from "./OllamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
 import { RagService } from "./ragService";
-import { ApiService } from "./apiServices";
-import { PromptService } from './promptService';
-import { MessageService } from "./messageService";
-import { exec, ExecException } from 'child_process'; // For executing system commands (Requires Node.js)
-import * as path from 'path'; // For path manipulation
+import { OllamaService } from "./OllamaService"; // Перейменований ApiService
+import { PromptService } from './PromptService';
+import { ChatManager } from "./ChatManager"; // Новий клас
+import { Chat, ChatMetadata } from "./Chat"; // Імпортуємо Chat та його типи
+import { RoleInfo } from "./ChatManager"; // Або звідки ви його імпортували
+import { exec, ExecException } from 'child_process';
+import * as path from 'path';
 
-// Type for role information used in menus etc.
-export interface RoleInfo {
-  name: string; // Role name from filename
-  path: string; // Full normalized path to the .md file
-  isCustom: boolean; // Is it from the user's folder?
-}
+// --- КОНСТАНТИ ДЛЯ ЗБЕРЕЖЕННЯ ---
+const SESSIONS_INDEX_KEY = 'chatSessionsIndex_v1';
+const ACTIVE_SESSION_ID_KEY = 'activeChatSessionId_v1';
+// ----------------------------------
 
-// Interfaces (kept for context, might move to types.ts)
+// Інтерфейси
 interface RAGDocument { id: string; content: string; metadata: { source: string; path: string; }; }
 interface Embedding { documentId: string; vector: number[]; }
+// RoleInfo вже імпортовано або визначено в ChatManager
 
 export default class OllamaPlugin extends Plugin {
   settings: OllamaPluginSettings;
   settingTab: OllamaSettingTab;
-  view: OllamaView | null = null; // Reference to the active view instance
-  ragService: RagService;
-  apiService: ApiService;
-  promptService: PromptService;
-  messageService: MessageService;
-  // Simple event emitter
+  view: OllamaView | null = null;
+
+  // Сервіси та Менеджер
+  ragService!: RagService;
+  ollamaService!: OllamaService;
+  promptService!: PromptService;
+  chatManager!: ChatManager; // Немає this.sessionIndex або this.activeChatId тут
+
+  // Події та кеш
   private eventHandlers: Record<string, Array<(data: any) => any>> = {};
-  // Cache for the list of available roles
   private roleListCache: RoleInfo[] | null = null;
-  // Debounce timer for clearing role cache on file changes
   private roleCacheClearTimeout: NodeJS.Timeout | null = null;
-  // Debounce timer for RAG index updates
   private indexUpdateTimeout: NodeJS.Timeout | null = null;
 
-  // RAG data (Placeholders, consider moving to RagService)
+  // RAG data (приклад)
   documents: RAGDocument[] = [];
   embeddings: Embedding[] = [];
 
-
   // --- Event Emitter Methods ---
-  on(event: string, callback: (data: any) => any): () => void {
-    if (!this.eventHandlers[event]) {
-      this.eventHandlers[event] = [];
-    }
-    this.eventHandlers[event].push(callback);
-    // Return an unsubscribe function
-    return () => {
-      this.eventHandlers[event] = this.eventHandlers[event]?.filter(
-        handler => handler !== callback
-      );
-      if (this.eventHandlers[event]?.length === 0) {
-        delete this.eventHandlers[event];
-      }
-    };
-  }
-
-  emit(event: string, data?: any): void {
-    const handlers = this.eventHandlers[event];
-    if (handlers) {
-      // Use slice to prevent issues if a handler unregisters itself during iteration
-      handlers.slice().forEach(handler => {
-        try {
-          handler(data);
-        } catch (e) {
-          console.error(`[OllamaPlugin] Error in event handler for ${event}:`, e);
-        }
-      });
-    }
-  }
-  // --- End Event Emitter Methods ---
+  on(event: string, callback: (data: any) => any): () => void { if (!this.eventHandlers[event]) this.eventHandlers[event] = []; this.eventHandlers[event].push(callback); return () => { this.eventHandlers[event] = this.eventHandlers[event]?.filter(h => h !== callback); if (this.eventHandlers[event]?.length === 0) { delete this.eventHandlers[event]; } }; }
+  emit(event: string, data?: any): void { const h = this.eventHandlers[event]; if (h) h.slice().forEach(handler => { try { handler(data); } catch (e) { console.error(`[OllamaPlugin] Error in event handler for ${event}:`, e); } }); }
 
 
   async onload() {
-    console.log("Loading Ollama Plugin..."); // English Log
+    console.log("Loading Ollama Plugin (MVC Arch)...");
+    await this.loadSettings();
 
-    await this.loadSettings(); // Load settings first, includes migration
-
-    // Initialize services, passing the plugin instance ('this')
-    this.apiService = new ApiService(this);
-    this.ragService = new RagService(this);
+    // Ініціалізація (порядок може бути важливим)
+    this.ollamaService = new OllamaService(this);
     this.promptService = new PromptService(this);
-    this.messageService = new MessageService(this);
+    this.ragService = new RagService(this);
+    this.chatManager = new ChatManager(this); // Ініціалізуємо ChatManager
 
-    // Register the view
-    this.registerView(VIEW_TYPE_OLLAMA, (leaf) => {
-      console.log("OllamaPlugin: Registering new view instance."); // English Log
-      this.view = new OllamaView(leaf, this);
-      this.messageService.setView(this.view); // Link service to view
-      this.apiService.setOllamaView(this.view); // Link API service to view
-      return this.view;
-    });
+    await this.chatManager.initialize(); // ChatManager завантажує індекс та активний ID
 
-    // Register API Service Event Handler for connection errors
-    this.apiService.on('connection-error', (error) => {
-      console.error("[OllamaPlugin] Ollama connection error event received:", error); // English Log
-      if (this.view) {
-        // Display error in the view if available
-        this.view.internalAddMessage(
-          "error",
-          `Failed to connect to Ollama: ${error.message}. Please check settings.` // English Message
-        );
-      } else {
-        // Fallback to Notice if view isn't open
-        new Notice(`Failed to connect to Ollama: ${error.message}`); // English Notice
-        console.log("[OllamaPlugin] Ollama connection error: View not available to display message."); // English Log
-      }
-    });
+    // Реєстрація View
+    this.registerView(VIEW_TYPE_OLLAMA, (leaf) => { console.log("OllamaPlugin: Registering view."); this.view = new OllamaView(leaf, this); /* Removed setOllamaViewRef */ return this.view; });
 
-    // Add Ribbon Icon
-    this.addRibbonIcon("message-square", "Open Ollama Chat", () => { // English Tooltip
-      this.activateView();
-    });
+    // Обробник помилок з'єднання (з OllamaService)
+    this.ollamaService.on('connection-error', (error) => { console.error("[OllamaPlugin] Connection error event:", error); this.emit('ollama-connection-error', error.message); if (!this.view) { new Notice(`Failed to connect to Ollama: ${error.message}`); } });
 
-    // Add Commands
-    this.addCommand({
-      id: "open-ollama-view",
-      name: "Open Ollama Chat", // English Command Name
-      callback: () => {
-        this.activateView();
-      },
-    });
-
-    this.addCommand({
-      id: "index-rag-documents",
-      name: "Index documents for RAG", // English Command Name
-      callback: async () => {
-        await this.ragService.indexDocuments(); // Assumes indexDocuments shows Notices
-      },
-    });
-
-    this.addCommand({
-      id: "clear-ollama-history",
-      name: "Clear Ollama Chat History", // English Command Name
-      callback: async () => {
-        await this.clearMessageHistory(); // Calls the updated clear method
-      },
-    });
-
-    this.addCommand({
-      id: "refresh-ollama-roles",
-      name: "Refresh Ollama Roles List",
-      callback: async () => {
-        await this.listRoleFiles(true); // Примусово оновлюємо кеш
-        this.emit('roles-updated');    // Генеруємо подію, View відреагує, якщо потрібно
-        new Notice("Role list refreshed.");
-      }
-    });
+    // --- Реєстрація обробників подій ---
+    this.register(this.on('ollama-connection-error', (message) => { this.view?.addMessageToDisplay?.('error', message, new Date()); }));
+    this.register(this.on('active-chat-changed', this.handleActiveChatChangedLocally)); // Локальний обробник для оновлення settings
+    // Видалено непотрібні проміжні обробники, View слухає напряму
+    this.register(this.on('chat-list-updated', () => {
+      console.log("[OllamaPlugin] Event 'chat-list-updated' received.");
+      // Немає потреби викликати методи View звідси.
+      // View оновить своє меню, коли воно буде відкрито наступного разу,
+      // або якщо змінився активний чат (через подію 'active-chat-changed').
+    }));
+    this.register(this.on('settings-updated', () => {
+      console.log("[OllamaPlugin] Event 'settings-updated' received.");
+      // Немає потреби викликати методи View звідси.
+      // View оновить меню при відкритті. Зміна URL/папки ролей обробляється інакше.
+    }));
+    // this.register(this.on('roles-updated', () => { if (this.view?.isMenuOpen()) { this.view?.renderRoleList(); } }));
+    // Ці події обробляються напряму в View
+    // this.register(this.on('model-changed', (modelName) => { this.view?.handleModelChange?.(modelName); }));
+    // this.register(this.on('role-changed', (roleName) => { this.view?.handleRoleChange?.(roleName); }));
+    // this.register(this.on('message-added', (data) => { this.view?.handleMessageAdded?.(data); }));
+    // this.register(this.on('messages-cleared', (chatId) => { this.view?.handleMessagesCleared?.(chatId); }));
 
 
-    // Add Settings Tab
+    // Ribbon & Commands
+    this.addRibbonIcon("message-square", "Open Ollama Chat", () => { this.activateView(); });
+    this.addCommand({ id: "open-ollama-view", name: "Open Ollama Chat", callback: () => { this.activateView(); }, });
+    this.addCommand({ id: "index-rag-documents", name: "Index documents for RAG", callback: async () => { await this.ragService.indexDocuments(); }, });
+    this.addCommand({ id: "clear-ollama-history", name: "Clear Active Chat History", callback: async () => { await this.chatManager.clearActiveChatMessages(); }, });
+    this.addCommand({ id: "refresh-ollama-roles", name: "Refresh Ollama Roles List", callback: async () => { await this.listRoleFiles(true); this.emit('roles-updated'); new Notice("Role list refreshed."); } });
+    this.addCommand({ id: "ollama-new-chat", name: "Ollama: New Chat", callback: async () => { const newChat = await this.chatManager.createNewChat(); if (newChat) { await this.activateView(); new Notice(`Created new chat: ${newChat.metadata.name}`); } } });
+    this.addCommand({ id: "ollama-switch-chat", name: "Ollama: Switch Chat", callback: async () => { await this.showChatSwitcher(); } }); // Потребує UI
+    this.addCommand({ id: "ollama-rename-chat", name: "Ollama: Rename Active Chat", callback: async () => { await this.renameActiveChat(); } });
+    this.addCommand({ id: "ollama-delete-chat", name: "Ollama: Delete Active Chat", callback: async () => { await this.deleteActiveChatWithConfirmation(); } });
+
+    // Settings Tab
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
 
-    // On Layout Ready Logic
-    this.app.workspace.onLayoutReady(async () => {
-      if (this.settings.ragEnabled) {
-        // Use a timeout to allow Obsidian UI to settle before potentially heavy indexing
-        setTimeout(() => {
-          console.log("[OllamaPlugin] RAG enabled, starting initial index."); // English Log
-          this.ragService?.indexDocuments();
-        }, 5000); // Delay indexing slightly
-      }
-    });
+    // Layout Ready
+    this.app.workspace.onLayoutReady(async () => { if (this.settings.ragEnabled) { setTimeout(() => { this.ragService?.indexDocuments(); }, 5000); } });
 
-
-
-    // Register listeners for file modifications/deletions/renames for RAG and Roles
-    // Debounce clearing role cache
-    const debouncedRoleClear = debounce(() => {
-      console.log("[Ollama] Role directory changed (debounced), clearing role cache and emitting event.");
-      this.roleListCache = null; // Скидаємо кеш
-      this.emit('roles-updated'); // Генеруємо подію
-    }, 1500, true); // 1.5 сек debounce, спрацьовує на початку
-
-    // Окремі обробники для кожної події Vault
-    const handleModify = (file: TFile) => {
-      // Подія 'modify' спрацьовує тільки для файлів (TFile)
-      this.handleFileChange(file.path, debouncedRoleClear);
-    };
-
-    const handleDelete = (file: TFile | TFolder) => {
-      // Подія 'delete' спрацьовує для файлів та папок
-      this.handleFileChange(file.path, debouncedRoleClear);
-    };
-
-    const handleRename = (file: TFile | TFolder, oldPath: string) => {
-      // Подія 'rename' спрацьовує для файлів та папок
-      // Реагуємо на новий шлях 'file.path', а також можна реагувати на старий 'oldPath'
-      this.handleFileChange(file.path, debouncedRoleClear);
-      this.handleFileChange(oldPath, debouncedRoleClear); // Перевіряємо і старий шлях
-    };
-
-    const handleCreate = (file: TFile | TFolder) => {
-      // Подія 'create' спрацьовує для файлів та папок
-      this.handleFileChange(file.path, debouncedRoleClear);
-    };
-
-
-    // Реєструємо обробники з правильними типами
-    this.registerEvent(this.app.vault.on("modify", handleModify));
-    this.registerEvent(this.app.vault.on("delete", handleDelete));
-    this.registerEvent(this.app.vault.on("rename", handleRename));
-    this.registerEvent(this.app.vault.on("create", handleCreate));
+    // File Watcher Setup
+    const debouncedRoleClear = debounce(() => { console.log("[Ollama] Role change detected, clearing cache & emitting."); this.roleListCache = null; this.emit('roles-updated'); }, 1500, true);
+    const fileChangeHandler = (file: TFile | TFolder | null) => { if (!file) return; this.handleFileChange(file.path, debouncedRoleClear); };
+    const handleModify = (file: TFile) => fileChangeHandler(file);
+    const handleDelete = (file: TFile | TFolder) => fileChangeHandler(file);
+    const handleRename = (file: TFile | TFolder, oldPath: string) => { fileChangeHandler(file); this.handleFileChange(oldPath, debouncedRoleClear); };
+    const handleCreate = (file: TFile | TFolder) => fileChangeHandler(file);
+    this.registerEvent(this.app.vault.on("modify", handleModify)); this.registerEvent(this.app.vault.on("delete", handleDelete)); this.registerEvent(this.app.vault.on("rename", handleRename)); this.registerEvent(this.app.vault.on("create", handleCreate));
   }
 
-  private handleFileChange(changedPath: string, debouncedRoleClear: () => void) {
-    const normalizedChangedPath = normalizePath(changedPath);
-    const userRolesPath = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null;
-    const defaultRolesPath = normalizePath(this.manifest.dir + '/roles');
-    if ((userRolesPath && normalizedChangedPath.startsWith(userRolesPath + '/')) || normalizedChangedPath.startsWith(defaultRolesPath + '/')) {
-      if (normalizedChangedPath.toLowerCase().endsWith('.md')) {
-        debouncedRoleClear(); // Викликаємо передану debounced функцію
-      }
-    }
-    const ragFolderPath = this.settings.ragFolderPath ? normalizePath(this.settings.ragFolderPath) : null;
-    if (this.settings.ragEnabled && ragFolderPath && normalizedChangedPath.startsWith(ragFolderPath + '/')) { this.debounceIndexUpdate(); }
-  }
+  // File Change Handler
+  private handleFileChange(changedPath: string, debouncedRoleClear: () => void) { const normPath = normalizePath(changedPath); const userR = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null; const defaultR = normalizePath(this.manifest.dir + '/roles'); if (((userR && normPath.startsWith(userR + '/')) || normPath.startsWith(defaultR + '/')) && normPath.toLowerCase().endsWith('.md')) { debouncedRoleClear(); } const ragF = this.settings.ragFolderPath ? normalizePath(this.settings.ragFolderPath) : null; if (this.settings.ragEnabled && ragF && normPath.startsWith(ragF + '/')) { this.debounceIndexUpdate(); } }
 
+  onunload() { console.log("Unloading Ollama Plugin..."); this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA).forEach(l => l.detach()); if (this.indexUpdateTimeout) clearTimeout(this.indexUpdateTimeout); if (this.roleCacheClearTimeout) clearTimeout(this.roleCacheClearTimeout); this.promptService?.clearModelDetailsCache?.(); this.promptService?.clearRoleCache?.(); this.roleListCache = null; }
 
+  updateOllamaServiceConfig() { if (this.ollamaService) { console.log("[OllamaPlugin] Settings changed, clearing model cache."); this.promptService?.clearModelDetailsCache(); } }
 
-  // Called when plugin is unloaded
-  onunload() {
-    console.log("Unloading Ollama Plugin..."); // English Log
-    // Clean up: remove view, clear timeouts, clear caches
-    this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA).forEach((leaf) => {
-      leaf.detach();
-    });
-    if (this.indexUpdateTimeout) { clearTimeout(this.indexUpdateTimeout); }
-    if (this.roleCacheClearTimeout) { clearTimeout(this.roleCacheClearTimeout); } // Clear role debounce timer
-    this.promptService?.clearModelDetailsCache?.(); // Clear model details cache
-    this.roleListCache = null; // Clear role list cache
-    // Event listeners registered with this.registerEvent are handled automatically
-  }
+  private debounceIndexUpdate() { if (this.indexUpdateTimeout) clearTimeout(this.indexUpdateTimeout); this.indexUpdateTimeout = setTimeout(() => { console.log("RAG index update."); this.ragService?.indexDocuments(); this.indexUpdateTimeout = null; }, 30000); }
 
+  async activateView() { const { workspace: e } = this.app; let l: WorkspaceLeaf | null = null; const s = e.getLeavesOfType(VIEW_TYPE_OLLAMA); s.length > 0 ? l = s[0] : (l = e.getRightLeaf(!1) ?? e.getLeaf(!0), l && await l.setViewState({ type: VIEW_TYPE_OLLAMA, active: !0 })); if (l) { e.revealLeaf(l); const v = l.view; if (v instanceof OllamaView) { this.view = v; console.log("View activated."); } else { console.error("View not OllamaView?"); } } else console.error("Failed leaf create."); }
 
-  // --- Service Updates ---
-  // Update API service when settings change (called from saveSettings)
-  updateApiService() {
-    if (this.apiService) {
-      this.apiService.setBaseUrl(this.settings.ollamaServerUrl);
-      // Clear model details cache if URL changes, as available models might differ
-      this.promptService?.clearModelDetailsCache();
-      // Clear role cache as well? Probably not needed unless role files depend on server? No.
-    }
-  }
+  async loadSettings() { this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); if ((this.settings as any).customRoleFilePath !== undefined && this.settings.selectedRolePath === undefined) { console.log("[Ollama] Migrating 'customRoleFilePath'->'selectedRolePath'."); this.settings.selectedRolePath = (this.settings as any).customRoleFilePath || ""; } delete (this.settings as any).customRoleFilePath; delete (this.settings as any).useDefaultRoleDefinition; }
+  async saveSettings() { delete (this.settings as any).customRoleFilePath; delete (this.settings as any).useDefaultRoleDefinition; await this.saveData(this.settings); this.updateOllamaServiceConfig(); this.roleListCache = null; this.promptService?.clearRoleCache?.(); console.log("OllamaPlugin: Settings saved."); this.emit('settings-updated'); }
 
+  // Data Helpers
+  async saveDataKey(key: string, value: any): Promise<void> { const d = await this.loadData() || {}; d[key] = value; await this.saveData(d); }
+  async loadDataKey(key: string): Promise<any> { const d = await this.loadData() || {}; return d[key]; }
 
-  // --- Debounce Indexing ---
-  private debounceIndexUpdate() {
-    if (this.indexUpdateTimeout) {
-      clearTimeout(this.indexUpdateTimeout);
-    }
-    this.indexUpdateTimeout = setTimeout(() => {
-      console.log("[OllamaPlugin] Debounced RAG index update triggered."); // English Log
-      this.ragService?.indexDocuments();
-      this.indexUpdateTimeout = null;
-    }, 30000); // 30 seconds delay
-  }
+  // History Persistence (Delegated)
+  async clearMessageHistory() { console.log("[OllamaPlugin] Clearing active chat via ChatManager."); if (this.chatManager) { await this.chatManager.clearActiveChatMessages(); } else { console.error("ChatManager not ready."); new Notice("Error: Chat Manager not ready."); } }
 
+  // List Role Files Method
+  async listRoleFiles(forceRefresh: boolean = false): Promise<RoleInfo[]> { if (this.roleListCache && !forceRefresh) return this.roleListCache; console.log("[Ollama] Fetching roles..."); const r: RoleInfo[] = []; const a = this.app.vault.adapter; const d = normalizePath(this.manifest.dir + '/roles'); try { if (await a.exists(d) && (await a.stat(d))?.type === 'folder') { const f = await a.list(d); for (const p of f.files) { if (p.toLowerCase().endsWith('.md')) { const fn = path.basename(p); const n = fn.substring(0, fn.length - 3); r.push({ name: n, path: p, isCustom: false }); } } } } catch (e) { console.error("Err list default roles:", e); } const u = this.settings.userRolesFolderPath?.trim(); if (u) { const nd = normalizePath(u); try { if (await a.exists(nd) && (await a.stat(nd))?.type === 'folder') { const f = await a.list(nd); const names = new Set(r.map(x => x.name)); for (const p of f.files) { if (p.toLowerCase().endsWith('.md')) { const fn = path.basename(p); const n = fn.substring(0, fn.length - 3); if (!names.has(n)) { r.push({ name: n, path: p, isCustom: true }); names.add(n); } } } } } catch (e) { console.error("Err list user roles:", e); } } r.sort((a, b) => a.name.localeCompare(b.name)); this.roleListCache = r; console.log(`Found ${r.length} roles.`); return r; }
 
-  // --- View Activation ---
-  async activateView() {
-    const { workspace } = this.app;
-    let leaf: WorkspaceLeaf | null = null;
-    const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA);
-
-    if (existingLeaves.length > 0) {
-      leaf = existingLeaves[0];
-      console.log("[OllamaPlugin] Found existing view leaf."); // English Log
-    } else {
-      console.log("[OllamaPlugin] No existing view leaf found, creating new one."); // English Log
-      leaf = workspace.getRightLeaf(false) ?? workspace.getLeaf(true);
-      if (leaf) { // Ensure leaf was created
-        await leaf.setViewState({ type: VIEW_TYPE_OLLAMA, active: true });
-        console.log("[OllamaPlugin] New view leaf created."); // English Log
-      } else {
-        console.error("[OllamaPlugin] Failed to get or create a leaf."); // English Error
-        new Notice("Failed to open Ollama Chat view."); // English Notice
-        return;
-      }
-    }
-
-    // Ensure the leaf is revealed and the view instance is correctly linked
-    if (leaf) {
-      workspace.revealLeaf(leaf);
-      const viewInstance = leaf.view;
-      if (viewInstance instanceof OllamaView) {
-        this.view = viewInstance; // Update internal reference
-        this.messageService.setView(this.view); // Ensure service has correct view ref
-        this.apiService.setOllamaView(this.view); // Ensure API service has correct view ref
-        console.log("[OllamaPlugin] View activated and services linked."); // English Log
-      } else {
-        console.error("[OllamaPlugin] Leaf revealed, but view instance is not OllamaView?"); // English Error
-      }
-    }
-  }
-
-
-  // --- Settings Management ---
-  async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-
-    // --- Settings Migration ---
-    // Migrate old role path setting if necessary
-    if ((this.settings as any).customRoleFilePath && !this.settings.selectedRolePath) {
-      console.log("[Ollama] Migrating 'customRoleFilePath' to 'selectedRolePath'."); // English Log
-      this.settings.selectedRolePath = (this.settings as any).customRoleFilePath;
-      // Don't delete the old key immediately, saveSettings will handle it
-    }
-    // Ensure removed keys are not present after loading defaults and saved data
-    delete (this.settings as any).customRoleFilePath;
-    delete (this.settings as any).useDefaultRoleDefinition;
-    // -------------------------
-  }
-
-  async saveSettings() {
-    // Ensure removed keys are definitely gone before saving
-    delete (this.settings as any).customRoleFilePath;
-    delete (this.settings as any).useDefaultRoleDefinition;
-
-    await this.saveData(this.settings);
-    this.updateApiService(); // Update API service on save
-    this.roleListCache = null; // Clear role cache when role folder path might have changed
-    this.promptService?.clearRoleCache?.(); // Clear role content cache as well
-    console.log("OllamaPlugin: Settings saved."); // English Log
-    // Optionally emit a generic settings-changed event if needed
-    // this.emit('settings-changed', this.settings);
-  }
-
-
-  // --- History Persistence ---
-
-  // saveMessageHistory: Handles saving actual history content, includes trimming and backup (modified to skip backup on clear)
-  async saveMessageHistory(messagesJsonString: string) {
-    if (!this.settings.saveMessageHistory) return;
-    const adapter = this.app.vault.adapter; const pluginConfigDir = this.manifest.dir; if (!pluginConfigDir) { console.error("[Ollama Save] Cannot determine plugin directory."); new Notice("Error saving history: Cannot find plugin directory."); return; }
-    const relativeLogPath = `${pluginConfigDir}/chat_history.json`; const logPath = normalizePath(relativeLogPath);
-    // console.log(`[Ollama Save] Preparing to save history to ${logPath}`);
-    try {
-      let dataToWrite = messagesJsonString; let finalSizeKB = dataToWrite.length / 1024;
-      const isClearing = dataToWrite.trim() === "[]";
-      if (!isClearing && finalSizeKB > this.settings.logFileSizeLimit) {
-        console.log(`[Ollama Save] History size (${finalSizeKB.toFixed(2)}KB) > limit (${this.settings.logFileSizeLimit}KB). Trimming.`);
-        try {
-          let parsed = JSON.parse(dataToWrite); if (!Array.isArray(parsed)) throw new Error("History not array.");
-          while ((JSON.stringify(parsed).length / 1024) > this.settings.logFileSizeLimit && parsed.length > 1) { parsed.shift(); }
-          dataToWrite = parsed.length > 0 ? JSON.stringify(parsed) : "[]"; finalSizeKB = dataToWrite.length / 1024;
-          console.log(`[Ollama Save] History trimmed. New size: ${finalSizeKB.toFixed(2)}KB`);
-        } catch (e) { console.error("[Ollama Save] Error parsing/trimming history. Resetting:", e); dataToWrite = "[]"; finalSizeKB = dataToWrite.length / 1024; new Notice("Error trimming history file. History may be reset."); }
-      }
-      const fileExists = await adapter.exists(logPath);
-      if (fileExists && !isClearing) { // Backup only if file exists and not clearing
-        try {
-          const backupPath = normalizePath(relativeLogPath + ".backup");
-          if (await adapter.exists(backupPath)) await adapter.remove(backupPath);
-          await adapter.copy(logPath, backupPath);
-          // console.log("[Ollama Save] Backup created.");
-        } catch (backupError) { console.error("[Ollama Save] Failed to create history backup:", backupError); new Notice("Warning: Failed to create history backup."); }
-      }
-      await adapter.write(logPath, dataToWrite);
-      // console.log("[Ollama Save] Write operation completed.");
-    } catch (error) { console.error("[Ollama Save] Failed to save message history:", error); new Notice("Error saving chat history."); }
-  }
-
-  // loadMessageHistory: Loads history from file
-  async loadMessageHistory(): Promise<any[]> {
-    if (!this.settings.saveMessageHistory) return [];
-    const adapter = this.app.vault.adapter; const pluginConfigDir = this.manifest.dir; if (!pluginConfigDir) { console.error("[Ollama Load] Cannot determine plugin directory."); return []; }
-    const relativeLogPath = `${pluginConfigDir}/chat_history.json`; const logPath = normalizePath(relativeLogPath);
-    try {
-      if (!(await adapter.exists(logPath))) return [];
-      const data = await adapter.read(logPath); if (!data?.trim() || data.trim() === '[]') return [];
-      const parsedData = JSON.parse(data);
-      if (Array.isArray(parsedData)) { /* console.log(`[Ollama Load] Parsed ${parsedData.length} messages.`); */ return parsedData; }
-      else { console.warn("[Ollama Load] Parsed history data is not an array."); return []; }
-    } catch (error) { console.error("[Ollama Load] Failed to load/parse message history:", error); new Notice("Error loading chat history. File might be corrupt."); return []; }
-  }
-
-  // clearMessageHistory: Clears history by overwriting file with "[]" and clearing view state
-  async clearMessageHistory() {
-    console.log("[Ollama Clear] Clearing message history initiated.");
-    try {
-      await this.saveMessageHistory("[]"); // Overwrite file with empty array (modified save doesn't backup)
-      console.log("[Ollama Clear] History file overwrite with '[]' completed.");
-
-      if (this.view) {
-        this.view.clearDisplayAndState();
-        console.log("[Ollama Clear] Cleared active view display and state.");
-      } else {
-        console.log("[Ollama Clear] Overwrite done, view not active.");
-      }
-      new Notice("Chat history cleared.");
-    } catch (error) {
-      console.error("[Ollama Clear] Failed to clear message history (error likely logged in saveMessageHistory):", error);
-      new Notice("Failed to clear chat history."); // General notice on failure
-    }
-  }
-  // --- End History Persistence ---
-
-
-  // --- NEW METHOD: List Role Files ---
-  async listRoleFiles(forceRefresh: boolean = false): Promise<RoleInfo[]> {
-    if (this.roleListCache && !forceRefresh) {
-      return this.roleListCache;
-    }
-    console.log("[Ollama] Fetching and caching role list..."); // English Log
-
-    const roles: RoleInfo[] = [];
-    const adapter = this.app.vault.adapter;
-
-    // 1. Default Roles (from plugin folder)
-    const defaultRolesDir = normalizePath(this.manifest.dir + '/roles');
-    try {
-      if (await adapter.exists(defaultRolesDir) && (await adapter.stat(defaultRolesDir))?.type === 'folder') {
-        const defaultFiles = await adapter.list(defaultRolesDir);
-        for (const filePath of defaultFiles.files) {
-          if (filePath.toLowerCase().endsWith('.md')) {
-            const fileName = path.basename(filePath);
-            const roleName = fileName.substring(0, fileName.length - 3);
-            roles.push({ name: roleName, path: filePath, isCustom: false });
-          }
-        }
-      } else { console.log(`[Ollama] Default roles directory not found or not a folder: ${defaultRolesDir}`); } // English Log
-    } catch (error) { console.error(`[Ollama] Error listing default roles in ${defaultRolesDir}:`, error); } // English Error
-
-    // 2. User Roles (from settings folder path)
-    const userRolesDir = this.settings.userRolesFolderPath?.trim();
-    if (userRolesDir) {
-      const normalizedUserDir = normalizePath(userRolesDir);
-      try {
-        if (await adapter.exists(normalizedUserDir) && (await adapter.stat(normalizedUserDir))?.type === 'folder') {
-          const userFiles = await adapter.list(normalizedUserDir);
-          const addedRoleNames = new Set(roles.map(r => r.name)); // Keep track of names already added
-          for (const filePath of userFiles.files) {
-            if (filePath.toLowerCase().endsWith('.md')) {
-              const fileName = path.basename(filePath);
-              const roleName = fileName.substring(0, fileName.length - 3);
-              // Add user role only if a default role with the same name doesn't exist
-              if (!addedRoleNames.has(roleName)) {
-                roles.push({ name: roleName, path: filePath, isCustom: true });
-                addedRoleNames.add(roleName); // Mark name as added
-              } else {
-                console.log(`[Ollama] Skipping user role '${roleName}' as a default role with the same name exists.`); // English Log
-              }
-            }
-          }
-        } else { console.warn(`[Ollama] User roles folder path does not exist or is not a folder: ${normalizedUserDir}`); } // English Warning
-      } catch (error) { console.error(`[Ollama] Error listing user roles in ${normalizedUserDir}:`, error); } // English Error
-    }
-
-    // Sort roles alphabetically by name
-    roles.sort((a, b) => a.name.localeCompare(b.name));
-
-    this.roleListCache = roles; // Save to cache
-    console.log(`[Ollama] Found ${roles.length} roles.`); // English Log
-    return roles;
-  }
-  // --- END List Role Files Method ---
-
-
-  // --- NEW METHOD: Execute System Command ---
+  // Execute System Command Method
   async executeSystemCommand(command: string): Promise<{ stdout: string; stderr: string; error: ExecException | null }> {
-    console.log(`[Ollama] Executing system command: ${command}`); // English Log
-    if (!command || command.trim().length === 0) {
-      console.warn("[Ollama] Attempted to execute empty command."); // English Warning
-      return { stdout: "", stderr: "Empty command provided.", error: new Error("Empty command") as ExecException };
-    }
-
-    // Check if running in a Node.js environment (like desktop Obsidian)
-    // @ts-ignore 'process' might not be defined in all Obsidian environments (like mobile potentially)
-    if (typeof process === 'undefined' || !process?.versions?.node) {
-      console.error("[Ollama] Node.js environment not detected. Cannot execute system commands."); // English Error
-      new Notice("Cannot execute system commands in this environment."); // English Notice
-      return { stdout: "", stderr: "Node.js environment not available.", error: new Error("Node.js not available") as ExecException };
-    }
-
-
-    return new Promise((resolve) => {
-      // Use exec from Node's child_process
-      exec(command, (error, stdout, stderr) => {
-        if (error) { console.error(`[Ollama] exec error for command "${command}": ${error}`); } // English Error
-        if (stderr) { console.error(`[Ollama] exec stderr for command "${command}": ${stderr}`); } // English Error
-        if (stdout) { console.log(`[Ollama] exec stdout for command "${command}": ${stdout}`); } // English Log
-        resolve({ stdout: stdout.toString(), stderr: stderr.toString(), error });
-      });
-    });
+    console.log(`Executing: ${command}`); if (!command?.trim()) { return { stdout: "", stderr: "Empty cmd.", error: new Error("Empty cmd") as ExecException }; }//@ts-ignore
+    if (typeof process === 'undefined' || !process?.versions?.node) { console.error("Node.js required."); new Notice("Cannot exec."); return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required") as ExecException }; } return new Promise(r => { exec(command, (e, o, s) => { if (e) console.error(`Exec error: ${e}`); if (s) console.error(`Exec stderr: ${s}`); if (o) console.log(`Exec stdout: ${o}`); r({ stdout: o.toString(), stderr: s.toString(), error: e }); }); });
   }
-  // --- END Execute System Command Method ---
+
+  // --- Session Management Command Helpers ---
+  async showChatSwitcher() { /* ... */ new Notice("Switch Chat UI not implemented."); }
+  async renameActiveChat() { /* ... */ const c = await this.chatManager?.getActiveChat(); if (!c) { new Notice("No active chat."); return; } const o = c.metadata.name; const n = prompt(`Enter new name for "${o}":`, o); if (n && n.trim() !== "" && n !== o) { await this.chatManager.renameChat(c.metadata.id, n); } }
+  async deleteActiveChatWithConfirmation() { /* ... */ const c = await this.chatManager?.getActiveChat(); if (!c) { new Notice("No active chat."); return; } if (confirm(`Delete chat "${c.metadata.name}"?`)) { await this.chatManager.deleteChat(c.metadata.id); } }
+
+  // --- Handler for active chat change (Updates global settings) ---
+  private async handleActiveChatChangedLocally(data: { chatId: string | null, chat: Chat | null }) {
+    console.log(`[OllamaPlugin] Handling active-chat-changed. ID: ${data.chatId}`);
+    const chat = data.chat; // Отримуємо об'єкт чату з події
+
+    if (chat) {
+      let settingsChanged = false;
+      // Синхронізуємо глобальні налаштування з налаштуваннями активного чату
+      if (this.settings.modelName !== chat.metadata.modelName) {
+        this.settings.modelName = chat.metadata.modelName;
+        settingsChanged = true;
+        this.emit('model-changed', chat.metadata.modelName);
+      }
+      if (this.settings.selectedRolePath !== chat.metadata.selectedRolePath) {
+        this.settings.selectedRolePath = chat.metadata.selectedRolePath;
+        settingsChanged = true;
+        const roleName = this.findRoleNameByPath(chat.metadata.selectedRolePath);
+        this.emit('role-changed', roleName);
+      }
+      if (this.settings.temperature !== chat.metadata.temperature) {
+        this.settings.temperature = chat.metadata.temperature;
+        settingsChanged = true;
+      }
+
+      // Зберігаємо глобальні налаштування, якщо вони змінилися
+      if (settingsChanged) {
+        await this.saveSettings();
+        console.log("[OllamaPlugin] Global settings updated to match active chat.");
+      }
+
+      // --- ПЕРЕВІРТЕ ЦЕЙ БЛОК ---
+      // Оновлюємо системний промпт в PromptService на основі РОЛІ АКТИВНОГО ЧАТУ
+      const rolePathToLoad = chat.metadata.selectedRolePath; // Беремо шлях з метаданих чату
+      // Викликаємо getRoleDefinition З АРГУМЕНТОМ rolePathToLoad
+      const roleContent = await this.promptService.getRoleDefinition(rolePathToLoad);
+      this.promptService.setSystemPrompt(roleContent); // Встановлюємо промпт
+      // --- КІНЕЦЬ БЛОКУ ПЕРЕВІРКИ ---
+      console.log(`[OllamaPlugin] System prompt updated for active chat. Role path: ${rolePathToLoad || 'None'}`);
+
+    } else { // Немає активного чату
+      this.promptService.setSystemPrompt(null); // Очищаємо системний промпт
+      console.log("[OllamaPlugin] Active chat is null, prompt service reset.");
+      // Повертати глобальні налаштування до дефолтних тут, мабуть, не варто
+    }
+  }
+
+
+  // Helper to find role name for event emitting
+  findRoleNameByPath(rolePath: string): string { if (!rolePath) return "Default Assistant"; const r = this.roleListCache?.find(rl => rl.path === rolePath); if (r) return r.name; try { return path.basename(rolePath, '.md'); } catch { return "Unknown Role"; } }
 
 } // End of OllamaPlugin class
