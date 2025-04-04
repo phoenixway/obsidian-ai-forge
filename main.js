@@ -1116,6 +1116,7 @@ var OllamaView = class extends import_obsidian.ItemView {
         this.chatListContainerEl.createEl("span", { text: "No saved chats found." });
         return;
       }
+      console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2));
       chats.forEach((chatMeta) => {
         const chatOptionEl = this.chatListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CHAT_OPTION}` });
         const iconSpan = chatOptionEl.createEl("span", { cls: "menu-option-icon" });

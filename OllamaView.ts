@@ -1138,6 +1138,7 @@ export class OllamaView extends ItemView {
       const currentActiveId = this.plugin.chatManager?.getActiveChatId();
       this.chatListContainerEl.empty();
       if (chats.length === 0) { this.chatListContainerEl.createEl("span", { text: "No saved chats found." }); return; }
+      console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2)); // ЛОГ ДЛЯ ПЕРЕВІРКИ
       chats.forEach(chatMeta => {
         const chatOptionEl = this.chatListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CHAT_OPTION}` });
         const iconSpan = chatOptionEl.createEl("span", { cls: "menu-option-icon" });
