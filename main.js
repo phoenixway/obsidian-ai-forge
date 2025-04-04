@@ -4637,15 +4637,17 @@ var ChatManager = class {
     console.log("[ChatManager] Initializing...");
     this.updateChatsFolderPath();
     await this.ensureChatsFolderExists();
-    await this.loadChatIndex();
+    await this.loadChatIndex(true);
     this.activeChatId = await this.plugin.loadDataKey(ACTIVE_SESSION_ID_KEY) || null;
     console.log(`[ChatManager] Loaded activeChatId from store: ${this.activeChatId}`);
     if (this.activeChatId && !this.sessionIndex[this.activeChatId]) {
-      console.warn(`[ChatManager] Active chat ID ${this.activeChatId} not found in index. Resetting.`);
+      console.warn(`[ChatManager] Active chat ID ${this.activeChatId} not found in the refreshed index. Resetting.`);
       this.activeChatId = null;
       await this.plugin.saveDataKey(ACTIVE_SESSION_ID_KEY, null);
+    } else if (this.activeChatId) {
+      console.log(`[ChatManager] Active chat ID ${this.activeChatId} confirmed in the refreshed index.`);
     }
-    console.log(`[ChatManager] Initialized. Found ${Object.keys(this.sessionIndex).length} chats in index. Final Active ID: ${this.activeChatId}`);
+    console.log(`[ChatManager] Initialized. Index has ${Object.keys(this.sessionIndex).length} entries. Final Active ID: ${this.activeChatId}`);
   }
   /**
    * Перевіряє існування папки для історії чатів у сховищі (згідно з `chatsFolderPath`).
@@ -4675,11 +4677,78 @@ var ChatManager = class {
       new import_obsidian5.Notice(`Error: Could not create chat history directory '${this.chatsFolderPath}'. Please check settings or folder permissions.`);
     }
   }
-  /** Завантажує індекс чатів з постійного сховища плагіна. */
-  async loadChatIndex() {
-    const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
-    this.sessionIndex = loadedIndex || {};
-    console.log(`[ChatManager] Loaded chat index with ${Object.keys(this.sessionIndex).length} entries.`);
+  /**
+   * Завантажує або оновлює індекс чатів.
+   * @param forceScanFromFile Якщо true, індекс буде перебудовано шляхом сканування файлів у папці історії.
+   * Якщо false (або не вказано), завантажує індекс зі сховища плагіна.
+   */
+  async loadChatIndex(forceScanFromFile = false) {
+    var _a;
+    if (!forceScanFromFile) {
+      const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
+      this.sessionIndex = loadedIndex || {};
+      console.log(`[ChatManager] Loaded chat index from plugin data with ${Object.keys(this.sessionIndex).length} entries.`);
+      return;
+    }
+    console.log(`[ChatManager] Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
+    const newIndex = {};
+    let filesScanned = 0;
+    let chatsLoaded = 0;
+    try {
+      if (!await this.adapter.exists(this.chatsFolderPath) && this.chatsFolderPath !== "/") {
+        console.warn(`[ChatManager] Chat history folder '${this.chatsFolderPath}' not found during index rebuild. Index will be empty.`);
+        this.sessionIndex = {};
+        await this.saveChatIndex();
+        return;
+      }
+      const listResult = await this.adapter.list(this.chatsFolderPath);
+      const chatFiles = listResult.files.filter(
+        (filePath) => filePath.toLowerCase().endsWith(".json") && // Тільки .json
+        !filePath.includes("/")
+        // Тільки файли безпосередньо в цій папці (не в підпапках)
+        // Можливо, треба адаптувати, якщо шлях до папки складний
+      );
+      filesScanned = chatFiles.length;
+      console.log(`[ChatManager] Found ${filesScanned} potential chat files to scan.`);
+      const constructorSettings = { ...this.plugin.settings };
+      for (const filePath of chatFiles) {
+        const fullPath = (0, import_obsidian5.normalizePath)(filePath);
+        const fileName = fullPath.split("/").pop() || "";
+        const chatId = fileName.endsWith(".json") ? fileName.slice(0, -5) : null;
+        if (!chatId) {
+          console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
+          continue;
+        }
+        try {
+          const jsonContent = await this.adapter.read(fullPath);
+          const data = JSON.parse(jsonContent);
+          if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && data.metadata.id === chatId) {
+            const metadata = data.metadata;
+            newIndex[chatId] = {
+              name: metadata.name,
+              modelName: metadata.modelName,
+              selectedRolePath: metadata.selectedRolePath,
+              temperature: metadata.temperature,
+              createdAt: metadata.createdAt,
+              lastModified: metadata.lastModified
+            };
+            chatsLoaded++;
+          } else {
+            console.warn(`[ChatManager] Metadata validation failed for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data == null ? void 0 : data.metadata);
+          }
+        } catch (e) {
+          console.error(`[ChatManager] Error reading or parsing chat file ${fullPath} during index rebuild:`, e);
+        }
+      }
+      console.log(`[ChatManager] Index rebuild complete. Scanned: ${filesScanned}, Successfully loaded metadata for: ${chatsLoaded}`);
+      this.sessionIndex = newIndex;
+      await this.saveChatIndex();
+    } catch (error) {
+      console.error(`[ChatManager] Critical error during index rebuild process:`, error);
+      this.sessionIndex = {};
+      await this.saveChatIndex();
+      new import_obsidian5.Notice("Error rebuilding chat index. List might be empty.");
+    }
   }
   /** Зберігає поточний індекс чатів у сховище плагіна. */
   async saveChatIndex() {
@@ -4974,28 +5043,24 @@ var ChatManager = class {
       this.sessionIndex[id].name = trimmedName;
       this.sessionIndex[id].lastModified = new Date().toISOString();
       await this.saveChatIndex();
-      if (this.loadedChats[id]) {
-        console.log(`[ChatManager] Updating name in cached chat object ${id}`);
-        await this.updateActiveChatMetadata({ name: trimmedName });
-        if (this.activeChatId !== id) {
-          this.loadedChats[id].metadata.name = trimmedName;
-          this.loadedChats[id].metadata.lastModified = this.sessionIndex[id].lastModified;
-          await this.loadedChats[id].saveImmediately();
-          this.plugin.emit("chat-list-updated");
+      const chatToRename = await this.getChat(id);
+      if (chatToRename) {
+        console.log(`[ChatManager] Saving renamed chat ${id} to file: ${chatToRename.filePath}`);
+        chatToRename.metadata.name = trimmedName;
+        chatToRename.metadata.lastModified = this.sessionIndex[id].lastModified;
+        const saved = await chatToRename.saveImmediately();
+        if (!saved) {
+          console.error(`[ChatManager] Failed to save renamed chat file for ${id}. Index might be inconsistent.`);
+          new import_obsidian5.Notice(`Error saving renamed chat ${trimmedName}.`);
+          return false;
         }
       } else {
-        const chatToRename = await this.getChat(id);
-        if (chatToRename) {
-          console.log(`[ChatManager] Saving renamed inactive chat ${id} to file.`);
-          chatToRename.metadata.name = trimmedName;
-          chatToRename.metadata.lastModified = this.sessionIndex[id].lastModified;
-          await chatToRename.saveImmediately();
-          this.plugin.emit("chat-list-updated");
-        } else {
-          console.error(`[ChatManager] Failed to load chat ${id} to save rename.`);
-        }
+        console.error(`[ChatManager] Failed to load chat ${id} to save rename after updating index.`);
+        new import_obsidian5.Notice(`Error saving renamed chat ${trimmedName}: Could not load chat data.`);
+        return false;
       }
-      console.log(`[ChatManager] Renamed chat ${id} to "${trimmedName}"`);
+      console.log(`[ChatManager] Finished renaming chat ${id}`);
+      this.plugin.emit("chat-list-updated");
       return true;
     }
     console.warn(`[ChatManager] Cannot rename chat ${id}: Not found in index.`);

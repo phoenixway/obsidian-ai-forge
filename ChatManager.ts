@@ -55,21 +55,25 @@ export class ChatManager {
      */
     async initialize(): Promise<void> {
         console.log("[ChatManager] Initializing...");
-        this.updateChatsFolderPath(); // Оновлюємо шлях на випадок змін у налаштуваннях
-        await this.ensureChatsFolderExists(); // Перевіряємо/створюємо папку у сховищі
-        await this.loadChatIndex();
+        this.updateChatsFolderPath();
+        await this.ensureChatsFolderExists();
+        // --- ЗМІНЕНО: Тепер loadChatIndex оновлює індекс з файлів ---
+        await this.loadChatIndex(true); // true - означає примусове оновлення з файлів
 
         // Завантажуємо ID останнього активного чату
         this.activeChatId = await this.plugin.loadDataKey(ACTIVE_SESSION_ID_KEY) || null;
         console.log(`[ChatManager] Loaded activeChatId from store: ${this.activeChatId}`);
 
-        // Валідація: перевіряємо, чи існує активний ID в індексі
+        // Валідація: перевіряємо, чи існує активний ID в *оновленому* індексі
         if (this.activeChatId && !this.sessionIndex[this.activeChatId]) {
-            console.warn(`[ChatManager] Active chat ID ${this.activeChatId} not found in index. Resetting.`);
+            console.warn(`[ChatManager] Active chat ID ${this.activeChatId} not found in the refreshed index. Resetting.`);
             this.activeChatId = null;
-            await this.plugin.saveDataKey(ACTIVE_SESSION_ID_KEY, null); // Зберігаємо null як активний ID
+            await this.plugin.saveDataKey(ACTIVE_SESSION_ID_KEY, null);
+        } else if (this.activeChatId) {
+            console.log(`[ChatManager] Active chat ID ${this.activeChatId} confirmed in the refreshed index.`);
         }
-        console.log(`[ChatManager] Initialized. Found ${Object.keys(this.sessionIndex).length} chats in index. Final Active ID: ${this.activeChatId}`);
+
+        console.log(`[ChatManager] Initialized. Index has ${Object.keys(this.sessionIndex).length} entries. Final Active ID: ${this.activeChatId}`);
     }
 
     /**
@@ -105,14 +109,102 @@ export class ChatManager {
             new Notice(`Error: Could not create chat history directory '${this.chatsFolderPath}'. Please check settings or folder permissions.`);
         }
     }
+    /**
+     * Завантажує або оновлює індекс чатів.
+     * @param forceScanFromFile Якщо true, індекс буде перебудовано шляхом сканування файлів у папці історії.
+     * Якщо false (або не вказано), завантажує індекс зі сховища плагіна.
+     */
+    private async loadChatIndex(forceScanFromFile: boolean = false): Promise<void> {
+        if (!forceScanFromFile) {
+            // Просто завантажуємо збережений індекс
+            const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
+            this.sessionIndex = loadedIndex || {};
+            console.log(`[ChatManager] Loaded chat index from plugin data with ${Object.keys(this.sessionIndex).length} entries.`);
+            return;
+        }
 
-    /** Завантажує індекс чатів з постійного сховища плагіна. */
-    private async loadChatIndex(): Promise<void> {
-        const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
-        this.sessionIndex = loadedIndex || {};
-        console.log(`[ChatManager] Loaded chat index with ${Object.keys(this.sessionIndex).length} entries.`);
-        // Optional: Prune index - check if files still exist? Could be slow.
+        console.log(`[ChatManager] Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
+        const newIndex: ChatSessionIndex = {};
+        let filesScanned = 0;
+        let chatsLoaded = 0;
+
+        try {
+            // Перевіряємо, чи існує папка історії
+            if (!(await this.adapter.exists(this.chatsFolderPath)) && this.chatsFolderPath !== "/") {
+                console.warn(`[ChatManager] Chat history folder '${this.chatsFolderPath}' not found during index rebuild. Index will be empty.`);
+                this.sessionIndex = {};
+                await this.saveChatIndex(); // Зберігаємо порожній індекс
+                return;
+            }
+
+            // Отримуємо список файлів у папці історії
+            const listResult = await this.adapter.list(this.chatsFolderPath);
+            const chatFiles = listResult.files.filter(filePath =>
+                filePath.toLowerCase().endsWith('.json') && // Тільки .json
+                !filePath.includes('/') // Тільки файли безпосередньо в цій папці (не в підпапках)
+                // Можливо, треба адаптувати, якщо шлях до папки складний
+            );
+
+            filesScanned = chatFiles.length;
+            console.log(`[ChatManager] Found ${filesScanned} potential chat files to scan.`);
+
+            // --- Готуємо налаштування один раз ---
+            const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
+
+            for (const filePath of chatFiles) {
+                const fullPath = normalizePath(filePath); // adapter.list може повертати відносні шляхи
+                // Спробуємо отримати ID з імені файлу (перед '.json')
+                const fileName = fullPath.split('/').pop() || '';
+                const chatId = fileName.endsWith('.json') ? fileName.slice(0, -5) : null;
+
+                if (!chatId) {
+                    console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
+                    continue; // Переходимо до наступного файлу
+                }
+
+                try {
+                    // Завантажуємо ТІЛЬКИ МЕТАДАНІ для швидкості (якщо можливо)
+                    // Поточний Chat.loadFromFile завантажує все, що може бути повільно.
+                    // Оптимізація: читаємо файл і парсимо тільки metadata.
+                    const jsonContent = await this.adapter.read(fullPath);
+                    const data = JSON.parse(jsonContent) as Partial<ChatData>; // Partial, бо нас цікавить тільки metadata
+
+                    if (data?.metadata?.id && data.metadata.id === chatId) {
+                        // Перевіряємо, чи ID в метаданих співпадає з ID з імені файлу
+                        const metadata = data.metadata;
+                        // Додаємо в новий індекс, видаляючи поле id зі значення
+                        newIndex[chatId] = {
+                            name: metadata.name,
+                            modelName: metadata.modelName,
+                            selectedRolePath: metadata.selectedRolePath,
+                            temperature: metadata.temperature,
+                            createdAt: metadata.createdAt,
+                            lastModified: metadata.lastModified
+                        };
+                        chatsLoaded++;
+                    } else {
+                        console.warn(`[ChatManager] Metadata validation failed for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data?.metadata);
+                    }
+                } catch (e) {
+                    console.error(`[ChatManager] Error reading or parsing chat file ${fullPath} during index rebuild:`, e);
+                    // Не додаємо цей чат в індекс
+                }
+            } // end for loop
+
+            console.log(`[ChatManager] Index rebuild complete. Scanned: ${filesScanned}, Successfully loaded metadata for: ${chatsLoaded}`);
+            this.sessionIndex = newIndex; // Встановлюємо новий індекс
+            await this.saveChatIndex(); // Зберігаємо оновлений індекс
+
+        } catch (error) {
+            console.error(`[ChatManager] Critical error during index rebuild process:`, error);
+            // У разі помилки, можливо, краще залишити старий індекс?
+            // Або встановити порожній? Поки що встановлюємо порожній.
+            this.sessionIndex = {};
+            await this.saveChatIndex();
+            new Notice("Error rebuilding chat index. List might be empty.");
+        }
     }
+
 
     /** Зберігає поточний індекс чатів у сховище плагіна. */
     private async saveChatIndex(): Promise<void> {
@@ -484,54 +576,46 @@ export class ChatManager {
      */
     async renameChat(id: string, newName: string): Promise<boolean> {
         const trimmedName = newName.trim();
-        if (!trimmedName) {
-            new Notice("Chat name cannot be empty.");
-            return false;
-        }
+        if (!trimmedName) { new Notice("Chat name cannot be empty."); return false; }
 
         if (this.sessionIndex[id]) {
             console.log(`[ChatManager] Renaming chat ${id} to "${trimmedName}"`);
-            // Оновлюємо індекс
+            // 1. Оновлюємо індекс
             this.sessionIndex[id].name = trimmedName;
             this.sessionIndex[id].lastModified = new Date().toISOString();
-            await this.saveChatIndex();
+            await this.saveChatIndex(); // Зберігаємо оновлений індекс
 
-            // Оновлюємо завантажений чат, якщо він у кеші
-            if (this.loadedChats[id]) {
-                console.log(`[ChatManager] Updating name in cached chat object ${id}`);
-                // Викликаємо updateMetadata, щоб оновити об'єкт і викликати збереження файлу
-                await this.updateActiveChatMetadata({ name: trimmedName }); // Використовуємо існуючий метод
-                // Важливо: updateActiveChatMetadata вже викликає saveChatIndex та emit,
-                // тому повторні виклики тут не потрібні, якщо перейменовуємо активний чат.
-                // Якщо перейменовуємо НЕ активний чат, треба зберегти файл напряму:
-                if (this.activeChatId !== id) {
-                    this.loadedChats[id].metadata.name = trimmedName;
-                    this.loadedChats[id].metadata.lastModified = this.sessionIndex[id].lastModified;
-                    await this.loadedChats[id].saveImmediately(); // Зберігаємо файл неактивного чату
-                    this.plugin.emit('chat-list-updated'); // Потрібно емітувати тут для неактивних
+            // 2. Оновлюємо файл .json
+            // Завантажуємо об'єкт Chat (з кешу або файлу)
+            const chatToRename = await this.getChat(id);
+            if (chatToRename) {
+                console.log(`[ChatManager] Saving renamed chat ${id} to file: ${chatToRename.filePath}`);
+                // Оновлюємо метадані в об'єкті Chat
+                chatToRename.metadata.name = trimmedName;
+                chatToRename.metadata.lastModified = this.sessionIndex[id].lastModified;
+                // Зберігаємо файл негайно
+                const saved = await chatToRename.saveImmediately();
+                if (!saved) {
+                    // Помилка збереження файлу - можливо, варто відкотити зміну в індексі?
+                    console.error(`[ChatManager] Failed to save renamed chat file for ${id}. Index might be inconsistent.`);
+                    new Notice(`Error saving renamed chat ${trimmedName}.`);
+                    // Поки що не відкочуємо індекс, але логуємо помилку.
+                    return false; // Повертаємо false через помилку збереження
                 }
             } else {
-                // Якщо чат не в кеші, нам все одно треба зберегти зміну назви у файлі.
-                // Завантажимо його, змінимо назву і збережемо.
-                const chatToRename = await this.getChat(id); // Завантажить у кеш
-                if (chatToRename) {
-                    console.log(`[ChatManager] Saving renamed inactive chat ${id} to file.`);
-                    chatToRename.metadata.name = trimmedName;
-                    chatToRename.metadata.lastModified = this.sessionIndex[id].lastModified;
-                    await chatToRename.saveImmediately();
-                    this.plugin.emit('chat-list-updated'); // Емітуємо оновлення списку
-                } else {
-                    console.error(`[ChatManager] Failed to load chat ${id} to save rename.`);
-                    // Можливо, відкотити зміну в індексі? Поки що залишаємо.
-                }
+                console.error(`[ChatManager] Failed to load chat ${id} to save rename after updating index.`);
+                // Індекс оновлено, але файл - ні. Погана ситуація.
+                new Notice(`Error saving renamed chat ${trimmedName}: Could not load chat data.`);
+                return false; // Повертаємо false
             }
 
-            console.log(`[ChatManager] Renamed chat ${id} to "${trimmedName}"`);
-            // this.plugin.emit('chat-list-updated'); // Викликається в updateActiveChatMetadata або вище
+            console.log(`[ChatManager] Finished renaming chat ${id}`);
+            this.plugin.emit('chat-list-updated'); // Повідомляємо UI
             return true;
         }
         console.warn(`[ChatManager] Cannot rename chat ${id}: Not found in index.`);
         new Notice(`Chat with ID ${id} not found.`);
         return false;
     }
+
 } // End of ChatManager class
