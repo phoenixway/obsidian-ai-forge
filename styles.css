@@ -72,7 +72,24 @@
   .buttons-container { display: flex; position: absolute; bottom: calc(var(--chat-spacing-unit) * 2); right: calc(var(--chat-spacing-unit) * 3); align-items: center; z-index: 21; gap: calc(var(--chat-spacing-unit) * 2); }
 
   /* Base button style */
-  .buttons-container button { width: 32px; height: 32px; border: none; border-radius: 50%; background-color: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s ease-in-out; opacity: 0.7; outline: none; flex-shrink: 0; }
+  input */
+  .buttons-container button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background-color: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.15s ease-in-out;
+    opacity: 0.7;
+    outline: none;
+    flex-shrink: 0;
+   }
   .buttons-container button:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); opacity: 1; transform: scale(1.05); }
   .buttons-container button:focus-visible { opacity: 1; background-color: var(--background-modifier-hover); box-shadow: 0 0 0 2px var(--interactive-accent-translucent); }
   .buttons-container button.disabled { opacity: 0.4 !important; cursor: not-allowed; background-color: transparent !important; transform: none !important; box-shadow: none !important; }
@@ -433,3 +450,14 @@
       :root { --chat-avatar-size: 24px; }
       .message-group { padding-left: 30px; padding-right: 30px;}
   }
+
+
+
+/* Стиль для кнопки перекладу вводу під час завантаження */
+.buttons-container .translate-input-button.translating-input .svg-icon {
+  animation: spin 1s linear infinite; /* Використовуємо ту ж анімацію */
+}
+.buttons-container .translate-input-button.translating-input {
+    cursor: default;
+    opacity: 0.5; /* Зменшуємо прозорість під час завантаження */
+}

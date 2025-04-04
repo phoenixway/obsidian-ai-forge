@@ -14,6 +14,10 @@ const CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
 const CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
 const CSS_CLASS_TRANSLATION_PENDING = "translation-pending"; // For loading state
 const CSS_CLASS_BUTTON_SPACER = "button-spacer"; // Optional spacer
+const CSS_CLASS_TRANSLATE_INPUT_BUTTON = "translate-input-button"; // <-- Нова константа
+const CSS_CLASS_TRANSLATING_INPUT = "translating-input"; // <-- Нова константа для стану завантаження
+
+
 
 export type MessageRole = "user" | "assistant" | "system" | "error";
 export interface Message { role: MessageRole; content: string; timestamp: Date; }
@@ -35,7 +39,7 @@ export class OllamaView extends ItemView {
   private exportChatOption!: HTMLElement;
   private settingsOption!: HTMLElement;
   private buttonsContainer!: HTMLElement;
-
+  private translateInputButton!: HTMLButtonElement;
   // --- State ---
   private isProcessing: boolean = false; // State for send/receive cycle
   private scrollTimeout: NodeJS.Timeout | null = null;
@@ -96,7 +100,22 @@ export class OllamaView extends ItemView {
   // --- UI Creation ---
   private createUIElements(): void {
     // ... (Code remains the same as previous response - creates all containers including model/role lists) ...
-    this.contentEl.empty(); this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER }); this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER }); this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR }); setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down"); this.newMessagesIndicatorEl.createSpan({ text: " New Messages" }); const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER }); this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text to ${this.plugin.settings.modelName}...`, rows: 1 } }); this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER }); this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send"); this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } }); setIcon(this.voiceButton, "mic"); this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } }); setIcon(this.menuButton, "more-vertical"); this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] }); this.menuDropdown.style.display = "none"; this.menuDropdown.createEl("div", { text: "Select Model", cls: CSS_CLASS_MENU_HEADER }); this.modelListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_MODEL_LIST_CONTAINER }); this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR }); this.menuDropdown.createEl("div", { text: "Select Role", cls: CSS_CLASS_MENU_HEADER }); this.roleListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_ROLE_LIST_CONTAINER }); this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR }); this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` }); setIcon(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2"); this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" }); this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` }); setIcon(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download"); this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" }); this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR }); this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` }); setIcon(this.settingsOption.createEl("span", { cls: "menu-option-icon" }), "settings"); this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
+    this.contentEl.empty(); this.chatContainerEl = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER }); this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+
+
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR }); setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down"); this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+    const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER }); this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text to ${this.plugin.settings.modelName}...`, rows: 1 } });
+    this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER }); this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send");
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } }); setIcon(this.voiceButton, "mic");
+    this.translateInputButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
+      attr: { 'aria-label': 'Translate input to English' }
+    });
+    setIcon(this.translateInputButton, "replace"); // Іконка 'replace' або 'repeat-2'
+    this.translateInputButton.title = "Translate input to English"; // Підказка
+
+
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } }); setIcon(this.menuButton, "more-vertical"); this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] }); this.menuDropdown.style.display = "none"; this.menuDropdown.createEl("div", { text: "Select Model", cls: CSS_CLASS_MENU_HEADER }); this.modelListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_MODEL_LIST_CONTAINER }); this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR }); this.menuDropdown.createEl("div", { text: "Select Role", cls: CSS_CLASS_MENU_HEADER }); this.roleListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_ROLE_LIST_CONTAINER }); this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR }); this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` }); setIcon(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2"); this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" }); this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` }); setIcon(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download"); this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" }); this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR }); this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` }); setIcon(this.settingsOption.createEl("span", { cls: "menu-option-icon" }), "settings"); this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
   }
 
   // --- Event Listeners ---
@@ -105,6 +124,7 @@ export class OllamaView extends ItemView {
     this.inputEl.addEventListener('input', this.handleInputForResize);
     this.sendButton.addEventListener("click", this.handleSendClick);
     this.voiceButton.addEventListener("click", this.handleVoiceClick);
+    this.translateInputButton.addEventListener("click", this.handleTranslateInputClick);
     this.menuButton.addEventListener("click", this.handleMenuClick);
     this.settingsOption.addEventListener("click", this.handleSettingsClick);
     this.clearChatOption.addEventListener("click", this.handleClearChatClick);
@@ -1138,7 +1158,25 @@ export class OllamaView extends ItemView {
   formatTime(date: Date): string { return date.toLocaleTimeString('en-US', { hour: "2-digit", minute: "2-digit" }); }
   formatDateSeparator(date: Date): string { const n = new Date(); const y = new Date(n); y.setDate(n.getDate() - 1); if (this.isSameDay(date, n)) return "Today"; else if (this.isSameDay(date, y)) return "Yesterday"; else return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); }
   isSameDay(date1: Date, date2: Date): boolean { return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); }
-  public setLoadingState(isLoading: boolean): void { this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } }
+  public setLoadingState(isLoading: boolean): void {
+    this.isProcessing = isLoading;
+    if (this.inputEl) this.inputEl.disabled = isLoading;
+    this.updateSendButtonState();
+    if (this.voiceButton) {
+      this.voiceButton.disabled = isLoading;
+      this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    }
+    // --- ДОДАНО: Оновлення стану кнопки перекладу вводу ---
+    if (this.translateInputButton) {
+      this.translateInputButton.disabled = isLoading;
+      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    }
+    // -----------------------------------------------------
+    if (this.menuButton) {
+      this.menuButton.disabled = isLoading;
+      this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    }
+  }
 
 
   private async handleTranslateClick(originalContent: string, contentEl: HTMLElement, buttonEl: HTMLButtonElement): Promise<void> {
@@ -1402,6 +1440,60 @@ export class OllamaView extends ItemView {
     // Return the main message element, useful for later manipulation (e.g., collapsing)
     return messageEl;
   }
+  private handleTranslateInputClick = async (): Promise<void> => {
+    const currentText = this.inputEl.value;
+    const targetLang = 'en'; // Завжди перекладаємо на англійську
 
+    if (!currentText.trim()) {
+      new Notice("Input field is empty, nothing to translate.");
+      return;
+    }
+
+    // Перевірка налаштувань перекладу (API ключ)
+    if (!this.plugin.settings.enableTranslation) {
+      new Notice("Translation feature is disabled in settings.");
+      return;
+    }
+    const apiKey = this.plugin.settings.googleTranslationApiKey;
+    if (!apiKey) {
+      new Notice("Google Translation API Key not set in settings.");
+      return;
+    }
+
+    // Встановлення стану завантаження
+    setIcon(this.translateInputButton, "loader"); // Змінюємо іконку на завантажувач
+    this.translateInputButton.disabled = true;
+    this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT);
+    this.translateInputButton.title = "Translating..."; // Оновлюємо підказку
+
+    try {
+      console.log(`[OllamaView] Translating input to ${targetLang}...`);
+      const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
+
+      if (translatedText !== null) {
+        // Успішний переклад: замінюємо текст у полі вводу
+        this.inputEl.value = translatedText;
+        this.inputEl.dispatchEvent(new Event('input')); // Оновлюємо висоту та стан кнопки надсилання
+        // Встановлюємо курсор в кінець тексту
+        this.inputEl.focus();
+        const end = translatedText.length;
+        this.inputEl.setSelectionRange(end, end);
+        console.log("[OllamaView] Input translation successful.");
+      } else {
+        // Помилка перекладу (Notice показується в TranslationService)
+        console.warn("[OllamaView] Input translation failed (service returned null).");
+      }
+    } catch (error) {
+      // Неочікувана помилка
+      console.error("Error during input translation:", error);
+      new Notice("An unexpected error occurred during input translation.");
+    } finally {
+      // Завжди знімаємо стан завантаження
+      setIcon(this.translateInputButton, "replace"); // Повертаємо іконку
+      this.translateInputButton.disabled = false;
+      this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT);
+      this.translateInputButton.title = "Translate input to English"; // Повертаємо підказку
+    }
+  }
 
 } // END OF OllamaView CLASS

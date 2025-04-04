@@ -605,6 +605,8 @@ var CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
 var CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
 var CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
 var CSS_CLASS_TRANSLATION_PENDING = "translation-pending";
+var CSS_CLASS_TRANSLATE_INPUT_BUTTON = "translate-input-button";
+var CSS_CLASS_TRANSLATING_INPUT = "translating-input";
 var _OllamaView = class extends import_obsidian2.ItemView {
   // Debounced save is REMOVED - saving handled by ChatManager/Chat
   constructor(leaf, plugin) {
@@ -803,6 +805,49 @@ var _OllamaView = class extends import_obsidian2.ItemView {
         this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, sh > mh);
       });
     };
+    this.handleTranslateInputClick = async () => {
+      const currentText = this.inputEl.value;
+      const targetLang = "en";
+      if (!currentText.trim()) {
+        new import_obsidian2.Notice("Input field is empty, nothing to translate.");
+        return;
+      }
+      if (!this.plugin.settings.enableTranslation) {
+        new import_obsidian2.Notice("Translation feature is disabled in settings.");
+        return;
+      }
+      const apiKey = this.plugin.settings.googleTranslationApiKey;
+      if (!apiKey) {
+        new import_obsidian2.Notice("Google Translation API Key not set in settings.");
+        return;
+      }
+      (0, import_obsidian2.setIcon)(this.translateInputButton, "loader");
+      this.translateInputButton.disabled = true;
+      this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT);
+      this.translateInputButton.title = "Translating...";
+      try {
+        console.log(`[OllamaView] Translating input to ${targetLang}...`);
+        const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
+        if (translatedText !== null) {
+          this.inputEl.value = translatedText;
+          this.inputEl.dispatchEvent(new Event("input"));
+          this.inputEl.focus();
+          const end = translatedText.length;
+          this.inputEl.setSelectionRange(end, end);
+          console.log("[OllamaView] Input translation successful.");
+        } else {
+          console.warn("[OllamaView] Input translation failed (service returned null).");
+        }
+      } catch (error) {
+        console.error("Error during input translation:", error);
+        new import_obsidian2.Notice("An unexpected error occurred during input translation.");
+      } finally {
+        (0, import_obsidian2.setIcon)(this.translateInputButton, "replace");
+        this.translateInputButton.disabled = false;
+        this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT);
+        this.translateInputButton.title = "Translate input to English";
+      }
+    };
     this.plugin = plugin;
     if (_OllamaView.instance && _OllamaView.instance !== this) {
       console.warn("Replacing existing OllamaView instance.");
@@ -877,6 +922,12 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     (0, import_obsidian2.setIcon)(this.sendButton, "send");
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
     (0, import_obsidian2.setIcon)(this.voiceButton, "mic");
+    this.translateInputButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
+      attr: { "aria-label": "Translate input to English" }
+    });
+    (0, import_obsidian2.setIcon)(this.translateInputButton, "replace");
+    this.translateInputButton.title = "Translate input to English";
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian2.setIcon)(this.menuButton, "more-vertical");
     this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
@@ -904,6 +955,7 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     this.inputEl.addEventListener("input", this.handleInputForResize);
     this.sendButton.addEventListener("click", this.handleSendClick);
     this.voiceButton.addEventListener("click", this.handleVoiceClick);
+    this.translateInputButton.addEventListener("click", this.handleTranslateInputClick);
     this.menuButton.addEventListener("click", this.handleMenuClick);
     this.settingsOption.addEventListener("click", this.handleSettingsClick);
     this.clearChatOption.addEventListener("click", this.handleClearChatClick);
@@ -1936,6 +1988,10 @@ var _OllamaView = class extends import_obsidian2.ItemView {
     if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
       this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    }
+    if (this.translateInputButton) {
+      this.translateInputButton.disabled = isLoading;
+      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
     if (this.menuButton) {
       this.menuButton.disabled = isLoading;
