@@ -1,4 +1,4 @@
-// src/Chat.ts
+// Chat.ts
 import { normalizePath, DataAdapter, Notice, debounce } from "obsidian";
 import { Message, MessageRole } from "./OllamaView";
 import { OllamaPluginSettings } from "./settings";

@@ -1,3 +1,4 @@
+//OllamaView.ts
 import {
   ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, Notice, debounce, requireApiVersion, normalizePath, Menu
 } from "obsidian";
@@ -382,13 +383,10 @@ export class OllamaView extends ItemView {
   }
 
 
-  // saveMessageHistory REMOVED - Handled by Chat/ChatManager
-  // sendMessage MODIFIED - Calls OllamaService via plugin
   async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled) return;
 
-    // Переконуємося, що є активний чат
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat) {
       new Notice("Error: No active chat session found.");
@@ -397,38 +395,50 @@ export class OllamaView extends ItemView {
 
     const userMessageContent = this.inputEl.value;
     this.clearInputField();
-    this.setLoadingState(true);
+    this.setLoadingState(true); // Disable UI
     this.hideEmptyState();
 
+    // --- ADDED: Create and store the loading indicator element ---
+    let loadingEl: HTMLElement | null = null;
+    // Add indicator *after* user message is potentially added for visual flow
+    // OR add immediately after setLoadingState(true) if preferred
+
     try {
-      // 1. Додаємо повідомлення користувача до ChatManager (він генерує timestamp)
+      // 1. Add user message (triggers event, adds to display)
       const userMessage = await this.plugin.chatManager.addMessageToActiveChat('user', userMessageContent);
       if (!userMessage) throw new Error("Failed to add user message.");
-      // View оновить себе через подію 'message-added', яка спрацює з ChatManager
 
-      // 2. Викликаємо OllamaService для отримання відповіді
-      // Передаємо весь об'єкт activeChat, щоб сервіс мав доступ до історії та метаданих
+      // --- MOVED/ADDED: Show loading indicator AFTER user message appears ---
+      loadingEl = this.addLoadingIndicator(); // Create the visual dots
+      // Ensure scroll after adding indicator
+      this.guaranteedScrollToBottom(50, true);
+
+      // 2. Generate AI response
       const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
 
-      // 3. Додаємо повідомлення асистента до ChatManager
+      // 3. Add assistant message (triggers event, adds to display)
       if (assistantMessage) {
-        // --- ЗМІНЕНО ТУТ: Передаємо лише role та content ---
         await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
-        // ----------------------------------------------------
-        // View оновить себе через подію 'message-added'
       } else {
         console.warn("[OllamaView] Service returned null assistant message.");
-        // Додаємо помилку у View напряму (тут timestamp потрібен)
+        // Add error directly to display (this might be removed by finally block's loading removal)
+        // Consider how to best display errors if loading indicator is present
         this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
       }
 
     } catch (error: any) {
       console.error("OllamaView: Send/receive cycle error:", error);
-      // Додаємо помилку у View напряму (тут timestamp потрібен)
+      // Add error directly to display
       this.addMessageToDisplay("error", `Error: ${error.message || 'Unknown error.'}`, new Date());
     } finally {
-      this.setLoadingState(false);
-      this.focusInput(); // Повертаємо фокус після завершення
+      // --- ADDED: Remove the loading indicator ---
+      if (loadingEl) {
+        this.removeLoadingIndicator(loadingEl);
+      }
+      // -----------------------------------------
+
+      this.setLoadingState(false); // Re-enable UI
+      this.focusInput(); // Return focus
     }
   }
 

@@ -577,8 +577,6 @@ var _OllamaView = class extends import_obsidian.ItemView {
     }
     this.hideEmptyState();
   }
-  // saveMessageHistory REMOVED - Handled by Chat/ChatManager
-  // sendMessage MODIFIED - Calls OllamaService via plugin
   async sendMessage() {
     var _a;
     const content = this.inputEl.value.trim();
@@ -593,10 +591,13 @@ var _OllamaView = class extends import_obsidian.ItemView {
     this.clearInputField();
     this.setLoadingState(true);
     this.hideEmptyState();
+    let loadingEl = null;
     try {
       const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
       if (!userMessage)
         throw new Error("Failed to add user message.");
+      loadingEl = this.addLoadingIndicator();
+      this.guaranteedScrollToBottom(50, true);
       const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
       if (assistantMessage) {
         await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
@@ -608,6 +609,9 @@ var _OllamaView = class extends import_obsidian.ItemView {
       console.error("OllamaView: Send/receive cycle error:", error);
       this.addMessageToDisplay("error", `Error: ${error.message || "Unknown error."}`, new Date());
     } finally {
+      if (loadingEl) {
+        this.removeLoadingIndicator(loadingEl);
+      }
       this.setLoadingState(false);
       this.focusInput();
     }

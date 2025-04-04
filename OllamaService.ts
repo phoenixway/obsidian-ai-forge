@@ -1,4 +1,4 @@
-// src/ollamaService.ts
+// OllamaService.ts
 import OllamaPlugin from './main';
 import { OllamaView } from './OllamaView'; // May not be needed directly anymore
 // import { PromptService } from './PromptService';

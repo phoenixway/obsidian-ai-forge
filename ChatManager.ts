@@ -1,4 +1,4 @@
-// src/ChatManager.ts
+// ChatManager.ts
 import { App, Notice, DataAdapter, normalizePath } from "obsidian";
 import OllamaPlugin from "./main";
 import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat"; // Import Chat class and types
