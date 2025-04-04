@@ -3,15 +3,18 @@ import {
   ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, Notice, debounce, requireApiVersion, normalizePath, Menu
 } from "obsidian";
 import OllamaPlugin from "./main";
-import { AvatarType } from "./settings";
+import { AvatarType, LANGUAGES } from "./settings";
 import { RoleInfo } from "./ChatManager"; // Import RoleInfo type
 import { Chat } from "./Chat"; // Import Chat class
 
-// Constants (без змін)
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 const CSS_CLASS_CONTAINER = "ollama-container"; const CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container"; const CSS_CLASS_INPUT_CONTAINER = "chat-input-container"; const CSS_CLASS_BUTTONS_CONTAINER = "buttons-container"; const CSS_CLASS_SEND_BUTTON = "send-button"; const CSS_CLASS_VOICE_BUTTON = "voice-button"; const CSS_CLASS_MENU_BUTTON = "menu-button"; const CSS_CLASS_MENU_DROPDOWN = "menu-dropdown"; const CSS_CLASS_MENU_OPTION = "menu-option"; const CSS_CLASS_SETTINGS_OPTION = "settings-option"; const CSS_CLASS_EMPTY_STATE = "ollama-empty-state"; const CSS_CLASS_MESSAGE_GROUP = "message-group"; const CSS_CLASS_USER_GROUP = "user-message-group"; const CSS_CLASS_OLLAMA_GROUP = "ollama-message-group"; const CSS_CLASS_SYSTEM_GROUP = "system-message-group"; const CSS_CLASS_ERROR_GROUP = "error-message-group"; const CSS_CLASS_MESSAGE = "message"; const CSS_CLASS_USER_MESSAGE = "user-message"; const CSS_CLASS_OLLAMA_MESSAGE = "ollama-message"; const CSS_CLASS_SYSTEM_MESSAGE = "system-message"; const CSS_CLASS_ERROR_MESSAGE = "error-message"; const CSS_CLASS_SYSTEM_ICON = "system-icon"; const CSS_CLASS_ERROR_ICON = "error-icon"; const CSS_CLASS_SYSTEM_TEXT = "system-message-text"; const CSS_CLASS_ERROR_TEXT = "error-message-text"; const CSS_CLASS_CONTENT_CONTAINER = "message-content-container"; const CSS_CLASS_CONTENT = "message-content"; const CSS_CLASS_THINKING_DOTS = "thinking-dots"; const CSS_CLASS_THINKING_DOT = "thinking-dot"; const CSS_CLASS_THINKING_BLOCK = "thinking-block"; const CSS_CLASS_THINKING_HEADER = "thinking-header"; const CSS_CLASS_THINKING_TOGGLE = "thinking-toggle"; const CSS_CLASS_THINKING_TITLE = "thinking-title"; const CSS_CLASS_THINKING_CONTENT = "thinking-content"; const CSS_CLASS_TIMESTAMP = "message-timestamp"; const CSS_CLASS_COPY_BUTTON = "copy-button"; const CSS_CLASS_TEXTAREA_EXPANDED = "expanded"; const CSS_CLASS_RECORDING = "recording"; const CSS_CLASS_DISABLED = "disabled"; const CSS_CLASS_MESSAGE_ARRIVING = "message-arriving"; const CSS_CLASS_DATE_SEPARATOR = "chat-date-separator"; const CSS_CLASS_AVATAR = "message-group-avatar"; const CSS_CLASS_AVATAR_USER = "user-avatar"; const CSS_CLASS_AVATAR_AI = "ai-avatar"; const CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button"; const CSS_CLASS_CODE_BLOCK_LANGUAGE = "code-block-language"; const CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator"; const CSS_CLASS_VISIBLE = "visible"; const CSS_CLASS_MENU_SEPARATOR = "menu-separator"; const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option"; const CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option"; const CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible"; const CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed"; const CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button"; const CSS_CLASS_MODEL_OPTION = "model-option"; const CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container"; const CSS_CLASS_ROLE_OPTION = "role-option"; const CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container"; const CSS_CLASS_MENU_HEADER = "menu-header"; /* ... */
+const CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
+const CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
+const CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
+const CSS_CLASS_TRANSLATION_PENDING = "translation-pending"; // For loading state
+const CSS_CLASS_BUTTON_SPACER = "button-spacer"; // Optional spacer
 
-// Message types
 export type MessageRole = "user" | "assistant" | "system" | "error";
 export interface Message { role: MessageRole; content: string; timestamp: Date; }
 interface AddMessageOptions { saveHistory?: boolean; timestamp?: Date | string; }
@@ -446,94 +449,94 @@ export class OllamaView extends ItemView {
 
   // --- Rendering Logic ---
   /** Renders a single message bubble based on the provided message object and context */
-  private renderMessageInternal(message: Message, messageContext: Message[]): HTMLElement | null {
-    const messageIndex = messageContext.findIndex(m => m === message); // Find index in the current context
-    if (messageIndex === -1) return null;
+  // private renderMessageInternal(message: Message, messageContext: Message[]): HTMLElement | null {
+  //   const messageIndex = messageContext.findIndex(m => m === message); // Find index in the current context
+  //   if (messageIndex === -1) return null;
 
-    const prevMessage = messageIndex > 0 ? messageContext[messageIndex - 1] : null;
-    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+  //   const prevMessage = messageIndex > 0 ? messageContext[messageIndex - 1] : null;
+  //   const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
 
-    // --- Date Separator Logic ---
-    if (isNewDay) {
-      this.renderDateSeparator(message.timestamp);
-      this.lastRenderedMessageDate = message.timestamp;
-    } else if (messageIndex === 0 && !this.lastRenderedMessageDate) {
-      // Set date for the very first message if not already set
-      this.lastRenderedMessageDate = message.timestamp;
-    }
+  //   // --- Date Separator Logic ---
+  //   if (isNewDay) {
+  //     this.renderDateSeparator(message.timestamp);
+  //     this.lastRenderedMessageDate = message.timestamp;
+  //   } else if (messageIndex === 0 && !this.lastRenderedMessageDate) {
+  //     // Set date for the very first message if not already set
+  //     this.lastRenderedMessageDate = message.timestamp;
+  //   }
 
-    let messageGroup: HTMLElement | null = null;
-    let groupClass = CSS_CLASS_MESSAGE_GROUP;
-    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`; // Add arriving animation class
-    let showAvatar = true; // Show avatars by default for user/assistant
-    let isUser = false;
+  //   let messageGroup: HTMLElement | null = null;
+  //   let groupClass = CSS_CLASS_MESSAGE_GROUP;
+  //   let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`; // Add arriving animation class
+  //   let showAvatar = true; // Show avatars by default for user/assistant
+  //   let isUser = false;
 
-    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+  //   const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
 
-    // Determine CSS classes based on role
-    switch (message.role) {
-      case "user": groupClass += ` ${CSS_CLASS_USER_GROUP}`; messageClass += ` ${CSS_CLASS_USER_MESSAGE}`; isUser = true; break;
-      case "assistant": groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`; messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`; break;
-      case "system": groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`; messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`; showAvatar = false; break; // No avatar for system
-      case "error": groupClass += ` ${CSS_CLASS_ERROR_GROUP}`; messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`; showAvatar = false; break; // No avatar for error
-    }
+  //   // Determine CSS classes based on role
+  //   switch (message.role) {
+  //     case "user": groupClass += ` ${CSS_CLASS_USER_GROUP}`; messageClass += ` ${CSS_CLASS_USER_MESSAGE}`; isUser = true; break;
+  //     case "assistant": groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`; messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`; break;
+  //     case "system": groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`; messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`; showAvatar = false; break; // No avatar for system
+  //     case "error": groupClass += ` ${CSS_CLASS_ERROR_GROUP}`; messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`; showAvatar = false; break; // No avatar for error
+  //   }
 
-    // Find or create message group container
-    const lastElement = this.chatContainer.lastElementChild as HTMLElement;
-    if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(' ')[1]}`)) {
-      messageGroup = this.chatContainer.createDiv({ cls: groupClass });
-      if (showAvatar) {
-        this.renderAvatar(messageGroup, isUser);
-      }
-    } else {
-      messageGroup = lastElement;
-    }
+  //   // Find or create message group container
+  //   const lastElement = this.chatContainer.lastElementChild as HTMLElement;
+  //   if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(' ')[1]}`)) {
+  //     messageGroup = this.chatContainer.createDiv({ cls: groupClass });
+  //     if (showAvatar) {
+  //       this.renderAvatar(messageGroup, isUser);
+  //     }
+  //   } else {
+  //     messageGroup = lastElement;
+  //   }
 
-    // Create message element and content containers
-    const messageEl = messageGroup.createDiv({ cls: messageClass });
-    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-    const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+  //   // Create message element and content containers
+  //   const messageEl = messageGroup.createDiv({ cls: messageClass });
+  //   const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+  //   const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
 
-    // Render content based on role
-    switch (message.role) {
-      case "assistant":
-      case "user":
-        contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE); // Add class for potential collapsing
-        if (message.role === 'assistant') {
-          this.renderAssistantContent(contentEl, message.content);
-        } else {
-          // Render user text, preserving line breaks
-          message.content.split("\n").forEach((line, index, array) => {
-            contentEl.appendText(line);
-            if (index < array.length - 1) contentEl.createEl("br");
-          });
-        }
-        break;
-      case "system":
-        setIcon(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
-        contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
-        break;
-      case "error":
-        setIcon(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
-        contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
-        break;
-    }
+  //   // Render content based on role
+  //   switch (message.role) {
+  //     case "assistant":
+  //     case "user":
+  //       contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE); // Add class for potential collapsing
+  //       if (message.role === 'assistant') {
+  //         this.renderAssistantContent(contentEl, message.content);
+  //       } else {
+  //         // Render user text, preserving line breaks
+  //         message.content.split("\n").forEach((line, index, array) => {
+  //           contentEl.appendText(line);
+  //           if (index < array.length - 1) contentEl.createEl("br");
+  //         });
+  //       }
+  //       break;
+  //     case "system":
+  //       setIcon(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+  //       contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+  //       break;
+  //     case "error":
+  //       setIcon(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+  //       contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+  //       break;
+  //   }
 
-    // Add copy button (not for system messages)
-    if (message.role !== "system") {
-      const copyBtn = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
-      setIcon(copyBtn, "copy");
-      this.registerDomEvent(copyBtn, "click", () => this.handleCopyClick(message.content, copyBtn)); // Use registerDomEvent
-    }
+  //   // Add copy button (not for system messages)
+  //   if (message.role !== "system") {
+  //     const copyBtn = contentContainer.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy" } });
+  //     setIcon(copyBtn, "copy");
+  //     this.registerDomEvent(copyBtn, "click", () => this.handleCopyClick(message.content, copyBtn)); // Use registerDomEvent
+  //   }
 
-    // Add timestamp
-    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+  //   // Add timestamp
+  //   messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
 
-    // Remove animation class after delay
-    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+  //   // Remove animation class after delay
+  //   setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
 
-    return messageEl; // Return the created element
-  }
+  //   return messageEl; // Return the created element
+  // }
 
   // renderAvatar, renderAssistantContent, addCodeBlockEnhancements etc. remain the same
   private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
@@ -1138,5 +1141,269 @@ export class OllamaView extends ItemView {
   formatDateSeparator(date: Date): string { const n = new Date(); const y = new Date(n); y.setDate(n.getDate() - 1); if (this.isSameDay(date, n)) return "Today"; else if (this.isSameDay(date, y)) return "Yesterday"; else return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); }
   isSameDay(date1: Date, date2: Date): boolean { return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); }
   public setLoadingState(isLoading: boolean): void { this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } }
+
+
+  private async handleTranslateClick(originalContent: string, contentEl: HTMLElement, buttonEl: HTMLButtonElement): Promise<void> {
+    const targetLang = this.plugin.settings.translationTargetLanguage;
+    const apiKey = this.plugin.settings.googleTranslationApiKey;
+
+    if (!targetLang) {
+      new Notice("Target translation language not set in settings.");
+      return;
+    }
+    if (!apiKey) {
+      new Notice("Google Translation API Key not set in settings.");
+      return;
+    }
+
+    // Use the same text extraction logic as the copy button (handles <think> tags)
+    let textToTranslate = originalContent;
+    if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
+      textToTranslate = this.decodeHtmlEntities(originalContent)
+        .replace(/<think>[\s\S]*?<\/think>/g, "")
+        .trim();
+    }
+
+    if (!textToTranslate) {
+      new Notice("Nothing to translate.");
+      return;
+    }
+
+    // Check if translation already exists, remove it before adding new one
+    const existingTranslationContainer = contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`);
+    if (existingTranslationContainer) {
+      existingTranslationContainer.remove();
+    }
+
+    // Add loading state to button
+    setIcon(buttonEl, "loader"); // Use a loading icon
+    buttonEl.disabled = true;
+    buttonEl.addClass(CSS_CLASS_TRANSLATION_PENDING);
+    buttonEl.setAttribute("title", "Translating...");
+
+
+    try {
+      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+
+      // Remove loading state (regardless of success/failure)
+      setIcon(buttonEl, "languages"); // Restore original icon
+      buttonEl.disabled = false;
+      buttonEl.removeClass(CSS_CLASS_TRANSLATION_PENDING);
+      buttonEl.setAttribute("title", `Translate to ${LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage}`);
+
+
+      if (translatedText !== null) {
+        // Create a container for the translation below the original content
+        const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+        // Optional: Add a separator
+        // translationContainer.createEl('hr');
+        translationContainer.createDiv({
+          cls: CSS_CLASS_TRANSLATION_CONTENT,
+          text: translatedText // Display the translated text
+        });
+        // Optional: Add language indicator like "[Translated to UK]"
+        translationContainer.createEl('div', {
+          cls: 'translation-indicator',
+          text: `[Translated to ${LANGUAGES[targetLang] || targetLang}]`
+        });
+
+        // Make sure chat scrolls if new content makes it longer
+        this.guaranteedScrollToBottom(50, false);
+
+      } else {
+        // Error handled by service (Notice shown there)
+        console.warn("[OllamaView] Translation service returned null.");
+      }
+    } catch (error) {
+      // Should be caught by the service, but have a fallback
+      console.error("Error during translation click handling:", error);
+      new Notice("An unexpected error occurred during translation.");
+      // Ensure loading state is removed in case of unexpected error here
+      setIcon(buttonEl, "languages");
+      buttonEl.disabled = false;
+      buttonEl.removeClass(CSS_CLASS_TRANSLATION_PENDING);
+      buttonEl.setAttribute("title", `Translate to ${LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage}`);
+    }
+  }
+  // --- End Translate Handler ---
+  private renderMessageInternal(message: Message, messageContext: Message[]): HTMLElement | null {
+    // Find index in the current context to determine previous message
+    const messageIndex = messageContext.findIndex(m => m === message);
+    if (messageIndex === -1) {
+      console.warn("Message not found in provided context for rendering", message);
+      return null; // Should not happen if context is correct
+    }
+
+    const prevMessage = messageIndex > 0 ? messageContext[messageIndex - 1] : null;
+
+    // Determine if it's a new day compared to the last rendered message
+    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+
+    // --- Date Separator Logic ---
+    if (isNewDay) {
+      // Render separator if the date has changed
+      this.renderDateSeparator(message.timestamp);
+      // Update the last rendered date
+      this.lastRenderedMessageDate = message.timestamp;
+    } else if (messageIndex === 0 && !this.lastRenderedMessageDate) {
+      // Ensure the date is set for the very first message if not already done
+      this.lastRenderedMessageDate = message.timestamp;
+    }
+    // --- End Date Separator ---
+
+
+    let messageGroup: HTMLElement | null = null;
+    let groupClass = CSS_CLASS_MESSAGE_GROUP;
+    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`; // Add arriving animation class
+    let showAvatar = true; // Show avatars by default for user/assistant
+    let isUser = false;
+
+    // Determine if this message starts a new group (different sender or new day)
+    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+
+    // Determine CSS classes based on message role
+    switch (message.role) {
+      case "user":
+        groupClass += ` ${CSS_CLASS_USER_GROUP}`;
+        messageClass += ` ${CSS_CLASS_USER_MESSAGE}`;
+        isUser = true;
+        break;
+      case "assistant":
+        groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`;
+        messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`;
+        break;
+      case "system":
+        groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`;
+        messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`;
+        showAvatar = false; // No avatar for system messages
+        break;
+      case "error":
+        groupClass += ` ${CSS_CLASS_ERROR_GROUP}`;
+        messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`;
+        showAvatar = false; // No avatar for error messages
+        break;
+    }
+
+    // Find the last element in the chat container to potentially append to an existing group
+    const lastElement = this.chatContainer.lastElementChild as HTMLElement;
+
+    // Create a new message group container if needed, otherwise use the last one
+    if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(' ')[1]}`)) {
+      // Create a new group div
+      messageGroup = this.chatContainer.createDiv({ cls: groupClass });
+      // Render avatar if applicable for this group type
+      if (showAvatar) {
+        this.renderAvatar(messageGroup, isUser);
+      }
+    } else {
+      // Use the existing last group element
+      messageGroup = lastElement;
+    }
+
+    // Create the individual message element and its content containers
+    const messageEl = messageGroup.createDiv({ cls: messageClass });
+    // Container for the main content and action buttons
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    // Div where the actual message text/markdown will be rendered
+    const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+
+    // --- Render Content Based on Role ---
+    switch (message.role) {
+      case "assistant":
+      case "user":
+        // Add class to allow collapsing long messages via CSS/JS
+        contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+        if (message.role === 'assistant') {
+          // Render assistant content using Markdown, handling code blocks and <think> tags
+          this.renderAssistantContent(contentEl, message.content);
+        } else {
+          // Render user text, preserving line breaks simply
+          message.content.split("\n").forEach((line, index, array) => {
+            contentEl.appendText(line);
+            // Add <br> element for line breaks except after the last line
+            if (index < array.length - 1) contentEl.createEl("br");
+          });
+        }
+        break;
+      case "system":
+        // Render system messages with an icon and text
+        setIcon(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+        contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+        break;
+      case "error":
+        // Render error messages with an icon and text
+        setIcon(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+        contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+        break;
+    }
+    // --- End Content Rendering ---
+
+
+    // --- Action Buttons (Copy, Translate) ---
+    // Create a wrapper div for buttons, positioned by CSS
+    const buttonsWrapper = contentContainer.createDiv({ cls: 'message-actions-wrapper' });
+
+    // Add Copy button (Conditionally based on role)
+    if (message.role !== "system" && message.role !== "error") {
+      const copyBtn = buttonsWrapper.createEl("button", {
+        cls: CSS_CLASS_COPY_BUTTON,
+        attr: { title: "Copy", 'aria-label': "Copy message content" }
+      });
+      setIcon(copyBtn, "copy");
+      // Use registerDomEvent for proper cleanup when view is destroyed
+      this.registerDomEvent(copyBtn, "click", (e) => {
+        e.stopPropagation(); // Prevent triggering other potential click listeners
+        this.handleCopyClick(message.content, copyBtn);
+      });
+    }
+
+    // Add Translate button (Conditionally based on settings and role)
+    // Check if translation is enabled, target language is set, and role is appropriate
+    if (this.plugin.settings.enableTranslation &&
+      this.plugin.settings.translationTargetLanguage &&
+      (message.role === "user" || message.role === "assistant")) {
+      // Optional: Add a small spacer span if both buttons are present
+      // if (message.role !== "system" && message.role !== "error") {
+      //    buttonsWrapper.createSpan({ cls: CSS_CLASS_BUTTON_SPACER });
+      // }
+
+      // Get language name for tooltip, default to code if not found
+      const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
+
+      const translateBtn = buttonsWrapper.createEl("button", {
+        cls: CSS_CLASS_TRANSLATE_BUTTON,
+        attr: {
+          title: `Translate to ${targetLangName}`, // Dynamic title
+          'aria-label': "Translate message"
+        }
+      });
+      setIcon(translateBtn, "languages"); // Set translate icon
+
+      // Use registerDomEvent for proper cleanup
+      this.registerDomEvent(translateBtn, "click", (e) => {
+        e.stopPropagation(); // Prevent triggering other potential click listeners
+        // Call the handler function, passing necessary elements
+        this.handleTranslateClick(message.content, contentEl, translateBtn);
+      });
+    }
+    // --- End Action Buttons ---
+
+
+    // --- Add Timestamp ---
+    messageEl.createDiv({
+      cls: CSS_CLASS_TIMESTAMP,
+      text: this.formatTime(message.timestamp) // Format time using helper
+    });
+    // --- End Timestamp ---
+
+
+    // Remove the "arriving" animation class after a short delay
+    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+
+
+    // Return the main message element, useful for later manipulation (e.g., collapsing)
+    return messageEl;
+  }
+
 
 } // END OF OllamaView CLASS

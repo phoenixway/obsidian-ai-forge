@@ -10,10 +10,35 @@ import {
   ButtonComponent
 } from "obsidian";
 import OllamaPlugin from "./main";
-// Removed direct import of exec if it wasn't used here
 
-// Types for avatar settings
+export const LANGUAGES: Record<string, string> = {
+  "af": "Afrikaans", "sq": "Albanian", "am": "Amharic", "ar": "Arabic", "hy": "Armenian",
+  "az": "Azerbaijani", "eu": "Basque", "be": "Belarusian", "bn": "Bengali", "bs": "Bosnian",
+  "bg": "Bulgarian", "ca": "Catalan", "ceb": "Cebuano", "ny": "Chichewa", "zh-CN": "Chinese (Simplified)",
+  "zh-TW": "Chinese (Traditional)", "co": "Corsican", "hr": "Croatian", "cs": "Czech", "da": "Danish",
+  "nl": "Dutch", "en": "English", "eo": "Esperanto", "et": "Estonian", "tl": "Filipino",
+  "fi": "Finnish", "fr": "French", "fy": "Frisian", "gl": "Galician", "ka": "Georgian",
+  "de": "German", "el": "Greek", "gu": "Gujarati", "ht": "Haitian Creole", "ha": "Hausa",
+  "haw": "Hawaiian", "iw": "Hebrew", "he": "Hebrew", "hi": "Hindi", "hmn": "Hmong",
+  "hu": "Hungarian", "is": "Icelandic", "ig": "Igbo", "id": "Indonesian", "ga": "Irish",
+  "it": "Italian", "ja": "Japanese", "jw": "Javanese", "kn": "Kannada", "kk": "Kazakh",
+  "km": "Khmer", "rw": "Kinyarwanda", "ko": "Korean", "ku": "Kurdish (Kurmanji)", "ky": "Kyrgyz",
+  "lo": "Lao", "la": "Latin", "lv": "Latvian", "lt": "Lithuanian", "lb": "Luxembourgish",
+  "mk": "Macedonian", "mg": "Malagasy", "ms": "Malay", "ml": "Malayalam", "mt": "Maltese",
+  "mi": "Maori", "mr": "Marathi", "mn": "Mongolian", "my": "Myanmar (Burmese)", "ne": "Nepali",
+  "no": "Norwegian", "or": "Odia (Oriya)", "ps": "Pashto", "fa": "Persian", "pl": "Polish",
+  "pt": "Portuguese", "pa": "Punjabi", "ro": "Romanian", "ru": "Russian", "sm": "Samoan",
+  "gd": "Scots Gaelic", "sr": "Serbian", "st": "Sesotho", "sn": "Shona", "sd": "Sindhi",
+  "si": "Sinhala", "sk": "Slovak", "sl": "Slovenian", "so": "Somali", "es": "Spanish",
+  "su": "Sundanese", "sw": "Swahili", "sv": "Swedish", "tg": "Tajik", "ta": "Tamil",
+  "tt": "Tatar", "te": "Telugu", "th": "Thai", "tr": "Turkish", "tk": "Turkmen",
+  "uk": "Ukrainian", "ur": "Urdu", "ug": "Uyghur", "uz": "Uzbek", "vi": "Vietnamese",
+  "cy": "Welsh", "xh": "Xhosa", "yi": "Yiddish", "yo": "Yoruba", "zu": "Zulu"
+};
+
+
 export type AvatarType = 'initials' | 'icon';
+
 
 export interface OllamaPluginSettings {
   // --- Core Ollama Settings ---
@@ -52,6 +77,9 @@ export interface OllamaPluginSettings {
   silenceDetection: boolean;
   // --- Service Management ---
   ollamaRestartCommand: string; // Command to restart Ollama service
+  enableTranslation: boolean;
+  translationTargetLanguage: string; // ISO 639-1 code
+  googleTranslationApiKey: string; // Separate key for translation
 }
 
 export const DEFAULT_SETTINGS: OllamaPluginSettings = {
@@ -83,6 +111,10 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   maxRecordingTime: 15,
   silenceDetection: true,
   ollamaRestartCommand: "", // Empty by default for safety
+  enableTranslation: false,
+  translationTargetLanguage: "uk", // Default to Ukrainian
+  googleTranslationApiKey: "",
+
 };
 
 export class OllamaSettingTab extends PluginSettingTab {
@@ -239,8 +271,52 @@ export class OllamaSettingTab extends PluginSettingTab {
         text.inputEl.style.width = "100%";
         // ---------------------------------------------
       }); // <-- Прибрано зайву крапку з комою    new Setting(containerEl).setName("Restart Ollama Service").setDesc("Attempt to execute the command above.").addButton(b => b.setButtonText("Restart Service").setIcon("refresh-ccw-dot").setWarning().onClick(async () => { const cmd = this.plugin.settings.ollamaRestartCommand; if (!cmd) { new Notice("No command entered."); return; } if (!confirm(`Execute?\n\n'${cmd}'\n\nThis could have unintended consequences.`)) return; new Notice(`Executing: ${cmd}`); try { const r = await this.plugin.executeSystemCommand(cmd); if (r.error) { new Notice(`Exec failed: ${r.error.message}`); } else if (r.stderr) { new Notice(`Exec stderr: ${r.stderr.split('\n')[0]}`); } else { new Notice("Exec success. Reconnect maybe needed."); this.plugin.promptService.clearModelDetailsCache(); } } catch (e: any) { new Notice(`Exec error: ${e.message}`); } }));
+    containerEl.createEl('h3', { text: 'Translation Settings' });
 
-    // Add styles for icon search when displayed
+    new Setting(containerEl)
+      .setName('Enable Translation Feature')
+      .setDesc('Show a button to translate messages using Google Translate API.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.enableTranslation)
+        .onChange(async (value) => {
+          this.plugin.settings.enableTranslation = value;
+          await this.plugin.saveSettings();
+          this.display(); // Re-render to show/hide related settings
+        }));
+
+    if (this.plugin.settings.enableTranslation) {
+      new Setting(containerEl)
+        .setName('Target Translation Language')
+        .setDesc('Select the language to translate messages into.')
+        .addDropdown(dropdown => {
+          // Add an empty option for 'disabled' or default
+          // dropdown.addOption('', 'Select Language');
+          for (const code in LANGUAGES) {
+            dropdown.addOption(code, LANGUAGES[code]);
+          }
+          dropdown
+            .setValue(this.plugin.settings.translationTargetLanguage)
+            .onChange(async (value) => {
+              this.plugin.settings.translationTargetLanguage = value;
+              await this.plugin.saveSettings();
+            });
+        });
+
+      new Setting(containerEl)
+        .setName('Google Cloud Translation API Key')
+        .setDesc('Required for the translation feature. Keep this confidential.')
+        .addText(text => text
+          .setPlaceholder('Enter your API Key')
+          .setValue(this.plugin.settings.googleTranslationApiKey)
+          .onChange(async (value) => {
+            this.plugin.settings.googleTranslationApiKey = value.trim();
+            await this.plugin.saveSettings();
+          }));
+    }
+
+
+
+
     this.addIconSearchStyles();
   }
 

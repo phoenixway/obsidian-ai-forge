@@ -21,6 +21,7 @@ import { Chat, ChatMetadata } from "./Chat"; // Імпортуємо Chat та �
 import { RoleInfo } from "./ChatManager"; // Або звідки ви його імпортували
 import { exec, ExecException } from 'child_process';
 import * as path from 'path';
+import { TranslationService } from './TranslationService'; // <-- Import new service
 
 // --- КОНСТАНТИ ДЛЯ ЗБЕРЕЖЕННЯ ---
 const SESSIONS_INDEX_KEY = 'chatSessionsIndex_v1';
@@ -42,6 +43,8 @@ export default class OllamaPlugin extends Plugin {
   ollamaService!: OllamaService;
   promptService!: PromptService;
   chatManager!: ChatManager; // Немає this.sessionIndex або this.activeChatId тут
+  translationService!: TranslationService; // <-- Add instance variable
+
 
   // Події та кеш
   private eventHandlers: Record<string, Array<(data: any) => any>> = {};
@@ -69,6 +72,7 @@ export default class OllamaPlugin extends Plugin {
     this.promptService = new PromptService(this);
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this); // Ініціалізуємо ChatManager
+    this.translationService = new TranslationService(this); // <-- Instantiate service
 
     await this.chatManager.initialize(); // ChatManager завантажує індекс та активний ID
 
