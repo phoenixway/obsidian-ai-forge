@@ -4683,7 +4683,7 @@ var ChatManager = class {
    * Якщо false (або не вказано), завантажує індекс зі сховища плагіна.
    */
   async loadChatIndex(forceScanFromFile = false) {
-    var _a;
+    var _a, _b;
     if (!forceScanFromFile) {
       const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
       this.sessionIndex = loadedIndex || {};
@@ -4702,19 +4702,20 @@ var ChatManager = class {
         return;
       }
       const listResult = await this.adapter.list(this.chatsFolderPath);
+      console.log("[ChatManager] adapter.list result:", JSON.stringify(listResult, null, 2));
       const chatFiles = listResult.files.filter(
-        (filePath) => filePath.toLowerCase().endsWith(".json") && // Тільки .json
-        !filePath.includes("/")
-        // Тільки файли безпосередньо в цій папці (не в підпапках)
-        // Можливо, треба адаптувати, якщо шлях до папки складний
+        (filePath) => filePath.toLowerCase().endsWith(".json")
+        // Тільки .json файли
+        // ВИДАЛЕНО: && !filePath.includes('/')
       );
       filesScanned = chatFiles.length;
-      console.log(`[ChatManager] Found ${filesScanned} potential chat files to scan.`);
+      console.log(`[ChatManager] Found ${filesScanned} potential chat files to scan:`, JSON.stringify(chatFiles));
       const constructorSettings = { ...this.plugin.settings };
       for (const filePath of chatFiles) {
         const fullPath = (0, import_obsidian5.normalizePath)(filePath);
         const fileName = fullPath.split("/").pop() || "";
         const chatId = fileName.endsWith(".json") ? fileName.slice(0, -5) : null;
+        console.log(`[ChatManager] Processing file: ${fullPath}, Extracted chatID: ${chatId}`);
         if (!chatId) {
           console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
           continue;
@@ -4722,7 +4723,9 @@ var ChatManager = class {
         try {
           const jsonContent = await this.adapter.read(fullPath);
           const data = JSON.parse(jsonContent);
-          if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && data.metadata.id === chatId) {
+          console.log(`[ChatManager] Parsed data for ${chatId}. Metadata ID: ${(_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id}`);
+          if (((_b = data == null ? void 0 : data.metadata) == null ? void 0 : _b.id) && data.metadata.id === chatId) {
+            console.log(`[ChatManager] VALID metadata for ${chatId}. Adding to newIndex.`);
             const metadata = data.metadata;
             newIndex[chatId] = {
               name: metadata.name,
@@ -4734,7 +4737,7 @@ var ChatManager = class {
             };
             chatsLoaded++;
           } else {
-            console.warn(`[ChatManager] Metadata validation failed for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data == null ? void 0 : data.metadata);
+            console.warn(`[ChatManager] Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data == null ? void 0 : data.metadata);
           }
         } catch (e) {
           console.error(`[ChatManager] Error reading or parsing chat file ${fullPath} during index rebuild:`, e);

@@ -139,40 +139,42 @@ export class ChatManager {
 
             // Отримуємо список файлів у папці історії
             const listResult = await this.adapter.list(this.chatsFolderPath);
+            console.log('[ChatManager] adapter.list result:', JSON.stringify(listResult, null, 2)); // Додано лог
+
+            // --- ВИПРАВЛЕНО ФІЛЬТР ---
             const chatFiles = listResult.files.filter(filePath =>
-                filePath.toLowerCase().endsWith('.json') && // Тільки .json
-                !filePath.includes('/') // Тільки файли безпосередньо в цій папці (не в підпапках)
-                // Можливо, треба адаптувати, якщо шлях до папки складний
+                filePath.toLowerCase().endsWith('.json') // Тільки .json файли
+                // ВИДАЛЕНО: && !filePath.includes('/')
             );
+            // --------------------------
 
             filesScanned = chatFiles.length;
-            console.log(`[ChatManager] Found ${filesScanned} potential chat files to scan.`);
+            console.log(`[ChatManager] Found ${filesScanned} potential chat files to scan:`, JSON.stringify(chatFiles)); // Додано лог
 
             // --- Готуємо налаштування один раз ---
             const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
 
             for (const filePath of chatFiles) {
-                const fullPath = normalizePath(filePath); // adapter.list може повертати відносні шляхи
-                // Спробуємо отримати ID з імені файлу (перед '.json')
+                // adapter.list має повертати повний шлях відносно кореня сховища
+                const fullPath = normalizePath(filePath);
                 const fileName = fullPath.split('/').pop() || '';
                 const chatId = fileName.endsWith('.json') ? fileName.slice(0, -5) : null;
+                console.log(`[ChatManager] Processing file: ${fullPath}, Extracted chatID: ${chatId}`); // Додано лог
 
                 if (!chatId) {
                     console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
-                    continue; // Переходимо до наступного файлу
+                    continue;
                 }
 
                 try {
-                    // Завантажуємо ТІЛЬКИ МЕТАДАНІ для швидкості (якщо можливо)
-                    // Поточний Chat.loadFromFile завантажує все, що може бути повільно.
-                    // Оптимізація: читаємо файл і парсимо тільки metadata.
                     const jsonContent = await this.adapter.read(fullPath);
-                    const data = JSON.parse(jsonContent) as Partial<ChatData>; // Partial, бо нас цікавить тільки metadata
+                    const data = JSON.parse(jsonContent) as Partial<ChatData>;
+                    console.log(`[ChatManager] Parsed data for ${chatId}. Metadata ID: ${data?.metadata?.id}`); // Додано лог
 
+                    // Перевірка ID в метаданих проти ID з імені файлу
                     if (data?.metadata?.id && data.metadata.id === chatId) {
-                        // Перевіряємо, чи ID в метаданих співпадає з ID з імені файлу
+                        console.log(`[ChatManager] VALID metadata for ${chatId}. Adding to newIndex.`); // Додано лог
                         const metadata = data.metadata;
-                        // Додаємо в новий індекс, видаляючи поле id зі значення
                         newIndex[chatId] = {
                             name: metadata.name,
                             modelName: metadata.modelName,
@@ -183,11 +185,10 @@ export class ChatManager {
                         };
                         chatsLoaded++;
                     } else {
-                        console.warn(`[ChatManager] Metadata validation failed for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data?.metadata);
+                        console.warn(`[ChatManager] Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data?.metadata);
                     }
                 } catch (e) {
                     console.error(`[ChatManager] Error reading or parsing chat file ${fullPath} during index rebuild:`, e);
-                    // Не додаємо цей чат в індекс
                 }
             } // end for loop
 
@@ -197,9 +198,7 @@ export class ChatManager {
 
         } catch (error) {
             console.error(`[ChatManager] Critical error during index rebuild process:`, error);
-            // У разі помилки, можливо, краще залишити старий індекс?
-            // Або встановити порожній? Поки що встановлюємо порожній.
-            this.sessionIndex = {};
+            this.sessionIndex = {}; // Встановлюємо порожній індекс у разі критичної помилки
             await this.saveChatIndex();
             new Notice("Error rebuilding chat index. List might be empty.");
         }
