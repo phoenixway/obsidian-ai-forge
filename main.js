@@ -4623,7 +4623,7 @@ var OllamaPlugin = class extends import_obsidian6.Plugin {
       var _a, _b;
       (_b = (_a = this.view) == null ? void 0 : _a.addMessageToDisplay) == null ? void 0 : _b.call(_a, "error", message, new Date());
     }));
-    this.register(this.on("active-chat-changed", this.handleActiveChatChangedLocally));
+    this.register(this.on("active-chat-changed", this.handleActiveChatChangedLocally.bind(this)));
     this.register(this.on("chat-list-updated", () => {
       console.log("[OllamaPlugin] Event 'chat-list-updated' received.");
     }));
@@ -4897,41 +4897,11 @@ var OllamaPlugin = class extends import_obsidian6.Plugin {
       await this.chatManager.deleteChat(c.metadata.id);
     }
   }
-  // --- Handler for active chat change (Updates global settings) ---
   async handleActiveChatChangedLocally(data) {
-    console.log(`[OllamaPlugin] Handling active-chat-changed. ID: ${data.chatId}`);
-    const chat = data.chat;
-    if (chat) {
-      let settingsChanged = false;
-      if (this.settings.modelName !== chat.metadata.modelName) {
-        this.settings.modelName = chat.metadata.modelName;
-        settingsChanged = true;
-        this.emit("model-changed", chat.metadata.modelName);
-      }
-      if (this.settings.selectedRolePath !== chat.metadata.selectedRolePath) {
-        this.settings.selectedRolePath = chat.metadata.selectedRolePath;
-        settingsChanged = true;
-        const roleName = this.findRoleNameByPath(chat.metadata.selectedRolePath);
-        this.emit("role-changed", roleName);
-      }
-      if (this.settings.temperature !== chat.metadata.temperature) {
-        this.settings.temperature = chat.metadata.temperature;
-        settingsChanged = true;
-      }
-      if (settingsChanged) {
-        await this.saveSettings();
-        console.log("[OllamaPlugin] Global settings updated to match active chat.");
-      }
-      const rolePathToLoad = chat.metadata.selectedRolePath;
-      const roleContent = await this.promptService.getRoleDefinition(rolePathToLoad);
-      this.promptService.setSystemPrompt(roleContent);
-      console.log(`[OllamaPlugin] System prompt updated for active chat. Role path: ${rolePathToLoad || "None"}`);
-    } else {
-      this.promptService.setSystemPrompt(null);
-      console.log("[OllamaPlugin] Active chat is null, prompt service reset.");
-    }
+    console.log(`[OllamaPlugin] Event 'active-chat-changed' handled. ID: ${data.chatId}. Settings/Prompt updated within setActiveSession.`);
   }
-  // Helper to find role name for event emitting
+  // --- КІНЕЦЬ ЗМІН ---
+  // Helper to find role name (без змін)
   findRoleNameByPath(rolePath) {
     var _a;
     if (!rolePath)

@@ -60,10 +60,12 @@ export default class OllamaPlugin extends Plugin {
 
   async onload() {
     console.log("Loading Ollama Plugin (MVC Arch)...");
+
     await this.loadSettings();
 
     // Ініціалізація (порядок може бути важливим)
     this.ollamaService = new OllamaService(this);
+
     this.promptService = new PromptService(this);
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this); // Ініціалізуємо ChatManager
@@ -78,7 +80,9 @@ export default class OllamaPlugin extends Plugin {
 
     // --- Реєстрація обробників подій ---
     this.register(this.on('ollama-connection-error', (message) => { this.view?.addMessageToDisplay?.('error', message, new Date()); }));
-    this.register(this.on('active-chat-changed', this.handleActiveChatChangedLocally)); // Локальний обробник для оновлення settings
+
+    this.register(this.on('active-chat-changed', this.handleActiveChatChangedLocally.bind(this))); // ADD .bind(this)
+
     // Видалено непотрібні проміжні обробники, View слухає напряму
     this.register(this.on('chat-list-updated', () => {
       console.log("[OllamaPlugin] Event 'chat-list-updated' received.");
@@ -162,54 +166,16 @@ export default class OllamaPlugin extends Plugin {
   async renameActiveChat() { /* ... */ const c = await this.chatManager?.getActiveChat(); if (!c) { new Notice("No active chat."); return; } const o = c.metadata.name; const n = prompt(`Enter new name for "${o}":`, o); if (n && n.trim() !== "" && n !== o) { await this.chatManager.renameChat(c.metadata.id, n); } }
   async deleteActiveChatWithConfirmation() { /* ... */ const c = await this.chatManager?.getActiveChat(); if (!c) { new Notice("No active chat."); return; } if (confirm(`Delete chat "${c.metadata.name}"?`)) { await this.chatManager.deleteChat(c.metadata.id); } }
 
-  // --- Handler for active chat change (Updates global settings) ---
-  private async handleActiveChatChangedLocally(data: { chatId: string | null, chat: Chat | null }) {
-    console.log(`[OllamaPlugin] Handling active-chat-changed. ID: ${data.chatId}`);
-    const chat = data.chat; // Отримуємо об'єкт чату з події
-
-    if (chat) {
-      let settingsChanged = false;
-      // Синхронізуємо глобальні налаштування з налаштуваннями активного чату
-      if (this.settings.modelName !== chat.metadata.modelName) {
-        this.settings.modelName = chat.metadata.modelName;
-        settingsChanged = true;
-        this.emit('model-changed', chat.metadata.modelName);
-      }
-      if (this.settings.selectedRolePath !== chat.metadata.selectedRolePath) {
-        this.settings.selectedRolePath = chat.metadata.selectedRolePath;
-        settingsChanged = true;
-        const roleName = this.findRoleNameByPath(chat.metadata.selectedRolePath);
-        this.emit('role-changed', roleName);
-      }
-      if (this.settings.temperature !== chat.metadata.temperature) {
-        this.settings.temperature = chat.metadata.temperature;
-        settingsChanged = true;
-      }
-
-      // Зберігаємо глобальні налаштування, якщо вони змінилися
-      if (settingsChanged) {
-        await this.saveSettings();
-        console.log("[OllamaPlugin] Global settings updated to match active chat.");
-      }
-
-      // --- ПЕРЕВІРТЕ ЦЕЙ БЛОК ---
-      // Оновлюємо системний промпт в PromptService на основі РОЛІ АКТИВНОГО ЧАТУ
-      const rolePathToLoad = chat.metadata.selectedRolePath; // Беремо шлях з метаданих чату
-      // Викликаємо getRoleDefinition З АРГУМЕНТОМ rolePathToLoad
-      const roleContent = await this.promptService.getRoleDefinition(rolePathToLoad);
-      this.promptService.setSystemPrompt(roleContent); // Встановлюємо промпт
-      // --- КІНЕЦЬ БЛОКУ ПЕРЕВІРКИ ---
-      console.log(`[OllamaPlugin] System prompt updated for active chat. Role path: ${rolePathToLoad || 'None'}`);
-
-    } else { // Немає активного чату
-      this.promptService.setSystemPrompt(null); // Очищаємо системний промпт
-      console.log("[OllamaPlugin] Active chat is null, prompt service reset.");
-      // Повертати глобальні налаштування до дефолтних тут, мабуть, не варто
-    }
+  private async handleActiveChatChangedLocally(data: { chatId: string | null }) {
+    // Цей обробник тепер *не потрібен*, оскільки логіка оновлення
+    // глобальних налаштувань та системного промпту перенесена в setActiveSession.
+    // Подія 'active-chat-changed' тепер слугує лише сигналом для UI (якщо потрібно).
+    console.log(`[OllamaPlugin] Event 'active-chat-changed' handled. ID: ${data.chatId}. Settings/Prompt updated within setActiveSession.`);
   }
+  // --- КІНЕЦЬ ЗМІН ---
 
-
-  // Helper to find role name for event emitting
+  // Helper to find role name (без змін)
   findRoleNameByPath(rolePath: string): string { if (!rolePath) return "Default Assistant"; const r = this.roleListCache?.find(rl => rl.path === rolePath); if (r) return r.name; try { return path.basename(rolePath, '.md'); } catch { return "Unknown Role"; } }
 
-} // End of OllamaPlugin class
+} //
+
