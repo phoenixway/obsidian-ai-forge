@@ -114,6 +114,7 @@ var CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 var CSS_CLASS_CHAT_OPTION = "chat-option";
 var CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 var CSS_CLASS_MENU_HEADER = "menu-header";
+var CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
 var LANGUAGES = {
   "en": "English",
   "uk": "Ukrainian",
@@ -124,7 +125,6 @@ var OllamaView = class extends import_obsidian.ItemView {
   // Tracks if user has scrolled away from bottom
   constructor(leaf, plugin) {
     super(leaf);
-    // Container holding input area buttons
     // --- State ---
     this.isProcessing = false;
     // State for send/receive cycle (blocks input)
@@ -250,11 +250,25 @@ var OllamaView = class extends import_obsidian.ItemView {
       var _a;
       this.closeMenu();
       if ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId()) {
-        if (confirm("Are you sure you want to clear all messages in this chat?")) {
-          this.plugin.chatManager.clearActiveChatMessages();
-        }
+        this.plugin.chatManager.clearActiveChatMessages();
       } else {
         new import_obsidian.Notice("No active chat to clear.");
+      }
+    };
+    this.handleNewChatClick = async () => {
+      this.closeMenu();
+      console.log("[OllamaView] 'New Chat' button clicked.");
+      try {
+        const newChat = await this.plugin.chatManager.createNewChat();
+        if (newChat) {
+          new import_obsidian.Notice(`Created new chat: ${newChat.metadata.name}`);
+          this.focusInput();
+        } else {
+          new import_obsidian.Notice("Failed to create new chat.");
+        }
+      } catch (error) {
+        console.error("Error creating new chat via menu:", error);
+        new import_obsidian.Notice("Error creating new chat.");
       }
     };
     this.handleExportChatClick = async () => {
@@ -521,6 +535,10 @@ var OllamaView = class extends import_obsidian.ItemView {
     this.menuDropdown.createEl("div", { text: "Load Chat", cls: CSS_CLASS_MENU_HEADER });
     this.chatListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_CHAT_LIST_CONTAINER });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
+    this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` });
+    (0, import_obsidian.setIcon)(this.newChatOption.createEl("span", { cls: "menu-option-icon" }), "plus-circle");
+    this.newChatOption.createEl("span", { cls: "menu-option-text", text: "New Chat" });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
     (0, import_obsidian.setIcon)(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
     this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
@@ -543,6 +561,7 @@ var OllamaView = class extends import_obsidian.ItemView {
     this.settingsOption.addEventListener("click", this.handleSettingsClick);
     this.clearChatOption.addEventListener("click", this.handleClearChatClick);
     this.exportChatOption.addEventListener("click", this.handleExportChatClick);
+    this.newChatOption.addEventListener("click", this.handleNewChatClick);
     this.registerDomEvent(window, "resize", this.handleWindowResize);
     this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
     this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);

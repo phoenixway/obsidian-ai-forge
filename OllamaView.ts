@@ -80,7 +80,7 @@ const CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 const CSS_CLASS_CHAT_OPTION = "chat-option";
 const CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 const CSS_CLASS_MENU_HEADER = "menu-header";
-
+const CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -111,6 +111,7 @@ export class OllamaView extends ItemView {
   private exportChatOption!: HTMLElement; // Menu option: Export chat
   private settingsOption!: HTMLElement; // Menu option: Open settings
   private buttonsContainer!: HTMLElement; // Container holding input area buttons
+  private newChatOption!: HTMLElement;
 
   // --- State ---
   private isProcessing: boolean = false; // State for send/receive cycle (blocks input)
@@ -244,6 +245,11 @@ export class OllamaView extends ItemView {
     this.chatListContainerEl = this.menuDropdown.createDiv({ cls: CSS_CLASS_CHAT_LIST_CONTAINER });
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
 
+    this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER }); // Можна додати заголовок
+    this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` });
+    setIcon(this.newChatOption.createEl("span", { cls: "menu-option-icon" }), "plus-circle"); // Іконка "+"
+    this.newChatOption.createEl("span", { cls: "menu-option-text", text: "New Chat" });
+
     // Section: Actions & Settings
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
     setIcon(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
@@ -276,6 +282,7 @@ export class OllamaView extends ItemView {
     this.settingsOption.addEventListener("click", this.handleSettingsClick);
     this.clearChatOption.addEventListener("click", this.handleClearChatClick);
     this.exportChatOption.addEventListener("click", this.handleExportChatClick);
+    this.newChatOption.addEventListener("click", this.handleNewChatClick);
 
     // Window/Workspace listeners (using registerDomEvent/registerEvent for cleanup)
     this.registerDomEvent(window, 'resize', this.handleWindowResize);
@@ -413,13 +420,33 @@ export class OllamaView extends ItemView {
     // Ask manager to clear active chat messages
     if (this.plugin.chatManager?.getActiveChatId()) {
       // Optional: Add confirmation dialog
-      if (confirm("Are you sure you want to clear all messages in this chat?")) {
-        this.plugin.chatManager.clearActiveChatMessages();
-      }
+      // if (confirm("Are you sure you want to clear all messages in this chat?")) {
+      this.plugin.chatManager.clearActiveChatMessages();
+      // }
     } else {
       new Notice("No active chat to clear.");
     }
   }
+
+  private handleNewChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    console.log("[OllamaView] 'New Chat' button clicked.");
+    try {
+      const newChat = await this.plugin.chatManager.createNewChat();
+      if (newChat) {
+        // View оновить себе через подію 'active-chat-changed',
+        // яку викличе setActiveChat всередині createNewChat
+        new Notice(`Created new chat: ${newChat.metadata.name}`);
+        this.focusInput(); // Фокус на полі вводу нового чату
+      } else {
+        new Notice("Failed to create new chat.");
+      }
+    } catch (error) {
+      console.error("Error creating new chat via menu:", error);
+      new Notice("Error creating new chat.");
+    }
+  }
+
   private handleExportChatClick = async (): Promise<void> => {
     this.closeMenu();
     console.log("[OllamaView] Export to Markdown initiated.");
