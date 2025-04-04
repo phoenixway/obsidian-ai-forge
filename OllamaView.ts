@@ -696,83 +696,145 @@ export class OllamaView extends ItemView {
     }
   }
 
+  /**
+   * Fetches available roles (from plugin's listRoleFiles) and renders them
+   * as selectable options in the menu dropdown. Marks the currently active
+   * chat's role with a checkmark. Updates BOTH the global setting AND the
+   * active chat's role setting on click.
+   */
   public async renderRoleList(): Promise<void> {
-    if (!this.roleListContainerEl) return; // Guard clause
+    // Guard clause: Ensure the container element exists
+    if (!this.roleListContainerEl) {
+      console.error("[OllamaView] Role list container not found for rendering.");
+      return;
+    }
 
+    // Clear previous list and show loading indicator
     this.roleListContainerEl.empty();
     const loadingEl = this.roleListContainerEl.createEl("span", { text: "Loading roles..." });
 
     try {
-      // Use forceRefresh = false to use cache if available
-      const roles = await this.plugin.listRoleFiles(false);
-      const currentRolePath = this.plugin.settings.selectedRolePath;
-      this.roleListContainerEl.empty(); // Clear "Loading..."
+      // Get roles using the plugin's method (potentially cached)
+      const roles: RoleInfo[] = await this.plugin.listRoleFiles(false); // Use forceRefresh = false
 
-      // Add "No Role" option first
+      // Get active chat to determine the current role *for this chat*
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      // Use the role path from active chat metadata, fallback to global setting if no chat
+      const currentChatRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+
+      // Clear "Loading..." message
+      this.roleListContainerEl.empty();
+
+      // --- Add "No Role" (Default Assistant) Option ---
       const noRoleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
       const noRoleIconSpan = noRoleOptionEl.createEl("span", { cls: "menu-option-icon" });
-      if (!currentRolePath) { // Check if no role is selected
-        setIcon(noRoleIconSpan, "check");
+
+      // Check if "No Role" is the currently selected one for the chat
+      if (!currentChatRolePath) {
+        setIcon(noRoleIconSpan, "check"); // Mark as selected
         noRoleOptionEl.addClass("is-selected");
       } else {
-        setIcon(noRoleIconSpan, "slash"); // Or 'x' or leave empty with min-width
-        noRoleIconSpan.style.minWidth = "18px";
+        setIcon(noRoleIconSpan, "slash"); // Use an icon indicating "none" or default
+        noRoleIconSpan.style.minWidth = "18px"; // Ensure alignment
       }
+
       noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default Assistant)" });
+
+      // Click handler for "No Role"
       this.registerDomEvent(noRoleOptionEl, 'click', async () => {
-        if (this.plugin.settings.selectedRolePath !== "") { // Only act if changed
-          this.plugin.settings.selectedRolePath = ""; // Set to empty path
+        const currentGlobalRolePath = this.plugin.settings.selectedRolePath;
+        const newRolePath = ""; // Path for "no role"
+
+        // Only proceed if the selected role is actually changing
+        if (currentGlobalRolePath !== newRolePath || currentChatRolePath !== newRolePath) {
+          // 1. Update global settings
+          this.plugin.settings.selectedRolePath = newRolePath;
           await this.plugin.saveSettings();
-          this.plugin.emit('role-changed', "Default Assistant"); // Emit event
-        }
-        this.closeMenu();
-      });
 
-
-      if (roles.length === 0 && !this.plugin.settings.userRolesFolderPath) {
-        // No custom roles found and no folder specified
-        // The "None" option is already there. Maybe add info text?
-        this.roleListContainerEl.createEl("span", { text: "No custom roles found. Add path in settings." });
-        return;
-      } else if (roles.length === 0 && this.plugin.settings.userRolesFolderPath) {
-        this.roleListContainerEl.createEl("span", { text: `No roles found in specified folders.` });
-        return;
-      }
-
-
-      roles.forEach(roleInfo => {
-        const roleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
-        if (roleInfo.isCustom) {
-          roleOptionEl.addClass("is-custom"); // Add class for potential styling
-        }
-        const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
-
-        if (roleInfo.path === currentRolePath) {
-          setIcon(iconSpan, "check");
-          roleOptionEl.addClass("is-selected");
-        } else {
-          // Use 'user' for custom, 'box' for default, or leave empty
-          setIcon(iconSpan, roleInfo.isCustom ? 'user' : 'box'); // Example icons
-        }
-
-        roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
-
-        // Add click handler to select the role
-        this.registerDomEvent(roleOptionEl, 'click', async () => {
-          if (roleInfo.path !== this.plugin.settings.selectedRolePath) {
-            console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${roleInfo.path})`);
-            this.plugin.settings.selectedRolePath = roleInfo.path; // Save the full path
-            await this.plugin.saveSettings();
-            this.plugin.emit('role-changed', roleInfo.name); // Emit event with role name
+          // 2. Update active chat metadata (if chat exists and its role differs)
+          const currentActiveChatOnClick = await this.plugin.chatManager?.getActiveChat(); // Re-fetch just in case
+          if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
+            console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
+            await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+            this.plugin.promptService?.clearRoleCache?.(); // Explicitly clear prompt cache
+          } else if (!currentActiveChatOnClick) {
+            console.warn("[OllamaView] No active chat found to update role metadata for.");
           }
-          this.closeMenu();
-        });
+
+          // 3. Emit event for UI feedback (e.g., system message)
+          this.plugin.emit('role-changed', "Default Assistant");
+        }
+        this.closeMenu(); // Close menu regardless
       });
+      // --- End of "No Role" Option ---
+
+
+      // --- Handle Role List Population ---
+      if (roles.length === 0) {
+        // No roles found, display informative message
+        const infoText = this.plugin.settings.userRolesFolderPath
+          ? "No roles found in specified folders."
+          : "No custom roles found. Add path in settings.";
+        this.roleListContainerEl.createEl("span", { cls: "menu-info-text", text: infoText });
+        // No return here, "None" option is always available
+      } else {
+        // Populate with available roles
+        roles.forEach(roleInfo => {
+          const roleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+          if (roleInfo.isCustom) {
+            roleOptionEl.addClass("is-custom"); // Add class for potential styling
+          }
+          const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
+
+          // Check if this role is the selected one for the current chat
+          if (roleInfo.path === currentChatRolePath) {
+            setIcon(iconSpan, "check"); // Mark as selected
+            roleOptionEl.addClass("is-selected");
+          } else {
+            // Use appropriate icons for default vs custom roles
+            setIcon(iconSpan, roleInfo.isCustom ? 'user' : 'box'); // Example icons
+            iconSpan.style.minWidth = "18px"; // Ensure alignment
+          }
+
+          roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
+
+          // Click handler for specific role
+          this.registerDomEvent(roleOptionEl, 'click', async () => {
+            const currentGlobalRolePath = this.plugin.settings.selectedRolePath;
+            const newRolePath = roleInfo.path; // Path of the clicked role
+
+            // Only proceed if the selected role is actually changing
+            if (newRolePath !== currentGlobalRolePath || newRolePath !== currentChatRolePath) {
+              console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${newRolePath})`);
+
+              // 1. Update global settings
+              this.plugin.settings.selectedRolePath = newRolePath;
+              await this.plugin.saveSettings();
+
+              // 2. Update active chat metadata (if chat exists and its role differs)
+              const currentActiveChatOnClick = await this.plugin.chatManager?.getActiveChat(); // Re-fetch
+              if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
+                console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
+                await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+                this.plugin.promptService?.clearRoleCache?.(); // Explicitly clear prompt cache
+              } else if (!currentActiveChatOnClick) {
+                console.warn("[OllamaView] No active chat found to update role metadata for.");
+              }
+
+              // 3. Emit event for UI feedback
+              this.plugin.emit('role-changed', roleInfo.name);
+            }
+            this.closeMenu(); // Close menu regardless
+          });
+        });
+      }
+      // --- End of Role List Population ---
 
     } catch (error) {
+      // Handle errors during role loading
       console.error("Error loading roles for menu:", error);
-      this.roleListContainerEl.empty();
-      this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
+      this.roleListContainerEl.empty(); // Clear any previous elements
+      this.roleListContainerEl.createEl("span", { cls: "menu-error-text", text: "Error loading roles." });
     }
   }
 

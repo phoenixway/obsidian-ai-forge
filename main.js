@@ -992,18 +992,28 @@ var _OllamaView = class extends import_obsidian.ItemView {
       this.modelListContainerEl.createEl("span", { text: "Error loading models." });
     }
   }
+  /**
+   * Fetches available roles (from plugin's listRoleFiles) and renders them
+   * as selectable options in the menu dropdown. Marks the currently active
+   * chat's role with a checkmark. Updates BOTH the global setting AND the
+   * active chat's role setting on click.
+   */
   async renderRoleList() {
-    if (!this.roleListContainerEl)
+    var _a, _b, _c;
+    if (!this.roleListContainerEl) {
+      console.error("[OllamaView] Role list container not found for rendering.");
       return;
+    }
     this.roleListContainerEl.empty();
     const loadingEl = this.roleListContainerEl.createEl("span", { text: "Loading roles..." });
     try {
       const roles = await this.plugin.listRoleFiles(false);
-      const currentRolePath = this.plugin.settings.selectedRolePath;
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      const currentChatRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
       this.roleListContainerEl.empty();
       const noRoleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
       const noRoleIconSpan = noRoleOptionEl.createEl("span", { cls: "menu-option-icon" });
-      if (!currentRolePath) {
+      if (!currentChatRolePath) {
         (0, import_obsidian.setIcon)(noRoleIconSpan, "check");
         noRoleOptionEl.addClass("is-selected");
       } else {
@@ -1012,47 +1022,68 @@ var _OllamaView = class extends import_obsidian.ItemView {
       }
       noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default Assistant)" });
       this.registerDomEvent(noRoleOptionEl, "click", async () => {
-        if (this.plugin.settings.selectedRolePath !== "") {
-          this.plugin.settings.selectedRolePath = "";
+        var _a2, _b2, _c2;
+        const currentGlobalRolePath = this.plugin.settings.selectedRolePath;
+        const newRolePath = "";
+        if (currentGlobalRolePath !== newRolePath || currentChatRolePath !== newRolePath) {
+          this.plugin.settings.selectedRolePath = newRolePath;
           await this.plugin.saveSettings();
+          const currentActiveChatOnClick = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
+          if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
+            console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
+            await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+            (_c2 = (_b2 = this.plugin.promptService) == null ? void 0 : _b2.clearRoleCache) == null ? void 0 : _c2.call(_b2);
+          } else if (!currentActiveChatOnClick) {
+            console.warn("[OllamaView] No active chat found to update role metadata for.");
+          }
           this.plugin.emit("role-changed", "Default Assistant");
         }
         this.closeMenu();
       });
-      if (roles.length === 0 && !this.plugin.settings.userRolesFolderPath) {
-        this.roleListContainerEl.createEl("span", { text: "No custom roles found. Add path in settings." });
-        return;
-      } else if (roles.length === 0 && this.plugin.settings.userRolesFolderPath) {
-        this.roleListContainerEl.createEl("span", { text: `No roles found in specified folders.` });
-        return;
-      }
-      roles.forEach((roleInfo) => {
-        const roleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
-        if (roleInfo.isCustom) {
-          roleOptionEl.addClass("is-custom");
-        }
-        const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
-        if (roleInfo.path === currentRolePath) {
-          (0, import_obsidian.setIcon)(iconSpan, "check");
-          roleOptionEl.addClass("is-selected");
-        } else {
-          (0, import_obsidian.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "box");
-        }
-        roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
-        this.registerDomEvent(roleOptionEl, "click", async () => {
-          if (roleInfo.path !== this.plugin.settings.selectedRolePath) {
-            console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${roleInfo.path})`);
-            this.plugin.settings.selectedRolePath = roleInfo.path;
-            await this.plugin.saveSettings();
-            this.plugin.emit("role-changed", roleInfo.name);
+      if (roles.length === 0) {
+        const infoText = this.plugin.settings.userRolesFolderPath ? "No roles found in specified folders." : "No custom roles found. Add path in settings.";
+        this.roleListContainerEl.createEl("span", { cls: "menu-info-text", text: infoText });
+      } else {
+        roles.forEach((roleInfo) => {
+          const roleOptionEl = this.roleListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+          if (roleInfo.isCustom) {
+            roleOptionEl.addClass("is-custom");
           }
-          this.closeMenu();
+          const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
+          if (roleInfo.path === currentChatRolePath) {
+            (0, import_obsidian.setIcon)(iconSpan, "check");
+            roleOptionEl.addClass("is-selected");
+          } else {
+            (0, import_obsidian.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "box");
+            iconSpan.style.minWidth = "18px";
+          }
+          roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
+          this.registerDomEvent(roleOptionEl, "click", async () => {
+            var _a2, _b2, _c2;
+            const currentGlobalRolePath = this.plugin.settings.selectedRolePath;
+            const newRolePath = roleInfo.path;
+            if (newRolePath !== currentGlobalRolePath || newRolePath !== currentChatRolePath) {
+              console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${newRolePath})`);
+              this.plugin.settings.selectedRolePath = newRolePath;
+              await this.plugin.saveSettings();
+              const currentActiveChatOnClick = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
+              if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
+                console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
+                await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+                (_c2 = (_b2 = this.plugin.promptService) == null ? void 0 : _b2.clearRoleCache) == null ? void 0 : _c2.call(_b2);
+              } else if (!currentActiveChatOnClick) {
+                console.warn("[OllamaView] No active chat found to update role metadata for.");
+              }
+              this.plugin.emit("role-changed", roleInfo.name);
+            }
+            this.closeMenu();
+          });
         });
-      });
+      }
     } catch (error) {
       console.error("Error loading roles for menu:", error);
       this.roleListContainerEl.empty();
-      this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
+      this.roleListContainerEl.createEl("span", { cls: "menu-error-text", text: "Error loading roles." });
     }
   }
   // --- Speech Recognition Placeholders ---
