@@ -625,10 +625,10 @@ This action cannot be undone.`)) {
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     (0, import_obsidian.setIcon)(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download");
     this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" });
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
     (0, import_obsidian.setIcon)(this.deleteChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
     this.deleteChatOption.createEl("span", { cls: "menu-option-text", text: "Delete Chat" });
+    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
     (0, import_obsidian.setIcon)(this.settingsOption.createEl("span", { cls: "menu-option-icon" }), "settings");
     this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
