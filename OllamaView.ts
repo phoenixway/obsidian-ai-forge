@@ -440,14 +440,30 @@ export class OllamaView extends ItemView {
     (this.app as any).setting?.open?.();
     (this.app as any).setting?.openTabById?.(this.plugin.manifest.id); // Use manifest ID
   }
-  private handleClearChatClick = (): void => {
+  private handleClearChatClick = async (): Promise<void> => { // Зробимо async, хоча тут не обов'язково
     this.closeMenu();
-    // Ask manager to clear active chat messages
-    if (this.plugin.chatManager?.getActiveChatId()) {
-      // Optional: Add confirmation dialog
-      // if (confirm("Are you sure you want to clear all messages in this chat?")) {
-      this.plugin.chatManager.clearActiveChatMessages();
-      // }
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); // Отримуємо об'єкт чату для імені
+
+    if (activeChat) {
+      const chatName = activeChat.metadata.name;
+      const chatId = activeChat.metadata.id;
+
+      // --- Використання ConfirmModal замість confirm() ---
+      new ConfirmModal(
+        this.app,
+        'Clear Chat Messages', // Заголовок вікна
+        `Are you sure you want to clear all messages in chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення для підтвердження
+        () => { // Функція, що виконається при натисканні "Confirm"
+          console.log(`[OllamaView] Clearing messages for chat ${chatId} ("${chatName}")`);
+          // Викликаємо метод менеджера для очищення
+          this.plugin.chatManager.clearActiveChatMessages();
+          // Повідомлення про успіх не потрібне тут, бо view оновить себе
+          // через подію 'messages-cleared', яка викличе showEmptyState
+        }
+        // Код для 'Cancel' не потрібен, модальне вікно просто закриється
+      ).open(); // Відкриваємо модальне вікно
+      // --- Кінець використання ConfirmModal ---
+
     } else {
       new Notice("No active chat to clear.");
     }

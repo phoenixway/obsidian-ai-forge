@@ -334,11 +334,26 @@ var OllamaView = class extends import_obsidian3.ItemView {
       (_b = (_a = this.app.setting) == null ? void 0 : _a.open) == null ? void 0 : _b.call(_a);
       (_d = (_c = this.app.setting) == null ? void 0 : _c.openTabById) == null ? void 0 : _d.call(_c, this.plugin.manifest.id);
     };
-    this.handleClearChatClick = () => {
+    this.handleClearChatClick = async () => {
       var _a;
       this.closeMenu();
-      if ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId()) {
-        this.plugin.chatManager.clearActiveChatMessages();
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      if (activeChat) {
+        const chatName = activeChat.metadata.name;
+        const chatId = activeChat.metadata.id;
+        new ConfirmModal(
+          this.app,
+          "Clear Chat Messages",
+          // Заголовок вікна
+          `Are you sure you want to clear all messages in chat "${chatName}"?
+This action cannot be undone.`,
+          // Повідомлення для підтвердження
+          () => {
+            console.log(`[OllamaView] Clearing messages for chat ${chatId} ("${chatName}")`);
+            this.plugin.chatManager.clearActiveChatMessages();
+          }
+          // Код для 'Cancel' не потрібен, модальне вікно просто закриється
+        ).open();
       } else {
         new import_obsidian3.Notice("No active chat to clear.");
       }
