@@ -3083,14 +3083,12 @@ var ChatManager = class {
         const fileName = fullPath.split("/").pop() || "";
         const chatId = fileName.endsWith(".json") ? fileName.slice(0, -5) : null;
         if (!chatId) {
-          console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
           continue;
         }
         try {
           const jsonContent = await this.adapter.read(fullPath);
           const data = JSON.parse(jsonContent);
           if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && data.metadata.id === chatId) {
-            console.log(`[ChatManager] VALID metadata for ${chatId}. Adding to newIndex.`);
             const metadata = data.metadata;
             newIndex[chatId] = {
               name: metadata.name,
@@ -3104,7 +3102,6 @@ var ChatManager = class {
           } else {
           }
         } catch (e) {
-          console.error(`[ChatManager] Error reading or parsing chat file ${fullPath} during index rebuild:`, e);
         }
       }
       this.sessionIndex = newIndex;
@@ -3160,7 +3157,6 @@ var ChatManager = class {
       if (!saved) {
         throw new Error("Failed to save initial chat file.");
       }
-      console.log(`[ChatManager] Initial chat file saved for ${newId}`);
       this.sessionIndex[newChat.metadata.id] = { ...newChat.metadata };
       delete this.sessionIndex[newChat.metadata.id].id;
       await this.saveChatIndex();
@@ -3193,7 +3189,6 @@ var ChatManager = class {
    * @param id ID чату для активації, або null для скидання активного чату.
    */
   async setActiveChat(id) {
-    console.log(`[ChatManager] Setting active chat to ID: ${id}`);
     if (id && !this.sessionIndex[id]) {
       id = null;
     }
@@ -3234,14 +3229,12 @@ var ChatManager = class {
         delete this.sessionIndex[id];
         await this.saveChatIndex();
         if (this.activeChatId === id) {
-          console.warn(`[ChatManager] Resetting activeChatId because the active chat file failed to load.`);
           await this.setActiveChat(null);
         }
         this.plugin.emit("chat-list-updated");
         return null;
       }
     }
-    console.warn(`[ChatManager] Chat with ID ${id} not found in session index.`);
     return null;
   }
   /**
@@ -3250,9 +3243,7 @@ var ChatManager = class {
    * @returns Активний об'єкт Chat або null у разі помилки створення/завантаження.
    */
   async getActiveChat() {
-    console.log(`[ChatManager] getActiveChat called. Current activeChatId: ${this.activeChatId}`);
     if (!this.activeChatId) {
-      console.log("[ChatManager] No active chat ID set. Checking available chats...");
       const availableChats = this.listAvailableChats();
       if (availableChats.length > 0) {
         const mostRecentId = availableChats[0].id;
@@ -3376,7 +3367,6 @@ var ChatManager = class {
       await this.saveChatIndex();
       const chatToRename = await this.getChat(id);
       if (chatToRename) {
-        console.log(`[ChatManager] Saving renamed chat ${id} to file: ${chatToRename.filePath}`);
         chatToRename.metadata.name = trimmedName;
         chatToRename.metadata.lastModified = this.sessionIndex[id].lastModified;
         const saved = await chatToRename.saveImmediately();
