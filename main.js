@@ -619,7 +619,7 @@ This action cannot be undone.`)) {
     this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` });
     (0, import_obsidian.setIcon)(this.cloneChatOption.createEl("span", { cls: "menu-option-icon" }), "copy-plus");
     this.cloneChatOption.createEl("span", { cls: "menu-option-text", text: "Clone Chat" });
-    this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
+    this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
     (0, import_obsidian.setIcon)(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
     this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
