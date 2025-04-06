@@ -271,6 +271,10 @@ export class OllamaView extends ItemView {
     setIcon(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download");
     this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" });
 
+    this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
+    setIcon(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
+    this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
+
     this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
     setIcon(this.deleteChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
     this.deleteChatOption.createEl("span", { cls: "menu-option-text", text: "Delete Chat" });
