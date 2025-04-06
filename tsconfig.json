@@ -15,5 +15,12 @@
 		"lib": ["DOM", "ES6", "DOM.Iterable", "ScriptHost", "ES2023"],
 		"rootDir": "src"
 	},
-	"include": ["src/**/*.ts"]
+	"include": ["src/**/*.ts"],
+	"exclude": [
+		"node_modules",
+		"main.js", // <--- Явно виключаємо вихідний файл esbuild
+		"manifest.json", // <--- Також гарна ідея виключити маніфест
+		"styles.css" // <--- І стилі (якщо є)
+		// Додайте сюди інші папки/файли, які не є вихідним кодом TS, якщо потрібно
+	]
 }
