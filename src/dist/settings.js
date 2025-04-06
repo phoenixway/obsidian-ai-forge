@@ -281,37 +281,150 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                 }
             });
         }); }); });
-        if (this.plugin.settings.useAdvancedContextStrategy) {
+        // --- Productivity Assistant Features --- <-- НОВА СЕКЦІЯ
+        containerEl.createEl('h3', { text: 'Productivity Assistant Features' });
+        // Головний перемикач для функцій продуктивності
+        new obsidian_1.Setting(containerEl)
+            .setName('Enable Productivity Features')
+            .setDesc('Activate features like daily task integration and advanced context management for planning-oriented personas.')
+            .addToggle(function (toggle) { return toggle
+            .setValue(_this.plugin.settings.enableProductivityFeatures)
+            .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        this.plugin.settings.enableProductivityFeatures = value;
+                        return [4 /*yield*/, this.plugin.saveSettings()];
+                    case 1:
+                        _a.sent();
+                        this.display(); // Перерендерити, щоб показати/сховати залежні налаштування
+                        return [2 /*return*/];
+                }
+            });
+        }); }); });
+        // Показуємо залежні налаштування, тільки якщо основна функція увімкнена
+        if (this.plugin.settings.enableProductivityFeatures) {
+            // Налаштування файлу завдань
             new obsidian_1.Setting(containerEl)
-                .setName('Enable Context Summarization')
-                .setDesc('If Advanced Strategy is enabled, allow summarizing older parts of the chat history to save tokens.')
-                .addToggle(function (toggle) { return toggle
-                .setValue(_this.plugin.settings.enableSummarization)
+                .setName('Daily Task File Name')
+                .setDesc('The exact filename (including .md) of your daily task list within the RAG folder.')
+                .addText(function (text) { return text
+                .setPlaceholder(exports.DEFAULT_SETTINGS.dailyTaskFileName)
+                .setValue(_this.plugin.settings.dailyTaskFileName)
                 .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
-                return __generator(this, function (_a) {
-                    switch (_a.label) {
+                var _a, _b, _c, _d;
+                return __generator(this, function (_e) {
+                    switch (_e.label) {
                         case 0:
-                            this.plugin.settings.enableSummarization = value;
+                            this.plugin.settings.dailyTaskFileName = value.trim() || exports.DEFAULT_SETTINGS.dailyTaskFileName;
                             return [4 /*yield*/, this.plugin.saveSettings()];
                         case 1:
-                            _a.sent();
-                            this.display(); // Re-render to show/hide prompt option
+                            _e.sent();
+                            // Повідомити плагін про зміну шляху/імені файлу
+                            (_b = (_a = this.plugin).updateDailyTaskFilePath) === null || _b === void 0 ? void 0 : _b.call(_a); // Викликаємо метод оновлення шляху (якщо він є)
+                            (_d = (_c = this.plugin).loadAndProcessInitialTasks) === null || _d === void 0 ? void 0 : _d.call(_c); // Перезавантажити завдання
                             return [2 /*return*/];
                     }
                 });
             }); }); });
-            if (this.plugin.settings.enableSummarization) {
+            // Налаштування розширеного контексту
+            new obsidian_1.Setting(containerEl)
+                .setName('Use Advanced Context Strategy')
+                .setDesc('Enables summarization and chunking for long conversations (requires Productivity Features enabled).')
+                .addToggle(function (toggle) { return toggle
+                .setValue(_this.plugin.settings.useAdvancedContextStrategy)
+                .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            this.plugin.settings.useAdvancedContextStrategy = value;
+                            return [4 /*yield*/, this.plugin.saveSettings()];
+                        case 1:
+                            _a.sent();
+                            this.display(); // Перерендерити, щоб показати/сховати налаштування підсумовування
+                            return [2 /*return*/];
+                    }
+                });
+            }); }); });
+            // Налаштування підсумовування (якщо увімкнено розширену стратегію)
+            if (this.plugin.settings.useAdvancedContextStrategy) {
                 new obsidian_1.Setting(containerEl)
-                    .setName('Summarization Prompt')
-                    .setDesc('The prompt used to instruct the model how to summarize chat history. Use {text_to_summarize} placeholder.')
-                    .addTextArea(function (text) { return text
-                    .setPlaceholder(exports.DEFAULT_SETTINGS.summarizationPrompt)
-                    .setValue(_this.plugin.settings.summarizationPrompt)
+                    .setName('Enable Context Summarization')
+                    .setDesc('Allow summarizing older parts of the chat history.')
+                    .addToggle(function (toggle) { return toggle
+                    .setValue(_this.plugin.settings.enableSummarization)
                     .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
                     return __generator(this, function (_a) {
                         switch (_a.label) {
                             case 0:
-                                this.plugin.settings.summarizationPrompt = value || exports.DEFAULT_SETTINGS.summarizationPrompt;
+                                this.plugin.settings.enableSummarization = value;
+                                return [4 /*yield*/, this.plugin.saveSettings()];
+                            case 1:
+                                _a.sent();
+                                this.display(); // Перерендерити, щоб показати/сховати промпт підсумовування
+                                return [2 /*return*/];
+                        }
+                    });
+                }); }); });
+                // Промпт для підсумовування (якщо увімкнено підсумовування)
+                if (this.plugin.settings.enableSummarization) {
+                    new obsidian_1.Setting(containerEl)
+                        .setName('Summarization Prompt')
+                        .setDesc('Prompt for summarizing history. Use {text_to_summarize}.')
+                        .addTextArea(function (text) { return text
+                        .setPlaceholder(exports.DEFAULT_SETTINGS.summarizationPrompt)
+                        .setValue(_this.plugin.settings.summarizationPrompt)
+                        .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+                        return __generator(this, function (_a) {
+                            switch (_a.label) {
+                                case 0:
+                                    this.plugin.settings.summarizationPrompt = value || exports.DEFAULT_SETTINGS.summarizationPrompt;
+                                    return [4 /*yield*/, this.plugin.saveSettings()];
+                                case 1:
+                                    _a.sent();
+                                    return [2 /*return*/];
+                            }
+                        });
+                    }); })
+                        // Зробимо поле трохи більшим
+                        .inputEl.setAttrs({ rows: 4 }); });
+                }
+                // Кількість повідомлень перед підсумовуванням
+                new obsidian_1.Setting(containerEl)
+                    .setName('Keep Last N Messages Before Summary')
+                    .setDesc('Number of recent messages kept verbatim before considering summarization.')
+                    .addText(function (text) { return text
+                    .setPlaceholder(exports.DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString())
+                    .setValue(_this.plugin.settings.keepLastNMessagesBeforeSummary.toString())
+                    .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+                    var num;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                num = parseInt(value.trim(), 10);
+                                this.plugin.settings.keepLastNMessagesBeforeSummary = (!isNaN(num) && num >= 0) ? num : exports.DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
+                                return [4 /*yield*/, this.plugin.saveSettings()];
+                            case 1:
+                                _a.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                }); }); });
+                // Розмір чанку для підсумовування
+                new obsidian_1.Setting(containerEl)
+                    .setName('Summarization Chunk Size (Tokens)')
+                    .setDesc('Approximate token size of message chunks processed for summarization.')
+                    .addText(function (text) { return text
+                    .setPlaceholder(exports.DEFAULT_SETTINGS.summarizationChunkSize.toString())
+                    .setValue(_this.plugin.settings.summarizationChunkSize.toString())
+                    .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+                    var num;
+                    return __generator(this, function (_a) {
+                        switch (_a.label) {
+                            case 0:
+                                num = parseInt(value.trim(), 10);
+                                // Встановлюємо мінімальний розумний розмір, наприклад 100
+                                this.plugin.settings.summarizationChunkSize = (!isNaN(num) && num > 100) ? num : exports.DEFAULT_SETTINGS.summarizationChunkSize;
                                 return [4 /*yield*/, this.plugin.saveSettings()];
                             case 1:
                                 _a.sent();
@@ -320,48 +433,8 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                     });
                 }); }); });
             }
-            new obsidian_1.Setting(containerEl)
-                .setName('Keep Last N Messages Before Summary')
-                .setDesc('Number of recent messages to always keep verbatim before considering summarization.')
-                .addText(function (text) { return text
-                .setPlaceholder(exports.DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString())
-                .setValue(_this.plugin.settings.keepLastNMessagesBeforeSummary.toString())
-                .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
-                var num;
-                return __generator(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            num = parseInt(value.trim(), 10);
-                            this.plugin.settings.keepLastNMessagesBeforeSummary = (!isNaN(num) && num >= 0) ? num : exports.DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
-                            return [4 /*yield*/, this.plugin.saveSettings()];
-                        case 1:
-                            _a.sent();
-                            return [2 /*return*/];
-                    }
-                });
-            }); }); });
-            new obsidian_1.Setting(containerEl)
-                .setName('Summarization Chunk Size (Tokens)')
-                .setDesc('Approximate size (in tokens) of message chunks processed for summarization.')
-                .addText(function (text) { return text
-                .setPlaceholder(exports.DEFAULT_SETTINGS.summarizationChunkSize.toString())
-                .setValue(_this.plugin.settings.summarizationChunkSize.toString())
-                .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
-                var num;
-                return __generator(this, function (_a) {
-                    switch (_a.label) {
-                        case 0:
-                            num = parseInt(value.trim(), 10);
-                            this.plugin.settings.summarizationChunkSize = (!isNaN(num) && num > 100) ? num : exports.DEFAULT_SETTINGS.summarizationChunkSize; // Ensure minimum size
-                            return [4 /*yield*/, this.plugin.saveSettings()];
-                        case 1:
-                            _a.sent();
-                            return [2 /*return*/];
-                    }
-                });
-            }); }); });
         }
-        // --- End Advanced Context Management ---
+        // --- End Productivity Assistant Features ---
         // --- Appearance Settings ---
         containerEl.createEl('h3', { text: 'Appearance' });
         // ... (User Avatar Style, User Initials/Icon, AI Avatar Style, AI Initials/Icon, Max Message Height) ...

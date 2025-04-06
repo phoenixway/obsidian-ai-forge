@@ -2134,28 +2134,50 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
       await this.plugin.saveSettings();
       this.display();
     }));
-    if (this.plugin.settings.useAdvancedContextStrategy) {
-      new import_obsidian4.Setting(containerEl).setName("Enable Context Summarization").setDesc("If Advanced Strategy is enabled, allow summarizing older parts of the chat history to save tokens.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
-        this.plugin.settings.enableSummarization = value;
+    containerEl.createEl("h3", { text: "Productivity Assistant Features" });
+    new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate features like daily task integration and advanced context management for planning-oriented personas.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
+      this.plugin.settings.enableProductivityFeatures = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    if (this.plugin.settings.enableProductivityFeatures) {
+      new import_obsidian4.Setting(containerEl).setName("Daily Task File Name").setDesc("The exact filename (including .md) of your daily task list within the RAG folder.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.dailyTaskFileName).setValue(this.plugin.settings.dailyTaskFileName).onChange(async (value) => {
+        var _a, _b, _c, _d;
+        this.plugin.settings.dailyTaskFileName = value.trim() || DEFAULT_SETTINGS.dailyTaskFileName;
+        await this.plugin.saveSettings();
+        (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
+        (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
+      }));
+      new import_obsidian4.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enables summarization and chunking for long conversations (requires Productivity Features enabled).").addToggle((toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
+        this.plugin.settings.useAdvancedContextStrategy = value;
         await this.plugin.saveSettings();
         this.display();
       }));
-      if (this.plugin.settings.enableSummarization) {
-        new import_obsidian4.Setting(containerEl).setName("Summarization Prompt").setDesc("The prompt used to instruct the model how to summarize chat history. Use {text_to_summarize} placeholder.").addTextArea((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
-          this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
+      if (this.plugin.settings.useAdvancedContextStrategy) {
+        new import_obsidian4.Setting(containerEl).setName("Enable Context Summarization").setDesc("Allow summarizing older parts of the chat history.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
+          this.plugin.settings.enableSummarization = value;
+          await this.plugin.saveSettings();
+          this.display();
+        }));
+        if (this.plugin.settings.enableSummarization) {
+          new import_obsidian4.Setting(containerEl).setName("Summarization Prompt").setDesc("Prompt for summarizing history. Use {text_to_summarize}.").addTextArea(
+            (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
+              this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
+              await this.plugin.saveSettings();
+            }).inputEl.setAttrs({ rows: 4 })
+          );
+        }
+        new import_obsidian4.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages kept verbatim before considering summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
+          const num = parseInt(value.trim(), 10);
+          this.plugin.settings.keepLastNMessagesBeforeSummary = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
+          await this.plugin.saveSettings();
+        }));
+        new import_obsidian4.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate token size of message chunks processed for summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
+          const num = parseInt(value.trim(), 10);
+          this.plugin.settings.summarizationChunkSize = !isNaN(num) && num > 100 ? num : DEFAULT_SETTINGS.summarizationChunkSize;
           await this.plugin.saveSettings();
         }));
       }
-      new import_obsidian4.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages to always keep verbatim before considering summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
-        const num = parseInt(value.trim(), 10);
-        this.plugin.settings.keepLastNMessagesBeforeSummary = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
-        await this.plugin.saveSettings();
-      }));
-      new import_obsidian4.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate size (in tokens) of message chunks processed for summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
-        const num = parseInt(value.trim(), 10);
-        this.plugin.settings.summarizationChunkSize = !isNaN(num) && num > 100 ? num : DEFAULT_SETTINGS.summarizationChunkSize;
-        await this.plugin.saveSettings();
-      }));
     }
     containerEl.createEl("h3", { text: "Appearance" });
     new import_obsidian4.Setting(containerEl).setName("User Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
