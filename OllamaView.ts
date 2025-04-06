@@ -2,17 +2,17 @@
 import {
   ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, Notice, debounce, requireApiVersion, normalizePath, Menu, TFolder,
 } from "obsidian";
-// import { prompt, confirm } from "obsidian";
 import OllamaPlugin from "./main"; // Your main plugin class
 import { AvatarType } from "./settings"; // Settings types
 import { RoleInfo } from "./ChatManager"; // Import RoleInfo type
 import { Chat } from "./Chat"; // Import Chat class
-import { ChatMetadata } from "./Chat"; // Import ChatMetadata type
+import { ChatMetadata } from "./Chat";
+import { ConfirmModal } from './ConfirmModal';
+import { PromptModal } from './PromptModal';
 
-// --- Constants ---
+
 export const VIEW_TYPE_OLLAMA = "ollama-chat-view";
 
-// CSS Classes (ensure these match your styles.css)
 const CSS_CLASS_CONTAINER = "ollama-container";
 const CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
 const CSS_CLASS_INPUT_CONTAINER = "chat-input-container";
@@ -1667,20 +1667,31 @@ export class OllamaView extends ItemView {
       return;
     }
     const currentName = activeChat.metadata.name;
-    const newName = prompt(`Enter new name for "${currentName}":`, currentName);
 
-    if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-      console.log(`[OllamaView] Renaming chat ${activeChat.metadata.id} to "${newName.trim()}"`);
-      const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
-      if (success) {
-        new Notice(`Chat renamed to "${newName.trim()}"`);
-        // Оновлення списку чатів у меню відбудеться при наступному відкритті або через подію chat-list-updated
-      } else {
-        new Notice("Failed to rename chat.");
+    // --- Використання PromptModal ---
+    new PromptModal(
+      this.app,
+      'Rename Chat', // Заголовок вікна
+      `Enter new name for "${currentName}":`, // Текст підказки
+      currentName, // Початкове значення
+      async (newName) => { // Функція, що виконається при Submit
+        if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
+          console.log(`[OllamaView] Renaming chat <span class="math-inline">\{activeChat\.metadata\.id\} to "</span>{newName.trim()}"`);
+          const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
+          if (success) { new Notice(`Chat renamed to "${newName.trim()}"`); }
+          else { new Notice("Failed to rename chat."); }
+        } else {
+          // Порожнє ім'я або не змінилося (або користувач нічого не ввів і натиснув Submit)
+          // Можна додати перевірку на порожнє значення в самому PromptModal перед onSubmit
+          if (newName?.trim() === currentName) {
+            new Notice("Name unchanged.");
+          } else {
+            new Notice("Rename cancelled or invalid name entered.");
+          }
+        }
       }
-    } else if (newName !== null) { // prompt не був скасований
-      new Notice("Rename cancelled or name unchanged.");
-    }
+    ).open(); // Відкриваємо модальне вікно
+    // --- Кінець використання PromptModal ---
   }
 
   private handleDeleteChatClick = async (): Promise<void> => {
@@ -1691,21 +1702,21 @@ export class OllamaView extends ItemView {
       return;
     }
     const chatName = activeChat.metadata.name;
-    if (confirm(`Delete chat "${chatName}"?\nThis action cannot be undone.`)) {
-      console.log(`[OllamaView] Deleting chat ${activeChat.metadata.id} ("${chatName}")`);
-      const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
-      if (success) {
-        new Notice(`Chat "${chatName}" deleted.`);
-        // Активний чат зміниться автоматично всередині deleteChat,
-        // View оновить себе через подію 'active-chat-changed'.
-      } else {
-        new Notice(`Failed to delete chat "${chatName}".`);
-      }
-    } else {
-      new Notice("Deletion cancelled.");
-    }
-  }
 
+    // --- Використання ConfirmModal ---
+    new ConfirmModal(
+      this.app,
+      'Delete Chat', // Заголовок
+      `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення
+      async () => { // Функція, що виконається при Confirm
+        console.log(`[OllamaView] Deleting chat <span class="math-inline">\{activeChat\.metadata\.id\} \("</span>{chatName}")`);
+        const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
+        if (success) { new Notice(`Chat "${chatName}" deleted.`); }
+        else { new Notice(`Failed to delete chat "${chatName}".`); }
+      }
+    ).open(); // Відкриваємо модальне вікно
+    // --- Кінець використання ConfirmModal ---
+  }
   private handleCloneChatClick = async (): Promise<void> => {
     this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat();
