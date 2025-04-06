@@ -261,26 +261,18 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                 }
             }); }); }); });
         }
-        // --- Advanced Context Management --- <-- Нова секція
-        containerEl.createEl('h3', { text: 'Advanced Context Management' });
-        new obsidian_1.Setting(containerEl)
-            .setName('Use Advanced Context Strategy')
-            .setDesc('Enables summarization and other techniques to manage long chat histories within the context window.')
-            .addToggle(function (toggle) { return toggle
-            .setValue(_this.plugin.settings.useAdvancedContextStrategy)
-            .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        this.plugin.settings.useAdvancedContextStrategy = value;
-                        return [4 /*yield*/, this.plugin.saveSettings()];
-                    case 1:
-                        _a.sent();
-                        this.display(); // Re-render to show/hide summarization options
-                        return [2 /*return*/];
-                }
-            });
-        }); }); });
+        // // --- Advanced Context Management --- <-- Нова секція
+        // containerEl.createEl('h3', { text: 'Advanced Context Management' });
+        // new Setting(containerEl)
+        //   .setName('Use Advanced Context Strategy')
+        //   .setDesc('Enables summarization and other techniques to manage long chat histories within the context window.')
+        //   .addToggle(toggle => toggle
+        //     .setValue(this.plugin.settings.useAdvancedContextStrategy)
+        //     .onChange(async (value) => {
+        //       this.plugin.settings.useAdvancedContextStrategy = value;
+        //       await this.plugin.saveSettings();
+        //       this.display(); // Re-render to show/hide summarization options
+        //     }));
         // --- Productivity Assistant Features --- <-- НОВА СЕКЦІЯ
         containerEl.createEl('h3', { text: 'Productivity Assistant Features' });
         // Головний перемикач для функцій продуктивності

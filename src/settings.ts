@@ -157,18 +157,18 @@ export class OllamaSettingTab extends PluginSettingTab {
     if (this.plugin.settings.ragEnabled) { new Setting(containerEl).setName('RAG Documents Folder Path').setDesc('Folder within your vault containing notes to use for RAG context.').addText(text => text.setPlaceholder('Example: Knowledge Base/RAG Docs').setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => { this.plugin.settings.ragFolderPath = value.trim(); await this.plugin.saveSettings(); })); }
 
 
-    // --- Advanced Context Management --- <-- Нова секція
-    containerEl.createEl('h3', { text: 'Advanced Context Management' });
-    new Setting(containerEl)
-      .setName('Use Advanced Context Strategy')
-      .setDesc('Enables summarization and other techniques to manage long chat histories within the context window.')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.useAdvancedContextStrategy)
-        .onChange(async (value) => {
-          this.plugin.settings.useAdvancedContextStrategy = value;
-          await this.plugin.saveSettings();
-          this.display(); // Re-render to show/hide summarization options
-        }));
+    // // --- Advanced Context Management --- <-- Нова секція
+    // containerEl.createEl('h3', { text: 'Advanced Context Management' });
+    // new Setting(containerEl)
+    //   .setName('Use Advanced Context Strategy')
+    //   .setDesc('Enables summarization and other techniques to manage long chat histories within the context window.')
+    //   .addToggle(toggle => toggle
+    //     .setValue(this.plugin.settings.useAdvancedContextStrategy)
+    //     .onChange(async (value) => {
+    //       this.plugin.settings.useAdvancedContextStrategy = value;
+    //       await this.plugin.saveSettings();
+    //       this.display(); // Re-render to show/hide summarization options
+    //     }));
 
     // --- Productivity Assistant Features --- <-- НОВА СЕКЦІЯ
     containerEl.createEl('h3', { text: 'Productivity Assistant Features' });

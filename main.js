@@ -2128,12 +2128,6 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
         await this.plugin.saveSettings();
       }));
     }
-    containerEl.createEl("h3", { text: "Advanced Context Management" });
-    new import_obsidian4.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enables summarization and other techniques to manage long chat histories within the context window.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
-      this.plugin.settings.useAdvancedContextStrategy = value;
-      await this.plugin.saveSettings();
-      this.display();
-    }));
     containerEl.createEl("h3", { text: "Productivity Assistant Features" });
     new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate features like daily task integration and advanced context management for planning-oriented personas.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
       this.plugin.settings.enableProductivityFeatures = value;
