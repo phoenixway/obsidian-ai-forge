@@ -293,7 +293,7 @@ export class OllamaView extends ItemView {
     // Button listeners
     this.sendButton.addEventListener("click", this.handleSendClick);
     this.voiceButton.addEventListener("click", this.handleVoiceClick);
-    this.translateInputButton.addEventListener("click", this.handleTranslateInputClick); // Added listener
+    this.translateInputButton.addEventListener("click", this.handleTranslateInputClick);
     this.menuButton.addEventListener("click", this.handleMenuClick);
 
     // Menu option listeners
@@ -302,9 +302,9 @@ export class OllamaView extends ItemView {
     this.exportChatOption.addEventListener("click", this.handleExportChatClick);
     this.newChatOption.addEventListener("click", this.handleNewChatClick);
 
-    this.renameChatOption.addEventListener("click", this.handleRenameChatClick); // <-- Додано
-    this.cloneChatOption.addEventListener("click", this.handleCloneChatClick);   // <-- Додано
-    this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick); // <-- Додано
+    this.renameChatOption.addEventListener("click", this.handleRenameChatClick);
+    this.cloneChatOption.addEventListener("click", this.handleCloneChatClick);
+    this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick);
 
 
     // Window/Workspace listeners (using registerDomEvent/registerEvent for cleanup)

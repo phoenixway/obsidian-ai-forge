@@ -530,3 +530,12 @@
       .message-group { padding-left: 30px; padding-right: 30px;}
       .message-actions-wrapper button .svg-icon { width: 11px; height: 11px; }
   }
+
+  /* Стиль для небезпечних опцій (наприклад, видалення) */
+.ollama-chat-menu .menu-option.danger-option:hover {
+  background-color: var(--background-modifier-error-hover); /* Червонуватий фон при наведенні */
+  color: var(--text-on-error); /* Білий або світлий текст */
+}
+.ollama-chat-menu .menu-option.danger-option:hover .menu-option-icon {
+  color: var(--text-on-error); /* Іконка теж змінює колір */
+}
