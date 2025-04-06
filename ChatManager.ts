@@ -617,4 +617,80 @@ export class ChatManager {
         return false;
     }
 
+
+    /**
+     * Створює копію (клон) існуючого чату з новим ID та назвою.
+     * @param chatIdToClone ID чату, який потрібно клонувати.
+     * @returns Новий об'єкт Chat (клон) або null у разі помилки.
+     */
+    async cloneChat(chatIdToClone: string): Promise<Chat | null> {
+        console.log(`[ChatManager] Attempting to clone chat ID: ${chatIdToClone}`);
+
+        // 1. Отримуємо дані оригінального чату
+        const originalChat = await this.getChat(chatIdToClone);
+        if (!originalChat) {
+            console.error(`[ChatManager] Cannot clone: Original chat with ID ${chatIdToClone} not found.`);
+            new Notice("Original chat not found for cloning.");
+            return null;
+        }
+
+        try {
+            // 2. Генеруємо новий ID для клона
+            const now = new Date();
+            const newId = `chat_${now.getTime()}_${Math.random().toString(36).substring(2, 8)}`;
+            const newFilePath = this.getChatFilePath(newId);
+            console.log(`[ChatManager] Clone details - New ID: ${newId}, New Path: ${newFilePath}`);
+
+            // 3. Створюємо нові метадані на основі оригіналу
+            const originalMetadata = originalChat.metadata;
+            const clonedMetadata: ChatMetadata = {
+                ...originalMetadata, // Копіюємо налаштування (модель, роль, температура)
+                id: newId, // Встановлюємо новий ID
+                name: `Copy of ${originalMetadata.name}`, // Додаємо префікс до назви
+                createdAt: now.toISOString(), // Нова дата створення
+                lastModified: now.toISOString(), // Нова дата модифікації
+            };
+
+            // 4. Готуємо дані для нового об'єкта Chat (метадані + КОПІЯ повідомлень)
+            const clonedChatData: ChatData = {
+                metadata: clonedMetadata,
+                // Створюємо копію масиву повідомлень
+                // Важливо: Date об'єкти копіюються за посиланням, але це ОК
+                messages: originalChat.getMessages().map(msg => ({ ...msg }))
+            };
+
+            // 5. Створюємо новий об'єкт Chat
+            const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
+            const clonedChat = new Chat(this.adapter, constructorSettings, clonedChatData, newFilePath);
+
+            // 6. Негайно зберігаємо файл клона
+            const saved = await clonedChat.saveImmediately();
+            if (!saved) {
+                throw new Error("Failed to save the cloned chat file.");
+            }
+            console.log(`[ChatManager] Cloned chat file saved for ${newId}`);
+
+            // 7. Оновлюємо індекс сесій
+            this.sessionIndex[clonedChat.metadata.id] = { ...clonedChat.metadata };
+            delete (this.sessionIndex[clonedChat.metadata.id] as any).id;
+            await this.saveChatIndex();
+            console.log(`[ChatManager] Chat index updated for cloned chat ${newId}`);
+
+            // 8. Додаємо клон до кешу
+            this.loadedChats[clonedChat.metadata.id] = clonedChat;
+
+            // 9. (Важливо!) Встановлюємо клон як активний чат
+            await this.setActiveChat(clonedChat.metadata.id);
+            console.log(`[ChatManager] Cloned chat "${clonedChat.metadata.name}" created and activated.`);
+
+            this.plugin.emit('chat-list-updated'); // Повідомляємо UI
+            return clonedChat; // Повертаємо щойно створений клон
+
+        } catch (error) {
+            console.error("[ChatManager] Error cloning chat:", error);
+            new Notice("An error occurred while cloning the chat.");
+            return null;
+        }
+    }
+
 } // End of ChatManager class

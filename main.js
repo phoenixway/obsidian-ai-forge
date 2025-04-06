@@ -115,6 +115,10 @@ var CSS_CLASS_CHAT_OPTION = "chat-option";
 var CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 var CSS_CLASS_MENU_HEADER = "menu-header";
 var CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
+var CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
+var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
+var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
+var CSS_CLASS_DANGER_OPTION = "danger-option";
 var LANGUAGES = {
   "en": "English",
   "uk": "Ukrainian",
@@ -444,6 +448,76 @@ var OllamaView = class extends import_obsidian.ItemView {
         this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight);
       });
     };
+    this.handleRenameChatClick = async () => {
+      var _a;
+      this.closeMenu();
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      if (!activeChat) {
+        new import_obsidian.Notice("No active chat to rename.");
+        return;
+      }
+      const currentName = activeChat.metadata.name;
+      const newName = prompt(`Enter new name for "${currentName}":`, currentName);
+      if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
+        console.log(`[OllamaView] Renaming chat ${activeChat.metadata.id} to "${newName.trim()}"`);
+        const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
+        if (success) {
+          new import_obsidian.Notice(`Chat renamed to "${newName.trim()}"`);
+        } else {
+          new import_obsidian.Notice("Failed to rename chat.");
+        }
+      } else if (newName !== null) {
+        new import_obsidian.Notice("Rename cancelled or name unchanged.");
+      }
+    };
+    this.handleDeleteChatClick = async () => {
+      var _a;
+      this.closeMenu();
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      if (!activeChat) {
+        new import_obsidian.Notice("No active chat to delete.");
+        return;
+      }
+      const chatName = activeChat.metadata.name;
+      if (confirm(`Delete chat "${chatName}"?
+This action cannot be undone.`)) {
+        console.log(`[OllamaView] Deleting chat ${activeChat.metadata.id} ("${chatName}")`);
+        const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
+        if (success) {
+          new import_obsidian.Notice(`Chat "${chatName}" deleted.`);
+        } else {
+          new import_obsidian.Notice(`Failed to delete chat "${chatName}".`);
+        }
+      } else {
+        new import_obsidian.Notice("Deletion cancelled.");
+      }
+    };
+    this.handleCloneChatClick = async () => {
+      var _a;
+      this.closeMenu();
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      if (!activeChat) {
+        new import_obsidian.Notice("No active chat to clone.");
+        return;
+      }
+      const originalName = activeChat.metadata.name;
+      console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
+      const cloningNotice = new import_obsidian.Notice("Cloning chat...", 0);
+      try {
+        const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
+        if (clonedChat) {
+          cloningNotice.hide();
+          new import_obsidian.Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
+        } else {
+          cloningNotice.hide();
+          new import_obsidian.Notice("Failed to clone chat.");
+        }
+      } catch (error) {
+        cloningNotice.hide();
+        console.error("Error cloning chat:", error);
+        new import_obsidian.Notice("An error occurred while cloning the chat.");
+      }
+    };
     this.plugin = plugin;
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian.debounce)(this.handleScroll, 150, true);
@@ -539,6 +613,12 @@ var OllamaView = class extends import_obsidian.ItemView {
     this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` });
     (0, import_obsidian.setIcon)(this.newChatOption.createEl("span", { cls: "menu-option-icon" }), "plus-circle");
     this.newChatOption.createEl("span", { cls: "menu-option-text", text: "New Chat" });
+    this.renameChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}` });
+    (0, import_obsidian.setIcon)(this.renameChatOption.createEl("span", { cls: "menu-option-icon" }), "pencil");
+    this.renameChatOption.createEl("span", { cls: "menu-option-text", text: "Rename Chat" });
+    this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` });
+    (0, import_obsidian.setIcon)(this.cloneChatOption.createEl("span", { cls: "menu-option-icon" }), "copy-plus");
+    this.cloneChatOption.createEl("span", { cls: "menu-option-text", text: "Clone Chat" });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
     (0, import_obsidian.setIcon)(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
     this.clearChatOption.createEl("span", { cls: "menu-option-text", text: "Clear Chat" });
@@ -546,6 +626,9 @@ var OllamaView = class extends import_obsidian.ItemView {
     (0, import_obsidian.setIcon)(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download");
     this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
+    (0, import_obsidian.setIcon)(this.deleteChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
+    this.deleteChatOption.createEl("span", { cls: "menu-option-text", text: "Delete Chat" });
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
     (0, import_obsidian.setIcon)(this.settingsOption.createEl("span", { cls: "menu-option-icon" }), "settings");
     this.settingsOption.createEl("span", { cls: "menu-option-text", text: "Settings" });
@@ -562,6 +645,9 @@ var OllamaView = class extends import_obsidian.ItemView {
     this.clearChatOption.addEventListener("click", this.handleClearChatClick);
     this.exportChatOption.addEventListener("click", this.handleExportChatClick);
     this.newChatOption.addEventListener("click", this.handleNewChatClick);
+    this.renameChatOption.addEventListener("click", this.handleRenameChatClick);
+    this.cloneChatOption.addEventListener("click", this.handleCloneChatClick);
+    this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick);
     this.registerDomEvent(window, "resize", this.handleWindowResize);
     this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
     this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
@@ -5088,6 +5174,65 @@ var ChatManager = class {
     console.warn(`[ChatManager] Cannot rename chat ${id}: Not found in index.`);
     new import_obsidian5.Notice(`Chat with ID ${id} not found.`);
     return false;
+  }
+  /**
+   * Створює копію (клон) існуючого чату з новим ID та назвою.
+   * @param chatIdToClone ID чату, який потрібно клонувати.
+   * @returns Новий об'єкт Chat (клон) або null у разі помилки.
+   */
+  async cloneChat(chatIdToClone) {
+    console.log(`[ChatManager] Attempting to clone chat ID: ${chatIdToClone}`);
+    const originalChat = await this.getChat(chatIdToClone);
+    if (!originalChat) {
+      console.error(`[ChatManager] Cannot clone: Original chat with ID ${chatIdToClone} not found.`);
+      new import_obsidian5.Notice("Original chat not found for cloning.");
+      return null;
+    }
+    try {
+      const now = new Date();
+      const newId = `chat_${now.getTime()}_${Math.random().toString(36).substring(2, 8)}`;
+      const newFilePath = this.getChatFilePath(newId);
+      console.log(`[ChatManager] Clone details - New ID: ${newId}, New Path: ${newFilePath}`);
+      const originalMetadata = originalChat.metadata;
+      const clonedMetadata = {
+        ...originalMetadata,
+        // Копіюємо налаштування (модель, роль, температура)
+        id: newId,
+        // Встановлюємо новий ID
+        name: `Copy of ${originalMetadata.name}`,
+        // Додаємо префікс до назви
+        createdAt: now.toISOString(),
+        // Нова дата створення
+        lastModified: now.toISOString()
+        // Нова дата модифікації
+      };
+      const clonedChatData = {
+        metadata: clonedMetadata,
+        // Створюємо копію масиву повідомлень
+        // Важливо: Date об'єкти копіюються за посиланням, але це ОК
+        messages: originalChat.getMessages().map((msg) => ({ ...msg }))
+      };
+      const constructorSettings = { ...this.plugin.settings };
+      const clonedChat = new Chat(this.adapter, constructorSettings, clonedChatData, newFilePath);
+      const saved = await clonedChat.saveImmediately();
+      if (!saved) {
+        throw new Error("Failed to save the cloned chat file.");
+      }
+      console.log(`[ChatManager] Cloned chat file saved for ${newId}`);
+      this.sessionIndex[clonedChat.metadata.id] = { ...clonedChat.metadata };
+      delete this.sessionIndex[clonedChat.metadata.id].id;
+      await this.saveChatIndex();
+      console.log(`[ChatManager] Chat index updated for cloned chat ${newId}`);
+      this.loadedChats[clonedChat.metadata.id] = clonedChat;
+      await this.setActiveChat(clonedChat.metadata.id);
+      console.log(`[ChatManager] Cloned chat "${clonedChat.metadata.name}" created and activated.`);
+      this.plugin.emit("chat-list-updated");
+      return clonedChat;
+    } catch (error) {
+      console.error("[ChatManager] Error cloning chat:", error);
+      new import_obsidian5.Notice("An error occurred while cloning the chat.");
+      return null;
+    }
   }
 };
 

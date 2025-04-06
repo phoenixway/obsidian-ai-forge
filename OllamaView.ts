@@ -1,7 +1,8 @@
 // OllamaView.ts
 import {
-  ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, Notice, debounce, requireApiVersion, normalizePath, Menu, TFolder // Added TFolder for export check
+  ItemView, WorkspaceLeaf, setIcon, MarkdownRenderer, Notice, debounce, requireApiVersion, normalizePath, Menu, TFolder,
 } from "obsidian";
+// import { prompt, confirm } from "obsidian";
 import OllamaPlugin from "./main"; // Your main plugin class
 import { AvatarType } from "./settings"; // Settings types
 import { RoleInfo } from "./ChatManager"; // Import RoleInfo type
@@ -82,6 +83,10 @@ const CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 const CSS_CLASS_MENU_HEADER = "menu-header";
 const CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
 
+const CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
+const CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
+const CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
+const CSS_CLASS_DANGER_OPTION = "danger-option";
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
 export interface Message {
@@ -112,6 +117,9 @@ export class OllamaView extends ItemView {
   private settingsOption!: HTMLElement; // Menu option: Open settings
   private buttonsContainer!: HTMLElement; // Container holding input area buttons
   private newChatOption!: HTMLElement;
+  private renameChatOption!: HTMLElement; // <-- Нова властивість
+  private cloneChatOption!: HTMLElement;  // <-- Нова властивість
+  private deleteChatOption!: HTMLElement;
 
   // --- State ---
   private isProcessing: boolean = false; // State for send/receive cycle (blocks input)
@@ -160,19 +168,13 @@ export class OllamaView extends ItemView {
     this.attachEventListeners(); // Attach event handlers
     this.autoResizeTextarea(); // Initial resize
     this.updateSendButtonState(); // Initial button state
-
-    // Load and display the last active chat (or default state)
-    // Wrap in try/catch for robustness during startup
     try {
       await this.loadAndDisplayActiveChat();
-      // Pre-render menu lists in background? Maybe not needed until menu open.
-      // await Promise.all([this.renderModelList(), this.renderRoleList()]);
     } catch (error) {
       console.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState(); // Show empty state on error
     }
 
-    // Focus the input field after a short delay to ensure UI is ready
     setTimeout(() => this.inputEl?.focus(), 100);
     this.inputEl?.dispatchEvent(new Event('input')); // Trigger initial height adjustment
   }
@@ -250,6 +252,16 @@ export class OllamaView extends ItemView {
     setIcon(this.newChatOption.createEl("span", { cls: "menu-option-icon" }), "plus-circle"); // Іконка "+"
     this.newChatOption.createEl("span", { cls: "menu-option-text", text: "New Chat" });
 
+    this.renameChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}` });
+    setIcon(this.renameChatOption.createEl("span", { cls: "menu-option-icon" }), "pencil");
+    this.renameChatOption.createEl("span", { cls: "menu-option-text", text: "Rename Chat" });
+
+    this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` });
+    setIcon(this.cloneChatOption.createEl("span", { cls: "menu-option-icon" }), "copy-plus");
+    this.cloneChatOption.createEl("span", { cls: "menu-option-text", text: "Clone Chat" });
+
+
+
     // Section: Actions & Settings
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION}` });
     setIcon(this.clearChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2");
@@ -259,6 +271,10 @@ export class OllamaView extends ItemView {
     setIcon(this.exportChatOption.createEl("span", { cls: "menu-option-icon" }), "download");
     this.exportChatOption.createEl("span", { cls: "menu-option-text", text: "Export to Markdown" });
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
+
+    this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); // Додатковий клас для стилізації
+    setIcon(this.deleteChatOption.createEl("span", { cls: "menu-option-icon" }), "trash-2"); // Іконка видалення
+    this.deleteChatOption.createEl("span", { cls: "menu-option-text", text: "Delete Chat" });
 
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
     setIcon(this.settingsOption.createEl("span", { cls: "menu-option-icon" }), "settings");
@@ -283,6 +299,11 @@ export class OllamaView extends ItemView {
     this.clearChatOption.addEventListener("click", this.handleClearChatClick);
     this.exportChatOption.addEventListener("click", this.handleExportChatClick);
     this.newChatOption.addEventListener("click", this.handleNewChatClick);
+
+    this.renameChatOption.addEventListener("click", this.handleRenameChatClick); // <-- Додано
+    this.cloneChatOption.addEventListener("click", this.handleCloneChatClick);   // <-- Додано
+    this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick); // <-- Додано
+
 
     // Window/Workspace listeners (using registerDomEvent/registerEvent for cleanup)
     this.registerDomEvent(window, 'resize', this.handleWindowResize);
@@ -1632,6 +1653,84 @@ export class OllamaView extends ItemView {
       }
     });
     return markdown.trim();
+  }
+
+  private handleRenameChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat) {
+      new Notice("No active chat to rename.");
+      return;
+    }
+    const currentName = activeChat.metadata.name;
+    const newName = prompt(`Enter new name for "${currentName}":`, currentName);
+
+    if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
+      console.log(`[OllamaView] Renaming chat ${activeChat.metadata.id} to "${newName.trim()}"`);
+      const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
+      if (success) {
+        new Notice(`Chat renamed to "${newName.trim()}"`);
+        // Оновлення списку чатів у меню відбудеться при наступному відкритті або через подію chat-list-updated
+      } else {
+        new Notice("Failed to rename chat.");
+      }
+    } else if (newName !== null) { // prompt не був скасований
+      new Notice("Rename cancelled or name unchanged.");
+    }
+  }
+
+  private handleDeleteChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat) {
+      new Notice("No active chat to delete.");
+      return;
+    }
+    const chatName = activeChat.metadata.name;
+    if (confirm(`Delete chat "${chatName}"?\nThis action cannot be undone.`)) {
+      console.log(`[OllamaView] Deleting chat ${activeChat.metadata.id} ("${chatName}")`);
+      const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
+      if (success) {
+        new Notice(`Chat "${chatName}" deleted.`);
+        // Активний чат зміниться автоматично всередині deleteChat,
+        // View оновить себе через подію 'active-chat-changed'.
+      } else {
+        new Notice(`Failed to delete chat "${chatName}".`);
+      }
+    } else {
+      new Notice("Deletion cancelled.");
+    }
+  }
+
+  private handleCloneChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat) {
+      new Notice("No active chat to clone.");
+      return;
+    }
+    const originalName = activeChat.metadata.name;
+    console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
+    const cloningNotice = new Notice("Cloning chat...", 0); // Повідомлення без автозникання
+
+    try {
+      // Викликаємо новий метод в ChatManager
+      const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
+
+      if (clonedChat) {
+        cloningNotice.hide(); // Ховаємо повідомлення про клонування
+        new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
+        // View оновить себе через подію 'active-chat-changed',
+        // яку викличе setActiveChat всередині cloneChat.
+      } else {
+        cloningNotice.hide();
+        new Notice("Failed to clone chat.");
+      }
+    } catch (error) {
+      cloningNotice.hide();
+      console.error("Error cloning chat:", error);
+      new Notice("An error occurred while cloning the chat.");
+    }
   }
 
 } // END OF OllamaView CLASS
