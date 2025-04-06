@@ -63,6 +63,9 @@ export default class OllamaPlugin extends Plugin {
   on(event: string, callback: (data: any) => any): () => void { if (!this.eventHandlers[event]) this.eventHandlers[event] = []; this.eventHandlers[event].push(callback); return () => { this.eventHandlers[event] = this.eventHandlers[event]?.filter(h => h !== callback); if (this.eventHandlers[event]?.length === 0) { delete this.eventHandlers[event]; } }; }
   emit(event: string, data?: any): void { const h = this.eventHandlers[event]; if (h) h.slice().forEach(handler => { try { handler(data); } catch (e) { console.error(`[OllamaPlugin] Error in event handler for ${event}:`, e); } }); }
 
+  public isTaskFileUpdated(): boolean {
+    return this.taskFileNeedsUpdate;
+  }
 
   async onload() {
     console.log("Loading Ollama Plugin (MVC Arch)...");

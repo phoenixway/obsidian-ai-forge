@@ -137,7 +137,7 @@ var OllamaService = /** @class */ (function () {
                         selectedRolePath = chat.metadata.selectedRolePath || currentSettings.selectedRolePath;
                         _b.label = 1;
                     case 1:
-                        _b.trys.push([1, 4, , 5]);
+                        _b.trys.push([1, 5, , 6]);
                         history = chat.getMessages();
                         lastUserMessage = history.findLast(function (m) { return m.role === 'user'; });
                         if (!lastUserMessage) {
@@ -147,7 +147,9 @@ var OllamaService = /** @class */ (function () {
                         return [4 /*yield*/, this.plugin.promptService.prepareFullPrompt(history, chat.metadata)];
                     case 2:
                         formattedPrompt = _b.sent();
-                        systemPrompt = this.plugin.promptService.getSystemPrompt();
+                        return [4 /*yield*/, this.plugin.promptService.getSystemPromptForAPI(chat.metadata)];
+                    case 3:
+                        systemPrompt = _b.sent();
                         requestBody = {
                             model: modelName,
                             prompt: formattedPrompt,
@@ -158,7 +160,7 @@ var OllamaService = /** @class */ (function () {
                         };
                         console.log("[OllamaService] Calling generateRaw for chat response: Model:\"" + modelName + "\", Temp:" + temperature);
                         return [4 /*yield*/, this.generateRaw(requestBody)];
-                    case 3:
+                    case 4:
                         responseData = _b.sent();
                         // -------------------------------------------
                         // Process response
@@ -174,8 +176,8 @@ var OllamaService = /** @class */ (function () {
                             console.warn("[OllamaService] generateRaw returned unexpected structure:", responseData);
                             throw new Error("Received unexpected or empty response from the model.");
                         }
-                        return [3 /*break*/, 5];
-                    case 4:
+                        return [3 /*break*/, 6];
+                    case 5:
                         error_1 = _b.sent();
                         console.error("[OllamaService] Error during chat response generation cycle:", error_1);
                         errorMessage = error_1 instanceof Error ? error_1.message : "Unknown error generating response.";
@@ -190,7 +192,7 @@ var OllamaService = /** @class */ (function () {
                         }
                         // Throw refined error for the caller (MessageService/View) to handle
                         throw new Error(errorMessage);
-                    case 5: return [2 /*return*/];
+                    case 6: return [2 /*return*/];
                 }
             });
         });

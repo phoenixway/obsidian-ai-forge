@@ -110,6 +110,9 @@ var OllamaPlugin = /** @class */ (function (_super) {
         catch (e) {
             console.error("[OllamaPlugin] Error in event handler for " + event + ":", e);
         } }); };
+    OllamaPlugin.prototype.isTaskFileUpdated = function () {
+        return this.taskFileNeedsUpdate;
+    };
     OllamaPlugin.prototype.onload = function () {
         return __awaiter(this, void 0, void 0, function () {
             var debouncedRoleClear, fileChangeHandler, handleModify, handleDelete, handleRename, handleCreate;

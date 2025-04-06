@@ -83,7 +83,7 @@ export class OllamaService {
             // Prepare prompt (this now also sets the system prompt in PromptService via getRoleDefinition)
             const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(history, chat.metadata);
             // Отримуємо системний промпт ТАКОЖ через promptService плагіна
-            const systemPrompt = this.plugin.promptService.getSystemPrompt();            // Prepare request body for generateRaw
+            const systemPrompt = await this.plugin.promptService.getSystemPromptForAPI(chat.metadata);
             const requestBody = {
                 model: modelName,
                 prompt: formattedPrompt,

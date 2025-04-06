@@ -55,38 +55,53 @@ var PromptService = /** @class */ (function () {
         this.plugin = plugin;
         this.app = plugin.app;
     }
-    // --- ДОДАНО: Приватний метод для підрахунку токенів ---
-    /**
-     * Дуже приблизно оцінює кількість токенів у тексті.
-     * Замініть на точніший метод, якщо є бібліотека токенізатора.
-     */
+    // --- Приватний метод для підрахунку токенів ---
     PromptService.prototype._countTokens = function (text) {
         if (!text)
             return 0;
-        // Проста евристика: приблизно 4 символи на токен
-        return Math.ceil(text.length / 4);
+        return Math.ceil(text.length / 4); // Груба оцінка
     };
-    // ----------------------------------------------------
+    // ---------------------------------------------
     PromptService.prototype.clearRoleCache = function () {
-        // ... (без змін)
         console.log("[PromptService] Clearing role definition cache.");
         this.roleCache = {};
         this.currentSystemPrompt = null;
         this.currentRolePath = null;
     };
     PromptService.prototype.clearModelDetailsCache = function () {
-        // ... (без змін)
         console.log("[PromptService] Clearing model details cache.");
         this.modelDetailsCache = {};
     };
-    PromptService.prototype.getSystemPrompt = function () {
-        // ... (без змін)
-        var targetRolePath = this.plugin.settings.selectedRolePath || null;
-        if (targetRolePath !== this.currentRolePath) {
-            console.warn("[PromptService] getSystemPrompt role path mismatch. Current: " + this.currentRolePath + ", Target: " + targetRolePath + ". Reloading.");
-            this.getRoleDefinition(targetRolePath);
-        }
-        return this.currentSystemPrompt;
+    /**
+     * Повертає поточний *тіло* системного промпту (без frontmatter).
+     * Гарантує, що роль завантажена для поточного шляху.
+     * @returns Тіло системного промпту або null.
+     */
+    PromptService.prototype.getSystemPromptForAPI = function (chatMetadata) {
+        return __awaiter(this, void 0, Promise, function () {
+            var selectedRolePath, roleDefinition, systemPrompt, now, formattedDate, formattedTime;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        selectedRolePath = chatMetadata.selectedRolePath || this.plugin.settings.selectedRolePath;
+                        return [4 /*yield*/, this.getRoleDefinition(selectedRolePath)];
+                    case 1:
+                        roleDefinition = _a.sent();
+                        systemPrompt = (roleDefinition === null || roleDefinition === void 0 ? void 0 : roleDefinition.systemPrompt) || null;
+                        // Опціонально: Додаємо динамічний час/дату для персон продуктивності
+                        if ((roleDefinition === null || roleDefinition === void 0 ? void 0 : roleDefinition.isProductivityPersona) && systemPrompt) {
+                            now = new Date();
+                            formattedDate = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                            formattedTime = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+                            // Замінюємо плейсхолдери (якщо вони є в промпті ролі)
+                            systemPrompt = systemPrompt.replace(/\[Current Time\]/gi, formattedTime);
+                            systemPrompt = systemPrompt.replace(/\[Current Date\]/gi, formattedDate);
+                            // Можна додати [Location] аналогічно, якщо потрібно
+                        }
+                        return [2 /*return*/, systemPrompt];
+                }
+            });
+        });
     };
     PromptService.prototype.getRoleDefinition = function (rolePath) {
         var _a;
@@ -96,14 +111,30 @@ var PromptService = /** @class */ (function () {
                 switch (_b.label) {
                     case 0:
                         normalizedPath = rolePath ? obsidian_1.normalizePath(rolePath) : null;
-                        this.currentRolePath = normalizedPath;
-                        if (!normalizedPath || !this.plugin.settings.followRole) { /*...*/
-                            return [2 /*return*/, { systemPrompt: null, isProductivityPersona: false }];
+                        // Оновлюємо лише якщо шлях дійсно змінився, щоб уникнути зайвих перезавантажень
+                        if (normalizedPath !== this.currentRolePath) {
+                            console.log("[PromptService] Role path changed from " + this.currentRolePath + " to " + normalizedPath + ". Clearing cache for this path.");
+                            if (normalizedPath && this.roleCache[normalizedPath]) {
+                                delete this.roleCache[normalizedPath]; // Видаляємо старий кеш для цього шляху
+                            }
+                            this.currentRolePath = normalizedPath; // Встановлюємо новий шлях
+                            this.currentSystemPrompt = null; // Скидаємо поточний системний промпт
                         }
-                        if (this.roleCache[normalizedPath]) { /*...*/
+                        else if (normalizedPath && this.roleCache[normalizedPath]) {
+                            // Шлях не змінився, повертаємо кеш
+                            // console.log(`[PromptService] Returning cached role definition for: ${normalizedPath}`);
+                            // Переконуємось, що currentSystemPrompt відповідає кешу
                             this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
                             return [2 /*return*/, this.roleCache[normalizedPath]];
                         }
+                        // Якщо шлях null або вимкнено followRole
+                        if (!normalizedPath || !this.plugin.settings.followRole) {
+                            // console.log("[PromptService] No role path or followRole disabled. Using null system prompt.");
+                            this.currentSystemPrompt = null;
+                            // Не кешуємо null-роль, щоб вона могла завантажитись, якщо налаштування зміниться
+                            return [2 /*return*/, { systemPrompt: null, isProductivityPersona: false }];
+                        }
+                        // Якщо кешу немає, завантажуємо
                         console.log("[PromptService] Loading role definition using metadataCache for: " + normalizedPath);
                         file = this.app.vault.getAbstractFileByPath(normalizedPath);
                         if (!(file instanceof obsidian_1.TFile)) return [3 /*break*/, 5];
@@ -116,22 +147,31 @@ var PromptService = /** @class */ (function () {
                         return [4 /*yield*/, this.app.vault.cachedRead(file)];
                     case 2:
                         content = _b.sent();
-                        systemPromptBody = (frontmatterPos === null || frontmatterPos === void 0 ? void 0 : frontmatterPos.end) ? content.substring(frontmatterPos.end.line + 1).trim() : content.trim();
+                        systemPromptBody = (frontmatterPos === null || frontmatterPos === void 0 ? void 0 : frontmatterPos.end) ? content.substring(frontmatterPos.end.offset).trim() // Беремо все ПІСЛЯ frontmatter
+                            : content.trim();
                         assistantType = (_a = frontmatter === null || frontmatter === void 0 ? void 0 : frontmatter.assistant_type) === null || _a === void 0 ? void 0 : _a.toLowerCase();
                         isProductivity = assistantType === 'productivity' || (frontmatter === null || frontmatter === void 0 ? void 0 : frontmatter.is_planner) === true;
-                        definition = { systemPrompt: systemPromptBody || null, isProductivityPersona: isProductivity };
-                        console.log("[PromptService] Role loaded. Is Productivity Persona: " + isProductivity);
+                        definition = {
+                            systemPrompt: systemPromptBody || null,
+                            isProductivityPersona: isProductivity
+                        };
+                        console.log("[PromptService] Role loaded: " + normalizedPath + ". Is Productivity Persona: " + isProductivity);
                         this.roleCache[normalizedPath] = definition;
-                        this.currentSystemPrompt = definition.systemPrompt;
+                        this.currentSystemPrompt = definition.systemPrompt; // Зберігаємо ТІЛО в кеш
                         return [2 /*return*/, definition];
                     case 3:
                         error_1 = _b.sent();
+                        console.error("[PromptService] Error processing role file " + normalizedPath + ":", error_1);
+                        new obsidian_1.Notice("Error loading role: " + file.basename + ".");
                         this.currentSystemPrompt = null;
-                        return [2 /*return*/, null];
+                        return [2 /*return*/, null]; // Повертаємо null при помилці
                     case 4: return [3 /*break*/, 6];
                     case 5:
+                        console.warn("[PromptService] Role file not found or not a file: " + normalizedPath);
                         this.currentSystemPrompt = null;
-                        return [2 /*return*/, null];
+                        // Кешуємо відсутність файлу, щоб не шукати постійно? Можливо.
+                        // this.roleCache[normalizedPath] = { systemPrompt: null, isProductivityPersona: false };
+                        return [2 /*return*/, null]; // Повертаємо null, якщо файл не знайдено
                     case 6: return [2 /*return*/];
                 }
             });
@@ -144,9 +184,9 @@ var PromptService = /** @class */ (function () {
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
-                        // ... (без змін) ...
-                        if (!this.plugin.settings.enableProductivityFeatures)
+                        if (!this.plugin.settings.enableProductivityFeatures) {
                             return [2 /*return*/, false];
+                        }
                         return [4 /*yield*/, this.getRoleDefinition(rolePath)];
                     case 1:
                         roleDefinition = _b.sent();
@@ -158,7 +198,7 @@ var PromptService = /** @class */ (function () {
     PromptService.prototype.prepareFullPrompt = function (history, chatMetadata) {
         var _a, _b, _c;
         return __awaiter(this, void 0, Promise, function () {
-            var settings, selectedRolePath, isProductivityActive, systemPrompt, taskContext, processedHistoryString, approxSystemTokens, maxContextTokens, ragContext, lastUserMessage, ragResult, error_2, finalPrompt;
+            var settings, selectedRolePath, isProductivityActive, taskContext, tasksWereUpdated, needsUpdateBefore, processedHistoryString, approxContextTokens, maxHistoryTokens, ragContext, lastUserMessage, ragResult, error_2, finalPrompt;
             return __generator(this, function (_d) {
                 switch (_d.label) {
                     case 0:
@@ -169,90 +209,81 @@ var PromptService = /** @class */ (function () {
                     case 1:
                         isProductivityActive = _d.sent();
                         console.log("[PromptService] Productivity features active for this request: " + isProductivityActive);
-                        systemPrompt = this.currentSystemPrompt;
                         taskContext = "";
+                        tasksWereUpdated = false;
                         if (!isProductivityActive) return [3 /*break*/, 3];
+                        needsUpdateBefore = this.plugin.isTaskFileUpdated();
                         return [4 /*yield*/, ((_b = (_a = this.plugin).checkAndProcessTaskUpdate) === null || _b === void 0 ? void 0 : _b.call(_a))];
                     case 2:
-                        _d.sent();
+                        _d.sent(); // Запускаємо перевірку/обробку
+                        // Визначаємо, чи відбулося оновлення (прапорець був true, а тепер false)
+                        tasksWereUpdated = needsUpdateBefore && !this.plugin.isTaskFileUpdated();
+                        // -------------------------------------
                         if ((_c = this.plugin.chatManager) === null || _c === void 0 ? void 0 : _c.filePlanExists) {
-                            taskContext = "\n--- Today's Tasks Context ---\n";
+                            taskContext = tasksWereUpdated
+                                ? "\n--- Updated Tasks Context ---\n"
+                                : "\n--- Today's Tasks Context ---\n";
                             taskContext += "Urgent: " + (this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(', ') : "None") + "\n";
                             taskContext += "Other: " + (this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(', ') : "None") + "\n";
                             taskContext += "--- End Tasks Context ---";
-                            console.log("[PromptService] Injecting task context.");
+                            console.log("[PromptService] Injecting task context (Updated: " + tasksWereUpdated + ").");
                         }
                         _d.label = 3;
                     case 3:
                         processedHistoryString = "";
-                        approxSystemTokens = this._countTokens(systemPrompt || "") + this._countTokens(taskContext);
-                        maxContextTokens = settings.contextWindow - approxSystemTokens - 50;
+                        approxContextTokens = this._countTokens(taskContext);
+                        maxHistoryTokens = settings.contextWindow - approxContextTokens - 200;
                         if (!(isProductivityActive && settings.useAdvancedContextStrategy)) return [3 /*break*/, 5];
-                        console.log("[PromptService] Using Advanced Context Strategy.");
-                        return [4 /*yield*/, this._buildAdvancedContext(history, chatMetadata, maxContextTokens)];
+                        return [4 /*yield*/, this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens)];
                     case 4:
                         processedHistoryString = _d.sent();
                         return [3 /*break*/, 6];
                     case 5:
-                        console.log("[PromptService] Using Simple Context Strategy.");
-                        processedHistoryString = this._buildSimpleContext(history, maxContextTokens);
+                        processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
                         _d.label = 6;
                     case 6:
                         ragContext = "";
-                        if (!(settings.ragEnabled && this.plugin.ragService)) return [3 /*break*/, 12];
+                        if (!(settings.ragEnabled && this.plugin.ragService)) return [3 /*break*/, 11];
                         lastUserMessage = history.findLast(function (m) { return m.role === 'user'; });
                         if (!(lastUserMessage === null || lastUserMessage === void 0 ? void 0 : lastUserMessage.content)) return [3 /*break*/, 11];
                         _d.label = 7;
                     case 7:
                         _d.trys.push([7, 9, , 10]);
-                        console.log("[PromptService] Calling RAG service...");
                         return [4 /*yield*/, this.plugin.ragService.findRelevantDocuments(lastUserMessage.content, 5)];
                     case 8:
                         ragResult = _d.sent();
-                        if (ragResult && ragResult.length > 0) {
-                            ragContext = "\n--- Relevant Notes Context ---\n";
-                            // Явно вказуємо тип DocumentVector для 'r' та використовуємо metadata.filename
-                            ragContext += ragResult.map(function (r) { var _a; return "[" + (((_a = r.metadata) === null || _a === void 0 ? void 0 : _a.filename) || 'Note') + "]:\n" + r.content; } // <--- Змінено доступ до метаданих
-                            ).join("\n\n");
-                            ragContext += "\n--- End Notes Context ---";
-                            console.log("[PromptService] Added RAG context (" + ragContext.length + " chars).");
+                        if (ragResult && ragResult.length > 0) { /*...*/
+                            ragContext = "\n--- Relevant Notes Context ---\n" + ragResult.map(function (r) { var _a, _b; return "[" + (((_a = r.metadata) === null || _a === void 0 ? void 0 : _a.filename) || ((_b = r.metadata) === null || _b === void 0 ? void 0 : _b.source) || 'Note') + "]:\n" + r.content; }).join("\n\n") + "\n--- End Notes Context ---"; /*...*/
                         }
-                        else {
-                            console.log("[PromptService] RAG service returned no results.");
-                        }
+                        else { /*...*/ }
                         return [3 /*break*/, 10];
                     case 9:
                         error_2 = _d.sent();
-                        console.error("[PromptService] Error calling RAG service:", error_2);
-                        new obsidian_1.Notice("Error retrieving RAG context. Check console.");
                         return [3 /*break*/, 10];
-                    case 10: return [3 /*break*/, 12];
+                    case 10: return [3 /*break*/, 11];
                     case 11:
-                        console.log("[PromptService] Skipping RAG: No last user message found.");
-                        _d.label = 12;
-                    case 12:
                         finalPrompt = ("" + ragContext + taskContext + "\n" + processedHistoryString).trim();
-                        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
-                        console.log("[PromptService] Final prompt length (approx tokens): " + this._countTokens(finalPrompt));
+                        console.log("[PromptService] Final prompt body length (approx tokens): " + this._countTokens(finalPrompt));
                         return [2 /*return*/, finalPrompt];
                 }
             });
         });
     };
+    // --- Методи обробки контексту та підсумовування ---
+    // (Залишаються без змін, але використовують this._countTokens)
     PromptService.prototype._buildSimpleContext = function (history, maxTokens) {
         var context = "";
         var currentTokens = 0;
         for (var i = history.length - 1; i >= 0; i--) {
             var message = history[i];
             var formattedMessage = (message.role === 'user' ? 'User' : 'Assistant') + ": " + message.content.trim();
-            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
-            var messageTokens = this._countTokens(formattedMessage) + 5;
+            var messageTokens = this._countTokens(formattedMessage) + 5; // Використовуємо this._countTokens
             if (currentTokens + messageTokens <= maxTokens) {
                 context = formattedMessage + "\n\n" + context;
                 currentTokens += messageTokens;
             }
             else {
-                console.log("[PromptService] Simple context limit reached (" + currentTokens + "/" + maxTokens + " tokens). Stopping at message index " + i + ".");
+                console.log("[PromptService] Simple context limit reached (" + currentTokens + "/" + maxTokens + " tokens).");
                 break;
             }
         }
@@ -274,7 +305,7 @@ var PromptService = /** @class */ (function () {
                         console.log("[PromptService] Advanced Context: Keeping last " + messagesToKeep.length + ", processing " + messagesToProcess.length + " older messages.");
                         if (!(messagesToProcess.length > 0)) return [3 /*break*/, 7];
                         if (!settings.enableSummarization) return [3 /*break*/, 6];
-                        console.log("[PromptService] Summarization enabled, attempting to summarize older messages...");
+                        console.log("[PromptService] Summarization enabled...");
                         remainingMessages = __spreadArrays(messagesToProcess);
                         _a.label = 1;
                     case 1:
@@ -285,7 +316,6 @@ var PromptService = /** @class */ (function () {
                             msg = remainingMessages.pop();
                             msgText = (msg.role === 'user' ? 'User' : 'Assistant') + ": " + msg.content.trim();
                             msgTokens = this._countTokens(msgText) + 5;
-                            // --- ВИПРАВЛЕНО: Перевірка з chunkTokens ---
                             if (chunkTokens + msgTokens <= settings.summarizationChunkSize) {
                                 chunkMessages.unshift(msg);
                                 chunkTokens += msgTokens;
@@ -299,12 +329,12 @@ var PromptService = /** @class */ (function () {
                         chunkCombinedText = chunkMessages.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n\n");
                         actualChunkTokens = this._countTokens(chunkCombinedText);
                         if (!(currentTokens + actualChunkTokens <= maxTokens)) return [3 /*break*/, 2];
-                        console.log("[PromptService] Adding chunk of " + chunkMessages.length + " messages (" + actualChunkTokens + " tokens) directly.");
+                        console.log("[PromptService] Adding chunk (" + actualChunkTokens + " tokens) directly.");
                         processedParts.unshift(chunkCombinedText);
                         currentTokens += actualChunkTokens;
                         return [3 /*break*/, 4];
                     case 2:
-                        console.log("[PromptService] Chunk (" + actualChunkTokens + " tokens) too large for remaining context (" + (maxTokens - currentTokens) + "). Attempting summarization.");
+                        console.log("[PromptService] Chunk (" + actualChunkTokens + " tokens) too large. Summarizing.");
                         return [4 /*yield*/, this._summarizeMessages(chunkMessages, chatMetadata)];
                     case 3:
                         summary = _a.sent();
@@ -314,29 +344,27 @@ var PromptService = /** @class */ (function () {
                             if (currentTokens + summaryTokens <= maxTokens) {
                                 console.log("[PromptService] Adding summary (" + summaryTokens + " tokens).");
                                 processedParts.unshift(summaryText);
-                                // --- ВИПРАВЛЕНО: Оновлення currentTokens ---
                                 currentTokens += summaryTokens;
                             }
                             else {
-                                console.warn("[PromptService] Summary (" + summaryTokens + " tokens) is still too large for remaining context. Skipping this part of history.");
+                                console.warn("[PromptService] Summary too large. Skipping.");
                                 return [3 /*break*/, 5];
                             }
                         }
                         else {
-                            console.warn("[PromptService] Summarization failed or returned empty for a chunk. Skipping this part of history.");
+                            console.warn("[PromptService] Summarization failed. Skipping.");
                             return [3 /*break*/, 5];
                         }
                         _a.label = 4;
                     case 4: return [3 /*break*/, 1];
                     case 5: return [3 /*break*/, 7];
                     case 6:
-                        console.log("[PromptService] Summarization disabled. Including older messages directly until limit.");
+                        console.log("[PromptService] Summarization disabled. Including older messages directly.");
                         olderHistoryString = this._buildSimpleContext(messagesToProcess, maxTokens - currentTokens);
                         if (olderHistoryString) {
                             processedParts.unshift(olderHistoryString);
-                            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
                             currentTokens += this._countTokens(olderHistoryString);
-                        }
+                        } // Використовуємо this._countTokens
                         _a.label = 7;
                     case 7:
                         keepHistoryString = messagesToKeep.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n\n");
@@ -346,13 +374,12 @@ var PromptService = /** @class */ (function () {
                             currentTokens += keepHistoryTokens;
                         }
                         else {
-                            console.warn("[PromptService] Could not fit all 'keepLastNMessages' (" + keepHistoryTokens + " tokens) into remaining context (" + (maxTokens - currentTokens) + "). Truncating further.");
+                            console.warn("[PromptService] Cannot fit all 'keepLastNMessages'. Truncating.");
                             truncatedKeepHistory = this._buildSimpleContext(messagesToKeep, maxTokens - currentTokens);
                             if (truncatedKeepHistory) {
                                 processedParts.push(truncatedKeepHistory);
-                                // --- ВИПРАВЛЕНО: Використання this._countTokens ---
                                 currentTokens += this._countTokens(truncatedKeepHistory);
-                            }
+                            } // Використовуємо this._countTokens
                         }
                         console.log("[PromptService] Advanced context built. Total approx tokens: " + currentTokens);
                         return [2 /*return*/, processedParts.join("\n\n").trim()];
@@ -366,6 +393,7 @@ var PromptService = /** @class */ (function () {
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
+                        // ... (код без змін, але внутрішньо використовує this._countTokens через виклик generateRaw) ...
                         if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0)
                             return [2 /*return*/, null];
                         console.log("[PromptService] Summarizing chunk of " + messagesToSummarize.length + " messages...");
@@ -386,7 +414,6 @@ var PromptService = /** @class */ (function () {
                         responseData = _a.sent();
                         if (responseData && typeof responseData.response === 'string') {
                             summary = responseData.response.trim();
-                            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
                             console.log("[PromptService] Summarization successful (" + this._countTokens(summary) + " tokens).");
                             return [2 /*return*/, summary];
                         }

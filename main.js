@@ -2390,7 +2390,7 @@ var OllamaService = class {
         return null;
       }
       const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(history, chat.metadata);
-      const systemPrompt = this.plugin.promptService.getSystemPrompt();
+      const systemPrompt = await this.plugin.promptService.getSystemPromptForAPI(chat.metadata);
       const requestBody = {
         model: modelName,
         prompt: formattedPrompt,
@@ -2501,17 +2501,13 @@ var PromptService = class {
     this.plugin = plugin;
     this.app = plugin.app;
   }
-  // --- ДОДАНО: Приватний метод для підрахунку токенів ---
-  /**
-   * Дуже приблизно оцінює кількість токенів у тексті.
-   * Замініть на точніший метод, якщо є бібліотека токенізатора.
-   */
+  // --- Приватний метод для підрахунку токенів ---
   _countTokens(text) {
     if (!text)
       return 0;
     return Math.ceil(text.length / 4);
   }
-  // ----------------------------------------------------
+  // ---------------------------------------------
   clearRoleCache() {
     console.log("[PromptService] Clearing role definition cache.");
     this.roleCache = {};
@@ -2522,24 +2518,41 @@ var PromptService = class {
     console.log("[PromptService] Clearing model details cache.");
     this.modelDetailsCache = {};
   }
-  getSystemPrompt() {
-    const targetRolePath = this.plugin.settings.selectedRolePath || null;
-    if (targetRolePath !== this.currentRolePath) {
-      console.warn(`[PromptService] getSystemPrompt role path mismatch. Current: ${this.currentRolePath}, Target: ${targetRolePath}. Reloading.`);
-      this.getRoleDefinition(targetRolePath);
+  /**
+   * Повертає поточний *тіло* системного промпту (без frontmatter).
+   * Гарантує, що роль завантажена для поточного шляху.
+   * @returns Тіло системного промпту або null.
+   */
+  async getSystemPromptForAPI(chatMetadata) {
+    const selectedRolePath = chatMetadata.selectedRolePath || this.plugin.settings.selectedRolePath;
+    const roleDefinition = await this.getRoleDefinition(selectedRolePath);
+    let systemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
+    if ((roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) && systemPrompt) {
+      const now = new Date();
+      const formattedDate = now.toLocaleDateString(void 0, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const formattedTime = now.toLocaleTimeString(void 0, { hour: "numeric", minute: "2-digit" });
+      systemPrompt = systemPrompt.replace(/\[Current Time\]/gi, formattedTime);
+      systemPrompt = systemPrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
-    return this.currentSystemPrompt;
+    return systemPrompt;
   }
   async getRoleDefinition(rolePath) {
     var _a;
     const normalizedPath = rolePath ? (0, import_obsidian5.normalizePath)(rolePath) : null;
-    this.currentRolePath = normalizedPath;
-    if (!normalizedPath || !this.plugin.settings.followRole) {
-      return { systemPrompt: null, isProductivityPersona: false };
-    }
-    if (this.roleCache[normalizedPath]) {
+    if (normalizedPath !== this.currentRolePath) {
+      console.log(`[PromptService] Role path changed from ${this.currentRolePath} to ${normalizedPath}. Clearing cache for this path.`);
+      if (normalizedPath && this.roleCache[normalizedPath]) {
+        delete this.roleCache[normalizedPath];
+      }
+      this.currentRolePath = normalizedPath;
+      this.currentSystemPrompt = null;
+    } else if (normalizedPath && this.roleCache[normalizedPath]) {
       this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
       return this.roleCache[normalizedPath];
+    }
+    if (!normalizedPath || !this.plugin.settings.followRole) {
+      this.currentSystemPrompt = null;
+      return { systemPrompt: null, isProductivityPersona: false };
     }
     console.log(`[PromptService] Loading role definition using metadataCache for: ${normalizedPath}`);
     const file = this.app.vault.getAbstractFileByPath(normalizedPath);
@@ -2549,27 +2562,35 @@ var PromptService = class {
         const frontmatter = fileCache == null ? void 0 : fileCache.frontmatter;
         const frontmatterPos = fileCache == null ? void 0 : fileCache.frontmatterPosition;
         const content = await this.app.vault.cachedRead(file);
-        const systemPromptBody = (frontmatterPos == null ? void 0 : frontmatterPos.end) ? content.substring(frontmatterPos.end.line + 1).trim() : content.trim();
+        const systemPromptBody = (frontmatterPos == null ? void 0 : frontmatterPos.end) ? content.substring(frontmatterPos.end.offset).trim() : content.trim();
         const assistantType = (_a = frontmatter == null ? void 0 : frontmatter.assistant_type) == null ? void 0 : _a.toLowerCase();
         const isProductivity = assistantType === "productivity" || (frontmatter == null ? void 0 : frontmatter.is_planner) === true;
-        const definition = { systemPrompt: systemPromptBody || null, isProductivityPersona: isProductivity };
-        console.log(`[PromptService] Role loaded. Is Productivity Persona: ${isProductivity}`);
+        const definition = {
+          systemPrompt: systemPromptBody || null,
+          // Тіло промпту
+          isProductivityPersona: isProductivity
+        };
+        console.log(`[PromptService] Role loaded: ${normalizedPath}. Is Productivity Persona: ${isProductivity}`);
         this.roleCache[normalizedPath] = definition;
         this.currentSystemPrompt = definition.systemPrompt;
         return definition;
       } catch (error) {
+        console.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
+        new import_obsidian5.Notice(`Error loading role: ${file.basename}.`);
         this.currentSystemPrompt = null;
         return null;
       }
     } else {
+      console.warn(`[PromptService] Role file not found or not a file: ${normalizedPath}`);
       this.currentSystemPrompt = null;
       return null;
     }
   }
   async _isProductivityPersonaActive(rolePath) {
     var _a;
-    if (!this.plugin.settings.enableProductivityFeatures)
+    if (!this.plugin.settings.enableProductivityFeatures) {
       return false;
+    }
     const roleDefinition = await this.getRoleDefinition(rolePath);
     return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
   }
@@ -2580,65 +2601,56 @@ var PromptService = class {
     const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
     const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
     console.log(`[PromptService] Productivity features active for this request: ${isProductivityActive}`);
-    const systemPrompt = this.currentSystemPrompt;
     let taskContext = "";
+    let tasksWereUpdated = false;
     if (isProductivityActive) {
+      const needsUpdateBefore = this.plugin.isTaskFileUpdated();
       await ((_b = (_a = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _b.call(_a));
+      tasksWereUpdated = needsUpdateBefore && !this.plugin.isTaskFileUpdated();
       if ((_c = this.plugin.chatManager) == null ? void 0 : _c.filePlanExists) {
-        taskContext = "\n--- Today's Tasks Context ---\n";
+        taskContext = tasksWereUpdated ? "\n--- Updated Tasks Context ---\n" : "\n--- Today's Tasks Context ---\n";
         taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(", ") : "None"}
 `;
         taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(", ") : "None"}
 `;
         taskContext += "--- End Tasks Context ---";
-        console.log("[PromptService] Injecting task context.");
+        console.log(`[PromptService] Injecting task context (Updated: ${tasksWereUpdated}).`);
       }
     }
     let processedHistoryString = "";
-    const approxSystemTokens = this._countTokens(systemPrompt || "") + this._countTokens(taskContext);
-    const maxContextTokens = settings.contextWindow - approxSystemTokens - 50;
+    const approxContextTokens = this._countTokens(taskContext);
+    const maxHistoryTokens = settings.contextWindow - approxContextTokens - 200;
     if (isProductivityActive && settings.useAdvancedContextStrategy) {
-      console.log("[PromptService] Using Advanced Context Strategy.");
-      processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxContextTokens);
+      processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
     } else {
-      console.log("[PromptService] Using Simple Context Strategy.");
-      processedHistoryString = this._buildSimpleContext(history, maxContextTokens);
+      processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
     }
     let ragContext = "";
     if (settings.ragEnabled && this.plugin.ragService) {
       const lastUserMessage = history.findLast((m) => m.role === "user");
       if (lastUserMessage == null ? void 0 : lastUserMessage.content) {
         try {
-          console.log("[PromptService] Calling RAG service...");
           const ragResult = await this.plugin.ragService.findRelevantDocuments(lastUserMessage.content, 5);
           if (ragResult && ragResult.length > 0) {
-            ragContext = "\n--- Relevant Notes Context ---\n";
-            ragContext += ragResult.map(
-              (r) => {
-                var _a2;
-                return `[${((_a2 = r.metadata) == null ? void 0 : _a2.filename) || "Note"}]:
+            ragContext = "\n--- Relevant Notes Context ---\n" + ragResult.map((r) => {
+              var _a2, _b2;
+              return `[${((_a2 = r.metadata) == null ? void 0 : _a2.filename) || ((_b2 = r.metadata) == null ? void 0 : _b2.source) || "Note"}]:
 ${r.content}`;
-              }
-              // <--- Змінено доступ до метаданих
-            ).join("\n\n");
-            ragContext += "\n--- End Notes Context ---";
-            console.log(`[PromptService] Added RAG context (${ragContext.length} chars).`);
+            }).join("\n\n") + "\n--- End Notes Context ---";
           } else {
-            console.log("[PromptService] RAG service returned no results.");
           }
         } catch (error) {
-          console.error("[PromptService] Error calling RAG service:", error);
-          new import_obsidian5.Notice("Error retrieving RAG context. Check console.");
         }
       } else {
-        console.log("[PromptService] Skipping RAG: No last user message found.");
       }
     }
     const finalPrompt = `${ragContext}${taskContext}
 ${processedHistoryString}`.trim();
-    console.log(`[PromptService] Final prompt length (approx tokens): ${this._countTokens(finalPrompt)}`);
+    console.log(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPrompt)}`);
     return finalPrompt;
   }
+  // --- Методи обробки контексту та підсумовування ---
+  // (Залишаються без змін, але використовують this._countTokens)
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
@@ -2650,7 +2662,7 @@ ${processedHistoryString}`.trim();
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
       } else {
-        console.log(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens). Stopping at message index ${i}.`);
+        console.log(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens).`);
         break;
       }
     }
@@ -2667,7 +2679,7 @@ ${processedHistoryString}`.trim();
     console.log(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
     if (messagesToProcess.length > 0) {
       if (settings.enableSummarization) {
-        console.log("[PromptService] Summarization enabled, attempting to summarize older messages...");
+        console.log("[PromptService] Summarization enabled...");
         let remainingMessages = [...messagesToProcess];
         while (remainingMessages.length > 0) {
           let chunkTokens = 0;
@@ -2688,11 +2700,11 @@ ${processedHistoryString}`.trim();
             const chunkCombinedText = chunkMessages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n\n");
             const actualChunkTokens = this._countTokens(chunkCombinedText);
             if (currentTokens + actualChunkTokens <= maxTokens) {
-              console.log(`[PromptService] Adding chunk of ${chunkMessages.length} messages (${actualChunkTokens} tokens) directly.`);
+              console.log(`[PromptService] Adding chunk (${actualChunkTokens} tokens) directly.`);
               processedParts.unshift(chunkCombinedText);
               currentTokens += actualChunkTokens;
             } else {
-              console.log(`[PromptService] Chunk (${actualChunkTokens} tokens) too large for remaining context (${maxTokens - currentTokens}). Attempting summarization.`);
+              console.log(`[PromptService] Chunk (${actualChunkTokens} tokens) too large. Summarizing.`);
               const summary = await this._summarizeMessages(chunkMessages, chatMetadata);
               if (summary) {
                 const summaryTokens = this._countTokens(summary) + 10;
@@ -2703,18 +2715,18 @@ ${summary}`;
                   processedParts.unshift(summaryText);
                   currentTokens += summaryTokens;
                 } else {
-                  console.warn(`[PromptService] Summary (${summaryTokens} tokens) is still too large for remaining context. Skipping this part of history.`);
+                  console.warn(`[PromptService] Summary too large. Skipping.`);
                   break;
                 }
               } else {
-                console.warn("[PromptService] Summarization failed or returned empty for a chunk. Skipping this part of history.");
+                console.warn("[PromptService] Summarization failed. Skipping.");
                 break;
               }
             }
           }
         }
       } else {
-        console.log("[PromptService] Summarization disabled. Including older messages directly until limit.");
+        console.log("[PromptService] Summarization disabled. Including older messages directly.");
         let olderHistoryString = this._buildSimpleContext(messagesToProcess, maxTokens - currentTokens);
         if (olderHistoryString) {
           processedParts.unshift(olderHistoryString);
@@ -2728,7 +2740,7 @@ ${summary}`;
       processedParts.push(keepHistoryString);
       currentTokens += keepHistoryTokens;
     } else {
-      console.warn(`[PromptService] Could not fit all 'keepLastNMessages' (${keepHistoryTokens} tokens) into remaining context (${maxTokens - currentTokens}). Truncating further.`);
+      console.warn(`[PromptService] Cannot fit all 'keepLastNMessages'. Truncating.`);
       const truncatedKeepHistory = this._buildSimpleContext(messagesToKeep, maxTokens - currentTokens);
       if (truncatedKeepHistory) {
         processedParts.push(truncatedKeepHistory);
@@ -3573,6 +3585,9 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
           console.error(`[OllamaPlugin] Error in event handler for ${event}:`, e);
         }
       });
+  }
+  isTaskFileUpdated() {
+    return this.taskFileNeedsUpdate;
   }
   async onload() {
     console.log("Loading Ollama Plugin (MVC Arch)...");
