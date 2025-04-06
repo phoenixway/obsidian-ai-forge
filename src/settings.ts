@@ -52,6 +52,9 @@ export interface OllamaPluginSettings {
   chatHistoryFolderPath: string; // History .json path in vault
   chatExportFolderPath: string; // Export .md path in vault
 
+  enableProductivityFeatures: boolean; // <-- ГОЛОВНИЙ ПЕРЕМИКАЧ
+  dailyTaskFileName: string;           // <-- Назва файлу завдань
+
   // --- Додані властивості для PromptService ---
   useAdvancedContextStrategy: boolean; // Використовувати розширену стратегію контексту?
   enableSummarization: boolean;        // Увімкнути підсумовування старих повідомлень?
@@ -86,8 +89,10 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   chatHistoryFolderPath: "Ollama Chats",
   chatExportFolderPath: "",
 
-  // --- Додані значення за замовчуванням ---
-  useAdvancedContextStrategy: false, // За замовчуванням - вимкнено
+  enableProductivityFeatures: false, // <-- За замовчуванням вимкнено
+  dailyTaskFileName: "Tasks_Today.md", // <-- Ім'я файлу за замовчуванням  useAdvancedContextStrategy: false, // За замовчуванням - вимкнено
+
+  useAdvancedContextStrategy: false,
   enableSummarization: false,        // За замовчуванням - вимкнено
   summarizationPrompt: "Summarize the key points of the preceding conversation concisely, focusing on information relevant for future interactions:\n{text_to_summarize}", // Приклад промпту
   keepLastNMessagesBeforeSummary: 10, // Зберігати останні 10 повідомлень

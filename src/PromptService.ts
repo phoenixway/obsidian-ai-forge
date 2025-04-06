@@ -1,251 +1,317 @@
-// promptService.ts
-import { TFile, normalizePath, Notice } from "obsidian";
-import * as path from 'path';
-import OllamaPlugin from "./main";
-import { Message, MessageRole } from "./OllamaView"; // Import Message types
-import { encode } from 'gpt-tokenizer'; // Import the tokenizer
-import { OllamaService, OllamaShowResponse } from "./OllamaService"; // Use OllamaService
-import { ChatMetadata } from "./Chat"; // Import ChatMetadata
-
-// Helper function: Word counter (for basic strategy)
-function countWords(text: string): number {
-    if (!text) return 0;
-    // More robust word count, ignoring multiple spaces
-    return text.trim().split(/\s+/).filter(Boolean).length;
+// PromptService.ts
+import { App, normalizePath, TFile, Notice, FrontMatterCache } from 'obsidian';
+import OllamaPlugin from './main';
+import { Message, MessageRole } from './OllamaView';
+import { ChatMetadata } from './Chat';
+import { OllamaGenerateResponse } from './OllamaService';
+// Імпортуємо або визначаємо DocumentVector тут, щоб TS знав тип
+// (Краще винести в окремий файл types.ts, якщо використовується в кількох місцях)
+interface DocumentVector {
+    path: string;
+    content: string;
+    metadata?: {
+        filename?: string; // Змінено на filename згідно ragService
+        created?: number;
+        modified?: number;
+        [key: string]: any; // Дозволяємо інші поля
+    };
 }
 
-// Helper function: Token counter (for advanced strategy)
-function countTokens(text: string): number {
-    if (!text) return 0;
-    try {
-        // Use encode from gpt-tokenizer library
-        return encode(text).length;
-    } catch (e) {
-        console.warn("Tokenizer error, falling back to word count estimation:", e); // English warning
-        // Fallback estimation in case of tokenizer error
-        return Math.ceil(countWords(text) * 1.5); // Increase factor for safety
-    }
-}
 
-// Interface for representing a chunk of history during processing
-interface HistoryChunk {
-    messages: Message[];
-    text: string; // Pre-formatted chunk text
-    tokens: number;
+interface RoleDefinition {
+    systemPrompt: string | null;
+    isProductivityPersona: boolean;
 }
 
 export class PromptService {
-    private systemPrompt: string | null = null;
     private plugin: OllamaPlugin;
-    // Reference to OllamaService needed for summarization calls and model details
-    // private ollamaService: OllamaService;
-    // Buffer of tokens to reserve for the model's response & potential inaccuracies
-    private readonly RESPONSE_TOKEN_BUFFER = 500;
-    // Cache for detected model context sizes { modelName: detectedContextSize | null }
-    private modelDetailsCache: Record<string, number | null> = {};
-    // Cache for role file content { roleFilePath: content | null }
-    private roleContentCache: Record<string, string | null> = {};
+    private app: App;
+    private currentSystemPrompt: string | null = null;
+    private currentRolePath: string | null = null;
+    private roleCache: Record<string, RoleDefinition> = {};
+    private modelDetailsCache: Record<string, any> = {};
 
     constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
-        // Get OllamaService instance from the plugin
-        // this.ollamaService = plugin.ollamaService;
+        this.app = plugin.app;
     }
 
-    setSystemPrompt(prompt: string | null): void { this.systemPrompt = prompt; }
-    getSystemPrompt(): string | null { return this.systemPrompt; }
-    clearModelDetailsCache(): void { this.modelDetailsCache = {}; console.log("[PromptService] Model details cache cleared."); }
-    clearRoleCache(): void { this.roleContentCache = {}; console.log("[PromptService] Role content cache cleared."); }
-
-
+    // --- ДОДАНО: Приватний метод для підрахунку токенів ---
     /**
-     * Determines the effective context limit by checking the model details (if advanced strategy enabled)
-     * and comparing with the user's setting. Returns the smaller of the two valid values.
+     * Дуже приблизно оцінює кількість токенів у тексті.
+     * Замініть на точніший метод, якщо є бібліотека токенізатора.
      */
-    private async _getEffectiveContextLimit(modelName: string): Promise<number> {
-        const userDefinedContextSize = this.plugin.settings.contextWindow;
-        let effectiveContextLimit = userDefinedContextSize; // Default to user setting
+    private _countTokens(text: string): number {
+        if (!text) return 0;
+        // Проста евристика: приблизно 4 символи на токен
+        return Math.ceil(text.length / 4);
+    }
+    // ----------------------------------------------------
 
-        if (this.plugin.settings.useAdvancedContextStrategy && modelName) {
-            let detectedSize: number | null = null;
-            if (this.modelDetailsCache.hasOwnProperty(modelName)) {
-                detectedSize = this.modelDetailsCache[modelName];
-            } else {
-                console.log(`[PromptService] No cache for ${modelName}, fetching details...`);
-                try {
-                    const details: OllamaShowResponse | null = await this.plugin.ollamaService.getModelDetails(modelName);
-                    if (details) {
-                        let sizeStr: string | undefined = undefined;
-                        if (details.parameters) { const match = details.parameters.match(/num_ctx\s+(\d+)/); if (match?.[1]) sizeStr = match[1]; }
-                        if (!sizeStr && details.details?.['llm.context_length']) sizeStr = String(details.details['llm.context_length']);
-                        if (!sizeStr && details.details?.['tokenizer.ggml.context_length']) sizeStr = String(details.details['tokenizer.ggml.context_length']);
 
-                        if (sizeStr) {
-                            const parsedSize = parseInt(sizeStr, 10);
-                            if (!isNaN(parsedSize) && parsedSize > 0) {
-                                detectedSize = parsedSize;
-                                console.log(`[PromptService] Detected context size for ${modelName}: ${detectedSize}`);
-                                this.modelDetailsCache[modelName] = detectedSize;
-                            } else { console.warn(`[PromptService] Parsed context size invalid: ${sizeStr}`); detectedSize = null; }
-                        }
-                        if (detectedSize === null) { console.log(`[PromptService] Context size not found for ${modelName}.`); this.modelDetailsCache[modelName] = null; }
-                    } else { this.modelDetailsCache[modelName] = null; }
-                } catch (error) { console.error(`[PromptService] Error fetching model details for ${modelName}:`, error); this.modelDetailsCache[modelName] = null; }
+    clearRoleCache(): void {
+        // ... (без змін)
+        console.log("[PromptService] Clearing role definition cache.");
+        this.roleCache = {};
+        this.currentSystemPrompt = null;
+        this.currentRolePath = null;
+    }
+
+    clearModelDetailsCache(): void {
+        // ... (без змін)
+        console.log("[PromptService] Clearing model details cache.");
+        this.modelDetailsCache = {};
+    }
+
+    getSystemPrompt(): string | null {
+        // ... (без змін)
+        const targetRolePath = this.plugin.settings.selectedRolePath || null;
+        if (targetRolePath !== this.currentRolePath) {
+            console.warn(`[PromptService] getSystemPrompt role path mismatch. Current: ${this.currentRolePath}, Target: ${targetRolePath}. Reloading.`);
+            this.getRoleDefinition(targetRolePath);
+        }
+        return this.currentSystemPrompt;
+    }
+
+    async getRoleDefinition(rolePath: string | null | undefined): Promise<RoleDefinition | null> {
+        // ... (без змін, використовує metadataCache) ...
+        const normalizedPath = rolePath ? normalizePath(rolePath) : null;
+        this.currentRolePath = normalizedPath;
+        if (!normalizedPath || !this.plugin.settings.followRole) { /*...*/ return { systemPrompt: null, isProductivityPersona: false }; }
+        if (this.roleCache[normalizedPath]) { /*...*/ this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt; return this.roleCache[normalizedPath]; }
+        console.log(`[PromptService] Loading role definition using metadataCache for: ${normalizedPath}`);
+        const file = this.app.vault.getAbstractFileByPath(normalizedPath);
+        if (file instanceof TFile) {
+            try {
+                const fileCache = this.app.metadataCache.getFileCache(file); const frontmatter = fileCache?.frontmatter; const frontmatterPos = fileCache?.frontmatterPosition;
+                const content = await this.app.vault.cachedRead(file);
+                const systemPromptBody = frontmatterPos?.end ? content.substring(frontmatterPos.end.line + 1).trim() : content.trim();
+                const assistantType = frontmatter?.assistant_type?.toLowerCase(); const isProductivity = assistantType === 'productivity' || frontmatter?.is_planner === true;
+                const definition: RoleDefinition = { systemPrompt: systemPromptBody || null, isProductivityPersona: isProductivity };
+                console.log(`[PromptService] Role loaded. Is Productivity Persona: ${isProductivity}`);
+                this.roleCache[normalizedPath] = definition; this.currentSystemPrompt = definition.systemPrompt; return definition;
+            } catch (error) { /*...*/ this.currentSystemPrompt = null; return null; }
+        } else { /*...*/ this.currentSystemPrompt = null; return null; }
+    }
+
+    private async _isProductivityPersonaActive(rolePath: string | null | undefined): Promise<boolean> {
+        // ... (без змін) ...
+        if (!this.plugin.settings.enableProductivityFeatures) return false;
+        const roleDefinition = await this.getRoleDefinition(rolePath);
+        return roleDefinition?.isProductivityPersona ?? false;
+    }
+
+    async prepareFullPrompt(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
+        console.log("[PromptService] Preparing full prompt...");
+        const settings = this.plugin.settings;
+        const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
+
+        const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
+        console.log(`[PromptService] Productivity features active for this request: ${isProductivityActive}`);
+
+        // Отримуємо системний промпт (вже має бути в кеші після _isProductivityPersonaActive)
+        const systemPrompt = this.currentSystemPrompt;
+
+        let taskContext = "";
+        if (isProductivityActive) {
+            await this.plugin.checkAndProcessTaskUpdate?.();
+            if (this.plugin.chatManager?.filePlanExists) {
+                taskContext = "\n--- Today's Tasks Context ---\n";
+                taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(', ') : "None"}\n`;
+                taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(', ') : "None"}\n`;
+                taskContext += "--- End Tasks Context ---";
+                console.log("[PromptService] Injecting task context.");
             }
-            if (detectedSize !== null && detectedSize > 0) {
-                effectiveContextLimit = Math.min(userDefinedContextSize, detectedSize);
-                // Optional logging comparing limits
-                // if (effectiveContextLimit < userDefinedContextSize) { console.log(`[PromptService] Using detected limit (${effectiveContextLimit})`); }
-                // else { console.log(`[PromptService] Using user limit (${effectiveContextLimit})`); }
-            } else { /* console.log(`[PromptService] Using user limit (${effectiveContextLimit})`); */ }
         }
-        return Math.max(100, effectiveContextLimit); // Ensure minimum limit
-    }
 
-    private async _summarizeMessages(messagesToSummarize: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
-        if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) return null;
-        console.log(`[Ollama] Attempting to summarize ${messagesToSummarize.length} messages.`);
+        let processedHistoryString = "";
+        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+        const approxSystemTokens = this._countTokens(systemPrompt || "") + this._countTokens(taskContext);
+        const maxContextTokens = settings.contextWindow - approxSystemTokens - 50;
 
-        const textToSummarize = messagesToSummarize.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`).join("\n");
-        const summarizationFullPrompt = this.plugin.settings.summarizationPrompt.replace('{text_to_summarize}', textToSummarize);
-
-        // Готуємо тіло запиту для generateRaw
-        const summaryRequestBody = {
-            model: chatMetadata.modelName || this.plugin.settings.modelName,
-            prompt: summarizationFullPrompt,
-            stream: false,
-            temperature: 0.2,
-            options: { num_ctx: this.plugin.settings.contextWindow, },
-            // НЕ передаємо сюди основний системний промпт ролі
-        };
-
-        try {
-            // Викликаємо новий метод generateRaw
-            const summaryResponse = await this.plugin.ollamaService.generateRaw(summaryRequestBody);
-            const summaryText = summaryResponse?.response?.trim();
-
-            if (summaryText) { console.log(`[Ollama] Summarization successful.`); return summaryText; }
-            else { console.warn("[Ollama] Summarization empty response."); return null; }
-        } catch (error) { console.error("[Ollama] Summarization failed:", error); return null; }
-    }
-
-
-    /**
-     * Prepares the full prompt string based on history and chat metadata.
-     * System prompt is handled separately.
-     */
-    async prepareFullPrompt(
-        history: Message[], // Full message history for the chat
-        chatMetadata: ChatMetadata // Metadata of the current chat
-    ): Promise<string> {
-        if (!this.plugin) { return history.slice(-1)?.[0]?.content || ""; }
-
-        // 1. Get System Prompt content based on the chat's selected role path
-        try {
-            // This is the only call site within this file
-            const roleContent = await this.getRoleDefinition(chatMetadata.selectedRolePath); // <--- Calling with argument
-            this.setSystemPrompt(roleContent);
-        } catch (error) {
-            console.error("Error setting role definition for prompt:", error);
-            this.setSystemPrompt(null);
-        }
-        const currentSystemPrompt = this.getSystemPrompt();
-
-        // 2. Prepare RAG context
-        const lastUserMessageContent = history.findLast(m => m.role === 'user')?.content || "";
-        let ragContext: string | null = null;
-        if (this.plugin.settings.ragEnabled && this.plugin.ragService && lastUserMessageContent) {
-            try { ragContext = this.plugin.ragService.prepareContext(lastUserMessageContent); }
-            catch (error) { console.error("Error processing RAG:", error); }
-        }
-        const ragHeader = "## Contextual Information from Notes:\n";
-        const ragBlock = ragContext ? `${ragHeader}${ragContext.trim()}\n\n---\n` : "";
-
-        // 3. Determine effective context limit and max prompt tokens
-        const modelName = chatMetadata.modelName || this.plugin.settings.modelName;
-        const effectiveContextLimit = await this._getEffectiveContextLimit(modelName);
-        const systemPromptTokens = currentSystemPrompt ? countTokens(currentSystemPrompt) : 0;
-        const maxPromptTokens = Math.max(100, effectiveContextLimit - systemPromptTokens - this.RESPONSE_TOKEN_BUFFER);
-
-        // 4. Build the prompt using the appropriate strategy
-        let finalPrompt: string;
-        const lastMessage = history.slice(-1)?.[0]; // Get the actual last message
-        const userInputFormatted = lastMessage ? `${lastMessage.role === 'user' ? 'User' : 'Assistant'}: ${lastMessage.content.trim()}` : ""; // Format last message
-        const historyForContext = history.slice(0, -1); // History *without* the last message
-
-        if (this.plugin.settings.useAdvancedContextStrategy) {
-            // --- Advanced Strategy (Tokens + Summarization) ---
-            // (Logic remains the same as previous version)
-            console.log(`[Ollama] Using advanced context (Effective Limit: ${effectiveContextLimit}, Max Prompt Field: ${maxPromptTokens}).`);
-            let currentPromptTokens = 0; let promptHistoryParts: string[] = [];
-            const userInputTokens = countTokens(userInputFormatted); currentPromptTokens += userInputTokens;
-            const ragTokens = countTokens(ragBlock); let finalRagBlock = "";
-            if (ragBlock && currentPromptTokens + ragTokens <= maxPromptTokens) { finalRagBlock = ragBlock; currentPromptTokens += ragTokens; } else if (ragBlock) { console.warn(`[Ollama] RAG skipped (${ragTokens}).`); }
-            const keepN = Math.min(historyForContext.length, this.plugin.settings.keepLastNMessagesBeforeSummary); const messagesToKeep = historyForContext.slice(-keepN); const messagesToProcess = historyForContext.slice(0, -keepN);
-            let keptMessagesTokens = 0; const keptMessagesStrings: string[] = [];
-            for (let i = messagesToKeep.length - 1; i >= 0; i--) { const m = messagesToKeep[i]; const fmt = `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`; const tkns = countTokens(fmt); if (currentPromptTokens + tkns <= maxPromptTokens) { keptMessagesStrings.push(fmt); currentPromptTokens += tkns; keptMessagesTokens += tkns; } else { console.warn(`[Ollama] Keep message doesn't fit.`); break; } } keptMessagesStrings.reverse();
-            let processedHistoryParts: string[] = []; let currentChunk: HistoryChunk = { messages: [], text: "", tokens: 0 };
-            for (let i = messagesToProcess.length - 1; i >= 0; i--) { const m = messagesToProcess[i]; const fmt = `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`; const tkns = countTokens(fmt); if (currentChunk.tokens > 0 && currentChunk.tokens + tkns > this.plugin.settings.summarizationChunkSize) { currentChunk.messages.reverse(); currentChunk.text = currentChunk.messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`).join("\n"); if (currentPromptTokens + currentChunk.tokens <= maxPromptTokens) { processedHistoryParts.push(currentChunk.text); currentPromptTokens += currentChunk.tokens; } else if (this.plugin.settings.enableSummarization) { const s = await this._summarizeMessages(currentChunk.messages, chatMetadata); if (s) { const st = countTokens(s); const sf = `[Summary]:\n${s}`; if (currentPromptTokens + st <= maxPromptTokens) { processedHistoryParts.push(sf); currentPromptTokens += st; } else { console.warn(`Summary too large.`); } } else { console.warn(`Summarization failed.`); } } else { console.log(`Chunk skipped.`); } currentChunk = { messages: [], text: "", tokens: 0 }; } currentChunk.messages.push(m); currentChunk.tokens += tkns; }
-            if (currentChunk.messages.length > 0) { currentChunk.messages.reverse(); currentChunk.text = currentChunk.messages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`).join("\n"); if (currentPromptTokens + currentChunk.tokens <= maxPromptTokens) { processedHistoryParts.push(currentChunk.text); currentPromptTokens += currentChunk.tokens; } else if (this.plugin.settings.enableSummarization) { const s = await this._summarizeMessages(currentChunk.messages, chatMetadata); if (s) { const st = countTokens(s); const sf = `[Summary]:\n${s}`; if (currentPromptTokens + st <= maxPromptTokens) { processedHistoryParts.push(sf); currentPromptTokens += st; } else { console.warn(`Summary too large.`); } } else { console.warn(`Summarization failed.`); } } else { console.log(`Last chunk skipped.`); } }
-            processedHistoryParts.reverse(); const finalPromptParts = [finalRagBlock, ...processedHistoryParts, ...keptMessagesStrings, userInputFormatted].filter(Boolean); finalPrompt = finalPromptParts.join("\n\n");
-            console.log(`[Ollama] Final prompt field tokens: ${currentPromptTokens}. Total context (incl sys): ${currentPromptTokens + systemPromptTokens}.`);
-
+        if (isProductivityActive && settings.useAdvancedContextStrategy) {
+            console.log("[PromptService] Using Advanced Context Strategy.");
+            processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxContextTokens);
         } else {
-            // --- Basic Strategy (Words) ---
-            console.log(`[Ollama] Using basic context strategy (Word Limit Approx based on ${effectiveContextLimit} tokens).`);
-            const systemPromptWordCount = currentSystemPrompt ? countWords(currentSystemPrompt) : 0; const userInputWordCount = countWords(userInputFormatted); const wordLimit = Math.max(100, (effectiveContextLimit / 1.0) - systemPromptWordCount - userInputWordCount - 300);
-            let contextParts: string[] = []; let currentWordCount = 0; const ragWords = countWords(ragBlock); let ragAdded = false; if (ragBlock && currentWordCount + ragWords <= wordLimit) { contextParts.push(ragBlock); currentWordCount += ragWords; ragAdded = true; } else if (ragBlock) { console.warn(`[Ollama] RAG context (${ragWords} words) skipped.`); }
-            let addedHistoryMessages = 0;
-            for (let i = historyForContext.length - 1; i >= 0; i--) { const m = historyForContext[i]; const fmt = `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`; const words = countWords(fmt); if (currentWordCount + words <= wordLimit) { contextParts.push(fmt); currentWordCount += words; addedHistoryMessages++; } else { break; } }
-            let finalPromptParts: string[] = []; if (ragAdded) { finalPromptParts.push(contextParts.shift()!); contextParts.reverse(); finalPromptParts = finalPromptParts.concat(contextParts); } else { contextParts.reverse(); finalPromptParts = contextParts; }
-            finalPromptParts.push(userInputFormatted); finalPrompt = finalPromptParts.join("\n\n");
-            console.log(`[Ollama] Final prompt word count (approx): ${currentWordCount + userInputWordCount}. History messages: ${addedHistoryMessages}.`);
+            console.log("[PromptService] Using Simple Context Strategy.");
+            processedHistoryString = this._buildSimpleContext(history, maxContextTokens);
         }
+
+        let ragContext = "";
+        if (settings.ragEnabled && this.plugin.ragService) {
+            const lastUserMessage = history.findLast(m => m.role === 'user');
+            if (lastUserMessage?.content) {
+                try {
+                    console.log("[PromptService] Calling RAG service...");
+                    // --- ВИПРАВЛЕНО: Назва методу та типи ---
+                    const ragResult: DocumentVector[] = await this.plugin.ragService.findRelevantDocuments(lastUserMessage.content, 5); // <--- Змінено назву
+
+                    if (ragResult && ragResult.length > 0) {
+                        ragContext = "\n--- Relevant Notes Context ---\n";
+                        // Явно вказуємо тип DocumentVector для 'r' та використовуємо metadata.filename
+                        ragContext += ragResult.map((r: DocumentVector) =>
+                            `[${r.metadata?.filename || 'Note'}]:\n${r.content}` // <--- Змінено доступ до метаданих
+                        ).join("\n\n");
+                        ragContext += "\n--- End Notes Context ---";
+                        console.log(`[PromptService] Added RAG context (${ragContext.length} chars).`);
+                    } else {
+                        console.log("[PromptService] RAG service returned no results.");
+                    }
+                } catch (error) {
+                    console.error("[PromptService] Error calling RAG service:", error);
+                    new Notice("Error retrieving RAG context. Check console.");
+                }
+            } else {
+                console.log("[PromptService] Skipping RAG: No last user message found.");
+            }
+        }
+
+        const finalPrompt = `${ragContext}${taskContext}\n${processedHistoryString}`.trim();
+        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+        console.log(`[PromptService] Final prompt length (approx tokens): ${this._countTokens(finalPrompt)}`);
 
         return finalPrompt;
     }
 
+    private _buildSimpleContext(history: Message[], maxTokens: number): string {
+        let context = "";
+        let currentTokens = 0;
+        for (let i = history.length - 1; i >= 0; i--) {
+            const message = history[i];
+            const formattedMessage = `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content.trim()}`;
+            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+            const messageTokens = this._countTokens(formattedMessage) + 5;
 
-    // --- Role definition methods ---
-    /**
-     * Reads the content of the specified role file path. Uses cache.
-     */
-    async getRoleDefinition(selectedRolePath: string | null | undefined): Promise<string | null> {
-        if (!this.plugin || !this.plugin.settings.followRole || !selectedRolePath) {
-            return null; // Role functionality disabled or no role selected/passed
-        }
-
-        // Check cache first
-        if (this.roleContentCache.hasOwnProperty(selectedRolePath)) {
-            return this.roleContentCache[selectedRolePath];
-        }
-
-        console.log(`[PromptService] Reading role file content: ${selectedRolePath}`);
-        try {
-            const normalizedPath = normalizePath(selectedRolePath);
-            const adapter = this.plugin.app.vault.adapter; // Use adapter for potentially reading outside vault too
-
-            if (!(await adapter.exists(normalizedPath))) {
-                console.warn(`Selected role file not found: ${normalizedPath}`);
-                this.roleContentCache[selectedRolePath] = null;
-                new Notice(`Selected role file not found: ${selectedRolePath}`);
-                return null;
+            if (currentTokens + messageTokens <= maxTokens) {
+                context = formattedMessage + "\n\n" + context;
+                currentTokens += messageTokens;
+            } else {
+                console.log(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens). Stopping at message index ${i}.`);
+                break;
             }
-
-            let content = await adapter.read(normalizedPath); // Use adapter read
-            // Append current date and time
-            const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-            content += `\n\nCurrent date and time: ${currentDate}, ${currentTime}`;
-            const finalContent = content.trim();
-            this.roleContentCache[selectedRolePath] = finalContent; // Cache the result
-            return finalContent;
-
-        } catch (error) {
-            console.error(`Error reading selected role file ${selectedRolePath}:`, error);
-            this.roleContentCache[selectedRolePath] = null; // Cache error
-            new Notice(`Error reading role file: ${selectedRolePath}`);
-            return null;
         }
+        return context.trim();
     }
-}
+
+    private async _buildAdvancedContext(history: Message[], chatMetadata: ChatMetadata, maxTokens: number): Promise<string> {
+        console.log("[PromptService] Building advanced context...");
+        const settings = this.plugin.settings;
+        const processedParts: string[] = [];
+        let currentTokens = 0;
+
+        const keepN = Math.min(history.length, settings.keepLastNMessagesBeforeSummary);
+        const messagesToKeep = history.slice(-keepN);
+        const messagesToProcess = history.slice(0, -keepN);
+
+        console.log(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
+
+        if (messagesToProcess.length > 0) {
+            if (settings.enableSummarization) {
+                console.log("[PromptService] Summarization enabled, attempting to summarize older messages...");
+                let remainingMessages = [...messagesToProcess];
+                while (remainingMessages.length > 0) {
+                    let chunkTokens = 0;
+                    let chunkMessages: Message[] = [];
+                    while (remainingMessages.length > 0 && chunkTokens < settings.summarizationChunkSize) {
+                        const msg = remainingMessages.pop()!;
+                        const msgText = `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content.trim()}`;
+                        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                        const msgTokens = this._countTokens(msgText) + 5;
+                        // --- ВИПРАВЛЕНО: Перевірка з chunkTokens ---
+                        if (chunkTokens + msgTokens <= settings.summarizationChunkSize) {
+                            chunkMessages.unshift(msg);
+                            chunkTokens += msgTokens;
+                        } else {
+                            remainingMessages.push(msg);
+                            break;
+                        }
+                    }
+
+                    if (chunkMessages.length > 0) {
+                        const chunkCombinedText = chunkMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`).join("\n\n");
+                        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                        const actualChunkTokens = this._countTokens(chunkCombinedText);
+
+                        if (currentTokens + actualChunkTokens <= maxTokens) {
+                            console.log(`[PromptService] Adding chunk of ${chunkMessages.length} messages (${actualChunkTokens} tokens) directly.`);
+                            processedParts.unshift(chunkCombinedText);
+                            currentTokens += actualChunkTokens;
+                        } else {
+                            console.log(`[PromptService] Chunk (${actualChunkTokens} tokens) too large for remaining context (${maxTokens - currentTokens}). Attempting summarization.`);
+                            const summary = await this._summarizeMessages(chunkMessages, chatMetadata);
+                            if (summary) {
+                                // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                                const summaryTokens = this._countTokens(summary) + 10;
+                                const summaryText = `[Summary of previous messages]:\n${summary}`;
+                                if (currentTokens + summaryTokens <= maxTokens) {
+                                    console.log(`[PromptService] Adding summary (${summaryTokens} tokens).`);
+                                    processedParts.unshift(summaryText);
+                                    // --- ВИПРАВЛЕНО: Оновлення currentTokens ---
+                                    currentTokens += summaryTokens;
+                                } else {
+                                    console.warn(`[PromptService] Summary (${summaryTokens} tokens) is still too large for remaining context. Skipping this part of history.`);
+                                    break;
+                                }
+                            } else {
+                                console.warn("[PromptService] Summarization failed or returned empty for a chunk. Skipping this part of history.");
+                                break;
+                            }
+                        }
+                    }
+                } // end while
+
+            } else {
+                console.log("[PromptService] Summarization disabled. Including older messages directly until limit.");
+                let olderHistoryString = this._buildSimpleContext(messagesToProcess, maxTokens - currentTokens);
+                if (olderHistoryString) {
+                    processedParts.unshift(olderHistoryString);
+                    // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                    currentTokens += this._countTokens(olderHistoryString);
+                }
+            }
+        }
+
+        const keepHistoryString = messagesToKeep.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`).join("\n\n");
+        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+        const keepHistoryTokens = this._countTokens(keepHistoryString);
+
+        if (currentTokens + keepHistoryTokens <= maxTokens) {
+            processedParts.push(keepHistoryString);
+            currentTokens += keepHistoryTokens;
+        } else {
+            console.warn(`[PromptService] Could not fit all 'keepLastNMessages' (${keepHistoryTokens} tokens) into remaining context (${maxTokens - currentTokens}). Truncating further.`);
+            const truncatedKeepHistory = this._buildSimpleContext(messagesToKeep, maxTokens - currentTokens);
+            if (truncatedKeepHistory) {
+                processedParts.push(truncatedKeepHistory);
+                // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                currentTokens += this._countTokens(truncatedKeepHistory);
+            }
+        }
+
+        console.log(`[PromptService] Advanced context built. Total approx tokens: ${currentTokens}`);
+        return processedParts.join("\n\n").trim();
+    }
+
+
+    private async _summarizeMessages(messagesToSummarize: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
+        if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) return null;
+        console.log(`[PromptService] Summarizing chunk of ${messagesToSummarize.length} messages...`);
+        // ... (решта коду без змін, але використовує this._countTokens)
+        const textToSummarize = messagesToSummarize.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`).join("\n");
+        const summarizationFullPrompt = this.plugin.settings.summarizationPrompt.replace('{text_to_summarize}', textToSummarize);
+        const modelName = chatMetadata.modelName || this.plugin.settings.modelName;
+        const contextWindow = this.plugin.settings.contextWindow;
+        const requestBody = { model: modelName, prompt: summarizationFullPrompt, stream: false, temperature: 0.3, options: { num_ctx: contextWindow, }, system: "You are a helpful assistant that summarizes conversation history concisely." };
+        try {
+            if (!this.plugin.ollamaService) { console.error("[PromptService] OllamaService is not available for summarization."); return null; }
+            const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
+            if (responseData && typeof responseData.response === 'string') {
+                const summary = responseData.response.trim();
+                // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                console.log(`[PromptService] Summarization successful (${this._countTokens(summary)} tokens).`); return summary;
+            }
+            else { console.warn("[PromptService] Summarization request returned unexpected structure:", responseData); return null; }
+        } catch (error) { console.error("[PromptService] Error during summarization request:", error); return null; }
+    }
+
+} // End of PromptService class

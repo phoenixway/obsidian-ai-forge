@@ -51,6 +51,9 @@ export default class OllamaPlugin extends Plugin {
   private roleListCache: RoleInfo[] | null = null;
   private roleCacheClearTimeout: NodeJS.Timeout | null = null;
   private indexUpdateTimeout: NodeJS.Timeout | null = null;
+  private dailyTaskFilePath: string | null = null; // Зберігаємо повний шлях
+  private taskFileContentCache: string | null = null; // Кеш вмісту
+  private taskFileNeedsUpdate: boolean = false; // Прапорець про оновлення
 
   // RAG data (приклад)
   documents: RAGDocument[] = [];
@@ -133,6 +136,108 @@ export default class OllamaPlugin extends Plugin {
     const handleRename = (file: TFile | TFolder, oldPath: string) => { fileChangeHandler(file); this.handleFileChange(oldPath, debouncedRoleClear); };
     const handleCreate = (file: TFile | TFolder) => fileChangeHandler(file);
     this.registerEvent(this.app.vault.on("modify", handleModify)); this.registerEvent(this.app.vault.on("delete", handleDelete)); this.registerEvent(this.app.vault.on("rename", handleRename)); this.registerEvent(this.app.vault.on("create", handleCreate));
+
+    this.updateDailyTaskFilePath(); // Встановлюємо шлях при завантаженні
+    await this.loadAndProcessInitialTasks(); // Завантажуємо початкові завдання
+    // Реєструємо спостерігача
+    this.registerEvent(
+      this.app.vault.on('modify', this.handleTaskFileModify)
+    );
+    // Також треба оновлювати шлях при зміні налаштувань
+    this.register(this.on('settings-updated', () => {
+      this.updateDailyTaskFilePath();
+      // Потенційно перезавантажити завдання, якщо шлях змінився
+      this.loadAndProcessInitialTasks();
+    }));
+  }
+
+  // Оновлює шлях до файлу завдань
+  updateDailyTaskFilePath() {
+    const folderPath = this.settings.ragFolderPath?.trim();
+    const fileName = this.settings.dailyTaskFileName?.trim();
+    if (folderPath && fileName) {
+      this.dailyTaskFilePath = normalizePath(`<span class="math-inline">\{folderPath\}/</span>{fileName}`);
+      console.log(`[Plugin] Daily task file path set to: ${this.dailyTaskFilePath}`);
+    } else {
+      this.dailyTaskFilePath = null;
+      console.log(`[Plugin] Daily task file path is not configured.`);
+    }
+  }
+
+  // Обробник зміни файлу
+  handleTaskFileModify = (file: TFile) => {
+    if (file.path === this.dailyTaskFilePath) {
+      console.log(`[Plugin] Detected modification in task file: ${file.path}`);
+      // Не читаємо файл тут одразу, щоб уникнути зайвих читань під час збереження.
+      // Просто встановлюємо прапорець, що файл потребує оновлення.
+      this.taskFileNeedsUpdate = true;
+      // Можна одразу викликати читання з debounce, якщо потрібно швидше реагувати
+      // this.debouncedLoadAndProcessTasks();
+    }
+  }
+
+  // Завантажує та обробляє завдання (можна викликати при старті та при зміні)
+  async loadAndProcessInitialTasks() {
+    if (!this.dailyTaskFilePath) {
+      this.taskFileContentCache = null;
+      // Повідомити ChatManager, що плану немає (якщо він тримає стан)
+      this.chatManager?.updateTaskState(null);
+      return;
+    }
+    try {
+      if (await this.app.vault.adapter.exists(this.dailyTaskFilePath)) {
+        const content = await this.app.vault.adapter.read(this.dailyTaskFilePath);
+        if (content !== this.taskFileContentCache) {
+          console.log(`[Plugin] Loading and processing tasks from ${this.dailyTaskFilePath}`);
+          this.taskFileContentCache = content;
+          // Тут викликаємо парсинг контенту та оновлення стану в ChatManager
+          const tasks = this.parseTasks(content);
+          this.chatManager?.updateTaskState(tasks); // Передаємо розпарсені завдання
+          this.taskFileNeedsUpdate = false; // Скидаємо прапорець після обробки
+        }
+      } else {
+        console.log(`[Plugin] Task file ${this.dailyTaskFilePath} not found.`);
+        this.taskFileContentCache = null;
+        this.chatManager?.updateTaskState(null); // Повідомити, що файлу немає
+      }
+    } catch (error) {
+      console.error(`[Plugin] Error loading/processing task file ${this.dailyTaskFilePath}:`, error);
+      this.taskFileContentCache = null;
+      this.chatManager?.updateTaskState(null); // Повідомити про помилку
+    }
+  }
+
+  // Функція парсингу завдань (приклад)
+  parseTasks(content: string): { urgent: string[], regular: string[], hasContent: boolean } {
+    const lines = content.split('\n');
+    const urgent: string[] = [];
+    const regular: string[] = [];
+    let hasContent = false;
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue; // Пропускаємо порожні рядки
+
+      hasContent = true; // Файл не порожній
+      // Приклад: шукаємо [Urgent], !, або інший маркер на початку/кінці
+      if (trimmedLine.startsWith('!') || trimmedLine.toLowerCase().includes('[urgent]')) {
+        // Видаляємо маркер для чистого тексту завдання
+        urgent.push(trimmedLine.replace(/^!/, '').replace(/\[urgent\]/i, '').trim());
+      } else if (trimmedLine.startsWith('- [ ]') || trimmedLine.startsWith('- [x]')) {
+        // Обробка Markdown задач
+        regular.push(trimmedLine.substring(trimmedLine.indexOf(']') + 1).trim());
+      }
+      else {
+        regular.push(trimmedLine); // Вважаємо звичайним завданням
+      }
+    }
+    return { urgent, regular, hasContent };
+  }
+
+  // Метод для перевірки, чи потрібно оновити завдання (викликається перед запитом до LLM)
+  async checkAndProcessTaskUpdate() {
+    if (this.taskFileNeedsUpdate) {
+      await this.loadAndProcessInitialTasks(); // Перезавантажуємо і обробляємо
+    }
   }
 
   // File Change Handler

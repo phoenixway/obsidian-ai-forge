@@ -44,447 +44,366 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
 };
 exports.__esModule = true;
 exports.PromptService = void 0;
-// promptService.ts
+// PromptService.ts
 var obsidian_1 = require("obsidian");
-var gpt_tokenizer_1 = require("gpt-tokenizer"); // Import the tokenizer
-// Helper function: Word counter (for basic strategy)
-function countWords(text) {
-    if (!text)
-        return 0;
-    // More robust word count, ignoring multiple spaces
-    return text.trim().split(/\s+/).filter(Boolean).length;
-}
-// Helper function: Token counter (for advanced strategy)
-function countTokens(text) {
-    if (!text)
-        return 0;
-    try {
-        // Use encode from gpt-tokenizer library
-        return gpt_tokenizer_1.encode(text).length;
-    }
-    catch (e) {
-        console.warn("Tokenizer error, falling back to word count estimation:", e); // English warning
-        // Fallback estimation in case of tokenizer error
-        return Math.ceil(countWords(text) * 1.5); // Increase factor for safety
-    }
-}
 var PromptService = /** @class */ (function () {
     function PromptService(plugin) {
-        this.systemPrompt = null;
-        // Reference to OllamaService needed for summarization calls and model details
-        // private ollamaService: OllamaService;
-        // Buffer of tokens to reserve for the model's response & potential inaccuracies
-        this.RESPONSE_TOKEN_BUFFER = 500;
-        // Cache for detected model context sizes { modelName: detectedContextSize | null }
+        this.currentSystemPrompt = null;
+        this.currentRolePath = null;
+        this.roleCache = {};
         this.modelDetailsCache = {};
-        // Cache for role file content { roleFilePath: content | null }
-        this.roleContentCache = {};
         this.plugin = plugin;
-        // Get OllamaService instance from the plugin
-        // this.ollamaService = plugin.ollamaService;
+        this.app = plugin.app;
     }
-    PromptService.prototype.setSystemPrompt = function (prompt) { this.systemPrompt = prompt; };
-    PromptService.prototype.getSystemPrompt = function () { return this.systemPrompt; };
-    PromptService.prototype.clearModelDetailsCache = function () { this.modelDetailsCache = {}; console.log("[PromptService] Model details cache cleared."); };
-    PromptService.prototype.clearRoleCache = function () { this.roleContentCache = {}; console.log("[PromptService] Role content cache cleared."); };
+    // --- ДОДАНО: Приватний метод для підрахунку токенів ---
     /**
-     * Determines the effective context limit by checking the model details (if advanced strategy enabled)
-     * and comparing with the user's setting. Returns the smaller of the two valid values.
+     * Дуже приблизно оцінює кількість токенів у тексті.
+     * Замініть на точніший метод, якщо є бібліотека токенізатора.
      */
-    PromptService.prototype._getEffectiveContextLimit = function (modelName) {
-        var _a, _b;
+    PromptService.prototype._countTokens = function (text) {
+        if (!text)
+            return 0;
+        // Проста евристика: приблизно 4 символи на токен
+        return Math.ceil(text.length / 4);
+    };
+    // ----------------------------------------------------
+    PromptService.prototype.clearRoleCache = function () {
+        // ... (без змін)
+        console.log("[PromptService] Clearing role definition cache.");
+        this.roleCache = {};
+        this.currentSystemPrompt = null;
+        this.currentRolePath = null;
+    };
+    PromptService.prototype.clearModelDetailsCache = function () {
+        // ... (без змін)
+        console.log("[PromptService] Clearing model details cache.");
+        this.modelDetailsCache = {};
+    };
+    PromptService.prototype.getSystemPrompt = function () {
+        // ... (без змін)
+        var targetRolePath = this.plugin.settings.selectedRolePath || null;
+        if (targetRolePath !== this.currentRolePath) {
+            console.warn("[PromptService] getSystemPrompt role path mismatch. Current: " + this.currentRolePath + ", Target: " + targetRolePath + ". Reloading.");
+            this.getRoleDefinition(targetRolePath);
+        }
+        return this.currentSystemPrompt;
+    };
+    PromptService.prototype.getRoleDefinition = function (rolePath) {
+        var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var userDefinedContextSize, effectiveContextLimit, detectedSize, details, sizeStr, match, parsedSize, error_1;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            var normalizedPath, file, fileCache, frontmatter, frontmatterPos, content, systemPromptBody, assistantType, isProductivity, definition, error_1;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
                     case 0:
-                        userDefinedContextSize = this.plugin.settings.contextWindow;
-                        effectiveContextLimit = userDefinedContextSize;
-                        if (!(this.plugin.settings.useAdvancedContextStrategy && modelName)) return [3 /*break*/, 6];
-                        detectedSize = null;
-                        if (!this.modelDetailsCache.hasOwnProperty(modelName)) return [3 /*break*/, 1];
-                        detectedSize = this.modelDetailsCache[modelName];
-                        return [3 /*break*/, 5];
+                        normalizedPath = rolePath ? obsidian_1.normalizePath(rolePath) : null;
+                        this.currentRolePath = normalizedPath;
+                        if (!normalizedPath || !this.plugin.settings.followRole) { /*...*/
+                            return [2 /*return*/, { systemPrompt: null, isProductivityPersona: false }];
+                        }
+                        if (this.roleCache[normalizedPath]) { /*...*/
+                            this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
+                            return [2 /*return*/, this.roleCache[normalizedPath]];
+                        }
+                        console.log("[PromptService] Loading role definition using metadataCache for: " + normalizedPath);
+                        file = this.app.vault.getAbstractFileByPath(normalizedPath);
+                        if (!(file instanceof obsidian_1.TFile)) return [3 /*break*/, 5];
+                        _b.label = 1;
                     case 1:
-                        console.log("[PromptService] No cache for " + modelName + ", fetching details...");
-                        _c.label = 2;
+                        _b.trys.push([1, 3, , 4]);
+                        fileCache = this.app.metadataCache.getFileCache(file);
+                        frontmatter = fileCache === null || fileCache === void 0 ? void 0 : fileCache.frontmatter;
+                        frontmatterPos = fileCache === null || fileCache === void 0 ? void 0 : fileCache.frontmatterPosition;
+                        return [4 /*yield*/, this.app.vault.cachedRead(file)];
                     case 2:
-                        _c.trys.push([2, 4, , 5]);
-                        return [4 /*yield*/, this.plugin.ollamaService.getModelDetails(modelName)];
+                        content = _b.sent();
+                        systemPromptBody = (frontmatterPos === null || frontmatterPos === void 0 ? void 0 : frontmatterPos.end) ? content.substring(frontmatterPos.end.line + 1).trim() : content.trim();
+                        assistantType = (_a = frontmatter === null || frontmatter === void 0 ? void 0 : frontmatter.assistant_type) === null || _a === void 0 ? void 0 : _a.toLowerCase();
+                        isProductivity = assistantType === 'productivity' || (frontmatter === null || frontmatter === void 0 ? void 0 : frontmatter.is_planner) === true;
+                        definition = { systemPrompt: systemPromptBody || null, isProductivityPersona: isProductivity };
+                        console.log("[PromptService] Role loaded. Is Productivity Persona: " + isProductivity);
+                        this.roleCache[normalizedPath] = definition;
+                        this.currentSystemPrompt = definition.systemPrompt;
+                        return [2 /*return*/, definition];
                     case 3:
-                        details = _c.sent();
-                        if (details) {
-                            sizeStr = undefined;
-                            if (details.parameters) {
-                                match = details.parameters.match(/num_ctx\s+(\d+)/);
-                                if (match === null || match === void 0 ? void 0 : match[1])
-                                    sizeStr = match[1];
+                        error_1 = _b.sent();
+                        this.currentSystemPrompt = null;
+                        return [2 /*return*/, null];
+                    case 4: return [3 /*break*/, 6];
+                    case 5:
+                        this.currentSystemPrompt = null;
+                        return [2 /*return*/, null];
+                    case 6: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    PromptService.prototype._isProductivityPersonaActive = function (rolePath) {
+        var _a;
+        return __awaiter(this, void 0, Promise, function () {
+            var roleDefinition;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        // ... (без змін) ...
+                        if (!this.plugin.settings.enableProductivityFeatures)
+                            return [2 /*return*/, false];
+                        return [4 /*yield*/, this.getRoleDefinition(rolePath)];
+                    case 1:
+                        roleDefinition = _b.sent();
+                        return [2 /*return*/, (_a = roleDefinition === null || roleDefinition === void 0 ? void 0 : roleDefinition.isProductivityPersona) !== null && _a !== void 0 ? _a : false];
+                }
+            });
+        });
+    };
+    PromptService.prototype.prepareFullPrompt = function (history, chatMetadata) {
+        var _a, _b, _c;
+        return __awaiter(this, void 0, Promise, function () {
+            var settings, selectedRolePath, isProductivityActive, systemPrompt, taskContext, processedHistoryString, approxSystemTokens, maxContextTokens, ragContext, lastUserMessage, ragResult, error_2, finalPrompt;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
+                    case 0:
+                        console.log("[PromptService] Preparing full prompt...");
+                        settings = this.plugin.settings;
+                        selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
+                        return [4 /*yield*/, this._isProductivityPersonaActive(selectedRolePath)];
+                    case 1:
+                        isProductivityActive = _d.sent();
+                        console.log("[PromptService] Productivity features active for this request: " + isProductivityActive);
+                        systemPrompt = this.currentSystemPrompt;
+                        taskContext = "";
+                        if (!isProductivityActive) return [3 /*break*/, 3];
+                        return [4 /*yield*/, ((_b = (_a = this.plugin).checkAndProcessTaskUpdate) === null || _b === void 0 ? void 0 : _b.call(_a))];
+                    case 2:
+                        _d.sent();
+                        if ((_c = this.plugin.chatManager) === null || _c === void 0 ? void 0 : _c.filePlanExists) {
+                            taskContext = "\n--- Today's Tasks Context ---\n";
+                            taskContext += "Urgent: " + (this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(', ') : "None") + "\n";
+                            taskContext += "Other: " + (this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(', ') : "None") + "\n";
+                            taskContext += "--- End Tasks Context ---";
+                            console.log("[PromptService] Injecting task context.");
+                        }
+                        _d.label = 3;
+                    case 3:
+                        processedHistoryString = "";
+                        approxSystemTokens = this._countTokens(systemPrompt || "") + this._countTokens(taskContext);
+                        maxContextTokens = settings.contextWindow - approxSystemTokens - 50;
+                        if (!(isProductivityActive && settings.useAdvancedContextStrategy)) return [3 /*break*/, 5];
+                        console.log("[PromptService] Using Advanced Context Strategy.");
+                        return [4 /*yield*/, this._buildAdvancedContext(history, chatMetadata, maxContextTokens)];
+                    case 4:
+                        processedHistoryString = _d.sent();
+                        return [3 /*break*/, 6];
+                    case 5:
+                        console.log("[PromptService] Using Simple Context Strategy.");
+                        processedHistoryString = this._buildSimpleContext(history, maxContextTokens);
+                        _d.label = 6;
+                    case 6:
+                        ragContext = "";
+                        if (!(settings.ragEnabled && this.plugin.ragService)) return [3 /*break*/, 12];
+                        lastUserMessage = history.findLast(function (m) { return m.role === 'user'; });
+                        if (!(lastUserMessage === null || lastUserMessage === void 0 ? void 0 : lastUserMessage.content)) return [3 /*break*/, 11];
+                        _d.label = 7;
+                    case 7:
+                        _d.trys.push([7, 9, , 10]);
+                        console.log("[PromptService] Calling RAG service...");
+                        return [4 /*yield*/, this.plugin.ragService.findRelevantDocuments(lastUserMessage.content, 5)];
+                    case 8:
+                        ragResult = _d.sent();
+                        if (ragResult && ragResult.length > 0) {
+                            ragContext = "\n--- Relevant Notes Context ---\n";
+                            // Явно вказуємо тип DocumentVector для 'r' та використовуємо metadata.filename
+                            ragContext += ragResult.map(function (r) { var _a; return "[" + (((_a = r.metadata) === null || _a === void 0 ? void 0 : _a.filename) || 'Note') + "]:\n" + r.content; } // <--- Змінено доступ до метаданих
+                            ).join("\n\n");
+                            ragContext += "\n--- End Notes Context ---";
+                            console.log("[PromptService] Added RAG context (" + ragContext.length + " chars).");
+                        }
+                        else {
+                            console.log("[PromptService] RAG service returned no results.");
+                        }
+                        return [3 /*break*/, 10];
+                    case 9:
+                        error_2 = _d.sent();
+                        console.error("[PromptService] Error calling RAG service:", error_2);
+                        new obsidian_1.Notice("Error retrieving RAG context. Check console.");
+                        return [3 /*break*/, 10];
+                    case 10: return [3 /*break*/, 12];
+                    case 11:
+                        console.log("[PromptService] Skipping RAG: No last user message found.");
+                        _d.label = 12;
+                    case 12:
+                        finalPrompt = ("" + ragContext + taskContext + "\n" + processedHistoryString).trim();
+                        // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                        console.log("[PromptService] Final prompt length (approx tokens): " + this._countTokens(finalPrompt));
+                        return [2 /*return*/, finalPrompt];
+                }
+            });
+        });
+    };
+    PromptService.prototype._buildSimpleContext = function (history, maxTokens) {
+        var context = "";
+        var currentTokens = 0;
+        for (var i = history.length - 1; i >= 0; i--) {
+            var message = history[i];
+            var formattedMessage = (message.role === 'user' ? 'User' : 'Assistant') + ": " + message.content.trim();
+            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+            var messageTokens = this._countTokens(formattedMessage) + 5;
+            if (currentTokens + messageTokens <= maxTokens) {
+                context = formattedMessage + "\n\n" + context;
+                currentTokens += messageTokens;
+            }
+            else {
+                console.log("[PromptService] Simple context limit reached (" + currentTokens + "/" + maxTokens + " tokens). Stopping at message index " + i + ".");
+                break;
+            }
+        }
+        return context.trim();
+    };
+    PromptService.prototype._buildAdvancedContext = function (history, chatMetadata, maxTokens) {
+        return __awaiter(this, void 0, Promise, function () {
+            var settings, processedParts, currentTokens, keepN, messagesToKeep, messagesToProcess, remainingMessages, chunkTokens, chunkMessages, msg, msgText, msgTokens, chunkCombinedText, actualChunkTokens, summary, summaryTokens, summaryText, olderHistoryString, keepHistoryString, keepHistoryTokens, truncatedKeepHistory;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        console.log("[PromptService] Building advanced context...");
+                        settings = this.plugin.settings;
+                        processedParts = [];
+                        currentTokens = 0;
+                        keepN = Math.min(history.length, settings.keepLastNMessagesBeforeSummary);
+                        messagesToKeep = history.slice(-keepN);
+                        messagesToProcess = history.slice(0, -keepN);
+                        console.log("[PromptService] Advanced Context: Keeping last " + messagesToKeep.length + ", processing " + messagesToProcess.length + " older messages.");
+                        if (!(messagesToProcess.length > 0)) return [3 /*break*/, 7];
+                        if (!settings.enableSummarization) return [3 /*break*/, 6];
+                        console.log("[PromptService] Summarization enabled, attempting to summarize older messages...");
+                        remainingMessages = __spreadArrays(messagesToProcess);
+                        _a.label = 1;
+                    case 1:
+                        if (!(remainingMessages.length > 0)) return [3 /*break*/, 5];
+                        chunkTokens = 0;
+                        chunkMessages = [];
+                        while (remainingMessages.length > 0 && chunkTokens < settings.summarizationChunkSize) {
+                            msg = remainingMessages.pop();
+                            msgText = (msg.role === 'user' ? 'User' : 'Assistant') + ": " + msg.content.trim();
+                            msgTokens = this._countTokens(msgText) + 5;
+                            // --- ВИПРАВЛЕНО: Перевірка з chunkTokens ---
+                            if (chunkTokens + msgTokens <= settings.summarizationChunkSize) {
+                                chunkMessages.unshift(msg);
+                                chunkTokens += msgTokens;
                             }
-                            if (!sizeStr && ((_a = details.details) === null || _a === void 0 ? void 0 : _a['llm.context_length']))
-                                sizeStr = String(details.details['llm.context_length']);
-                            if (!sizeStr && ((_b = details.details) === null || _b === void 0 ? void 0 : _b['tokenizer.ggml.context_length']))
-                                sizeStr = String(details.details['tokenizer.ggml.context_length']);
-                            if (sizeStr) {
-                                parsedSize = parseInt(sizeStr, 10);
-                                if (!isNaN(parsedSize) && parsedSize > 0) {
-                                    detectedSize = parsedSize;
-                                    console.log("[PromptService] Detected context size for " + modelName + ": " + detectedSize);
-                                    this.modelDetailsCache[modelName] = detectedSize;
-                                }
-                                else {
-                                    console.warn("[PromptService] Parsed context size invalid: " + sizeStr);
-                                    detectedSize = null;
-                                }
+                            else {
+                                remainingMessages.push(msg);
+                                break;
                             }
-                            if (detectedSize === null) {
-                                console.log("[PromptService] Context size not found for " + modelName + ".");
-                                this.modelDetailsCache[modelName] = null;
+                        }
+                        if (!(chunkMessages.length > 0)) return [3 /*break*/, 4];
+                        chunkCombinedText = chunkMessages.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n\n");
+                        actualChunkTokens = this._countTokens(chunkCombinedText);
+                        if (!(currentTokens + actualChunkTokens <= maxTokens)) return [3 /*break*/, 2];
+                        console.log("[PromptService] Adding chunk of " + chunkMessages.length + " messages (" + actualChunkTokens + " tokens) directly.");
+                        processedParts.unshift(chunkCombinedText);
+                        currentTokens += actualChunkTokens;
+                        return [3 /*break*/, 4];
+                    case 2:
+                        console.log("[PromptService] Chunk (" + actualChunkTokens + " tokens) too large for remaining context (" + (maxTokens - currentTokens) + "). Attempting summarization.");
+                        return [4 /*yield*/, this._summarizeMessages(chunkMessages, chatMetadata)];
+                    case 3:
+                        summary = _a.sent();
+                        if (summary) {
+                            summaryTokens = this._countTokens(summary) + 10;
+                            summaryText = "[Summary of previous messages]:\n" + summary;
+                            if (currentTokens + summaryTokens <= maxTokens) {
+                                console.log("[PromptService] Adding summary (" + summaryTokens + " tokens).");
+                                processedParts.unshift(summaryText);
+                                // --- ВИПРАВЛЕНО: Оновлення currentTokens ---
+                                currentTokens += summaryTokens;
+                            }
+                            else {
+                                console.warn("[PromptService] Summary (" + summaryTokens + " tokens) is still too large for remaining context. Skipping this part of history.");
+                                return [3 /*break*/, 5];
                             }
                         }
                         else {
-                            this.modelDetailsCache[modelName] = null;
+                            console.warn("[PromptService] Summarization failed or returned empty for a chunk. Skipping this part of history.");
+                            return [3 /*break*/, 5];
                         }
-                        return [3 /*break*/, 5];
-                    case 4:
-                        error_1 = _c.sent();
-                        console.error("[PromptService] Error fetching model details for " + modelName + ":", error_1);
-                        this.modelDetailsCache[modelName] = null;
-                        return [3 /*break*/, 5];
-                    case 5:
-                        if (detectedSize !== null && detectedSize > 0) {
-                            effectiveContextLimit = Math.min(userDefinedContextSize, detectedSize);
-                            // Optional logging comparing limits
-                            // if (effectiveContextLimit < userDefinedContextSize) { console.log(`[PromptService] Using detected limit (${effectiveContextLimit})`); }
-                            // else { console.log(`[PromptService] Using user limit (${effectiveContextLimit})`); }
+                        _a.label = 4;
+                    case 4: return [3 /*break*/, 1];
+                    case 5: return [3 /*break*/, 7];
+                    case 6:
+                        console.log("[PromptService] Summarization disabled. Including older messages directly until limit.");
+                        olderHistoryString = this._buildSimpleContext(messagesToProcess, maxTokens - currentTokens);
+                        if (olderHistoryString) {
+                            processedParts.unshift(olderHistoryString);
+                            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                            currentTokens += this._countTokens(olderHistoryString);
                         }
-                        else { /* console.log(`[PromptService] Using user limit (${effectiveContextLimit})`); */ }
-                        _c.label = 6;
-                    case 6: return [2 /*return*/, Math.max(100, effectiveContextLimit)]; // Ensure minimum limit
+                        _a.label = 7;
+                    case 7:
+                        keepHistoryString = messagesToKeep.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n\n");
+                        keepHistoryTokens = this._countTokens(keepHistoryString);
+                        if (currentTokens + keepHistoryTokens <= maxTokens) {
+                            processedParts.push(keepHistoryString);
+                            currentTokens += keepHistoryTokens;
+                        }
+                        else {
+                            console.warn("[PromptService] Could not fit all 'keepLastNMessages' (" + keepHistoryTokens + " tokens) into remaining context (" + (maxTokens - currentTokens) + "). Truncating further.");
+                            truncatedKeepHistory = this._buildSimpleContext(messagesToKeep, maxTokens - currentTokens);
+                            if (truncatedKeepHistory) {
+                                processedParts.push(truncatedKeepHistory);
+                                // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                                currentTokens += this._countTokens(truncatedKeepHistory);
+                            }
+                        }
+                        console.log("[PromptService] Advanced context built. Total approx tokens: " + currentTokens);
+                        return [2 /*return*/, processedParts.join("\n\n").trim()];
                 }
             });
         });
     };
     PromptService.prototype._summarizeMessages = function (messagesToSummarize, chatMetadata) {
-        var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var textToSummarize, summarizationFullPrompt, summaryRequestBody, summaryResponse, summaryText, error_2;
-            return __generator(this, function (_b) {
-                switch (_b.label) {
+            var textToSummarize, summarizationFullPrompt, modelName, contextWindow, requestBody, responseData, summary, error_3;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
                     case 0:
                         if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0)
                             return [2 /*return*/, null];
-                        console.log("[Ollama] Attempting to summarize " + messagesToSummarize.length + " messages.");
+                        console.log("[PromptService] Summarizing chunk of " + messagesToSummarize.length + " messages...");
                         textToSummarize = messagesToSummarize.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n");
                         summarizationFullPrompt = this.plugin.settings.summarizationPrompt.replace('{text_to_summarize}', textToSummarize);
-                        summaryRequestBody = {
-                            model: chatMetadata.modelName || this.plugin.settings.modelName,
-                            prompt: summarizationFullPrompt,
-                            stream: false,
-                            temperature: 0.2,
-                            options: { num_ctx: this.plugin.settings.contextWindow }
-                        };
-                        _b.label = 1;
+                        modelName = chatMetadata.modelName || this.plugin.settings.modelName;
+                        contextWindow = this.plugin.settings.contextWindow;
+                        requestBody = { model: modelName, prompt: summarizationFullPrompt, stream: false, temperature: 0.3, options: { num_ctx: contextWindow }, system: "You are a helpful assistant that summarizes conversation history concisely." };
+                        _a.label = 1;
                     case 1:
-                        _b.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, this.plugin.ollamaService.generateRaw(summaryRequestBody)];
+                        _a.trys.push([1, 3, , 4]);
+                        if (!this.plugin.ollamaService) {
+                            console.error("[PromptService] OllamaService is not available for summarization.");
+                            return [2 /*return*/, null];
+                        }
+                        return [4 /*yield*/, this.plugin.ollamaService.generateRaw(requestBody)];
                     case 2:
-                        summaryResponse = _b.sent();
-                        summaryText = (_a = summaryResponse === null || summaryResponse === void 0 ? void 0 : summaryResponse.response) === null || _a === void 0 ? void 0 : _a.trim();
-                        if (summaryText) {
-                            console.log("[Ollama] Summarization successful.");
-                            return [2 /*return*/, summaryText];
+                        responseData = _a.sent();
+                        if (responseData && typeof responseData.response === 'string') {
+                            summary = responseData.response.trim();
+                            // --- ВИПРАВЛЕНО: Використання this._countTokens ---
+                            console.log("[PromptService] Summarization successful (" + this._countTokens(summary) + " tokens).");
+                            return [2 /*return*/, summary];
                         }
                         else {
-                            console.warn("[Ollama] Summarization empty response.");
+                            console.warn("[PromptService] Summarization request returned unexpected structure:", responseData);
                             return [2 /*return*/, null];
                         }
                         return [3 /*break*/, 4];
                     case 3:
-                        error_2 = _b.sent();
-                        console.error("[Ollama] Summarization failed:", error_2);
+                        error_3 = _a.sent();
+                        console.error("[PromptService] Error during summarization request:", error_3);
                         return [2 /*return*/, null];
                     case 4: return [2 /*return*/];
                 }
             });
         });
     };
-    /**
-     * Prepares the full prompt string based on history and chat metadata.
-     * System prompt is handled separately.
-     */
-    PromptService.prototype.prepareFullPrompt = function (history, // Full message history for the chat
-    chatMetadata // Metadata of the current chat
-    ) {
-        var _a, _b, _c, _d;
-        return __awaiter(this, void 0, Promise, function () {
-            var roleContent, error_3, currentSystemPrompt, lastUserMessageContent, ragContext, ragHeader, ragBlock, modelName, effectiveContextLimit, systemPromptTokens, maxPromptTokens, finalPrompt, lastMessage, userInputFormatted, historyForContext, currentPromptTokens, promptHistoryParts, userInputTokens, ragTokens, finalRagBlock, keepN, messagesToKeep, messagesToProcess, keptMessagesTokens, keptMessagesStrings, i, m, fmt, tkns, processedHistoryParts, currentChunk, i, m, fmt, tkns, s, st, sf, s, st, sf, finalPromptParts, systemPromptWordCount, userInputWordCount, wordLimit, contextParts, currentWordCount, ragWords, ragAdded, addedHistoryMessages, i, m, fmt, words, finalPromptParts;
-            return __generator(this, function (_e) {
-                switch (_e.label) {
-                    case 0:
-                        if (!this.plugin) {
-                            return [2 /*return*/, ((_b = (_a = history.slice(-1)) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.content) || ""];
-                        }
-                        _e.label = 1;
-                    case 1:
-                        _e.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, this.getRoleDefinition(chatMetadata.selectedRolePath)];
-                    case 2:
-                        roleContent = _e.sent();
-                        this.setSystemPrompt(roleContent);
-                        return [3 /*break*/, 4];
-                    case 3:
-                        error_3 = _e.sent();
-                        console.error("Error setting role definition for prompt:", error_3);
-                        this.setSystemPrompt(null);
-                        return [3 /*break*/, 4];
-                    case 4:
-                        currentSystemPrompt = this.getSystemPrompt();
-                        lastUserMessageContent = ((_c = history.findLast(function (m) { return m.role === 'user'; })) === null || _c === void 0 ? void 0 : _c.content) || "";
-                        ragContext = null;
-                        if (this.plugin.settings.ragEnabled && this.plugin.ragService && lastUserMessageContent) {
-                            try {
-                                ragContext = this.plugin.ragService.prepareContext(lastUserMessageContent);
-                            }
-                            catch (error) {
-                                console.error("Error processing RAG:", error);
-                            }
-                        }
-                        ragHeader = "## Contextual Information from Notes:\n";
-                        ragBlock = ragContext ? "" + ragHeader + ragContext.trim() + "\n\n---\n" : "";
-                        modelName = chatMetadata.modelName || this.plugin.settings.modelName;
-                        return [4 /*yield*/, this._getEffectiveContextLimit(modelName)];
-                    case 5:
-                        effectiveContextLimit = _e.sent();
-                        systemPromptTokens = currentSystemPrompt ? countTokens(currentSystemPrompt) : 0;
-                        maxPromptTokens = Math.max(100, effectiveContextLimit - systemPromptTokens - this.RESPONSE_TOKEN_BUFFER);
-                        lastMessage = (_d = history.slice(-1)) === null || _d === void 0 ? void 0 : _d[0];
-                        userInputFormatted = lastMessage ? (lastMessage.role === 'user' ? 'User' : 'Assistant') + ": " + lastMessage.content.trim() : "";
-                        historyForContext = history.slice(0, -1);
-                        if (!this.plugin.settings.useAdvancedContextStrategy) return [3 /*break*/, 18];
-                        // --- Advanced Strategy (Tokens + Summarization) ---
-                        // (Logic remains the same as previous version)
-                        console.log("[Ollama] Using advanced context (Effective Limit: " + effectiveContextLimit + ", Max Prompt Field: " + maxPromptTokens + ").");
-                        currentPromptTokens = 0;
-                        promptHistoryParts = [];
-                        userInputTokens = countTokens(userInputFormatted);
-                        currentPromptTokens += userInputTokens;
-                        ragTokens = countTokens(ragBlock);
-                        finalRagBlock = "";
-                        if (ragBlock && currentPromptTokens + ragTokens <= maxPromptTokens) {
-                            finalRagBlock = ragBlock;
-                            currentPromptTokens += ragTokens;
-                        }
-                        else if (ragBlock) {
-                            console.warn("[Ollama] RAG skipped (" + ragTokens + ").");
-                        }
-                        keepN = Math.min(historyForContext.length, this.plugin.settings.keepLastNMessagesBeforeSummary);
-                        messagesToKeep = historyForContext.slice(-keepN);
-                        messagesToProcess = historyForContext.slice(0, -keepN);
-                        keptMessagesTokens = 0;
-                        keptMessagesStrings = [];
-                        for (i = messagesToKeep.length - 1; i >= 0; i--) {
-                            m = messagesToKeep[i];
-                            fmt = (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim();
-                            tkns = countTokens(fmt);
-                            if (currentPromptTokens + tkns <= maxPromptTokens) {
-                                keptMessagesStrings.push(fmt);
-                                currentPromptTokens += tkns;
-                                keptMessagesTokens += tkns;
-                            }
-                            else {
-                                console.warn("[Ollama] Keep message doesn't fit.");
-                                break;
-                            }
-                        }
-                        keptMessagesStrings.reverse();
-                        processedHistoryParts = [];
-                        currentChunk = { messages: [], text: "", tokens: 0 };
-                        i = messagesToProcess.length - 1;
-                        _e.label = 6;
-                    case 6:
-                        if (!(i >= 0)) return [3 /*break*/, 13];
-                        m = messagesToProcess[i];
-                        fmt = (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim();
-                        tkns = countTokens(fmt);
-                        if (!(currentChunk.tokens > 0 && currentChunk.tokens + tkns > this.plugin.settings.summarizationChunkSize)) return [3 /*break*/, 11];
-                        currentChunk.messages.reverse();
-                        currentChunk.text = currentChunk.messages.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n");
-                        if (!(currentPromptTokens + currentChunk.tokens <= maxPromptTokens)) return [3 /*break*/, 7];
-                        processedHistoryParts.push(currentChunk.text);
-                        currentPromptTokens += currentChunk.tokens;
-                        return [3 /*break*/, 10];
-                    case 7:
-                        if (!this.plugin.settings.enableSummarization) return [3 /*break*/, 9];
-                        return [4 /*yield*/, this._summarizeMessages(currentChunk.messages, chatMetadata)];
-                    case 8:
-                        s = _e.sent();
-                        if (s) {
-                            st = countTokens(s);
-                            sf = "[Summary]:\n" + s;
-                            if (currentPromptTokens + st <= maxPromptTokens) {
-                                processedHistoryParts.push(sf);
-                                currentPromptTokens += st;
-                            }
-                            else {
-                                console.warn("Summary too large.");
-                            }
-                        }
-                        else {
-                            console.warn("Summarization failed.");
-                        }
-                        return [3 /*break*/, 10];
-                    case 9:
-                        console.log("Chunk skipped.");
-                        _e.label = 10;
-                    case 10:
-                        currentChunk = { messages: [], text: "", tokens: 0 };
-                        _e.label = 11;
-                    case 11:
-                        currentChunk.messages.push(m);
-                        currentChunk.tokens += tkns;
-                        _e.label = 12;
-                    case 12:
-                        i--;
-                        return [3 /*break*/, 6];
-                    case 13:
-                        if (!(currentChunk.messages.length > 0)) return [3 /*break*/, 17];
-                        currentChunk.messages.reverse();
-                        currentChunk.text = currentChunk.messages.map(function (m) { return (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim(); }).join("\n");
-                        if (!(currentPromptTokens + currentChunk.tokens <= maxPromptTokens)) return [3 /*break*/, 14];
-                        processedHistoryParts.push(currentChunk.text);
-                        currentPromptTokens += currentChunk.tokens;
-                        return [3 /*break*/, 17];
-                    case 14:
-                        if (!this.plugin.settings.enableSummarization) return [3 /*break*/, 16];
-                        return [4 /*yield*/, this._summarizeMessages(currentChunk.messages, chatMetadata)];
-                    case 15:
-                        s = _e.sent();
-                        if (s) {
-                            st = countTokens(s);
-                            sf = "[Summary]:\n" + s;
-                            if (currentPromptTokens + st <= maxPromptTokens) {
-                                processedHistoryParts.push(sf);
-                                currentPromptTokens += st;
-                            }
-                            else {
-                                console.warn("Summary too large.");
-                            }
-                        }
-                        else {
-                            console.warn("Summarization failed.");
-                        }
-                        return [3 /*break*/, 17];
-                    case 16:
-                        console.log("Last chunk skipped.");
-                        _e.label = 17;
-                    case 17:
-                        processedHistoryParts.reverse();
-                        finalPromptParts = __spreadArrays([finalRagBlock], processedHistoryParts, keptMessagesStrings, [userInputFormatted]).filter(Boolean);
-                        finalPrompt = finalPromptParts.join("\n\n");
-                        console.log("[Ollama] Final prompt field tokens: " + currentPromptTokens + ". Total context (incl sys): " + (currentPromptTokens + systemPromptTokens) + ".");
-                        return [3 /*break*/, 19];
-                    case 18:
-                        // --- Basic Strategy (Words) ---
-                        console.log("[Ollama] Using basic context strategy (Word Limit Approx based on " + effectiveContextLimit + " tokens).");
-                        systemPromptWordCount = currentSystemPrompt ? countWords(currentSystemPrompt) : 0;
-                        userInputWordCount = countWords(userInputFormatted);
-                        wordLimit = Math.max(100, (effectiveContextLimit / 1.0) - systemPromptWordCount - userInputWordCount - 300);
-                        contextParts = [];
-                        currentWordCount = 0;
-                        ragWords = countWords(ragBlock);
-                        ragAdded = false;
-                        if (ragBlock && currentWordCount + ragWords <= wordLimit) {
-                            contextParts.push(ragBlock);
-                            currentWordCount += ragWords;
-                            ragAdded = true;
-                        }
-                        else if (ragBlock) {
-                            console.warn("[Ollama] RAG context (" + ragWords + " words) skipped.");
-                        }
-                        addedHistoryMessages = 0;
-                        for (i = historyForContext.length - 1; i >= 0; i--) {
-                            m = historyForContext[i];
-                            fmt = (m.role === 'user' ? 'User' : 'Assistant') + ": " + m.content.trim();
-                            words = countWords(fmt);
-                            if (currentWordCount + words <= wordLimit) {
-                                contextParts.push(fmt);
-                                currentWordCount += words;
-                                addedHistoryMessages++;
-                            }
-                            else {
-                                break;
-                            }
-                        }
-                        finalPromptParts = [];
-                        if (ragAdded) {
-                            finalPromptParts.push(contextParts.shift());
-                            contextParts.reverse();
-                            finalPromptParts = finalPromptParts.concat(contextParts);
-                        }
-                        else {
-                            contextParts.reverse();
-                            finalPromptParts = contextParts;
-                        }
-                        finalPromptParts.push(userInputFormatted);
-                        finalPrompt = finalPromptParts.join("\n\n");
-                        console.log("[Ollama] Final prompt word count (approx): " + (currentWordCount + userInputWordCount) + ". History messages: " + addedHistoryMessages + ".");
-                        _e.label = 19;
-                    case 19: return [2 /*return*/, finalPrompt];
-                }
-            });
-        });
-    };
-    // --- Role definition methods ---
-    /**
-     * Reads the content of the specified role file path. Uses cache.
-     */
-    PromptService.prototype.getRoleDefinition = function (selectedRolePath) {
-        return __awaiter(this, void 0, Promise, function () {
-            var normalizedPath, adapter, content, currentTime, currentDate, finalContent, error_4;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0:
-                        if (!this.plugin || !this.plugin.settings.followRole || !selectedRolePath) {
-                            return [2 /*return*/, null]; // Role functionality disabled or no role selected/passed
-                        }
-                        // Check cache first
-                        if (this.roleContentCache.hasOwnProperty(selectedRolePath)) {
-                            return [2 /*return*/, this.roleContentCache[selectedRolePath]];
-                        }
-                        console.log("[PromptService] Reading role file content: " + selectedRolePath);
-                        _a.label = 1;
-                    case 1:
-                        _a.trys.push([1, 4, , 5]);
-                        normalizedPath = obsidian_1.normalizePath(selectedRolePath);
-                        adapter = this.plugin.app.vault.adapter;
-                        return [4 /*yield*/, adapter.exists(normalizedPath)];
-                    case 2:
-                        if (!(_a.sent())) {
-                            console.warn("Selected role file not found: " + normalizedPath);
-                            this.roleContentCache[selectedRolePath] = null;
-                            new obsidian_1.Notice("Selected role file not found: " + selectedRolePath);
-                            return [2 /*return*/, null];
-                        }
-                        return [4 /*yield*/, adapter.read(normalizedPath)];
-                    case 3:
-                        content = _a.sent();
-                        currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                        currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                        content += "\n\nCurrent date and time: " + currentDate + ", " + currentTime;
-                        finalContent = content.trim();
-                        this.roleContentCache[selectedRolePath] = finalContent; // Cache the result
-                        return [2 /*return*/, finalContent];
-                    case 4:
-                        error_4 = _a.sent();
-                        console.error("Error reading selected role file " + selectedRolePath + ":", error_4);
-                        this.roleContentCache[selectedRolePath] = null; // Cache error
-                        new obsidian_1.Notice("Error reading role file: " + selectedRolePath);
-                        return [2 /*return*/, null];
-                    case 5: return [2 /*return*/];
-                }
-            });
-        });
-    };
     return PromptService;
-}());
+}()); // End of PromptService class
 exports.PromptService = PromptService;

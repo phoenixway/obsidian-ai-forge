@@ -74,9 +74,23 @@ var OllamaPlugin = /** @class */ (function (_super) {
         _this.roleListCache = null;
         _this.roleCacheClearTimeout = null;
         _this.indexUpdateTimeout = null;
+        _this.dailyTaskFilePath = null; // Зберігаємо повний шлях
+        _this.taskFileContentCache = null; // Кеш вмісту
+        _this.taskFileNeedsUpdate = false; // Прапорець про оновлення
         // RAG data (приклад)
         _this.documents = [];
         _this.embeddings = [];
+        // Обробник зміни файлу
+        _this.handleTaskFileModify = function (file) {
+            if (file.path === _this.dailyTaskFilePath) {
+                console.log("[Plugin] Detected modification in task file: " + file.path);
+                // Не читаємо файл тут одразу, щоб уникнути зайвих читань під час збереження.
+                // Просто встановлюємо прапорець, що файл потребує оновлення.
+                _this.taskFileNeedsUpdate = true;
+                // Можна одразу викликати читання з debounce, якщо потрібно швидше реагувати
+                // this.debouncedLoadAndProcessTasks();
+            }
+        };
         return _this;
     }
     // --- Event Emitter Methods ---
@@ -234,7 +248,124 @@ var OllamaPlugin = /** @class */ (function (_super) {
                         this.registerEvent(this.app.vault.on("delete", handleDelete));
                         this.registerEvent(this.app.vault.on("rename", handleRename));
                         this.registerEvent(this.app.vault.on("create", handleCreate));
+                        this.updateDailyTaskFilePath(); // Встановлюємо шлях при завантаженні
+                        return [4 /*yield*/, this.loadAndProcessInitialTasks()];
+                    case 3:
+                        _a.sent(); // Завантажуємо початкові завдання
+                        // Реєструємо спостерігача
+                        this.registerEvent(this.app.vault.on('modify', this.handleTaskFileModify));
+                        // Також треба оновлювати шлях при зміні налаштувань
+                        this.register(this.on('settings-updated', function () {
+                            _this.updateDailyTaskFilePath();
+                            // Потенційно перезавантажити завдання, якщо шлях змінився
+                            _this.loadAndProcessInitialTasks();
+                        }));
                         return [2 /*return*/];
+                }
+            });
+        });
+    };
+    // Оновлює шлях до файлу завдань
+    OllamaPlugin.prototype.updateDailyTaskFilePath = function () {
+        var _a, _b;
+        var folderPath = (_a = this.settings.ragFolderPath) === null || _a === void 0 ? void 0 : _a.trim();
+        var fileName = (_b = this.settings.dailyTaskFileName) === null || _b === void 0 ? void 0 : _b.trim();
+        if (folderPath && fileName) {
+            this.dailyTaskFilePath = obsidian_1.normalizePath("<span class=\"math-inline\">{folderPath}/</span>{fileName}");
+            console.log("[Plugin] Daily task file path set to: " + this.dailyTaskFilePath);
+        }
+        else {
+            this.dailyTaskFilePath = null;
+            console.log("[Plugin] Daily task file path is not configured.");
+        }
+    };
+    // Завантажує та обробляє завдання (можна викликати при старті та при зміні)
+    OllamaPlugin.prototype.loadAndProcessInitialTasks = function () {
+        var _a, _b, _c, _d;
+        return __awaiter(this, void 0, void 0, function () {
+            var content, tasks, error_1;
+            return __generator(this, function (_e) {
+                switch (_e.label) {
+                    case 0:
+                        if (!this.dailyTaskFilePath) {
+                            this.taskFileContentCache = null;
+                            // Повідомити ChatManager, що плану немає (якщо він тримає стан)
+                            (_a = this.chatManager) === null || _a === void 0 ? void 0 : _a.updateTaskState(null);
+                            return [2 /*return*/];
+                        }
+                        _e.label = 1;
+                    case 1:
+                        _e.trys.push([1, 6, , 7]);
+                        return [4 /*yield*/, this.app.vault.adapter.exists(this.dailyTaskFilePath)];
+                    case 2:
+                        if (!_e.sent()) return [3 /*break*/, 4];
+                        return [4 /*yield*/, this.app.vault.adapter.read(this.dailyTaskFilePath)];
+                    case 3:
+                        content = _e.sent();
+                        if (content !== this.taskFileContentCache) {
+                            console.log("[Plugin] Loading and processing tasks from " + this.dailyTaskFilePath);
+                            this.taskFileContentCache = content;
+                            tasks = this.parseTasks(content);
+                            (_b = this.chatManager) === null || _b === void 0 ? void 0 : _b.updateTaskState(tasks); // Передаємо розпарсені завдання
+                            this.taskFileNeedsUpdate = false; // Скидаємо прапорець після обробки
+                        }
+                        return [3 /*break*/, 5];
+                    case 4:
+                        console.log("[Plugin] Task file " + this.dailyTaskFilePath + " not found.");
+                        this.taskFileContentCache = null;
+                        (_c = this.chatManager) === null || _c === void 0 ? void 0 : _c.updateTaskState(null); // Повідомити, що файлу немає
+                        _e.label = 5;
+                    case 5: return [3 /*break*/, 7];
+                    case 6:
+                        error_1 = _e.sent();
+                        console.error("[Plugin] Error loading/processing task file " + this.dailyTaskFilePath + ":", error_1);
+                        this.taskFileContentCache = null;
+                        (_d = this.chatManager) === null || _d === void 0 ? void 0 : _d.updateTaskState(null); // Повідомити про помилку
+                        return [3 /*break*/, 7];
+                    case 7: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    // Функція парсингу завдань (приклад)
+    OllamaPlugin.prototype.parseTasks = function (content) {
+        var lines = content.split('\n');
+        var urgent = [];
+        var regular = [];
+        var hasContent = false;
+        for (var _i = 0, lines_1 = lines; _i < lines_1.length; _i++) {
+            var line = lines_1[_i];
+            var trimmedLine = line.trim();
+            if (!trimmedLine)
+                continue; // Пропускаємо порожні рядки
+            hasContent = true; // Файл не порожній
+            // Приклад: шукаємо [Urgent], !, або інший маркер на початку/кінці
+            if (trimmedLine.startsWith('!') || trimmedLine.toLowerCase().includes('[urgent]')) {
+                // Видаляємо маркер для чистого тексту завдання
+                urgent.push(trimmedLine.replace(/^!/, '').replace(/\[urgent\]/i, '').trim());
+            }
+            else if (trimmedLine.startsWith('- [ ]') || trimmedLine.startsWith('- [x]')) {
+                // Обробка Markdown задач
+                regular.push(trimmedLine.substring(trimmedLine.indexOf(']') + 1).trim());
+            }
+            else {
+                regular.push(trimmedLine); // Вважаємо звичайним завданням
+            }
+        }
+        return { urgent: urgent, regular: regular, hasContent: hasContent };
+    };
+    // Метод для перевірки, чи потрібно оновити завдання (викликається перед запитом до LLM)
+    OllamaPlugin.prototype.checkAndProcessTaskUpdate = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!this.taskFileNeedsUpdate) return [3 /*break*/, 2];
+                        return [4 /*yield*/, this.loadAndProcessInitialTasks()];
+                    case 1:
+                        _a.sent(); // Перезавантажуємо і обробляємо
+                        _a.label = 2;
+                    case 2: return [2 /*return*/];
                 }
             });
         });

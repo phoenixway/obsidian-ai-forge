@@ -23,6 +23,9 @@ export class ChatManager {
     private sessionIndex: ChatSessionIndex = {}; // In-memory index of available chats {id: metadata}
     private activeChatId: string | null = null;
     private loadedChats: Record<string, Chat> = {}; // Cache for loaded Chat objects
+    public filePlanExists: boolean = false;
+    public fileUrgentTasks: string[] = [];
+    public fileRegularTasks: string[] = [];
 
     constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
@@ -48,7 +51,22 @@ export class ChatManager {
         }
         console.log(`[ChatManager] Updated chatsFolderPath to: ${this.chatsFolderPath}`);
     }
-
+    // Метод для оновлення стану з плагіна
+    updateTaskState(tasks: { urgent: string[], regular: string[], hasContent: boolean } | null) {
+        if (tasks) {
+            this.filePlanExists = tasks.hasContent; // План є, якщо файл не порожній
+            this.fileUrgentTasks = [...tasks.urgent];
+            this.fileRegularTasks = [...tasks.regular];
+            console.log(`[ChatManager] Updated task state from file. Plan exists: ${this.filePlanExists}, Urgent tasks: ${this.fileUrgentTasks.length}`);
+        } else {
+            this.filePlanExists = false;
+            this.fileUrgentTasks = [];
+            this.fileRegularTasks = [];
+            console.log(`[ChatManager] Cleared task state (file not found or error).`);
+        }
+        // Тут можна викликати подію, якщо потрібно негайно оновити стан AI,
+        // але краще передавати стан при наступному запиті.
+    }
     /**
      * Ініціалізує ChatManager: оновлює шлях, перевіряє існування папки,
      * завантажує індекс чатів та ID активного чату.

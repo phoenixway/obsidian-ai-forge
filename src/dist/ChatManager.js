@@ -46,6 +46,13 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArrays = (this && this.__spreadArrays) || function () {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+};
 exports.__esModule = true;
 exports.ChatManager = void 0;
 // ChatManager.ts
@@ -60,6 +67,9 @@ var ChatManager = /** @class */ (function () {
         this.sessionIndex = {}; // In-memory index of available chats {id: metadata}
         this.activeChatId = null;
         this.loadedChats = {}; // Cache for loaded Chat objects
+        this.filePlanExists = false;
+        this.fileUrgentTasks = [];
+        this.fileRegularTasks = [];
         this.plugin = plugin;
         this.app = plugin.app;
         this.adapter = plugin.app.vault.adapter; // Використовуємо адаптер сховища
@@ -83,6 +93,23 @@ var ChatManager = /** @class */ (function () {
             this.chatsFolderPath = "/";
         }
         console.log("[ChatManager] Updated chatsFolderPath to: " + this.chatsFolderPath);
+    };
+    // Метод для оновлення стану з плагіна
+    ChatManager.prototype.updateTaskState = function (tasks) {
+        if (tasks) {
+            this.filePlanExists = tasks.hasContent; // План є, якщо файл не порожній
+            this.fileUrgentTasks = __spreadArrays(tasks.urgent);
+            this.fileRegularTasks = __spreadArrays(tasks.regular);
+            console.log("[ChatManager] Updated task state from file. Plan exists: " + this.filePlanExists + ", Urgent tasks: " + this.fileUrgentTasks.length);
+        }
+        else {
+            this.filePlanExists = false;
+            this.fileUrgentTasks = [];
+            this.fileRegularTasks = [];
+            console.log("[ChatManager] Cleared task state (file not found or error).");
+        }
+        // Тут можна викликати подію, якщо потрібно негайно оновити стан AI,
+        // але краще передавати стан при наступному запиті.
     };
     /**
      * Ініціалізує ChatManager: оновлює шлях, перевіряє існування папки,
