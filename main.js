@@ -36,7 +36,7 @@ var __publicField = (obj, key, value) => {
   return value;
 };
 
-// main.ts
+// src/main.ts
 var main_exports = {};
 __export(main_exports, {
   default: () => OllamaPlugin
@@ -44,10 +44,10 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian9 = require("obsidian");
 
-// OllamaView.ts
+// src/OllamaView.ts
 var import_obsidian3 = require("obsidian");
 
-// ConfirmModal.ts
+// src/ConfirmModal.ts
 var import_obsidian = require("obsidian");
 var ConfirmModal = class extends import_obsidian.Modal {
   constructor(app, title, message, onConfirm) {
@@ -76,7 +76,7 @@ var ConfirmModal = class extends import_obsidian.Modal {
   }
 };
 
-// PromptModal.ts
+// src/PromptModal.ts
 var import_obsidian2 = require("obsidian");
 var PromptModal = class extends import_obsidian2.Modal {
   constructor(app, title, promptText, initialValue = "", onSubmit) {
@@ -129,7 +129,7 @@ var PromptModal = class extends import_obsidian2.Modal {
   }
 };
 
-// OllamaView.ts
+// src/OllamaView.ts
 var VIEW_TYPE_OLLAMA = "ollama-chat-view";
 var CSS_CLASS_CONTAINER = "ollama-container";
 var CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
@@ -1911,7 +1911,7 @@ ${contentPrefix}`) + "\n\n";
   }
 };
 
-// settings.ts
+// src/settings.ts
 var import_obsidian4 = require("obsidian");
 var LANGUAGES2 = {
   /* ... ваш довгий список мов ... */
@@ -2245,7 +2245,7 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   }
 };
 
-// ragService.ts
+// src/ragService.ts
 var RagService = class {
   constructor(plugin) {
     this.documents = [];
@@ -2368,7 +2368,7 @@ var RagService = class {
   }
 };
 
-// OllamaService.ts
+// src/OllamaService.ts
 var OllamaService = class {
   // Keep event emitter for connection errors
   constructor(plugin) {
@@ -2550,7 +2550,7 @@ var OllamaService = class {
   }
 };
 
-// PromptService.ts
+// src/PromptService.ts
 var import_obsidian5 = require("obsidian");
 
 // node_modules/gpt-tokenizer/esm/bpeRanks/cl100k_base.js
@@ -4285,7 +4285,7 @@ __publicField(GptEncoding, "FimSuffix", FimSuffix);
 var api = GptEncoding.getEncodingApi("cl100k_base", () => cl100k_base_default);
 var { decode, decodeAsyncGenerator, decodeGenerator, encode, encodeGenerator, isWithinTokenLimit, countTokens, encodeChat, encodeChatGenerator, vocabularySize, setMergeCacheSize, clearMergeCache, estimateCost } = api;
 
-// PromptService.ts
+// src/PromptService.ts
 function countWords(text) {
   if (!text)
     return 0;
@@ -4634,10 +4634,10 @@ Current date and time: ${currentDate}, ${currentTime}`;
   }
 };
 
-// ChatManager.ts
+// src/ChatManager.ts
 var import_obsidian7 = require("obsidian");
 
-// Chat.ts
+// src/Chat.ts
 var import_obsidian6 = require("obsidian");
 var Chat = class {
   // Debounced function for saving
@@ -4820,7 +4820,7 @@ var Chat = class {
   }
 };
 
-// ChatManager.ts
+// src/ChatManager.ts
 var SESSIONS_INDEX_KEY = "chatSessionsIndex_v1";
 var ACTIVE_SESSION_ID_KEY = "activeChatSessionId_v1";
 var ChatManager = class {
@@ -5355,11 +5355,11 @@ var ChatManager = class {
   }
 };
 
-// main.ts
+// src/main.ts
 var import_child_process = require("child_process");
 var path = __toESM(require("path"));
 
-// TranslationService.ts
+// src/TranslationService.ts
 var import_obsidian8 = require("obsidian");
 var GOOGLE_TRANSLATE_API_URL = "https://translation.googleapis.com/language/translate/v2";
 var TranslationService = class {
@@ -5441,7 +5441,7 @@ var TranslationService = class {
   }
 };
 
-// main.ts
+// src/main.ts
 var OllamaPlugin = class extends import_obsidian9.Plugin {
   constructor() {
     super(...arguments);
