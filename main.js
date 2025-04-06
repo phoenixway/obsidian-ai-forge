@@ -2276,7 +2276,7 @@ var RagService = class {
     try {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
-      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from 'data' subfolder)`);
+      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from here)`);
       const allFiles = vault.getFiles();
       console.log(`Total files in vault: ${allFiles.length}`);
       const files = await this.getMarkdownFiles(vault, folderPath);
@@ -2318,7 +2318,7 @@ var RagService = class {
     if (!normalizedFolderPath.endsWith("/")) {
       normalizedFolderPath += "/";
     }
-    const dataFolderPath = normalizedFolderPath + "data/";
+    const dataFolderPath = normalizedFolderPath;
     console.log(`Looking for markdown files in: "${dataFolderPath}"`);
     const allFiles = vault.getFiles();
     for (const file of allFiles) {

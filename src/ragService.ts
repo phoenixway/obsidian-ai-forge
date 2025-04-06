@@ -30,7 +30,7 @@ export class RagService {
       const vault = this.plugin.app.vault;
 
       // Оновлюємо повідомлення для логування
-      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from 'data' subfolder)`);
+      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from here)`);
       const allFiles = vault.getFiles();
       console.log(`Total files in vault: ${allFiles.length}`);
       const files = await this.getMarkdownFiles(vault, folderPath);
@@ -82,7 +82,7 @@ export class RagService {
     }
 
     // Завжди шукаємо тільки в підпапці "data" заданого шляху
-    const dataFolderPath = normalizedFolderPath + 'data/';
+    const dataFolderPath = normalizedFolderPath;
 
     console.log(`Looking for markdown files in: "${dataFolderPath}"`);
 
