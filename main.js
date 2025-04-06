@@ -277,7 +277,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
       this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT);
       this.translateInputButton.title = "Translating...";
       try {
-        console.log(`[OllamaView] Translating input to ${targetLang}...`);
         const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
         if (translatedText !== null) {
           this.inputEl.value = translatedText;
@@ -285,12 +284,9 @@ var OllamaView = class extends import_obsidian3.ItemView {
           this.inputEl.focus();
           const end = translatedText.length;
           this.inputEl.setSelectionRange(end, end);
-          console.log("[OllamaView] Input translation successful.");
         } else {
-          console.warn("[OllamaView] Input translation failed (service returned null).");
         }
       } catch (error) {
-        console.error("Error during input translation:", error);
         new import_obsidian3.Notice("An unexpected error occurred during input translation.");
       } finally {
         (0, import_obsidian3.setIcon)(this.translateInputButton, "replace");
@@ -304,7 +300,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
       e.stopPropagation();
       const isHidden = !this.isMenuOpen();
       if (isHidden) {
-        console.log("[OllamaView] Opening menu, rendering lists...");
         Promise.all([
           this.renderModelList(),
           this.renderRoleList(),
@@ -344,7 +339,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
 This action cannot be undone.`,
           // Повідомлення для підтвердження
           () => {
-            console.log(`[OllamaView] Clearing messages for chat ${chatId} ("${chatName}")`);
             this.plugin.chatManager.clearActiveChatMessages();
           }
           // Код для 'Cancel' не потрібен, модальне вікно просто закриється
@@ -355,7 +349,6 @@ This action cannot be undone.`,
     };
     this.handleNewChatClick = async () => {
       this.closeMenu();
-      console.log("[OllamaView] 'New Chat' button clicked.");
       try {
         const newChat = await this.plugin.chatManager.createNewChat();
         if (newChat) {
@@ -365,14 +358,12 @@ This action cannot be undone.`,
           new import_obsidian3.Notice("Failed to create new chat.");
         }
       } catch (error) {
-        console.error("Error creating new chat via menu:", error);
         new import_obsidian3.Notice("Error creating new chat.");
       }
     };
     this.handleExportChatClick = async () => {
       var _a, _b;
       this.closeMenu();
-      console.log("[OllamaView] Export to Markdown initiated.");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (!activeChat || activeChat.messages.length === 0) {
         new import_obsidian3.Notice("Chat is empty, nothing to export.");
@@ -390,20 +381,17 @@ This action cannot be undone.`,
           const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
           if (!abstractFile) {
             try {
-              console.log(`[OllamaView] Export folder '${targetFolderPath}' not found, creating...`);
               await this.app.vault.createFolder(targetFolderPath);
               targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath);
               if (targetFolder)
                 new import_obsidian3.Notice(`Created export folder: ${targetFolderPath}`);
             } catch (err) {
-              console.error(`Failed to create export folder ${targetFolderPath}:`, err);
               new import_obsidian3.Notice(`Error: Could not create export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
             }
           } else if (abstractFile instanceof import_obsidian3.TFolder) {
             targetFolder = abstractFile;
           } else {
-            console.warn(`Export path ${targetFolderPath} is not a folder. Saving to vault root.`);
             new import_obsidian3.Notice(`Error: Export path is not a folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
@@ -411,17 +399,14 @@ This action cannot be undone.`,
           targetFolder = this.app.vault.getRoot();
         }
         if (!targetFolder) {
-          console.error("Could not determine target folder for export. Aborting.");
           new import_obsidian3.Notice("Error: Could not determine target folder for export.");
           return;
         }
         const filePath = (0, import_obsidian3.normalizePath)(`${targetFolder.path}/${defaultFileName}`);
         const file = await this.app.vault.create(filePath, markdownContent);
         new import_obsidian3.Notice(`Chat exported successfully to ${file.path}`);
-        console.log(`[OllamaView] Chat exported to ${file.path}`);
       } catch (error) {
-        console.error("Error exporting chat to Markdown:", error);
-        new import_obsidian3.Notice("Error exporting chat. Check console for details.");
+        new import_obsidian3.Notice("Error exporting chat. Check //console for details.");
       }
     };
     // Plugin Event Handlers
@@ -447,19 +432,16 @@ This action cannot be undone.`,
       }
     };
     this.handleRolesUpdated = () => {
-      console.log("[OllamaView] Roles updated event received.");
       if (this.isMenuOpen()) {
         this.renderRoleList();
       }
     };
     this.handleChatListUpdated = () => {
-      console.log("[OllamaView] Chat list updated event received.");
       if (this.isMenuOpen()) {
         this.renderChatListMenu();
       }
     };
     this.handleActiveChatChanged = (data) => {
-      console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
       this.loadAndDisplayActiveChat();
       if (this.isMenuOpen()) {
         this.renderModelList();
@@ -479,7 +461,6 @@ This action cannot be undone.`,
     this.handleMessagesCleared = (chatId) => {
       var _a;
       if (chatId === ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
-        console.log("[OllamaView] Messages cleared event received for active chat.");
         this.clearChatContainerInternal();
         this.currentMessages = [];
         this.showEmptyState();
@@ -561,7 +542,6 @@ This action cannot be undone.`,
         // Початкове значення
         async (newName) => {
           if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-            console.log(`[OllamaView] Renaming chat <span class="math-inline">{activeChat.metadata.id} to "</span>{newName.trim()}"`);
             const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
             if (success) {
               new import_obsidian3.Notice(`Chat renamed to "${newName.trim()}"`);
@@ -595,7 +575,6 @@ This action cannot be undone.`,
 This action cannot be undone.`,
         // Повідомлення
         async () => {
-          console.log(`[OllamaView] Deleting chat <span class="math-inline">{activeChat.metadata.id} ("</span>{chatName}")`);
           const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
           if (success) {
             new import_obsidian3.Notice(`Chat "${chatName}" deleted.`);
@@ -614,7 +593,6 @@ This action cannot be undone.`,
         return;
       }
       const originalName = activeChat.metadata.name;
-      console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
       const cloningNotice = new import_obsidian3.Notice("Cloning chat...", 0);
       try {
         const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
@@ -627,14 +605,12 @@ This action cannot be undone.`,
         }
       } catch (error) {
         cloningNotice.hide();
-        console.error("Error cloning chat:", error);
         new import_obsidian3.Notice("An error occurred while cloning the chat.");
       }
     };
     this.plugin = plugin;
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian3.debounce)(this.handleScroll, 150, true);
-    console.log("[OllamaView] Constructed.");
   }
   // --- Getters ---
   isMenuOpen() {
@@ -655,7 +631,6 @@ This action cannot be undone.`,
   // Obsidian icon ID
   async onOpen() {
     var _a;
-    console.log("[OllamaView] onOpen called.");
     this.createUIElements();
     this.updateInputPlaceholder(this.plugin.settings.modelName);
     this.attachEventListeners();
@@ -664,7 +639,6 @@ This action cannot be undone.`,
     try {
       await this.loadAndDisplayActiveChat();
     } catch (error) {
-      console.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState();
     }
     setTimeout(() => {
@@ -674,7 +648,6 @@ This action cannot be undone.`,
     (_a = this.inputEl) == null ? void 0 : _a.dispatchEvent(new Event("input"));
   }
   async onClose() {
-    console.log("[OllamaView] onClose: Cleaning up...");
     if (this.speechWorker) {
       this.speechWorker.terminate();
       this.speechWorker = null;
@@ -820,14 +793,12 @@ This action cannot be undone.`,
   /** Loads the active chat session from ChatManager and displays its messages */
   async loadAndDisplayActiveChat() {
     var _a;
-    console.log("[OllamaView] Loading and displaying active chat...");
     this.clearChatContainerInternal();
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
     try {
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (activeChat && activeChat.messages.length > 0) {
-        console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
         this.hideEmptyState();
         this.renderMessages(activeChat.messages);
         this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
@@ -836,16 +807,13 @@ This action cannot be undone.`,
           this.guaranteedScrollToBottom(100, true);
         }, 150);
       } else if (activeChat) {
-        console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
         this.showEmptyState();
         this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
       } else {
-        console.warn("[OllamaView] No active chat found or failed to load.");
         this.showEmptyState();
         this.updateInputPlaceholder(this.plugin.settings.modelName);
       }
     } catch (error) {
-      console.error("[OllamaView] Error getting active chat:", error);
       this.showEmptyState();
       new import_obsidian3.Notice("Error loading chat history.");
     }
@@ -858,7 +826,6 @@ This action cannot be undone.`,
     messagesToRender.forEach((message) => {
       this.renderMessageInternal(message, messagesToRender);
     });
-    console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
   }
   /** Appends a single message to the display */
   addMessageToDisplay(role, content, timestamp) {
@@ -902,9 +869,7 @@ This action cannot be undone.`,
         throw new Error("Failed to add user message to history.");
       loadingEl = this.addLoadingIndicator();
       this.guaranteedScrollToBottom(50, true);
-      console.log("[OllamaView] Requesting AI response...");
       const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
-      console.log("[OllamaView] Received response from service.");
       if (loadingEl) {
         this.removeLoadingIndicator(loadingEl);
         loadingEl = null;
@@ -912,11 +877,9 @@ This action cannot be undone.`,
       if (assistantMessage) {
         await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
       } else {
-        console.warn("[OllamaView] Service returned null assistant message.");
         this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
       }
     } catch (error) {
-      console.error("[OllamaView] Send/receive cycle error:", error);
       if (loadingEl) {
         this.removeLoadingIndicator(loadingEl);
         loadingEl = null;
@@ -1041,8 +1004,6 @@ This action cannot be undone.`,
         buttonEl.setAttribute("title", "Copy");
       }, 2e3);
     }).catch((err) => {
-      console.error("Copy failed:", err);
-      new import_obsidian3.Notice("Failed to copy text.");
     });
   }
   async handleTranslateClick(originalContent, contentEl, buttonEl) {
@@ -1074,7 +1035,6 @@ This action cannot be undone.`,
         this.guaranteedScrollToBottom(50, false);
       }
     } catch (error) {
-      console.error("Error during translation click handling:", error);
       new import_obsidian3.Notice("An unexpected error occurred during translation.");
     } finally {
       (0, import_obsidian3.setIcon)(buttonEl, "languages");
@@ -1097,7 +1057,6 @@ This action cannot be undone.`,
       try {
         (0, import_obsidian3.setIcon)(avatarEl, avatarContent || (isUser ? "user" : "bot"));
       } catch (e) {
-        console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
         avatarEl.textContent = isUser ? "U" : "A";
       }
     } else {
@@ -1163,7 +1122,6 @@ This action cannot be undone.`,
             copyBtn.setAttribute("title", "Copy Code");
           }, 1500);
         }).catch((err) => {
-          console.error("Code block copy failed:", err);
           new import_obsidian3.Notice("Failed to copy code.");
         });
       });
@@ -1210,7 +1168,6 @@ This action cannot be undone.`,
         try {
           (0, import_obsidian3.setIcon)(iconSpan, iconToUse);
         } catch (e) {
-          console.warn(`[OllamaView] Could not set icon '${iconToUse}' for model ${modelName}`);
           iconSpan.style.minWidth = "18px";
         }
         modelOptionEl.createEl("span", { cls: "menu-option-text", text: modelName });
@@ -1219,11 +1176,9 @@ This action cannot be undone.`,
           const currentActiveChatOnClick = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
           const currentActiveModelOnClick = ((_b2 = currentActiveChatOnClick == null ? void 0 : currentActiveChatOnClick.metadata) == null ? void 0 : _b2.modelName) || this.plugin.settings.modelName;
           if (modelName !== currentActiveModelOnClick) {
-            console.log(`[OllamaView] Model selected via menu for active chat: ${modelName}`);
             if (this.plugin.chatManager && currentActiveChatOnClick) {
               await this.plugin.chatManager.updateActiveChatMetadata({ modelName });
             } else {
-              console.error("[OllamaView] Cannot update model - no active chat found via ChatManager.");
               new import_obsidian3.Notice("Error: Could not find active chat to update model.");
             }
           }
@@ -1231,7 +1186,6 @@ This action cannot be undone.`,
         });
       });
     } catch (error) {
-      console.error("Error loading models for menu:", error);
       this.modelListContainerEl.empty();
       this.modelListContainerEl.createEl("span", { text: "Error loading models." });
     }
@@ -1266,11 +1220,9 @@ This action cannot be undone.`,
           await this.plugin.saveSettings();
           const currentActiveChatOnClick = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
           if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
-            console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
             await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
             (_c2 = (_b2 = this.plugin.promptService) == null ? void 0 : _b2.clearRoleCache) == null ? void 0 : _c2.call(_b2);
           } else if (!currentActiveChatOnClick) {
-            console.warn("[OllamaView] No active chat found to update role metadata for.");
           }
           this.plugin.emit("role-changed", "Default Assistant");
         }
@@ -1298,16 +1250,13 @@ This action cannot be undone.`,
             const currentGlobalRolePath = this.plugin.settings.selectedRolePath;
             const newRolePath = roleInfo.path;
             if (newRolePath !== currentGlobalRolePath || newRolePath !== currentChatRolePath) {
-              console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${newRolePath})`);
               this.plugin.settings.selectedRolePath = newRolePath;
               await this.plugin.saveSettings();
               const currentActiveChatOnClick = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
               if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
-                console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
                 await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
                 (_c2 = (_b2 = this.plugin.promptService) == null ? void 0 : _b2.clearRoleCache) == null ? void 0 : _c2.call(_b2);
               } else if (!currentActiveChatOnClick) {
-                console.warn("[OllamaView] No active chat found to update role metadata for.");
               }
               this.plugin.emit("role-changed", roleInfo.name);
             }
@@ -1316,7 +1265,6 @@ This action cannot be undone.`,
         });
       }
     } catch (error) {
-      console.error("Error loading roles for menu:", error);
       this.roleListContainerEl.empty();
       this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
     }
@@ -1335,7 +1283,6 @@ This action cannot be undone.`,
         this.chatListContainerEl.createEl("span", { text: "No saved chats found." });
         return;
       }
-      console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2));
       chats.forEach((chatMeta) => {
         const chatOptionEl = this.chatListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CHAT_OPTION}` });
         const iconSpan = chatOptionEl.createEl("span", { cls: "menu-option-icon" });
@@ -1352,14 +1299,12 @@ This action cannot be undone.`,
         this.registerDomEvent(chatOptionEl, "click", async () => {
           var _a2;
           if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
-            console.log(`[OllamaView] Switching to chat via menu: ${chatMeta.name} (${chatMeta.id})`);
             await this.plugin.chatManager.setActiveChat(chatMeta.id);
           }
           this.closeMenu();
         });
       });
     } catch (error) {
-      console.error("Error loading chats for menu:", error);
       this.chatListContainerEl.empty();
       this.chatListContainerEl.createEl("span", { text: "Error loading chats." });
     }
@@ -1425,7 +1370,7 @@ This action cannot be undone.`,
               const responseData = await response.json();
 
               if (!response.ok) {
-                console.error("Google Speech API Error:", responseData);
+                //console.error("Google Speech API Error:", responseData);
                 self.postMessage({
                   error: true,
                   message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
@@ -1444,7 +1389,7 @@ This action cannot be undone.`,
                  self.postMessage({ error: true, message: 'No speech detected or recognized.' });
               }
             } catch (error) {
-               console.error("Error in speech worker processing:", error);
+               //console.error("Error in speech worker processing:", error);
                self.postMessage({
                  error: true,
                  message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
@@ -1457,9 +1402,7 @@ This action cannot be undone.`,
       this.speechWorker = new Worker(workerUrl);
       URL.revokeObjectURL(workerUrl);
       this.setupSpeechWorkerHandlers();
-      console.log("Speech worker initialized.");
     } catch (error) {
-      console.error("Failed to initialize speech worker:", error);
       new import_obsidian3.Notice("Speech recognition feature failed to initialize.");
       this.speechWorker = null;
     }
@@ -1470,7 +1413,6 @@ This action cannot be undone.`,
     this.speechWorker.onmessage = (event) => {
       const data = event.data;
       if (data && typeof data === "object" && data.error) {
-        console.error("Speech recognition error:", data.message);
         new import_obsidian3.Notice(`Speech Recognition Error: ${data.message}`);
         this.updateInputPlaceholder(this.plugin.settings.modelName);
         this.updateSendButtonState();
@@ -1480,12 +1422,10 @@ This action cannot be undone.`,
         const transcript = data.trim();
         this.insertTranscript(transcript);
       } else if (typeof data !== "string") {
-        console.warn("Received unexpected data format from speech worker:", data);
       }
       this.updateSendButtonState();
     };
     this.speechWorker.onerror = (error) => {
-      console.error("Unhandled worker error:", error);
       new import_obsidian3.Notice("An unexpected error occurred in the speech recognition worker.");
       this.updateInputPlaceholder(this.plugin.settings.modelName);
       this.stopVoiceRecording(false);
@@ -1522,10 +1462,9 @@ This action cannot be undone.`,
     }
   }
   async startVoiceRecognition() {
-    var _a, _b, _c;
+    var _a;
     if (!this.speechWorker) {
       new import_obsidian3.Notice("\u0424\u0443\u043D\u043A\u0446\u0456\u044F \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 (worker \u043D\u0435 \u0456\u043D\u0456\u0446\u0456\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E).");
-      console.error("\u0421\u043F\u0440\u043E\u0431\u0430 \u0440\u043E\u0437\u043F\u043E\u0447\u0430\u0442\u0438 \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u0433\u043E\u043B\u043E\u0441\u0443 \u0431\u0435\u0437 \u0456\u043D\u0456\u0446\u0456\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E\u0433\u043E worker'\u0430.");
       return;
     }
     if (!this.plugin.settings.googleApiKey) {
@@ -1537,10 +1476,8 @@ This action cannot be undone.`,
       let recorderOptions;
       const preferredMimeType = "audio/webm;codecs=opus";
       if (MediaRecorder.isTypeSupported(preferredMimeType)) {
-        console.log(`\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0432\u0430\u043D\u0438\u0439 mimeType: ${preferredMimeType}`);
         recorderOptions = { mimeType: preferredMimeType };
       } else {
-        console.warn(`${preferredMimeType} \u043D\u0435 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454\u0442\u044C\u0441\u044F, \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0438\u0439 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430.`);
         recorderOptions = void 0;
       }
       this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
@@ -1555,10 +1492,8 @@ This action cannot be undone.`,
       };
       this.mediaRecorder.onstop = () => {
         var _a2;
-        console.log("MediaRecorder stopped.");
         if (this.speechWorker && audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: ((_a2 = this.mediaRecorder) == null ? void 0 : _a2.mimeType) || "audio/webm" });
-          console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
           this.inputEl.placeholder = "Processing speech...";
           this.speechWorker.postMessage({
             apiKey: this.plugin.settings.googleApiKey,
@@ -1566,20 +1501,16 @@ This action cannot be undone.`,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA"
           });
         } else if (audioChunks.length === 0) {
-          console.log("No audio data recorded.");
           this.updateInputPlaceholder(this.plugin.settings.modelName);
           this.updateSendButtonState();
         }
       };
       this.mediaRecorder.onerror = (event) => {
-        console.error("MediaRecorder Error:", event);
         new import_obsidian3.Notice("An error occurred during recording.");
         this.stopVoiceRecording(false);
       };
       this.mediaRecorder.start();
-      console.log("Recording started. MimeType:", (_c = (_b = this.mediaRecorder) == null ? void 0 : _b.mimeType) != null ? _c : "default");
     } catch (error) {
-      console.error("Error accessing microphone or starting recording:", error);
       if (error instanceof DOMException && error.name === "NotAllowedError") {
         new import_obsidian3.Notice("Microphone access denied. Please grant permission.");
       } else if (error instanceof DOMException && error.name === "NotFoundError") {
@@ -1592,7 +1523,6 @@ This action cannot be undone.`,
   }
   stopVoiceRecording(processAudio) {
     var _a, _b;
-    console.log(`Stopping voice recording. Process audio: ${processAudio}`);
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       this.mediaRecorder.stop();
     } else if (!processAudio && ((_a = this.mediaRecorder) == null ? void 0 : _a.state) === "inactive") {
@@ -1604,7 +1534,6 @@ This action cannot be undone.`,
     if (this.audioStream) {
       this.audioStream.getTracks().forEach((track) => track.stop());
       this.audioStream = null;
-      console.log("Audio stream tracks stopped.");
     }
     this.mediaRecorder = null;
   }
@@ -1721,7 +1650,6 @@ This action cannot be undone.`,
     this.showEmptyState();
     this.updateSendButtonState();
     setTimeout(() => this.focusInput(), 50);
-    console.log("[OllamaView] Display and internal state cleared.");
   }
   addLoadingIndicator() {
     this.hideEmptyState();
@@ -1782,7 +1710,6 @@ This action cannot be undone.`,
             }
           }
         } else {
-          console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found.");
         }
       });
       this.scrollTimeout = null;

@@ -140,15 +140,15 @@ export class OllamaView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     // Consider if singleton pattern (OllamaView.instance) is truly necessary
-    // if (OllamaView.instance && OllamaView.instance !== this) { console.warn("Replacing existing OllamaView instance."); }
+    // if (OllamaView.instance && OllamaView.instance !== this) { //console.warn("Replacing existing OllamaView instance."); }
     // OllamaView.instance = this;
 
     // Check Obsidian API version if needed
-    // if (!requireApiVersion || !requireApiVersion("1.0.0")) { console.warn("Ollama Plugin: Obsidian API version might be outdated."); }
+    // if (!requireApiVersion || !requireApiVersion("1.0.0")) { //console.warn("Ollama Plugin: Obsidian API version might be outdated."); }
 
     this.initSpeechWorker(); // Initialize speech worker (if using)
     this.scrollListenerDebounced = debounce(this.handleScroll, 150, true);
-    console.log("[OllamaView] Constructed.");
+    //console.log("[OllamaView] Constructed.");
   }
 
   // --- Getters ---
@@ -162,7 +162,7 @@ export class OllamaView extends ItemView {
   getIcon(): string { return "message-square"; } // Obsidian icon ID
 
   async onOpen(): Promise<void> {
-    console.log("[OllamaView] onOpen called.");
+    //console.log("[OllamaView] onOpen called.");
     this.createUIElements(); // Build the HTML structure
     this.updateInputPlaceholder(this.plugin.settings.modelName); // Set initial placeholder
     this.attachEventListeners(); // Attach event handlers
@@ -171,7 +171,7 @@ export class OllamaView extends ItemView {
     try {
       await this.loadAndDisplayActiveChat();
     } catch (error) {
-      console.error("[OllamaView] Error during initial chat load:", error);
+      //console.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState(); // Show empty state on error
     }
 
@@ -180,7 +180,7 @@ export class OllamaView extends ItemView {
   }
 
   async onClose(): Promise<void> {
-    console.log("[OllamaView] onClose: Cleaning up...");
+    //console.log("[OllamaView] onClose: Cleaning up...");
     // Terminate worker, stop recording, clear timeouts, etc.
     if (this.speechWorker) { this.speechWorker.terminate(); this.speechWorker = null; }
     this.stopVoiceRecording(false);
@@ -384,7 +384,7 @@ export class OllamaView extends ItemView {
     this.translateInputButton.title = "Translating...";
 
     try {
-      console.log(`[OllamaView] Translating input to ${targetLang}...`);
+      //console.log(`[OllamaView] Translating input to ${targetLang}...`);
       const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
 
       if (translatedText !== null) {
@@ -393,12 +393,12 @@ export class OllamaView extends ItemView {
         this.inputEl.focus();
         const end = translatedText.length;
         this.inputEl.setSelectionRange(end, end);
-        console.log("[OllamaView] Input translation successful.");
+        //console.log("[OllamaView] Input translation successful.");
       } else {
-        console.warn("[OllamaView] Input translation failed (service returned null).");
+        //console.warn("[OllamaView] Input translation failed (service returned null).");
       }
     } catch (error) {
-      console.error("Error during input translation:", error);
+      //console.error("Error during input translation:", error);
       new Notice("An unexpected error occurred during input translation.");
     } finally {
       setIcon(this.translateInputButton, "replace");
@@ -413,7 +413,7 @@ export class OllamaView extends ItemView {
     e.stopPropagation();
     const isHidden = !this.isMenuOpen();
     if (isHidden) {
-      console.log("[OllamaView] Opening menu, rendering lists...");
+      //console.log("[OllamaView] Opening menu, rendering lists...");
       // Render all lists when menu is opened
       Promise.all([
         this.renderModelList(),
@@ -454,7 +454,7 @@ export class OllamaView extends ItemView {
         'Clear Chat Messages', // Заголовок вікна
         `Are you sure you want to clear all messages in chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення для підтвердження
         () => { // Функція, що виконається при натисканні "Confirm"
-          console.log(`[OllamaView] Clearing messages for chat ${chatId} ("${chatName}")`);
+          //console.log(`[OllamaView] Clearing messages for chat ${chatId} ("${chatName}")`);
           // Викликаємо метод менеджера для очищення
           this.plugin.chatManager.clearActiveChatMessages();
           // Повідомлення про успіх не потрібне тут, бо view оновить себе
@@ -471,7 +471,7 @@ export class OllamaView extends ItemView {
 
   private handleNewChatClick = async (): Promise<void> => {
     this.closeMenu();
-    console.log("[OllamaView] 'New Chat' button clicked.");
+    //console.log("[OllamaView] 'New Chat' button clicked.");
     try {
       const newChat = await this.plugin.chatManager.createNewChat();
       if (newChat) {
@@ -483,14 +483,14 @@ export class OllamaView extends ItemView {
         new Notice("Failed to create new chat.");
       }
     } catch (error) {
-      console.error("Error creating new chat via menu:", error);
+      //console.error("Error creating new chat via menu:", error);
       new Notice("Error creating new chat.");
     }
   }
 
   private handleExportChatClick = async (): Promise<void> => {
     this.closeMenu();
-    console.log("[OllamaView] Export to Markdown initiated.");
+    //console.log("[OllamaView] Export to Markdown initiated.");
 
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat || activeChat.messages.length === 0) {
@@ -513,19 +513,19 @@ export class OllamaView extends ItemView {
         const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
         if (!abstractFile) { // Folder doesn't exist
           try {
-            console.log(`[OllamaView] Export folder '${targetFolderPath}' not found, creating...`);
+            //console.log(`[OllamaView] Export folder '${targetFolderPath}' not found, creating...`);
             await this.app.vault.createFolder(targetFolderPath);
             targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath) as TFolder;
             if (targetFolder) new Notice(`Created export folder: ${targetFolderPath}`);
           } catch (err: any) {
-            console.error(`Failed to create export folder ${targetFolderPath}:`, err);
+            //console.error(`Failed to create export folder ${targetFolderPath}:`, err);
             new Notice(`Error: Could not create export folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
         } else if (abstractFile instanceof TFolder) { // Folder exists
           targetFolder = abstractFile;
         } else { // Path exists but is not a folder
-          console.warn(`Export path ${targetFolderPath} is not a folder. Saving to vault root.`);
+          //console.warn(`Export path ${targetFolderPath} is not a folder. Saving to vault root.`);
           new Notice(`Error: Export path is not a folder. Saving to vault root.`);
           targetFolder = this.app.vault.getRoot();
         }
@@ -535,7 +535,7 @@ export class OllamaView extends ItemView {
       }
 
       if (!targetFolder) { // Final fallback check
-        console.error("Could not determine target folder for export. Aborting.");
+        //console.error("Could not determine target folder for export. Aborting.");
         new Notice("Error: Could not determine target folder for export.");
         return;
       }
@@ -544,11 +544,11 @@ export class OllamaView extends ItemView {
       const file = await this.app.vault.create(filePath, markdownContent);
 
       new Notice(`Chat exported successfully to ${file.path}`);
-      console.log(`[OllamaView] Chat exported to ${file.path}`);
+      //console.log(`[OllamaView] Chat exported to ${file.path}`);
 
     } catch (error) {
-      console.error("Error exporting chat to Markdown:", error);
-      new Notice("Error exporting chat. Check console for details.");
+      //console.error("Error exporting chat to Markdown:", error);
+      new Notice("Error exporting chat. Check //console for details.");
     }
   }
 
@@ -580,19 +580,19 @@ export class OllamaView extends ItemView {
     }
   }
   private handleRolesUpdated = (): void => {
-    console.log("[OllamaView] Roles updated event received.");
+    //console.log("[OllamaView] Roles updated event received.");
     if (this.isMenuOpen()) {
       this.renderRoleList(); // Refresh role list if menu is open
     }
   };
   private handleChatListUpdated = (): void => {
-    console.log("[OllamaView] Chat list updated event received.");
+    //console.log("[OllamaView] Chat list updated event received.");
     if (this.isMenuOpen()) {
       this.renderChatListMenu(); // Refresh chat list if menu is open
     }
   };
   private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => {
-    console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
+    //console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
     this.loadAndDisplayActiveChat(); // Load content of the new active chat
     // Re-render menu lists if open to update selections
     if (this.isMenuOpen()) {
@@ -604,7 +604,7 @@ export class OllamaView extends ItemView {
   private handleMessageAdded = (data: { chatId: string, message: Message }): void => {
     // Only add if the message belongs to the currently viewed chat
     if (data.chatId === this.plugin.chatManager?.getActiveChatId()) {
-      // console.log("[OllamaView] Message added event received for active chat.");
+      // //console.log("[OllamaView] Message added event received for active chat.");
       this.addMessageToDisplay(data.message.role, data.message.content, data.message.timestamp);
       // Also update chat list menu if open to refresh date
       if (this.isMenuOpen()) { this.renderChatListMenu(); }
@@ -612,7 +612,7 @@ export class OllamaView extends ItemView {
   }
   private handleMessagesCleared = (chatId: string): void => {
     if (chatId === this.plugin.chatManager?.getActiveChatId()) {
-      console.log("[OllamaView] Messages cleared event received for active chat.");
+      //console.log("[OllamaView] Messages cleared event received for active chat.");
       this.clearChatContainerInternal(); // Clear visual display
       this.currentMessages = []; // Clear local cache
       this.showEmptyState(); // Show empty message
@@ -726,7 +726,7 @@ export class OllamaView extends ItemView {
 
   /** Loads the active chat session from ChatManager and displays its messages */
   async loadAndDisplayActiveChat(): Promise<void> {
-    console.log("[OllamaView] Loading and displaying active chat...");
+    //console.log("[OllamaView] Loading and displaying active chat...");
     this.clearChatContainerInternal(); // Clear previous content & state
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
@@ -735,7 +735,7 @@ export class OllamaView extends ItemView {
       const activeChat = await this.plugin.chatManager?.getActiveChat(); // Get current chat data
 
       if (activeChat && activeChat.messages.length > 0) {
-        console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
+        //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
         this.hideEmptyState();
         this.renderMessages(activeChat.messages); // Render the loaded messages
         this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
@@ -743,18 +743,18 @@ export class OllamaView extends ItemView {
         this.checkAllMessagesForCollapsing();
         setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150); // Scroll after render
       } else if (activeChat) {
-        console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
+        //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
         // Chat exists but is empty
         this.showEmptyState();
         this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
       } else {
-        console.warn("[OllamaView] No active chat found or failed to load.");
+        //console.warn("[OllamaView] No active chat found or failed to load.");
         // No active chat found or failed to load
         this.showEmptyState();
         this.updateInputPlaceholder(this.plugin.settings.modelName); // Fallback placeholder
       }
     } catch (error) {
-      console.error("[OllamaView] Error getting active chat:", error);
+      //console.error("[OllamaView] Error getting active chat:", error);
       this.showEmptyState();
       new Notice("Error loading chat history.");
     }
@@ -769,7 +769,7 @@ export class OllamaView extends ItemView {
     messagesToRender.forEach(message => {
       this.renderMessageInternal(message, messagesToRender); // Render each message
     });
-    console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
+    //console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
   }
 
   /** Appends a single message to the display */
@@ -833,9 +833,9 @@ export class OllamaView extends ItemView {
       this.guaranteedScrollToBottom(50, true); // Scroll to show indicator
 
       // 3. Call OllamaService to get AI response
-      console.log("[OllamaView] Requesting AI response...");
+      //console.log("[OllamaView] Requesting AI response...");
       const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
-      console.log("[OllamaView] Received response from service.");
+      //console.log("[OllamaView] Received response from service.");
 
       // Remove indicator BEFORE adding assistant message
       if (loadingEl) { this.removeLoadingIndicator(loadingEl); loadingEl = null; }
@@ -845,13 +845,13 @@ export class OllamaView extends ItemView {
         await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
         // Assistant message appears via event handler
       } else {
-        console.warn("[OllamaView] Service returned null assistant message.");
+        //console.warn("[OllamaView] Service returned null assistant message.");
         // Add error directly to display (as ChatManager won't add a null message)
         this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
       }
 
     } catch (error: any) {
-      console.error("[OllamaView] Send/receive cycle error:", error);
+      //console.error("[OllamaView] Send/receive cycle error:", error);
       if (loadingEl) { this.removeLoadingIndicator(loadingEl); loadingEl = null; } // Ensure indicator removed on error
       // Add error directly to display
       this.addMessageToDisplay("error", `Error: ${error.message || 'Unknown error.'}`, new Date());
@@ -967,7 +967,7 @@ export class OllamaView extends ItemView {
       setIcon(buttonEl, "check"); buttonEl.setAttribute("title", "Copied!");
       setTimeout(() => { setIcon(buttonEl, "copy"); buttonEl.setAttribute("title", "Copy"); }, 2000);
     }).catch(err => {
-      console.error("Copy failed:", err); new Notice("Failed to copy text.");
+      //console.error("Copy failed:", err); new Notice("Failed to copy text.");
     });
   }
   private async handleTranslateClick(originalContent: string, contentEl: HTMLElement, buttonEl: HTMLButtonElement): Promise<void> {
@@ -1001,7 +1001,7 @@ export class OllamaView extends ItemView {
         this.guaranteedScrollToBottom(50, false); // Scroll if needed
       } // Error notice shown by service if null
     } catch (error) {
-      console.error("Error during translation click handling:", error);
+      //console.error("Error during translation click handling:", error);
       new Notice("An unexpected error occurred during translation.");
     } finally {
       // Restore button state
@@ -1026,7 +1026,7 @@ export class OllamaView extends ItemView {
       try {
         setIcon(avatarEl, avatarContent || (isUser ? 'user' : 'bot'));
       } catch (e) {
-        console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
+        //console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
         avatarEl.textContent = isUser ? 'U' : 'A'; // Fallback
       }
     } else {
@@ -1096,7 +1096,8 @@ export class OllamaView extends ItemView {
           setIcon(copyBtn, "check"); copyBtn.setAttribute("title", "Copied!");
           setTimeout(() => { setIcon(copyBtn, "copy"); copyBtn.setAttribute("title", "Copy Code"); }, 1500);
         }).catch(err => {
-          console.error("Code block copy failed:", err); new Notice("Failed to copy code.");
+          //console.error("Code block copy failed:", err); 
+          new Notice("Failed to copy code.");
         });
       });
     });
@@ -1121,23 +1122,31 @@ export class OllamaView extends ItemView {
         let iconToUse = defaultIcon;
         if (modelName === currentModelName) { iconToUse = "check"; modelOptionEl.addClass("is-selected"); }
         else { const lowerModelName = modelName.toLowerCase(); let foundIcon = false; for (const key in modelIconMap) { if (lowerModelName.includes(key)) { iconToUse = modelIconMap[key]; foundIcon = true; break; } } if (!foundIcon) iconToUse = defaultIcon; }
-        try { setIcon(iconSpan, iconToUse); } catch (e) { console.warn(`[OllamaView] Could not set icon '${iconToUse}' for model ${modelName}`); iconSpan.style.minWidth = "18px"; }
+        try { setIcon(iconSpan, iconToUse); } catch (e) {
+          //console.warn(`[OllamaView] Could not set icon '${iconToUse}' for model ${modelName}`); 
+          iconSpan.style.minWidth = "18px";
+        }
         modelOptionEl.createEl("span", { cls: "menu-option-text", text: modelName });
         this.registerDomEvent(modelOptionEl, 'click', async () => {
           const currentActiveChatOnClick = await this.plugin.chatManager?.getActiveChat();
           const currentActiveModelOnClick = currentActiveChatOnClick?.metadata?.modelName || this.plugin.settings.modelName;
           if (modelName !== currentActiveModelOnClick) {
-            console.log(`[OllamaView] Model selected via menu for active chat: ${modelName}`);
+            //console.log(`[OllamaView] Model selected via menu for active chat: ${modelName}`);
             if (this.plugin.chatManager && currentActiveChatOnClick) {
               await this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName });
               // Event emission is handled by ChatManager now or handled by separate model-changed event listener
               // this.plugin.emit('model-changed', modelName); // Already handled?
-            } else { console.error("[OllamaView] Cannot update model - no active chat found via ChatManager."); new Notice("Error: Could not find active chat to update model."); }
+            } else { //console.error("[OllamaView] Cannot update model - no active chat found via ChatManager."); 
+              new Notice("Error: Could not find active chat to update model.");
+            }
           }
           this.closeMenu();
         });
       });
-    } catch (error) { console.error("Error loading models for menu:", error); this.modelListContainerEl.empty(); this.modelListContainerEl.createEl("span", { text: "Error loading models." }); }
+    } catch (error) {
+      //console.error("Error loading models for menu:", error); 
+      this.modelListContainerEl.empty(); this.modelListContainerEl.createEl("span", { text: "Error loading models." });
+    }
   }
   public async renderRoleList(): Promise<void> { /* ... (Implementation from previous responses - includes updating active chat metadata) ... */
     if (!this.roleListContainerEl) return;
@@ -1160,10 +1169,11 @@ export class OllamaView extends ItemView {
           this.plugin.settings.selectedRolePath = newRolePath; await this.plugin.saveSettings();
           const currentActiveChatOnClick = await this.plugin.chatManager?.getActiveChat();
           if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
-            console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
+            //console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
             await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
             this.plugin.promptService?.clearRoleCache?.();
-          } else if (!currentActiveChatOnClick) { console.warn("[OllamaView] No active chat found to update role metadata for."); }
+          } else if (!currentActiveChatOnClick) { //console.warn("[OllamaView] No active chat found to update role metadata for."); 
+          }
           this.plugin.emit('role-changed', "Default Assistant");
         }
         this.closeMenu();
@@ -1181,21 +1191,26 @@ export class OllamaView extends ItemView {
           this.registerDomEvent(roleOptionEl, 'click', async () => {
             const currentGlobalRolePath = this.plugin.settings.selectedRolePath; const newRolePath = roleInfo.path;
             if (newRolePath !== currentGlobalRolePath || newRolePath !== currentChatRolePath) {
-              console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${newRolePath})`);
+              //console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${newRolePath})`);
               this.plugin.settings.selectedRolePath = newRolePath; await this.plugin.saveSettings();
               const currentActiveChatOnClick = await this.plugin.chatManager?.getActiveChat();
               if (currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath) {
-                console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
+                //console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
                 await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
                 this.plugin.promptService?.clearRoleCache?.();
-              } else if (!currentActiveChatOnClick) { console.warn("[OllamaView] No active chat found to update role metadata for."); }
+              } else if (!currentActiveChatOnClick) {
+                //console.warn("[OllamaView] No active chat found to update role metadata for."); 
+              }
               this.plugin.emit('role-changed', roleInfo.name);
             }
             this.closeMenu();
           });
         });
       }
-    } catch (error) { console.error("Error loading roles for menu:", error); this.roleListContainerEl.empty(); this.roleListContainerEl.createEl("span", { text: "Error loading roles." }); }
+    } catch (error) {
+      //console.error("Error loading roles for menu:", error); 
+      this.roleListContainerEl.empty(); this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
+    }
   }
   private async renderChatListMenu(): Promise<void> { /* ... (Implementation from previous responses) ... */
     if (!this.chatListContainerEl) return;
@@ -1206,7 +1221,7 @@ export class OllamaView extends ItemView {
       const currentActiveId = this.plugin.chatManager?.getActiveChatId();
       this.chatListContainerEl.empty();
       if (chats.length === 0) { this.chatListContainerEl.createEl("span", { text: "No saved chats found." }); return; }
-      console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2)); // ЛОГ ДЛЯ ПЕРЕВІРКИ
+      //console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2)); // ЛОГ ДЛЯ ПЕРЕВІРКИ
       chats.forEach(chatMeta => {
         const chatOptionEl = this.chatListContainerEl.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CHAT_OPTION}` });
         const iconSpan = chatOptionEl.createEl("span", { cls: "menu-option-icon" });
@@ -1218,13 +1233,16 @@ export class OllamaView extends ItemView {
         textSpan.createEl('div', { cls: 'chat-option-date', text: dateText });
         this.registerDomEvent(chatOptionEl, 'click', async () => {
           if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
-            console.log(`[OllamaView] Switching to chat via menu: ${chatMeta.name} (${chatMeta.id})`);
+            //console.log(`[OllamaView] Switching to chat via menu: ${chatMeta.name} (${chatMeta.id})`);
             await this.plugin.chatManager.setActiveChat(chatMeta.id);
           }
           this.closeMenu();
         });
       });
-    } catch (error) { console.error("Error loading chats for menu:", error); this.chatListContainerEl.empty(); this.chatListContainerEl.createEl("span", { text: "Error loading chats." }); }
+    } catch (error) {
+      //console.error("Error loading chats for menu:", error); 
+      this.chatListContainerEl.empty(); this.chatListContainerEl.createEl("span", { text: "Error loading chats." });
+    }
   }
 
   // --- Speech Recognition Placeholders ---
@@ -1292,7 +1310,7 @@ export class OllamaView extends ItemView {
               const responseData = await response.json();
 
               if (!response.ok) {
-                console.error("Google Speech API Error:", responseData);
+                //console.error("Google Speech API Error:", responseData);
                 self.postMessage({
                   error: true,
                   message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
@@ -1311,7 +1329,7 @@ export class OllamaView extends ItemView {
                  self.postMessage({ error: true, message: 'No speech detected or recognized.' });
               }
             } catch (error) {
-               console.error("Error in speech worker processing:", error);
+               //console.error("Error in speech worker processing:", error);
                self.postMessage({
                  error: true,
                  message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
@@ -1326,10 +1344,10 @@ export class OllamaView extends ItemView {
       URL.revokeObjectURL(workerUrl); // Revoke URL immediately after worker creation
 
       this.setupSpeechWorkerHandlers(); // Setup message/error handlers
-      console.log("Speech worker initialized.");
+      //console.log("Speech worker initialized.");
 
     } catch (error) {
-      console.error("Failed to initialize speech worker:", error);
+      //console.error("Failed to initialize speech worker:", error);
       new Notice("Speech recognition feature failed to initialize.");
       this.speechWorker = null; // Ensure worker is null if init fails
     }
@@ -1342,7 +1360,7 @@ export class OllamaView extends ItemView {
 
       // Check for error object from worker
       if (data && typeof data === 'object' && data.error) {
-        console.error("Speech recognition error:", data.message);
+        //console.error("Speech recognition error:", data.message);
         new Notice(`Speech Recognition Error: ${data.message}`);
         this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder on error
         this.updateSendButtonState(); // Update button state as well
@@ -1354,14 +1372,14 @@ export class OllamaView extends ItemView {
         const transcript = data.trim();
         this.insertTranscript(transcript);
       } else if (typeof data !== 'string') {
-        console.warn("Received unexpected data format from speech worker:", data);
+        //console.warn("Received unexpected data format from speech worker:", data);
       }
       // If data is an empty string, do nothing (might happen with short silence)
       this.updateSendButtonState(); // Update button state after processing
     };
 
     this.speechWorker.onerror = (error) => {
-      console.error("Unhandled worker error:", error);
+      //console.error("Unhandled worker error:", error);
       new Notice("An unexpected error occurred in the speech recognition worker.");
       this.updateInputPlaceholder(this.plugin.settings.modelName); // Reset placeholder
       // Attempt to gracefully stop recording if it was active
@@ -1409,7 +1427,7 @@ export class OllamaView extends ItemView {
     // Перевірка наявності worker'а для розпізнавання
     if (!this.speechWorker) {
       new Notice("Функція розпізнавання мовлення недоступна (worker не ініціалізовано).");
-      console.error("Спроба розпочати розпізнавання голосу без ініціалізованого worker'а.");
+      //console.error("Спроба розпочати розпізнавання голосу без ініціалізованого worker'а.");
       return;
     }
     // Перевірка наявності ключа Google API
@@ -1429,10 +1447,10 @@ export class OllamaView extends ItemView {
       const preferredMimeType = 'audio/webm;codecs=opus'; // Бажаний формат
 
       if (MediaRecorder.isTypeSupported(preferredMimeType)) {
-        console.log(`Використовується підтримуваний mimeType: ${preferredMimeType}`);
+        //console.log(`Використовується підтримуваний mimeType: ${preferredMimeType}`);
         recorderOptions = { mimeType: preferredMimeType }; // Призначаємо об'єкт опцій, якщо підтримується
       } else {
-        console.warn(`${preferredMimeType} не підтримується, використовується стандартний браузера.`);
+        //console.warn(`${preferredMimeType} не підтримується, використовується стандартний браузера.`);
         recorderOptions = undefined; // Явно використовуємо undefined для стандартних налаштувань браузера
       }
 
@@ -1451,10 +1469,10 @@ export class OllamaView extends ItemView {
         if (event.data.size > 0) { audioChunks.push(event.data); }
       };
       this.mediaRecorder.onstop = () => {
-        console.log("MediaRecorder stopped.");
+        //console.log("MediaRecorder stopped.");
         if (this.speechWorker && audioChunks.length > 0) {
           const audioBlob = new Blob(audioChunks, { type: this.mediaRecorder?.mimeType || 'audio/webm' });
-          console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
+          //console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
           this.inputEl.placeholder = "Processing speech..."; // Update placeholder
           this.speechWorker.postMessage({
             apiKey: this.plugin.settings.googleApiKey,
@@ -1462,23 +1480,23 @@ export class OllamaView extends ItemView {
             languageCode: this.plugin.settings.speechLanguage || 'uk-UA'
           });
         } else if (audioChunks.length === 0) {
-          console.log("No audio data recorded.");
+          //console.log("No audio data recorded.");
           this.updateInputPlaceholder(this.plugin.settings.modelName); // Restore placeholder if nothing was recorded
           this.updateSendButtonState(); // Ensure button state is correct
         }
       };
       this.mediaRecorder.onerror = (event) => {
-        console.error("MediaRecorder Error:", event);
+        //console.error("MediaRecorder Error:", event);
         new Notice("An error occurred during recording.");
         this.stopVoiceRecording(false); // Stop without processing on error
       };
 
       // --- Старт запису ---
       this.mediaRecorder.start();
-      console.log("Recording started. MimeType:", this.mediaRecorder?.mimeType ?? 'default');
+      //console.log("Recording started. MimeType:", this.mediaRecorder?.mimeType ?? 'default');
 
     } catch (error) {
-      console.error("Error accessing microphone or starting recording:", error);
+      //console.error("Error accessing microphone or starting recording:", error);
       if (error instanceof DOMException && error.name === 'NotAllowedError') {
         new Notice("Microphone access denied. Please grant permission.");
       } else if (error instanceof DOMException && error.name === 'NotFoundError') {
@@ -1490,7 +1508,7 @@ export class OllamaView extends ItemView {
     }
   }
   private stopVoiceRecording(processAudio: boolean): void { /* ... same as before ... */
-    console.log(`Stopping voice recording. Process audio: ${processAudio}`);
+    //console.log(`Stopping voice recording. Process audio: ${processAudio}`);
     if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
       // onstop handler will be triggered eventually to process if processAudio is true
       this.mediaRecorder.stop();
@@ -1507,7 +1525,7 @@ export class OllamaView extends ItemView {
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(track => track.stop());
       this.audioStream = null;
-      console.log("Audio stream tracks stopped.");
+      //console.log("Audio stream tracks stopped.");
     }
     this.mediaRecorder = null;
   }
@@ -1541,7 +1559,7 @@ export class OllamaView extends ItemView {
     this.showEmptyState();
     this.updateSendButtonState();
     setTimeout(() => this.focusInput(), 50); // Refocus after clear
-    console.log("[OllamaView] Display and internal state cleared.");
+    //console.log("[OllamaView] Display and internal state cleared.");
   }
   public addLoadingIndicator(): HTMLElement {
     // Adds the visual "thinking" dots indicator
@@ -1592,7 +1610,7 @@ export class OllamaView extends ItemView {
             }
           }
         } else {
-          console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found.");
+          //console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found.");
         }
       });
       this.scrollTimeout = null;
@@ -1692,7 +1710,7 @@ export class OllamaView extends ItemView {
       currentName, // Початкове значення
       async (newName) => { // Функція, що виконається при Submit
         if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-          console.log(`[OllamaView] Renaming chat <span class="math-inline">\{activeChat\.metadata\.id\} to "</span>{newName.trim()}"`);
+          //console.log(`[OllamaView] Renaming chat <span class="math-inline">\{activeChat\.metadata\.id\} to "</span>{newName.trim()}"`);
           const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
           if (success) { new Notice(`Chat renamed to "${newName.trim()}"`); }
           else { new Notice("Failed to rename chat."); }
@@ -1725,7 +1743,7 @@ export class OllamaView extends ItemView {
       'Delete Chat', // Заголовок
       `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення
       async () => { // Функція, що виконається при Confirm
-        console.log(`[OllamaView] Deleting chat <span class="math-inline">\{activeChat\.metadata\.id\} \("</span>{chatName}")`);
+        //console.log(`[OllamaView] Deleting chat <span class="math-inline">\{activeChat\.metadata\.id\} \("</span>{chatName}")`);
         const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
         if (success) { new Notice(`Chat "${chatName}" deleted.`); }
         else { new Notice(`Failed to delete chat "${chatName}".`); }
@@ -1741,7 +1759,7 @@ export class OllamaView extends ItemView {
       return;
     }
     const originalName = activeChat.metadata.name;
-    console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
+    //console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
     const cloningNotice = new Notice("Cloning chat...", 0); // Повідомлення без автозникання
 
     try {
@@ -1759,7 +1777,7 @@ export class OllamaView extends ItemView {
       }
     } catch (error) {
       cloningNotice.hide();
-      console.error("Error cloning chat:", error);
+      //console.error("Error cloning chat:", error);
       new Notice("An error occurred while cloning the chat.");
     }
   }

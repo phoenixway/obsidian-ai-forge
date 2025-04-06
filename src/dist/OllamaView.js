@@ -205,7 +205,6 @@ var OllamaView = /** @class */ (function (_super) {
                         _a.label = 1;
                     case 1:
                         _a.trys.push([1, 3, 4, 5]);
-                        console.log("[OllamaView] Translating input to " + targetLang + "...");
                         return [4 /*yield*/, this.plugin.translationService.translate(currentText, targetLang)];
                     case 2:
                         translatedText = _a.sent();
@@ -215,15 +214,15 @@ var OllamaView = /** @class */ (function (_super) {
                             this.inputEl.focus();
                             end = translatedText.length;
                             this.inputEl.setSelectionRange(end, end);
-                            console.log("[OllamaView] Input translation successful.");
+                            //console.log("[OllamaView] Input translation successful.");
                         }
                         else {
-                            console.warn("[OllamaView] Input translation failed (service returned null).");
+                            //console.warn("[OllamaView] Input translation failed (service returned null).");
                         }
                         return [3 /*break*/, 5];
                     case 3:
                         error_1 = _a.sent();
-                        console.error("Error during input translation:", error_1);
+                        //console.error("Error during input translation:", error);
                         new obsidian_1.Notice("An unexpected error occurred during input translation.");
                         return [3 /*break*/, 5];
                     case 4:
@@ -241,7 +240,7 @@ var OllamaView = /** @class */ (function (_super) {
             e.stopPropagation();
             var isHidden = !_this.isMenuOpen();
             if (isHidden) {
-                console.log("[OllamaView] Opening menu, rendering lists...");
+                //console.log("[OllamaView] Opening menu, rendering lists...");
                 // Render all lists when menu is opened
                 Promise.all([
                     _this.renderModelList(),
@@ -273,7 +272,7 @@ var OllamaView = /** @class */ (function (_super) {
             });
         }); };
         _this.handleClearChatClick = function () { return __awaiter(_this, void 0, Promise, function () {
-            var activeChat, chatName_1, chatId_1;
+            var activeChat, chatName, chatId;
             var _this = this;
             var _a;
             return __generator(this, function (_b) {
@@ -284,13 +283,13 @@ var OllamaView = /** @class */ (function (_super) {
                     case 1:
                         activeChat = _b.sent();
                         if (activeChat) {
-                            chatName_1 = activeChat.metadata.name;
-                            chatId_1 = activeChat.metadata.id;
+                            chatName = activeChat.metadata.name;
+                            chatId = activeChat.metadata.id;
                             // --- Використання ConfirmModal замість confirm() ---
                             new ConfirmModal_1.ConfirmModal(this.app, 'Clear Chat Messages', // Заголовок вікна
-                            "Are you sure you want to clear all messages in chat \"" + chatName_1 + "\"?\nThis action cannot be undone.", // Повідомлення для підтвердження
+                            "Are you sure you want to clear all messages in chat \"" + chatName + "\"?\nThis action cannot be undone.", // Повідомлення для підтвердження
                             function () {
-                                console.log("[OllamaView] Clearing messages for chat " + chatId_1 + " (\"" + chatName_1 + "\")");
+                                //console.log(`[OllamaView] Clearing messages for chat ${chatId} ("${chatName}")`);
                                 // Викликаємо метод менеджера для очищення
                                 _this.plugin.chatManager.clearActiveChatMessages();
                                 // Повідомлення про успіх не потрібне тут, бо view оновить себе
@@ -313,7 +312,6 @@ var OllamaView = /** @class */ (function (_super) {
                 switch (_a.label) {
                     case 0:
                         this.closeMenu();
-                        console.log("[OllamaView] 'New Chat' button clicked.");
                         _a.label = 1;
                     case 1:
                         _a.trys.push([1, 3, , 4]);
@@ -332,7 +330,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 4];
                     case 3:
                         error_2 = _a.sent();
-                        console.error("Error creating new chat via menu:", error_2);
+                        //console.error("Error creating new chat via menu:", error);
                         new obsidian_1.Notice("Error creating new chat.");
                         return [3 /*break*/, 4];
                     case 4: return [2 /*return*/];
@@ -346,7 +344,6 @@ var OllamaView = /** @class */ (function (_super) {
                 switch (_c.label) {
                     case 0:
                         this.closeMenu();
-                        console.log("[OllamaView] Export to Markdown initiated.");
                         return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
                     case 1:
                         activeChat = _c.sent();
@@ -370,9 +367,10 @@ var OllamaView = /** @class */ (function (_super) {
                         _c.label = 3;
                     case 3:
                         _c.trys.push([3, 5, , 6]);
-                        console.log("[OllamaView] Export folder '" + targetFolderPath + "' not found, creating...");
+                        //console.log(`[OllamaView] Export folder '${targetFolderPath}' not found, creating...`);
                         return [4 /*yield*/, this.app.vault.createFolder(targetFolderPath)];
                     case 4:
+                        //console.log(`[OllamaView] Export folder '${targetFolderPath}' not found, creating...`);
                         _c.sent();
                         targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath);
                         if (targetFolder)
@@ -380,7 +378,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 6];
                     case 5:
                         err_1 = _c.sent();
-                        console.error("Failed to create export folder " + targetFolderPath + ":", err_1);
+                        //console.error(`Failed to create export folder ${targetFolderPath}:`, err);
                         new obsidian_1.Notice("Error: Could not create export folder. Saving to vault root.");
                         targetFolder = this.app.vault.getRoot();
                         return [3 /*break*/, 6];
@@ -390,7 +388,7 @@ var OllamaView = /** @class */ (function (_super) {
                             targetFolder = abstractFile;
                         }
                         else { // Path exists but is not a folder
-                            console.warn("Export path " + targetFolderPath + " is not a folder. Saving to vault root.");
+                            //console.warn(`Export path ${targetFolderPath} is not a folder. Saving to vault root.`);
                             new obsidian_1.Notice("Error: Export path is not a folder. Saving to vault root.");
                             targetFolder = this.app.vault.getRoot();
                         }
@@ -402,7 +400,7 @@ var OllamaView = /** @class */ (function (_super) {
                         _c.label = 10;
                     case 10:
                         if (!targetFolder) { // Final fallback check
-                            console.error("Could not determine target folder for export. Aborting.");
+                            //console.error("Could not determine target folder for export. Aborting.");
                             new obsidian_1.Notice("Error: Could not determine target folder for export.");
                             return [2 /*return*/];
                         }
@@ -411,12 +409,11 @@ var OllamaView = /** @class */ (function (_super) {
                     case 11:
                         file = _c.sent();
                         new obsidian_1.Notice("Chat exported successfully to " + file.path);
-                        console.log("[OllamaView] Chat exported to " + file.path);
                         return [3 /*break*/, 13];
                     case 12:
                         error_3 = _c.sent();
-                        console.error("Error exporting chat to Markdown:", error_3);
-                        new obsidian_1.Notice("Error exporting chat. Check console for details.");
+                        //console.error("Error exporting chat to Markdown:", error);
+                        new obsidian_1.Notice("Error exporting chat. Check //console for details.");
                         return [3 /*break*/, 13];
                     case 13: return [2 /*return*/];
                 }
@@ -452,19 +449,19 @@ var OllamaView = /** @class */ (function (_super) {
             }
         };
         _this.handleRolesUpdated = function () {
-            console.log("[OllamaView] Roles updated event received.");
+            //console.log("[OllamaView] Roles updated event received.");
             if (_this.isMenuOpen()) {
                 _this.renderRoleList(); // Refresh role list if menu is open
             }
         };
         _this.handleChatListUpdated = function () {
-            console.log("[OllamaView] Chat list updated event received.");
+            //console.log("[OllamaView] Chat list updated event received.");
             if (_this.isMenuOpen()) {
                 _this.renderChatListMenu(); // Refresh chat list if menu is open
             }
         };
         _this.handleActiveChatChanged = function (data) {
-            console.log("[OllamaView] Active chat changed event received. New ID: " + data.chatId);
+            //console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
             _this.loadAndDisplayActiveChat(); // Load content of the new active chat
             // Re-render menu lists if open to update selections
             if (_this.isMenuOpen()) {
@@ -477,7 +474,7 @@ var OllamaView = /** @class */ (function (_super) {
             var _a;
             // Only add if the message belongs to the currently viewed chat
             if (data.chatId === ((_a = _this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChatId())) {
-                // console.log("[OllamaView] Message added event received for active chat.");
+                // //console.log("[OllamaView] Message added event received for active chat.");
                 _this.addMessageToDisplay(data.message.role, data.message.content, data.message.timestamp);
                 // Also update chat list menu if open to refresh date
                 if (_this.isMenuOpen()) {
@@ -488,7 +485,7 @@ var OllamaView = /** @class */ (function (_super) {
         _this.handleMessagesCleared = function (chatId) {
             var _a;
             if (chatId === ((_a = _this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChatId())) {
-                console.log("[OllamaView] Messages cleared event received for active chat.");
+                //console.log("[OllamaView] Messages cleared event received for active chat.");
                 _this.clearChatContainerInternal(); // Clear visual display
                 _this.currentMessages = []; // Clear local cache
                 _this.showEmptyState(); // Show empty message
@@ -585,7 +582,6 @@ var OllamaView = /** @class */ (function (_super) {
                                 switch (_a.label) {
                                     case 0:
                                         if (!(newName && newName.trim() !== "" && newName.trim() !== currentName)) return [3 /*break*/, 2];
-                                        console.log("[OllamaView] Renaming chat <span class=\"math-inline\">{activeChat.metadata.id} to \"</span>{newName.trim()}\"");
                                         return [4 /*yield*/, this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim())];
                                     case 1:
                                         success = _a.sent();
@@ -637,9 +633,7 @@ var OllamaView = /** @class */ (function (_super) {
                             var success;
                             return __generator(this, function (_a) {
                                 switch (_a.label) {
-                                    case 0:
-                                        console.log("[OllamaView] Deleting chat <span class=\"math-inline\">{activeChat.metadata.id} (\"</span>{chatName}\")");
-                                        return [4 /*yield*/, this.plugin.chatManager.deleteChat(activeChat.metadata.id)];
+                                    case 0: return [4 /*yield*/, this.plugin.chatManager.deleteChat(activeChat.metadata.id)];
                                     case 1:
                                         success = _a.sent();
                                         if (success) {
@@ -671,7 +665,6 @@ var OllamaView = /** @class */ (function (_super) {
                             return [2 /*return*/];
                         }
                         originalName = activeChat.metadata.name;
-                        console.log("[OllamaView] Cloning chat " + activeChat.metadata.id + " (\"" + originalName + "\")");
                         cloningNotice = new obsidian_1.Notice("Cloning chat...", 0);
                         _b.label = 2;
                     case 2:
@@ -693,7 +686,7 @@ var OllamaView = /** @class */ (function (_super) {
                     case 4:
                         error_4 = _b.sent();
                         cloningNotice.hide();
-                        console.error("Error cloning chat:", error_4);
+                        //console.error("Error cloning chat:", error);
                         new obsidian_1.Notice("An error occurred while cloning the chat.");
                         return [3 /*break*/, 5];
                     case 5: return [2 /*return*/];
@@ -702,14 +695,14 @@ var OllamaView = /** @class */ (function (_super) {
         }); };
         _this.plugin = plugin;
         // Consider if singleton pattern (OllamaView.instance) is truly necessary
-        // if (OllamaView.instance && OllamaView.instance !== this) { console.warn("Replacing existing OllamaView instance."); }
+        // if (OllamaView.instance && OllamaView.instance !== this) { //console.warn("Replacing existing OllamaView instance."); }
         // OllamaView.instance = this;
         // Check Obsidian API version if needed
-        // if (!requireApiVersion || !requireApiVersion("1.0.0")) { console.warn("Ollama Plugin: Obsidian API version might be outdated."); }
+        // if (!requireApiVersion || !requireApiVersion("1.0.0")) { //console.warn("Ollama Plugin: Obsidian API version might be outdated."); }
         _this.initSpeechWorker(); // Initialize speech worker (if using)
         _this.scrollListenerDebounced = obsidian_1.debounce(_this.handleScroll, 150, true);
-        console.log("[OllamaView] Constructed.");
         return _this;
+        //console.log("[OllamaView] Constructed.");
     }
     // --- Getters ---
     OllamaView.prototype.isMenuOpen = function () {
@@ -728,7 +721,7 @@ var OllamaView = /** @class */ (function (_super) {
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
-                        console.log("[OllamaView] onOpen called.");
+                        //console.log("[OllamaView] onOpen called.");
                         this.createUIElements(); // Build the HTML structure
                         this.updateInputPlaceholder(this.plugin.settings.modelName); // Set initial placeholder
                         this.attachEventListeners(); // Attach event handlers
@@ -743,7 +736,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 4];
                     case 3:
                         error_5 = _b.sent();
-                        console.error("[OllamaView] Error during initial chat load:", error_5);
+                        //console.error("[OllamaView] Error during initial chat load:", error);
                         this.showEmptyState(); // Show empty state on error
                         return [3 /*break*/, 4];
                     case 4:
@@ -757,7 +750,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.onClose = function () {
         return __awaiter(this, void 0, Promise, function () {
             return __generator(this, function (_a) {
-                console.log("[OllamaView] onClose: Cleaning up...");
+                //console.log("[OllamaView] onClose: Cleaning up...");
                 // Terminate worker, stop recording, clear timeouts, etc.
                 if (this.speechWorker) {
                     this.speechWorker.terminate();
@@ -934,7 +927,7 @@ var OllamaView = /** @class */ (function (_super) {
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
-                        console.log("[OllamaView] Loading and displaying active chat...");
+                        //console.log("[OllamaView] Loading and displaying active chat...");
                         this.clearChatContainerInternal(); // Clear previous content & state
                         this.currentMessages = [];
                         this.lastRenderedMessageDate = null;
@@ -945,7 +938,7 @@ var OllamaView = /** @class */ (function (_super) {
                     case 2:
                         activeChat = _b.sent();
                         if (activeChat && activeChat.messages.length > 0) {
-                            console.log("[OllamaView] Active chat '" + activeChat.metadata.name + "' found with " + activeChat.messages.length + " messages.");
+                            //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
                             this.hideEmptyState();
                             this.renderMessages(activeChat.messages); // Render the loaded messages
                             this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
@@ -954,13 +947,13 @@ var OllamaView = /** @class */ (function (_super) {
                             setTimeout(function () { _this.guaranteedScrollToBottom(100, true); }, 150); // Scroll after render
                         }
                         else if (activeChat) {
-                            console.log("[OllamaView] Active chat '" + activeChat.metadata.name + "' found but is empty.");
+                            //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
                             // Chat exists but is empty
                             this.showEmptyState();
                             this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
                         }
                         else {
-                            console.warn("[OllamaView] No active chat found or failed to load.");
+                            //console.warn("[OllamaView] No active chat found or failed to load.");
                             // No active chat found or failed to load
                             this.showEmptyState();
                             this.updateInputPlaceholder(this.plugin.settings.modelName); // Fallback placeholder
@@ -968,7 +961,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 4];
                     case 3:
                         error_6 = _b.sent();
-                        console.error("[OllamaView] Error getting active chat:", error_6);
+                        //console.error("[OllamaView] Error getting active chat:", error);
                         this.showEmptyState();
                         new obsidian_1.Notice("Error loading chat history.");
                         return [3 /*break*/, 4];
@@ -986,7 +979,7 @@ var OllamaView = /** @class */ (function (_super) {
         messagesToRender.forEach(function (message) {
             _this.renderMessageInternal(message, messagesToRender); // Render each message
         });
-        console.log("[OllamaView] Rendered " + messagesToRender.length + " messages.");
+        //console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
     };
     /** Appends a single message to the display */
     OllamaView.prototype.addMessageToDisplay = function (role, content, timestamp) {
@@ -1050,12 +1043,10 @@ var OllamaView = /** @class */ (function (_super) {
                         // 2. Show loading indicator *after* user message is likely added
                         loadingEl = this.addLoadingIndicator();
                         this.guaranteedScrollToBottom(50, true); // Scroll to show indicator
-                        // 3. Call OllamaService to get AI response
-                        console.log("[OllamaView] Requesting AI response...");
                         return [4 /*yield*/, this.plugin.ollamaService.generateChatResponse(activeChat)];
                     case 4:
                         assistantMessage = _b.sent();
-                        console.log("[OllamaView] Received response from service.");
+                        //console.log("[OllamaView] Received response from service.");
                         // Remove indicator BEFORE adding assistant message
                         if (loadingEl) {
                             this.removeLoadingIndicator(loadingEl);
@@ -1067,14 +1058,14 @@ var OllamaView = /** @class */ (function (_super) {
                         _b.sent();
                         return [3 /*break*/, 7];
                     case 6:
-                        console.warn("[OllamaView] Service returned null assistant message.");
+                        //console.warn("[OllamaView] Service returned null assistant message.");
                         // Add error directly to display (as ChatManager won't add a null message)
                         this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
                         _b.label = 7;
                     case 7: return [3 /*break*/, 10];
                     case 8:
                         error_7 = _b.sent();
-                        console.error("[OllamaView] Send/receive cycle error:", error_7);
+                        //console.error("[OllamaView] Send/receive cycle error:", error);
                         if (loadingEl) {
                             this.removeLoadingIndicator(loadingEl);
                             loadingEl = null;
@@ -1209,8 +1200,7 @@ var OllamaView = /** @class */ (function (_super) {
             buttonEl.setAttribute("title", "Copied!");
             setTimeout(function () { obsidian_1.setIcon(buttonEl, "copy"); buttonEl.setAttribute("title", "Copy"); }, 2000);
         })["catch"](function (err) {
-            console.error("Copy failed:", err);
-            new obsidian_1.Notice("Failed to copy text.");
+            //console.error("Copy failed:", err); new Notice("Failed to copy text.");
         });
     };
     OllamaView.prototype.handleTranslateClick = function (originalContent, contentEl, buttonEl) {
@@ -1255,7 +1245,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 5];
                     case 3:
                         error_8 = _b.sent();
-                        console.error("Error during translation click handling:", error_8);
+                        //console.error("Error during translation click handling:", error);
                         new obsidian_1.Notice("An unexpected error occurred during translation.");
                         return [3 /*break*/, 5];
                     case 4:
@@ -1286,7 +1276,7 @@ var OllamaView = /** @class */ (function (_super) {
                 obsidian_1.setIcon(avatarEl, avatarContent || (isUser ? 'user' : 'bot'));
             }
             catch (e) {
-                console.warn("Failed to set avatar icon \"" + avatarContent + "\". Falling back to initials.", e);
+                //console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
                 avatarEl.textContent = isUser ? 'U' : 'A'; // Fallback
             }
         }
@@ -1355,7 +1345,7 @@ var OllamaView = /** @class */ (function (_super) {
                     copyBtn.setAttribute("title", "Copied!");
                     setTimeout(function () { obsidian_1.setIcon(copyBtn, "copy"); copyBtn.setAttribute("title", "Copy Code"); }, 1500);
                 })["catch"](function (err) {
-                    console.error("Code block copy failed:", err);
+                    //console.error("Code block copy failed:", err); 
                     new obsidian_1.Notice("Failed to copy code.");
                 });
             });
@@ -1416,7 +1406,7 @@ var OllamaView = /** @class */ (function (_super) {
                                 obsidian_1.setIcon(iconSpan, iconToUse);
                             }
                             catch (e) {
-                                console.warn("[OllamaView] Could not set icon '" + iconToUse + "' for model " + modelName);
+                                //console.warn(`[OllamaView] Could not set icon '${iconToUse}' for model ${modelName}`); 
                                 iconSpan.style.minWidth = "18px";
                             }
                             modelOptionEl.createEl("span", { cls: "menu-option-text", text: modelName });
@@ -1430,14 +1420,12 @@ var OllamaView = /** @class */ (function (_super) {
                                             currentActiveChatOnClick = _c.sent();
                                             currentActiveModelOnClick = ((_b = currentActiveChatOnClick === null || currentActiveChatOnClick === void 0 ? void 0 : currentActiveChatOnClick.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
                                             if (!(modelName !== currentActiveModelOnClick)) return [3 /*break*/, 4];
-                                            console.log("[OllamaView] Model selected via menu for active chat: " + modelName);
                                             if (!(this.plugin.chatManager && currentActiveChatOnClick)) return [3 /*break*/, 3];
                                             return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName })];
                                         case 2:
                                             _c.sent();
                                             return [3 /*break*/, 4];
                                         case 3:
-                                            console.error("[OllamaView] Cannot update model - no active chat found via ChatManager.");
                                             new obsidian_1.Notice("Error: Could not find active chat to update model.");
                                             _c.label = 4;
                                         case 4:
@@ -1450,7 +1438,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 5];
                     case 4:
                         error_9 = _c.sent();
-                        console.error("Error loading models for menu:", error_9);
+                        //console.error("Error loading models for menu:", error); 
                         this.modelListContainerEl.empty();
                         this.modelListContainerEl.createEl("span", { text: "Error loading models." });
                         return [3 /*break*/, 5];
@@ -1510,15 +1498,15 @@ var OllamaView = /** @class */ (function (_super) {
                                     case 2:
                                         currentActiveChatOnClick = _d.sent();
                                         if (!(currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath)) return [3 /*break*/, 4];
-                                        console.log("[OllamaView] Updating active chat (" + currentActiveChatOnClick.metadata.id + ") role to None");
+                                        //console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
                                         return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath })];
                                     case 3:
+                                        //console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to None`);
                                         _d.sent();
                                         (_c = (_b = this.plugin.promptService) === null || _b === void 0 ? void 0 : _b.clearRoleCache) === null || _c === void 0 ? void 0 : _c.call(_b);
                                         return [3 /*break*/, 5];
                                     case 4:
-                                        if (!currentActiveChatOnClick) {
-                                            console.warn("[OllamaView] No active chat found to update role metadata for.");
+                                        if (!currentActiveChatOnClick) { //console.warn("[OllamaView] No active chat found to update role metadata for."); 
                                         }
                                         _d.label = 5;
                                     case 5:
@@ -1559,7 +1547,7 @@ var OllamaView = /** @class */ (function (_super) {
                                                 currentGlobalRolePath = this.plugin.settings.selectedRolePath;
                                                 newRolePath = roleInfo.path;
                                                 if (!(newRolePath !== currentGlobalRolePath || newRolePath !== currentChatRolePath_1)) return [3 /*break*/, 6];
-                                                console.log("[OllamaView] Role selected via menu: " + roleInfo.name + " (" + newRolePath + ")");
+                                                //console.log(`[OllamaView] Role selected via menu: ${roleInfo.name} (${newRolePath})`);
                                                 this.plugin.settings.selectedRolePath = newRolePath;
                                                 return [4 /*yield*/, this.plugin.saveSettings()];
                                             case 1:
@@ -1568,15 +1556,16 @@ var OllamaView = /** @class */ (function (_super) {
                                             case 2:
                                                 currentActiveChatOnClick = _d.sent();
                                                 if (!(currentActiveChatOnClick && currentActiveChatOnClick.metadata.selectedRolePath !== newRolePath)) return [3 /*break*/, 4];
-                                                console.log("[OllamaView] Updating active chat (" + currentActiveChatOnClick.metadata.id + ") role to " + roleInfo.name);
+                                                //console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
                                                 return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath })];
                                             case 3:
+                                                //console.log(`[OllamaView] Updating active chat (${currentActiveChatOnClick.metadata.id}) role to ${roleInfo.name}`);
                                                 _d.sent();
                                                 (_c = (_b = this.plugin.promptService) === null || _b === void 0 ? void 0 : _b.clearRoleCache) === null || _c === void 0 ? void 0 : _c.call(_b);
                                                 return [3 /*break*/, 5];
                                             case 4:
                                                 if (!currentActiveChatOnClick) {
-                                                    console.warn("[OllamaView] No active chat found to update role metadata for.");
+                                                    //console.warn("[OllamaView] No active chat found to update role metadata for."); 
                                                 }
                                                 _d.label = 5;
                                             case 5:
@@ -1593,7 +1582,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 5];
                     case 4:
                         error_10 = _d.sent();
-                        console.error("Error loading roles for menu:", error_10);
+                        //console.error("Error loading roles for menu:", error); 
                         this.roleListContainerEl.empty();
                         this.roleListContainerEl.createEl("span", { text: "Error loading roles." });
                         return [3 /*break*/, 5];
@@ -1620,7 +1609,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.chatListContainerEl.createEl("span", { text: "No saved chats found." });
                         return [2 /*return*/];
                     }
-                    console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2)); // ЛОГ ДЛЯ ПЕРЕВІРКИ
+                    //console.log("[OllamaView] Chats available for menu:", JSON.stringify(chats, null, 2)); // ЛОГ ДЛЯ ПЕРЕВІРКИ
                     chats.forEach(function (chatMeta) {
                         var chatOptionEl = _this.chatListContainerEl.createDiv({ cls: CSS_CLASS_MENU_OPTION + " " + CSS_CLASS_CHAT_OPTION });
                         var iconSpan = chatOptionEl.createEl("span", { cls: "menu-option-icon" });
@@ -1641,9 +1630,10 @@ var OllamaView = /** @class */ (function (_super) {
                                 switch (_b.label) {
                                     case 0:
                                         if (!(chatMeta.id !== ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChatId()))) return [3 /*break*/, 2];
-                                        console.log("[OllamaView] Switching to chat via menu: " + chatMeta.name + " (" + chatMeta.id + ")");
+                                        //console.log(`[OllamaView] Switching to chat via menu: ${chatMeta.name} (${chatMeta.id})`);
                                         return [4 /*yield*/, this.plugin.chatManager.setActiveChat(chatMeta.id)];
                                     case 1:
+                                        //console.log(`[OllamaView] Switching to chat via menu: ${chatMeta.name} (${chatMeta.id})`);
                                         _b.sent();
                                         _b.label = 2;
                                     case 2:
@@ -1655,7 +1645,7 @@ var OllamaView = /** @class */ (function (_super) {
                     });
                 }
                 catch (error) {
-                    console.error("Error loading chats for menu:", error);
+                    //console.error("Error loading chats for menu:", error); 
                     this.chatListContainerEl.empty();
                     this.chatListContainerEl.createEl("span", { text: "Error loading chats." });
                 }
@@ -1678,16 +1668,16 @@ var OllamaView = /** @class */ (function (_super) {
                 return btoa(binary);
             };
             // Worker code as a template literal for better readability
-            var workerCode = "\n          // Worker Scope\n          self.onmessage = async (event) => {\n            const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;\n\n            if (!apiKey || apiKey.trim() === '') {\n              self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });\n              return;\n            }\n\n            const url = \"https://speech.googleapis.com/v1/speech:recognize?key=\" + apiKey;\n\n            try {\n              const arrayBuffer = await audioBlob.arrayBuffer();\n\n              // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)\n              // Simpler approach: pass buffer directly if API allows, or use efficient base64:\n              let base64Audio;\n              if (typeof TextDecoder !== 'undefined') { // Browser environment check\n                   // Modern approach (often faster if native)\n                   const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));\n                   base64Audio = base64String;\n\n              } else {\n                   // Fallback (similar to original, ensure correctness)\n                   base64Audio = btoa(\n                     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')\n                   );\n              }\n\n\n              const response = await fetch(url, {\n                method: 'POST',\n                body: JSON.stringify({\n                  config: {\n                    encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output\n                    sampleRateHertz: 48000, // Match sample rate if possible\n                    languageCode: languageCode,\n                    model: 'latest_long', // Consider other models if needed\n                    enableAutomaticPunctuation: true,\n                  },\n                  audio: { content: base64Audio },\n                }),\n                headers: { 'Content-Type': 'application/json' },\n              });\n\n              const responseData = await response.json();\n\n              if (!response.ok) {\n                console.error(\"Google Speech API Error:\", responseData);\n                self.postMessage({\n                  error: true,\n                  message: \"Error from Google Speech API: \" + (responseData.error?.message || response.statusText || 'Unknown error')\n                });\n                return;\n              }\n\n              if (responseData.results && responseData.results.length > 0) {\n                const transcript = responseData.results\n                  .map(result => result.alternatives[0].transcript)\n                  .join(' ')\n                  .trim();\n                self.postMessage(transcript); // Send back only the transcript string\n              } else {\n                 // Handle cases where API returns ok but no results (e.g., silence)\n                 self.postMessage({ error: true, message: 'No speech detected or recognized.' });\n              }\n            } catch (error) {\n               console.error(\"Error in speech worker processing:\", error);\n               self.postMessage({\n                 error: true,\n                 message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))\n               });\n            }\n          };\n        ";
+            var workerCode = "\n          // Worker Scope\n          self.onmessage = async (event) => {\n            const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;\n\n            if (!apiKey || apiKey.trim() === '') {\n              self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });\n              return;\n            }\n\n            const url = \"https://speech.googleapis.com/v1/speech:recognize?key=\" + apiKey;\n\n            try {\n              const arrayBuffer = await audioBlob.arrayBuffer();\n\n              // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)\n              // Simpler approach: pass buffer directly if API allows, or use efficient base64:\n              let base64Audio;\n              if (typeof TextDecoder !== 'undefined') { // Browser environment check\n                   // Modern approach (often faster if native)\n                   const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));\n                   base64Audio = base64String;\n\n              } else {\n                   // Fallback (similar to original, ensure correctness)\n                   base64Audio = btoa(\n                     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')\n                   );\n              }\n\n\n              const response = await fetch(url, {\n                method: 'POST',\n                body: JSON.stringify({\n                  config: {\n                    encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output\n                    sampleRateHertz: 48000, // Match sample rate if possible\n                    languageCode: languageCode,\n                    model: 'latest_long', // Consider other models if needed\n                    enableAutomaticPunctuation: true,\n                  },\n                  audio: { content: base64Audio },\n                }),\n                headers: { 'Content-Type': 'application/json' },\n              });\n\n              const responseData = await response.json();\n\n              if (!response.ok) {\n                //console.error(\"Google Speech API Error:\", responseData);\n                self.postMessage({\n                  error: true,\n                  message: \"Error from Google Speech API: \" + (responseData.error?.message || response.statusText || 'Unknown error')\n                });\n                return;\n              }\n\n              if (responseData.results && responseData.results.length > 0) {\n                const transcript = responseData.results\n                  .map(result => result.alternatives[0].transcript)\n                  .join(' ')\n                  .trim();\n                self.postMessage(transcript); // Send back only the transcript string\n              } else {\n                 // Handle cases where API returns ok but no results (e.g., silence)\n                 self.postMessage({ error: true, message: 'No speech detected or recognized.' });\n              }\n            } catch (error) {\n               //console.error(\"Error in speech worker processing:\", error);\n               self.postMessage({\n                 error: true,\n                 message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))\n               });\n            }\n          };\n        ";
             var workerBlob = new Blob([workerCode], { type: 'application/javascript' });
             var workerUrl = URL.createObjectURL(workerBlob);
             this.speechWorker = new Worker(workerUrl);
             URL.revokeObjectURL(workerUrl); // Revoke URL immediately after worker creation
             this.setupSpeechWorkerHandlers(); // Setup message/error handlers
-            console.log("Speech worker initialized.");
+            //console.log("Speech worker initialized.");
         }
         catch (error) {
-            console.error("Failed to initialize speech worker:", error);
+            //console.error("Failed to initialize speech worker:", error);
             new obsidian_1.Notice("Speech recognition feature failed to initialize.");
             this.speechWorker = null; // Ensure worker is null if init fails
         }
@@ -1700,7 +1690,7 @@ var OllamaView = /** @class */ (function (_super) {
             var data = event.data;
             // Check for error object from worker
             if (data && typeof data === 'object' && data.error) {
-                console.error("Speech recognition error:", data.message);
+                //console.error("Speech recognition error:", data.message);
                 new obsidian_1.Notice("Speech Recognition Error: " + data.message);
                 _this.updateInputPlaceholder(_this.plugin.settings.modelName); // Reset placeholder on error
                 _this.updateSendButtonState(); // Update button state as well
@@ -1712,13 +1702,13 @@ var OllamaView = /** @class */ (function (_super) {
                 _this.insertTranscript(transcript);
             }
             else if (typeof data !== 'string') {
-                console.warn("Received unexpected data format from speech worker:", data);
+                //console.warn("Received unexpected data format from speech worker:", data);
             }
             // If data is an empty string, do nothing (might happen with short silence)
             _this.updateSendButtonState(); // Update button state after processing
         };
         this.speechWorker.onerror = function (error) {
-            console.error("Unhandled worker error:", error);
+            //console.error("Unhandled worker error:", error);
             new obsidian_1.Notice("An unexpected error occurred in the speech recognition worker.");
             _this.updateInputPlaceholder(_this.plugin.settings.modelName); // Reset placeholder
             // Attempt to gracefully stop recording if it was active
@@ -1768,17 +1758,17 @@ var OllamaView = /** @class */ (function (_super) {
         });
     };
     OllamaView.prototype.startVoiceRecognition = function () {
-        var _a, _b, _c;
+        var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var _d, recorderOptions, preferredMimeType, audioChunks_1, error_11;
+            var _b, recorderOptions, preferredMimeType, audioChunks_1, error_11;
             var _this = this;
-            return __generator(this, function (_e) {
-                switch (_e.label) {
+            return __generator(this, function (_c) {
+                switch (_c.label) {
                     case 0:
                         // Перевірка наявності worker'а для розпізнавання
                         if (!this.speechWorker) {
                             new obsidian_1.Notice("Функція розпізнавання мовлення недоступна (worker не ініціалізовано).");
-                            console.error("Спроба розпочати розпізнавання голосу без ініціалізованого worker'а.");
+                            //console.error("Спроба розпочати розпізнавання голосу без ініціалізованого worker'а.");
                             return [2 /*return*/];
                         }
                         // Перевірка наявності ключа Google API
@@ -1786,23 +1776,23 @@ var OllamaView = /** @class */ (function (_super) {
                             new obsidian_1.Notice("Ключ Google API не налаштовано. Будь ласка, додайте його в налаштуваннях плагіна для використання голосового вводу.");
                             return [2 /*return*/];
                         }
-                        _e.label = 1;
+                        _c.label = 1;
                     case 1:
-                        _e.trys.push([1, 3, , 4]);
+                        _c.trys.push([1, 3, , 4]);
                         // Запит доступу до мікрофона
-                        _d = this;
+                        _b = this;
                         return [4 /*yield*/, navigator.mediaDevices.getUserMedia({ audio: true })];
                     case 2:
                         // Запит доступу до мікрофона
-                        _d.audioStream = _e.sent();
+                        _b.audioStream = _c.sent();
                         recorderOptions = void 0;
                         preferredMimeType = 'audio/webm;codecs=opus';
                         if (MediaRecorder.isTypeSupported(preferredMimeType)) {
-                            console.log("\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0432\u0430\u043D\u0438\u0439 mimeType: " + preferredMimeType);
+                            //console.log(`Використовується підтримуваний mimeType: ${preferredMimeType}`);
                             recorderOptions = { mimeType: preferredMimeType }; // Призначаємо об'єкт опцій, якщо підтримується
                         }
                         else {
-                            console.warn(preferredMimeType + " \u043D\u0435 \u043F\u0456\u0434\u0442\u0440\u0438\u043C\u0443\u0454\u0442\u044C\u0441\u044F, \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u0438\u0439 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430.");
+                            //console.warn(`${preferredMimeType} не підтримується, використовується стандартний браузера.`);
                             recorderOptions = undefined; // Явно використовуємо undefined для стандартних налаштувань браузера
                         }
                         // Створення екземпляру MediaRecorder з визначеними опціями
@@ -1820,10 +1810,10 @@ var OllamaView = /** @class */ (function (_super) {
                         };
                         this.mediaRecorder.onstop = function () {
                             var _a;
-                            console.log("MediaRecorder stopped.");
+                            //console.log("MediaRecorder stopped.");
                             if (_this.speechWorker && audioChunks_1.length > 0) {
                                 var audioBlob = new Blob(audioChunks_1, { type: ((_a = _this.mediaRecorder) === null || _a === void 0 ? void 0 : _a.mimeType) || 'audio/webm' });
-                                console.log("Sending audio blob to worker: type=" + audioBlob.type + ", size=" + audioBlob.size);
+                                //console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
                                 _this.inputEl.placeholder = "Processing speech..."; // Update placeholder
                                 _this.speechWorker.postMessage({
                                     apiKey: _this.plugin.settings.googleApiKey,
@@ -1832,23 +1822,22 @@ var OllamaView = /** @class */ (function (_super) {
                                 });
                             }
                             else if (audioChunks_1.length === 0) {
-                                console.log("No audio data recorded.");
+                                //console.log("No audio data recorded.");
                                 _this.updateInputPlaceholder(_this.plugin.settings.modelName); // Restore placeholder if nothing was recorded
                                 _this.updateSendButtonState(); // Ensure button state is correct
                             }
                         };
                         this.mediaRecorder.onerror = function (event) {
-                            console.error("MediaRecorder Error:", event);
+                            //console.error("MediaRecorder Error:", event);
                             new obsidian_1.Notice("An error occurred during recording.");
                             _this.stopVoiceRecording(false); // Stop without processing on error
                         };
                         // --- Старт запису ---
                         this.mediaRecorder.start();
-                        console.log("Recording started. MimeType:", (_c = (_b = this.mediaRecorder) === null || _b === void 0 ? void 0 : _b.mimeType) !== null && _c !== void 0 ? _c : 'default');
                         return [3 /*break*/, 4];
                     case 3:
-                        error_11 = _e.sent();
-                        console.error("Error accessing microphone or starting recording:", error_11);
+                        error_11 = _c.sent();
+                        //console.error("Error accessing microphone or starting recording:", error);
                         if (error_11 instanceof DOMException && error_11.name === 'NotAllowedError') {
                             new obsidian_1.Notice("Microphone access denied. Please grant permission.");
                         }
@@ -1867,7 +1856,7 @@ var OllamaView = /** @class */ (function (_super) {
     };
     OllamaView.prototype.stopVoiceRecording = function (processAudio) {
         var _a, _b;
-        console.log("Stopping voice recording. Process audio: " + processAudio);
+        //console.log(`Stopping voice recording. Process audio: ${processAudio}`);
         if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
             // onstop handler will be triggered eventually to process if processAudio is true
             this.mediaRecorder.stop();
@@ -1883,7 +1872,7 @@ var OllamaView = /** @class */ (function (_super) {
         if (this.audioStream) {
             this.audioStream.getTracks().forEach(function (track) { return track.stop(); });
             this.audioStream = null;
-            console.log("Audio stream tracks stopped.");
+            //console.log("Audio stream tracks stopped.");
         }
         this.mediaRecorder = null;
     };
@@ -1964,7 +1953,7 @@ var OllamaView = /** @class */ (function (_super) {
         this.showEmptyState();
         this.updateSendButtonState();
         setTimeout(function () { return _this.focusInput(); }, 50); // Refocus after clear
-        console.log("[OllamaView] Display and internal state cleared.");
+        //console.log("[OllamaView] Display and internal state cleared.");
     };
     OllamaView.prototype.addLoadingIndicator = function () {
         // Adds the visual "thinking" dots indicator
@@ -2028,7 +2017,7 @@ var OllamaView = /** @class */ (function (_super) {
                     }
                 }
                 else {
-                    console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found.");
+                    //console.warn("[OllamaView] guaranteedScrollToBottom: chatContainer not found.");
                 }
             });
             _this.scrollTimeout = null;
