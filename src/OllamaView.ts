@@ -255,9 +255,9 @@ export class OllamaView extends ItemView {
       return { header, content };
     };
 
-    const modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER); this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
-    const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader = roleSection.header; this.roleSubmenuContent = roleSection.content;
-    const chatSection = createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER); this.chatSubmenuHeader = chatSection.header; this.chatSubmenuContent = chatSection.content;
+    const modelSection = createSubmenuSection("Models", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER); this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
+    const roleSection = createSubmenuSection("Roles", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader = roleSection.header; this.roleSubmenuContent = roleSection.content;
+    const chatSection = createSubmenuSection("Chats", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER); this.chatSubmenuHeader = chatSection.header; this.chatSubmenuContent = chatSection.content;
 
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
     this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });

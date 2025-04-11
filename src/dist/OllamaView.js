@@ -703,13 +703,13 @@ var OllamaView = /** @class */ (function (_super) {
             content.style.paddingBottom = '0';
             return { header: header, content: content };
         };
-        var modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER);
+        var modelSection = createSubmenuSection("Models", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER);
         this.modelSubmenuHeader = modelSection.header;
         this.modelSubmenuContent = modelSection.content;
-        var roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER);
+        var roleSection = createSubmenuSection("Roles", "users", CSS_CLASS_ROLE_LIST_CONTAINER);
         this.roleSubmenuHeader = roleSection.header;
         this.roleSubmenuContent = roleSection.content;
-        var chatSection = createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER);
+        var chatSection = createSubmenuSection("Chats", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER);
         this.chatSubmenuHeader = chatSection.header;
         this.chatSubmenuContent = chatSection.content;
         this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
