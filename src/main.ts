@@ -459,7 +459,7 @@ export default class OllamaPlugin extends Plugin {
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md"; // Назва файлу (можна зробити константою)
     // Шлях до файлу відносно кореня сховища
-    const builtInRolePath = normalizePath(`${pluginDir}/assets/roles/${builtInRoleFileName}`);
+    const builtInRolePath = normalizePath(`${pluginDir}/roles/${builtInRoleFileName}`);
     console.log(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
 
     try {
