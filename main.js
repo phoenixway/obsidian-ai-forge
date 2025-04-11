@@ -4293,49 +4293,80 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     }
   }
   // List Role Files Method
+  /**
+     * Отримує список доступних ролей, включаючи вбудовану роль "Productivity Assistant".
+     * @param forceRefresh Якщо true, кеш буде проігноровано і список буде зчитано з файлів.
+     * @returns Масив об'єктів RoleInfo.
+     */
   async listRoleFiles(forceRefresh = false) {
-    if (this.roleListCache && !forceRefresh)
+    var _a;
+    if (this.roleListCache && !forceRefresh) {
+      console.log("[OllamaPlugin] Returning cached roles.");
       return this.roleListCache;
-    console.log("[OllamaPlugin] Fetching roles...");
+    }
+    console.log("[OllamaPlugin] Fetching roles (including built-in)...");
     const roles = [];
+    const addedNamesLowerCase = /* @__PURE__ */ new Set();
     const adapter = this.app.vault.adapter;
-    const defaultRolesPath = (0, import_obsidian9.normalizePath)(this.manifest.dir + "/roles");
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian9.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const processFolder = async (folderPath, isCustom) => {
-      var _a;
-      if (!folderPath)
-        return;
+    const pluginDir = this.manifest.dir;
+    const builtInRoleName = "Productivity Assistant";
+    const builtInRoleFileName = "Productivity_Assistant.md";
+    const builtInRolePath = (0, import_obsidian9.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+    console.log(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
+    try {
+      if (await adapter.exists(builtInRolePath)) {
+        const stat = await adapter.stat(builtInRolePath);
+        if ((stat == null ? void 0 : stat.type) === "file") {
+          console.log(`[OllamaPlugin] Found built-in role: ${builtInRoleName}`);
+          roles.push({
+            name: builtInRoleName,
+            path: builtInRolePath,
+            // Зберігаємо шлях відносно кореня сховища
+            isCustom: false
+            // Позначаємо як не користувацьку
+            // isBuiltIn: true // Можна додати окремий прапорець
+          });
+          addedNamesLowerCase.add(builtInRoleName.toLowerCase());
+        } else {
+          console.warn(`[OllamaPlugin] Built-in role path exists but is not a file: ${builtInRolePath}`);
+        }
+      } else {
+        console.warn(`[OllamaPlugin] Built-in role file NOT FOUND at: ${builtInRolePath}. Productivity features might rely on it.`);
+      }
+    } catch (error) {
+      console.error(`[OllamaPlugin] Error checking/adding built-in role at ${builtInRolePath}:`, error);
+    }
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian9.normalizePath)(this.settings.userRolesFolderPath) : null;
+    if (userRolesFolderPath) {
+      console.log(`[OllamaPlugin] Processing user roles from: ${userRolesFolderPath}`);
       try {
-        if (await adapter.exists(folderPath) && ((_a = await adapter.stat(folderPath)) == null ? void 0 : _a.type) === "folder") {
-          const listResult = await adapter.list(folderPath);
-          const currentNames = new Set(roles.map((r) => r.name.toLowerCase()));
+        if (await adapter.exists(userRolesFolderPath) && ((_a = await adapter.stat(userRolesFolderPath)) == null ? void 0 : _a.type) === "folder") {
+          const listResult = await adapter.list(userRolesFolderPath);
           for (const filePath of listResult.files) {
-            if (filePath.toLowerCase().endsWith(".md") && filePath.split("/").length === (folderPath === "/" ? 1 : folderPath.split("/").length + 1)) {
+            if (filePath.toLowerCase().endsWith(".md") && (userRolesFolderPath === "/" || filePath.split("/").length === userRolesFolderPath.split("/").length + 1) && filePath !== builtInRolePath) {
               const fileName = path.basename(filePath);
               const roleName = fileName.substring(0, fileName.length - 3);
-              if (!currentNames.has(roleName.toLowerCase())) {
-                roles.push({ name: roleName, path: filePath, isCustom });
-                currentNames.add(roleName.toLowerCase());
-              } else if (isCustom) {
-                console.warn(`[OllamaPlugin] Duplicate role name found: "${roleName}". User role overrides default.`);
-                const indexToRemove = roles.findIndex((r) => !r.isCustom && r.name.toLowerCase() === roleName.toLowerCase());
-                if (indexToRemove > -1) {
-                  roles.splice(indexToRemove, 1);
-                }
-                roles.push({ name: roleName, path: filePath, isCustom });
+              if (!addedNamesLowerCase.has(roleName.toLowerCase())) {
+                console.log(`[OllamaPlugin] Adding user role: ${roleName}`);
+                roles.push({ name: roleName, path: filePath, isCustom: true });
+                addedNamesLowerCase.add(roleName.toLowerCase());
+              } else {
+                console.warn(`[OllamaPlugin] Skipping user role "${roleName}" from "${userRolesFolderPath}" due to name conflict.`);
               }
             }
           }
+        } else if (userRolesFolderPath !== "/") {
+          console.warn(`[OllamaPlugin] User roles path not found or not a folder: ${userRolesFolderPath}`);
         }
       } catch (e) {
-        console.error(`Error listing roles in ${folderPath} (Custom: ${isCustom}):`, e);
+        console.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
       }
-    };
-    await processFolder(defaultRolesPath, false);
-    await processFolder(userRolesPath, true);
-    roles.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    roles.sort((a, b) => {
+      return a.name.localeCompare(b.name);
+    });
     this.roleListCache = roles;
-    console.log(`[OllamaPlugin] Found ${roles.length} roles.`);
+    console.log(`[OllamaPlugin] Found total ${roles.length} roles (including built-in if present).`);
     return roles;
   }
   // Execute System Command Method

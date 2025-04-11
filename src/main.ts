@@ -438,56 +438,111 @@ export default class OllamaPlugin extends Plugin {
   }
 
   // List Role Files Method
+  /**
+     * Отримує список доступних ролей, включаючи вбудовану роль "Productivity Assistant".
+     * @param forceRefresh Якщо true, кеш буде проігноровано і список буде зчитано з файлів.
+     * @returns Масив об'єктів RoleInfo.
+     */
   async listRoleFiles(forceRefresh: boolean = false): Promise<RoleInfo[]> {
-    if (this.roleListCache && !forceRefresh) return this.roleListCache;
-    console.log("[OllamaPlugin] Fetching roles...");
+    if (this.roleListCache && !forceRefresh) {
+      console.log("[OllamaPlugin] Returning cached roles.");
+      return this.roleListCache;
+    }
+    console.log("[OllamaPlugin] Fetching roles (including built-in)...");
+
     const roles: RoleInfo[] = [];
+    const addedNamesLowerCase = new Set<string>(); // Для уникнення дублікатів імен
     const adapter = this.app.vault.adapter;
-    const defaultRolesPath = normalizePath(this.manifest.dir + '/roles');
-    const userRolesPath = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null;
+    const pluginDir = this.manifest.dir; // Шлях до папки плагіна відносно .obsidian/plugins/
 
-    // Функція для обробки папки
-    const processFolder = async (folderPath: string | null, isCustom: boolean) => {
-      if (!folderPath) return;
+    // --- 1. Додаємо Вбудовану Роль "Productivity Assistant" ---
+    const builtInRoleName = "Productivity Assistant";
+    const builtInRoleFileName = "Productivity_Assistant.md"; // Назва файлу (можна зробити константою)
+    // Шлях до файлу відносно кореня сховища
+    const builtInRolePath = normalizePath(`${pluginDir}/roles/${builtInRoleFileName}`);
+    console.log(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
+
+    try {
+      // Перевіряємо існування файлу через адаптер
+      if (await adapter.exists(builtInRolePath)) {
+        // Додатково перевіряємо, чи це файл (stat може бути повільним)
+        const stat = await adapter.stat(builtInRolePath);
+        if (stat?.type === 'file') {
+          console.log(`[OllamaPlugin] Found built-in role: ${builtInRoleName}`);
+          // Додаємо першою або просто до загального списку
+          roles.push({
+            name: builtInRoleName,
+            path: builtInRolePath, // Зберігаємо шлях відносно кореня сховища
+            isCustom: false, // Позначаємо як не користувацьку
+            // isBuiltIn: true // Можна додати окремий прапорець
+          });
+          addedNamesLowerCase.add(builtInRoleName.toLowerCase());
+        } else {
+          console.warn(`[OllamaPlugin] Built-in role path exists but is not a file: ${builtInRolePath}`);
+        }
+      } else {
+        console.warn(`[OllamaPlugin] Built-in role file NOT FOUND at: ${builtInRolePath}. Productivity features might rely on it.`);
+        // Можливо, варто показати Notice, якщо ця роль критична
+        // new Notice("Built-in 'Productivity Assistant' role file is missing!");
+      }
+    } catch (error) {
+      console.error(`[OllamaPlugin] Error checking/adding built-in role at ${builtInRolePath}:`, error);
+    }
+    // --- Кінець Вбудованої Ролі ---
+
+
+    // --- 2. Додаємо Користувацькі Ролі (з папки налаштувань) ---
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null;
+    if (userRolesFolderPath) {
+      console.log(`[OllamaPlugin] Processing user roles from: ${userRolesFolderPath}`);
       try {
-        if (await adapter.exists(folderPath) && (await adapter.stat(folderPath))?.type === 'folder') {
-          const listResult = await adapter.list(folderPath);
-          const currentNames = new Set(roles.map(r => r.name.toLowerCase())); // Для перевірки дублікатів імен (регістронезалежно)
-
+        if (await adapter.exists(userRolesFolderPath) && (await adapter.stat(userRolesFolderPath))?.type === 'folder') {
+          const listResult = await adapter.list(userRolesFolderPath);
           for (const filePath of listResult.files) {
-            // Переконуємось, що це markdown файл безпосередньо в папці
-            if (filePath.toLowerCase().endsWith('.md') && filePath.split('/').length === (folderPath === '/' ? 1 : folderPath.split('/').length + 1)) {
-              const fileName = path.basename(filePath);
+            // Обробляємо лише .md файли безпосередньо в цій папці
+            if (filePath.toLowerCase().endsWith('.md') &&
+              (userRolesFolderPath === '/' || filePath.split('/').length === userRolesFolderPath.split('/').length + 1) &&
+              filePath !== builtInRolePath) { // Не додаємо вбудовану роль ще раз, якщо папки співпали
+
+              const fileName = path.basename(filePath); // Використовуємо path для надійності
               const roleName = fileName.substring(0, fileName.length - 3);
+
               // Додаємо, тільки якщо ім'я унікальне (регістронезалежно)
-              if (!currentNames.has(roleName.toLowerCase())) {
-                roles.push({ name: roleName, path: filePath, isCustom: isCustom });
-                currentNames.add(roleName.toLowerCase());
-              } else if (isCustom) {
-                console.warn(`[OllamaPlugin] Duplicate role name found: "${roleName}". User role overrides default.`);
-                // Якщо користувацька роль має таке ж ім'я, як стандартна, видаляємо стандартну
-                const indexToRemove = roles.findIndex(r => !r.isCustom && r.name.toLowerCase() === roleName.toLowerCase());
-                if (indexToRemove > -1) {
-                  roles.splice(indexToRemove, 1);
-                }
-                roles.push({ name: roleName, path: filePath, isCustom: isCustom }); // Додаємо користувацьку
+              if (!addedNamesLowerCase.has(roleName.toLowerCase())) {
+                console.log(`[OllamaPlugin] Adding user role: ${roleName}`);
+                roles.push({ name: roleName, path: filePath, isCustom: true });
+                addedNamesLowerCase.add(roleName.toLowerCase());
+              } else {
+                console.warn(`[OllamaPlugin] Skipping user role "${roleName}" from "${userRolesFolderPath}" due to name conflict.`);
               }
             }
           }
+        } else if (userRolesFolderPath !== "/") { // Не виводимо попередження для кореневої папки
+          console.warn(`[OllamaPlugin] User roles path not found or not a folder: ${userRolesFolderPath}`);
+          // Можливо, варто повідомити користувача через Notice?
         }
       } catch (e) {
-        console.error(`Error listing roles in ${folderPath} (Custom: ${isCustom}):`, e);
+        console.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
       }
-    };
+    }
+    // --- Кінець Користувацьких Ролей ---
 
-    // Обробляємо стандартні ролі
-    await processFolder(defaultRolesPath, false);
-    // Обробляємо користувацькі ролі
-    await processFolder(userRolesPath, true);
 
-    roles.sort((a, b) => a.name.localeCompare(b.name)); // Сортуємо за іменем
-    this.roleListCache = roles; // Кешуємо результат
-    console.log(`[OllamaPlugin] Found ${roles.length} roles.`);
+    // --- 3. Додаємо Інші Стандартні Ролі (Якщо є папка roles/ крім файлу Productivity_Assistant) ---
+    // const defaultRolesPath = normalizePath(pluginDir + '/roles');
+    // // ... (схожа логіка обробки папки, як для userRolesPath, перевіряючи addedNamesLowerCase) ...
+    // --- Кінець Інших Стандартних Ролей ---
+
+
+    // --- 4. Сортування та Кешування ---
+    roles.sort((a, b) => {
+      // Можна зробити, щоб вбудована роль була завжди першою
+      // if (a.name === builtInRoleName) return -1;
+      // if (b.name === builtInRoleName) return 1;
+      return a.name.localeCompare(b.name); // Або просто сортуємо за алфавітом
+    });
+    this.roleListCache = roles;
+    console.log(`[OllamaPlugin] Found total ${roles.length} roles (including built-in if present).`);
     return roles;
   }
 
