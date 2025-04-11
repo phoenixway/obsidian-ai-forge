@@ -104,7 +104,7 @@ Here you can configure:
 
 ## 🤝 Support & Contribution
 
-* **Questions & Ideas:** Create an [Issue](https://github.com/phoenixway/obsidian-ollama-personas/issues) or join the [Discussions](https://github.com/phoenixway/obsidian-ollama-personas/discussions). *(Note: Updated repo name)*
+* **Questions & Ideas:** Create an [Issue](https://github.com/phoenixway/obsidian-ai-forge/issues) or join the [Discussions](https://github.com/phoenixway/obsidian-ai-forge/discussions). *(Note: Updated repo name)*
 * **Contributions:** Pull requests are welcome! Please discuss significant changes in an issue first.
 
 ## 📜 License
