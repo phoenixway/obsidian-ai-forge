@@ -48,6 +48,13 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+var __spreadArrays = (this && this.__spreadArrays) || function () {
+    for (var s = 0, i = 0, il = arguments.length; i < il; i++) s += arguments[i].length;
+    for (var r = Array(s), k = 0, i = 0; i < il; i++)
+        for (var a = arguments[i], j = 0, jl = a.length; j < jl; j++, k++)
+            r[k] = a[j];
+    return r;
+};
 exports.__esModule = true;
 exports.OllamaView = exports.VIEW_TYPE_OLLAMA_PERSONAS = void 0;
 // OllamaView.ts
@@ -160,6 +167,7 @@ var OllamaView = /** @class */ (function (_super) {
             }
         };
         _this.handleSendClick = function () {
+            console.log("OllamaView.ts ->     : sendClick");
             if (!_this.isProcessing && !_this.sendButton.disabled) {
                 _this.sendMessage();
             }
@@ -614,42 +622,452 @@ var OllamaView = /** @class */ (function (_super) {
             this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: "Type a message or use the menu to start interacting with " + modelName + "." });
         }
     };
-    OllamaView.prototype.hideEmptyState = function () { /* ... */ if (this.emptyStateEl) {
-        this.emptyStateEl.remove();
-        this.emptyStateEl = null;
-    } };
-    // public setLoadingS'tate(isLoading: boolean): void { /* ... */ this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } }
-    // --- Message Handling & Rendering ---
-    OllamaView.prototype.loadAndDisplayActiveChat = function () {
-        return __awaiter(this, void 0, Promise, function () { return __generator(this, function (_a) {
-            return [2 /*return*/];
-        }); });
+    OllamaView.prototype.hideEmptyState = function () {
+        // Remove the empty state message
+        if (this.emptyStateEl) {
+            this.emptyStateEl.remove();
+            this.emptyStateEl = null;
+        }
     };
-    OllamaView.prototype.renderMessages = function (messagesToRender) { };
-    OllamaView.prototype.addMessageToDisplay = function (role, content, timestamp) { };
+    // --- Message Handling & Rendering ---
+    /** Loads the active chat session from ChatManager and displays its messages */
+    OllamaView.prototype.loadAndDisplayActiveChat = function () {
+        var _a;
+        return __awaiter(this, void 0, Promise, function () {
+            var activeChat, error_3;
+            var _this = this;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        //console.log("[OllamaView] Loading and displaying active chat...");
+                        this.clearChatContainerInternal(); // Clear previous content & state
+                        this.currentMessages = [];
+                        this.lastRenderedMessageDate = null;
+                        _b.label = 1;
+                    case 1:
+                        _b.trys.push([1, 3, , 4]);
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 2:
+                        activeChat = _b.sent();
+                        if (activeChat && activeChat.messages.length > 0) {
+                            //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
+                            this.hideEmptyState();
+                            this.renderMessages(activeChat.messages); // Render the loaded messages
+                            this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+                            // Check collapsing and scroll after rendering
+                            this.checkAllMessagesForCollapsing();
+                            setTimeout(function () { _this.guaranteedScrollToBottom(100, true); }, 150); // Scroll after render
+                        }
+                        else if (activeChat) {
+                            //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
+                            // Chat exists but is empty
+                            this.showEmptyState();
+                            this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+                        }
+                        else {
+                            //console.warn("[OllamaView] No active chat found or failed to load.");
+                            // No active chat found or failed to load
+                            this.showEmptyState();
+                            this.updateInputPlaceholder(this.plugin.settings.modelName); // Fallback placeholder
+                        }
+                        return [3 /*break*/, 4];
+                    case 3:
+                        error_3 = _b.sent();
+                        //console.error("[OllamaView] Error getting active chat:", error);
+                        this.showEmptyState();
+                        new obsidian_1.Notice("Error loading chat history.");
+                        return [3 /*break*/, 4];
+                    case 4: return [2 /*return*/];
+                }
+            });
+        });
+    };
+    /** Renders a list of messages to the chat container */
+    OllamaView.prototype.renderMessages = function (messagesToRender) {
+        var _this = this;
+        this.clearChatContainerInternal(); // Ensure container is empty first
+        this.currentMessages = __spreadArrays(messagesToRender); // Update local cache
+        this.lastRenderedMessageDate = null; // Reset date separator logic
+        messagesToRender.forEach(function (message) {
+            _this.renderMessageInternal(message, messagesToRender); // Render each message
+        });
+        //console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
+    };
+    /** Appends a single message to the display */
+    OllamaView.prototype.addMessageToDisplay = function (role, content, timestamp) {
+        // Avoid adding if container doesn't exist (e.g., during close)
+        if (!this.chatContainer)
+            return;
+        var newMessage = { role: role, content: content, timestamp: timestamp };
+        var currentContext = __spreadArrays(this.currentMessages); // Capture context *before* adding
+        // Render the new message using the captured context
+        var messageEl = this.renderMessageInternal(newMessage, __spreadArrays(currentContext, [newMessage]));
+        // Update local cache AFTER rendering to ensure correct prevMessage context
+        this.currentMessages.push(newMessage);
+        if (messageEl) {
+            this.checkMessageForCollapsing(messageEl); // Check height for collapsing
+        }
+        // Handle scrolling and new message indicator
+        var isUserOrError = role === "user" || role === "error";
+        if (!isUserOrError && this.userScrolledUp && this.newMessagesIndicatorEl) {
+            this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE); // Show indicator
+        }
+        else if (!this.userScrolledUp) {
+            // Scroll down if user is already at the bottom
+            var forceScroll = !isUserOrError; // Force scroll more reliably for AI messages
+            // Use slightly longer delay for AI messages to allow rendering
+            this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+        }
+        this.hideEmptyState(); // Ensure empty state is hidden
+    };
+    /** Sends the user's input as a message and gets a response */
     OllamaView.prototype.sendMessage = function () {
-        return __awaiter(this, void 0, Promise, function () { return __generator(this, function (_a) {
-            return [2 /*return*/];
-        }); });
+        var _a;
+        return __awaiter(this, void 0, Promise, function () {
+            var content, activeChat, userMessageContent, loadingEl, userMessage, assistantMessage, error_4;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        content = this.inputEl.value.trim();
+                        if (!content || this.isProcessing || this.sendButton.disabled)
+                            return [2 /*return*/];
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 1:
+                        activeChat = _b.sent();
+                        if (!activeChat) {
+                            new obsidian_1.Notice("Error: No active chat session found.");
+                            return [2 /*return*/];
+                        }
+                        userMessageContent = this.inputEl.value;
+                        this.clearInputField(); // Clear input immediately
+                        this.setLoadingState(true); // Disable UI, set processing state
+                        this.hideEmptyState();
+                        loadingEl = null;
+                        _b.label = 2;
+                    case 2:
+                        _b.trys.push([2, 8, 9, 10]);
+                        return [4 /*yield*/, this.plugin.chatManager.addMessageToActiveChat('user', userMessageContent)];
+                    case 3:
+                        userMessage = _b.sent();
+                        if (!userMessage)
+                            throw new Error("Failed to add user message to history.");
+                        // User message appears via event handler
+                        // 2. Show loading indicator *after* user message is likely added
+                        loadingEl = this.addLoadingIndicator();
+                        this.guaranteedScrollToBottom(50, true); // Scroll to show indicator
+                        return [4 /*yield*/, this.plugin.ollamaService.generateChatResponse(activeChat)];
+                    case 4:
+                        assistantMessage = _b.sent();
+                        //console.log("[OllamaView] Received response from service.");
+                        // Remove indicator BEFORE adding assistant message
+                        if (loadingEl) {
+                            this.removeLoadingIndicator(loadingEl);
+                            loadingEl = null;
+                        }
+                        if (!assistantMessage) return [3 /*break*/, 6];
+                        return [4 /*yield*/, this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content)];
+                    case 5:
+                        _b.sent();
+                        return [3 /*break*/, 7];
+                    case 6:
+                        //console.warn("[OllamaView] Service returned null assistant message.");
+                        // Add error directly to display (as ChatManager won't add a null message)
+                        this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
+                        _b.label = 7;
+                    case 7: return [3 /*break*/, 10];
+                    case 8:
+                        error_4 = _b.sent();
+                        //console.error("[OllamaView] Send/receive cycle error:", error);
+                        if (loadingEl) {
+                            this.removeLoadingIndicator(loadingEl);
+                            loadingEl = null;
+                        } // Ensure indicator removed on error
+                        // Add error directly to display
+                        this.addMessageToDisplay("error", "Error: " + (error_4.message || 'Unknown error.'), new Date());
+                        return [3 /*break*/, 10];
+                    case 9:
+                        // Ensure indicator is removed in all cases (if somehow missed)
+                        if (loadingEl) {
+                            this.removeLoadingIndicator(loadingEl);
+                        }
+                        this.setLoadingState(false); // Re-enable UI
+                        this.focusInput(); // Return focus to input field
+                        return [7 /*endfinally*/];
+                    case 10: return [2 /*return*/];
+                }
+            });
+        });
     };
     // --- Core Rendering Logic ---
-    OllamaView.prototype.renderMessageInternal = function (message, messageContext) { /* ... */ return null; };
-    OllamaView.prototype.handleCopyClick = function (content, buttonEl) { };
+    /** Renders a single message bubble based on the message object and context */
+    OllamaView.prototype.renderMessageInternal = function (message, messageContext) {
+        var _this = this;
+        var messageIndex = messageContext.findIndex(function (m) { return m === message; });
+        if (messageIndex === -1)
+            return null; // Should not happen
+        var prevMessage = messageIndex > 0 ? messageContext[messageIndex - 1] : null;
+        var isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+        // --- Date Separator ---
+        if (isNewDay) {
+            this.renderDateSeparator(message.timestamp);
+            this.lastRenderedMessageDate = message.timestamp;
+        }
+        else if (messageIndex === 0 && !this.lastRenderedMessageDate) {
+            this.lastRenderedMessageDate = message.timestamp; // Set for the very first message
+        }
+        // --- Grouping Logic ---
+        var messageGroup = null;
+        var groupClass = CSS_CLASS_MESSAGE_GROUP;
+        var messageClass = CSS_CLASS_MESSAGE + " " + CSS_CLASS_MESSAGE_ARRIVING;
+        var showAvatar = true;
+        var isUser = false;
+        var isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+        switch (message.role) {
+            case "user":
+                groupClass += " " + CSS_CLASS_USER_GROUP;
+                messageClass += " " + CSS_CLASS_USER_MESSAGE;
+                isUser = true;
+                break;
+            case "assistant":
+                groupClass += " " + CSS_CLASS_OLLAMA_GROUP;
+                messageClass += " " + CSS_CLASS_OLLAMA_MESSAGE;
+                break;
+            case "system":
+                groupClass += " " + CSS_CLASS_SYSTEM_GROUP;
+                messageClass += " " + CSS_CLASS_SYSTEM_MESSAGE;
+                showAvatar = false;
+                break;
+            case "error":
+                groupClass += " " + CSS_CLASS_ERROR_GROUP;
+                messageClass += " " + CSS_CLASS_ERROR_MESSAGE;
+                showAvatar = false;
+                break;
+        }
+        var lastElement = this.chatContainer.lastElementChild;
+        if (isFirstInGroup || !lastElement || !lastElement.matches("." + groupClass.split(' ')[1])) {
+            messageGroup = this.chatContainer.createDiv({ cls: groupClass });
+            if (showAvatar)
+                this.renderAvatar(messageGroup, isUser);
+        }
+        else {
+            messageGroup = lastElement;
+        }
+        // --- Element Creation ---
+        var messageEl = messageGroup.createDiv({ cls: messageClass });
+        var contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+        var contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+        // --- Render Content ---
+        switch (message.role) {
+            case "assistant":
+            case "user":
+                contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+                if (message.role === 'assistant') {
+                    this.renderAssistantContent(contentEl, message.content);
+                }
+                else {
+                    message.content.split("\n").forEach(function (line, i, arr) {
+                        contentEl.appendText(line);
+                        if (i < arr.length - 1)
+                            contentEl.createEl("br");
+                    });
+                }
+                break;
+            case "system":
+                obsidian_1.setIcon(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+                contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+                break;
+            case "error":
+                obsidian_1.setIcon(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+                contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+                break;
+        }
+        // --- Action Buttons ---
+        var buttonsWrapper = contentContainer.createDiv({ cls: 'message-actions-wrapper' });
+        if (message.role !== "system" && message.role !== "error") {
+            var copyBtn_1 = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
+            obsidian_1.setIcon(copyBtn_1, "copy");
+            this.registerDomEvent(copyBtn_1, "click", function (e) { e.stopPropagation(); _this.handleCopyClick(message.content, copyBtn_1); });
+        }
+        if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
+            var targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
+            var translateBtn_1 = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: "Translate to " + targetLangName, 'aria-label': "Translate message" } });
+            obsidian_1.setIcon(translateBtn_1, "languages");
+            this.registerDomEvent(translateBtn_1, "click", function (e) { e.stopPropagation(); _this.handleTranslateClick(message.content, contentEl, translateBtn_1); });
+        }
+        // --- Timestamp ---
+        messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+        // --- Animation Cleanup ---
+        setTimeout(function () { return messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING); }, 500);
+        return messageEl;
+    };
+    // --- Action Button Handlers ---
+    OllamaView.prototype.handleCopyClick = function (content, buttonEl) {
+        var textToCopy = content;
+        // Decode HTML and remove <think> tags before copying
+        if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
+            textToCopy = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        }
+        navigator.clipboard.writeText(textToCopy).then(function () {
+            obsidian_1.setIcon(buttonEl, "check");
+            buttonEl.setAttribute("title", "Copied!");
+            setTimeout(function () { obsidian_1.setIcon(buttonEl, "copy"); buttonEl.setAttribute("title", "Copy"); }, 2000);
+        })["catch"](function (err) {
+            //console.error("Copy failed:", err); new Notice("Failed to copy text.");
+        });
+    };
     OllamaView.prototype.handleTranslateClick = function (originalContent, contentEl, buttonEl) {
-        return __awaiter(this, void 0, Promise, function () { return __generator(this, function (_a) {
-            return [2 /*return*/];
-        }); });
+        var _a;
+        return __awaiter(this, void 0, Promise, function () {
+            var targetLang, apiKey, textToTranslate, translatedText, translationContainer, targetLangName, error_5, targetLangName;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        targetLang = this.plugin.settings.translationTargetLanguage;
+                        apiKey = this.plugin.settings.googleTranslationApiKey;
+                        if (!targetLang || !apiKey) {
+                            new obsidian_1.Notice("Translation not configured. Please check language and API key in settings.");
+                            return [2 /*return*/];
+                        }
+                        textToTranslate = originalContent;
+                        if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
+                            textToTranslate = this.decodeHtmlEntities(originalContent).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+                        }
+                        if (!textToTranslate)
+                            return [2 /*return*/]; // Nothing to translate
+                        // Remove previous translation if exists
+                        (_a = contentEl.querySelector("." + CSS_CLASS_TRANSLATION_CONTAINER)) === null || _a === void 0 ? void 0 : _a.remove();
+                        // Set loading state
+                        obsidian_1.setIcon(buttonEl, "loader");
+                        buttonEl.disabled = true;
+                        buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING);
+                        buttonEl.setAttribute("title", "Translating...");
+                        _b.label = 1;
+                    case 1:
+                        _b.trys.push([1, 3, 4, 5]);
+                        return [4 /*yield*/, this.plugin.translationService.translate(textToTranslate, targetLang)];
+                    case 2:
+                        translatedText = _b.sent();
+                        if (translatedText !== null) {
+                            translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+                            translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT, text: translatedText });
+                            targetLangName = LANGUAGES[targetLang] || targetLang;
+                            translationContainer.createEl('div', { cls: 'translation-indicator', text: "[Translated to " + targetLangName + "]" });
+                            this.guaranteedScrollToBottom(50, false); // Scroll if needed
+                        } // Error notice shown by service if null
+                        return [3 /*break*/, 5];
+                    case 3:
+                        error_5 = _b.sent();
+                        //console.error("Error during translation click handling:", error);
+                        new obsidian_1.Notice("An unexpected error occurred during translation.");
+                        return [3 /*break*/, 5];
+                    case 4:
+                        // Restore button state
+                        obsidian_1.setIcon(buttonEl, "languages");
+                        buttonEl.disabled = false;
+                        buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+                        targetLangName = LANGUAGES[targetLang] || targetLang;
+                        buttonEl.setAttribute("title", "Translate to " + targetLangName);
+                        return [7 /*endfinally*/];
+                    case 5: return [2 /*return*/];
+                }
+            });
+        });
     };
     // --- Rendering Helpers ---
-    OllamaView.prototype.renderAvatar = function (groupEl, isUser) { };
-    OllamaView.prototype.renderDateSeparator = function (date) { };
-    OllamaView.prototype.renderAssistantContent = function (containerEl, content) { };
-    OllamaView.prototype.addCodeBlockEnhancements = function (contentEl) { };
+    OllamaView.prototype.renderAvatar = function (groupEl, isUser) {
+        var settings = this.plugin.settings;
+        var avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
+        var avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
+        var avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
+        var avatarEl = groupEl.createDiv({ cls: CSS_CLASS_AVATAR + " " + avatarClass });
+        if (avatarType === 'initials') {
+            avatarEl.textContent = avatarContent || (isUser ? 'U' : 'A');
+        }
+        else if (avatarType === 'icon') {
+            try {
+                obsidian_1.setIcon(avatarEl, avatarContent || (isUser ? 'user' : 'bot'));
+            }
+            catch (e) {
+                //console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
+                avatarEl.textContent = isUser ? 'U' : 'A'; // Fallback
+            }
+        }
+        else {
+            avatarEl.textContent = isUser ? 'U' : 'A'; // Default fallback
+        }
+    };
+    OllamaView.prototype.renderDateSeparator = function (date) {
+        if (!this.chatContainer)
+            return;
+        this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) });
+    };
+    OllamaView.prototype.renderAssistantContent = function (containerEl, content) {
+        var _a, _b;
+        // Decode entities first for tag detection and rendering
+        var decodedContent = this.decodeHtmlEntities(content);
+        var thinkingInfo = this.detectThinkingTags(decodedContent);
+        containerEl.empty(); // Clear previous content
+        if (thinkingInfo.hasThinkingTags) {
+            // Process content with <think> tags
+            var processedHtml = this.processThinkingTags(decodedContent);
+            containerEl.innerHTML = processedHtml; // Set innerHTML for complex structure
+            this.addThinkingToggleListeners(containerEl); // Add listeners for foldouts
+            this.addCodeBlockEnhancements(containerEl); // Enhance code blocks within generated HTML
+        }
+        else {
+            // Render standard Markdown content
+            obsidian_1.MarkdownRenderer.renderMarkdown(decodedContent, // Use decoded content for rendering
+            containerEl, (_b = (_a = this.app.vault.getRoot()) === null || _a === void 0 ? void 0 : _a.path) !== null && _b !== void 0 ? _b : "", // Source path context
+            this // Component context for links etc.
+            );
+            this.addCodeBlockEnhancements(containerEl); // Enhance standard code blocks
+        }
+    };
+    OllamaView.prototype.addCodeBlockEnhancements = function (contentEl) {
+        var _this = this;
+        contentEl.querySelectorAll("pre").forEach(function (pre) {
+            // Prevent adding button multiple times
+            if (pre.querySelector("." + CSS_CLASS_CODE_BLOCK_COPY_BUTTON))
+                return;
+            var code = pre.querySelector("code");
+            if (!code)
+                return;
+            var codeText = code.textContent || "";
+            // Add language identifier badge
+            var langClass = Array.from(code.classList).find(function (cls) { return cls.startsWith("language-"); });
+            if (langClass) {
+                var lang = langClass.replace("language-", "");
+                if (lang) {
+                    // Check if language badge already exists (added robustness)
+                    if (!pre.querySelector("." + CSS_CLASS_CODE_BLOCK_LANGUAGE)) {
+                        pre.createEl("span", { cls: CSS_CLASS_CODE_BLOCK_LANGUAGE, text: lang });
+                    }
+                }
+            }
+            // Add copy button
+            var copyBtn = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
+            obsidian_1.setIcon(copyBtn, "copy");
+            copyBtn.setAttribute("title", "Copy Code");
+            copyBtn.setAttribute("aria-label", "Copy code block"); // Accessibility
+            // Use registerDomEvent for reliable cleanup
+            _this.registerDomEvent(copyBtn, "click", function (e) {
+                e.stopPropagation();
+                navigator.clipboard.writeText(codeText).then(function () {
+                    obsidian_1.setIcon(copyBtn, "check");
+                    copyBtn.setAttribute("title", "Copied!");
+                    setTimeout(function () { obsidian_1.setIcon(copyBtn, "copy"); copyBtn.setAttribute("title", "Copy Code"); }, 1500);
+                })["catch"](function (err) {
+                    //console.error("Code block copy failed:", err); 
+                    new obsidian_1.Notice("Failed to copy code.");
+                });
+            });
+        });
+    };
     // --- Menu List Rendering (ПОТРІБНІ ЗНОВУ) ---
     OllamaView.prototype.renderModelList = function () {
         var _a, _b;
         return __awaiter(this, void 0, Promise, function () {
-            var container, modelIconMap, defaultIcon, models, activeChat, currentModelName_1, error_3;
+            var container, modelIconMap, defaultIcon, models, activeChat, currentModelName_1, error_6;
             var _this = this;
             return __generator(this, function (_c) {
                 switch (_c.label) {
@@ -735,7 +1153,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
                     case 4:
-                        error_3 = _c.sent();
+                        error_6 = _c.sent();
                         container.empty();
                         container.createEl("div", { cls: "menu-error-text", text: "Error loading models." });
                         this.updateSubmenuHeight(container);
@@ -748,7 +1166,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.renderRoleList = function () {
         var _a, _b, _c;
         return __awaiter(this, void 0, Promise, function () {
-            var container, roles, activeChat, currentChatRolePath_1, noRoleOptionEl, noRoleIconSpan, error_4;
+            var container, roles, activeChat, currentChatRolePath_1, noRoleOptionEl, noRoleIconSpan, error_7;
             var _this = this;
             return __generator(this, function (_d) {
                 switch (_d.label) {
@@ -856,7 +1274,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
                     case 4:
-                        error_4 = _d.sent();
+                        error_7 = _d.sent();
                         container.empty();
                         container.createEl("div", { cls: "menu-error-text", text: "Error loading roles." });
                         this.updateSubmenuHeight(container);

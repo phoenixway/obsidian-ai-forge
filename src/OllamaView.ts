@@ -330,6 +330,7 @@ export class OllamaView extends ItemView {
     }
   }
   private handleSendClick = (): void => {
+    console.log(`OllamaView.ts ->     : sendClick`);
     if (!this.isProcessing && !this.sendButton.disabled) {
       this.sendMessage();
     }
@@ -520,25 +521,395 @@ export class OllamaView extends ItemView {
       this.chatContainer.empty(); this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE }); this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" }); const modelName = this.plugin?.settings?.modelName || "the AI"; this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use the menu to start interacting with ${modelName}.` });
     }
   }
-  public hideEmptyState(): void { /* ... */ if (this.emptyStateEl) { this.emptyStateEl.remove(); this.emptyStateEl = null; } }
-  // public setLoadingS'tate(isLoading: boolean): void { /* ... */ this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } }
+  public hideEmptyState(): void {
+    // Remove the empty state message
+    if (this.emptyStateEl) {
+      this.emptyStateEl.remove();
+      this.emptyStateEl = null;
+    }
+  }
 
   // --- Message Handling & Rendering ---
-  async loadAndDisplayActiveChat(): Promise<void> { /* ... */ }
-  private renderMessages(messagesToRender: Message[]): void { /* ... */ }
-  addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void { /* ... */ }
-  async sendMessage(): Promise<void> { /* ... */ }
+
+  /** Loads the active chat session from ChatManager and displays its messages */
+  async loadAndDisplayActiveChat(): Promise<void> {
+    //console.log("[OllamaView] Loading and displaying active chat...");
+    this.clearChatContainerInternal(); // Clear previous content & state
+    this.currentMessages = [];
+    this.lastRenderedMessageDate = null;
+
+    try {
+      const activeChat = await this.plugin.chatManager?.getActiveChat(); // Get current chat data
+
+      if (activeChat && activeChat.messages.length > 0) {
+        //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
+        this.hideEmptyState();
+        this.renderMessages(activeChat.messages); // Render the loaded messages
+        this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+        // Check collapsing and scroll after rendering
+        this.checkAllMessagesForCollapsing();
+        setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150); // Scroll after render
+      } else if (activeChat) {
+        //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
+        // Chat exists but is empty
+        this.showEmptyState();
+        this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+      } else {
+        //console.warn("[OllamaView] No active chat found or failed to load.");
+        // No active chat found or failed to load
+        this.showEmptyState();
+        this.updateInputPlaceholder(this.plugin.settings.modelName); // Fallback placeholder
+      }
+    } catch (error) {
+      //console.error("[OllamaView] Error getting active chat:", error);
+      this.showEmptyState();
+      new Notice("Error loading chat history.");
+    }
+  }
+
+  /** Renders a list of messages to the chat container */
+  private renderMessages(messagesToRender: Message[]): void {
+    this.clearChatContainerInternal(); // Ensure container is empty first
+    this.currentMessages = [...messagesToRender]; // Update local cache
+    this.lastRenderedMessageDate = null; // Reset date separator logic
+
+    messagesToRender.forEach(message => {
+      this.renderMessageInternal(message, messagesToRender); // Render each message
+    });
+    //console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
+  }
+
+  /** Appends a single message to the display */
+  addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
+    // Avoid adding if container doesn't exist (e.g., during close)
+    if (!this.chatContainer) return;
+
+    const newMessage: Message = { role, content, timestamp };
+    const currentContext = [...this.currentMessages]; // Capture context *before* adding
+
+    // Render the new message using the captured context
+    const messageEl = this.renderMessageInternal(newMessage, [...currentContext, newMessage]);
+
+    // Update local cache AFTER rendering to ensure correct prevMessage context
+    this.currentMessages.push(newMessage);
+
+    if (messageEl) {
+      this.checkMessageForCollapsing(messageEl); // Check height for collapsing
+    }
+
+    // Handle scrolling and new message indicator
+    const isUserOrError = role === "user" || role === "error";
+    if (!isUserOrError && this.userScrolledUp && this.newMessagesIndicatorEl) {
+      this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE); // Show indicator
+    } else if (!this.userScrolledUp) {
+      // Scroll down if user is already at the bottom
+      const forceScroll = !isUserOrError; // Force scroll more reliably for AI messages
+      // Use slightly longer delay for AI messages to allow rendering
+      this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+    }
+
+    this.hideEmptyState(); // Ensure empty state is hidden
+  }
+
+  /** Sends the user's input as a message and gets a response */
+  async sendMessage(): Promise<void> {
+    const content = this.inputEl.value.trim();
+    if (!content || this.isProcessing || this.sendButton.disabled) return;
+
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat) {
+      new Notice("Error: No active chat session found.");
+      return;
+    }
+
+    const userMessageContent = this.inputEl.value; // Keep original formatting
+    this.clearInputField(); // Clear input immediately
+    this.setLoadingState(true); // Disable UI, set processing state
+    this.hideEmptyState();
+
+    let loadingEl: HTMLElement | null = null; // To hold the loading indicator element
+
+    try {
+      // 1. Add user message to ChatManager (triggers 'message-added' event for display)
+      const userMessage = await this.plugin.chatManager.addMessageToActiveChat('user', userMessageContent);
+      if (!userMessage) throw new Error("Failed to add user message to history.");
+      // User message appears via event handler
+
+      // 2. Show loading indicator *after* user message is likely added
+      loadingEl = this.addLoadingIndicator();
+      this.guaranteedScrollToBottom(50, true); // Scroll to show indicator
+
+      // 3. Call OllamaService to get AI response
+      //console.log("[OllamaView] Requesting AI response...");
+      const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
+      //console.log("[OllamaView] Received response from service.");
+
+      // Remove indicator BEFORE adding assistant message
+      if (loadingEl) { this.removeLoadingIndicator(loadingEl); loadingEl = null; }
+
+      // 4. Add assistant message to ChatManager (triggers 'message-added' event)
+      if (assistantMessage) {
+        await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
+        // Assistant message appears via event handler
+      } else {
+        //console.warn("[OllamaView] Service returned null assistant message.");
+        // Add error directly to display (as ChatManager won't add a null message)
+        this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
+      }
+
+    } catch (error: any) {
+      //console.error("[OllamaView] Send/receive cycle error:", error);
+      if (loadingEl) { this.removeLoadingIndicator(loadingEl); loadingEl = null; } // Ensure indicator removed on error
+      // Add error directly to display
+      this.addMessageToDisplay("error", `Error: ${error.message || 'Unknown error.'}`, new Date());
+    } finally {
+      // Ensure indicator is removed in all cases (if somehow missed)
+      if (loadingEl) { this.removeLoadingIndicator(loadingEl); }
+      this.setLoadingState(false); // Re-enable UI
+      this.focusInput(); // Return focus to input field
+    }
+  }
 
   // --- Core Rendering Logic ---
-  private renderMessageInternal(message: Message, messageContext: Message[]): HTMLElement | null { /* ... */ return null; }
-  private handleCopyClick(content: string, buttonEl: HTMLElement): void { /* ... */ }
-  private async handleTranslateClick(originalContent: string, contentEl: HTMLElement, buttonEl: HTMLButtonElement): Promise<void> { /* ... */ }
+
+  /** Renders a single message bubble based on the message object and context */
+  private renderMessageInternal(message: Message, messageContext: Message[]): HTMLElement | null {
+    const messageIndex = messageContext.findIndex(m => m === message);
+    if (messageIndex === -1) return null; // Should not happen
+
+    const prevMessage = messageIndex > 0 ? messageContext[messageIndex - 1] : null;
+    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+
+    // --- Date Separator ---
+    if (isNewDay) {
+      this.renderDateSeparator(message.timestamp);
+      this.lastRenderedMessageDate = message.timestamp;
+    } else if (messageIndex === 0 && !this.lastRenderedMessageDate) {
+      this.lastRenderedMessageDate = message.timestamp; // Set for the very first message
+    }
+
+    // --- Grouping Logic ---
+    let messageGroup: HTMLElement | null = null;
+    let groupClass = CSS_CLASS_MESSAGE_GROUP;
+    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
+    let showAvatar = true;
+    let isUser = false;
+    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+
+    switch (message.role) {
+      case "user": groupClass += ` ${CSS_CLASS_USER_GROUP}`; messageClass += ` ${CSS_CLASS_USER_MESSAGE}`; isUser = true; break;
+      case "assistant": groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`; messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`; break;
+      case "system": groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`; messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`; showAvatar = false; break;
+      case "error": groupClass += ` ${CSS_CLASS_ERROR_GROUP}`; messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`; showAvatar = false; break;
+    }
+
+    const lastElement = this.chatContainer.lastElementChild as HTMLElement;
+    if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(' ')[1]}`)) {
+      messageGroup = this.chatContainer.createDiv({ cls: groupClass });
+      if (showAvatar) this.renderAvatar(messageGroup, isUser);
+    } else {
+      messageGroup = lastElement;
+    }
+
+    // --- Element Creation ---
+    const messageEl = messageGroup.createDiv({ cls: messageClass });
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+
+    // --- Render Content ---
+    switch (message.role) {
+      case "assistant":
+      case "user":
+        contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+        if (message.role === 'assistant') {
+          this.renderAssistantContent(contentEl, message.content);
+        } else {
+          message.content.split("\n").forEach((line, i, arr) => {
+            contentEl.appendText(line);
+            if (i < arr.length - 1) contentEl.createEl("br");
+          });
+        }
+        break;
+      case "system":
+        setIcon(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+        contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+        break;
+      case "error":
+        setIcon(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+        contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+        break;
+    }
+
+    // --- Action Buttons ---
+    const buttonsWrapper = contentContainer.createDiv({ cls: 'message-actions-wrapper' });
+    if (message.role !== "system" && message.role !== "error") {
+      const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
+      setIcon(copyBtn, "copy");
+      this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
+    }
+    if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
+      const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
+      const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, 'aria-label': "Translate message" } });
+      setIcon(translateBtn, "languages");
+      this.registerDomEvent(translateBtn, "click", (e) => { e.stopPropagation(); this.handleTranslateClick(message.content, contentEl, translateBtn); });
+    }
+
+    // --- Timestamp ---
+    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+
+    // --- Animation Cleanup ---
+    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+
+    return messageEl;
+  }
+
+  // --- Action Button Handlers ---
+  private handleCopyClick(content: string, buttonEl: HTMLElement): void {
+    let textToCopy = content;
+    // Decode HTML and remove <think> tags before copying
+    if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
+      textToCopy = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    }
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setIcon(buttonEl, "check"); buttonEl.setAttribute("title", "Copied!");
+      setTimeout(() => { setIcon(buttonEl, "copy"); buttonEl.setAttribute("title", "Copy"); }, 2000);
+    }).catch(err => {
+      //console.error("Copy failed:", err); new Notice("Failed to copy text.");
+    });
+  }
+  private async handleTranslateClick(originalContent: string, contentEl: HTMLElement, buttonEl: HTMLButtonElement): Promise<void> {
+    const targetLang = this.plugin.settings.translationTargetLanguage;
+    const apiKey = this.plugin.settings.googleTranslationApiKey;
+    if (!targetLang || !apiKey) {
+      new Notice("Translation not configured. Please check language and API key in settings.");
+      return;
+    }
+
+    let textToTranslate = originalContent;
+    if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
+      textToTranslate = this.decodeHtmlEntities(originalContent).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    }
+    if (!textToTranslate) return; // Nothing to translate
+
+    // Remove previous translation if exists
+    contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
+
+    // Set loading state
+    setIcon(buttonEl, "loader"); buttonEl.disabled = true;
+    buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); buttonEl.setAttribute("title", "Translating...");
+
+    try {
+      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+      if (translatedText !== null) {
+        const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+        translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT, text: translatedText });
+        const targetLangName = LANGUAGES[targetLang] || targetLang;
+        translationContainer.createEl('div', { cls: 'translation-indicator', text: `[Translated to ${targetLangName}]` });
+        this.guaranteedScrollToBottom(50, false); // Scroll if needed
+      } // Error notice shown by service if null
+    } catch (error) {
+      //console.error("Error during translation click handling:", error);
+      new Notice("An unexpected error occurred during translation.");
+    } finally {
+      // Restore button state
+      setIcon(buttonEl, "languages"); buttonEl.disabled = false;
+      buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+      const targetLangName = LANGUAGES[targetLang] || targetLang;
+      buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
+    }
+  }
 
   // --- Rendering Helpers ---
-  private renderAvatar(groupEl: HTMLElement, isUser: boolean): void { /* ... */ }
-  private renderDateSeparator(date: Date): void { /* ... */ }
-  private renderAssistantContent(containerEl: HTMLElement, content: string): void { /* ... */ }
-  private addCodeBlockEnhancements(contentEl: HTMLElement): void { /* ... */ }
+  private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
+    const settings = this.plugin.settings;
+    const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
+    const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
+    const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
+    const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${avatarClass}` });
+
+    if (avatarType === 'initials') {
+      avatarEl.textContent = avatarContent || (isUser ? 'U' : 'A');
+    } else if (avatarType === 'icon') {
+      try {
+        setIcon(avatarEl, avatarContent || (isUser ? 'user' : 'bot'));
+      } catch (e) {
+        //console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
+        avatarEl.textContent = isUser ? 'U' : 'A'; // Fallback
+      }
+    } else {
+      avatarEl.textContent = isUser ? 'U' : 'A'; // Default fallback
+    }
+  }
+  private renderDateSeparator(date: Date): void {
+    if (!this.chatContainer) return;
+    this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) });
+  }
+  private renderAssistantContent(containerEl: HTMLElement, content: string): void {
+    // Decode entities first for tag detection and rendering
+    const decodedContent = this.decodeHtmlEntities(content);
+    const thinkingInfo = this.detectThinkingTags(decodedContent);
+
+    containerEl.empty(); // Clear previous content
+
+    if (thinkingInfo.hasThinkingTags) {
+      // Process content with <think> tags
+      const processedHtml = this.processThinkingTags(decodedContent);
+      containerEl.innerHTML = processedHtml; // Set innerHTML for complex structure
+      this.addThinkingToggleListeners(containerEl); // Add listeners for foldouts
+      this.addCodeBlockEnhancements(containerEl); // Enhance code blocks within generated HTML
+    } else {
+      // Render standard Markdown content
+      MarkdownRenderer.renderMarkdown(
+        decodedContent, // Use decoded content for rendering
+        containerEl,
+        this.app.vault.getRoot()?.path ?? "", // Source path context
+        this // Component context for links etc.
+      );
+      this.addCodeBlockEnhancements(containerEl); // Enhance standard code blocks
+    }
+  }
+  private addCodeBlockEnhancements(contentEl: HTMLElement): void {
+    contentEl.querySelectorAll("pre").forEach(pre => {
+      // Prevent adding button multiple times
+      if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`)) return;
+
+      const code = pre.querySelector("code");
+      if (!code) return;
+
+      const codeText = code.textContent || "";
+
+      // Add language identifier badge
+      const langClass = Array.from(code.classList).find(cls => cls.startsWith("language-"));
+      if (langClass) {
+        const lang = langClass.replace("language-", "");
+        if (lang) {
+          // Check if language badge already exists (added robustness)
+          if (!pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_LANGUAGE}`)) {
+            pre.createEl("span", { cls: CSS_CLASS_CODE_BLOCK_LANGUAGE, text: lang });
+          }
+        }
+      }
+
+      // Add copy button
+      const copyBtn = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
+      setIcon(copyBtn, "copy");
+      copyBtn.setAttribute("title", "Copy Code");
+      copyBtn.setAttribute("aria-label", "Copy code block"); // Accessibility
+
+      // Use registerDomEvent for reliable cleanup
+      this.registerDomEvent(copyBtn, "click", e => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(codeText).then(() => {
+          setIcon(copyBtn, "check"); copyBtn.setAttribute("title", "Copied!");
+          setTimeout(() => { setIcon(copyBtn, "copy"); copyBtn.setAttribute("title", "Copy Code"); }, 1500);
+        }).catch(err => {
+          //console.error("Code block copy failed:", err); 
+          new Notice("Failed to copy code.");
+        });
+      });
+    });
+  }
+
 
   // --- Menu List Rendering (ПОТРІБНІ ЗНОВУ) ---
   private async renderModelList(): Promise<void> {

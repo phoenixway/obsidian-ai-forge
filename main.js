@@ -58,13 +58,43 @@ var CSS_CLASS_SUBMENU_CONTENT = "submenu-content";
 var CSS_CLASS_SUBMENU_CONTENT_HIDDEN = "submenu-content-hidden";
 var CSS_CLASS_SETTINGS_OPTION = "settings-option";
 var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
+var CSS_CLASS_MESSAGE_GROUP = "message-group";
+var CSS_CLASS_USER_GROUP = "user-message-group";
+var CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
+var CSS_CLASS_SYSTEM_GROUP = "system-message-group";
+var CSS_CLASS_ERROR_GROUP = "error-message-group";
+var CSS_CLASS_MESSAGE = "message";
+var CSS_CLASS_USER_MESSAGE = "user-message";
+var CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
+var CSS_CLASS_SYSTEM_MESSAGE = "system-message";
+var CSS_CLASS_ERROR_MESSAGE = "error-message";
+var CSS_CLASS_SYSTEM_ICON = "system-icon";
+var CSS_CLASS_ERROR_ICON = "error-icon";
+var CSS_CLASS_SYSTEM_TEXT = "system-message-text";
+var CSS_CLASS_ERROR_TEXT = "error-message-text";
+var CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
+var CSS_CLASS_CONTENT = "message-content";
+var CSS_CLASS_TIMESTAMP = "message-timestamp";
+var CSS_CLASS_COPY_BUTTON = "copy-button";
+var CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
+var CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
+var CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
+var CSS_CLASS_TRANSLATION_PENDING = "translation-pending";
 var CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
 var CSS_CLASS_DISABLED = "disabled";
+var CSS_CLASS_MESSAGE_ARRIVING = "message-arriving";
+var CSS_CLASS_DATE_SEPARATOR = "chat-date-separator";
+var CSS_CLASS_AVATAR = "message-group-avatar";
+var CSS_CLASS_AVATAR_USER = "user-avatar";
+var CSS_CLASS_AVATAR_AI = "ai-avatar";
+var CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button";
+var CSS_CLASS_CODE_BLOCK_LANGUAGE = "code-block-language";
 var CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 var CSS_CLASS_VISIBLE = "visible";
 var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 var CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
 var CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option";
+var CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
 var CSS_CLASS_MODEL_OPTION = "model-option";
 var CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
 var CSS_CLASS_ROLE_OPTION = "role-option";
@@ -77,6 +107,12 @@ var CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
 var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_DANGER_OPTION = "danger-option";
+var LANGUAGES = {
+  /* ... ваш список мов ... */
+  "en": "English",
+  "uk": "Ukrainian",
+  "de": "German"
+};
 var OllamaView = class extends import_obsidian.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -102,6 +138,7 @@ var OllamaView = class extends import_obsidian.ItemView {
       }
     };
     this.handleSendClick = () => {
+      console.log(`OllamaView.ts ->     : sendClick`);
       if (!this.isProcessing && !this.sendButton.disabled) {
         this.sendMessage();
       }
@@ -526,32 +563,343 @@ var OllamaView = class extends import_obsidian.ItemView {
       this.emptyStateEl = null;
     }
   }
-  // public setLoadingS'tate(isLoading: boolean): void { /* ... */ this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } }
   // --- Message Handling & Rendering ---
+  /** Loads the active chat session from ChatManager and displays its messages */
   async loadAndDisplayActiveChat() {
+    var _a;
+    this.clearChatContainerInternal();
+    this.currentMessages = [];
+    this.lastRenderedMessageDate = null;
+    try {
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      if (activeChat && activeChat.messages.length > 0) {
+        this.hideEmptyState();
+        this.renderMessages(activeChat.messages);
+        this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+        this.checkAllMessagesForCollapsing();
+        setTimeout(() => {
+          this.guaranteedScrollToBottom(100, true);
+        }, 150);
+      } else if (activeChat) {
+        this.showEmptyState();
+        this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+      } else {
+        this.showEmptyState();
+        this.updateInputPlaceholder(this.plugin.settings.modelName);
+      }
+    } catch (error) {
+      this.showEmptyState();
+      new import_obsidian.Notice("Error loading chat history.");
+    }
   }
+  /** Renders a list of messages to the chat container */
   renderMessages(messagesToRender) {
+    this.clearChatContainerInternal();
+    this.currentMessages = [...messagesToRender];
+    this.lastRenderedMessageDate = null;
+    messagesToRender.forEach((message) => {
+      this.renderMessageInternal(message, messagesToRender);
+    });
   }
+  /** Appends a single message to the display */
   addMessageToDisplay(role, content, timestamp) {
+    if (!this.chatContainer)
+      return;
+    const newMessage = { role, content, timestamp };
+    const currentContext = [...this.currentMessages];
+    const messageEl = this.renderMessageInternal(newMessage, [...currentContext, newMessage]);
+    this.currentMessages.push(newMessage);
+    if (messageEl) {
+      this.checkMessageForCollapsing(messageEl);
+    }
+    const isUserOrError = role === "user" || role === "error";
+    if (!isUserOrError && this.userScrolledUp && this.newMessagesIndicatorEl) {
+      this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
+    } else if (!this.userScrolledUp) {
+      const forceScroll = !isUserOrError;
+      this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+    }
+    this.hideEmptyState();
   }
+  /** Sends the user's input as a message and gets a response */
   async sendMessage() {
+    var _a;
+    const content = this.inputEl.value.trim();
+    if (!content || this.isProcessing || this.sendButton.disabled)
+      return;
+    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    if (!activeChat) {
+      new import_obsidian.Notice("Error: No active chat session found.");
+      return;
+    }
+    const userMessageContent = this.inputEl.value;
+    this.clearInputField();
+    this.setLoadingState(true);
+    this.hideEmptyState();
+    let loadingEl = null;
+    try {
+      const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
+      if (!userMessage)
+        throw new Error("Failed to add user message to history.");
+      loadingEl = this.addLoadingIndicator();
+      this.guaranteedScrollToBottom(50, true);
+      const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
+      if (loadingEl) {
+        this.removeLoadingIndicator(loadingEl);
+        loadingEl = null;
+      }
+      if (assistantMessage) {
+        await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
+      } else {
+        this.addMessageToDisplay("error", "Assistant did not provide a response.", new Date());
+      }
+    } catch (error) {
+      if (loadingEl) {
+        this.removeLoadingIndicator(loadingEl);
+        loadingEl = null;
+      }
+      this.addMessageToDisplay("error", `Error: ${error.message || "Unknown error."}`, new Date());
+    } finally {
+      if (loadingEl) {
+        this.removeLoadingIndicator(loadingEl);
+      }
+      this.setLoadingState(false);
+      this.focusInput();
+    }
   }
   // --- Core Rendering Logic ---
+  /** Renders a single message bubble based on the message object and context */
   renderMessageInternal(message, messageContext) {
-    return null;
+    const messageIndex = messageContext.findIndex((m) => m === message);
+    if (messageIndex === -1)
+      return null;
+    const prevMessage = messageIndex > 0 ? messageContext[messageIndex - 1] : null;
+    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+    if (isNewDay) {
+      this.renderDateSeparator(message.timestamp);
+      this.lastRenderedMessageDate = message.timestamp;
+    } else if (messageIndex === 0 && !this.lastRenderedMessageDate) {
+      this.lastRenderedMessageDate = message.timestamp;
+    }
+    let messageGroup = null;
+    let groupClass = CSS_CLASS_MESSAGE_GROUP;
+    let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
+    let showAvatar = true;
+    let isUser = false;
+    const isFirstInGroup = !prevMessage || prevMessage.role !== message.role || isNewDay;
+    switch (message.role) {
+      case "user":
+        groupClass += ` ${CSS_CLASS_USER_GROUP}`;
+        messageClass += ` ${CSS_CLASS_USER_MESSAGE}`;
+        isUser = true;
+        break;
+      case "assistant":
+        groupClass += ` ${CSS_CLASS_OLLAMA_GROUP}`;
+        messageClass += ` ${CSS_CLASS_OLLAMA_MESSAGE}`;
+        break;
+      case "system":
+        groupClass += ` ${CSS_CLASS_SYSTEM_GROUP}`;
+        messageClass += ` ${CSS_CLASS_SYSTEM_MESSAGE}`;
+        showAvatar = false;
+        break;
+      case "error":
+        groupClass += ` ${CSS_CLASS_ERROR_GROUP}`;
+        messageClass += ` ${CSS_CLASS_ERROR_MESSAGE}`;
+        showAvatar = false;
+        break;
+    }
+    const lastElement = this.chatContainer.lastElementChild;
+    if (isFirstInGroup || !lastElement || !lastElement.matches(`.${groupClass.split(" ")[1]}`)) {
+      messageGroup = this.chatContainer.createDiv({ cls: groupClass });
+      if (showAvatar)
+        this.renderAvatar(messageGroup, isUser);
+    } else {
+      messageGroup = lastElement;
+    }
+    const messageEl = messageGroup.createDiv({ cls: messageClass });
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
+    switch (message.role) {
+      case "assistant":
+      case "user":
+        contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
+        if (message.role === "assistant") {
+          this.renderAssistantContent(contentEl, message.content);
+        } else {
+          message.content.split("\n").forEach((line, i, arr) => {
+            contentEl.appendText(line);
+            if (i < arr.length - 1)
+              contentEl.createEl("br");
+          });
+        }
+        break;
+      case "system":
+        (0, import_obsidian.setIcon)(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
+        contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_TEXT, text: message.content });
+        break;
+      case "error":
+        (0, import_obsidian.setIcon)(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
+        contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
+        break;
+    }
+    const buttonsWrapper = contentContainer.createDiv({ cls: "message-actions-wrapper" });
+    if (message.role !== "system" && message.role !== "error") {
+      const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", "aria-label": "Copy message content" } });
+      (0, import_obsidian.setIcon)(copyBtn, "copy");
+      this.registerDomEvent(copyBtn, "click", (e) => {
+        e.stopPropagation();
+        this.handleCopyClick(message.content, copyBtn);
+      });
+    }
+    if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
+      const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
+      const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, "aria-label": "Translate message" } });
+      (0, import_obsidian.setIcon)(translateBtn, "languages");
+      this.registerDomEvent(translateBtn, "click", (e) => {
+        e.stopPropagation();
+        this.handleTranslateClick(message.content, contentEl, translateBtn);
+      });
+    }
+    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+    return messageEl;
   }
+  // --- Action Button Handlers ---
   handleCopyClick(content, buttonEl) {
+    let textToCopy = content;
+    if (this.detectThinkingTags(this.decodeHtmlEntities(content)).hasThinkingTags) {
+      textToCopy = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    }
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      (0, import_obsidian.setIcon)(buttonEl, "check");
+      buttonEl.setAttribute("title", "Copied!");
+      setTimeout(() => {
+        (0, import_obsidian.setIcon)(buttonEl, "copy");
+        buttonEl.setAttribute("title", "Copy");
+      }, 2e3);
+    }).catch((err) => {
+    });
   }
   async handleTranslateClick(originalContent, contentEl, buttonEl) {
+    var _a;
+    const targetLang = this.plugin.settings.translationTargetLanguage;
+    const apiKey = this.plugin.settings.googleTranslationApiKey;
+    if (!targetLang || !apiKey) {
+      new import_obsidian.Notice("Translation not configured. Please check language and API key in settings.");
+      return;
+    }
+    let textToTranslate = originalContent;
+    if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
+      textToTranslate = this.decodeHtmlEntities(originalContent).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+    }
+    if (!textToTranslate)
+      return;
+    (_a = contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)) == null ? void 0 : _a.remove();
+    (0, import_obsidian.setIcon)(buttonEl, "loader");
+    buttonEl.disabled = true;
+    buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING);
+    buttonEl.setAttribute("title", "Translating...");
+    try {
+      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+      if (translatedText !== null) {
+        const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+        translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT, text: translatedText });
+        const targetLangName = LANGUAGES[targetLang] || targetLang;
+        translationContainer.createEl("div", { cls: "translation-indicator", text: `[Translated to ${targetLangName}]` });
+        this.guaranteedScrollToBottom(50, false);
+      }
+    } catch (error) {
+      new import_obsidian.Notice("An unexpected error occurred during translation.");
+    } finally {
+      (0, import_obsidian.setIcon)(buttonEl, "languages");
+      buttonEl.disabled = false;
+      buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+      const targetLangName = LANGUAGES[targetLang] || targetLang;
+      buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
+    }
   }
   // --- Rendering Helpers ---
   renderAvatar(groupEl, isUser) {
+    const settings = this.plugin.settings;
+    const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
+    const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
+    const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
+    const avatarEl = groupEl.createDiv({ cls: `${CSS_CLASS_AVATAR} ${avatarClass}` });
+    if (avatarType === "initials") {
+      avatarEl.textContent = avatarContent || (isUser ? "U" : "A");
+    } else if (avatarType === "icon") {
+      try {
+        (0, import_obsidian.setIcon)(avatarEl, avatarContent || (isUser ? "user" : "bot"));
+      } catch (e) {
+        avatarEl.textContent = isUser ? "U" : "A";
+      }
+    } else {
+      avatarEl.textContent = isUser ? "U" : "A";
+    }
   }
   renderDateSeparator(date) {
+    if (!this.chatContainer)
+      return;
+    this.chatContainer.createDiv({ cls: CSS_CLASS_DATE_SEPARATOR, text: this.formatDateSeparator(date) });
   }
   renderAssistantContent(containerEl, content) {
+    var _a, _b;
+    const decodedContent = this.decodeHtmlEntities(content);
+    const thinkingInfo = this.detectThinkingTags(decodedContent);
+    containerEl.empty();
+    if (thinkingInfo.hasThinkingTags) {
+      const processedHtml = this.processThinkingTags(decodedContent);
+      containerEl.innerHTML = processedHtml;
+      this.addThinkingToggleListeners(containerEl);
+      this.addCodeBlockEnhancements(containerEl);
+    } else {
+      import_obsidian.MarkdownRenderer.renderMarkdown(
+        decodedContent,
+        // Use decoded content for rendering
+        containerEl,
+        (_b = (_a = this.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
+        // Source path context
+        this
+        // Component context for links etc.
+      );
+      this.addCodeBlockEnhancements(containerEl);
+    }
   }
   addCodeBlockEnhancements(contentEl) {
+    contentEl.querySelectorAll("pre").forEach((pre) => {
+      if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`))
+        return;
+      const code = pre.querySelector("code");
+      if (!code)
+        return;
+      const codeText = code.textContent || "";
+      const langClass = Array.from(code.classList).find((cls) => cls.startsWith("language-"));
+      if (langClass) {
+        const lang = langClass.replace("language-", "");
+        if (lang) {
+          if (!pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_LANGUAGE}`)) {
+            pre.createEl("span", { cls: CSS_CLASS_CODE_BLOCK_LANGUAGE, text: lang });
+          }
+        }
+      }
+      const copyBtn = pre.createEl("button", { cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON });
+      (0, import_obsidian.setIcon)(copyBtn, "copy");
+      copyBtn.setAttribute("title", "Copy Code");
+      copyBtn.setAttribute("aria-label", "Copy code block");
+      this.registerDomEvent(copyBtn, "click", (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(codeText).then(() => {
+          (0, import_obsidian.setIcon)(copyBtn, "check");
+          copyBtn.setAttribute("title", "Copied!");
+          setTimeout(() => {
+            (0, import_obsidian.setIcon)(copyBtn, "copy");
+            copyBtn.setAttribute("title", "Copy Code");
+          }, 1500);
+        }).catch((err) => {
+          new import_obsidian.Notice("Failed to copy code.");
+        });
+      });
+    });
   }
   // --- Menu List Rendering (ПОТРІБНІ ЗНОВУ) ---
   async renderModelList() {
@@ -871,7 +1219,7 @@ var OllamaView = class extends import_obsidian.ItemView {
 
 // src/settings.ts
 var import_obsidian2 = require("obsidian");
-var LANGUAGES = {
+var LANGUAGES2 = {
   /* ... ваш довгий список мов ... */
   "af": "Afrikaans",
   "sq": "Albanian",
@@ -1200,8 +1548,8 @@ var OllamaSettingTab = class extends import_obsidian2.PluginSettingTab {
     }));
     if (this.plugin.settings.enableTranslation) {
       new import_obsidian2.Setting(containerEl).setName("Target Translation Language").setDesc("Select the language to translate messages/input into.").addDropdown((dropdown) => {
-        for (const code in LANGUAGES) {
-          dropdown.addOption(code, LANGUAGES[code]);
+        for (const code in LANGUAGES2) {
+          dropdown.addOption(code, LANGUAGES2[code]);
         }
         dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async (value) => {
           this.plugin.settings.translationTargetLanguage = value;
