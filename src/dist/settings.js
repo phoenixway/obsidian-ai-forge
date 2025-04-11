@@ -83,7 +83,7 @@ exports.DEFAULT_SETTINGS = {
     modelName: "",
     temperature: 0.7,
     contextWindow: 4096,
-    userRolesFolderPath: "",
+    userRolesFolderPath: "/etc/roles",
     selectedRolePath: "",
     saveMessageHistory: true,
     ragEnabled: false,
@@ -98,8 +98,8 @@ exports.DEFAULT_SETTINGS = {
     enableTranslation: false,
     translationTargetLanguage: "uk",
     googleTranslationApiKey: "",
-    chatHistoryFolderPath: "Ollama Chats",
-    chatExportFolderPath: "",
+    chatHistoryFolderPath: "/etc/chats",
+    chatExportFolderPath: "/etc/chats",
     enableProductivityFeatures: false,
     dailyTaskFileName: "Tasks_Today.md",
     useAdvancedContextStrategy: false,
@@ -333,10 +333,7 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                             return [4 /*yield*/, this.plugin.saveSettings()];
                         case 1:
                             _e.sent(); // Зберігаємо саме налаштування одразу
-                            // --- ВИКЛИКАЄМО DEBOUNCED ---
                             this.debouncedUpdateRagPath();
-                            // ---------------------------
-                            // Також оновлюємо шлях для файлу завдань, якщо він в RAG папці
                             (_b = (_a = this.plugin).updateDailyTaskFilePath) === null || _b === void 0 ? void 0 : _b.call(_a);
                             (_d = (_c = this.plugin).loadAndProcessInitialTasks) === null || _d === void 0 ? void 0 : _d.call(_c);
                             return [2 /*return*/];
@@ -344,19 +341,6 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                 });
             }); }); });
         }
-        // // --- Advanced Context Management --- <-- Нова секція
-        // containerEl.createEl('h3', { text: 'Advanced Context Management' });
-        // new Setting(containerEl)
-        //   .setName('Use Advanced Context Strategy')
-        //   .setDesc('Enables summarization and other techniques to manage long chat histories within the context window.')
-        //   .addToggle(toggle => toggle
-        //     .setValue(this.plugin.settings.useAdvancedContextStrategy)
-        //     .onChange(async (value) => {
-        //       this.plugin.settings.useAdvancedContextStrategy = value;
-        //       await this.plugin.saveSettings();
-        //       this.display(); // Re-render to show/hide summarization options
-        //     }));
-        // --- Productivity Assistant Features --- <-- НОВА СЕКЦІЯ
         containerEl.createEl('h3', { text: 'Productivity Assistant Features' });
         // Головний перемикач для функцій продуктивності
         new obsidian_1.Setting(containerEl)

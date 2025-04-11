@@ -71,7 +71,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   modelName: "",
   temperature: 0.7,
   contextWindow: 4096,
-  userRolesFolderPath: "",
+  userRolesFolderPath: "/etc/roles",
   selectedRolePath: "",
   saveMessageHistory: true,
   ragEnabled: false,
@@ -86,8 +86,8 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   enableTranslation: false,
   translationTargetLanguage: "uk",
   googleTranslationApiKey: "",
-  chatHistoryFolderPath: "Ollama Chats",
-  chatExportFolderPath: "",
+  chatHistoryFolderPath: "/etc/chats",
+  chatExportFolderPath: "/etc/chats",
 
   enableProductivityFeatures: false, // <-- За замовчуванням вимкнено
   dailyTaskFileName: "Tasks_Today.md", // <-- Ім'я файлу за замовчуванням  useAdvancedContextStrategy: false, // За замовчуванням - вимкнено
@@ -227,30 +227,12 @@ export class OllamaSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.ragFolderPath = value.trim();
             await this.plugin.saveSettings(); // Зберігаємо саме налаштування одразу
-            // --- ВИКЛИКАЄМО DEBOUNCED ---
             this.debouncedUpdateRagPath();
-            // ---------------------------
-            // Також оновлюємо шлях для файлу завдань, якщо він в RAG папці
             this.plugin.updateDailyTaskFilePath?.();
             this.plugin.loadAndProcessInitialTasks?.();
           }));
     }
 
-
-    // // --- Advanced Context Management --- <-- Нова секція
-    // containerEl.createEl('h3', { text: 'Advanced Context Management' });
-    // new Setting(containerEl)
-    //   .setName('Use Advanced Context Strategy')
-    //   .setDesc('Enables summarization and other techniques to manage long chat histories within the context window.')
-    //   .addToggle(toggle => toggle
-    //     .setValue(this.plugin.settings.useAdvancedContextStrategy)
-    //     .onChange(async (value) => {
-    //       this.plugin.settings.useAdvancedContextStrategy = value;
-    //       await this.plugin.saveSettings();
-    //       this.display(); // Re-render to show/hide summarization options
-    //     }));
-
-    // --- Productivity Assistant Features --- <-- НОВА СЕКЦІЯ
     containerEl.createEl('h3', { text: 'Productivity Assistant Features' });
 
     // Головний перемикач для функцій продуктивності
