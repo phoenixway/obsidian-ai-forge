@@ -1005,7 +1005,9 @@ var OllamaView = /** @class */ (function (_super) {
     } };
     OllamaView.prototype.isSameDay = function (date1, date2) { /* ... */ return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); };
     // setLoadingState definition is needed
+    // OllamaView.ts -> setLoadingState
     OllamaView.prototype.setLoadingState = function (isLoading) {
+        console.log("[OllamaView] setLoadingState CALLED with: " + isLoading); // <--- ЛОГ
         this.isProcessing = isLoading;
         if (this.inputEl)
             this.inputEl.disabled = isLoading;
@@ -1022,6 +1024,7 @@ var OllamaView = /** @class */ (function (_super) {
             this.menuButton.disabled = isLoading;
             this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
         }
+        console.log("[OllamaView] isProcessing is now: " + this.isProcessing); // <--- ЛОГ
     };
     OllamaView.prototype.formatChatToMarkdown = function (messagesToFormat) { /* ... */ return ''; };
     return OllamaView;

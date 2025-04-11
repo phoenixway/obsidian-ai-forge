@@ -841,7 +841,9 @@ var OllamaView = class extends import_obsidian.ItemView {
     return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate();
   }
   // setLoadingState definition is needed
+  // OllamaView.ts -> setLoadingState
   setLoadingState(isLoading) {
+    console.log(`[OllamaView] setLoadingState CALLED with: ${isLoading}`);
     this.isProcessing = isLoading;
     if (this.inputEl)
       this.inputEl.disabled = isLoading;
@@ -858,6 +860,7 @@ var OllamaView = class extends import_obsidian.ItemView {
       this.menuButton.disabled = isLoading;
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
+    console.log(`[OllamaView] isProcessing is now: ${this.isProcessing}`);
   }
   formatChatToMarkdown(messagesToFormat) {
     return "";

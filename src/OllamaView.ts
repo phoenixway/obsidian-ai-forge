@@ -705,9 +705,19 @@ export class OllamaView extends ItemView {
   formatRelativeDate(date: Date): string { /* ... */ const now = new Date(); const diffSeconds = Math.round((now.getTime() - date.getTime()) / 1000); const diffDays = Math.floor(diffSeconds / (60 * 60 * 24)); if (diffDays === 0) { const diffHours = Math.floor(diffSeconds / (60 * 60)); if (diffHours < 1) return "Just now"; if (diffHours === 1) return "1 hour ago"; if (diffHours < now.getHours()) return `${diffHours} hours ago`; else return "Today"; } else if (diffDays === 1) { return "Yesterday"; } else if (diffDays < 7) { return `${diffDays} days ago`; } else { return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } }
   isSameDay(date1: Date, date2: Date): boolean { /* ... */ return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); }
   // setLoadingState definition is needed
-  public setLoadingState(isLoading: boolean): void { // <- ADDED BACK
-    this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
+
+  // OllamaView.ts -> setLoadingState
+  public setLoadingState(isLoading: boolean): void {
+    console.log(`[OllamaView] setLoadingState CALLED with: ${isLoading}`); // <--- ЛОГ
+    this.isProcessing = isLoading;
+    if (this.inputEl) this.inputEl.disabled = isLoading;
+    this.updateSendButtonState();
+    if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
+    if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
+    if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
+    console.log(`[OllamaView] isProcessing is now: ${this.isProcessing}`); // <--- ЛОГ
   }
+
   private formatChatToMarkdown(messagesToFormat: Message[]): string { /* ... */ return ''; }
 
 } // END OF OllamaView CLASS
