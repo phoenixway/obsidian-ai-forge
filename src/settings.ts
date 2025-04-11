@@ -1,5 +1,5 @@
 // settings.ts
-import { App, PluginSettingTab, Setting, TFolder } from "obsidian";
+import { App, PluginSettingTab, Setting, TFolder, debounce } from "obsidian";
 import OllamaPlugin from "./main";
 
 // --- Мови (залишаємо як є) ---
@@ -108,9 +108,42 @@ export type AvatarType = 'initials' | 'icon';
 export class OllamaSettingTab extends PluginSettingTab {
   plugin: OllamaPlugin;
 
+  private debouncedUpdateChatPath: () => void;
+  private debouncedUpdateRolePath: () => void;
+  private debouncedUpdateRagPath: () => void;
+
+
+
   constructor(app: App, plugin: OllamaPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    // --- Ініціалізація Debounced функцій ---
+    this.debouncedUpdateChatPath = debounce(async () => {
+      console.log("Debounced: Updating chat path and ensuring folder exists...");
+      if (this.plugin.chatManager) {
+        this.plugin.chatManager.updateChatsFolderPath();
+        // Викликаємо ensure замість повного initialize, щоб уникнути перезавантаження індексу
+        await (this.plugin.chatManager as any).ensureChatsFolderExists(); // Припускаємо, що метод є приватним, але доступний
+        // Або зробіть ensureChatsFolderExists публічним/внутрішнім в ChatManager
+      }
+    }, 1000, true); // Затримка 1 секунда
+
+    this.debouncedUpdateRolePath = debounce(async () => {
+      console.log("Debounced: Refreshing role list due to path change...");
+      await this.plugin.listRoleFiles(true); // Примусово оновлюємо список
+      this.plugin.emit('roles-updated'); // Повідомляємо View
+    }, 1000, true);
+
+    this.debouncedUpdateRagPath = debounce(async () => {
+      console.log("Debounced: Re-indexing RAG due to path change...");
+      if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+        // Можливо, варто додати метод для оновлення шляху в ragService
+        // this.plugin.ragService.updateFolderPath();
+        await this.plugin.ragService.indexDocuments(); // Переіндексовуємо
+      }
+    }, 1000, true);
+    // --------------------------------------
+
   }
 
   display(): void {
@@ -127,11 +160,20 @@ export class OllamaSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("Context Window Size (Tokens)").setDesc("Maximum number of tokens (input + output) the model considers. Adjust based on model and available memory.").addText(text => text.setPlaceholder(DEFAULT_SETTINGS.contextWindow.toString()).setValue(this.plugin.settings.contextWindow.toString()).onChange(async (value) => { const num = parseInt(value.trim(), 10); if (!isNaN(num) && num > 0) { this.plugin.settings.contextWindow = num; } else { this.plugin.settings.contextWindow = DEFAULT_SETTINGS.contextWindow; } await this.plugin.saveSettings(); }));
 
 
-    // --- Roles & Personas ---
     containerEl.createEl('h3', { text: 'Roles & Personas' });
-    // ... (Custom Roles Folder Path) ...
-    new Setting(containerEl).setName('Custom Roles Folder Path').setDesc('Folder within your vault containing custom role definition (.md) files.').addText(text => text.setPlaceholder('Example: System Prompts/Ollama Roles').setValue(this.plugin.settings.userRolesFolderPath).onChange(async (value) => { this.plugin.settings.userRolesFolderPath = value.trim(); await this.plugin.saveSettings(); this.plugin.listRoleFiles(true); this.plugin.emit('roles-updated'); }));
-    // --- Додано налаштування followRole ---
+    new Setting(containerEl)
+      .setName('Custom Roles Folder Path')
+      .setDesc('Folder within your vault containing custom role definition (.md) files.')
+      .addText(text => text
+        .setPlaceholder('Example: System Prompts/Ollama Roles')
+        .setValue(this.plugin.settings.userRolesFolderPath)
+        .onChange(async (value) => {
+          this.plugin.settings.userRolesFolderPath = value.trim();
+          await this.plugin.saveSettings(); // Зберігаємо саме налаштування одразу
+          // --- ВИКЛИКАЄМО DEBOUNCED ---
+          this.debouncedUpdateRolePath();
+          // ---------------------------
+        }));    // --- Додано налаштування followRole ---
     new Setting(containerEl)
       .setName('Always Apply Selected Role')
       .setDesc('If enabled, the globally selected role (or chat-specific role) will always be used as the system prompt.')
@@ -143,19 +185,38 @@ export class OllamaSettingTab extends PluginSettingTab {
         }));
     // --------------------------------------
 
-    // --- Storage & History Settings ---
     containerEl.createEl('h3', { text: 'Storage & History' });
-    // ... (Save Message History, Chat History Folder Path) ...
-    new Setting(containerEl).setName('Save Message History').setDesc('Automatically save chat conversations to files.').addToggle(toggle => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => { this.plugin.settings.saveMessageHistory = value; await this.plugin.saveSettings(); }));
-    new Setting(containerEl).setName('Chat History Folder Path').setDesc('Folder within your vault to store chat history (.json files). Leave empty to save in the vault root.').addText(text => text.setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath || 'Vault Root').setValue(this.plugin.settings.chatHistoryFolderPath).onChange(async (value) => { this.plugin.settings.chatHistoryFolderPath = value.trim(); await this.plugin.saveSettings(); if (this.plugin.chatManager) { this.plugin.chatManager.updateChatsFolderPath(); await this.plugin.chatManager.initialize(); } }));
+    new Setting(containerEl)
+      .setName('Save Message History')
+      .setDesc('Automatically save chat conversations to files.')
+      .addToggle(toggle => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => { this.plugin.settings.saveMessageHistory = value; await this.plugin.saveSettings(); }));
+    new Setting(containerEl)
+      .setName('Chat History Folder Path')
+      .setDesc('Folder within your vault to store chat history (.json files). Leave empty to save in the vault root.')
+      .addText(text => text
+        .setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath || 'Vault Root')
+        .setValue(this.plugin.settings.chatHistoryFolderPath)
+        .onChange(async (value) => {
+          this.plugin.settings.chatHistoryFolderPath = value.trim();
+          await this.plugin.saveSettings(); // Зберігаємо саме налаштування одразу
+          // --- ВИКЛИКАЄМО DEBOUNCED ---
+          this.debouncedUpdateChatPath();
+          // ---------------------------
+        }));
 
-
-    // --- RAG Settings ---
     containerEl.createEl('h3', { text: 'Retrieval-Augmented Generation (RAG)' });
-    // ... (Enable RAG, RAG Documents Folder Path) ...
-    new Setting(containerEl).setName('Enable RAG').setDesc('Allow the chat to retrieve information from your notes for context (requires indexing).').addToggle(toggle => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => { this.plugin.settings.ragEnabled = value; await this.plugin.saveSettings(); this.display(); }));
-    if (this.plugin.settings.ragEnabled) { new Setting(containerEl).setName('RAG Documents Folder Path').setDesc('Folder within your vault containing notes to use for RAG context.').addText(text => text.setPlaceholder('Example: Knowledge Base/RAG Docs').setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => { this.plugin.settings.ragFolderPath = value.trim(); await this.plugin.saveSettings(); })); }
-
+    new Setting(containerEl)
+      .setName('Enable RAG')
+      .setDesc('Allow the chat to retrieve information from your notes for context (requires indexing).')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.ragEnabled)
+        .onChange(async (value) => {
+          this.plugin.settings.ragEnabled = value;
+          await this.plugin.saveSettings();
+          this.display();
+          // Запускаємо індексацію при увімкненні (з затримкою)
+          if (value) this.debouncedUpdateRagPath();
+        }));
 
     // // --- Advanced Context Management --- <-- Нова секція
     // containerEl.createEl('h3', { text: 'Advanced Context Management' });

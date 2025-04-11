@@ -115,7 +115,57 @@ var OllamaSettingTab = /** @class */ (function (_super) {
     function OllamaSettingTab(app, plugin) {
         var _this = _super.call(this, app, plugin) || this;
         _this.plugin = plugin;
+        // --- Ініціалізація Debounced функцій ---
+        _this.debouncedUpdateChatPath = obsidian_1.debounce(function () { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        console.log("Debounced: Updating chat path and ensuring folder exists...");
+                        if (!this.plugin.chatManager) return [3 /*break*/, 2];
+                        this.plugin.chatManager.updateChatsFolderPath();
+                        // Викликаємо ensure замість повного initialize, щоб уникнути перезавантаження індексу
+                        return [4 /*yield*/, this.plugin.chatManager.ensureChatsFolderExists()];
+                    case 1:
+                        // Викликаємо ensure замість повного initialize, щоб уникнути перезавантаження індексу
+                        _a.sent(); // Припускаємо, що метод є приватним, але доступний
+                        _a.label = 2;
+                    case 2: return [2 /*return*/];
+                }
+            });
+        }); }, 1000, true); // Затримка 1 секунда
+        _this.debouncedUpdateRolePath = obsidian_1.debounce(function () { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        console.log("Debounced: Refreshing role list due to path change...");
+                        return [4 /*yield*/, this.plugin.listRoleFiles(true)];
+                    case 1:
+                        _a.sent(); // Примусово оновлюємо список
+                        this.plugin.emit('roles-updated'); // Повідомляємо View
+                        return [2 /*return*/];
+                }
+            });
+        }); }, 1000, true);
+        _this.debouncedUpdateRagPath = obsidian_1.debounce(function () { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        console.log("Debounced: Re-indexing RAG due to path change...");
+                        if (!(this.plugin.settings.ragEnabled && this.plugin.ragService)) return [3 /*break*/, 2];
+                        // Можливо, варто додати метод для оновлення шляху в ragService
+                        // this.plugin.ragService.updateFolderPath();
+                        return [4 /*yield*/, this.plugin.ragService.indexDocuments()];
+                    case 1:
+                        // Можливо, варто додати метод для оновлення шляху в ragService
+                        // this.plugin.ragService.updateFolderPath();
+                        _a.sent(); // Переіндексовуємо
+                        _a.label = 2;
+                    case 2: return [2 /*return*/];
+                }
+            });
+        }); }, 1000, true);
         return _this;
+        // --------------------------------------
     }
     OllamaSettingTab.prototype.display = function () {
         var _this = this;
@@ -172,22 +222,27 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                     return [2 /*return*/];
             }
         }); }); }); });
-        // --- Roles & Personas ---
         containerEl.createEl('h3', { text: 'Roles & Personas' });
-        // ... (Custom Roles Folder Path) ...
-        new obsidian_1.Setting(containerEl).setName('Custom Roles Folder Path').setDesc('Folder within your vault containing custom role definition (.md) files.').addText(function (text) { return text.setPlaceholder('Example: System Prompts/Ollama Roles').setValue(_this.plugin.settings.userRolesFolderPath).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    this.plugin.settings.userRolesFolderPath = value.trim();
-                    return [4 /*yield*/, this.plugin.saveSettings()];
-                case 1:
-                    _a.sent();
-                    this.plugin.listRoleFiles(true);
-                    this.plugin.emit('roles-updated');
-                    return [2 /*return*/];
-            }
-        }); }); }); });
-        // --- Додано налаштування followRole ---
+        new obsidian_1.Setting(containerEl)
+            .setName('Custom Roles Folder Path')
+            .setDesc('Folder within your vault containing custom role definition (.md) files.')
+            .addText(function (text) { return text
+            .setPlaceholder('Example: System Prompts/Ollama Roles')
+            .setValue(_this.plugin.settings.userRolesFolderPath)
+            .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        this.plugin.settings.userRolesFolderPath = value.trim();
+                        return [4 /*yield*/, this.plugin.saveSettings()];
+                    case 1:
+                        _a.sent(); // Зберігаємо саме налаштування одразу
+                        // --- ВИКЛИКАЄМО DEBOUNCED ---
+                        this.debouncedUpdateRolePath();
+                        return [2 /*return*/];
+                }
+            });
+        }); }); }); // --- Додано налаштування followRole ---
         new obsidian_1.Setting(containerEl)
             .setName('Always Apply Selected Role')
             .setDesc('If enabled, the globally selected role (or chat-specific role) will always be used as the system prompt.')
@@ -206,10 +261,11 @@ var OllamaSettingTab = /** @class */ (function (_super) {
             });
         }); }); });
         // --------------------------------------
-        // --- Storage & History Settings ---
         containerEl.createEl('h3', { text: 'Storage & History' });
-        // ... (Save Message History, Chat History Folder Path) ...
-        new obsidian_1.Setting(containerEl).setName('Save Message History').setDesc('Automatically save chat conversations to files.').addToggle(function (toggle) { return toggle.setValue(_this.plugin.settings.saveMessageHistory).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+        new obsidian_1.Setting(containerEl)
+            .setName('Save Message History')
+            .setDesc('Automatically save chat conversations to files.')
+            .addToggle(function (toggle) { return toggle.setValue(_this.plugin.settings.saveMessageHistory).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     this.plugin.settings.saveMessageHistory = value;
@@ -219,48 +275,48 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                     return [2 /*return*/];
             }
         }); }); }); });
-        new obsidian_1.Setting(containerEl).setName('Chat History Folder Path').setDesc('Folder within your vault to store chat history (.json files). Leave empty to save in the vault root.').addText(function (text) { return text.setPlaceholder(exports.DEFAULT_SETTINGS.chatHistoryFolderPath || 'Vault Root').setValue(_this.plugin.settings.chatHistoryFolderPath).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    this.plugin.settings.chatHistoryFolderPath = value.trim();
-                    return [4 /*yield*/, this.plugin.saveSettings()];
-                case 1:
-                    _a.sent();
-                    if (!this.plugin.chatManager) return [3 /*break*/, 3];
-                    this.plugin.chatManager.updateChatsFolderPath();
-                    return [4 /*yield*/, this.plugin.chatManager.initialize()];
-                case 2:
-                    _a.sent();
-                    _a.label = 3;
-                case 3: return [2 /*return*/];
-            }
-        }); }); }); });
-        // --- RAG Settings ---
-        containerEl.createEl('h3', { text: 'Retrieval-Augmented Generation (RAG)' });
-        // ... (Enable RAG, RAG Documents Folder Path) ...
-        new obsidian_1.Setting(containerEl).setName('Enable RAG').setDesc('Allow the chat to retrieve information from your notes for context (requires indexing).').addToggle(function (toggle) { return toggle.setValue(_this.plugin.settings.ragEnabled).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    this.plugin.settings.ragEnabled = value;
-                    return [4 /*yield*/, this.plugin.saveSettings()];
-                case 1:
-                    _a.sent();
-                    this.display();
-                    return [2 /*return*/];
-            }
-        }); }); }); });
-        if (this.plugin.settings.ragEnabled) {
-            new obsidian_1.Setting(containerEl).setName('RAG Documents Folder Path').setDesc('Folder within your vault containing notes to use for RAG context.').addText(function (text) { return text.setPlaceholder('Example: Knowledge Base/RAG Docs').setValue(_this.plugin.settings.ragFolderPath).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+        new obsidian_1.Setting(containerEl)
+            .setName('Chat History Folder Path')
+            .setDesc('Folder within your vault to store chat history (.json files). Leave empty to save in the vault root.')
+            .addText(function (text) { return text
+            .setPlaceholder(exports.DEFAULT_SETTINGS.chatHistoryFolderPath || 'Vault Root')
+            .setValue(_this.plugin.settings.chatHistoryFolderPath)
+            .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
-                        this.plugin.settings.ragFolderPath = value.trim();
+                        this.plugin.settings.chatHistoryFolderPath = value.trim();
+                        return [4 /*yield*/, this.plugin.saveSettings()];
+                    case 1:
+                        _a.sent(); // Зберігаємо саме налаштування одразу
+                        // --- ВИКЛИКАЄМО DEBOUNCED ---
+                        this.debouncedUpdateChatPath();
+                        return [2 /*return*/];
+                }
+            });
+        }); }); });
+        containerEl.createEl('h3', { text: 'Retrieval-Augmented Generation (RAG)' });
+        new obsidian_1.Setting(containerEl)
+            .setName('Enable RAG')
+            .setDesc('Allow the chat to retrieve information from your notes for context (requires indexing).')
+            .addToggle(function (toggle) { return toggle
+            .setValue(_this.plugin.settings.ragEnabled)
+            .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        this.plugin.settings.ragEnabled = value;
                         return [4 /*yield*/, this.plugin.saveSettings()];
                     case 1:
                         _a.sent();
+                        this.display();
+                        // Запускаємо індексацію при увімкненні (з затримкою)
+                        if (value)
+                            this.debouncedUpdateRagPath();
                         return [2 /*return*/];
                 }
-            }); }); }); });
-        }
+            });
+        }); }); });
         // // --- Advanced Context Management --- <-- Нова секція
         // containerEl.createEl('h3', { text: 'Advanced Context Management' });
         // new Setting(containerEl)

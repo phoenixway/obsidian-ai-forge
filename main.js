@@ -2343,6 +2343,24 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.debouncedUpdateChatPath = (0, import_obsidian4.debounce)(async () => {
+      console.log("Debounced: Updating chat path and ensuring folder exists...");
+      if (this.plugin.chatManager) {
+        this.plugin.chatManager.updateChatsFolderPath();
+        await this.plugin.chatManager.ensureChatsFolderExists();
+      }
+    }, 1e3, true);
+    this.debouncedUpdateRolePath = (0, import_obsidian4.debounce)(async () => {
+      console.log("Debounced: Refreshing role list due to path change...");
+      await this.plugin.listRoleFiles(true);
+      this.plugin.emit("roles-updated");
+    }, 1e3, true);
+    this.debouncedUpdateRagPath = (0, import_obsidian4.debounce)(async () => {
+      console.log("Debounced: Re-indexing RAG due to path change...");
+      if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+        await this.plugin.ragService.indexDocuments();
+      }
+    }, 1e3, true);
   }
   display() {
     const { containerEl } = this;
@@ -2375,8 +2393,7 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
     new import_obsidian4.Setting(containerEl).setName("Custom Roles Folder Path").setDesc("Folder within your vault containing custom role definition (.md) files.").addText((text) => text.setPlaceholder("Example: System Prompts/Ollama Roles").setValue(this.plugin.settings.userRolesFolderPath).onChange(async (value) => {
       this.plugin.settings.userRolesFolderPath = value.trim();
       await this.plugin.saveSettings();
-      this.plugin.listRoleFiles(true);
-      this.plugin.emit("roles-updated");
+      this.debouncedUpdateRolePath();
     }));
     new import_obsidian4.Setting(containerEl).setName("Always Apply Selected Role").setDesc("If enabled, the globally selected role (or chat-specific role) will always be used as the system prompt.").addToggle((toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
       this.plugin.settings.followRole = value;
@@ -2390,23 +2407,16 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
     new import_obsidian4.Setting(containerEl).setName("Chat History Folder Path").setDesc("Folder within your vault to store chat history (.json files). Leave empty to save in the vault root.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath || "Vault Root").setValue(this.plugin.settings.chatHistoryFolderPath).onChange(async (value) => {
       this.plugin.settings.chatHistoryFolderPath = value.trim();
       await this.plugin.saveSettings();
-      if (this.plugin.chatManager) {
-        this.plugin.chatManager.updateChatsFolderPath();
-        await this.plugin.chatManager.initialize();
-      }
+      this.debouncedUpdateChatPath();
     }));
     containerEl.createEl("h3", { text: "Retrieval-Augmented Generation (RAG)" });
     new import_obsidian4.Setting(containerEl).setName("Enable RAG").setDesc("Allow the chat to retrieve information from your notes for context (requires indexing).").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
       this.plugin.settings.ragEnabled = value;
       await this.plugin.saveSettings();
       this.display();
+      if (value)
+        this.debouncedUpdateRagPath();
     }));
-    if (this.plugin.settings.ragEnabled) {
-      new import_obsidian4.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder within your vault containing notes to use for RAG context.").addText((text) => text.setPlaceholder("Example: Knowledge Base/RAG Docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
-        this.plugin.settings.ragFolderPath = value.trim();
-        await this.plugin.saveSettings();
-      }));
-    }
     containerEl.createEl("h3", { text: "Productivity Assistant Features" });
     new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate features like daily task integration and advanced context management for planning-oriented personas.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
       this.plugin.settings.enableProductivityFeatures = value;
