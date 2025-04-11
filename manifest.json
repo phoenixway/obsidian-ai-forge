@@ -1,9 +1,9 @@
 {
-    "id": "obsidian-ollama-duet",  
-    "name": "Obsidian+Ollama duet",         
+    "id": "obsidian-ai-forge",  
+    "name": "AI Forge",         
     "version": "0.2.0",              
     "minAppVersion": "0.15.0",       
-    "description": "Integrate Ollama with Obsidian",
+    "description": "AI Forge",
     "author": "Roman Kozak",         
     "authorUrl": "https://github.com/phoenixway/",
     "isDesktopOnly": false,         
