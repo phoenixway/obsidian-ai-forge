@@ -2417,6 +2417,16 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
       if (value)
         this.debouncedUpdateRagPath();
     }));
+    if (this.plugin.settings.ragEnabled) {
+      new import_obsidian4.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder within your vault containing notes to use for RAG context.").addText((text) => text.setPlaceholder("Example: Knowledge Base/RAG Docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
+        var _a, _b, _c, _d;
+        this.plugin.settings.ragFolderPath = value.trim();
+        await this.plugin.saveSettings();
+        this.debouncedUpdateRagPath();
+        (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
+        (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
+      }));
+    }
     containerEl.createEl("h3", { text: "Productivity Assistant Features" });
     new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate features like daily task integration and advanced context management for planning-oriented personas.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
       this.plugin.settings.enableProductivityFeatures = value;

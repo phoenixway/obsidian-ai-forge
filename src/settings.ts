@@ -217,6 +217,25 @@ export class OllamaSettingTab extends PluginSettingTab {
           // Запускаємо індексацію при увімкненні (з затримкою)
           if (value) this.debouncedUpdateRagPath();
         }));
+    if (this.plugin.settings.ragEnabled) {
+      new Setting(containerEl)
+        .setName('RAG Documents Folder Path')
+        .setDesc('Folder within your vault containing notes to use for RAG context.')
+        .addText(text => text
+          .setPlaceholder('Example: Knowledge Base/RAG Docs')
+          .setValue(this.plugin.settings.ragFolderPath)
+          .onChange(async (value) => {
+            this.plugin.settings.ragFolderPath = value.trim();
+            await this.plugin.saveSettings(); // Зберігаємо саме налаштування одразу
+            // --- ВИКЛИКАЄМО DEBOUNCED ---
+            this.debouncedUpdateRagPath();
+            // ---------------------------
+            // Також оновлюємо шлях для файлу завдань, якщо він в RAG папці
+            this.plugin.updateDailyTaskFilePath?.();
+            this.plugin.loadAndProcessInitialTasks?.();
+          }));
+    }
+
 
     // // --- Advanced Context Management --- <-- Нова секція
     // containerEl.createEl('h3', { text: 'Advanced Context Management' });

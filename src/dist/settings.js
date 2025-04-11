@@ -317,6 +317,33 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                 }
             });
         }); }); });
+        if (this.plugin.settings.ragEnabled) {
+            new obsidian_1.Setting(containerEl)
+                .setName('RAG Documents Folder Path')
+                .setDesc('Folder within your vault containing notes to use for RAG context.')
+                .addText(function (text) { return text
+                .setPlaceholder('Example: Knowledge Base/RAG Docs')
+                .setValue(_this.plugin.settings.ragFolderPath)
+                .onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+                var _a, _b, _c, _d;
+                return __generator(this, function (_e) {
+                    switch (_e.label) {
+                        case 0:
+                            this.plugin.settings.ragFolderPath = value.trim();
+                            return [4 /*yield*/, this.plugin.saveSettings()];
+                        case 1:
+                            _e.sent(); // Зберігаємо саме налаштування одразу
+                            // --- ВИКЛИКАЄМО DEBOUNCED ---
+                            this.debouncedUpdateRagPath();
+                            // ---------------------------
+                            // Також оновлюємо шлях для файлу завдань, якщо він в RAG папці
+                            (_b = (_a = this.plugin).updateDailyTaskFilePath) === null || _b === void 0 ? void 0 : _b.call(_a);
+                            (_d = (_c = this.plugin).loadAndProcessInitialTasks) === null || _d === void 0 ? void 0 : _d.call(_c);
+                            return [2 /*return*/];
+                    }
+                });
+            }); }); });
+        }
         // // --- Advanced Context Management --- <-- Нова секція
         // containerEl.createEl('h3', { text: 'Advanced Context Management' });
         // new Setting(containerEl)
