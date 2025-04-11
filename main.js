@@ -4311,7 +4311,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     const pluginDir = this.manifest.dir;
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md";
-    const builtInRolePath = (0, import_obsidian9.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+    const builtInRolePath = (0, import_obsidian9.normalizePath)(`${pluginDir}/assets/roles/${builtInRoleFileName}`);
     console.log(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
     try {
       if (await adapter.exists(builtInRolePath)) {

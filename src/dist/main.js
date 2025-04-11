@@ -686,7 +686,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                         pluginDir = this.manifest.dir;
                         builtInRoleName = "Productivity Assistant";
                         builtInRoleFileName = "Productivity_Assistant.md";
-                        builtInRolePath = obsidian_1.normalizePath(pluginDir + "/roles/" + builtInRoleFileName);
+                        builtInRolePath = obsidian_1.normalizePath(pluginDir + "/assets/roles/" + builtInRoleFileName);
                         console.log("[OllamaPlugin] Checking for built-in role at: " + builtInRolePath);
                         _d.label = 1;
                     case 1:
