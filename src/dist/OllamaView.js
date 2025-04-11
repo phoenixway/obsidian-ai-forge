@@ -153,6 +153,7 @@ var OllamaView = /** @class */ (function (_super) {
         // --- Event Handlers ---
         // Input & Sending
         _this.handleKeyDown = function (e) {
+            console.log("[OllamaView] handleKeyDown: Key=<span class=\"math-inline\">{e.key}, Shift=</span>{e.shiftKey}"); // <--- ЛОГ
             if (e.key === "Enter" && !e.shiftKey && !_this.isProcessing && !_this.sendButton.disabled) {
                 e.preventDefault();
                 _this.sendMessage();
@@ -164,6 +165,7 @@ var OllamaView = /** @class */ (function (_super) {
             }
         };
         _this.handleInputForResize = function () {
+            console.log("[OllamaView] handleSendClick called."); // <--- ЛОГ
             if (_this.resizeTimeout)
                 clearTimeout(_this.resizeTimeout);
             _this.resizeTimeout = setTimeout(function () {

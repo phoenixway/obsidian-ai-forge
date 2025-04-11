@@ -323,6 +323,7 @@ export class OllamaView extends ItemView {
 
   // Input & Sending
   private handleKeyDown = (e: KeyboardEvent): void => {
+    console.log(`[OllamaView] handleKeyDown: Key=<span class="math-inline">\{e\.key\}, Shift\=</span>{e.shiftKey}`); // <--- ЛОГ
     if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) {
       e.preventDefault();
       this.sendMessage();
@@ -334,6 +335,7 @@ export class OllamaView extends ItemView {
     }
   }
   private handleInputForResize = (): void => {
+    console.log("[OllamaView] handleSendClick called."); // <--- ЛОГ
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
     this.resizeTimeout = setTimeout(() => {
       this.adjustTextareaHeight();

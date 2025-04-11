@@ -95,6 +95,7 @@ var OllamaView = class extends import_obsidian.ItemView {
     // --- Event Handlers ---
     // Input & Sending
     this.handleKeyDown = (e) => {
+      console.log(`[OllamaView] handleKeyDown: Key=<span class="math-inline">{e.key}, Shift=</span>{e.shiftKey}`);
       if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton.disabled) {
         e.preventDefault();
         this.sendMessage();
@@ -106,6 +107,7 @@ var OllamaView = class extends import_obsidian.ItemView {
       }
     };
     this.handleInputForResize = () => {
+      console.log("[OllamaView] handleSendClick called.");
       if (this.resizeTimeout)
         clearTimeout(this.resizeTimeout);
       this.resizeTimeout = setTimeout(() => {
