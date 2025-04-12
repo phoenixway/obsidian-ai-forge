@@ -187,17 +187,17 @@
 /* ==========================================================================
      ACTION BUTTONS (Copy, Translate) in Messages
      ========================================================================== */
-  .message-actions-wrapper {
-    display: flex;
-    gap: calc(var(--chat-spacing-unit) * 1.5); /* Space between buttons */
-    position: absolute; /* Position relative to message content container */
-    top: calc(var(--chat-spacing-unit) * 1);
-    right: calc(var(--chat-spacing-unit) * 1.5);
-    opacity: 0; /* Hide by default */
-    visibility: hidden; /* Hide completely */
-    transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
-    z-index: 2; /* Ensure buttons are above content */
-  }
+     .message-actions-wrapper {
+      display: flex;
+      gap: calc(var(--chat-spacing-unit) * 1.5); /* Space between buttons */
+      position: absolute;
+      top: calc(var(--chat-spacing-unit) * 1);
+      right: calc(var(--chat-spacing-unit) * 1.5);
+      opacity: 0; /* Приховано за замовчуванням на десктопі */
+      visibility: hidden;
+      transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
+      z-index: 2;
+    }
 
   /* Show buttons on hover over the message bubble */
   .message:hover .message-actions-wrapper {
@@ -206,9 +206,8 @@
     transition-delay: 0s; /* Show immediately on hover */
   }
 
-  /* Base style for action buttons within the wrapper */
   .message-actions-wrapper button {
-    padding: calc(var(--chat-spacing-unit) * 0.5) calc(var(--chat-spacing-unit) * 1); /* Small padding */
+    padding: calc(var(--chat-spacing-unit) * 0.5) calc(var(--chat-spacing-unit) * 1);
     background-color: var(--background-modifier-hover);
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-s);
@@ -216,16 +215,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-muted); /* Muted color */
+    color: var(--text-muted);
     transition: all 0.15s ease-out;
     outline: none;
+    line-height: 1; /* Для кращого вирівнювання іконки */
   }
 
   .message-actions-wrapper button:hover {
-    background-color: var(--background-modifier-border); /* Slightly darker */
-    color: var(--text-normal); /* Normal color on hover */
+    background-color: var(--background-modifier-border);
+    color: var(--text-normal);
     transform: scale(1.05);
-  }
+   }
 
   /* Adjust icon size within buttons */
   .message-actions-wrapper button .svg-icon {
@@ -235,25 +235,15 @@
 
   /* Specific styles for user message buttons (different background) */
   .user-message .message-actions-wrapper button {
-      background-color: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.2);
-      color: var(--text-on-accent);
-      opacity: 0.7;
-  }
-  .user-message .message-actions-wrapper button:hover {
-      background-color: rgba(255, 255, 255, 0.25);
-      border-color: rgba(255, 255, 255, 0.3);
-      opacity: 1;
-  }
+    background-color: rgba(255, 255, 255, 0.15); border-color: rgba(255, 255, 255, 0.2); color: var(--text-on-accent); opacity: 0.7;
+ }
+ .user-message .message-actions-wrapper button:hover {
+    background-color: rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.3); opacity: 1;
+ }
+ .translate-button.translation-pending .svg-icon { animation: spin 1s linear infinite; }
+ .translate-button.translation-pending { cursor: default; opacity: 0.6 !important; }
+ @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-  /* Style for translate button during loading */
-  .translate-button.translation-pending .svg-icon {
-    animation: spin 1s linear infinite; /* Simple spin animation */
-  }
-  .translate-button.translation-pending {
-    cursor: default;
-    opacity: 0.6 !important; /* Override hover opacity */
-  }
 
   @keyframes spin {
     0% { transform: rotate(0deg); }
@@ -491,12 +481,12 @@
 /* ==========================================================================
      RESPONSIVE DESIGN
      ========================================================================== */
-
+/*
   @media screen and (max-width: 600px) {
     .ollama-chat-container .message { max-width: 90%; }
     :root { --chat-message-max-width: 90%; }
-    .message-actions-wrapper { opacity: 0.6; visibility: visible; /* Make buttons visible by default on touch */ }
-    .message:hover .message-actions-wrapper { opacity: 1; } /* Full opacity on hover still */
+    .message-actions-wrapper { opacity: 0.6; visibility: visible;  }
+    .message:hover .message-actions-wrapper { opacity: 1; } 
 
   }
 
@@ -504,37 +494,217 @@
     :root { --chat-spacing-unit: 3px; --chat-avatar-size: 26px; }
     .ollama-chat-container { padding: 10px; padding-bottom: 5px; }
     .chat-input-container { margin: 5px 8px; padding: 6px 10px; }
-    .chat-input-container textarea { font-size: 13px; padding-right: 135px; /* Adjust right padding for 4 smaller buttons: (28+6)*4 = 136? */ }
+    .chat-input-container textarea { font-size: 13px; padding-right: 135px;  }
     .buttons-container { gap: 6px; right: 10px; bottom: 6px; }
     .buttons-container button { width: 28px; height: 28px; }
     .ollama-chat-container .message { font-size: 13px; padding: 6px 10px;}
-    .message-group { padding-left: 34px; padding-right: 34px; /* Recalculate based on avatar size */}
+    .message-group { padding-left: 34px; padding-right: 34px;}
     .menu-dropdown.ollama-chat-menu { min-width: 180px; }
-    .ollama-chat-menu .menu-option { padding: 6px 10px; } /* Adjusted general menu option padding */
+    .ollama-chat-menu .menu-option { padding: 6px 10px; } 
     .ollama-chat-menu .model-option,
     .ollama-chat-menu .role-option,
-    .ollama-chat-menu .chat-option { padding-top: 4px; padding-bottom: 4px; } /* Adjusted model/role/chat padding */
+    .ollama-chat-menu .chat-option { padding-top: 4px; padding-bottom: 4px; } 
     .ollama-chat-menu .menu-option-text { font-size: 13px; }
-    /* Adjust action button size on mobile */
+    
     .message-actions-wrapper button { padding: 1px 3px; }
     .message-actions-wrapper button .svg-icon { width: 12px; height: 12px; }
-    .message-actions-wrapper { top: 2px; right: 3px; gap: 3px; } /* Adjust position/gap */
+    .message-actions-wrapper { top: 2px; right: 3px; gap: 3px; } 
   }
 
   @media screen and (max-width: 360px) {
       .buttons-container { gap: 4px; }
       .buttons-container button { width: 26px; height: 26px; }
-      .chat-input-container textarea { padding-right: 125px; /* (26+4)*4 = 120? Adjust as needed */ }
+      .chat-input-container textarea { padding-right: 125px; }
       :root { --chat-avatar-size: 24px; }
       .message-group { padding-left: 30px; padding-right: 30px;}
       .message-actions-wrapper button .svg-icon { width: 11px; height: 11px; }
   }
-
-  /* Стиль для небезпечних опцій (наприклад, видалення) */
+*/
+ 
 .ollama-chat-menu .menu-option.danger-option:hover {
-  background-color: var(--background-modifier-error-hover); /* Червонуватий фон при наведенні */
-  color: var(--text-on-error); /* Білий або світлий текст */
+  background-color: var(--background-modifier-error-hover);
+    color: var(--text-on-error);
 }
 .ollama-chat-menu .menu-option.danger-option:hover .menu-option-icon {
-  color: var(--text-on-error); /* Іконка теж змінює колір */
+  color: var(--text-on-error); 
 }
+@media (hover: hover) and (pointer: fine) {
+  .message:hover .message-actions-wrapper {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+}
+
+@media screen and (max-width: 768px) { /* Збільшено поріг для планшетів */
+  :root {
+      --chat-message-max-width: 90%; /* Трохи ширші повідомлення */
+      --chat-avatar-size: 28px; /* Трохи менший аватар */
+  }
+  .ollama-chat-container {
+      padding: calc(var(--chat-spacing-unit) * 3); /* Менші відступи контейнера */
+      padding-bottom: calc(var(--chat-spacing-unit) * 1.5);
+  }
+  .message-group {
+      padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+      padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+      margin-bottom: calc(var(--chat-spacing-unit) * 3); /* Менший відступ між групами */
+  }
+  .ollama-chat-container .message {
+      padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); /* Менші відступи в бульбашці */
+      font-size: calc(var(--font-ui-small) * 0.98); /* Трохи менший шрифт */
+  }
+   /* Кнопки дій на повідомленнях - робимо видимими */
+   .message-actions-wrapper {
+      opacity: 0.6; /* Напівпрозорі */
+      visibility: visible;
+      transition: none; /* Прибираємо transition */
+   }
+    .message-actions-wrapper button {
+        background-color: transparent; /* Прозоріший фон */
+        border: none;
+        padding: 1px; /* Менший паддінг */
+    }
+    .message-actions-wrapper button .svg-icon {
+        width: 13px; height: 13px; /* Менша іконка */
+    }
+     .user-message .message-actions-wrapper button {
+         background-color: transparent; border: none; opacity: 0.7;
+     }
+     .message-actions-wrapper button:hover { /* Ефект при наведенні/натисканні */
+        background-color: var(--background-modifier-hover);
+        transform: scale(1.1);
+     }
+      .user-message .message-actions-wrapper button:hover {
+          background-color: rgba(255, 255, 255, 0.2) !important;
+      }
+
+   /* Поле вводу */
+   .chat-input-container textarea {
+       padding-right: 145px; /* Оновлюємо відступ для 4 кнопок (30+6)*4 + ~6 */
+   }
+    .buttons-container button {
+      width: 30px; height: 30px; /* Трохи менші кнопки */
+    }
+     .buttons-container {
+      gap: calc(var(--chat-spacing-unit) * 1.5); /* Менший проміжок */
+    }
+}
+
+/* --- Звичайні телефони (портрет) --- */
+@media screen and (max-width: 480px) {
+  :root {
+      --chat-spacing-unit: 3px; /* Ще менша одиниця відступу */
+      --chat-avatar-size: 26px; /* Менший аватар */
+      --chat-message-max-width: 92%; /* Ще ширші повідомлення */
+  }
+  .ollama-chat-container {
+      padding: calc(var(--chat-spacing-unit) * 3); /* 9px */
+      padding-bottom: calc(var(--chat-spacing-unit) * 1); /* 3px */
+  }
+  .chat-input-container {
+      margin: 4px 8px; /* Менші зовнішні відступи */
+      padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2); /* Менші внутрішні відступи */
+      border-radius: 10px;
+  }
+  .chat-input-container textarea {
+      font-size: 13px; /* Менший шрифт */
+      padding: 8px 10px; /* Менші відступи */
+      min-height: 36px;
+      padding-right: 110px; /* Відступ для 3 кнопок: (28+4)*3 + 6 */
+  }
+  .buttons-container {
+      gap: var(--chat-spacing-unit); /* Ще менший проміжок (3px) */
+      right: calc(var(--chat-spacing-unit) * 2); /* 6px */
+      bottom: calc(var(--chat-spacing-unit) * 1.5); /* 4.5px */
+  }
+  .buttons-container button {
+      width: 28px; /* Менші кнопки */
+      height: 28px;
+  }
+  /* Ховаємо кнопку перекладу вводу на малих екранах */
+  .buttons-container .translate-input-button {
+      display: none;
+  }
+
+  .ollama-chat-container .message {
+      font-size: 13px; /* Менший шрифт повідомлень */
+      padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); /* Менші відступи */
+      border-radius: 15px; /* Менший радіус */
+  }
+  /* Адаптуємо радіуси для послідовних */
+  .user-message-group .message:not(:last-child) { border-bottom-right-radius: 4px; }
+  .ollama-message-group .message:not(:last-child) { border-bottom-left-radius: 4px; }
+  .ollama-chat-container .user-message-group .message:last-child.user-message { border-bottom-right-radius: 15px; }
+  .ollama-chat-container .ollama-message-group .message:last-child.ollama-message { border-bottom-left-radius: 15px; }
+
+
+  .message-group {
+      padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); /* (26+6 = 32px) */
+      padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); /* (26+6 = 32px) */
+      margin-bottom: calc(var(--chat-spacing-unit) * 3);
+  }
+   .message-group-avatar {
+      bottom: calc(var(--chat-spacing-unit) * 1.5); /* Піднімаємо аватар ближче */
+   }
+
+  .message-timestamp {
+      font-size: 0.7em; /* Дуже маленький шрифт для дати */
+      margin-top: 2px;
+  }
+
+   /* Кнопки дій на повідомленнях */
+   .message-actions-wrapper {
+      top: 2px;
+      right: 4px;
+      gap: 3px;
+   }
+   .message-actions-wrapper button .svg-icon {
+        width: 12px; height: 12px; /* Дуже маленькі іконки */
+   }
+
+  /* Меню */
+  .menu-dropdown.ollama-chat-menu {
+      min-width: 190px; /* Трохи вужче */
+      max-width: calc(100vw - 20px); /* Не вилазити за екран */
+  }
+  .ollama-chat-menu .menu-option {
+      padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); /* Менші відступи пунктів */
+  }
+  .ollama-chat-menu .menu-header-item { /* Менші відступи для заголовків підменю */
+       padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+  }
+   .ollama-chat-menu .submenu-content .menu-option {
+       padding-left: calc(var(--chat-spacing-unit) * 2) !important; /* Менший відступ вкладених */
+   }
+   .ollama-chat-menu .menu-option-text { font-size: 13px; } /* Менший шрифт меню */
+   .ollama-chat-menu .chat-option .chat-option-date { font-size: 0.75em; } /* Менший шрифт дати в меню */
+   .ollama-chat-menu .model-list-container,
+   .ollama-chat-menu .role-list-container,
+   .ollama-chat-menu .chat-list-container {
+        max-height: 150px; /* Обмежуємо висоту списків */
+   }
+}
+
+/* --- Дуже вузькі екрани --- */
+@media screen and (max-width: 360px) {
+    :root {
+      --chat-avatar-size: 24px;
+    }
+     .chat-input-container textarea {
+         padding-right: 105px; /* Ще менше місця для 3 кнопок (26+3)*3 + 5 */
+     }
+     .buttons-container {
+         gap: 3px;
+         right: 6px;
+     }
+     .buttons-container button {
+         width: 26px; height: 26px;
+     }
+     .message-group {
+          padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); /* (24+6=30px) */
+          padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+     }
+     .message-actions-wrapper button .svg-icon { width: 11px; height: 11px; }
+}
+
