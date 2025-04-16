@@ -759,7 +759,8 @@ var OllamaView = /** @class */ (function (_super) {
                         textarea.style.overflowY = 'auto';
                     }
                 }
-                textarea.style.height = newHeight + "px";
+                // textarea.style.height = `${newHeight}px`;
+                textarea.style.setProperty('height', newHeight + "px", 'important');
                 console.log("adjustTextareaHeight: Set style.height=" + newHeight + "px"); // Старий ЛОГ 4
             });
         };

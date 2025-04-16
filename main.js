@@ -800,7 +800,7 @@ This action cannot be undone.`, async () => {
             textarea.style.overflowY = "auto";
           }
         }
-        textarea.style.height = `${newHeight}px`;
+        textarea.style.setProperty("height", `${newHeight}px`, "important");
         console.log(`adjustTextareaHeight: Set style.height=${newHeight}px`);
       });
     };
