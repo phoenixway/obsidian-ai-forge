@@ -694,41 +694,39 @@ var OllamaView = /** @class */ (function (_super) {
         _this.handleNewMessageIndicatorClick = function () { var _a; if (_this.chatContainer) {
             _this.chatContainer.scrollTo({ top: _this.chatContainer.scrollHeight, behavior: 'smooth' });
         } (_a = _this.newMessagesIndicatorEl) === null || _a === void 0 ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE); _this.userScrolledUp = false; };
+        // OllamaView.ts
         _this.adjustTextareaHeight = function () {
-            // Використовуємо requestAnimationFrame для плавності та уникнення layout thrashing
+            // Використовуємо подвійний requestAnimationFrame для стабільності вимірювань
             requestAnimationFrame(function () {
                 if (!_this.inputEl)
                     return;
                 var textarea = _this.inputEl;
                 var computedStyle = window.getComputedStyle(textarea);
-                // Читаємо базовий min-height та максимальний max-height з CSS
-                var baseMinHeight = parseFloat(computedStyle.minHeight) || 40; // Базовий мінімум
-                var maxHeight = parseFloat(computedStyle.maxHeight); // Максимум з CSS
-                // Зберігаємо поточний min-height (якщо він встановлений inline)
-                var originalMinHeight = textarea.style.minHeight;
-                // Тимчасово знімаємо обмеження min-height та height для коректного вимірювання scrollHeight
-                textarea.style.minHeight = '0';
+                // Читаємо min/max з CSS
+                var minHeight = parseFloat(computedStyle.minHeight) || 40;
+                var maxHeight = parseFloat(computedStyle.maxHeight);
+                // Фаза 1: Скидання висоти для вимірювання
                 textarea.style.height = 'auto';
-                // Вимірюємо scrollHeight в наступному кадрі, щоб браузер встиг оновити макет
                 requestAnimationFrame(function () {
                     if (!_this.inputEl)
-                        return; // Перевірка елемента ще раз
+                        return;
                     var scrollHeight = textarea.scrollHeight;
-                    // Повертаємо оригінальний inline min-height, якщо він був, або скидаємо
-                    textarea.style.minHeight = originalMinHeight || '';
-                    // Нова цільова min-height - це scrollHeight, але не менше базового min-height
-                    var newMinHeight = Math.max(baseMinHeight, scrollHeight);
-                    // Застосовуємо обмеження max-height з CSS, якщо воно є і ми його досягли
-                    if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
-                        newMinHeight = maxHeight;
-                        // Переконуємося, що overflow увімкнено при досягненні межі
+                    // Обчислюємо нову висоту: між minHeight та scrollHeight
+                    var newHeight = Math.max(minHeight, scrollHeight);
+                    // Обмежуємо зверху значенням maxHeight з CSS (якщо воно є)
+                    if (!isNaN(maxHeight) && newHeight > maxHeight) {
+                        newHeight = maxHeight;
+                        // Переконуємося, що скролінг увімкнено, якщо досягли межі
                         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-                            textarea.style.overflowY = 'auto'; // Забезпечуємо скролінг
+                            textarea.style.overflowY = 'auto';
                         }
                     }
-                    // Встановлюємо обчислену min-height і дозволяємо height бути auto
-                    textarea.style.minHeight = newMinHeight + "px";
-                    textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
+                    // ВАЖЛИВО: Встановлюємо саме 'height', а не 'min-height'
+                    textarea.style.height = newHeight + "px";
+                    // Логування для перевірки (можна потім прибрати)
+                    console.log("adjustTextareaHeight HEIGHT: Set style.height=" + newHeight + "px");
+                    var renderedHeight = textarea.clientHeight;
+                    console.log("adjustTextareaHeight HEIGHT: Rendered clientHeight=" + renderedHeight);
                 });
             });
         };

@@ -737,31 +737,31 @@ This action cannot be undone.`, async () => {
       (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
+    // OllamaView.ts
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
         if (!this.inputEl)
           return;
         const textarea = this.inputEl;
         const computedStyle = window.getComputedStyle(textarea);
-        const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
+        const minHeight = parseFloat(computedStyle.minHeight) || 40;
         const maxHeight = parseFloat(computedStyle.maxHeight);
-        const originalMinHeight = textarea.style.minHeight;
-        textarea.style.minHeight = "0";
         textarea.style.height = "auto";
         requestAnimationFrame(() => {
           if (!this.inputEl)
             return;
           const scrollHeight = textarea.scrollHeight;
-          textarea.style.minHeight = originalMinHeight || "";
-          let newMinHeight = Math.max(baseMinHeight, scrollHeight);
-          if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
-            newMinHeight = maxHeight;
+          let newHeight = Math.max(minHeight, scrollHeight);
+          if (!isNaN(maxHeight) && newHeight > maxHeight) {
+            newHeight = maxHeight;
             if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
               textarea.style.overflowY = "auto";
             }
           }
-          textarea.style.minHeight = `${newMinHeight}px`;
-          textarea.style.height = "auto";
+          textarea.style.height = `${newHeight}px`;
+          console.log(`adjustTextareaHeight HEIGHT: Set style.height=${newHeight}px`);
+          const renderedHeight = textarea.clientHeight;
+          console.log(`adjustTextareaHeight HEIGHT: Rendered clientHeight=${renderedHeight}`);
         });
       });
     };
