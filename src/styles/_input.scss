@@ -10,6 +10,7 @@
   flex-direction: column; // ЯВНО вказуємо напрямок колонки!
   flex-grow: 0;
   flex-shrink: 0;
+  align-items: flex-start; // <-- СПРОБУЙТЕ ЦЕ
 
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
@@ -52,7 +53,7 @@
 
     // --- ДОДАЄМО ВЛАСТИВОСТІ FLEX ITEM ---
     flex-grow: 0; // Не рости за рахунок вільного місця flex-контейнера
-    flex-shrink: 0; // ЗАБОРОНЯЄМО стискання textarea по висоті!
+    // flex-shrink: 0; // ЗАБОРОНЯЄМО стискання textarea по висоті!
     // flex-basis: auto; // Базовий розмір - автоматичний (зазвичай від height/min-height)
     // --- КІНЕЦЬ ДОДАВАННЯ ---
 

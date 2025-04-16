@@ -3,6 +3,7 @@
   flex-direction: column;
   flex-grow: 0;
   flex-shrink: 0;
+  align-items: flex-start;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
@@ -37,7 +38,6 @@
   margin-bottom: calc(var(--chat-spacing-unit) * 2);
   box-shadow: none !important;
   flex-grow: 0;
-  flex-shrink: 0;
 }
 .chat-input-container textarea:focus {
   outline: none;
