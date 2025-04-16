@@ -9,7 +9,7 @@
   // --- КІНЕЦЬ ЗМІН ---
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
-  background-color: var(--background-primary);
+  background-color: red !important;//var(--background-primary);
   z-index: 20;
   border-radius: 12px;
   margin: calc(var(--chat-spacing-unit) * 2);
@@ -25,7 +25,6 @@
   &:focus-within {
     border-color: var(--interactive-accent);
     box-shadow: none;
-    color: chartreuse !important;
   }
 
   textarea {

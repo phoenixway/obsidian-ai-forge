@@ -5,7 +5,7 @@
   flex-shrink: 0;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
-  background-color: var(--background-primary);
+  background-color: red !important;
   z-index: 20;
   border-radius: 12px;
   margin: calc(var(--chat-spacing-unit) * 2);
@@ -19,7 +19,6 @@
 .chat-input-container:focus-within {
   border-color: var(--interactive-accent);
   box-shadow: none;
-  color: chartreuse !important;
 }
 .chat-input-container textarea {
   width: 100%;
