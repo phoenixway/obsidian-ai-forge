@@ -143,6 +143,8 @@ var CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
 var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_DANGER_OPTION = "danger-option"; // Для небезпечних дій
+var CSS_CLASS_INPUT_AREA_LEFT = "input-area-left";
+var CSS_CLASS_MODEL_DISPLAY = "model-display";
 // --- Language List ---
 var LANGUAGES = {
     "af": "Afrikaans", "sq": "Albanian", "am": "Amharic", "ar": "Arabic", "hy": "Armenian",
@@ -184,6 +186,83 @@ var OllamaView = /** @class */ (function (_super) {
         _this.lastRenderedMessageDate = null;
         _this.newMessagesIndicatorEl = null;
         _this.userScrolledUp = false;
+        _this.handleModelDisplayClick = function (event) {
+            console.log("[OllamaView Debug] Model display clicked.");
+            var menu = new obsidian_1.Menu(); // Створюємо *нативне* спливаюче меню Obsidian
+            // Асинхронно наповнюємо його моделями
+            (function () { return __awaiter(_this, void 0, void 0, function () {
+                var models, activeChat, currentModelName_1, error_1;
+                var _this = this;
+                var _a, _b;
+                return __generator(this, function (_c) {
+                    switch (_c.label) {
+                        case 0:
+                            menu.addItem(function (item) { return item.setTitle("Loading models...").setDisabled(true); }); // Показуємо завантаження
+                            menu.showAtMouseEvent(event); // Показуємо меню одразу (з лоадером)
+                            _c.label = 1;
+                        case 1:
+                            _c.trys.push([1, 4, , 5]);
+                            return [4 /*yield*/, this.plugin.ollamaService.getModels()];
+                        case 2:
+                            models = _c.sent();
+                            return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                        case 3:
+                            activeChat = _c.sent();
+                            currentModelName_1 = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                            // Очищаємо меню перед додаванням реальних пунктів
+                            // @ts-ignore - Доступ до items для очищення (неофіційно)
+                            if (menu.items.length > 0)
+                                menu.items = [];
+                            if (models.length === 0) {
+                                menu.addItem(function (item) { return item.setTitle("No models found").setDisabled(true); });
+                            }
+                            else {
+                                models.forEach(function (modelName) {
+                                    menu.addItem(function (item) {
+                                        return item
+                                            .setTitle(modelName)
+                                            .setIcon(modelName === currentModelName_1 ? "check" : "radio-button")
+                                            .onClick(function () { return __awaiter(_this, void 0, void 0, function () {
+                                            var chatToUpdate, latestModelName;
+                                            var _a, _b;
+                                            return __generator(this, function (_c) {
+                                                switch (_c.label) {
+                                                    case 0: return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                                                    case 1:
+                                                        chatToUpdate = _c.sent();
+                                                        latestModelName = ((_b = chatToUpdate === null || chatToUpdate === void 0 ? void 0 : chatToUpdate.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                                                        if (!(modelName !== latestModelName)) return [3 /*break*/, 4];
+                                                        if (!chatToUpdate) return [3 /*break*/, 3];
+                                                        return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName })];
+                                                    case 2:
+                                                        _c.sent();
+                                                        new obsidian_1.Notice("Model set to: " + modelName);
+                                                        this.updateModelDisplay(modelName); // Оновлюємо текстовий дисплей
+                                                        return [3 /*break*/, 4];
+                                                    case 3:
+                                                        new obsidian_1.Notice("Cannot set model: No active chat.");
+                                                        _c.label = 4;
+                                                    case 4: return [2 /*return*/];
+                                                }
+                                            });
+                                        }); });
+                                    });
+                                });
+                            }
+                            return [3 /*break*/, 5];
+                        case 4:
+                            error_1 = _c.sent();
+                            console.error("Error loading models for model selection menu:", error_1);
+                            // @ts-ignore
+                            if (menu.items.length > 0)
+                                menu.items = []; // Очищаємо
+                            menu.addItem(function (item) { return item.setTitle("Error loading models").setDisabled(true); });
+                            return [3 /*break*/, 5];
+                        case 5: return [2 /*return*/];
+                    }
+                });
+            }); })(); // Викликаємо асинхронну функцію
+        };
         // --- Event Handlers ---
         // Input & Sending
         _this.handleKeyDown = function (e) {
@@ -217,7 +296,7 @@ var OllamaView = /** @class */ (function (_super) {
         // Input Area Buttons
         _this.handleVoiceClick = function () { _this.toggleVoiceRecognition(); };
         _this.handleTranslateInputClick = function () { return __awaiter(_this, void 0, Promise, function () {
-            var currentText, targetLang, apiKey, translatedText, end, error_1;
+            var currentText, targetLang, apiKey, translatedText, end, error_2;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0:
@@ -258,8 +337,8 @@ var OllamaView = /** @class */ (function (_super) {
                         }
                         return [3 /*break*/, 5];
                     case 3:
-                        error_1 = _a.sent();
-                        console.error("Input translation error:", error_1);
+                        error_2 = _a.sent();
+                        console.error("Input translation error:", error_2);
                         new obsidian_1.Notice("Input translation error.");
                         return [3 /*break*/, 5];
                     case 4:
@@ -291,7 +370,7 @@ var OllamaView = /** @class */ (function (_super) {
             }
         };
         // --- Action Handlers (Must call closeMenu) ---
-        _this.handleNewChatClick = function () { return __awaiter(_this, void 0, Promise, function () { var newChat, error_2; return __generator(this, function (_a) {
+        _this.handleNewChatClick = function () { return __awaiter(_this, void 0, Promise, function () { var newChat, error_3; return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
                     this.closeMenu();
@@ -311,7 +390,7 @@ var OllamaView = /** @class */ (function (_super) {
                     }
                     return [3 /*break*/, 4];
                 case 3:
-                    error_2 = _a.sent();
+                    error_3 = _a.sent();
                     new obsidian_1.Notice("Error creating new chat.");
                     return [3 /*break*/, 4];
                 case 4: return [2 /*return*/];
@@ -367,7 +446,7 @@ var OllamaView = /** @class */ (function (_super) {
                 }
             });
         }); };
-        _this.handleCloneChatClick = function () { return __awaiter(_this, void 0, Promise, function () { var activeChat, originalName, cloningNotice, clonedChat, error_3; var _a; return __generator(this, function (_b) {
+        _this.handleCloneChatClick = function () { return __awaiter(_this, void 0, Promise, function () { var activeChat, originalName, cloningNotice, clonedChat, error_4; var _a; return __generator(this, function (_b) {
             switch (_b.label) {
                 case 0:
                     this.closeMenu();
@@ -395,7 +474,7 @@ var OllamaView = /** @class */ (function (_super) {
                     }
                     return [3 /*break*/, 6];
                 case 4:
-                    error_3 = _b.sent();
+                    error_4 = _b.sent();
                     new obsidian_1.Notice("An error occurred while cloning the chat.");
                     return [3 /*break*/, 6];
                 case 5:
@@ -463,7 +542,7 @@ var OllamaView = /** @class */ (function (_super) {
                 }
             });
         }); };
-        _this.handleExportChatClick = function () { return __awaiter(_this, void 0, Promise, function () { var activeChat, md, ts, safeName, fName, targetFolderPath, targetFolder, abstractFile, err_1, filePath, file, error_4; var _a, _b; return __generator(this, function (_c) {
+        _this.handleExportChatClick = function () { return __awaiter(_this, void 0, Promise, function () { var activeChat, md, ts, safeName, fName, targetFolderPath, targetFolder, abstractFile, err_1, filePath, file, error_5; var _a, _b; return __generator(this, function (_c) {
             switch (_c.label) {
                 case 0:
                     this.closeMenu();
@@ -529,9 +608,9 @@ var OllamaView = /** @class */ (function (_super) {
                     new obsidian_1.Notice("Chat exported to " + file.path);
                     return [3 /*break*/, 13];
                 case 12:
-                    error_4 = _c.sent();
+                    error_5 = _c.sent();
                     new obsidian_1.Notice("Error exporting chat.");
-                    console.error(error_4);
+                    console.error(error_5);
                     return [3 /*break*/, 13];
                 case 13: return [2 /*return*/];
             }
@@ -610,7 +689,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.getIcon = function () { return "message-square"; };
     OllamaView.prototype.onOpen = function () {
         return __awaiter(this, void 0, Promise, function () {
-            var error_5;
+            var error_6;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -618,6 +697,7 @@ var OllamaView = /** @class */ (function (_super) {
                         console.log("[OllamaView] onOpen START");
                         this.createUIElements();
                         this.updateInputPlaceholder(this.plugin.settings.modelName);
+                        this.updateModelDisplay(this.plugin.settings.modelName);
                         this.attachEventListeners();
                         this.autoResizeTextarea();
                         this.updateSendButtonState();
@@ -629,8 +709,8 @@ var OllamaView = /** @class */ (function (_super) {
                         _a.sent();
                         return [3 /*break*/, 4];
                     case 3:
-                        error_5 = _a.sent();
-                        console.error("[OllamaView] Error during initial chat load:", error_5);
+                        error_6 = _a.sent();
+                        console.error("[OllamaView] Error during initial chat load:", error_6);
                         this.showEmptyState();
                         return [3 /*break*/, 4];
                     case 4:
@@ -675,35 +755,72 @@ var OllamaView = /** @class */ (function (_super) {
         obsidian_1.setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
         this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
         var inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-        this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: "Text...", rows: 1 } });
+        inputContainer.style.display = 'flex'; // Встановлюємо flex
+        inputContainer.style.alignItems = 'flex-end'; // Вирівнюємо по низу
+        inputContainer.style.gap = '8px'; // Проміжок між елементами
+        // --- Ліва частина (Відображення моделі + Кнопка перекладу) ---
+        var leftArea = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_AREA_LEFT });
+        leftArea.style.display = 'flex';
+        leftArea.style.flexDirection = 'column'; // Модель над кнопкою
+        leftArea.style.alignItems = 'center';
+        this.modelDisplayEl = leftArea.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+        this.modelDisplayEl.setText("Loading model..."); // Початковий текст
+        this.modelDisplayEl.title = "Click to select model"; // Підказка
+        this.translateInputButton = leftArea.createEl("button", {
+            cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
+            attr: { 'aria-label': 'Translate input to English' }
+        });
+        obsidian_1.setIcon(this.translateInputButton, "replace");
+        this.translateInputButton.title = "Translate input to English";
+        // Стилізація кнопки (розмір, тощо) додається в CSS
+        // ------------------------------------------------
+        // --- Поле вводу (займає решту місця) ---
+        this.inputEl = inputContainer.createEl("textarea", {
+            attr: { placeholder: "Text...", rows: 1 }
+        });
+        this.inputEl.style.flex = '1'; // Дозволяємо розтягуватися
+        this.inputEl.style.paddingRight = '85px'; // Оновлюємо відступ для 3 кнопок справа (32*3 + 6*2 = 108 -> ~85) - НАЛАШТУЙТЕ!
+        // ------------------------------------------
+        // --- Контейнер для кнопок СПРАВА ---
         this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
-        // Input Buttons
+        // Видаляємо position: absolute, бо кнопки тепер у flex-контейнері
+        this.buttonsContainer.style.display = 'flex';
+        this.buttonsContainer.style.alignItems = 'flex-end'; // Вирівнюємо по низу з textarea
+        this.buttonsContainer.style.gap = '6px'; // Проміжок
+        // Кнопки СПРАВА (Send, Voice, Menu)
         this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } });
         obsidian_1.setIcon(this.sendButton, "send");
         this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } });
         obsidian_1.setIcon(this.voiceButton, "mic");
-        this.translateInputButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { 'aria-label': 'Translate input to English' } });
-        obsidian_1.setIcon(this.translateInputButton, "replace");
-        this.translateInputButton.title = "Translate input to English";
         this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } });
         obsidian_1.setIcon(this.menuButton, "more-vertical");
-        // --- Custom Menu Dropdown Structure (Accordion Style) ---
+        // --- Кінець кнопок справа ---
+        // --- Кастомне Меню (як і раніше, але всередині inputContainer) ---
         this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
         this.menuDropdown.style.display = "none";
-        var createSubmenuSection = function (title, icon, listContainerClass) {
-            var header = _this.menuDropdown.createDiv({ cls: CSS_CLASS_MENU_OPTION + " " + CSS_CLASS_MENU_HEADER_ITEM });
+        var createSubmenuSection = function (title, icon, listContainerClass, sectionClass // <-- Додано необов'язковий параметр тут
+        ) {
+            // Обгортка для всієї секції (заголовок + контент)
+            var section = _this.menuDropdown.createDiv();
+            // Додаємо клас до обгортки, якщо він переданий
+            if (sectionClass) {
+                section.addClass(sectionClass);
+            }
+            // Клікабельний Заголовок
+            var header = section.createDiv({ cls: CSS_CLASS_MENU_OPTION + " " + CSS_CLASS_MENU_HEADER_ITEM });
             obsidian_1.setIcon(header.createSpan({ cls: "menu-option-icon" }), icon);
             header.createSpan({ cls: "menu-option-text", text: title });
             obsidian_1.setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
-            var content = _this.menuDropdown.createDiv({ cls: CSS_CLASS_SUBMENU_CONTENT + " " + CSS_CLASS_SUBMENU_CONTENT_HIDDEN + " " + listContainerClass });
+            // Контейнер для Вмісту (прихований)
+            var content = section.createDiv({ cls: CSS_CLASS_SUBMENU_CONTENT + " " + CSS_CLASS_SUBMENU_CONTENT_HIDDEN + " " + listContainerClass });
             content.style.maxHeight = '0';
             content.style.overflow = 'hidden';
             content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out';
             content.style.paddingTop = '0';
             content.style.paddingBottom = '0';
-            return { header: header, content: content };
+            return { header: header, content: content, section: section }; // Повертаємо обгортку секції також
         };
-        var modelSection = createSubmenuSection("Models", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER);
+        var modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section"); // <--- Додано клас секції
         this.modelSubmenuHeader = modelSection.header;
         this.modelSubmenuContent = modelSection.content;
         var roleSection = createSubmenuSection("Roles", "users", CSS_CLASS_ROLE_LIST_CONTAINER);
@@ -714,6 +831,7 @@ var OllamaView = /** @class */ (function (_super) {
         this.chatSubmenuContent = chatSection.content;
         this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
         this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
+        //TODO:  checkit
         this.newChatOption = this.menuDropdown.createEl("div", { cls: CSS_CLASS_MENU_OPTION + " " + CSS_CLASS_NEW_CHAT_OPTION });
         obsidian_1.setIcon(this.newChatOption.createSpan({ cls: "menu-option-icon" }), "plus-circle");
         this.newChatOption.createSpan({ cls: "menu-option-text", text: "New Chat" });
@@ -780,6 +898,13 @@ var OllamaView = /** @class */ (function (_super) {
             this.menuButton.addEventListener("click", this.handleMenuClick);
         else
             console.error("menuButton missing!");
+        if (this.modelDisplayEl) {
+            this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick);
+            console.log("[OllamaView Debug] Attached listener to modelDisplayEl.");
+        }
+        else {
+            console.error("modelDisplayEl missing!");
+        }
         // --- Listeners for Custom Menu Items ---
         if (this.modelSubmenuHeader)
             this.registerDomEvent(this.modelSubmenuHeader, 'click', function () { return _this.toggleSubmenu(_this.modelSubmenuHeader, _this.modelSubmenuContent, 'models'); });
@@ -848,10 +973,16 @@ var OllamaView = /** @class */ (function (_super) {
         this.register(this.plugin.on('chat-list-updated', this.handleChatListUpdated));
         console.log("[OllamaView Debug] Attaching event listeners END");
     };
+    OllamaView.prototype.updateModelDisplay = function (modelName) {
+        if (this.modelDisplayEl) {
+            this.modelDisplayEl.setText(modelName || "No Model"); // Показуємо назву або текст за замовчуванням
+            this.modelDisplayEl.title = "Current model: " + (modelName || "None") + ". Click to change.";
+        }
+    };
     // Handles clicks on submenu headers (Model, Role, Chat)
     OllamaView.prototype.toggleSubmenu = function (headerEl, contentEl, type) {
         return __awaiter(this, void 0, Promise, function () {
-            var iconEl, isHidden, loadingEl, _a, error_6;
+            var iconEl, isHidden, loadingEl, _a, error_7;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
@@ -914,8 +1045,8 @@ var OllamaView = /** @class */ (function (_super) {
                         });
                         return [3 /*break*/, 10];
                     case 9:
-                        error_6 = _b.sent();
-                        console.error("[OllamaView] Error rendering " + type + " list:", error_6);
+                        error_7 = _b.sent();
+                        console.error("[OllamaView] Error rendering " + type + " list:", error_7);
                         contentEl.empty(); // Clear loading text on error too
                         contentEl.createDiv({ cls: "menu-error-text", text: "Error loading " + type + "." });
                         contentEl.style.maxHeight = '50px'; // Keep slightly expanded for error
@@ -996,7 +1127,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.loadAndDisplayActiveChat = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var activeChat, error_7;
+            var activeChat, error_8;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
@@ -1034,7 +1165,7 @@ var OllamaView = /** @class */ (function (_super) {
                         }
                         return [3 /*break*/, 4];
                     case 3:
-                        error_7 = _b.sent();
+                        error_8 = _b.sent();
                         //console.error("[OllamaView] Error getting active chat:", error);
                         this.showEmptyState();
                         new obsidian_1.Notice("Error loading chat history.");
@@ -1086,7 +1217,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.sendMessage = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var content, activeChat, userMessageContent, loadingEl, userMessage, assistantMessage, error_8;
+            var content, activeChat, userMessageContent, loadingEl, userMessage, assistantMessage, error_9;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
@@ -1138,14 +1269,14 @@ var OllamaView = /** @class */ (function (_super) {
                         _b.label = 7;
                     case 7: return [3 /*break*/, 10];
                     case 8:
-                        error_8 = _b.sent();
+                        error_9 = _b.sent();
                         //console.error("[OllamaView] Send/receive cycle error:", error);
                         if (loadingEl) {
                             this.removeLoadingIndicator(loadingEl);
                             loadingEl = null;
                         } // Ensure indicator removed on error
                         // Add error directly to display
-                        this.addMessageToDisplay("error", "Error: " + (error_8.message || 'Unknown error.'), new Date());
+                        this.addMessageToDisplay("error", "Error: " + (error_9.message || 'Unknown error.'), new Date());
                         return [3 /*break*/, 10];
                     case 9:
                         // Ensure indicator is removed in all cases (if somehow missed)
@@ -1280,7 +1411,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.handleTranslateClick = function (originalContent, contentEl, buttonEl) {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var targetLang, apiKey, textToTranslate, translatedText, translationContainer, targetLangName, error_9, targetLangName;
+            var targetLang, apiKey, textToTranslate, translatedText, translationContainer, targetLangName, error_10, targetLangName;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
@@ -1318,7 +1449,7 @@ var OllamaView = /** @class */ (function (_super) {
                         } // Error notice shown by service if null
                         return [3 /*break*/, 5];
                     case 3:
-                        error_9 = _b.sent();
+                        error_10 = _b.sent();
                         //console.error("Error during translation click handling:", error);
                         new obsidian_1.Notice("An unexpected error occurred during translation.");
                         return [3 /*break*/, 5];
@@ -1429,7 +1560,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.renderModelList = function () {
         var _a, _b;
         return __awaiter(this, void 0, Promise, function () {
-            var container, modelIconMap, defaultIcon, models, activeChat, currentModelName_1, error_10;
+            var container, modelIconMap, defaultIcon, models, activeChat, currentModelName_2, error_11;
             var _this = this;
             return __generator(this, function (_c) {
                 switch (_c.label) {
@@ -1449,7 +1580,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
                     case 3:
                         activeChat = _c.sent();
-                        currentModelName_1 = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                        currentModelName_2 = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
                         if (models.length === 0) {
                             container.createEl("div", { cls: "menu-info-text", text: "No models." });
                             return [2 /*return*/];
@@ -1458,7 +1589,7 @@ var OllamaView = /** @class */ (function (_super) {
                             var optionEl = container.createDiv({ cls: CSS_CLASS_MENU_OPTION + " " + CSS_CLASS_MODEL_OPTION });
                             var iconSpan = optionEl.createEl("span", { cls: "menu-option-icon" });
                             var iconToUse = defaultIcon;
-                            if (modelName === currentModelName_1) {
+                            if (modelName === currentModelName_2) {
                                 iconToUse = "check";
                                 optionEl.addClass("is-selected");
                             }
@@ -1488,7 +1619,7 @@ var OllamaView = /** @class */ (function (_super) {
                                 return __generator(this, function (_b) {
                                     switch (_b.label) {
                                         case 0:
-                                            if (!(modelName !== currentModelName_1)) return [3 /*break*/, 4];
+                                            if (!(modelName !== currentModelName_2)) return [3 /*break*/, 4];
                                             return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
                                         case 1:
                                             chat = _b.sent();
@@ -1510,7 +1641,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
                     case 4:
-                        error_10 = _c.sent();
+                        error_11 = _c.sent();
                         container.empty();
                         container.createEl("div", { cls: "menu-error-text", text: "Error models." });
                         this.updateSubmenuHeight(container);
@@ -1523,7 +1654,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.renderRoleList = function () {
         var _a, _b, _c;
         return __awaiter(this, void 0, Promise, function () {
-            var container, roles, activeChat, currentChatRolePath_1, noRoleOptionEl, noRoleIconSpan, error_11;
+            var container, roles, activeChat, currentChatRolePath_1, noRoleOptionEl, noRoleIconSpan, error_12;
             var _this = this;
             return __generator(this, function (_d) {
                 switch (_d.label) {
@@ -1625,7 +1756,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
                     case 4:
-                        error_11 = _d.sent();
+                        error_12 = _d.sent();
                         container.empty();
                         container.createEl("div", { cls: "menu-error-text", text: "Error roles." });
                         this.updateSubmenuHeight(container);
@@ -1802,7 +1933,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.startVoiceRecognition = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var _b, recorderOptions, preferredMimeType, audioChunks_1, error_12;
+            var _b, recorderOptions, preferredMimeType, audioChunks_1, error_13;
             var _this = this;
             return __generator(this, function (_c) {
                 switch (_c.label) {
@@ -1878,12 +2009,12 @@ var OllamaView = /** @class */ (function (_super) {
                         this.mediaRecorder.start();
                         return [3 /*break*/, 4];
                     case 3:
-                        error_12 = _c.sent();
+                        error_13 = _c.sent();
                         //console.error("Error accessing microphone or starting recording:", error);
-                        if (error_12 instanceof DOMException && error_12.name === 'NotAllowedError') {
+                        if (error_13 instanceof DOMException && error_13.name === 'NotAllowedError') {
                             new obsidian_1.Notice("Microphone access denied. Please grant permission.");
                         }
-                        else if (error_12 instanceof DOMException && error_12.name === 'NotFoundError') {
+                        else if (error_13 instanceof DOMException && error_13.name === 'NotFoundError') {
                             new obsidian_1.Notice("Microphone not found. Please ensure it's connected and enabled.");
                         }
                         else {

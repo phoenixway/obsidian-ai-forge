@@ -202,6 +202,8 @@ var CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
 var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_DANGER_OPTION = "danger-option";
+var CSS_CLASS_INPUT_AREA_LEFT = "input-area-left";
+var CSS_CLASS_MODEL_DISPLAY = "model-display";
 var LANGUAGES = {
   "af": "Afrikaans",
   "sq": "Albanian",
@@ -329,6 +331,49 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
+    this.handleModelDisplayClick = (event) => {
+      console.log("[OllamaView Debug] Model display clicked.");
+      const menu = new import_obsidian3.Menu();
+      (async () => {
+        var _a, _b;
+        menu.addItem((item) => item.setTitle("Loading models...").setDisabled(true));
+        menu.showAtMouseEvent(event);
+        try {
+          const models = await this.plugin.ollamaService.getModels();
+          const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+          const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+          if (menu.items.length > 0)
+            menu.items = [];
+          if (models.length === 0) {
+            menu.addItem((item) => item.setTitle("No models found").setDisabled(true));
+          } else {
+            models.forEach((modelName) => {
+              menu.addItem(
+                (item) => item.setTitle(modelName).setIcon(modelName === currentModelName ? "check" : "radio-button").onClick(async () => {
+                  var _a2, _b2;
+                  const chatToUpdate = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
+                  const latestModelName = ((_b2 = chatToUpdate == null ? void 0 : chatToUpdate.metadata) == null ? void 0 : _b2.modelName) || this.plugin.settings.modelName;
+                  if (modelName !== latestModelName) {
+                    if (chatToUpdate) {
+                      await this.plugin.chatManager.updateActiveChatMetadata({ modelName });
+                      new import_obsidian3.Notice(`Model set to: ${modelName}`);
+                      this.updateModelDisplay(modelName);
+                    } else {
+                      new import_obsidian3.Notice("Cannot set model: No active chat.");
+                    }
+                  }
+                })
+              );
+            });
+          }
+        } catch (error) {
+          console.error("Error loading models for model selection menu:", error);
+          if (menu.items.length > 0)
+            menu.items = [];
+          menu.addItem((item) => item.setTitle("Error loading models").setDisabled(true));
+        }
+      })();
+    };
     // --- Event Handlers ---
     // Input & Sending
     this.handleKeyDown = (e) => {
@@ -720,6 +765,7 @@ This action cannot be undone.`, async () => {
     console.log("[OllamaView] onOpen START");
     this.createUIElements();
     this.updateInputPlaceholder(this.plugin.settings.modelName);
+    this.updateModelDisplay(this.plugin.settings.modelName);
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
@@ -763,33 +809,57 @@ This action cannot be undone.`, async () => {
     (0, import_obsidian3.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
     const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+    inputContainer.style.display = "flex";
+    inputContainer.style.alignItems = "flex-end";
+    inputContainer.style.gap = "8px";
+    const leftArea = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_AREA_LEFT });
+    leftArea.style.display = "flex";
+    leftArea.style.flexDirection = "column";
+    leftArea.style.alignItems = "center";
+    this.modelDisplayEl = leftArea.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+    this.modelDisplayEl.setText("Loading model...");
+    this.modelDisplayEl.title = "Click to select model";
+    this.translateInputButton = leftArea.createEl("button", {
+      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
+      attr: { "aria-label": "Translate input to English" }
+    });
+    (0, import_obsidian3.setIcon)(this.translateInputButton, "replace");
+    this.translateInputButton.title = "Translate input to English";
+    this.inputEl = inputContainer.createEl("textarea", {
+      attr: { placeholder: `Text...`, rows: 1 }
+    });
+    this.inputEl.style.flex = "1";
+    this.inputEl.style.paddingRight = "85px";
     this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
+    this.buttonsContainer.style.display = "flex";
+    this.buttonsContainer.style.alignItems = "flex-end";
+    this.buttonsContainer.style.gap = "6px";
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
     (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
-    this.translateInputButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { "aria-label": "Translate input to English" } });
-    (0, import_obsidian3.setIcon)(this.translateInputButton, "replace");
-    this.translateInputButton.title = "Translate input to English";
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian3.setIcon)(this.menuButton, "more-vertical");
     this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
-    const createSubmenuSection = (title, icon, listContainerClass) => {
-      const header = this.menuDropdown.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
+    const createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
+      const section = this.menuDropdown.createDiv();
+      if (sectionClass) {
+        section.addClass(sectionClass);
+      }
+      const header = section.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
       (0, import_obsidian3.setIcon)(header.createSpan({ cls: "menu-option-icon" }), icon);
       header.createSpan({ cls: "menu-option-text", text: title });
       (0, import_obsidian3.setIcon)(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
-      const content = this.menuDropdown.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass}` });
+      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass}` });
       content.style.maxHeight = "0";
       content.style.overflow = "hidden";
       content.style.transition = "max-height 0.3s ease-out, padding 0.3s ease-out";
       content.style.paddingTop = "0";
       content.style.paddingBottom = "0";
-      return { header, content };
+      return { header, content, section };
     };
-    const modelSection = createSubmenuSection("Models", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER);
+    const modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
     this.modelSubmenuHeader = modelSection.header;
     this.modelSubmenuContent = modelSection.content;
     const roleSection = createSubmenuSection("Roles", "users", CSS_CLASS_ROLE_LIST_CONTAINER);
@@ -862,6 +932,12 @@ This action cannot be undone.`, async () => {
       this.menuButton.addEventListener("click", this.handleMenuClick);
     else
       console.error("menuButton missing!");
+    if (this.modelDisplayEl) {
+      this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
+      console.log("[OllamaView Debug] Attached listener to modelDisplayEl.");
+    } else {
+      console.error("modelDisplayEl missing!");
+    }
     if (this.modelSubmenuHeader)
       this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"));
     else
@@ -924,6 +1000,12 @@ This action cannot be undone.`, async () => {
     this.register(this.plugin.on("messages-cleared", this.handleMessagesCleared));
     this.register(this.plugin.on("chat-list-updated", this.handleChatListUpdated));
     console.log("[OllamaView Debug] Attaching event listeners END");
+  }
+  updateModelDisplay(modelName) {
+    if (this.modelDisplayEl) {
+      this.modelDisplayEl.setText(modelName || "No Model");
+      this.modelDisplayEl.title = `Current model: ${modelName || "None"}. Click to change.`;
+    }
   }
   // Handles clicks on submenu headers (Model, Role, Chat)
   async toggleSubmenu(headerEl, contentEl, type) {
