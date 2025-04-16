@@ -735,33 +735,39 @@ var OllamaView = /** @class */ (function (_super) {
         //   });
         // }
         // OllamaView.ts
+        // OllamaView.ts -> adjustTextareaHeight
         _this.adjustTextareaHeight = function () {
             requestAnimationFrame(function () {
                 if (!_this.inputEl)
                     return;
                 var textarea = _this.inputEl;
-                var computedStyle = window.getComputedStyle(textarea);
-                var minHeight = parseFloat(computedStyle.minHeight) || 40;
-                var maxHeight = parseFloat(computedStyle.maxHeight);
-                // --- ЛОГУВАННЯ ПОЧАТКОВОГО СТАНУ ---
-                console.log("adjustTextareaHeight INITIAL: scrollHeight=" + textarea.scrollHeight + ", minHeight=" + minHeight + ", value=\"" + textarea.value + "\"");
-                // --- КІНЕЦЬ ЛОГУВАННЯ ---
-                console.log("adjustTextareaHeight: Fired."); // Старий ЛОГ 1
-                var currentHeight = textarea.style.height;
-                textarea.style.height = 'auto';
-                var scrollHeight = textarea.scrollHeight;
-                console.log("adjustTextareaHeight: Measured scrollHeight=" + scrollHeight + ", CSS MaxHeight=" + maxHeight + ", Current Style Height=" + currentHeight); // Старий ЛОГ 2 + новий вимір
-                var newHeight = Math.max(minHeight, scrollHeight);
-                if (!isNaN(maxHeight) && newHeight > maxHeight) {
-                    console.log("adjustTextareaHeight: Capped by CSS max-height (" + maxHeight + "px)."); // Старий ЛОГ 3
-                    newHeight = maxHeight;
-                    if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-                        textarea.style.overflowY = 'auto';
+                console.log("adjustTextareaHeight Phase 1: Resetting height to auto.");
+                // Запам'ятовуємо поточну висоту перед скиданням (для логування)
+                var currentStyleHeightBeforeReset = textarea.style.height;
+                textarea.style.height = 'auto'; // Скидаємо висоту
+                // Відкладаємо вимірювання та встановлення на НАСТУПНИЙ кадр
+                requestAnimationFrame(function () {
+                    if (!_this.inputEl)
+                        return; // Перевірка ще раз
+                    var computedStyle = window.getComputedStyle(textarea);
+                    var minHeight = parseFloat(computedStyle.minHeight) || 40;
+                    var maxHeight = parseFloat(computedStyle.maxHeight);
+                    var scrollHeight = textarea.scrollHeight;
+                    console.log("adjustTextareaHeight Phase 2: Measured scrollHeight=<span class=\"math-inline\">{scrollHeight}, CSS MaxHeight=</span>{maxHeight}, Height before reset=" + currentStyleHeightBeforeReset);
+                    var newHeight = Math.max(minHeight, scrollHeight);
+                    if (!isNaN(maxHeight) && newHeight > maxHeight) {
+                        console.log("adjustTextareaHeight: Capped by CSS max-height (" + maxHeight + "px).");
+                        newHeight = maxHeight;
+                        if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
+                            textarea.style.overflowY = 'auto';
+                        }
                     }
-                }
-                // textarea.style.height = `${newHeight}px`;
-                textarea.style.height = newHeight + "px"; // Встановлюємо висоту без !important
-                console.log("adjustTextareaHeight: Set style.height=" + newHeight + "px"); // Старий ЛОГ 4
+                    textarea.style.height = newHeight + "px";
+                    console.log("adjustTextareaHeight Phase 2: Set style.height=" + newHeight + "px");
+                    // ДОДАТКОВИЙ ЛОГ: Перевірка clientHeight одразу після встановлення
+                    var renderedHeight = textarea.clientHeight;
+                    console.log("adjustTextareaHeight Phase 2: Rendered clientHeight=" + renderedHeight);
+                });
             });
         };
         _this.plugin = plugin;

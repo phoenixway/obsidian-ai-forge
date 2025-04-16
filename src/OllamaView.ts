@@ -673,40 +673,45 @@ export class OllamaView extends ItemView {
   // }
   // OllamaView.ts
 
+  // OllamaView.ts -> adjustTextareaHeight
+
   private adjustTextareaHeight = (): void => {
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => { // Перший кадр: скидання висоти
       if (!this.inputEl) return;
-
       const textarea = this.inputEl;
-      const computedStyle = window.getComputedStyle(textarea);
-      const minHeight = parseFloat(computedStyle.minHeight) || 40;
-      const maxHeight = parseFloat(computedStyle.maxHeight);
 
-      // --- ЛОГУВАННЯ ПОЧАТКОВОГО СТАНУ ---
-      console.log(`adjustTextareaHeight INITIAL: scrollHeight=${textarea.scrollHeight}, minHeight=${minHeight}, value="${textarea.value}"`);
-      // --- КІНЕЦЬ ЛОГУВАННЯ ---
+      console.log("adjustTextareaHeight Phase 1: Resetting height to auto.");
+      // Запам'ятовуємо поточну висоту перед скиданням (для логування)
+      const currentStyleHeightBeforeReset = textarea.style.height;
+      textarea.style.height = 'auto'; // Скидаємо висоту
 
-      console.log("adjustTextareaHeight: Fired."); // Старий ЛОГ 1
+      // Відкладаємо вимірювання та встановлення на НАСТУПНИЙ кадр
+      requestAnimationFrame(() => { // Другий кадр: вимірювання та встановлення
+        if (!this.inputEl) return; // Перевірка ще раз
+        const computedStyle = window.getComputedStyle(textarea);
+        const minHeight = parseFloat(computedStyle.minHeight) || 40;
+        const maxHeight = parseFloat(computedStyle.maxHeight);
+        const scrollHeight = textarea.scrollHeight;
 
-      const currentHeight = textarea.style.height;
-      textarea.style.height = 'auto';
+        console.log(`adjustTextareaHeight Phase 2: Measured scrollHeight=<span class="math-inline">\{scrollHeight\}, CSS MaxHeight\=</span>{maxHeight}, Height before reset=${currentStyleHeightBeforeReset}`);
 
-      const scrollHeight = textarea.scrollHeight;
-      console.log(`adjustTextareaHeight: Measured scrollHeight=${scrollHeight}, CSS MaxHeight=${maxHeight}, Current Style Height=${currentHeight}`); // Старий ЛОГ 2 + новий вимір
+        let newHeight = Math.max(minHeight, scrollHeight);
 
-      let newHeight = Math.max(minHeight, scrollHeight);
-
-      if (!isNaN(maxHeight) && newHeight > maxHeight) {
-        console.log(`adjustTextareaHeight: Capped by CSS max-height (${maxHeight}px).`); // Старий ЛОГ 3
-        newHeight = maxHeight;
-        if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-          textarea.style.overflowY = 'auto';
+        if (!isNaN(maxHeight) && newHeight > maxHeight) {
+          console.log(`adjustTextareaHeight: Capped by CSS max-height (${maxHeight}px).`);
+          newHeight = maxHeight;
+          if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
+            textarea.style.overflowY = 'auto';
+          }
         }
-      }
 
-      // textarea.style.height = `${newHeight}px`;
-      textarea.style.height = `${newHeight}px`; // Встановлюємо висоту без !important
-      console.log(`adjustTextareaHeight: Set style.height=${newHeight}px`); // Старий ЛОГ 4
+        textarea.style.height = `${newHeight}px`;
+        console.log(`adjustTextareaHeight Phase 2: Set style.height=${newHeight}px`);
+
+        // ДОДАТКОВИЙ ЛОГ: Перевірка clientHeight одразу після встановлення
+        const renderedHeight = textarea.clientHeight;
+        console.log(`adjustTextareaHeight Phase 2: Rendered clientHeight=${renderedHeight}`);
+      });
     });
   }
 
