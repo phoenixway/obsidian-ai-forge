@@ -38,6 +38,7 @@
     line-height: 1.5;
     min-height: 40px;     // ЗАЛИШАЄМО (для JS)
     max-height: 60vh;     // ЗАЛИШАЄМО (для JS)
+    height: auto; 
     overflow-y: auto;     // ЗАЛИШАЄМО (для скролінгу textarea)
     // height: auto;      // ПРИБИРАЄМО
     background-color: var(--background-primary);
