@@ -1,10 +1,10 @@
 // src/styles/_input.scss
 
 .chat-input-container {
-  display: flex;
-  flex-direction: column;
-  flex-grow: 0;
-  flex-shrink: 0;
+  // display: flex;
+  // flex-direction: column;
+  // flex-grow: 0;
+  // flex-shrink: 0;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
@@ -36,7 +36,7 @@
     // --- ЗМІНЕНО: Встановлюємо max-height ТУТ ---
     max-height: 60vh; // Спробуйте це значення (60% висоти вікна), можна змінити
     // overflow-y: auto; // Дуже важливо для скролінгу textarea!
-    overflow-y: scroll !important; 
+    overflow-y: auto;//!important; 
     // --- КІНЕЦЬ ЗМІН ---
     background-color: var(--background-primary);
     color: var(--text-normal);
@@ -60,6 +60,7 @@
     align-items: center;
     width: 100%;
     flex-shrink: 0; // Prevent controls from shrinking
+    margin-top: calc(var(--chat-spacing-unit) * 2);
   
       .input-controls-left {
         display: flex;

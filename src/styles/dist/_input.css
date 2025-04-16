@@ -1,8 +1,4 @@
 .chat-input-container {
-  display: flex;
-  flex-direction: column;
-  flex-grow: 0;
-  flex-shrink: 0;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
@@ -27,7 +23,7 @@
   box-sizing: border-box;
   min-height: 40px;
   max-height: 60vh;
-  overflow-y: scroll !important;
+  overflow-y: auto;
   background-color: var(--background-primary);
   color: var(--text-normal);
   font-size: 14px;
@@ -48,6 +44,7 @@
   align-items: center;
   width: 100%;
   flex-shrink: 0;
+  margin-top: calc(var(--chat-spacing-unit) * 2);
 }
 .chat-input-container .input-controls-container .input-controls-left {
   display: flex;
