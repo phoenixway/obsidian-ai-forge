@@ -15,12 +15,14 @@
   box-shadow: none;
   width: 100%;
   box-sizing: border-box;
+  height: auto;
 }
 .chat-input-container:focus-within {
   border-color: var(--interactive-accent);
   box-shadow: none;
 }
 .chat-input-container textarea {
+  display: block !important;
   width: 100%;
   box-sizing: border-box;
   resize: none;

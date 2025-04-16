@@ -27,6 +27,7 @@
   box-shadow: none;
   width: 100% ;
   box-sizing: border-box;
+  height: auto; 
 
   &:focus-within {
     border-color: var(--interactive-accent);
@@ -34,7 +35,7 @@
   }
 
   textarea {
-    // display: block !important;
+    display: block !important;
     width: 100%;
     box-sizing: border-box;
     resize: none;
