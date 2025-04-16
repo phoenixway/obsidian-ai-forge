@@ -12,13 +12,14 @@
   border-radius: 12px;
   margin: calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
-  box-sizing: border-box;
   position: relative;
   // --- ВИДАЛЕНО ---
   // max-height: 66vh;
   // overflow: hidden;
   // --- КІНЕЦЬ ВИДАЛЕННЯ ---
   box-shadow: none;
+  width: 100%;             // Явно вказуємо займати всю ширину
+  box-sizing: border-box;
 
   &:focus-within {
     border-color: var(--interactive-accent);
@@ -31,7 +32,8 @@
     border: none;
     border-radius: 8px;
     padding: 10px 15px;
-    box-sizing: border-box; // Важливо!
+    width: 100%;             // Переконуємося, що textarea теж 100%
+    box-sizing: border-box;
     min-height: 40px;
     // --- ЗМІНЕНО: Встановлюємо max-height ТУТ ---
     max-height: 60vh; // Спробуйте це значення (60% висоти вікна), можна змінити
@@ -59,6 +61,7 @@
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    box-sizing: border-box;
     flex-shrink: 0; // Prevent controls from shrinking
     margin-top: calc(var(--chat-spacing-unit) * 2);
   

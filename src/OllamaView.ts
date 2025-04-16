@@ -678,42 +678,36 @@ export class OllamaView extends ItemView {
       if (!this.inputEl) return;
 
       const textarea = this.inputEl;
-      // Отримуємо обчислені стилі, щоб прочитати min/max-height з CSS
       const computedStyle = window.getComputedStyle(textarea);
-      const minHeight = parseFloat(computedStyle.minHeight) || 40; // Беремо min-height з CSS або 40px
-      const maxHeight = parseFloat(computedStyle.maxHeight); // Читаємо max-height з CSS
+      const minHeight = parseFloat(computedStyle.minHeight) || 40;
+      const maxHeight = parseFloat(computedStyle.maxHeight);
 
-      console.log("adjustTextareaHeight: Fired."); // ЛОГ 1
+      // --- ЛОГУВАННЯ ПОЧАТКОВОГО СТАНУ ---
+      console.log(`adjustTextareaHeight INITIAL: scrollHeight=${textarea.scrollHeight}, minHeight=${minHeight}, value="${textarea.value}"`);
+      // --- КІНЕЦЬ ЛОГУВАННЯ ---
+
+      console.log("adjustTextareaHeight: Fired."); // Старий ЛОГ 1
 
       const currentHeight = textarea.style.height;
-      // Скидаємо висоту для вимірювання scrollHeight
       textarea.style.height = 'auto';
 
       const scrollHeight = textarea.scrollHeight;
-      console.log(`adjustTextareaHeight: ScrollHeight=${scrollHeight}, CSS MaxHeight=${maxHeight}, Current Style Height=${currentHeight}`); // ЛОГ 2
+      console.log(`adjustTextareaHeight: Measured scrollHeight=${scrollHeight}, CSS MaxHeight=${maxHeight}, Current Style Height=${currentHeight}`); // Старий ЛОГ 2 + новий вимір
 
-      // Початкова нова висота - це scrollHeight, але не менше minHeight
       let newHeight = Math.max(minHeight, scrollHeight);
 
-      // Перевіряємо, чи є дійсне значення CSS max-height і чи newHeight його перевищує
       if (!isNaN(maxHeight) && newHeight > maxHeight) {
-        console.log(`adjustTextareaHeight: Capped by CSS max-height (${maxHeight}px).`); // ЛОГ 3
-        newHeight = maxHeight; // Обмежуємо висоту значенням з CSS max-height
-
-        // Переконуємося, що overflow увімкнено, якщо досягли межі (на випадок, якщо CSS не спрацював)
-        // Хоча це має бути в CSS, додаємо як страховку
+        console.log(`adjustTextareaHeight: Capped by CSS max-height (${maxHeight}px).`); // Старий ЛОГ 3
+        newHeight = maxHeight;
         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
           textarea.style.overflowY = 'auto';
         }
       }
-      // Немає потреби ховати overflow, якщо не досягли межі, CSS має це обробляти
 
-      // Встановлюємо фінальну висоту
       textarea.style.height = `${newHeight}px`;
-      console.log(`adjustTextareaHeight: Set style.height=${newHeight}px`); // ЛОГ 4
+      console.log(`adjustTextareaHeight: Set style.height=${newHeight}px`); // Старий ЛОГ 4
     });
   }
-
 
   private updateSendButtonState(): void { if (!this.inputEl || !this.sendButton) return; const isDisabled = this.inputEl.value.trim() === '' || this.isProcessing; this.sendButton.disabled = isDisabled; this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled); }
   public showEmptyState(): void { if (this.currentMessages.length === 0 && !this.emptyStateEl && this.chatContainer) { this.chatContainer.empty(); this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE }); this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" }); const modelName = this.plugin?.settings?.modelName || "the AI"; this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use the menu options to start interacting with ${modelName}.` }); } }
