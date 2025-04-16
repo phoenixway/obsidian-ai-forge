@@ -270,7 +270,7 @@ export class OllamaView extends ItemView {
     this.modelDisplayEl.setText("..."); // Початковий текст
     this.modelDisplayEl.title = "Click to select model";
     this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { 'aria-label': 'Translate input to English' } });
-    setIcon(this.translateInputButton, "replace");
+    setIcon(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
 
     // 2b. Права група контролів (старий buttonsContainer)

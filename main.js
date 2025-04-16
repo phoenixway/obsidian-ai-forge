@@ -843,7 +843,7 @@ This action cannot be undone.`, async () => {
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
     this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { "aria-label": "Translate input to English" } });
-    (0, import_obsidian3.setIcon)(this.translateInputButton, "replace");
+    (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
     this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
