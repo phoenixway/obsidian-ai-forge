@@ -694,85 +694,41 @@ var OllamaView = /** @class */ (function (_super) {
         _this.handleNewMessageIndicatorClick = function () { var _a; if (_this.chatContainer) {
             _this.chatContainer.scrollTo({ top: _this.chatContainer.scrollHeight, behavior: 'smooth' });
         } (_a = _this.newMessagesIndicatorEl) === null || _a === void 0 ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE); _this.userScrolledUp = false; };
-        // private adjustTextareaHeight = (): void => {
-        //   requestAnimationFrame(() => {
-        //     // Перевіряємо наявність необхідних елементів
-        //     if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement) return;
-        //     const inputContainer = this.inputEl.parentElement as HTMLElement; // Отримуємо батьківський контейнер
-        //     const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`) as HTMLElement;
-        //     // Мінімальна висота textarea
-        //     const minTextareaHeight = 40; // px, як у CSS
-        //     // Максимальна частка висоти вікна для зони вводу (textarea + controls)
-        //     const maxContainerHeightFraction = 2 / 3; // Приблизно 66.7%
-        //     // Загальна доступна висота в межах view
-        //     const viewHeight = this.contentEl.clientHeight;
-        //     // Максимальна висота для ВСЬОГО контейнера вводу
-        //     const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction); // Не менше 100px
-        //     // Висота контролів (кнопок, дисплею моделі)
-        //     // Використовуємо offsetHeight, якщо елемент видимий, інакше - 0
-        //     const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
-        //     // Вертикальні padding'и самого inputContainer (отримуємо зі стилів)
-        //     const containerStyle = window.getComputedStyle(inputContainer);
-        //     const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
-        //     const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
-        //     const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
-        //     // Відступ між textarea і controlsContainer (margin-bottom у textarea)
-        //     const textareaStyle = window.getComputedStyle(this.inputEl);
-        //     const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
-        //     // Розраховуємо максимальну доступну висоту САМЕ ДЛЯ TEXTAREA
-        //     const maxTextareaHeight = Math.max(
-        //       minTextareaHeight, // Не може бути меншою за мінімальну
-        //       maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
-        //     );
-        //     // Скидаємо висоту, щоб отримати реальну висоту контенту
-        //     this.inputEl.style.height = 'auto';
-        //     const scrollHeight = this.inputEl.scrollHeight;
-        //     // Встановлюємо нову висоту textarea, обмежуючи її максимумом
-        //     const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
-        //     this.inputEl.style.height = `${newTextareaHeight}px`;
-        //     // Більше не потрібен клас 'expanded', бо скролінг з'явиться автоматично
-        //     // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
-        //   });
-        // }
-        // OllamaView.ts
-        // OllamaView.ts -> adjustTextareaHeight
         _this.adjustTextareaHeight = function () {
+            // Використовуємо requestAnimationFrame для плавності та уникнення layout thrashing
             requestAnimationFrame(function () {
                 if (!_this.inputEl)
                     return;
                 var textarea = _this.inputEl;
                 var computedStyle = window.getComputedStyle(textarea);
-                // Читаємо поточний min-height або беремо 40
-                var currentMinHeight = parseFloat(computedStyle.minHeight) || 40;
-                var maxHeight = parseFloat(computedStyle.maxHeight);
-                console.log("adjustTextareaHeight MH: Fired.");
-                // Важливо: Щоб виміряти scrollHeight, ТИМЧАСОВО
-                // встановлюємо height:auto АБО знімаємо min-height
-                var originalMinHeight = textarea.style.minHeight; // Зберігаємо інлайн min-height
-                textarea.style.minHeight = '0'; // Тимчасово прибираємо обмеження знизу
-                textarea.style.height = 'auto'; // Дозволяємо виміряти реальний вміст
+                // Читаємо базовий min-height та максимальний max-height з CSS
+                var baseMinHeight = parseFloat(computedStyle.minHeight) || 40; // Базовий мінімум
+                var maxHeight = parseFloat(computedStyle.maxHeight); // Максимум з CSS
+                // Зберігаємо поточний min-height (якщо він встановлений inline)
+                var originalMinHeight = textarea.style.minHeight;
+                // Тимчасово знімаємо обмеження min-height та height для коректного вимірювання scrollHeight
+                textarea.style.minHeight = '0';
+                textarea.style.height = 'auto';
+                // Вимірюємо scrollHeight в наступному кадрі, щоб браузер встиг оновити макет
                 requestAnimationFrame(function () {
                     if (!_this.inputEl)
-                        return;
+                        return; // Перевірка елемента ще раз
                     var scrollHeight = textarea.scrollHeight;
-                    // Повертаємо оригінальний інлайн min-height, якщо він був
-                    textarea.style.minHeight = originalMinHeight;
-                    console.log("adjustTextareaHeight MH: Measured scrollHeight=<span class=\"math-inline\">{scrollHeight}, CSS MaxHeight=</span>{maxHeight}");
-                    // Нова цільова min-height - це scrollHeight, але не менше базового 40
-                    var newMinHeight = Math.max(40, scrollHeight); // Порівнюємо з базовим 40
+                    // Повертаємо оригінальний inline min-height, якщо він був, або скидаємо
+                    textarea.style.minHeight = originalMinHeight || '';
+                    // Нова цільова min-height - це scrollHeight, але не менше базового min-height
+                    var newMinHeight = Math.max(baseMinHeight, scrollHeight);
+                    // Застосовуємо обмеження max-height з CSS, якщо воно є і ми його досягли
                     if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
-                        console.log("adjustTextareaHeight MH: Capped by CSS max-height (" + maxHeight + "px).");
                         newMinHeight = maxHeight;
+                        // Переконуємося, що overflow увімкнено при досягненні межі
                         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-                            textarea.style.overflowY = 'auto';
+                            textarea.style.overflowY = 'auto'; // Забезпечуємо скролінг
                         }
                     }
-                    // Встановлюємо min-height і дозволяємо height бути auto
+                    // Встановлюємо обчислену min-height і дозволяємо height бути auto
                     textarea.style.minHeight = newMinHeight + "px";
-                    textarea.style.height = 'auto'; // Нехай висота визначається min-height
-                    console.log("adjustTextareaHeight MH: Set style.minHeight=" + newMinHeight + "px, style.height=auto");
-                    var renderedHeight = textarea.clientHeight;
-                    console.log("adjustTextareaHeight MH: Rendered clientHeight=" + renderedHeight);
+                    textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
                 });
             });
         };

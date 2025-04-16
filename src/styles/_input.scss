@@ -35,36 +35,33 @@
   }
 
   textarea {
-    display: block !important;
     width: 100%;
     box-sizing: border-box;
     resize: none;
-    border: none;
+    border: none; // Або ваш стандартний border
     border-radius: 8px;
-    padding: 10px 15px; // Стандартний padding
-    line-height: 1.5;   // Стандартний line-height
-    min-height: 40px;
-    max-height: 60vh;
-    overflow-y: auto;
+    padding: 10px 15px;   // Ваш стандартний padding
+    line-height: 1.5;     // Ваш стандартний line-height
+    min-height: 40px;     // Ваш базовий min-height
+    max-height: 60vh;     // Ваш бажаний max-height (або інше значення)
+    overflow-y: auto;     // Обов'язково для скролінгу
+    height: auto;         // Дозволяємо висоті слідувати за min-height/контентом
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
-    transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out; // Можна тимчасово закоментувати transition, щоб бачити зміни миттєво
+    transition: border-color 0.3s, background-color 0.3s; // Прибираємо height з transition
     margin-bottom: calc(var(--chat-spacing-unit) * 2);
-    box-shadow: none !important;
+    box-shadow: none; // Переконуємося, що немає тіні
 
-    // --- ДОДАЄМО ВЛАСТИВОСТІ FLEX ITEM ---
-    // flex-grow: 0; // Не рости за рахунок вільного місця flex-контейнера
-    // flex-shrink: 0; // ЗАБОРОНЯЄМО стискання textarea по висоті!
-    // flex-basis: auto; // Базовий розмір - автоматичний (зазвичай від height/min-height)
-    // --- КІНЕЦЬ ДОДАВАННЯ ---
-
+    // Можна прибрати flex-властивості, якщо вони не потрібні для інших цілей
+    // flex-grow: 0;
+    // flex-shrink: 0;
 
     &:focus {
       outline: none;
-      border-color: var(--interactive-accent);
-      background-color: var(--background-secondary);
-      box-shadow: none !important;
+      border-color: var(--interactive-accent); // Стиль фокусу
+      background-color: var(--background-secondary); // Стиль фокусу
+      box-shadow: none; // Переконуємося, що немає тіні
     }
   }
   

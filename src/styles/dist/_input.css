@@ -22,7 +22,6 @@
   box-shadow: none;
 }
 .chat-input-container textarea {
-  display: block !important;
   width: 100%;
   box-sizing: border-box;
   resize: none;
@@ -33,18 +32,19 @@
   min-height: 40px;
   max-height: 60vh;
   overflow-y: auto;
+  height: auto;
   background-color: var(--background-primary);
   color: var(--text-normal);
   font-size: 14px;
-  transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
+  transition: border-color 0.3s, background-color 0.3s;
   margin-bottom: calc(var(--chat-spacing-unit) * 2);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 .chat-input-container textarea:focus {
   outline: none;
   border-color: var(--interactive-accent);
   background-color: var(--background-secondary);
-  box-shadow: none !important;
+  box-shadow: none;
 }
 .chat-input-container .input-controls-container {
   display: flex;
