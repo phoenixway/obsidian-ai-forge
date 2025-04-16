@@ -24,7 +24,6 @@
   border-radius: 8px;
   padding: 10px 15px;
   min-height: 40px;
-  max-height: 50vh;
   overflow-y: auto;
   background-color: var(--background-primary);
   color: var(--text-normal);

@@ -32,7 +32,7 @@
       padding: 10px 15px;
       min-height: 40px;
       // --- FIX: Allow scrolling within textarea & set max-height ---
-      max-height: 50vh; // Safety limit
+      //max-height: 50vh; 
       overflow-y: auto;
       background-color: var(--background-primary);
       color: var(--text-normal);
