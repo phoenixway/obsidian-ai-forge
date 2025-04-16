@@ -1069,6 +1069,13 @@ var OllamaView = /** @class */ (function (_super) {
             this.menuButton.addEventListener("click", this.handleMenuClick); // Головне кастомне меню
         if (this.modelDisplayEl)
             this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick); // Спливаюче меню моделей
+        if (this.roleDisplayEl) {
+            this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
+            console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
+        }
+        else {
+            console.error("roleDisplayEl missing!");
+        }
         // Слухачі для кастомного меню (акордеон)
         if (this.modelSubmenuHeader)
             this.registerDomEvent(this.modelSubmenuHeader, 'click', function () { return _this.toggleSubmenu(_this.modelSubmenuHeader, _this.modelSubmenuContent, 'models'); });
@@ -1155,13 +1162,6 @@ var OllamaView = /** @class */ (function (_super) {
         }
         if (this.newMessagesIndicatorEl) {
             this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick);
-        }
-        if (this.roleDisplayEl) { // <-- Новий слухач
-            this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
-            console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
-        }
-        else {
-            console.error("roleDisplayEl missing!");
         }
         // Plugin/ChatManager Event Listeners
         this.register(this.plugin.on('model-changed', this.handleModelChange));

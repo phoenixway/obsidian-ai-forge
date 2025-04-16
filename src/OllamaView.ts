@@ -340,12 +340,21 @@ export class OllamaView extends ItemView {
       this.inputEl.addEventListener('input', this.handleInputForResize);
     }
 
+
+
     // Слухачі кнопок
     if (this.sendButton) this.sendButton.addEventListener("click", this.handleSendClick);
     if (this.voiceButton) this.voiceButton.addEventListener("click", this.handleVoiceClick);
     if (this.translateInputButton) this.translateInputButton.addEventListener("click", this.handleTranslateInputClick);
     if (this.menuButton) this.menuButton.addEventListener("click", this.handleMenuClick); // Головне кастомне меню
     if (this.modelDisplayEl) this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick); // Спливаюче меню моделей
+
+    if (this.roleDisplayEl) {
+      this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
+      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
+    } else {
+      console.error("roleDisplayEl missing!");
+    }
 
     // Слухачі для кастомного меню (акордеон)
     if (this.modelSubmenuHeader) this.registerDomEvent(this.modelSubmenuHeader, 'click', () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, 'models')); else console.error("modelSubmenuHeader missing!");
@@ -379,12 +388,7 @@ export class OllamaView extends ItemView {
     if (this.chatContainer) { this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced); console.log("[OllamaView] Attached listener to chatContainer scroll"); } else { console.error("chatContainer missing!") }
     if (this.newMessagesIndicatorEl) { this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick); }
 
-    if (this.roleDisplayEl) { // <-- Новий слухач
-      this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
-      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
-    } else {
-      console.error("roleDisplayEl missing!");
-    }
+
 
     // Plugin/ChatManager Event Listeners
     this.register(this.plugin.on('model-changed', this.handleModelChange));

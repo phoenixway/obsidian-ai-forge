@@ -1012,6 +1012,12 @@ This action cannot be undone.`, async () => {
       this.menuButton.addEventListener("click", this.handleMenuClick);
     if (this.modelDisplayEl)
       this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
+    if (this.roleDisplayEl) {
+      this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
+      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
+    } else {
+      console.error("roleDisplayEl missing!");
+    }
     if (this.modelSubmenuHeader)
       this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"));
     else
@@ -1093,12 +1099,6 @@ This action cannot be undone.`, async () => {
     }
     if (this.newMessagesIndicatorEl) {
       this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
-    }
-    if (this.roleDisplayEl) {
-      this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
-      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
-    } else {
-      console.error("roleDisplayEl missing!");
     }
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));
