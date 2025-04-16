@@ -839,12 +839,12 @@ This action cannot be undone.`, async () => {
     this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
     const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
     const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-    this.modelDisplayEl.setText("...");
-    this.modelDisplayEl.title = "Click to select model";
     this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { "aria-label": "Translate input to English" } });
     (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
+    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+    this.modelDisplayEl.setText("...");
+    this.modelDisplayEl.title = "Click to select model";
     this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");

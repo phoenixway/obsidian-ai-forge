@@ -830,12 +830,12 @@ var OllamaView = /** @class */ (function (_super) {
         var controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
         // 2a. Ліва група контролів
         var leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-        this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-        this.modelDisplayEl.setText("..."); // Початковий текст
-        this.modelDisplayEl.title = "Click to select model";
         this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { 'aria-label': 'Translate input to English' } });
         obsidian_1.setIcon(this.translateInputButton, "languages");
         this.translateInputButton.title = "Translate input to English";
+        this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+        this.modelDisplayEl.setText("..."); // Початковий текст
+        this.modelDisplayEl.title = "Click to select model";
         // 2b. Права група контролів (старий buttonsContainer)
         this.buttonsContainer = controlsContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER + " " + CSS_CLASS_INPUT_CONTROLS_RIGHT });
         this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } });
