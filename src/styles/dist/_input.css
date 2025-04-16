@@ -21,6 +21,7 @@
   box-shadow: none;
 }
 .chat-input-container textarea {
+  display: block !important;
   width: 100%;
   box-sizing: border-box;
   resize: none;
