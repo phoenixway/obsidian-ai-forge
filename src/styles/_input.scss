@@ -5,6 +5,12 @@
   // flex-direction: column;
   // flex-grow: 0;
   // flex-shrink: 0;
+
+  display: flex;
+  flex-direction: column; // ЯВНО вказуємо напрямок колонки!
+  flex-grow: 0;
+  flex-shrink: 0;
+
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
@@ -18,8 +24,8 @@
   // overflow: hidden;
   // --- КІНЕЦЬ ВИДАЛЕННЯ ---
   box-shadow: none;
-  width: 100% !important;;
-  box-sizing: border-box !important; ;
+  width: 100% ;
+  box-sizing: border-box;
 
   &:focus-within {
     border-color: var(--interactive-accent);
@@ -27,17 +33,17 @@
   }
 
   textarea {
-    width: 100% !important; 
-    box-sizing: border-box !important;
+    width: 100% ; 
+    box-sizing: border-box;
     resize: none;
     border: none;
     border-radius: 8px;
-    padding: 5px 10px !important;   // Спробуємо значно менший padding
-    line-height: 1.3 !important;  
-
+    padding: 10px 15px; // Стандартний padding
+    line-height: 1.5;   // Стандартний line-height
     min-height: 40px;
-    max-height: 60vh; // Спробуйте це значення (60% висоти вікна), можна змінити
-    overflow-y: auto;//!important; 
+    max-height: 60vh; // Обмеження висоти textarea
+    overflow-y: auto; 
+
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
@@ -57,10 +63,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 100% !important; 
-    box-sizing: border-box !important; 
+    width: 100%; 
+    box-sizing: border-box; 
     flex-shrink: 0; // Prevent controls from shrinking
-    margin-top: calc(var(--chat-spacing-unit) * 2);
+    // margin-top: calc(var(--chat-spacing-unit) * 2);
   
       .input-controls-left {
         display: flex;
