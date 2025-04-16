@@ -694,21 +694,15 @@ var OllamaView = /** @class */ (function (_super) {
         _this.handleNewMessageIndicatorClick = function () { var _a; if (_this.chatContainer) {
             _this.chatContainer.scrollTo({ top: _this.chatContainer.scrollHeight, behavior: 'smooth' });
         } (_a = _this.newMessagesIndicatorEl) === null || _a === void 0 ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE); _this.userScrolledUp = false; };
-        // OllamaView.ts
-        // OllamaView.ts
-        // OllamaView.ts
-        // OllamaView.ts - Спроба №X
         _this.adjustTextareaHeight = function () {
             requestAnimationFrame(function () {
                 if (!_this.inputEl)
                     return;
                 var textarea = _this.inputEl;
-                // Зберігаємо лише для логування
-                var currentClientHeight = textarea.clientHeight;
+                var originalMinHeightStyle = textarea.style.minHeight;
                 // Скидаємо height та inline min-height для коректного вимірювання
                 textarea.style.height = 'auto';
                 textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
-                console.log("adjustTextareaHeight MH_FIX2: Reset H=auto, minH=0. ClientH before reset=" + currentClientHeight);
                 requestAnimationFrame(function () {
                     if (!_this.inputEl)
                         return;
@@ -718,13 +712,12 @@ var OllamaView = /** @class */ (function (_super) {
                     var maxHeight = parseFloat(computedStyle.maxHeight);
                     // Вимірюємо scrollHeight ПІСЛЯ скидання
                     var scrollHeight = textarea.scrollHeight;
-                    console.log("adjustTextareaHeight MH_FIX2: Measured scrollH=" + scrollHeight + ", baseMinH=" + baseMinHeight + ", CSS maxH=" + maxHeight);
                     // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
                     var targetMinHeight = Math.max(baseMinHeight, scrollHeight);
                     // Застосовуємо обмеження max-height
                     if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
                         targetMinHeight = maxHeight;
-                        console.log("adjustTextareaHeight MH_FIX2: Capped by CSS max-height (" + maxHeight + "px).");
+                        // Переконуємося, що overflow увімкнено при досягненні межі
                         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
                             textarea.style.overflowY = 'auto';
                         }
@@ -732,11 +725,6 @@ var OllamaView = /** @class */ (function (_super) {
                     // Встановлюємо обчислену min-height та height: auto
                     textarea.style.minHeight = targetMinHeight + "px";
                     textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
-                    console.log("adjustTextareaHeight MH_FIX2: Set minH=" + targetMinHeight + "px, H=auto");
-                    // Фінальне логування
-                    var renderedHeight = textarea.clientHeight;
-                    var finalMinHeight = parseFloat(window.getComputedStyle(textarea).minHeight);
-                    console.log("adjustTextareaHeight MH_FIX2: Final Rendered clientH=" + renderedHeight + ", final computed minH=" + finalMinHeight);
                 });
             });
         };

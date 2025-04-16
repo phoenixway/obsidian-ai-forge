@@ -36,7 +36,7 @@
   font-size: 14px;
   transition: border-color 0.3s, background-color 0.3s;
   margin-bottom: calc(var(--chat-spacing-unit) * 2);
-  box-shadow: none !important;
+  box-shadow: none;
   flex-shrink: 0;
 }
 .chat-input-container textarea:focus {

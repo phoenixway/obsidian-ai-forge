@@ -618,28 +618,15 @@ export class OllamaView extends ItemView {
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
 
-  // OllamaView.ts
-
-  // OllamaView.ts
-
-  // OllamaView.ts
-
-  // OllamaView.ts - Спроба №X
-
   private adjustTextareaHeight = (): void => {
     requestAnimationFrame(() => { // Кадр 1: Скидання
       if (!this.inputEl) return;
       const textarea = this.inputEl;
-
-      // Зберігаємо лише для логування
-      const currentClientHeight = textarea.clientHeight;
+      const originalMinHeightStyle = textarea.style.minHeight;
 
       // Скидаємо height та inline min-height для коректного вимірювання
       textarea.style.height = 'auto';
       textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
-
-      console.log(`adjustTextareaHeight MH_FIX2: Reset H=auto, minH=0. ClientH before reset=${currentClientHeight}`);
-
 
       requestAnimationFrame(() => { // Кадр 2: Вимірювання та встановлення
         if (!this.inputEl) return;
@@ -650,15 +637,13 @@ export class OllamaView extends ItemView {
         // Вимірюємо scrollHeight ПІСЛЯ скидання
         const scrollHeight = textarea.scrollHeight;
 
-        console.log(`adjustTextareaHeight MH_FIX2: Measured scrollH=${scrollHeight}, baseMinH=${baseMinHeight}, CSS maxH=${maxHeight}`);
-
         // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
         let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
 
         // Застосовуємо обмеження max-height
         if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
           targetMinHeight = maxHeight;
-          console.log(`adjustTextareaHeight MH_FIX2: Capped by CSS max-height (${maxHeight}px).`);
+          // Переконуємося, що overflow увімкнено при досягненні межі
           if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
             textarea.style.overflowY = 'auto';
           }
@@ -667,12 +652,6 @@ export class OllamaView extends ItemView {
         // Встановлюємо обчислену min-height та height: auto
         textarea.style.minHeight = `${targetMinHeight}px`;
         textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
-        console.log(`adjustTextareaHeight MH_FIX2: Set minH=${targetMinHeight}px, H=auto`);
-
-        // Фінальне логування
-        const renderedHeight = textarea.clientHeight;
-        const finalMinHeight = parseFloat(window.getComputedStyle(textarea).minHeight);
-        console.log(`adjustTextareaHeight MH_FIX2: Final Rendered clientH=${renderedHeight}, final computed minH=${finalMinHeight}`);
       });
     });
   }

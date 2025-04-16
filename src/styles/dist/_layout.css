@@ -11,9 +11,7 @@
   flex: 1 1 auto;
   overflow-y: auto;
   padding: calc(var(--chat-spacing-unit) * 4);
-  /* 16px */
   padding-bottom: calc(var(--chat-spacing-unit) * 2);
-  /* 8px */
   box-sizing: border-box;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
@@ -40,13 +38,13 @@
 .workspace-leaf-content[data-type=ollama-personas-chat-view] {
   display: flex;
   flex-direction: column;
-  overflow-y: visible !important;
+  overflow-y: visible;
 }
 .workspace-leaf-content[data-type=ollama-personas-chat-view] .view-content {
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow-y: visible !important;
+  overflow-y: visible;
 }
 .workspace-leaf-content[data-type=ollama-personas-chat-view] .view-content .ollama-container {
   flex-grow: 1;
