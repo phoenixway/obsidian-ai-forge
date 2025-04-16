@@ -25,6 +25,7 @@
   &:focus-within {
     border-color: var(--interactive-accent);
     box-shadow: none;
+    color: chartreuse !important;
   }
 
   textarea {
