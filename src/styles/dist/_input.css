@@ -10,7 +10,7 @@
   background-color: var(--background-primary);
   z-index: 20;
   border-radius: 12px;
-  margin: 0 calc(var(--chat-spacing-unit) * 5) calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2);
+  margin: 0 calc(var(--chat-spacing-unit) * 50) calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
   position: relative;
   box-shadow: none;
