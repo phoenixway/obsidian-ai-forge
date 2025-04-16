@@ -92,6 +92,15 @@
         .model-submenu-section + hr { // Show separator too
             display: block !important;
         }
+
+        .role-submenu-section {
+            display: block !important; // Показуємо секцію
+      
+            // Показуємо роздільник після неї теж
+            + hr.menu-separator {
+              display: block !important;
+            }
+          }
     }
 
     .input-controls-left {
@@ -284,12 +293,10 @@
         }
      }
   
-     // Action buttons in messages hidden by default on desktop
      .message-actions-wrapper {
          opacity: 0;
          visibility: hidden;
          transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
-         // Hover effect is handled by the base rule + parent hover
      }
 
   }

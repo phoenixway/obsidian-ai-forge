@@ -21,6 +21,12 @@
   /* Menu Separator */
   /* Section Header in Menu (Non-clickable) */
 }
+.menu-dropdown.ollama-chat-menu .role-submenu-section {
+  display: none;
+}
+.menu-dropdown.ollama-chat-menu .role-submenu-section + hr.menu-separator {
+  display: none;
+}
 .menu-dropdown.ollama-chat-menu .menu-option {
   display: flex;
   align-items: center;

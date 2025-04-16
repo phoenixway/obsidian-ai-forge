@@ -82,6 +82,12 @@
   .menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
     display: block !important;
   }
+  .menu-dropdown.ollama-chat-menu .role-submenu-section {
+    display: block !important;
+  }
+  .menu-dropdown.ollama-chat-menu .role-submenu-section + hr.menu-separator {
+    display: block !important;
+  }
 
   .input-controls-left .role-display {
     display: none;

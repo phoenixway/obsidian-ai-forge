@@ -306,7 +306,11 @@ export class OllamaView extends ItemView {
     // Створюємо секції акордеону
     // Секція Моделей буде прихована на десктопі через CSS
     const modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section"); this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
-    const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader = roleSection.header; this.roleSubmenuContent = roleSection.content;
+    // const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader s= roleSection.header; this.roleSubmenuContent = roleSection.content;
+    const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.roleSubmenuHeader = roleSection.header;
+    this.roleSubmenuContent = roleSection.content;
+
     const chatSection = createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER); this.chatSubmenuHeader = chatSection.header; this.chatSubmenuContent = chatSection.content;
 
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });

@@ -994,7 +994,8 @@ var OllamaView = /** @class */ (function (_super) {
         var modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
         this.modelSubmenuHeader = modelSection.header;
         this.modelSubmenuContent = modelSection.content;
-        var roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER);
+        // const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader s= roleSection.header; this.roleSubmenuContent = roleSection.content;
+        var roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
         this.roleSubmenuHeader = roleSection.header;
         this.roleSubmenuContent = roleSection.content;
         var chatSection = createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER);

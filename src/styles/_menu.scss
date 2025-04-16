@@ -16,6 +16,15 @@
     display: flex;
     flex-direction: column;
   
+    .role-submenu-section {
+      display: none; // Ховаємо секцію вибору ролі за замовчуванням
+  
+       // Також ховаємо роздільник, що йде ОДРАЗУ ПІСЛЯ цієї секції
+       + hr.menu-separator {
+          display: none;
+       }
+    }
+
     // Hide model selection section on desktop (handled by media query later)
     .model-submenu-section {
        // display: none; // Default hidden, shown in responsive
