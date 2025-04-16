@@ -27,7 +27,7 @@
   box-sizing: border-box;
   min-height: 40px;
   max-height: 60vh;
-  overflow-y: auto;
+  overflow-y: scroll !important;
   background-color: var(--background-primary);
   color: var(--text-normal);
   font-size: 14px;

@@ -35,7 +35,8 @@
     min-height: 40px;
     // --- ЗМІНЕНО: Встановлюємо max-height ТУТ ---
     max-height: 60vh; // Спробуйте це значення (60% висоти вікна), можна змінити
-    overflow-y: auto; // Дуже важливо для скролінгу textarea!
+    // overflow-y: auto; // Дуже важливо для скролінгу textarea!
+    overflow-y: scroll !important; 
     // --- КІНЕЦЬ ЗМІН ---
     background-color: var(--background-primary);
     color: var(--text-normal);
