@@ -734,24 +734,22 @@ var OllamaView = /** @class */ (function (_super) {
         //     // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
         //   });
         // }
+        // OllamaView.ts
         _this.adjustTextareaHeight = function () {
-            // Виконуємо в requestAnimationFrame для плавності
             requestAnimationFrame(function () {
                 if (!_this.inputEl)
                     return;
                 var textarea = _this.inputEl;
                 var minHeight = 40; // Мінімальна висота з CSS
-                // 1. Скидаємо висоту, щоб отримати реальну висоту контенту (scrollHeight)
-                textarea.style.height = 'auto'; // Можна встановити `${minHeight}px` для уникнення "стрибка"
-                // 2. Отримуємо scrollHeight
+                console.log("adjustTextareaHeight: Fired."); // <-- ЛОГ 1
+                // Зберігаємо поточну висоту перед скиданням
+                var currentHeight = textarea.style.height;
+                textarea.style.height = 'auto'; // Скидаємо для вимірювання
                 var scrollHeight = textarea.scrollHeight;
-                // 3. Встановлюємо нову висоту, але не меншу за minHeight
-                //    Обмеження max-height тепер обробляється CSS на самому textarea
-                //    та/або на .chat-input-container
+                console.log("adjustTextareaHeight: ScrollHeight=<span class=\"math-inline\">{scrollHeight}, Current Style Height=</span>{currentHeight}"); // <-- ЛОГ 2
                 var newHeight = Math.max(minHeight, scrollHeight);
                 textarea.style.height = newHeight + "px";
-                // Немає потреби в складних розрахунках max-height тут,
-                // якщо CSS налаштований правильно (max-height на контейнері/textarea + overflow)
+                console.log("adjustTextareaHeight: Set style.height=" + newHeight + "px"); // <-- ЛОГ 3
             });
         };
         _this.plugin = plugin;

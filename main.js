@@ -777,16 +777,21 @@ This action cannot be undone.`, async () => {
     //     // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
     //   });
     // }
+    // OllamaView.ts
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
         if (!this.inputEl)
           return;
         const textarea = this.inputEl;
         const minHeight = 40;
+        console.log("adjustTextareaHeight: Fired.");
+        const currentHeight = textarea.style.height;
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
+        console.log(`adjustTextareaHeight: ScrollHeight=<span class="math-inline">{scrollHeight}, Current Style Height=</span>{currentHeight}`);
         const newHeight = Math.max(minHeight, scrollHeight);
         textarea.style.height = `${newHeight}px`;
+        console.log(`adjustTextareaHeight: Set style.height=${newHeight}px`);
       });
     };
     this.plugin = plugin;
