@@ -29,6 +29,9 @@
   .workspace-leaf-content[data-type='ollama-personas-chat-view'] { // Consider using a more specific selector if possible
     display: flex;
     flex-direction: column;
+    overflow-y: visible !important; // Або auto !important
+   height: auto !important; 
+   min-height: 0 !important;
   
     .view-content { // Assuming this is the direct child
       height: 100%;
