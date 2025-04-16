@@ -38,7 +38,6 @@
   transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
   margin-bottom: calc(var(--chat-spacing-unit) * 2);
   box-shadow: none !important;
-  flex-grow: 0;
 }
 .chat-input-container textarea:focus {
   outline: none;
