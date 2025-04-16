@@ -783,13 +783,22 @@ This action cannot be undone.`, async () => {
         if (!this.inputEl)
           return;
         const textarea = this.inputEl;
-        const minHeight = 40;
+        const computedStyle = window.getComputedStyle(textarea);
+        const minHeight = parseFloat(computedStyle.minHeight) || 40;
+        const maxHeight = parseFloat(computedStyle.maxHeight);
         console.log("adjustTextareaHeight: Fired.");
         const currentHeight = textarea.style.height;
         textarea.style.height = "auto";
         const scrollHeight = textarea.scrollHeight;
-        console.log(`adjustTextareaHeight: ScrollHeight=<span class="math-inline">{scrollHeight}, Current Style Height=</span>{currentHeight}`);
-        const newHeight = Math.max(minHeight, scrollHeight);
+        console.log(`adjustTextareaHeight: ScrollHeight=${scrollHeight}, CSS MaxHeight=${maxHeight}, Current Style Height=${currentHeight}`);
+        let newHeight = Math.max(minHeight, scrollHeight);
+        if (!isNaN(maxHeight) && newHeight > maxHeight) {
+          console.log(`adjustTextareaHeight: Capped by CSS max-height (${maxHeight}px).`);
+          newHeight = maxHeight;
+          if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
+            textarea.style.overflowY = "auto";
+          }
+        }
         textarea.style.height = `${newHeight}px`;
         console.log(`adjustTextareaHeight: Set style.height=${newHeight}px`);
       });

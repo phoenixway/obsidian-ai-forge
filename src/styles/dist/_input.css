@@ -5,15 +5,13 @@
   flex-shrink: 0;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
-  background-color: red !important;
+  background-color: var(--background-primary);
   z-index: 20;
   border-radius: 12px;
   margin: calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
   box-sizing: border-box;
   position: relative;
-  max-height: 66vh;
-  overflow: hidden;
   box-shadow: none;
 }
 .chat-input-container:focus-within {
@@ -26,14 +24,15 @@
   border: none;
   border-radius: 8px;
   padding: 10px 15px;
+  box-sizing: border-box;
   min-height: 40px;
+  max-height: 60vh;
   overflow-y: auto;
   background-color: var(--background-primary);
   color: var(--text-normal);
   font-size: 14px;
   line-height: 1.5;
   transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
-  box-sizing: border-box;
   margin-bottom: calc(var(--chat-spacing-unit) * 2);
   box-shadow: none !important;
 }

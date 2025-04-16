@@ -3,23 +3,21 @@
 .chat-input-container {
   display: flex;
   flex-direction: column;
-  // --- ДОДАНО/ПЕРЕВІРЕНО: Налаштування flex для самого контейнера вводу ---
-  flex-grow: 0;    // Не розтягувати по вертикалі автоматично
-  flex-shrink: 0;  // Не стискати по вертикалі
-  // --- КІНЕЦЬ ЗМІН ---
+  flex-grow: 0;
+  flex-shrink: 0;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
-  background-color: red !important;//var(--background-primary);
+  background-color: var(--background-primary);
   z-index: 20;
   border-radius: 12px;
   margin: calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
   box-sizing: border-box;
   position: relative;
-  // --- ПОВЕРНІТЬ ЦІ РЯДКИ: Обмеження висоти та overflow ---
-  max-height: 66vh; // Обмежуємо висоту 2/3 висоти вікна
-  overflow: hidden; // Важливо, щоб скролбар з'явився на textarea, а не тут
-  // --- КІНЕЦЬ ПОВЕРНЕННЯ ---
+  // --- ВИДАЛЕНО ---
+  // max-height: 66vh;
+  // overflow: hidden;
+  // --- КІНЕЦЬ ВИДАЛЕННЯ ---
   box-shadow: none;
 
   &:focus-within {
@@ -33,17 +31,17 @@
     border: none;
     border-radius: 8px;
     padding: 10px 15px;
+    box-sizing: border-box; // Важливо!
     min-height: 40px;
-    // --- ПОВЕРНІТЬ ЦЕЙ РЯДОК (АБО ПРИБЕРІТЬ): overflow має бути тут ---
-    overflow-y: auto; // Дозволяємо скролінг всередині textarea
-    // --- КІНЕЦЬ ПОВЕРНЕННЯ ---
-    // max-height: 50vh; // Цей max-height, ймовірно, вже НЕ ПОТРІБЕН тут, оскільки обмежується контейнером
+    // --- ЗМІНЕНО: Встановлюємо max-height ТУТ ---
+    max-height: 60vh; // Спробуйте це значення (60% висоти вікна), можна змінити
+    overflow-y: auto; // Дуже важливо для скролінгу textarea!
+    // --- КІНЕЦЬ ЗМІН ---
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
     line-height: 1.5;
     transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
-    box-sizing: border-box;
     margin-bottom: calc(var(--chat-spacing-unit) * 2);
     box-shadow: none !important;
 
@@ -55,12 +53,12 @@
     }
   }
   
-    .input-controls-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 100%;
-      flex-shrink: 0; // Prevent controls from shrinking
+  .input-controls-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    flex-shrink: 0; // Prevent controls from shrinking
   
       .input-controls-left {
         display: flex;

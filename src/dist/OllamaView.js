@@ -740,16 +740,32 @@ var OllamaView = /** @class */ (function (_super) {
                 if (!_this.inputEl)
                     return;
                 var textarea = _this.inputEl;
-                var minHeight = 40; // Мінімальна висота з CSS
-                console.log("adjustTextareaHeight: Fired."); // <-- ЛОГ 1
-                // Зберігаємо поточну висоту перед скиданням
+                // Отримуємо обчислені стилі, щоб прочитати min/max-height з CSS
+                var computedStyle = window.getComputedStyle(textarea);
+                var minHeight = parseFloat(computedStyle.minHeight) || 40; // Беремо min-height з CSS або 40px
+                var maxHeight = parseFloat(computedStyle.maxHeight); // Читаємо max-height з CSS
+                console.log("adjustTextareaHeight: Fired."); // ЛОГ 1
                 var currentHeight = textarea.style.height;
-                textarea.style.height = 'auto'; // Скидаємо для вимірювання
+                // Скидаємо висоту для вимірювання scrollHeight
+                textarea.style.height = 'auto';
                 var scrollHeight = textarea.scrollHeight;
-                console.log("adjustTextareaHeight: ScrollHeight=<span class=\"math-inline\">{scrollHeight}, Current Style Height=</span>{currentHeight}"); // <-- ЛОГ 2
+                console.log("adjustTextareaHeight: ScrollHeight=" + scrollHeight + ", CSS MaxHeight=" + maxHeight + ", Current Style Height=" + currentHeight); // ЛОГ 2
+                // Початкова нова висота - це scrollHeight, але не менше minHeight
                 var newHeight = Math.max(minHeight, scrollHeight);
+                // Перевіряємо, чи є дійсне значення CSS max-height і чи newHeight його перевищує
+                if (!isNaN(maxHeight) && newHeight > maxHeight) {
+                    console.log("adjustTextareaHeight: Capped by CSS max-height (" + maxHeight + "px)."); // ЛОГ 3
+                    newHeight = maxHeight; // Обмежуємо висоту значенням з CSS max-height
+                    // Переконуємося, що overflow увімкнено, якщо досягли межі (на випадок, якщо CSS не спрацював)
+                    // Хоча це має бути в CSS, додаємо як страховку
+                    if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
+                        textarea.style.overflowY = 'auto';
+                    }
+                }
+                // Немає потреби ховати overflow, якщо не досягли межі, CSS має це обробляти
+                // Встановлюємо фінальну висоту
                 textarea.style.height = newHeight + "px";
-                console.log("adjustTextareaHeight: Set style.height=" + newHeight + "px"); // <-- ЛОГ 3
+                console.log("adjustTextareaHeight: Set style.height=" + newHeight + "px"); // ЛОГ 4
             });
         };
         _this.plugin = plugin;
