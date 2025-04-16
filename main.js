@@ -739,6 +739,7 @@ This action cannot be undone.`, async () => {
     };
     // OllamaView.ts
     // OllamaView.ts
+    // OllamaView.ts
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
         if (!this.inputEl)
@@ -758,31 +759,21 @@ This action cannot be undone.`, async () => {
             return;
           const scrollHeight = textarea.scrollHeight;
           textarea.style.minHeight = originalMinHeightStyle || "";
-          console.log(`adjustTextareaHeight MH+: Measured scrollH=${scrollHeight}, currentClientH=${currentClientHeight}, CSS maxH=${maxHeight}`);
+          console.log(`adjustTextareaHeight SIMPLE_MH: Measured scrollH=${scrollHeight}, clientH before reset=${currentClientHeight}, CSS maxH=${maxHeight}`);
           let newMinHeight = Math.max(baseMinHeight, scrollHeight);
-          let isCapped = false;
           if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
             newMinHeight = maxHeight;
-            isCapped = true;
+            console.log(`adjustTextareaHeight SIMPLE_MH: Capped by CSS max-height (${maxHeight}px).`);
             if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
               textarea.style.overflowY = "auto";
             }
-            console.log(`adjustTextareaHeight MH+: Capped by CSS max-height (${maxHeight}px).`);
           }
-          if (newMinHeight < currentClientHeight - 1) {
-            console.log(`adjustTextareaHeight MH+: Shrinking required. Target minH=${newMinHeight}px.`);
-            textarea.style.height = `${newMinHeight}px`;
-            textarea.style.minHeight = `${newMinHeight}px`;
-            textarea.style.height = "auto";
-            console.log(`adjustTextareaHeight MH+: SHRINK Applied H=${newMinHeight}px then minH=${newMinHeight}px, H=auto`);
-          } else {
-            textarea.style.minHeight = `${newMinHeight}px`;
-            textarea.style.height = "auto";
-            console.log(`adjustTextareaHeight MH+: GROW/STABLE Set minH=${newMinHeight}px, H=auto`);
-          }
+          textarea.style.minHeight = `${newMinHeight}px`;
+          textarea.style.height = "auto";
+          console.log(`adjustTextareaHeight SIMPLE_MH: Set minH=${newMinHeight}px, H=auto`);
           const renderedHeight = textarea.clientHeight;
           const finalMinHeight = parseFloat(window.getComputedStyle(textarea).minHeight);
-          console.log(`adjustTextareaHeight MH+: Final Rendered clientH=${renderedHeight}, computed minH=${finalMinHeight}`);
+          console.log(`adjustTextareaHeight SIMPLE_MH: clientH BEFORE reset was ${currentClientHeight}, final rendered clientH=${renderedHeight}, final computed minH=${finalMinHeight}`);
         });
       });
     };

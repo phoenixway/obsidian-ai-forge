@@ -696,6 +696,7 @@ var OllamaView = /** @class */ (function (_super) {
         } (_a = _this.newMessagesIndicatorEl) === null || _a === void 0 ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE); _this.userScrolledUp = false; };
         // OllamaView.ts
         // OllamaView.ts
+        // OllamaView.ts
         _this.adjustTextareaHeight = function () {
             // Використовуємо подвійний requestAnimationFrame
             requestAnimationFrame(function () {
@@ -705,12 +706,11 @@ var OllamaView = /** @class */ (function (_super) {
                 var computedStyle = window.getComputedStyle(textarea);
                 var baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
                 var maxHeight = parseFloat(computedStyle.maxHeight);
-                // Зберігаємо поточну візуальну висоту ДО змін
+                // Запам'ятовуємо візуальну висоту ДО будь-яких змін у цьому циклі
                 var currentClientHeight = textarea.clientHeight;
-                var originalMinHeightStyle = textarea.style.minHeight; // Зберігаємо інлайн стиль min-height
-                // Скидаємо для вимірювання
+                var originalMinHeightStyle = textarea.style.minHeight;
+                // Фаза 1: Скидання для вимірювання
                 textarea.style.height = 'auto';
-                // Якщо min-height було встановлено inline, тимчасово його теж скидаємо
                 if (originalMinHeightStyle) {
                     textarea.style.minHeight = '0';
                 }
@@ -718,45 +718,29 @@ var OllamaView = /** @class */ (function (_super) {
                     if (!_this.inputEl)
                         return;
                     var scrollHeight = textarea.scrollHeight;
-                    // Відновлюємо оригінальний inline min-height (або скидаємо, якщо його не було)
+                    // Відновлюємо inline min-height, якщо був
                     textarea.style.minHeight = originalMinHeightStyle || '';
-                    console.log("adjustTextareaHeight MH+: Measured scrollH=" + scrollHeight + ", currentClientH=" + currentClientHeight + ", CSS maxH=" + maxHeight);
+                    console.log("adjustTextareaHeight SIMPLE_MH: Measured scrollH=" + scrollHeight + ", clientH before reset=" + currentClientHeight + ", CSS maxH=" + maxHeight);
                     // Обчислюємо нову цільову min-height
                     var newMinHeight = Math.max(baseMinHeight, scrollHeight);
                     // Обмежуємо зверху CSS max-height
-                    var isCapped = false;
                     if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
                         newMinHeight = maxHeight;
-                        isCapped = true;
+                        console.log("adjustTextareaHeight SIMPLE_MH: Capped by CSS max-height (" + maxHeight + "px).");
                         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
                             textarea.style.overflowY = 'auto';
                         }
-                        console.log("adjustTextareaHeight MH+: Capped by CSS max-height (" + maxHeight + "px).");
                     }
-                    // --- ЛОГІКА ДЛЯ ЗМЕНШЕННЯ ---
-                    // Перевіряємо, чи ПОТРІБНО зменшувати (новий розмір < поточного візуального)
-                    // Додаємо невеликий допуск (~1px) для плаваючих значень
-                    if (newMinHeight < currentClientHeight - 1) {
-                        console.log("adjustTextareaHeight MH+: Shrinking required. Target minH=" + newMinHeight + "px.");
-                        // 1. ПРИМУСОВО встановлюємо меншу ВИСОТУ, щоб змусити стиснутись
-                        textarea.style.height = newMinHeight + "px";
-                        // 2. Встановлюємо новий (менший) min-height
-                        textarea.style.minHeight = newMinHeight + "px";
-                        // 3. ПОВЕРТАЄМО height: auto, щоб дозволити майбутнє зростання
-                        textarea.style.height = 'auto';
-                        console.log("adjustTextareaHeight MH+: SHRINK Applied H=" + newMinHeight + "px then minH=" + newMinHeight + "px, H=auto");
-                    }
-                    else {
-                        // --- ЛОГІКА ДЛЯ ЗБІЛЬШЕННЯ / СТАБІЛЬНОСТІ ---
-                        // Просто встановлюємо min-height і дозволяємо height: auto робити свою справу
-                        textarea.style.minHeight = newMinHeight + "px";
-                        textarea.style.height = 'auto';
-                        console.log("adjustTextareaHeight MH+: GROW/STABLE Set minH=" + newMinHeight + "px, H=auto");
-                    }
-                    // Фінальне логування
+                    // --- ПРОСТО ВСТАНОВЛЮЄМО MIN-HEIGHT + HEIGHT:AUTO ---
+                    textarea.style.minHeight = newMinHeight + "px";
+                    textarea.style.height = 'auto';
+                    console.log("adjustTextareaHeight SIMPLE_MH: Set minH=" + newMinHeight + "px, H=auto");
+                    // --- КІНЕЦЬ ---
+                    // Фінальне логування після застосування стилів
                     var renderedHeight = textarea.clientHeight;
                     var finalMinHeight = parseFloat(window.getComputedStyle(textarea).minHeight);
-                    console.log("adjustTextareaHeight MH+: Final Rendered clientH=" + renderedHeight + ", computed minH=" + finalMinHeight);
+                    // Порівнюємо висоту до і після
+                    console.log("adjustTextareaHeight SIMPLE_MH: clientH BEFORE reset was " + currentClientHeight + ", final rendered clientH=" + renderedHeight + ", final computed minH=" + finalMinHeight);
                 });
             });
         };
