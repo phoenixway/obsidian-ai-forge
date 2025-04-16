@@ -172,7 +172,6 @@ var CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
 var CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
 var CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
 var CSS_CLASS_TRANSLATION_PENDING = "translation-pending";
-var CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
 var CSS_CLASS_RECORDING = "recording";
 var CSS_CLASS_DISABLED = "disabled";
 var CSS_CLASS_MESSAGE_ARRIVING = "message-arriving";
@@ -740,17 +739,30 @@ This action cannot be undone.`, async () => {
     };
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
-        if (!this.inputEl || !this.buttonsContainer)
+        if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement)
           return;
-        const maxHeightPercentage = 0.5;
-        const minHeight = 40;
+        const inputContainer = this.inputEl.parentElement;
+        const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`);
+        const minTextareaHeight = 40;
+        const maxContainerHeightFraction = 2 / 3;
         const viewHeight = this.contentEl.clientHeight;
-        const maxHeight = Math.max(100, viewHeight * maxHeightPercentage);
+        const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction);
+        const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
+        const containerStyle = window.getComputedStyle(inputContainer);
+        const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
+        const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
+        const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
+        const textareaStyle = window.getComputedStyle(this.inputEl);
+        const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
+        const maxTextareaHeight = Math.max(
+          minTextareaHeight,
+          // Не може бути меншою за мінімальну
+          maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
+        );
         this.inputEl.style.height = "auto";
         const scrollHeight = this.inputEl.scrollHeight;
-        const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight));
-        this.inputEl.style.height = `${newHeight}px`;
-        this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight);
+        const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
+        this.inputEl.style.height = `${newTextareaHeight}px`;
       });
     };
     this.plugin = plugin;

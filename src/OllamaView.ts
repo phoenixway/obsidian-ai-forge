@@ -617,7 +617,61 @@ export class OllamaView extends ItemView {
   }
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
-  private adjustTextareaHeight = (): void => { requestAnimationFrame(() => { if (!this.inputEl || !this.buttonsContainer) return; const maxHeightPercentage = 0.50; const minHeight = 40; const viewHeight = this.contentEl.clientHeight; const maxHeight = Math.max(100, viewHeight * maxHeightPercentage); this.inputEl.style.height = 'auto'; const scrollHeight = this.inputEl.scrollHeight; const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight)); this.inputEl.style.height = `${newHeight}px`; this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight); }); }
+
+  private adjustTextareaHeight = (): void => {
+    requestAnimationFrame(() => {
+      // Перевіряємо наявність необхідних елементів
+      if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement) return;
+
+      const inputContainer = this.inputEl.parentElement as HTMLElement; // Отримуємо батьківський контейнер
+      const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`) as HTMLElement;
+
+      // Мінімальна висота textarea
+      const minTextareaHeight = 40; // px, як у CSS
+
+      // Максимальна частка висоти вікна для зони вводу (textarea + controls)
+      const maxContainerHeightFraction = 2 / 3; // Приблизно 66.7%
+
+      // Загальна доступна висота в межах view
+      const viewHeight = this.contentEl.clientHeight;
+      // Максимальна висота для ВСЬОГО контейнера вводу
+      const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction); // Не менше 100px
+
+      // Висота контролів (кнопок, дисплею моделі)
+      // Використовуємо offsetHeight, якщо елемент видимий, інакше - 0
+      const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
+
+      // Вертикальні padding'и самого inputContainer (отримуємо зі стилів)
+      const containerStyle = window.getComputedStyle(inputContainer);
+      const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
+      const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
+      const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
+
+      // Відступ між textarea і controlsContainer (margin-bottom у textarea)
+      const textareaStyle = window.getComputedStyle(this.inputEl);
+      const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
+
+
+      // Розраховуємо максимальну доступну висоту САМЕ ДЛЯ TEXTAREA
+      const maxTextareaHeight = Math.max(
+        minTextareaHeight, // Не може бути меншою за мінімальну
+        maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
+      );
+
+      // Скидаємо висоту, щоб отримати реальну висоту контенту
+      this.inputEl.style.height = 'auto';
+      const scrollHeight = this.inputEl.scrollHeight;
+
+      // Встановлюємо нову висоту textarea, обмежуючи її максимумом
+      const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
+      this.inputEl.style.height = `${newTextareaHeight}px`;
+
+      // Більше не потрібен клас 'expanded', бо скролінг з'явиться автоматично
+      // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
+
+    });
+  }
+
   private updateSendButtonState(): void { if (!this.inputEl || !this.sendButton) return; const isDisabled = this.inputEl.value.trim() === '' || this.isProcessing; this.sendButton.disabled = isDisabled; this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled); }
   public showEmptyState(): void { if (this.currentMessages.length === 0 && !this.emptyStateEl && this.chatContainer) { this.chatContainer.empty(); this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE }); this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" }); const modelName = this.plugin?.settings?.modelName || "the AI"; this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use the menu options to start interacting with ${modelName}.` }); } }
   public hideEmptyState(): void { if (this.emptyStateEl) { this.emptyStateEl.remove(); this.emptyStateEl = null; } }

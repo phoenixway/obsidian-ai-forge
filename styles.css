@@ -75,14 +75,15 @@
       margin: calc(var(--chat-spacing-unit) * 2);
       margin-top: 0;
       box-sizing: border-box;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      /* box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1); */
       position: relative; /* Для позиціонування меню */
       transition: box-shadow 0.2s;
     }
 
     .chat-input-container:focus-within {
        /* Можна додати стиль для активного стану */
-       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--background-modifier-border);
+       /* box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--background-modifier-border); */
+       border-color: var(--interactive-accent); /* Приклад: зміна кольору рамки при фокусі */
     }
   
   
@@ -202,13 +203,26 @@
     .chat-input-container textarea {
       flex: 1; /* Не потрібен, бо контейнер column */
       width: 100%; /* Займає всю ширину */
-      resize: none; border: none; border-radius: 8px;
+      resize: none; 
+      border: none; 
+      border-radius: 8px;
       padding: 10px 15px;
       padding-right: 15px; /* Скидаємо великий правий відступ */
-      min-height: 40px; max-height: 50vh; background-color: var(--background-primary); color: var(--text-normal); font-size: 14px; line-height: 1.5; transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; overflow-y: auto; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); box-sizing: border-box;
+      min-height: 40px; max-height: 50vh; 
+      background-color: var(--background-primary); 
+      color: var(--text-normal); font-size: 14px; line-height: 1.5; 
+      transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; overflow-y: auto; 
+      /* box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);  */
       margin-bottom: calc(var(--chat-spacing-unit) * 2); /* Відступ між textarea та контролами */
-     }
-    .chat-input-container textarea:focus { outline: none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 0 2px var(--interactive-accent-translucent); }
+      box-sizing: border-box; 
+    }
+    .chat-input-container textarea:focus { 
+      outline: none; 
+      /* box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 0 2px var(--interactive-accent-translucent);  */
+      border-color: var(--interactive-accent); /* Наприклад, якщо у textarea є border */
+      background-color: var(--background-secondary); /* Ледь помітна зміна фону при фокусі */
+
+    }
        
     .input-controls-container {
       display: flex;
@@ -290,19 +304,7 @@
   .message-group-avatar .svg-icon { width: 60%; height: 60%; } /* Adjust icon size within avatar */
 
 
-  .ollama-chat-container .message {
-    margin-bottom: calc(var(--chat-spacing-unit) * 1);
-    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
-    border-radius: 18px;
-    max-width: var(--chat-message-max-width);
-    word-wrap: break-word;
-    position: relative;
-    /* box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); */ /* <--- ВИДАЛЕНО/ЗАКОМЕНТОВАНО */
-    font-size: var(--font-ui-small);
-    line-height: 1.5;
-    /* transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; */ /* Можна прибрати box-shadow з transition */
-    transition: transform 0.2s ease-out;
- }
+  .ollama-chat-container .message { margin-bottom: calc(var(--chat-spacing-unit) * 1); /* Small gap between messages in group */ padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3); border-radius: 18px; max-width: var(--chat-message-max-width); word-wrap: break-word; position: relative; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); font-size: var(--font-ui-small); line-height: 1.5; transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
 
   /* Consecutive messages styling */
   .user-message-group .message:not(:last-child) { border-bottom-right-radius: 5px; }
@@ -311,42 +313,16 @@
 
 
   /* User messages */
-  .ollama-chat-container .user-message {
-    background-color: var(--interactive-accent);
-    background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
-    color: var(--text-on-accent);
-    align-self: flex-end;
-    border-top-left-radius: 18px;
-    border-bottom-left-radius: 18px;
-    border-top-right-radius: 18px;
-    border-bottom-right-radius: 5px;
-    /* box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2); */ /* <--- ВИДАЛЕНО/ЗАКОМЕНТОВАНО */
- }
- .ollama-chat-container .user-message-group .message:last-child.user-message { border-bottom-right-radius: 18px; }
-
-  .ollama-chat-container .user-message:hover {
-    /* box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3); */ /* <--- ВИДАЛЕНО/ЗАКОМЕНТОВАНО */
-    transform: translateY(-1px) scale(1.01);
- }
+  .ollama-chat-container .user-message { background-color: var(--interactive-accent); background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%); color: var(--text-on-accent); align-self: flex-end; border-top-left-radius: 18px; border-bottom-left-radius: 18px; border-top-right-radius: 18px; border-bottom-right-radius: 5px; box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2); }
+  .ollama-chat-container .user-message-group .message:last-child.user-message { border-bottom-right-radius: 18px; }
+  .ollama-chat-container .user-message:hover { box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3); transform: translateY(-1px) scale(1.01); }
 
 
   /* AI messages */
-  .ollama-chat-container .ollama-message {
-    background-color: var(--background-primary);
-    color: var(--text-normal);
-    align-self: flex-start;
-    border-top-right-radius: 18px;
-    border-bottom-right-radius: 18px;
-    border-top-left-radius: 18px;
-    border-bottom-left-radius: 5px;
-    /* box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); */ /* <--- ВИДАЛЕНО/ЗАКОМЕНТОВАНО */
- }
- .ollama-chat-container .ollama-message-group .message:last-child.ollama-message { border-bottom-left-radius: 18px; }
- 
- .ollama-chat-container .ollama-message:hover {
-  /* box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); */ /* <--- ВИДАЛЕНО/ЗАКОМЕНТОВАНО */
-  transform: translateY(-1px) scale(1.01);
-}
+  .ollama-chat-container .ollama-message { background-color: var(--background-primary); color: var(--text-normal); align-self: flex-start; border-top-right-radius: 18px; border-bottom-right-radius: 18px; border-top-left-radius: 18px; border-bottom-left-radius: 5px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
+  .ollama-chat-container .ollama-message-group .message:last-child.ollama-message { border-bottom-left-radius: 18px; }
+  .ollama-chat-container .ollama-message:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); transform: translateY(-1px) scale(1.01); }
+
   /* Message Content & Meta */
   .message-content-container { position: relative; /* Needed for absolute positioning of buttons */ width: 100%; }
   .message-content { padding-bottom: calc(var(--chat-spacing-unit) * 2); /* Space below text before timestamp/translation */ box-sizing: border-box; width: 100%; /* Ensure it spans width for padding */ }
@@ -358,8 +334,9 @@
      SYSTEM & ERROR MESSAGES
      ========================================================================== */
 
-  .system-message-group { display: flex; flex-direction: column; align-items: center; margin: calc(var(--chat-spacing-unit) * 4) 0; } 
-  .system-message { background: var(--background-secondary); color: var(--text-muted); border-left: 3px solid var(--interactive-accent); font-style: italic; padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); border-radius: 8px; max-width: 90%; display: flex !important; align-items: center !important; /* box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; */ /* <--- ВИДАЛЕНО/ЗАКОМЕНТОВАНО */ position: relative; font-size: 0.9em; }  .system-icon { color: var(--interactive-accent); margin-right: 8px; font-size: 1em; flex-shrink: 0; }
+  .system-message-group { display: flex; flex-direction: column; align-items: center; margin: calc(var(--chat-spacing-unit) * 4) 0; }
+  .system-message { background: var(--background-secondary); color: var(--text-muted); border-left: 3px solid var(--interactive-accent); font-style: italic; padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); border-radius: 8px; max-width: 90%; display: flex !important; align-items: center !important; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important; position: relative; font-size: 0.9em; }
+  .system-icon { color: var(--interactive-accent); margin-right: 8px; font-size: 1em; flex-shrink: 0; }
   .system-message-text { line-height: 1.4; }
 
   .error-message-group { margin: calc(var(--chat-spacing-unit) * 4) 0 !important; display: flex; flex-direction: column; align-items: center; }

@@ -694,8 +694,45 @@ var OllamaView = /** @class */ (function (_super) {
         _this.handleNewMessageIndicatorClick = function () { var _a; if (_this.chatContainer) {
             _this.chatContainer.scrollTo({ top: _this.chatContainer.scrollHeight, behavior: 'smooth' });
         } (_a = _this.newMessagesIndicatorEl) === null || _a === void 0 ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE); _this.userScrolledUp = false; };
-        _this.adjustTextareaHeight = function () { requestAnimationFrame(function () { if (!_this.inputEl || !_this.buttonsContainer)
-            return; var maxHeightPercentage = 0.50; var minHeight = 40; var viewHeight = _this.contentEl.clientHeight; var maxHeight = Math.max(100, viewHeight * maxHeightPercentage); _this.inputEl.style.height = 'auto'; var scrollHeight = _this.inputEl.scrollHeight; var newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight)); _this.inputEl.style.height = newHeight + "px"; _this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight); }); };
+        _this.adjustTextareaHeight = function () {
+            requestAnimationFrame(function () {
+                // Перевіряємо наявність необхідних елементів
+                if (!_this.inputEl || !_this.contentEl || !_this.inputEl.parentElement)
+                    return;
+                var inputContainer = _this.inputEl.parentElement; // Отримуємо батьківський контейнер
+                var controlsContainer = inputContainer.querySelector("." + CSS_CLASS_INPUT_CONTROLS_CONTAINER);
+                // Мінімальна висота textarea
+                var minTextareaHeight = 40; // px, як у CSS
+                // Максимальна частка висоти вікна для зони вводу (textarea + controls)
+                var maxContainerHeightFraction = 2 / 3; // Приблизно 66.7%
+                // Загальна доступна висота в межах view
+                var viewHeight = _this.contentEl.clientHeight;
+                // Максимальна висота для ВСЬОГО контейнера вводу
+                var maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction); // Не менше 100px
+                // Висота контролів (кнопок, дисплею моделі)
+                // Використовуємо offsetHeight, якщо елемент видимий, інакше - 0
+                var controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
+                // Вертикальні padding'и самого inputContainer (отримуємо зі стилів)
+                var containerStyle = window.getComputedStyle(inputContainer);
+                var containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
+                var containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
+                var totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
+                // Відступ між textarea і controlsContainer (margin-bottom у textarea)
+                var textareaStyle = window.getComputedStyle(_this.inputEl);
+                var textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
+                // Розраховуємо максимальну доступну висоту САМЕ ДЛЯ TEXTAREA
+                var maxTextareaHeight = Math.max(minTextareaHeight, // Не може бути меншою за мінімальну
+                maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom);
+                // Скидаємо висоту, щоб отримати реальну висоту контенту
+                _this.inputEl.style.height = 'auto';
+                var scrollHeight = _this.inputEl.scrollHeight;
+                // Встановлюємо нову висоту textarea, обмежуючи її максимумом
+                var newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
+                _this.inputEl.style.height = newTextareaHeight + "px";
+                // Більше не потрібен клас 'expanded', бо скролінг з'явиться автоматично
+                // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
+            });
+        };
         _this.plugin = plugin;
         _this.initSpeechWorker();
         // Переконуємось, що handleScroll визначено ПЕРЕД цим рядком
