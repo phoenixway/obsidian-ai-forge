@@ -339,9 +339,6 @@ export class OllamaView extends ItemView {
       this.inputEl.addEventListener("keydown", this.handleKeyDown);
       this.inputEl.addEventListener('input', this.handleInputForResize);
     }
-
-
-
     // Слухачі кнопок
     if (this.sendButton) this.sendButton.addEventListener("click", this.handleSendClick);
     if (this.voiceButton) this.voiceButton.addEventListener("click", this.handleVoiceClick);
