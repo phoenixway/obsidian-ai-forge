@@ -1,0 +1,43 @@
+// src/styles/_base.scss
+
+:root {
+  --chat-avatar-size: 30px; /* Avatar size */
+  --chat-spacing-unit: 4px; /* Base spacing unit */
+  --chat-message-max-width: 82%; /* Increased max message width */
+}
+
+/* Keyframe Animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes message-appear {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes dot-pulse {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.4; }
+  40% { transform: scale(1.2); opacity: 1; }
+}
+
+@keyframes pulse-recording {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 6px rgba(var(--text-error-rgb), 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); }
+}
+
+@keyframes error-pulse {
+  0% { box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2); }
+  50% { box-shadow: 0 3px 10px 2px rgba(var(--text-error-rgb), 0.35); }
+  100% { box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2); }
+}
+
+@keyframes menu-fade-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Basic reset or global adjustments if needed */
+/* Example: body { margin: 0; font-family: sans-serif; } */

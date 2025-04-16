@@ -1,0 +1,240 @@
+@media screen and (max-width: 768px) {
+  :root {
+    --chat-message-max-width: 90%;
+    --chat-avatar-size: 28px;
+  }
+
+  .ollama-chat-container {
+    padding: calc(var(--chat-spacing-unit) * 3);
+    padding-bottom: calc(var(--chat-spacing-unit) * 1.5);
+  }
+
+  .message-group {
+    margin-bottom: calc(var(--chat-spacing-unit) * 3);
+  }
+  .message-group.user-message-group .message-wrapper {
+    margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+  .message-group.ollama-message-group .message-wrapper {
+    margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+
+  .message {
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+    font-size: calc(var(--font-ui-small) * 0.98);
+  }
+
+  .message-actions-wrapper {
+    opacity: 0.6;
+    visibility: visible;
+    transition: none;
+  }
+  .message-actions-wrapper button {
+    background-color: transparent;
+    border: none;
+    padding: 1px;
+  }
+  .message-actions-wrapper button .svg-icon {
+    width: 13px;
+    height: 13px;
+  }
+  .message-actions-wrapper button:hover {
+    background-color: var(--background-modifier-hover);
+    transform: scale(1.1);
+  }
+  .user-message .message-actions-wrapper button {
+    background-color: transparent;
+    border: none;
+    opacity: 0.7;
+  }
+  .user-message .message-actions-wrapper button:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  .chat-input-container {
+    gap: 6px;
+    max-height: 75vh;
+  }
+  .chat-input-container .input-controls-container {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  .chat-input-container textarea {
+    padding-left: 10px;
+    margin-bottom: 6px;
+    padding-right: 15px;
+  }
+  .chat-input-container .input-controls-right button,
+.chat-input-container .input-controls-left .translate-input-button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .menu-dropdown.ollama-chat-menu .model-submenu-section {
+    display: block !important;
+  }
+  .menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
+    display: block !important;
+  }
+}
+@media screen and (max-width: 480px) {
+  :root {
+    --chat-spacing-unit: 3px;
+    --chat-avatar-size: 26px;
+    --chat-message-max-width: 92%;
+  }
+
+  .ollama-chat-container {
+    padding: calc(var(--chat-spacing-unit) * 3);
+    /* 9px */
+    padding-bottom: calc(var(--chat-spacing-unit) * 1);
+    /* 3px */
+  }
+
+  .chat-input-container {
+    margin: 4px 8px;
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2);
+    border-radius: 10px;
+    max-height: 60vh;
+  }
+  .chat-input-container textarea {
+    font-size: 13px;
+    padding: 8px 10px;
+    min-height: 36px;
+  }
+  .chat-input-container .input-controls-container {
+    gap: 4px;
+  }
+  .chat-input-container .input-controls-right button,
+.chat-input-container .input-controls-left .translate-input-button {
+    width: 28px;
+    height: 28px;
+  }
+  .chat-input-container .input-controls-left .translate-input-button {
+    display: none;
+  }
+
+  .message {
+    font-size: 13px;
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+    border-radius: 15px;
+  }
+
+  .user-message-group .message-wrapper .message:not(:last-child) {
+    border-bottom-right-radius: 4px;
+  }
+  .user-message-group .message-wrapper .message:last-child {
+    border-bottom-right-radius: 15px;
+  }
+  .user-message-group .message-wrapper .message:not(:first-child) {
+    border-top-right-radius: 4px;
+  }
+  .user-message-group .message-wrapper .message:first-child {
+    border-top-right-radius: 15px;
+  }
+
+  .ollama-message-group .message-wrapper .message:not(:last-child) {
+    border-bottom-left-radius: 4px;
+  }
+  .ollama-message-group .message-wrapper .message:last-child {
+    border-bottom-left-radius: 15px;
+  }
+  .ollama-message-group .message-wrapper .message:not(:first-child) {
+    border-top-left-radius: 4px;
+  }
+  .ollama-message-group .message-wrapper .message:first-child {
+    border-top-left-radius: 15px;
+  }
+
+  .message-group {
+    margin-bottom: calc(var(--chat-spacing-unit) * 3);
+  }
+  .message-group.user-message-group .message-wrapper {
+    margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+  .message-group.ollama-message-group .message-wrapper {
+    margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+
+  .message-timestamp {
+    font-size: 0.7em;
+    margin-top: 2px;
+  }
+
+  .message-actions-wrapper {
+    top: 2px;
+    right: 4px;
+    gap: 3px;
+  }
+  .message-actions-wrapper button .svg-icon {
+    width: 12px;
+    height: 12px;
+  }
+
+  .menu-dropdown.ollama-chat-menu {
+    min-width: 180px;
+    max-width: calc(100vw - 20px);
+  }
+  .menu-dropdown.ollama-chat-menu .menu-option, .menu-dropdown.ollama-chat-menu .menu-header-item {
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+  }
+  .menu-dropdown.ollama-chat-menu .submenu-content .menu-option {
+    padding-left: calc(var(--chat-spacing-unit) * 2) !important;
+  }
+  .menu-dropdown.ollama-chat-menu .menu-option-text {
+    font-size: 13px;
+  }
+  .menu-dropdown.ollama-chat-menu .chat-option .chat-option-date {
+    font-size: 0.75em;
+  }
+  .menu-dropdown.ollama-chat-menu .submenu-content.model-list-container,
+.menu-dropdown.ollama-chat-menu .submenu-content.role-list-container,
+.menu-dropdown.ollama-chat-menu .submenu-content.chat-list-container {
+    max-height: 150px;
+  }
+}
+@media screen and (max-width: 360px) {
+  :root {
+    --chat-avatar-size: 24px;
+  }
+
+  .chat-input-container .input-controls-right button,
+.chat-input-container .input-controls-left .translate-input-button {
+    width: 26px;
+    height: 26px;
+  }
+  .chat-input-container .input-controls-container {
+    gap: 3px;
+  }
+
+  .message-group.user-message-group .message-wrapper {
+    margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+  .message-group.ollama-message-group .message-wrapper {
+    margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  }
+
+  .message-actions-wrapper button .svg-icon {
+    width: 11px;
+    height: 11px;
+  }
+}
+@media screen and (min-width: 769px) {
+  .workspace-leaf-content[data-type=ollama-personas-chat-view] .ollama-container {
+    min-height: 65vh;
+  }
+
+  .menu-dropdown.ollama-chat-menu .model-submenu-section {
+    display: none;
+  }
+  .menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
+    display: none;
+  }
+
+  .message-actions-wrapper {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
+  }
+}

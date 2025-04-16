@@ -1,0 +1,151 @@
+// src/styles/_indicators.scss
+
+// Loading dots shown when waiting for AI response
+.thinking-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+  
+    .thinking-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: var(--text-muted);
+      margin: 0 3px;
+      opacity: 0.6;
+      animation: dot-pulse 1.4s infinite ease-in-out;
+  
+      &:nth-child(1) { animation-delay: 0s; }
+      &:nth-child(2) { animation-delay: 0.2s; }
+      &:nth-child(3) { animation-delay: 0.4s; }
+    }
+  }
+  
+  // Styling for <think> tag content
+  .thinking-block {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    margin: 10px 0;
+    background-color: var(--background-secondary-alt);
+    overflow: hidden;
+  
+    .thinking-header {
+      background-color: var(--background-modifier-hover);
+      color: var(--text-muted);
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.2s;
+  
+      &:hover {
+        background-color: var(--background-modifier-border);
+      }
+  
+      .thinking-toggle {
+        margin-right: 6px;
+        font-weight: bold;
+        transition: transform 0.2s ease-in-out;
+        font-size: 0.9em;
+      }
+  
+      // State handled by JS attribute
+      &[data-fold-state="expanded"] .thinking-toggle {
+        transform: rotate(90deg);
+      }
+  
+      .thinking-title {
+        font-weight: 500;
+        font-size: 0.9em;
+      }
+    }
+  
+    .thinking-content {
+      padding: 10px 12px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      line-height: 1.5;
+      border-top: 1px solid var(--background-modifier-border);
+      background-color: var(--background-primary);
+      font-size: 0.9em;
+      color: var(--text-normal);
+  
+      // Override nested code block background if needed
+      pre {
+        background-color: var(--background-secondary) !important;
+      }
+      code { // Inline code inside thinking
+        background-color: var(--background-modifier-hover) !important;
+      }
+    }
+  }
+  
+  
+  // --- New Message Indicator ---
+  .new-message-indicator {
+    position: absolute;
+    bottom: 15px; // Adjust as needed relative to input area
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 3);
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(var(--interactive-accent-rgb), 0.3);
+    z-index: 15;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, visibility 0s 0.3s;
+    visibility: hidden;
+  
+    &.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      visibility: visible;
+      transition-delay: 0s;
+    }
+  
+    &:hover {
+      background-color: var(--interactive-accent-hover);
+      box-shadow: 0 4px 10px rgba(var(--interactive-accent-rgb), 0.4);
+    }
+  
+    .indicator-icon {
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+  }
+  
+  // Empty state styling
+  .ollama-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%; // Takes full height of chat container
+    width: 100%;
+    position: absolute; // Overlay on chat container
+    top: 0;
+    left: 0;
+    text-align: center;
+    color: var(--text-muted);
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 1; // Below input/menu
+    background-color: var(--background-secondary-alt); // Match container background
+  
+    .empty-state-message {
+      font-size: 18px;
+      margin-bottom: 10px;
+      opacity: 0.7;
+    }
+    .empty-state-tip {
+      font-size: 14px;
+      opacity: 0.5;
+      max-width: 80%;
+    }
+  }

@@ -1,0 +1,135 @@
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+.thinking-dots .thinking-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--text-muted);
+  margin: 0 3px;
+  opacity: 0.6;
+  animation: dot-pulse 1.4s infinite ease-in-out;
+}
+.thinking-dots .thinking-dot:nth-child(1) {
+  animation-delay: 0s;
+}
+.thinking-dots .thinking-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.thinking-dots .thinking-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.thinking-block {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  margin: 10px 0;
+  background-color: var(--background-secondary-alt);
+  overflow: hidden;
+}
+.thinking-block .thinking-header {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+.thinking-block .thinking-header:hover {
+  background-color: var(--background-modifier-border);
+}
+.thinking-block .thinking-header .thinking-toggle {
+  margin-right: 6px;
+  font-weight: bold;
+  transition: transform 0.2s ease-in-out;
+  font-size: 0.9em;
+}
+.thinking-block .thinking-header[data-fold-state=expanded] .thinking-toggle {
+  transform: rotate(90deg);
+}
+.thinking-block .thinking-header .thinking-title {
+  font-weight: 500;
+  font-size: 0.9em;
+}
+.thinking-block .thinking-content {
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  line-height: 1.5;
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--background-primary);
+  font-size: 0.9em;
+  color: var(--text-normal);
+}
+.thinking-block .thinking-content pre {
+  background-color: var(--background-secondary) !important;
+}
+.thinking-block .thinking-content code {
+  background-color: var(--background-modifier-hover) !important;
+}
+
+.new-message-indicator {
+  position: absolute;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 3);
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(var(--interactive-accent-rgb), 0.3);
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out, visibility 0s 0.3s;
+  visibility: hidden;
+}
+.new-message-indicator.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  visibility: visible;
+  transition-delay: 0s;
+}
+.new-message-indicator:hover {
+  background-color: var(--interactive-accent-hover);
+  box-shadow: 0 4px 10px rgba(var(--interactive-accent-rgb), 0.4);
+}
+.new-message-indicator .indicator-icon {
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.ollama-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 20px;
+  box-sizing: border-box;
+  z-index: 1;
+  background-color: var(--background-secondary-alt);
+}
+.ollama-empty-state .empty-state-message {
+  font-size: 18px;
+  margin-bottom: 10px;
+  opacity: 0.7;
+}
+.ollama-empty-state .empty-state-tip {
+  font-size: 14px;
+  opacity: 0.5;
+  max-width: 80%;
+}

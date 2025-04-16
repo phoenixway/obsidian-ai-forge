@@ -1,0 +1,179 @@
+// src/styles/_messages.scss
+
+.message-group {
+    display: flex;
+    // --- CHANGE: Changed from flex-direction: column to align items based on role ---
+    // flex-direction: column;
+    width: 100%;
+    margin-bottom: calc(var(--chat-spacing-unit) * 4); /* Increased spacing */
+    position: relative;
+    // --- CHANGE: Padding removed, alignment handled by group type ---
+    // padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+    // padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+    box-sizing: border-box;
+  
+    // Group alignment based on role
+    &.user-message-group {
+      justify-content: flex-end; // Align items (avatar + messages) to the right
+      .message-group-avatar {
+        right: 0; // Position avatar right
+        order: 2; // Place avatar after messages visually
+      }
+      .message-wrapper { // New wrapper for messages within the group
+         display: flex;
+         flex-direction: column;
+         align-items: flex-end; // Align bubbles right
+         order: 1; // Place messages before avatar
+         margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+      }
+    }
+  
+    &.ollama-message-group {
+      justify-content: flex-start; // Align items (avatar + messages) to the left
+      .message-group-avatar {
+        left: 0; // Position avatar left
+        order: 1; // Place avatar before messages visually
+      }
+       .message-wrapper { // New wrapper for messages within the group
+         display: flex;
+         flex-direction: column;
+         align-items: flex-start; // Align bubbles left
+         order: 2; // Place messages after avatar
+         margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+      }
+    }
+  }
+  
+  // Avatars
+  .message-group-avatar {
+    // position: absolute; // --- CHANGE: No longer absolute positioned ---
+    // bottom: calc(var(--chat-spacing-unit) * 2.5);
+    align-self: flex-end; // Stick to the bottom of the flex container (message-group)
+    width: var(--chat-avatar-size);
+    height: var(--chat-avatar-size);
+    border-radius: 50%;
+    background-color: var(--background-modifier-hover);
+    color: var(--text-muted);
+    font-size: calc(var(--chat-avatar-size) * 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    z-index: 5;
+    flex-shrink: 0; // Prevent avatar from shrinking
+  
+    .svg-icon {
+      width: 60%;
+      height: 60%;
+    }
+  
+    // Specific Avatar Styles
+    .user-message-group & { // Nesting for user avatar
+      background-color: var(--interactive-accent-translucent);
+      color: var(--interactive-accent);
+    }
+  }
+  
+  // Base message bubble style
+  .message {
+    margin-bottom: calc(var(--chat-spacing-unit) * 1); /* Small gap between messages in group */
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+    border-radius: 18px;
+    max-width: var(--chat-message-max-width);
+    word-wrap: break-word;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    font-size: var(--font-ui-small);
+    line-height: 1.5;
+    transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  
+    &.message-arriving { // Animation class
+      animation: message-appear 0.3s ease-out forwards;
+    }
+  
+    // Remove bottom margin for the last message in the wrapper
+    .message-wrapper > &:last-child {
+       margin-bottom: 0;
+    }
+  }
+  
+  // --- CHANGE: Grouping logic simplified with wrapper ---
+  // Consecutive messages styling (adjusting corners)
+  .user-message-group .message-wrapper {
+    .message:not(:last-child) { border-bottom-right-radius: 5px; }
+    .message:last-child { border-bottom-right-radius: 18px; }
+    .message:not(:first-child) { border-top-right-radius: 5px; }
+    .message:first-child { border-top-right-radius: 18px; }
+  }
+  
+  .ollama-message-group .message-wrapper {
+    .message:not(:last-child) { border-bottom-left-radius: 5px; }
+    .message:last-child { border-bottom-left-radius: 18px; }
+    .message:not(:first-child) { border-top-left-radius: 5px; }
+    .message:first-child { border-top-left-radius: 18px; }
+  }
+  
+  
+  // User messages specific styles
+  .user-message {
+    background-color: var(--interactive-accent);
+    background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
+    color: var(--text-on-accent);
+    // align-self: flex-end; // Handled by wrapper
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
+    // border-top-right-radius: 18px; // Handled by group logic
+    // border-bottom-right-radius: 5px; // Handled by group logic
+    box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
+  
+    &:hover {
+      box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
+      transform: translateY(-1px) scale(1.01);
+    }
+  
+    .message-timestamp { // Timestamp color for user messages
+      color: var(--text-on-accent);
+      opacity: 0.75;
+    }
+  }
+  
+  // AI messages specific styles
+  .ollama-message {
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    // align-self: flex-start; // Handled by wrapper
+    border-top-right-radius: 18px;
+    border-bottom-right-radius: 18px;
+    // border-top-left-radius: 18px; // Handled by group logic
+    // border-bottom-left-radius: 5px; // Handled by group logic
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  
+    &:hover {
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+      transform: translateY(-1px) scale(1.01);
+    }
+  }
+  
+  // Message Content & Meta
+  .message-content-container {
+    position: relative; /* Needed for absolute positioning of action buttons */
+    width: 100%;
+  }
+  
+  .message-content {
+    padding-bottom: calc(var(--chat-spacing-unit) * 2); /* Space below text before timestamp/translation */
+    box-sizing: border-box;
+    width: 100%; /* Ensure it spans width for padding */
+  }
+  
+  .message-timestamp {
+    font-size: 0.75em;
+    color: var(--text-faint);
+    margin-top: var(--chat-spacing-unit);
+    text-align: right;
+    display: block;
+    width: 100%;
+    opacity: 0.9;
+    clear: both; /* Ensure it doesn't overlap floated elements if any */
+  }

@@ -1,0 +1,206 @@
+// src/styles/_input.scss
+
+.chat-input-container {
+    display: flex;
+    flex-direction: column;
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+    border-top: 1px solid var(--divider-color);
+    background-color: var(--background-primary); // Фон як у textarea
+    z-index: 20;
+    border-radius: 12px;
+    margin: calc(var(--chat-spacing-unit) * 2);
+    margin-top: 0;
+    box-sizing: border-box;
+    position: relative; /* Для позиціонування меню */
+    // --- FIX: Limit growth and hide container scrollbar ---
+    max-height: 66vh;
+    overflow: hidden;
+    // --- FIX: Remove shadow ---
+    box-shadow: none;
+    // border: 1px solid transparent; // Add border for focus instead?
+  
+    &:focus-within {
+      // border-color: var(--interactive-accent); // Optional focus indicator
+      box-shadow: none; // Ensure no shadow on focus-within either
+    }
+  
+    textarea {
+      width: 100%;
+      resize: none;
+      border: none; // Or set a default border
+      border-radius: 8px;
+      padding: 10px 15px;
+      min-height: 40px;
+      // --- FIX: Allow scrolling within textarea & set max-height ---
+      max-height: 50vh; // Safety limit
+      overflow-y: auto;
+      background-color: var(--background-primary);
+      color: var(--text-normal);
+      font-size: 14px;
+      line-height: 1.5;
+      transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
+      box-sizing: border-box;
+      margin-bottom: calc(var(--chat-spacing-unit) * 2);
+      // --- FIX: Remove shadow ---
+      box-shadow: none !important; // Use !important as a last resort if needed
+  
+      &:focus {
+        outline: none;
+        // border-color: var(--interactive-accent); // Optional focus indicator
+        background-color: var(--background-secondary); // Optional focus indicator
+        box-shadow: none !important; // Ensure no shadow on focus
+      }
+    }
+  
+    .input-controls-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      flex-shrink: 0; // Prevent controls from shrinking
+  
+      .input-controls-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+  
+        .model-display {
+          font-size: var(--font-ui-smaller);
+          color: var(--text-muted);
+          padding: 4px 8px;
+          border-radius: var(--radius-s);
+          cursor: pointer;
+          text-align: center;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 150px;
+          border: 1px solid transparent;
+          background-color: var(--background-primary); // Match input background
+          transition: all 0.2s ease;
+  
+          &:hover {
+            background-color: var(--background-modifier-hover);
+            border-color: var(--background-modifier-border);
+            color: var(--text-normal);
+          }
+        }
+  
+        // Translate button in left group
+        .translate-input-button {
+           width: 28px;
+           height: 28px;
+           border: none;
+           border-radius: var(--radius-s);
+           background-color: transparent;
+           color: var(--text-muted);
+           cursor: pointer;
+           display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s ease-in-out; opacity: 0.7; outline: none; flex-shrink: 0;
+  
+           &:hover {
+             background-color: var(--background-modifier-hover);
+             color: var(--text-normal);
+             opacity: 1;
+             transform: scale(1.05);
+           }
+  
+           &.translating-input {
+             cursor: default;
+             opacity: 0.5;
+             .svg-icon {
+                animation: spin 1s linear infinite;
+             }
+           }
+        }
+      }
+  
+      // Right controls group (assuming .input-controls-right is used in TS)
+      .input-controls-right {
+        display: flex;
+        align-items: center;
+        gap: calc(var(--chat-spacing-unit) * 1.5);
+        flex-shrink: 0;
+  
+        // Base button styles
+        button {
+          width: 32px;
+          height: 32px;
+          border: none;
+          border-radius: 50%;
+          background-color: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          transition: all 0.15s ease-in-out;
+          opacity: 0.7;
+          outline: none;
+          flex-shrink: 0;
+  
+          &:hover {
+            background-color: var(--background-modifier-hover);
+            color: var(--text-normal);
+            opacity: 1;
+            transform: scale(1.05);
+          }
+  
+          &.disabled {
+            opacity: 0.4 !important;
+            cursor: not-allowed;
+            background-color: transparent !important;
+            transform: none !important;
+            box-shadow: none !important; // Ensure no shadow when disabled
+          }
+  
+           &:focus-visible { // Style for keyboard navigation focus
+             opacity: 1;
+             background-color: var(--background-modifier-hover);
+             box-shadow: 0 0 0 2px var(--interactive-accent-translucent);
+           }
+        }
+  
+        // Send Button
+        .send-button {
+          background-color: var(--interactive-accent);
+          color: var(--text-on-accent);
+          opacity: 1;
+          // box-shadow: 0 1px 3px rgba(var(--interactive-accent-rgb), 0.2); // Removed shadow
+  
+          &:hover {
+            background-color: var(--interactive-accent-hover);
+            transform: scale(1.08);
+            // box-shadow: 0 2px 6px rgba(var(--interactive-accent-rgb), 0.3); // Removed shadow
+          }
+  
+          &:active {
+            transform: scale(1.02);
+            background-color: var(--interactive-accent);
+          }
+  
+          &.disabled {
+            background-color: var(--background-modifier-border) !important;
+            color: var(--text-muted) !important;
+            opacity: 0.6 !important;
+            box-shadow: none !important;
+          }
+        }
+  
+        // Voice Button
+        .voice-button {
+          &.recording {
+            background-color: var(--text-error);
+            color: white;
+            opacity: 1;
+            animation: pulse-recording 1.5s infinite ease-in-out;
+            box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); // Keep pulse animation shadow
+          }
+        }
+  
+        // Menu Button - Add specific styles if needed
+        // .menu-button { }
+      }
+    }
+  }

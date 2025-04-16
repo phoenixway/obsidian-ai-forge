@@ -1,0 +1,17 @@
+// src/styles/main.scss
+
+// Базові змінні та стилі
+@use 'base';
+
+// Основні компоненти та секції
+@use 'layout';
+@use 'input';
+@use 'messages';
+@use 'system_error';
+@use 'markdown';
+@use 'actions';
+@use 'indicators';
+@use 'menu';
+
+// Адаптивні стилі (мають бути в кінці)
+@use 'responsive';

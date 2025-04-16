@@ -1,0 +1,174 @@
+@charset "UTF-8";
+.chat-input-container {
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+  border-top: 1px solid var(--divider-color);
+  background-color: var(--background-primary);
+  z-index: 20;
+  border-radius: 12px;
+  margin: calc(var(--chat-spacing-unit) * 2);
+  margin-top: 0;
+  box-sizing: border-box;
+  position: relative;
+  /* Для позиціонування меню */
+  max-height: 66vh;
+  overflow: hidden;
+  box-shadow: none;
+}
+.chat-input-container:focus-within {
+  box-shadow: none;
+}
+.chat-input-container textarea {
+  width: 100%;
+  resize: none;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 15px;
+  min-height: 40px;
+  max-height: 50vh;
+  overflow-y: auto;
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  font-size: 14px;
+  line-height: 1.5;
+  transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
+  box-sizing: border-box;
+  margin-bottom: calc(var(--chat-spacing-unit) * 2);
+  box-shadow: none !important;
+}
+.chat-input-container textarea:focus {
+  outline: none;
+  background-color: var(--background-secondary);
+  box-shadow: none !important;
+}
+.chat-input-container .input-controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+.chat-input-container .input-controls-container .input-controls-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.chat-input-container .input-controls-container .input-controls-left .model-display {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: 4px 8px;
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+  border: 1px solid transparent;
+  background-color: var(--background-primary);
+  transition: all 0.2s ease;
+}
+.chat-input-container .input-controls-container .input-controls-left .model-display:hover {
+  background-color: var(--background-modifier-hover);
+  border-color: var(--background-modifier-border);
+  color: var(--text-normal);
+}
+.chat-input-container .input-controls-container .input-controls-left .translate-input-button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-s);
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease-in-out;
+  opacity: 0.7;
+  outline: none;
+  flex-shrink: 0;
+}
+.chat-input-container .input-controls-container .input-controls-left .translate-input-button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  opacity: 1;
+  transform: scale(1.05);
+}
+.chat-input-container .input-controls-container .input-controls-left .translate-input-button.translating-input {
+  cursor: default;
+  opacity: 0.5;
+}
+.chat-input-container .input-controls-container .input-controls-left .translate-input-button.translating-input .svg-icon {
+  animation: spin 1s linear infinite;
+}
+.chat-input-container .input-controls-container .input-controls-right {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--chat-spacing-unit) * 1.5);
+  flex-shrink: 0;
+}
+.chat-input-container .input-controls-container .input-controls-right button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease-in-out;
+  opacity: 0.7;
+  outline: none;
+  flex-shrink: 0;
+}
+.chat-input-container .input-controls-container .input-controls-right button:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+  opacity: 1;
+  transform: scale(1.05);
+}
+.chat-input-container .input-controls-container .input-controls-right button.disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed;
+  background-color: transparent !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.chat-input-container .input-controls-container .input-controls-right button:focus-visible {
+  opacity: 1;
+  background-color: var(--background-modifier-hover);
+  box-shadow: 0 0 0 2px var(--interactive-accent-translucent);
+}
+.chat-input-container .input-controls-container .input-controls-right .send-button {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  opacity: 1;
+}
+.chat-input-container .input-controls-container .input-controls-right .send-button:hover {
+  background-color: var(--interactive-accent-hover);
+  transform: scale(1.08);
+}
+.chat-input-container .input-controls-container .input-controls-right .send-button:active {
+  transform: scale(1.02);
+  background-color: var(--interactive-accent);
+}
+.chat-input-container .input-controls-container .input-controls-right .send-button.disabled {
+  background-color: var(--background-modifier-border) !important;
+  color: var(--text-muted) !important;
+  opacity: 0.6 !important;
+  box-shadow: none !important;
+}
+.chat-input-container .input-controls-container .input-controls-right .voice-button.recording {
+  background-color: var(--text-error);
+  color: white;
+  opacity: 1;
+  animation: pulse-recording 1.5s infinite ease-in-out;
+  box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5);
+}

@@ -1,0 +1,162 @@
+.message-group {
+  display: flex;
+  width: 100%;
+  margin-bottom: calc(var(--chat-spacing-unit) * 4);
+  /* Increased spacing */
+  position: relative;
+  box-sizing: border-box;
+}
+.message-group.user-message-group {
+  justify-content: flex-end;
+}
+.message-group.user-message-group .message-group-avatar {
+  right: 0;
+  order: 2;
+}
+.message-group.user-message-group .message-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  order: 1;
+  margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+}
+.message-group.ollama-message-group {
+  justify-content: flex-start;
+}
+.message-group.ollama-message-group .message-group-avatar {
+  left: 0;
+  order: 1;
+}
+.message-group.ollama-message-group .message-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  order: 2;
+  margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+}
+
+.message-group-avatar {
+  align-self: flex-end;
+  width: var(--chat-avatar-size);
+  height: var(--chat-avatar-size);
+  border-radius: 50%;
+  background-color: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: calc(var(--chat-avatar-size) * 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  z-index: 5;
+  flex-shrink: 0;
+}
+.message-group-avatar .svg-icon {
+  width: 60%;
+  height: 60%;
+}
+.user-message-group .message-group-avatar {
+  background-color: var(--interactive-accent-translucent);
+  color: var(--interactive-accent);
+}
+
+.message {
+  margin-bottom: calc(var(--chat-spacing-unit) * 1);
+  /* Small gap between messages in group */
+  padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+  border-radius: 18px;
+  max-width: var(--chat-message-max-width);
+  word-wrap: break-word;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.message.message-arriving {
+  animation: message-appear 0.3s ease-out forwards;
+}
+.message-wrapper > .message:last-child {
+  margin-bottom: 0;
+}
+
+.user-message-group .message-wrapper .message:not(:last-child) {
+  border-bottom-right-radius: 5px;
+}
+.user-message-group .message-wrapper .message:last-child {
+  border-bottom-right-radius: 18px;
+}
+.user-message-group .message-wrapper .message:not(:first-child) {
+  border-top-right-radius: 5px;
+}
+.user-message-group .message-wrapper .message:first-child {
+  border-top-right-radius: 18px;
+}
+
+.ollama-message-group .message-wrapper .message:not(:last-child) {
+  border-bottom-left-radius: 5px;
+}
+.ollama-message-group .message-wrapper .message:last-child {
+  border-bottom-left-radius: 18px;
+}
+.ollama-message-group .message-wrapper .message:not(:first-child) {
+  border-top-left-radius: 5px;
+}
+.ollama-message-group .message-wrapper .message:first-child {
+  border-top-left-radius: 18px;
+}
+
+.user-message {
+  background-color: var(--interactive-accent);
+  background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
+  color: var(--text-on-accent);
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+  box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
+}
+.user-message:hover {
+  box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
+  transform: translateY(-1px) scale(1.01);
+}
+.user-message .message-timestamp {
+  color: var(--text-on-accent);
+  opacity: 0.75;
+}
+
+.ollama-message {
+  background-color: var(--background-primary);
+  color: var(--text-normal);
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.ollama-message:hover {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px) scale(1.01);
+}
+
+.message-content-container {
+  position: relative;
+  /* Needed for absolute positioning of action buttons */
+  width: 100%;
+}
+
+.message-content {
+  padding-bottom: calc(var(--chat-spacing-unit) * 2);
+  /* Space below text before timestamp/translation */
+  box-sizing: border-box;
+  width: 100%;
+  /* Ensure it spans width for padding */
+}
+
+.message-timestamp {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  margin-top: var(--chat-spacing-unit);
+  text-align: right;
+  display: block;
+  width: 100%;
+  opacity: 0.9;
+  clear: both;
+  /* Ensure it doesn't overlap floated elements if any */
+}

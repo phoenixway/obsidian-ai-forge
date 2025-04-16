@@ -618,57 +618,82 @@ export class OllamaView extends ItemView {
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
 
+  // private adjustTextareaHeight = (): void => {
+  //   requestAnimationFrame(() => {
+  //     // Перевіряємо наявність необхідних елементів
+  //     if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement) return;
+
+  //     const inputContainer = this.inputEl.parentElement as HTMLElement; // Отримуємо батьківський контейнер
+  //     const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`) as HTMLElement;
+
+  //     // Мінімальна висота textarea
+  //     const minTextareaHeight = 40; // px, як у CSS
+
+  //     // Максимальна частка висоти вікна для зони вводу (textarea + controls)
+  //     const maxContainerHeightFraction = 2 / 3; // Приблизно 66.7%
+
+  //     // Загальна доступна висота в межах view
+  //     const viewHeight = this.contentEl.clientHeight;
+  //     // Максимальна висота для ВСЬОГО контейнера вводу
+  //     const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction); // Не менше 100px
+
+  //     // Висота контролів (кнопок, дисплею моделі)
+  //     // Використовуємо offsetHeight, якщо елемент видимий, інакше - 0
+  //     const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
+
+  //     // Вертикальні padding'и самого inputContainer (отримуємо зі стилів)
+  //     const containerStyle = window.getComputedStyle(inputContainer);
+  //     const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
+  //     const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
+  //     const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
+
+  //     // Відступ між textarea і controlsContainer (margin-bottom у textarea)
+  //     const textareaStyle = window.getComputedStyle(this.inputEl);
+  //     const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
+
+
+  //     // Розраховуємо максимальну доступну висоту САМЕ ДЛЯ TEXTAREA
+  //     const maxTextareaHeight = Math.max(
+  //       minTextareaHeight, // Не може бути меншою за мінімальну
+  //       maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
+  //     );
+
+  //     // Скидаємо висоту, щоб отримати реальну висоту контенту
+  //     this.inputEl.style.height = 'auto';
+  //     const scrollHeight = this.inputEl.scrollHeight;
+
+  //     // Встановлюємо нову висоту textarea, обмежуючи її максимумом
+  //     const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
+  //     this.inputEl.style.height = `${newTextareaHeight}px`;
+
+  //     // Більше не потрібен клас 'expanded', бо скролінг з'явиться автоматично
+  //     // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
+
+  //   });
+  // }
+
   private adjustTextareaHeight = (): void => {
+    // Виконуємо в requestAnimationFrame для плавності
     requestAnimationFrame(() => {
-      // Перевіряємо наявність необхідних елементів
-      if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement) return;
+      if (!this.inputEl) return;
 
-      const inputContainer = this.inputEl.parentElement as HTMLElement; // Отримуємо батьківський контейнер
-      const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`) as HTMLElement;
+      const textarea = this.inputEl;
+      const minHeight = 40; // Мінімальна висота з CSS
 
-      // Мінімальна висота textarea
-      const minTextareaHeight = 40; // px, як у CSS
+      // 1. Скидаємо висоту, щоб отримати реальну висоту контенту (scrollHeight)
+      textarea.style.height = 'auto'; // Можна встановити `${minHeight}px` для уникнення "стрибка"
 
-      // Максимальна частка висоти вікна для зони вводу (textarea + controls)
-      const maxContainerHeightFraction = 2 / 3; // Приблизно 66.7%
+      // 2. Отримуємо scrollHeight
+      const scrollHeight = textarea.scrollHeight;
 
-      // Загальна доступна висота в межах view
-      const viewHeight = this.contentEl.clientHeight;
-      // Максимальна висота для ВСЬОГО контейнера вводу
-      const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction); // Не менше 100px
+      // 3. Встановлюємо нову висоту, але не меншу за minHeight
+      //    Обмеження max-height тепер обробляється CSS на самому textarea
+      //    та/або на .chat-input-container
+      const newHeight = Math.max(minHeight, scrollHeight);
+      textarea.style.height = `${newHeight}px`;
 
-      // Висота контролів (кнопок, дисплею моделі)
-      // Використовуємо offsetHeight, якщо елемент видимий, інакше - 0
-      const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
-
-      // Вертикальні padding'и самого inputContainer (отримуємо зі стилів)
-      const containerStyle = window.getComputedStyle(inputContainer);
-      const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
-      const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
-      const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
-
-      // Відступ між textarea і controlsContainer (margin-bottom у textarea)
-      const textareaStyle = window.getComputedStyle(this.inputEl);
-      const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
-
-
-      // Розраховуємо максимальну доступну висоту САМЕ ДЛЯ TEXTAREA
-      const maxTextareaHeight = Math.max(
-        minTextareaHeight, // Не може бути меншою за мінімальну
-        maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
-      );
-
-      // Скидаємо висоту, щоб отримати реальну висоту контенту
-      this.inputEl.style.height = 'auto';
-      const scrollHeight = this.inputEl.scrollHeight;
-
-      // Встановлюємо нову висоту textarea, обмежуючи її максимумом
-      const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
-      this.inputEl.style.height = `${newTextareaHeight}px`;
-
-      // Більше не потрібен клас 'expanded', бо скролінг з'явиться автоматично
-      // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
-
+      // Немає потреби в складних розрахунках max-height тут,
+      // якщо CSS налаштований правильно (max-height на контейнері/textarea + overflow)
     });
   }
 
@@ -867,7 +892,21 @@ export class OllamaView extends ItemView {
     }
 
     // --- Element Creation ---
-    const messageEl = messageGroup.createDiv({ cls: messageClass });
+    //TODO: checkit
+    // const messageEl = messageGroup.createDiv({ cls: messageClass });
+
+    let messageWrapper = messageGroup.querySelector('.message-wrapper') as HTMLElement;
+    if (!messageWrapper) {
+      messageWrapper = messageGroup.createDiv({ cls: 'message-wrapper' });
+      // Ensure correct order relative to avatar based on group type
+      if (messageGroup.classList.contains(CSS_CLASS_USER_GROUP)) {
+        messageWrapper.style.order = '1'; // Messages first
+      } else {
+        messageWrapper.style.order = '2'; // Messages second
+      }
+    }
+    const messageEl = messageWrapper.createDiv({ cls: messageClass }); // Append message to wrapper
+
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
 

@@ -737,32 +737,56 @@ This action cannot be undone.`, async () => {
       (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
+    // private adjustTextareaHeight = (): void => {
+    //   requestAnimationFrame(() => {
+    //     // Перевіряємо наявність необхідних елементів
+    //     if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement) return;
+    //     const inputContainer = this.inputEl.parentElement as HTMLElement; // Отримуємо батьківський контейнер
+    //     const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`) as HTMLElement;
+    //     // Мінімальна висота textarea
+    //     const minTextareaHeight = 40; // px, як у CSS
+    //     // Максимальна частка висоти вікна для зони вводу (textarea + controls)
+    //     const maxContainerHeightFraction = 2 / 3; // Приблизно 66.7%
+    //     // Загальна доступна висота в межах view
+    //     const viewHeight = this.contentEl.clientHeight;
+    //     // Максимальна висота для ВСЬОГО контейнера вводу
+    //     const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction); // Не менше 100px
+    //     // Висота контролів (кнопок, дисплею моделі)
+    //     // Використовуємо offsetHeight, якщо елемент видимий, інакше - 0
+    //     const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
+    //     // Вертикальні padding'и самого inputContainer (отримуємо зі стилів)
+    //     const containerStyle = window.getComputedStyle(inputContainer);
+    //     const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
+    //     const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
+    //     const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
+    //     // Відступ між textarea і controlsContainer (margin-bottom у textarea)
+    //     const textareaStyle = window.getComputedStyle(this.inputEl);
+    //     const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
+    //     // Розраховуємо максимальну доступну висоту САМЕ ДЛЯ TEXTAREA
+    //     const maxTextareaHeight = Math.max(
+    //       minTextareaHeight, // Не може бути меншою за мінімальну
+    //       maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
+    //     );
+    //     // Скидаємо висоту, щоб отримати реальну висоту контенту
+    //     this.inputEl.style.height = 'auto';
+    //     const scrollHeight = this.inputEl.scrollHeight;
+    //     // Встановлюємо нову висоту textarea, обмежуючи її максимумом
+    //     const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
+    //     this.inputEl.style.height = `${newTextareaHeight}px`;
+    //     // Більше не потрібен клас 'expanded', бо скролінг з'явиться автоматично
+    //     // this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxTextareaHeight);
+    //   });
+    // }
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
-        if (!this.inputEl || !this.contentEl || !this.inputEl.parentElement)
+        if (!this.inputEl)
           return;
-        const inputContainer = this.inputEl.parentElement;
-        const controlsContainer = inputContainer.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`);
-        const minTextareaHeight = 40;
-        const maxContainerHeightFraction = 2 / 3;
-        const viewHeight = this.contentEl.clientHeight;
-        const maxInputContainerHeight = Math.max(100, viewHeight * maxContainerHeightFraction);
-        const controlsHeight = controlsContainer ? controlsContainer.offsetHeight : 0;
-        const containerStyle = window.getComputedStyle(inputContainer);
-        const containerPaddingTop = parseFloat(containerStyle.paddingTop) || 0;
-        const containerPaddingBottom = parseFloat(containerStyle.paddingBottom) || 0;
-        const totalContainerVerticalPadding = containerPaddingTop + containerPaddingBottom;
-        const textareaStyle = window.getComputedStyle(this.inputEl);
-        const textareaMarginBottom = parseFloat(textareaStyle.marginBottom) || 0;
-        const maxTextareaHeight = Math.max(
-          minTextareaHeight,
-          // Не може бути меншою за мінімальну
-          maxInputContainerHeight - controlsHeight - totalContainerVerticalPadding - textareaMarginBottom
-        );
-        this.inputEl.style.height = "auto";
-        const scrollHeight = this.inputEl.scrollHeight;
-        const newTextareaHeight = Math.max(minTextareaHeight, Math.min(scrollHeight, maxTextareaHeight));
-        this.inputEl.style.height = `${newTextareaHeight}px`;
+        const textarea = this.inputEl;
+        const minHeight = 40;
+        textarea.style.height = "auto";
+        const scrollHeight = textarea.scrollHeight;
+        const newHeight = Math.max(minHeight, scrollHeight);
+        textarea.style.height = `${newHeight}px`;
       });
     };
     this.plugin = plugin;
@@ -1335,7 +1359,16 @@ This action cannot be undone.`, async () => {
     } else {
       messageGroup = lastElement;
     }
-    const messageEl = messageGroup.createDiv({ cls: messageClass });
+    let messageWrapper = messageGroup.querySelector(".message-wrapper");
+    if (!messageWrapper) {
+      messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
+      if (messageGroup.classList.contains(CSS_CLASS_USER_GROUP)) {
+        messageWrapper.style.order = "1";
+      } else {
+        messageWrapper.style.order = "2";
+      }
+    }
+    const messageEl = messageWrapper.createDiv({ cls: messageClass });
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
     switch (message.role) {
