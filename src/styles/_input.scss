@@ -1,17 +1,12 @@
 // src/styles/_input.scss
 
 .chat-input-container {
-  // display: flex;
-  // flex-direction: column;
-  // flex-grow: 0;
-  // flex-shrink: 0;
-
   display: flex;
-  flex-direction: column; // ЯВНО вказуємо напрямок колонки!
+  flex-direction: column;
   flex-grow: 0;
-  flex-shrink: 0;
-  align-items: flex-start; // <-- СПРОБУЙТЕ ЦЕ
-
+  flex-shrink: 0; // Важливо, щоб батьківський flex не стискав його
+  width: 100%;
+  box-sizing: border-box;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
@@ -20,19 +15,18 @@
   margin: calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
   position: relative;
-  // --- ВИДАЛЕНО ---
+  // --- ВИДАЛЕНО/ЗАКОМЕНТОВАНО: Висота тепер контролюється JS ---
   // max-height: 66vh;
-  // overflow: hidden;
-  // --- КІНЕЦЬ ВИДАЛЕННЯ ---
+  // height: auto; // Теж не потрібно, JS встановлює height
+  // --- КІНЕЦЬ ЗМІН ---
+  overflow: hidden; // Можна залишити, якщо хочете обрізати те, що теоретично може вилізти
   box-shadow: none;
-  width: 100% ;
-  box-sizing: border-box;
-  height: auto; 
 
   &:focus-within {
     border-color: var(--interactive-accent);
     box-shadow: none;
   }
+
 
   textarea {
     width: 100%;
@@ -42,16 +36,18 @@
     border-radius: 8px;
     padding: 10px 15px;
     line-height: 1.5;
-    min-height: 40px;     // ЗАЛИШАЄМО
-    max-height: 60vh;     // ЗАЛИШАЄМО
-    overflow-y: auto;     // ЗАЛИШАЄМО
-    // height: auto;      // ПРИБИРАЄМО або коментуємо цей рядок, якщо він був
+    min-height: 40px;     // ЗАЛИШАЄМО (для JS)
+    max-height: 60vh;     // ЗАЛИШАЄМО (для JS)
+    overflow-y: auto;     // ЗАЛИШАЄМО (для скролінгу textarea)
+    // height: auto;      // ПРИБИРАЄМО
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
-    transition: border-color 0.3s, background-color 0.3s; // Прибираємо 'height' з transition
-    margin-bottom: calc(var(--chat-spacing-unit) * 2);
+    // Прибираємо height з transition, якщо він там був
+    transition: border-color 0.3s, background-color 0.3s;
+    margin-bottom: calc(var(--chat-spacing-unit) * 2); // Важливо для розрахунку висоти контейнера
     box-shadow: none !important;
+    flex-shrink: 0; // Можна залишити, хоча навряд чи потрібно для textarea
 
     &:focus {
       outline: none;
@@ -65,9 +61,10 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 100%; 
-    box-sizing: border-box; 
-    flex-shrink: 0; // Prevent controls from shrinking
+    width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0; // Важливо, щоб контроли не стискалися
+   
     // margin-top: calc(var(--chat-spacing-unit) * 2);
   
       .input-controls-left {

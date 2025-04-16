@@ -694,39 +694,63 @@ var OllamaView = /** @class */ (function (_super) {
         _this.handleNewMessageIndicatorClick = function () { var _a; if (_this.chatContainer) {
             _this.chatContainer.scrollTo({ top: _this.chatContainer.scrollHeight, behavior: 'smooth' });
         } (_a = _this.newMessagesIndicatorEl) === null || _a === void 0 ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE); _this.userScrolledUp = false; };
-        // OllamaView.ts
         _this.adjustTextareaHeight = function () {
-            // Використовуємо подвійний requestAnimationFrame для стабільності вимірювань
+            // Використовуємо requestAnimationFrame для плавності
             requestAnimationFrame(function () {
-                if (!_this.inputEl)
+                // Перевіряємо наявність textarea та її батька
+                if (!_this.inputEl || !_this.inputEl.parentElement)
                     return;
                 var textarea = _this.inputEl;
-                var computedStyle = window.getComputedStyle(textarea);
-                // Читаємо min/max з CSS
-                var minHeight = parseFloat(computedStyle.minHeight) || 40;
-                var maxHeight = parseFloat(computedStyle.maxHeight);
-                // Фаза 1: Скидання висоти для вимірювання
-                textarea.style.height = 'auto';
+                var container = textarea.parentElement; // Батько = .chat-input-container
+                // Знаходимо контроли всередині батька
+                var controlsContainer = container.querySelector("." + CSS_CLASS_INPUT_CONTROLS_CONTAINER);
+                // Додаткова перевірка наявності контейнера контролів
+                if (!controlsContainer) {
+                    console.error("Controls container not found inside input container.");
+                    return;
+                }
+                var computedTextareaStyle = window.getComputedStyle(textarea);
+                var computedContainerStyle = window.getComputedStyle(container);
+                // Обмеження висоти для textarea з її CSS
+                var minTextareaHeight = parseFloat(computedTextareaStyle.minHeight) || 40;
+                var maxTextareaHeight = parseFloat(computedTextareaStyle.maxHeight); // max-height самої textarea
+                console.log("adjustTextareaHeight BOTH: Fired.");
+                var originalTextareaHeight = textarea.style.height;
+                textarea.style.height = 'auto'; // Скидання для вимірювання
+                // Вимірювання в наступному кадрі
                 requestAnimationFrame(function () {
-                    if (!_this.inputEl)
-                        return;
+                    if (!textarea || !container || !controlsContainer)
+                        return; // Повторна перевірка
                     var scrollHeight = textarea.scrollHeight;
-                    // Обчислюємо нову висоту: між minHeight та scrollHeight
-                    var newHeight = Math.max(minHeight, scrollHeight);
-                    // Обмежуємо зверху значенням maxHeight з CSS (якщо воно є)
-                    if (!isNaN(maxHeight) && newHeight > maxHeight) {
-                        newHeight = maxHeight;
-                        // Переконуємося, що скролінг увімкнено, якщо досягли межі
+                    // Можна прибрати відновлення originalTextareaHeight, оскільки ми все одно встановимо нову висоту
+                    // textarea.style.height = originalTextareaHeight;
+                    // --- 1. Обчислення висоти для Textarea ---
+                    var newTextareaHeight = Math.max(minTextareaHeight, scrollHeight);
+                    // Застосовуємо обмеження CSS max-height до textarea
+                    if (!isNaN(maxTextareaHeight) && newTextareaHeight > maxTextareaHeight) {
+                        newTextareaHeight = maxTextareaHeight;
+                        console.log("adjustTextareaHeight BOTH: Textarea capped by CSS max-height (" + maxTextareaHeight + "px).");
+                        // Переконуємося, що overflow увімкнено для textarea
                         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
                             textarea.style.overflowY = 'auto';
                         }
                     }
-                    // ВАЖЛИВО: Встановлюємо саме 'height', а не 'min-height'
-                    textarea.style.height = newHeight + "px";
-                    // Логування для перевірки (можна потім прибрати)
-                    console.log("adjustTextareaHeight HEIGHT: Set style.height=" + newHeight + "px");
-                    var renderedHeight = textarea.clientHeight;
-                    console.log("adjustTextareaHeight HEIGHT: Rendered clientHeight=" + renderedHeight);
+                    // --- 2. Обчислення висоти для Контейнера ---
+                    var controlsHeight = controlsContainer.offsetHeight; // Реальна висота блоку контролів
+                    var containerPaddingTop = parseFloat(computedContainerStyle.paddingTop) || 0;
+                    var containerPaddingBottom = parseFloat(computedContainerStyle.paddingBottom) || 0;
+                    // Відступ між textarea та controls (зазвичай margin-bottom на textarea)
+                    var textareaMarginBottom = parseFloat(computedTextareaStyle.marginBottom) || 0;
+                    // Формула: Паддінг_Верх + Висота_Textarea + Марджін_Textarea + Висота_Контролів + Паддінг_Низ
+                    var newContainerHeight = containerPaddingTop + newTextareaHeight + textareaMarginBottom + controlsHeight + containerPaddingBottom;
+                    // --- 3. Встановлення ОБИДВОХ висот ---
+                    textarea.style.height = newTextareaHeight + "px";
+                    container.style.height = newContainerHeight + "px"; // Встановлюємо висоту контейнера
+                    console.log("adjustTextareaHeight BOTH: Set textarea H=" + newTextareaHeight + "px, container H=" + newContainerHeight + "px");
+                    // Логування реальних розмірів після встановлення (для діагностики)
+                    var renderedTextareaHeight = textarea.clientHeight;
+                    var renderedContainerHeight = container.clientHeight;
+                    console.log("adjustTextareaHeight BOTH: Rendered textarea H=" + renderedTextareaHeight + ", container H=" + renderedContainerHeight);
                 });
             });
         };

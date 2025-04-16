@@ -3,7 +3,8 @@
   flex-direction: column;
   flex-grow: 0;
   flex-shrink: 0;
-  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
@@ -12,10 +13,8 @@
   margin: calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
   position: relative;
+  overflow: hidden;
   box-shadow: none;
-  width: 100%;
-  box-sizing: border-box;
-  height: auto;
 }
 .chat-input-container:focus-within {
   border-color: var(--interactive-accent);
@@ -38,6 +37,7 @@
   transition: border-color 0.3s, background-color 0.3s;
   margin-bottom: calc(var(--chat-spacing-unit) * 2);
   box-shadow: none !important;
+  flex-shrink: 0;
 }
 .chat-input-container textarea:focus {
   outline: none;
