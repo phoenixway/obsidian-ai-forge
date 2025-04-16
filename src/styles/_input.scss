@@ -7,7 +7,11 @@
   flex-shrink: 0; 
   width: 100%;
   box-sizing: border-box;
-  padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+  padding:
+    calc(var(--chat-spacing-unit) * 2)    // Top
+    calc(var(--chat-spacing-unit) * 5)    // Right (ЗБІЛЬШЕНО)
+    calc(var(--chat-spacing-unit) * 2)    // Bottom
+    calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
   z-index: 20;
