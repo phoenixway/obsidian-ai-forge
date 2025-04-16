@@ -31,19 +31,16 @@
     resize: none;
     border: none;
     border-radius: 8px;
-    padding: 10px 15px;
-    width: 100%;             // Переконуємося, що textarea теж 100%
+    padding: 5px 10px !important;   // Спробуємо значно менший padding
+    line-height: 1.3 !important;  
+
     box-sizing: border-box;
     min-height: 40px;
-    // --- ЗМІНЕНО: Встановлюємо max-height ТУТ ---
     max-height: 60vh; // Спробуйте це значення (60% висоти вікна), можна змінити
-    // overflow-y: auto; // Дуже важливо для скролінгу textarea!
     overflow-y: auto;//!important; 
-    // --- КІНЕЦЬ ЗМІН ---
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
-    line-height: 1.5;
     transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
     margin-bottom: calc(var(--chat-spacing-unit) * 2);
     box-shadow: none !important;
