@@ -838,12 +838,12 @@ var OllamaView = /** @class */ (function (_super) {
         this.translateInputButton.title = "Translate input to English";
         // 2b. Права група контролів (старий buttonsContainer)
         this.buttonsContainer = controlsContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER + " " + CSS_CLASS_INPUT_CONTROLS_RIGHT });
+        this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } });
+        obsidian_1.setIcon(this.sendButton, "send");
         this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } });
         obsidian_1.setIcon(this.voiceButton, "mic");
         this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } });
         obsidian_1.setIcon(this.menuButton, "more-vertical");
-        this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } });
-        obsidian_1.setIcon(this.sendButton, "send");
         // --- Кастомне Випадаюче Меню (для кнопки "...") ---
         // Позиціонується відносно inputContainer або menuButton
         this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
