@@ -62,14 +62,14 @@
      CHAT INPUT SECTION
      ========================================================================== */
 
-
      .chat-input-container {
       /* ВИКОРИСТОВУЄМО FLEXBOX ДЛЯ ОСНОВНОГО КОНТЕЙНЕРА */
       display: flex;
       flex-direction: column; /* Тепер елементи йдуть зверху вниз */
       padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
       border-top: 1px solid var(--divider-color);
-      background-color: var(--background-secondary-alt); /* Спільний фон */
+      /* --- ЗМІНЕНО --- */
+      background-color: var(--background-primary); /* Фон як у textarea */
       z-index: 20;
       border-radius: 12px;
       margin: calc(var(--chat-spacing-unit) * 2);
@@ -79,6 +79,7 @@
       position: relative; /* Для позиціонування меню */
       transition: box-shadow 0.2s;
     }
+
     .chat-input-container:focus-within {
        /* Можна додати стиль для активного стану */
        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--background-modifier-border);
@@ -107,14 +108,19 @@
       text-overflow: ellipsis;
       max-width: 150px; /* Можна збільшити */
       border: 1px solid transparent;
-      background-color: var(--background-secondary); /* Фон для кращого вигляду */
+      /* --- ЗМІНЕНО --- */
+      background-color: var(--background-primary); /* Фон як у textarea */
       transition: all 0.2s ease;
-  }
-  .model-display:hover {
-      background-color: var(--background-modifier-hover);
+    }
+    .model-display:hover {
+      /* --- МОЖЛИВО ПОТРІБНО НАЛАШТУВАТИ --- */
+      /* Якщо --background-primary = --background-modifier-hover, hover не буде видно */
+      /* Можливо, краще var(--background-secondary) або var(--background-modifier-border) */
+      background-color: var(--background-modifier-hover); /* Залишаємо поки що, але майте на увазі */
       border-color: var(--background-modifier-border);
       color: var(--text-normal);
-  }
+    }
+
   
     /* Кнопка перекладу в лівій групі */
     .input-controls-left .translate-input-button {

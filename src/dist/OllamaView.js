@@ -189,86 +189,91 @@ var OllamaView = /** @class */ (function (_super) {
         _this.lastRenderedMessageDate = null;
         _this.newMessagesIndicatorEl = null;
         _this.userScrolledUp = false;
-        _this.handleModelDisplayClick = function (event) {
-            console.log("[OllamaView Debug] Model display clicked, creating native menu.");
-            var menu = new obsidian_1.Menu();
-            // Тимчасовий пункт під час завантаження
-            var loadingItem = menu.addItem(function (item) { return item.setTitle("Loading models...").setDisabled(true); });
-            menu.showAtMouseEvent(event); // Показати одразу
-            // Асинхронно завантажуємо і наповнюємо
-            (function () { return __awaiter(_this, void 0, void 0, function () {
-                var modelsLoaded, models, activeChat, currentModelName_1, error_1;
-                var _this = this;
-                var _a, _b;
-                return __generator(this, function (_c) {
-                    switch (_c.label) {
-                        case 0:
-                            modelsLoaded = false;
-                            _c.label = 1;
-                        case 1:
-                            _c.trys.push([1, 4, , 5]);
-                            return [4 /*yield*/, this.plugin.ollamaService.getModels()];
-                        case 2:
-                            models = _c.sent();
-                            return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
-                        case 3:
-                            activeChat = _c.sent();
-                            currentModelName_1 = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
-                            // Очищаємо меню від "Loading..."
-                            // @ts-ignore - Неофіційний доступ до items
-                            if (menu.items.includes(loadingItem)) {
-                                menu.items.remove(loadingItem);
-                            }
-                            if (models.length === 0) {
-                                menu.addItem(function (item) { return item.setTitle("No models found").setDisabled(true); });
-                            }
-                            else {
-                                modelsLoaded = true;
-                                models.forEach(function (modelName) {
-                                    menu.addItem(function (item) {
-                                        return item
-                                            .setTitle(modelName)
-                                            .setIcon(modelName === currentModelName_1 ? "check" : "radio-button")
-                                            .onClick(function () { return __awaiter(_this, void 0, void 0, function () {
-                                            var chatToUpdate, latestModelName;
-                                            var _a, _b;
-                                            return __generator(this, function (_c) {
-                                                switch (_c.label) {
-                                                    case 0: return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
-                                                    case 1:
-                                                        chatToUpdate = _c.sent();
-                                                        latestModelName = ((_b = chatToUpdate === null || chatToUpdate === void 0 ? void 0 : chatToUpdate.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
-                                                        if (!(modelName !== latestModelName)) return [3 /*break*/, 4];
-                                                        if (!chatToUpdate) return [3 /*break*/, 3];
-                                                        return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName })];
-                                                    case 2:
-                                                        _c.sent();
-                                                        return [3 /*break*/, 4];
-                                                    case 3:
-                                                        new obsidian_1.Notice("Cannot set model: No active chat.");
-                                                        _c.label = 4;
-                                                    case 4: return [2 /*return*/];
-                                                }
-                                            });
-                                        }); });
-                                    });
+        // OllamaView.ts -> handleModelDisplayClick
+        _this.handleModelDisplayClick = function (event) { return __awaiter(_this, void 0, void 0, function () {
+            var menu, itemsAdded, loadingNotice, models, activeChat, currentModelName_1, error_1;
+            var _this = this;
+            var _a, _b;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
+                    case 0:
+                        console.log("[OllamaView Debug] Model display clicked, creating native menu.");
+                        menu = new obsidian_1.Menu();
+                        itemsAdded = false;
+                        loadingNotice = new obsidian_1.Notice("Loading models...", 0);
+                        _c.label = 1;
+                    case 1:
+                        _c.trys.push([1, 4, 5, 6]);
+                        return [4 /*yield*/, this.plugin.ollamaService.getModels()];
+                    case 2:
+                        models = _c.sent();
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 3:
+                        activeChat = _c.sent();
+                        currentModelName_1 = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                        loadingNotice.hide();
+                        if (models.length === 0) {
+                            menu.addItem(function (item) { return item.setTitle("No models found").setDisabled(true); });
+                            itemsAdded = true; // <-- Позначили, що елемент додано
+                        }
+                        else {
+                            models.forEach(function (modelName) {
+                                menu.addItem(function (item) {
+                                    return item
+                                        .setTitle(modelName)
+                                        .setIcon(modelName === currentModelName_1 ? "check" : "radio-button")
+                                        .onClick(function () { return __awaiter(_this, void 0, void 0, function () {
+                                        var chatToUpdate, latestModelName;
+                                        var _a, _b;
+                                        return __generator(this, function (_c) {
+                                            switch (_c.label) {
+                                                case 0: return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                                                case 1:
+                                                    chatToUpdate = _c.sent();
+                                                    latestModelName = ((_b = chatToUpdate === null || chatToUpdate === void 0 ? void 0 : chatToUpdate.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                                                    if (!(modelName !== latestModelName)) return [3 /*break*/, 4];
+                                                    if (!chatToUpdate) return [3 /*break*/, 3];
+                                                    return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName })];
+                                                case 2:
+                                                    _c.sent();
+                                                    return [3 /*break*/, 4];
+                                                case 3:
+                                                    new obsidian_1.Notice("Cannot set model: No active chat.");
+                                                    _c.label = 4;
+                                                case 4: return [2 /*return*/];
+                                            }
+                                        });
+                                    }); });
                                 });
-                            }
-                            return [3 /*break*/, 5];
-                        case 4:
-                            error_1 = _c.sent();
-                            console.error("Error loading models for model selection menu:", error_1);
-                            // @ts-ignore
-                            if (menu.items.includes(loadingItem)) {
-                                menu.items.remove(loadingItem);
-                            }
-                            menu.addItem(function (item) { return item.setTitle("Error loading models").setDisabled(true); });
-                            return [3 /*break*/, 5];
-                        case 5: return [2 /*return*/];
-                    }
-                });
-            }); })();
-        };
+                                itemsAdded = true; // <-- Позначили, що елемент(и) додано
+                            });
+                        }
+                        return [3 /*break*/, 6];
+                    case 4:
+                        error_1 = _c.sent();
+                        loadingNotice.hide();
+                        console.error("Error loading models for model selection menu:", error_1);
+                        menu.addItem(function (item) { return item.setTitle("Error loading models").setDisabled(true); });
+                        itemsAdded = true; // <-- Позначили, що елемент помилки додано
+                        new obsidian_1.Notice("Failed to load models. Check Ollama connection.");
+                        return [3 /*break*/, 6];
+                    case 5:
+                        // --- ЗМІНЕНО ---
+                        // Показуємо меню, ТІЛЬКИ ЯКЩО хоч один елемент було додано
+                        if (itemsAdded) {
+                            menu.showAtMouseEvent(event);
+                        }
+                        else {
+                            // Якщо нічого не додалося (малоймовірно, але можливо)
+                            console.warn("Model menu was not shown because no items were added.");
+                            // Можна показати сповіщення користувачу, якщо потрібно
+                            // new Notice("Could not display model menu.");
+                        }
+                        return [7 /*endfinally*/];
+                    case 6: return [2 /*return*/];
+                }
+            });
+        }); };
         // --- Event Handlers ---
         // Input & Sending
         _this.handleKeyDown = function (e) {
@@ -633,12 +638,25 @@ var OllamaView = /** @class */ (function (_super) {
         } };
         // --- Plugin Event Handlers ---
         // private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
-        _this.handleModelChange = function (modelName) { _this.updateInputPlaceholder(modelName); _this.updateModelDisplay(modelName); if (_this.currentMessages.length > 0)
-            _this.addMessageToDisplay("system", "Model changed to: " + modelName, new Date()); };
-        _this.handleRoleChange = function (roleName) { var displayRole = roleName || "Default Assistant"; if (_this.currentMessages.length > 0)
-            _this.addMessageToDisplay("system", "Role changed to: " + displayRole, new Date());
-        else
-            new obsidian_1.Notice("Role set to: " + displayRole); };
+        _this.handleModelChange = function (modelName) {
+            // this.updateInputPlaceholder(modelName); // Більше не оновлюємо плейсхолдер тут
+            _this.updateModelDisplay(modelName); // Тільки дисплей моделі
+            if (_this.currentMessages.length > 0) {
+                _this.addMessageToDisplay("system", "Model changed to: " + modelName, new Date());
+            }
+        };
+        // --- ЗМІНЕНО ---
+        _this.handleRoleChange = function (roleName) {
+            var displayRole = roleName || "Default Assistant";
+            // Оновлюємо плейсхолдер при зміні ролі
+            _this.updateInputPlaceholder(displayRole);
+            if (_this.currentMessages.length > 0) {
+                _this.addMessageToDisplay("system", "Role changed to: " + displayRole, new Date());
+            }
+            else {
+                new obsidian_1.Notice("Role set to: " + displayRole);
+            }
+        };
         _this.handleRolesUpdated = function () { var _a; (_a = _this.plugin.promptService) === null || _a === void 0 ? void 0 : _a.clearRoleCache(); console.log("[OllamaView] Roles updated: Cleared prompt service role cache."); if (_this.isMenuOpen()) {
             _this.renderRoleList();
         } }; // Refresh list if open
@@ -703,7 +721,11 @@ var OllamaView = /** @class */ (function (_super) {
                     case 0:
                         console.log("[OllamaView] onOpen START");
                         this.createUIElements();
-                        this.updateInputPlaceholder(this.plugin.settings.modelName);
+                        // Оновлюємо плейсхолдер на основі ролі при відкритті
+                        this.getCurrentRoleDisplayName().then(function (roleName) {
+                            _this.updateInputPlaceholder(roleName);
+                        });
+                        // Модель оновлюється окремо, можливо, з кешу налаштувань спочатку
                         this.updateModelDisplay(this.plugin.settings.modelName);
                         this.attachEventListeners();
                         this.autoResizeTextarea();
@@ -711,18 +733,23 @@ var OllamaView = /** @class */ (function (_super) {
                         _a.label = 1;
                     case 1:
                         _a.trys.push([1, 3, , 4]);
+                        // loadAndDisplayActiveChat тепер сам оновить і модель, і роль/плейсхолдер
                         return [4 /*yield*/, this.loadAndDisplayActiveChat()];
                     case 2:
+                        // loadAndDisplayActiveChat тепер сам оновить і модель, і роль/плейсхолдер
                         _a.sent();
                         return [3 /*break*/, 4];
                     case 3:
                         error_6 = _a.sent();
                         console.error("[OllamaView] Error during initial chat load:", error_6);
                         this.showEmptyState();
+                        // Якщо завантаження чату не вдалось, все одно встановимо плейсхолдер і модель
+                        this.getCurrentRoleDisplayName().then(function (roleName) { return _this.updateInputPlaceholder(roleName); });
+                        this.updateModelDisplay(this.plugin.settings.modelName);
                         return [3 /*break*/, 4];
                     case 4:
                         setTimeout(function () { var _a; return (_a = _this.inputEl) === null || _a === void 0 ? void 0 : _a.focus(); }, 150);
-                        if (this.inputEl) { // Check if inputEl exists before dispatching event
+                        if (this.inputEl) {
                             this.inputEl.dispatchEvent(new Event('input'));
                         }
                         console.log("[OllamaView] onOpen END");
@@ -986,7 +1013,9 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.updateModelDisplay = function (modelName) {
         if (this.modelDisplayEl) {
             var displayName = modelName || "Default"; // Або "Select Model"
-            this.modelDisplayEl.setText(displayName);
+            // Забираємо ':latest', якщо воно є, для коротшого відображення
+            var shortName = displayName.replace(/:latest$/, '');
+            this.modelDisplayEl.setText(shortName);
             this.modelDisplayEl.title = "Current model: " + displayName + ". Click to change.";
         }
     };
@@ -1088,9 +1117,12 @@ var OllamaView = /** @class */ (function (_super) {
         });
     };
     // --- UI Update Methods ---
-    OllamaView.prototype.updateInputPlaceholder = function (modelName) { if (this.inputEl) {
-        this.inputEl.placeholder = modelName ? "Text to " + modelName + "..." : "Select a model...";
-    } };
+    OllamaView.prototype.updateInputPlaceholder = function (roleName) {
+        if (this.inputEl) {
+            var displayRole = roleName || "Assistant"; // Запасний варіант
+            this.inputEl.placeholder = "Message " + displayRole + "..."; // Новий формат
+        }
+    };
     OllamaView.prototype.closeMenu = function () { if (this.menuDropdown) {
         this.menuDropdown.style.display = "none";
         this.collapseAllSubmenus(null);
@@ -1123,50 +1155,59 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.loadAndDisplayActiveChat = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var activeChat, error_8;
+            var currentModelName, currentRoleName, activeChat, error_8;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
-                        //console.log("[OllamaView] Loading and displaying active chat...");
-                        this.clearChatContainerInternal(); // Clear previous content & state
+                        console.log("[OllamaView] Loading and displaying active chat...");
+                        this.clearChatContainerInternal();
                         this.currentMessages = [];
                         this.lastRenderedMessageDate = null;
-                        _b.label = 1;
+                        currentModelName = this.plugin.settings.modelName;
+                        return [4 /*yield*/, this.getCurrentRoleDisplayName()];
                     case 1:
-                        _b.trys.push([1, 3, , 4]);
-                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                        currentRoleName = _b.sent();
+                        _b.label = 2;
                     case 2:
+                        _b.trys.push([2, 4, 5, 6]);
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 3:
                         activeChat = _b.sent();
-                        if (activeChat && activeChat.messages.length > 0) {
-                            //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
-                            this.hideEmptyState();
-                            this.renderMessages(activeChat.messages); // Render the loaded messages
-                            this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
-                            // Check collapsing and scroll after rendering
-                            this.checkAllMessagesForCollapsing();
-                            setTimeout(function () { _this.guaranteedScrollToBottom(100, true); }, 150); // Scroll after render
-                        }
-                        else if (activeChat) {
-                            //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
-                            // Chat exists but is empty
-                            this.showEmptyState();
-                            this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+                        if (activeChat) {
+                            // Отримуємо модель з метаданих активного чату
+                            currentModelName = activeChat.metadata.modelName || this.plugin.settings.modelName;
+                            // Роль вже визначена вище через getCurrentRoleDisplayName, яка враховує activeChat
+                            if (activeChat.messages.length > 0) {
+                                console.log("[OllamaView] Active chat '" + activeChat.metadata.name + "' found with " + activeChat.messages.length + " messages.");
+                                this.hideEmptyState();
+                                this.renderMessages(activeChat.messages);
+                                this.checkAllMessagesForCollapsing();
+                                setTimeout(function () { _this.guaranteedScrollToBottom(100, true); }, 150);
+                            }
+                            else {
+                                console.log("[OllamaView] Active chat '" + activeChat.metadata.name + "' found but is empty.");
+                                this.showEmptyState();
+                            }
                         }
                         else {
-                            //console.warn("[OllamaView] No active chat found or failed to load.");
-                            // No active chat found or failed to load
+                            console.warn("[OllamaView] No active chat found or failed to load.");
                             this.showEmptyState();
-                            this.updateInputPlaceholder(this.plugin.settings.modelName); // Fallback placeholder
+                            // Модель та роль вже встановлені на глобальні значення за замовчуванням вище
                         }
-                        return [3 /*break*/, 4];
-                    case 3:
+                        return [3 /*break*/, 6];
+                    case 4:
                         error_8 = _b.sent();
-                        //console.error("[OllamaView] Error getting active chat:", error);
+                        console.error("[OllamaView] Error getting active chat:", error_8);
                         this.showEmptyState();
                         new obsidian_1.Notice("Error loading chat history.");
-                        return [3 /*break*/, 4];
-                    case 4: return [2 /*return*/];
+                        return [3 /*break*/, 6];
+                    case 5:
+                        // Оновлюємо плейсхолдер РОЛІ та дисплей МОДЕЛІ в кінці
+                        this.updateInputPlaceholder(currentRoleName);
+                        this.updateModelDisplay(currentModelName);
+                        return [7 /*endfinally*/];
+                    case 6: return [2 /*return*/];
                 }
             });
         });
@@ -2288,6 +2329,127 @@ var OllamaView = /** @class */ (function (_super) {
             }
         });
         return markdown.trim();
+    };
+    // private handleRenameChatClick = async (): Promise<void> => {
+    //   this.closeMenu();
+    //   const activeChat = await this.plugin.chatManager?.getActiveChat();
+    //   if (!activeChat) {
+    //     new Notice("No active chat to rename.");
+    //     return;
+    //   }
+    //   const currentName = activeChat.metadata.name;
+    //   // --- Використання PromptModal ---
+    //   new PromptModal(
+    //     this.app,
+    //     'Rename Chat', // Заголовок вікна
+    //     `Enter new name for "${currentName}":`, // Текст підказки
+    //     currentName, // Початкове значення
+    //     async (newName) => { // Функція, що виконається при Submit
+    //       if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
+    //         //console.log(`[OllamaView] Renaming chat <span class="math-inline">\{activeChat\.metadata\.id\} to "</span>{newName.trim()}"`);
+    //         const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
+    //         if (success) { new Notice(`Chat renamed to "${newName.trim()}"`); }
+    //         else { new Notice("Failed to rename chat."); }
+    //       } else {
+    //         // Порожнє ім'я або не змінилося (або користувач нічого не ввів і натиснув Submit)
+    //         // Можна додати перевірку на порожнє значення в самому PromptModal перед onSubmit
+    //         if (newName?.trim() === currentName) {
+    //           new Notice("Name unchanged.");
+    //         } else {
+    //           new Notice("Rename cancelled or invalid name entered.");
+    //         }
+    //       }
+    //     }
+    //   ).open(); // Відкриваємо модальне вікно
+    //   // --- Кінець використання PromptModal ---
+    // }
+    // private handleDeleteChatClick = async (): Promise<void> => {
+    //   this.closeMenu();
+    //   const activeChat = await this.plugin.chatManager?.getActiveChat();
+    //   if (!activeChat) {
+    //     new Notice("No active chat to delete.");
+    //     return;
+    //   }
+    //   const chatName = activeChat.metadata.name;
+    //   // --- Використання ConfirmModal ---
+    //   new ConfirmModal(
+    //     this.app,
+    //     'Delete Chat', // Заголовок
+    //     `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення
+    //     async () => { // Функція, що виконається при Confirm
+    //       //console.log(`[OllamaView] Deleting chat <span class="math-inline">\{activeChat\.metadata\.id\} \("</span>{chatName}")`);
+    //       const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
+    //       if (success) { new Notice(`Chat "${chatName}" deleted.`); }
+    //       else { new Notice(`Failed to delete chat "${chatName}".`); }
+    //     }
+    //   ).open(); // Відкриваємо модальне вікно
+    //   // --- Кінець використання ConfirmModal ---
+    // }
+    // private handleCloneChatClick = async (): Promise<void> => {
+    //   this.closeMenu();
+    //   const activeChat = await this.plugin.chatManager?.getActiveChat();
+    //   if (!activeChat) {
+    //     new Notice("No active chat to clone.");
+    //     return;
+    //   }
+    //   const originalName = activeChat.metadata.name;
+    //   //console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
+    //   const cloningNotice = new Notice("Cloning chat...", 0); // Повідомлення без автозникання
+    //   try {
+    //     // Викликаємо новий метод в ChatManager
+    //     const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
+    //     if (clonedChat) {
+    //       cloningNotice.hide(); // Ховаємо повідомлення про клонування
+    //       new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
+    //       // View оновить себе через подію 'active-chat-changed',
+    //       // яку викличе setActiveChat всередині cloneChat.
+    //     } else {
+    //       cloningNotice.hide();
+    //       new Notice("Failed to clone chat.");
+    //     }
+    //   } catch (error) {
+    //     cloningNotice.hide();
+    //     //console.error("Error cloning chat:", error);
+    //     new Notice("An error occurred while cloning the chat.");
+    //   }
+    // }
+    OllamaView.prototype.getCurrentRoleDisplayName = function () {
+        var _a, _b, _c, _d;
+        return __awaiter(this, void 0, Promise, function () {
+            var activeChat, rolePath_1, allRoles, foundRole, error_14;
+            return __generator(this, function (_e) {
+                switch (_e.label) {
+                    case 0:
+                        _e.trys.push([0, 4, , 5]);
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 1:
+                        activeChat = _e.sent();
+                        rolePath_1 = (_c = (_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.selectedRolePath) !== null && _c !== void 0 ? _c : this.plugin.settings.selectedRolePath;
+                        if (!rolePath_1) return [3 /*break*/, 3];
+                        return [4 /*yield*/, this.plugin.listRoleFiles(true)];
+                    case 2:
+                        allRoles = _e.sent();
+                        foundRole = allRoles.find(function (role) { return role.path === rolePath_1; });
+                        if (foundRole) {
+                            return [2 /*return*/, foundRole.name]; // Повертаємо знайдене ім'я
+                        }
+                        else {
+                            console.warn("Role with path \"" + rolePath_1 + "\" not found in listRoleFiles results.");
+                            // Якщо шлях є, але роль не знайдена (наприклад, файл видалено), повертаємо заглушку
+                            return [2 /*return*/, ((_d = rolePath_1.split('/').pop()) === null || _d === void 0 ? void 0 : _d.replace('.md', '')) || "Selected Role"]; // Спробуємо отримати ім'я з шляху
+                        }
+                        _e.label = 3;
+                    case 3: return [3 /*break*/, 5];
+                    case 4:
+                        error_14 = _e.sent();
+                        console.error("Error getting current role display name:", error_14);
+                        return [3 /*break*/, 5];
+                    case 5: 
+                    // Повертаємо стандартне ім'я, якщо роль не вибрана або сталася помилка
+                    return [2 /*return*/, "Default Assistant"];
+                }
+            });
+        });
     };
     return OllamaView;
 }(obsidian_1.ItemView)); // END OF OllamaView CLASS

@@ -208,23 +208,32 @@ export class OllamaView extends ItemView {
   async onOpen(): Promise<void> {
     console.log("[OllamaView] onOpen START");
     this.createUIElements();
-    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    // Оновлюємо плейсхолдер на основі ролі при відкритті
+    this.getCurrentRoleDisplayName().then(roleName => {
+      this.updateInputPlaceholder(roleName);
+    });
+    // Модель оновлюється окремо, можливо, з кешу налаштувань спочатку
     this.updateModelDisplay(this.plugin.settings.modelName);
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
+      // loadAndDisplayActiveChat тепер сам оновить і модель, і роль/плейсхолдер
       await this.loadAndDisplayActiveChat();
     } catch (error) {
       console.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState();
+      // Якщо завантаження чату не вдалось, все одно встановимо плейсхолдер і модель
+      this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
+      this.updateModelDisplay(this.plugin.settings.modelName);
     }
     setTimeout(() => this.inputEl?.focus(), 150);
-    if (this.inputEl) { // Check if inputEl exists before dispatching event
+    if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event('input'));
     }
     console.log("[OllamaView] onOpen END");
   }
+
 
   async onClose(): Promise<void> {
     console.log("[OllamaView] onClose: Cleaning up...");
@@ -372,64 +381,73 @@ export class OllamaView extends ItemView {
     console.log("[OllamaView Debug] Attaching event listeners END");
   }
 
-  private handleModelDisplayClick = (event: MouseEvent) => {
+  // OllamaView.ts -> handleModelDisplayClick
+
+  private handleModelDisplayClick = async (event: MouseEvent) => {
     console.log("[OllamaView Debug] Model display clicked, creating native menu.");
     const menu = new Menu();
+    let itemsAdded = false; // <-- Прапорець: чи додали ми щось до меню?
 
-    // Тимчасовий пункт під час завантаження
-    const loadingItem = menu.addItem(item => item.setTitle("Loading models...").setDisabled(true));
-    menu.showAtMouseEvent(event); // Показати одразу
+    const loadingNotice = new Notice("Loading models...", 0);
 
-    // Асинхронно завантажуємо і наповнюємо
-    (async () => {
-      let modelsLoaded = false;
-      try {
-        const models = await this.plugin.ollamaService.getModels();
-        const activeChat = await this.plugin.chatManager?.getActiveChat();
-        const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+    try {
+      const models = await this.plugin.ollamaService.getModels();
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
 
-        // Очищаємо меню від "Loading..."
-        // @ts-ignore - Неофіційний доступ до items
-        if (menu.items.includes(loadingItem)) { menu.items.remove(loadingItem); }
+      loadingNotice.hide();
 
-        if (models.length === 0) {
-          menu.addItem(item => item.setTitle("No models found").setDisabled(true));
-        } else {
-          modelsLoaded = true;
-          models.forEach((modelName) => {
-            menu.addItem((item) =>
-              item
-                .setTitle(modelName)
-                .setIcon(modelName === currentModelName ? "check" : "radio-button")
-                .onClick(async () => {
-                  const chatToUpdate = await this.plugin.chatManager?.getActiveChat();
-                  const latestModelName = chatToUpdate?.metadata?.modelName || this.plugin.settings.modelName;
-                  if (modelName !== latestModelName) {
-                    if (chatToUpdate) {
-                      await this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName });
-                      // Подія 'model-changed' спрацює з ChatManager/plugin
-                      // this.updateModelDisplay(modelName); // Оновлення дисплею відбудеться через подію
-                    } else { new Notice("Cannot set model: No active chat."); }
+      if (models.length === 0) {
+        menu.addItem(item => item.setTitle("No models found").setDisabled(true));
+        itemsAdded = true; // <-- Позначили, що елемент додано
+      } else {
+        models.forEach((modelName) => {
+          menu.addItem((item) =>
+            item
+              .setTitle(modelName)
+              .setIcon(modelName === currentModelName ? "check" : "radio-button")
+              .onClick(async () => {
+                const chatToUpdate = await this.plugin.chatManager?.getActiveChat();
+                const latestModelName = chatToUpdate?.metadata?.modelName || this.plugin.settings.modelName;
+                if (modelName !== latestModelName) {
+                  if (chatToUpdate) {
+                    await this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName });
+                  } else {
+                    new Notice("Cannot set model: No active chat.");
                   }
-                })
-            );
-          });
-        }
-      } catch (error) {
-        console.error("Error loading models for model selection menu:", error);
-        // @ts-ignore
-        if (menu.items.includes(loadingItem)) { menu.items.remove(loadingItem); }
-        menu.addItem(item => item.setTitle("Error loading models").setDisabled(true));
+                }
+              })
+          );
+          itemsAdded = true; // <-- Позначили, що елемент(и) додано
+        });
       }
-      // Оновлюємо позицію меню, якщо воно ще видиме (може бути закрите користувачем)
-      // Поки що не будемо цього робити, може дратувати.
-    })();
+    } catch (error) {
+      loadingNotice.hide();
+      console.error("Error loading models for model selection menu:", error);
+      menu.addItem(item => item.setTitle("Error loading models").setDisabled(true));
+      itemsAdded = true; // <-- Позначили, що елемент помилки додано
+      new Notice("Failed to load models. Check Ollama connection.");
+    } finally {
+      // --- ЗМІНЕНО ---
+      // Показуємо меню, ТІЛЬКИ ЯКЩО хоч один елемент було додано
+      if (itemsAdded) {
+        menu.showAtMouseEvent(event);
+      } else {
+        // Якщо нічого не додалося (малоймовірно, але можливо)
+        console.warn("Model menu was not shown because no items were added.");
+        // Можна показати сповіщення користувачу, якщо потрібно
+        // new Notice("Could not display model menu.");
+      }
+      // --- КІНЕЦЬ ЗМІН ---
+    }
   }
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
       const displayName = modelName || "Default"; // Або "Select Model"
-      this.modelDisplayEl.setText(displayName);
+      // Забираємо ':latest', якщо воно є, для коротшого відображення
+      const shortName = displayName.replace(/:latest$/, '');
+      this.modelDisplayEl.setText(shortName);
       this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
     }
   }
@@ -557,8 +575,24 @@ export class OllamaView extends ItemView {
 
   // --- Plugin Event Handlers ---
   // private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
-  private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); this.updateModelDisplay(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
-  private handleRoleChange = (roleName: string): void => { const displayRole = roleName || "Default Assistant"; if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Role changed to: ${displayRole}`, new Date()); else new Notice(`Role set to: ${displayRole}`); }
+  private handleModelChange = (modelName: string): void => {
+    // this.updateInputPlaceholder(modelName); // Більше не оновлюємо плейсхолдер тут
+    this.updateModelDisplay(modelName); // Тільки дисплей моделі
+    if (this.currentMessages.length > 0) {
+      this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
+    }
+  }
+  // --- ЗМІНЕНО ---
+  private handleRoleChange = (roleName: string): void => {
+    const displayRole = roleName || "Default Assistant";
+    // Оновлюємо плейсхолдер при зміні ролі
+    this.updateInputPlaceholder(displayRole);
+    if (this.currentMessages.length > 0) {
+      this.addMessageToDisplay("system", `Role changed to: ${displayRole}`, new Date());
+    } else {
+      new Notice(`Role set to: ${displayRole}`);
+    }
+  }
   private handleRolesUpdated = (): void => { this.plugin.promptService?.clearRoleCache(); console.log("[OllamaView] Roles updated: Cleared prompt service role cache."); if (this.isMenuOpen()) { this.renderRoleList(); } }; // Refresh list if open
   private handleChatListUpdated = (): void => { console.log("[OllamaView] Chat list updated event received."); if (this.isMenuOpen()) { this.renderChatListMenu(); } }; // Refresh list if open
   private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => { console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`); this.loadAndDisplayActiveChat(); }
@@ -575,8 +609,12 @@ export class OllamaView extends ItemView {
   private handleNewMessageIndicatorClick = (): void => { if (this.chatContainer) { this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: 'smooth' }); } this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); this.userScrolledUp = false; }
 
   // --- UI Update Methods ---
-  private updateInputPlaceholder(modelName: string): void { if (this.inputEl) { this.inputEl.placeholder = modelName ? `Text to ${modelName}...` : "Select a model..."; } }
-
+  private updateInputPlaceholder(roleName: string | null | undefined): void {
+    if (this.inputEl) {
+      const displayRole = roleName || "Assistant"; // Запасний варіант
+      this.inputEl.placeholder = `Message ${displayRole}...`; // Новий формат
+    }
+  }
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
   private adjustTextareaHeight = (): void => { requestAnimationFrame(() => { if (!this.inputEl || !this.buttonsContainer) return; const maxHeightPercentage = 0.50; const minHeight = 40; const viewHeight = this.contentEl.clientHeight; const maxHeight = Math.max(100, viewHeight * maxHeightPercentage); this.inputEl.style.height = 'auto'; const scrollHeight = this.inputEl.scrollHeight; const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight)); this.inputEl.style.height = `${newHeight}px`; this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight); }); }
@@ -586,37 +624,47 @@ export class OllamaView extends ItemView {
   public setLoadingState(isLoading: boolean): void { console.log(`[OllamaView Debug] setLoadingState CALLED with: ${isLoading}`); this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`); }
 
   async loadAndDisplayActiveChat(): Promise<void> {
-    //console.log("[OllamaView] Loading and displaying active chat...");
-    this.clearChatContainerInternal(); // Clear previous content & state
+    console.log("[OllamaView] Loading and displaying active chat...");
+    this.clearChatContainerInternal();
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
 
-    try {
-      const activeChat = await this.plugin.chatManager?.getActiveChat(); // Get current chat data
+    let currentModelName = this.plugin.settings.modelName;
+    // Викликаємо переписаний getCurrentRoleDisplayName, він сам визначить потрібну роль
+    let currentRoleName = await this.getCurrentRoleDisplayName();
 
-      if (activeChat && activeChat.messages.length > 0) {
-        //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
-        this.hideEmptyState();
-        this.renderMessages(activeChat.messages); // Render the loaded messages
-        this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
-        // Check collapsing and scroll after rendering
-        this.checkAllMessagesForCollapsing();
-        setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150); // Scroll after render
-      } else if (activeChat) {
-        //console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
-        // Chat exists but is empty
-        this.showEmptyState();
-        this.updateInputPlaceholder(activeChat.metadata.modelName || this.plugin.settings.modelName);
+    try {
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+
+      if (activeChat) {
+        // Отримуємо модель з метаданих активного чату
+        currentModelName = activeChat.metadata.modelName || this.plugin.settings.modelName;
+        // Роль вже визначена вище через getCurrentRoleDisplayName, яка враховує activeChat
+
+        if (activeChat.messages.length > 0) {
+          console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
+          this.hideEmptyState();
+          this.renderMessages(activeChat.messages);
+          this.checkAllMessagesForCollapsing();
+          setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150);
+        } else {
+          console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
+          this.showEmptyState();
+        }
       } else {
-        //console.warn("[OllamaView] No active chat found or failed to load.");
-        // No active chat found or failed to load
+        console.warn("[OllamaView] No active chat found or failed to load.");
         this.showEmptyState();
-        this.updateInputPlaceholder(this.plugin.settings.modelName); // Fallback placeholder
+        // Модель та роль вже встановлені на глобальні значення за замовчуванням вище
       }
     } catch (error) {
-      //console.error("[OllamaView] Error getting active chat:", error);
+      console.error("[OllamaView] Error getting active chat:", error);
       this.showEmptyState();
       new Notice("Error loading chat history.");
+      // Модель та роль вже встановлені на глобальні значення за замовчуванням вище
+    } finally {
+      // Оновлюємо плейсхолдер РОЛІ та дисплей МОДЕЛІ в кінці
+      this.updateInputPlaceholder(currentRoleName);
+      this.updateModelDisplay(currentModelName);
     }
   }
 
@@ -1545,5 +1593,37 @@ export class OllamaView extends ItemView {
   //     new Notice("An error occurred while cloning the chat.");
   //   }
   // }
+
+  private async getCurrentRoleDisplayName(): Promise<string> {
+    try {
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      // Визначаємо, який шлях до ролі використовувати: з чату чи глобальний
+      const rolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+
+      if (rolePath) {
+        // Отримуємо список всіх доступних ролей
+        // УВАГА: Це може бути неефективно, якщо listRoleFiles читає файли щоразу.
+        // Розгляньте кешування списку ролей у майбутньому.
+        const allRoles = await this.plugin.listRoleFiles(true); // true - включаючи кастомні
+
+        // Знаходимо потрібну роль за шляхом
+        const foundRole = allRoles.find(role => role.path === rolePath);
+
+        if (foundRole) {
+          return foundRole.name; // Повертаємо знайдене ім'я
+        } else {
+          console.warn(`Role with path "${rolePath}" not found in listRoleFiles results.`);
+          // Якщо шлях є, але роль не знайдена (наприклад, файл видалено), повертаємо заглушку
+          return rolePath.split('/').pop()?.replace('.md', '') || "Selected Role"; // Спробуємо отримати ім'я з шляху
+        }
+      }
+    } catch (error) {
+      console.error("Error getting current role display name:", error);
+    }
+    // Повертаємо стандартне ім'я, якщо роль не вибрана або сталася помилка
+    return "Default Assistant";
+  }
+  // --- КІНЕЦЬ ПЕРЕПИСАНОЇ ФУНКЦІЇ ---
+
 
 } // END OF OllamaView CLASS
