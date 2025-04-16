@@ -13,8 +13,8 @@
     box-sizing: border-box;
     position: relative; /* Для позиціонування меню */
     // --- FIX: Limit growth and hide container scrollbar ---
-    max-height: 66vh;
-    overflow: hidden;
+    // max-height: 66vh;
+    // overflow: hidden;
     // --- FIX: Remove shadow ---
     box-shadow: none;
     // border: 1px solid transparent; // Add border for focus instead?

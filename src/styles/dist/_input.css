@@ -12,8 +12,6 @@
   box-sizing: border-box;
   position: relative;
   /* Для позиціонування меню */
-  max-height: 66vh;
-  overflow: hidden;
   box-shadow: none;
 }
 .chat-input-container:focus-within {
