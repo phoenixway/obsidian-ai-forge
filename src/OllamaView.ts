@@ -102,8 +102,13 @@ const CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 const CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 const CSS_CLASS_DANGER_OPTION = "danger-option"; // Для небезпечних дій
 
+
 const CSS_CLASS_INPUT_AREA_LEFT = "input-area-left";
 const CSS_CLASS_MODEL_DISPLAY = "model-display";
+const CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
+const CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
+const CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
+
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -148,6 +153,7 @@ export class OllamaView extends ItemView {
   private buttonsContainer!: HTMLElement;
 
   private modelDisplayEl!: HTMLElement;
+
 
   // Властивості для кастомного меню
   private menuDropdown!: HTMLElement;
@@ -238,97 +244,56 @@ export class OllamaView extends ItemView {
     setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
+    // --- Input Container (Тепер містить textarea + controlsContainer) ---
     const inputContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    inputContainer.style.display = 'flex'; // Встановлюємо flex
-    inputContainer.style.alignItems = 'flex-end'; // Вирівнюємо по низу
-    inputContainer.style.gap = '8px'; // Проміжок між елементами
 
-    // --- Ліва частина (Відображення моделі + Кнопка перекладу) ---
-    const leftArea = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_AREA_LEFT });
-    leftArea.style.display = 'flex';
-    leftArea.style.flexDirection = 'column'; // Модель над кнопкою
-    leftArea.style.alignItems = 'center';
+    // 1. Textarea (зверху)
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+    // Забираємо зайвий padding-right, який був для старих кнопок
+    // this.inputEl.style.paddingRight = '15px'; // Або залишити стандартний
 
-    this.modelDisplayEl = leftArea.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-    this.modelDisplayEl.setText("Loading model..."); // Початковий текст
-    this.modelDisplayEl.title = "Click to select model"; // Підказка
+    // 2. Контейнер для контролів (знизу)
+    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
 
-    this.translateInputButton = leftArea.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { 'aria-label': 'Translate input to English' }
-    });
+    // 2a. Ліва група контролів
+    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+    this.modelDisplayEl.setText("..."); // Початковий текст
+    this.modelDisplayEl.title = "Click to select model";
+    this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { 'aria-label': 'Translate input to English' } });
     setIcon(this.translateInputButton, "replace");
     this.translateInputButton.title = "Translate input to English";
-    // Стилізація кнопки (розмір, тощо) додається в CSS
-    // ------------------------------------------------
 
-    // --- Поле вводу (займає решту місця) ---
-    this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Text...`, rows: 1 }
-    });
-    this.inputEl.style.flex = '1'; // Дозволяємо розтягуватися
-    this.inputEl.style.paddingRight = '85px'; // Оновлюємо відступ для 3 кнопок справа (32*3 + 6*2 = 108 -> ~85) - НАЛАШТУЙТЕ!
-    // ------------------------------------------
-
-    // --- Контейнер для кнопок СПРАВА ---
-    this.buttonsContainer = inputContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER });
-    // Видаляємо position: absolute, бо кнопки тепер у flex-контейнері
-    this.buttonsContainer.style.display = 'flex';
-    this.buttonsContainer.style.alignItems = 'flex-end'; // Вирівнюємо по низу з textarea
-    this.buttonsContainer.style.gap = '6px'; // Проміжок
-
-    // Кнопки СПРАВА (Send, Voice, Menu)
-    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send");
+    // 2b. Права група контролів (старий buttonsContainer)
+    this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } }); setIcon(this.voiceButton, "mic");
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } }); setIcon(this.menuButton, "more-vertical");
-    // --- Кінець кнопок справа ---
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send");
 
-
-    // --- Кастомне Меню (як і раніше, але всередині inputContainer) ---
+    // --- Кастомне Випадаюче Меню (для кнопки "...") ---
+    // Позиціонується відносно inputContainer або menuButton
     this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
-    this.menuDropdown.style.display = "none";
+    this.menuDropdown.style.display = "none"; // Приховано
 
-
-    const createSubmenuSection = (
-      title: string,
-      icon: string,
-      listContainerClass: string,
-      sectionClass?: string // <-- Додано необов'язковий параметр тут
-    ): { header: HTMLElement, content: HTMLElement, section: HTMLElement } => {
-      // Обгортка для всієї секції (заголовок + контент)
-      const section = this.menuDropdown.createDiv();
-      // Додаємо клас до обгортки, якщо він переданий
-      if (sectionClass) {
-        section.addClass(sectionClass);
-      }
-
-      // Клікабельний Заголовок
+    // Helper для секцій акордеону
+    const createSubmenuSection = (title: string, icon: string, listContainerClass: string, sectionClass?: string): { header: HTMLElement, content: HTMLElement, section: HTMLElement } => {
+      const section = this.menuDropdown.createDiv(); if (sectionClass) section.addClass(sectionClass);
       const header = section.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
-      setIcon(header.createSpan({ cls: "menu-option-icon" }), icon);
-      header.createSpan({ cls: "menu-option-text", text: title });
-      setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
-
-      // Контейнер для Вмісту (прихований)
+      setIcon(header.createSpan({ cls: "menu-option-icon" }), icon); header.createSpan({ cls: "menu-option-text", text: title }); setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
       const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass}` });
-      content.style.maxHeight = '0';
-      content.style.overflow = 'hidden';
-      content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out';
-      content.style.paddingTop = '0';
-      content.style.paddingBottom = '0';
-
-      return { header, content, section }; // Повертаємо обгортку секції також
+      content.style.maxHeight = '0'; content.style.overflow = 'hidden'; content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out'; content.style.paddingTop = '0'; content.style.paddingBottom = '0';
+      return { header, content, section };
     };
 
-    const modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section"); // <--- Додано клас секції
-    this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
-
-    const roleSection = createSubmenuSection("Roles", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader = roleSection.header; this.roleSubmenuContent = roleSection.content;
-    const chatSection = createSubmenuSection("Chats", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER); this.chatSubmenuHeader = chatSection.header; this.chatSubmenuContent = chatSection.content;
+    // Створюємо секції акордеону
+    // Секція Моделей буде прихована на десктопі через CSS
+    const modelSection = createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section"); this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
+    const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader = roleSection.header; this.roleSubmenuContent = roleSection.content;
+    const chatSection = createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER); this.chatSubmenuHeader = chatSection.header; this.chatSubmenuContent = chatSection.content;
 
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
     this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
-
-    //TODO:  checkit
+    // ... (всі прямі опції меню: New Chat, Rename, Clone, Export, Clear, Delete, Settings) ...
     this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` }); setIcon(this.newChatOption.createSpan({ cls: "menu-option-icon" }), "plus-circle"); this.newChatOption.createSpan({ cls: "menu-option-text", text: "New Chat" });
     this.renameChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}` }); setIcon(this.renameChatOption.createSpan({ cls: "menu-option-icon" }), "pencil"); this.renameChatOption.createSpan({ cls: "menu-option-text", text: "Rename Chat" });
     this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` }); setIcon(this.cloneChatOption.createSpan({ cls: "menu-option-icon" }), "copy-plus"); this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
@@ -338,43 +303,45 @@ export class OllamaView extends ItemView {
     this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); setIcon(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2"); this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` }); setIcon(this.settingsOption.createSpan({ cls: "menu-option-icon" }), "settings"); this.settingsOption.createSpan({ cls: "menu-option-text", text: "Settings" });
-    // --- End Custom Menu ---
+    // --- Кінець Кастомного Меню ---
   }
 
   // --- Event Listeners (with Custom Div Menu) ---
   private attachEventListeners(): void {
     console.log("[OllamaView Debug] Attaching event listeners START");
+    // Перевірки існування елементів
     if (!this.inputEl) console.error("inputEl missing!"); else console.log("[OllamaView Debug] inputEl FOUND");
     if (!this.sendButton) console.error("sendButton missing!"); else console.log("[OllamaView Debug] sendButton FOUND");
     if (!this.menuButton) console.error("menuButton missing!"); else console.log("[OllamaView Debug] menuButton FOUND");
+    if (!this.modelDisplayEl) console.error("modelDisplayEl missing!"); else console.log("[OllamaView Debug] modelDisplayEl FOUND");
+    if (!this.translateInputButton) console.error("translateInputButton missing!"); else console.log("[OllamaView Debug] translateInputButton FOUND");
 
-    // Input area listeners
+    // Слухачі поля вводу
     if (this.inputEl) {
-      console.log("[OllamaView Debug] Attaching keydown to inputEl");
       this.inputEl.addEventListener("keydown", this.handleKeyDown);
       this.inputEl.addEventListener('input', this.handleInputForResize);
-      console.log("[OllamaView Debug] Listeners attached to inputEl.");
     }
 
-    // Button listeners
-    if (this.sendButton) {
-      console.log("[OllamaView Debug] Attaching click to sendButton");
-      this.sendButton.addEventListener("click", this.handleSendClick);
-      console.log("[OllamaView Debug] Listener attached to sendButton.");
-    }
-    if (this.voiceButton) this.voiceButton.addEventListener("click", this.handleVoiceClick); else console.error("voiceButton missing!");
-    if (this.translateInputButton) this.translateInputButton.addEventListener("click", this.handleTranslateInputClick); else console.error("translateInputButton missing!");
-    if (this.menuButton) this.menuButton.addEventListener("click", this.handleMenuClick); else console.error("menuButton missing!");
+    // Слухачі кнопок
+    if (this.sendButton) this.sendButton.addEventListener("click", this.handleSendClick);
+    if (this.voiceButton) this.voiceButton.addEventListener("click", this.handleVoiceClick);
+    if (this.translateInputButton) this.translateInputButton.addEventListener("click", this.handleTranslateInputClick);
+    if (this.menuButton) this.menuButton.addEventListener("click", this.handleMenuClick); // Головне кастомне меню
+    if (this.modelDisplayEl) this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick); // Спливаюче меню моделей
 
-    if (this.modelDisplayEl) {
-      this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick);
-      console.log("[OllamaView Debug] Attached listener to modelDisplayEl.");
-    } else { console.error("modelDisplayEl missing!"); }
-
-    // --- Listeners for Custom Menu Items ---
+    // Слухачі для кастомного меню (акордеон)
     if (this.modelSubmenuHeader) this.registerDomEvent(this.modelSubmenuHeader, 'click', () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, 'models')); else console.error("modelSubmenuHeader missing!");
     if (this.roleSubmenuHeader) this.registerDomEvent(this.roleSubmenuHeader, 'click', () => this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, 'roles')); else console.error("roleSubmenuHeader missing!");
     if (this.chatSubmenuHeader) this.registerDomEvent(this.chatSubmenuHeader, 'click', () => this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, 'chats')); else console.error("chatSubmenuHeader missing!");
+
+    // Слухачі для прямих опцій меню
+    if (this.settingsOption) this.settingsOption.addEventListener("click", this.handleSettingsClick); else console.error("settingsOption missing!");
+    if (this.clearChatOption) this.clearChatOption.addEventListener("click", this.handleClearChatClick); else console.error("clearChatOption missing!");
+    if (this.exportChatOption) this.exportChatOption.addEventListener("click", this.handleExportChatClick); else console.error("exportChatOption missing!");
+    if (this.newChatOption) this.newChatOption.addEventListener("click", this.handleNewChatClick); else console.error("newChatOption missing!");
+    if (this.renameChatOption) this.renameChatOption.addEventListener("click", this.handleRenameChatClick); else console.error("renameChatOption missing!");
+    if (this.cloneChatOption) this.cloneChatOption.addEventListener("click", this.handleCloneChatClick); else console.error("cloneChatOption missing!");
+    if (this.deleteChatOption) this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick); else console.error("deleteChatOption missing!");
 
     if (this.settingsOption) this.settingsOption.addEventListener("click", this.handleSettingsClick); else console.error("settingsOption missing!");
     if (this.clearChatOption) this.clearChatOption.addEventListener("click", this.handleClearChatClick); else console.error("clearChatOption missing!");
@@ -406,64 +373,64 @@ export class OllamaView extends ItemView {
   }
 
   private handleModelDisplayClick = (event: MouseEvent) => {
-    console.log("[OllamaView Debug] Model display clicked.");
-    const menu = new Menu(); // Створюємо *нативне* спливаюче меню Obsidian
+    console.log("[OllamaView Debug] Model display clicked, creating native menu.");
+    const menu = new Menu();
 
-    // Асинхронно наповнюємо його моделями
+    // Тимчасовий пункт під час завантаження
+    const loadingItem = menu.addItem(item => item.setTitle("Loading models...").setDisabled(true));
+    menu.showAtMouseEvent(event); // Показати одразу
+
+    // Асинхронно завантажуємо і наповнюємо
     (async () => {
-      menu.addItem(item => item.setTitle("Loading models...").setDisabled(true)); // Показуємо завантаження
-      menu.showAtMouseEvent(event); // Показуємо меню одразу (з лоадером)
-
+      let modelsLoaded = false;
       try {
         const models = await this.plugin.ollamaService.getModels();
         const activeChat = await this.plugin.chatManager?.getActiveChat();
         const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
 
-        // Очищаємо меню перед додаванням реальних пунктів
-        // @ts-ignore - Доступ до items для очищення (неофіційно)
-        if (menu.items.length > 0) menu.items = [];
+        // Очищаємо меню від "Loading..."
+        // @ts-ignore - Неофіційний доступ до items
+        if (menu.items.includes(loadingItem)) { menu.items.remove(loadingItem); }
 
         if (models.length === 0) {
           menu.addItem(item => item.setTitle("No models found").setDisabled(true));
         } else {
+          modelsLoaded = true;
           models.forEach((modelName) => {
             menu.addItem((item) =>
               item
                 .setTitle(modelName)
                 .setIcon(modelName === currentModelName ? "check" : "radio-button")
                 .onClick(async () => {
-                  // Перевіряємо знову перед оновленням
                   const chatToUpdate = await this.plugin.chatManager?.getActiveChat();
                   const latestModelName = chatToUpdate?.metadata?.modelName || this.plugin.settings.modelName;
                   if (modelName !== latestModelName) {
                     if (chatToUpdate) {
                       await this.plugin.chatManager.updateActiveChatMetadata({ modelName: modelName });
-                      new Notice(`Model set to: ${modelName}`);
-                      this.updateModelDisplay(modelName); // Оновлюємо текстовий дисплей
+                      // Подія 'model-changed' спрацює з ChatManager/plugin
+                      // this.updateModelDisplay(modelName); // Оновлення дисплею відбудеться через подію
                     } else { new Notice("Cannot set model: No active chat."); }
                   }
                 })
             );
           });
         }
-        // Перепозиціонуємо меню, якщо його розмір сильно змінився?
-        // menu.hide(); // Сховати і показати знову? Може мигати.
-        // menu.showAtMouseEvent(event); // Поки що не будемо, може бути незручно.
-
       } catch (error) {
         console.error("Error loading models for model selection menu:", error);
         // @ts-ignore
-        if (menu.items.length > 0) menu.items = []; // Очищаємо
+        if (menu.items.includes(loadingItem)) { menu.items.remove(loadingItem); }
         menu.addItem(item => item.setTitle("Error loading models").setDisabled(true));
       }
-    })(); // Викликаємо асинхронну функцію
-
+      // Оновлюємо позицію меню, якщо воно ще видиме (може бути закрите користувачем)
+      // Поки що не будемо цього робити, може дратувати.
+    })();
   }
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
-      this.modelDisplayEl.setText(modelName || "No Model"); // Показуємо назву або текст за замовчуванням
-      this.modelDisplayEl.title = `Current model: ${modelName || "None"}. Click to change.`;
+      const displayName = modelName || "Default"; // Або "Select Model"
+      this.modelDisplayEl.setText(displayName);
+      this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
     }
   }
 
@@ -527,65 +494,32 @@ export class OllamaView extends ItemView {
 
   // Handles clicks on submenu headers (Model, Role, Chat)
   private async toggleSubmenu(headerEl: HTMLElement | null, contentEl: HTMLElement | null, type: 'models' | 'roles' | 'chats'): Promise<void> {
-    if (!headerEl || !contentEl) {
-      console.error(`[OllamaView Debug] Missing header or content element for submenu type: ${type}`);
-      return;
-    }
+    if (!headerEl || !contentEl) return;
     const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
     const isHidden = contentEl.style.maxHeight === '0px' || contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-
-    console.log(`[OllamaView Debug] Toggling submenu '${type}'. Currently hidden: ${isHidden}`);
-
-    // Collapse *other* submenus first if opening this one
-    if (isHidden) {
-      this.collapseAllSubmenus(contentEl);
-    }
+    console.log(`[OllamaView Debug] Toggling submenu '${type}'. Hidden: ${isHidden}`);
+    if (isHidden) { this.collapseAllSubmenus(contentEl); } // Collapse others first
 
     if (isHidden) {
-      // --- Expand this submenu ---
-      if (iconEl instanceof HTMLElement) { setIcon(iconEl, 'chevron-down'); } // Set icon
-
-      // Clear previous content and show loading placeholder
+      // --- Expand ---
+      if (iconEl instanceof HTMLElement) setIcon(iconEl, 'chevron-down');
       contentEl.empty();
-      const loadingEl = contentEl.createDiv({ cls: "menu-loading", text: `Loading ${type}...` });
-      // Set initial height for loading text AFTER ensuring it's visible
+      contentEl.createDiv({ cls: "menu-loading", text: `Loading ${type}...` });
       contentEl.classList.remove(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-      contentEl.style.paddingTop = '5px';
-      contentEl.style.paddingBottom = '5px';
-      contentEl.style.maxHeight = '40px'; // Fixed height for loading
-
-      // Render content asynchronously
+      contentEl.style.paddingTop = '5px'; contentEl.style.paddingBottom = '5px'; contentEl.style.maxHeight = '40px'; // For loading text
       try {
-        console.log(`[OllamaView Debug] Rendering submenu content for '${type}'...`);
         switch (type) {
-          case 'models': await this.renderModelList(); break;
+          case 'models': await this.renderModelList(); break; // Рендеримо в контейнер
           case 'roles': await this.renderRoleList(); break;
           case 'chats': await this.renderChatListMenu(); break;
         }
-        console.log(`[OllamaView Debug] Finished rendering submenu content for '${type}'.`);
-        // The render methods should empty the container first, removing the loading text
-
-        // Update max-height AFTER content is rendered
-        requestAnimationFrame(() => {
-          if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-            console.log(`[OllamaView Debug] Setting maxHeight for '${type}' to scrollHeight: ${contentEl.scrollHeight}px`);
-            contentEl.style.maxHeight = contentEl.scrollHeight + 'px';
-          }
-        });
-      } catch (error) {
-        console.error(`[OllamaView] Error rendering ${type} list:`, error);
-        contentEl.empty(); // Clear loading text on error too
-        contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` });
-        contentEl.style.maxHeight = '50px'; // Keep slightly expanded for error
-      }
+        requestAnimationFrame(() => { if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) { contentEl.style.maxHeight = contentEl.scrollHeight + 'px'; } });
+      } catch (error) { console.error(`Error rendering ${type} list:`, error); contentEl.empty(); contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` }); contentEl.style.maxHeight = '50px'; }
     } else {
-      // --- Collapse this submenu ---
-      console.log(`[OllamaView Debug] Collapsing submenu '${type}'.`);
+      // --- Collapse ---
       contentEl.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-      contentEl.style.maxHeight = '0';
-      contentEl.style.paddingTop = '0';
-      contentEl.style.paddingBottom = '0';
-      if (iconEl instanceof HTMLElement) { setIcon(iconEl, 'chevron-right'); }
+      contentEl.style.maxHeight = '0'; contentEl.style.paddingTop = '0'; contentEl.style.paddingBottom = '0';
+      if (iconEl instanceof HTMLElement) setIcon(iconEl, 'chevron-right');
     }
   }
 
@@ -622,7 +556,8 @@ export class OllamaView extends ItemView {
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.isMenuOpen() && !this.menuButton?.contains(e.target as Node) && !this.menuDropdown?.contains(e.target as Node)) { this.closeMenu(); } }
 
   // --- Plugin Event Handlers ---
-  private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
+  // private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
+  private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); this.updateModelDisplay(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
   private handleRoleChange = (roleName: string): void => { const displayRole = roleName || "Default Assistant"; if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Role changed to: ${displayRole}`, new Date()); else new Notice(`Role set to: ${displayRole}`); }
   private handleRolesUpdated = (): void => { this.plugin.promptService?.clearRoleCache(); console.log("[OllamaView] Roles updated: Cleared prompt service role cache."); if (this.isMenuOpen()) { this.renderRoleList(); } }; // Refresh list if open
   private handleChatListUpdated = (): void => { console.log("[OllamaView] Chat list updated event received."); if (this.isMenuOpen()) { this.renderChatListMenu(); } }; // Refresh list if open
@@ -641,6 +576,7 @@ export class OllamaView extends ItemView {
 
   // --- UI Update Methods ---
   private updateInputPlaceholder(modelName: string): void { if (this.inputEl) { this.inputEl.placeholder = modelName ? `Text to ${modelName}...` : "Select a model..."; } }
+
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
   private adjustTextareaHeight = (): void => { requestAnimationFrame(() => { if (!this.inputEl || !this.buttonsContainer) return; const maxHeightPercentage = 0.50; const minHeight = 40; const viewHeight = this.contentEl.clientHeight; const maxHeight = Math.max(100, viewHeight * maxHeightPercentage); this.inputEl.style.height = 'auto'; const scrollHeight = this.inputEl.scrollHeight; const newHeight = Math.max(minHeight, Math.min(scrollHeight, maxHeight)); this.inputEl.style.height = `${newHeight}px`; this.inputEl.classList.toggle(CSS_CLASS_TEXTAREA_EXPANDED, scrollHeight > maxHeight); }); }

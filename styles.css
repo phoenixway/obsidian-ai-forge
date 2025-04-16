@@ -62,23 +62,28 @@
      CHAT INPUT SECTION
      ========================================================================== */
 
+
      .chat-input-container {
-      display: flex; /* ВИКОРИСТОВУЄМО FLEXBOX */
-      align-items: flex-end; /* Вирівнюємо елементи по низу */
-      gap: 8px; /* Проміжок між лівою зоною, textarea та правою зоною кнопок */
+      /* ВИКОРИСТОВУЄМО FLEXBOX ДЛЯ ОСНОВНОГО КОНТЕЙНЕРА */
+      display: flex;
+      flex-direction: column; /* Тепер елементи йдуть зверху вниз */
       padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
       border-top: 1px solid var(--divider-color);
-      background-color: var(--background-secondary-alt);
+      background-color: var(--background-secondary-alt); /* Спільний фон */
       z-index: 20;
       border-radius: 12px;
       margin: calc(var(--chat-spacing-unit) * 2);
       margin-top: 0;
       box-sizing: border-box;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-      position: relative; /* Залишаємо для позиціонування меню */
+      position: relative; /* Для позиціонування меню */
       transition: box-shadow 0.2s;
     }
-    .chat-input-container:focus-within { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15); }
+    .chat-input-container:focus-within {
+       /* Можна додати стиль для активного стану */
+       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--background-modifier-border);
+    }
+  
   
     /* --- Нова ліва зона для Model Display та Translate Button --- */
     .input-area-left {
@@ -91,25 +96,67 @@
     }
   
     .model-display {
-        font-size: var(--font-ui-smaller);
-        color: var(--text-muted);
-        padding: 4px 6px;
-        border-radius: var(--radius-s);
-        cursor: pointer;
-        text-align: center;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-width: 100px; /* Обмежуємо ширину */
-        border: 1px solid transparent; /* Рамка для hover */
-        transition: all 0.2s ease;
-    }
-    .model-display:hover {
-        background-color: var(--background-modifier-hover);
-        border-color: var(--background-modifier-border);
-        color: var(--text-normal);
-    }
+      font-size: var(--font-ui-smaller);
+      color: var(--text-muted);
+      padding: 4px 8px; /* Збільшено горизонтальний паддінг */
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px; /* Можна збільшити */
+      border: 1px solid transparent;
+      background-color: var(--background-secondary); /* Фон для кращого вигляду */
+      transition: all 0.2s ease;
+  }
+  .model-display:hover {
+      background-color: var(--background-modifier-hover);
+      border-color: var(--background-modifier-border);
+      color: var(--text-normal);
+  }
   
+    /* Кнопка перекладу в лівій групі */
+    .input-controls-left .translate-input-button {
+      width: 28px; /* Трохи менша */
+      height: 28px;
+      border: none;
+      border-radius: var(--radius-s); /* Не кругла */
+      background-color: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s ease-in-out; opacity: 0.7; outline: none; flex-shrink: 0;
+ }
+  .input-controls-left .translate-input-button:hover {
+      background-color: var(--background-modifier-hover);
+      color: var(--text-normal);
+      opacity: 1;
+      transform: scale(1.05);
+  }
+  /* Стиль завантаження */
+  .input-controls-left .translate-input-button.translating-input .svg-icon { animation: spin 1s linear infinite; }
+  .input-controls-left .translate-input-button.translating-input { cursor: default; opacity: 0.5; }
+ /* --- Кінець лівої групи --- */
+
+  /* --- Права група кнопок (старий buttonsContainer) --- */
+  .input-controls-right {
+    /* Видалено position: absolute */
+    display: flex;
+    align-items: center; /* Вирівнюємо кнопки */
+    gap: calc(var(--chat-spacing-unit) * 1.5); /* Проміжок між кнопками */
+    flex-shrink: 0;
+  }
+  /* Базовий стиль кнопок (Send, Voice, Menu) */
+  .input-controls-right button {
+    width: 32px; height: 32px; border: none; border-radius: 50%; background-color: transparent; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s ease-in-out; opacity: 0.7; outline: none; flex-shrink: 0;
+   }
+   .input-controls-right button:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); opacity: 1; transform: scale(1.05); }
+   .input-controls-right button.disabled { opacity: 0.4 !important; cursor: not-allowed; background-color: transparent !important; transform: none !important; box-shadow: none !important; }
+   /* Специфічні стилі для Send, Voice */
+   .input-controls-right .send-button { /* ... (стилі без змін) ... */ }
+   .input-controls-right .voice-button.recording { /* ... (стилі без змін) ... */ }
+   /* --- Кінець правої групи --- */
+
     .input-area-left .translate-input-button {
          /* Успадковує базові стилі .buttons-container button, але тут ми його винесли */
          width: 30px; /* Розмір як у інших кнопок */
@@ -147,14 +194,31 @@
   
 
     .chat-input-container textarea {
-      flex: 1; /* Займає весь доступний простір */
-      resize: none; border: none; border-radius: 8px; padding: 10px 15px;
-      /* Змінюємо padding-right, тепер відступ потрібен лише для правої групи кнопок */
-      padding-right: 125px; /* Приблизно (32*3 для кнопок + 6*2 для проміжків + 6 для відступу) - Налаштуйте! */
-      min-height: 40px; max-height: 50vh; background-color: var(--background-primary); color: var(--text-normal); font-size: 14px; line-height: 1.5; transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; overflow-y: auto; width: auto; /* Важливо для flex */ box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); box-sizing: border-box;
+      flex: 1; /* Не потрібен, бо контейнер column */
+      width: 100%; /* Займає всю ширину */
+      resize: none; border: none; border-radius: 8px;
+      padding: 10px 15px;
+      padding-right: 15px; /* Скидаємо великий правий відступ */
+      min-height: 40px; max-height: 50vh; background-color: var(--background-primary); color: var(--text-normal); font-size: 14px; line-height: 1.5; transition: border-color 0.3s, box-shadow 0.3s, height 0.15s ease-out; overflow-y: auto; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05); box-sizing: border-box;
+      margin-bottom: calc(var(--chat-spacing-unit) * 2); /* Відступ між textarea та контролами */
      }
     .chat-input-container textarea:focus { outline: none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05), 0 0 0 2px var(--interactive-accent-translucent); }
-     
+       
+    .input-controls-container {
+      display: flex;
+      justify-content: space-between; /* Розносимо ліву та праву групи */
+      align-items: center; /* Вирівнюємо по вертикалі */
+      width: 100%;
+  }
+
+  .input-controls-left {
+    display: flex;
+    align-items: center; /* Вирівнюємо по центру */
+    gap: 6px; /* Проміжок */
+    flex-shrink: 0; /* Не стискати */
+}
+
+
     .buttons-container {
       /* Видалено position: absolute */
       display: flex;
@@ -424,8 +488,16 @@
      ========================================================================== */
 
   .menu-dropdown.ollama-chat-menu { /* Target specific menu */
-      position: absolute; right: calc(var(--chat-spacing-unit) * 3); bottom: calc(100% + var(--chat-spacing-unit)); background-color: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); z-index: 100; min-width: 220px; /* Slightly wider */ overflow: hidden; animation: menu-fade-in 0.15s ease-out; padding: calc(var(--chat-spacing-unit) * 1) 0; display: flex; flex-direction: column;
+      position: absolute; 
+
+      right: calc(var(--chat-spacing-unit) * 1); /* Ближче до правої кнопки */
+      bottom: calc(100% + var(--chat-spacing-unit)); /* Над полем контролів */
+
+      background-color: var(--background-secondary); border: 1px solid var(--background-modifier-border); border-radius: 8px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15); z-index: 100; min-width: 220px; /* Slightly wider */ 
+      overflow: hidden; animation: menu-fade-in 0.15s ease-out; padding: calc(var(--chat-spacing-unit) * 1) 0; display: flex; flex-direction: column;
   }
+
+
 
   .ollama-chat-menu .model-submenu-section {
     /* Поки що без змін, але ми додамо приховування на десктопі */
@@ -562,49 +634,23 @@
 .show-more-button:hover { background-color: var(--background-modifier-hover); border-color: var(--interactive-accent-translucent); color: var(--text-accent-hover); }
 
 
+.ollama-chat-menu .menu-header-item { /* Клікабельний заголовок */
+  /* ... (стилі з попередньої відповіді) ... */
+}
+.ollama-chat-menu .submenu-icon { /* Іконка стрілки */
+  /* ... (стилі з попередньої відповіді) ... */
+}
+.ollama-chat-menu .submenu-content { /* Контейнер списку */
+  max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out, padding 0.3s ease-out; padding: 0 calc(var(--chat-spacing-unit) * 1); margin: 0 calc(var(--chat-spacing-unit) * 1); border-left: 2px solid var(--background-modifier-border-hover); margin-left: calc(var(--chat-spacing-unit) * 3); padding-left: calc(var(--chat-spacing-unit) * 2); margin-bottom: calc(var(--chat-spacing-unit) * 1);
+}
+.ollama-chat-menu .submenu-content-hidden { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; border-left-color: transparent; margin-bottom: 0; }
+.ollama-chat-menu .submenu-content .menu-option { /* Елементи всередині акордеону */
+  padding-left: calc(var(--chat-spacing-unit) * 2) !important; margin-left: 0 !important; margin-right: 0 !important; width: auto;
+}
+
 /* ==========================================================================
      RESPONSIVE DESIGN
      ========================================================================== */
-/*
-  @media screen and (max-width: 600px) {
-    .ollama-chat-container .message { max-width: 90%; }
-    :root { --chat-message-max-width: 90%; }
-    .message-actions-wrapper { opacity: 0.6; visibility: visible;  }
-    .message:hover .message-actions-wrapper { opacity: 1; } 
-
-  }
-
-  @media screen and (max-width: 480px) {
-    :root { --chat-spacing-unit: 3px; --chat-avatar-size: 26px; }
-    .ollama-chat-container { padding: 10px; padding-bottom: 5px; }
-    .chat-input-container { margin: 5px 8px; padding: 6px 10px; }
-    .chat-input-container textarea { font-size: 13px; padding-right: 135px;  }
-    .buttons-container { gap: 6px; right: 10px; bottom: 6px; }
-    .buttons-container button { width: 28px; height: 28px; }
-    .ollama-chat-container .message { font-size: 13px; padding: 6px 10px;}
-    .message-group { padding-left: 34px; padding-right: 34px;}
-    .menu-dropdown.ollama-chat-menu { min-width: 180px; }
-    .ollama-chat-menu .menu-option { padding: 6px 10px; } 
-    .ollama-chat-menu .model-option,
-    .ollama-chat-menu .role-option,
-    .ollama-chat-menu .chat-option { padding-top: 4px; padding-bottom: 4px; } 
-    .ollama-chat-menu .menu-option-text { font-size: 13px; }
-    
-    .message-actions-wrapper button { padding: 1px 3px; }
-    .message-actions-wrapper button .svg-icon { width: 12px; height: 12px; }
-    .message-actions-wrapper { top: 2px; right: 3px; gap: 3px; } 
-  }
-
-  @media screen and (max-width: 360px) {
-      .buttons-container { gap: 4px; }
-      .buttons-container button { width: 26px; height: 26px; }
-      .chat-input-container textarea { padding-right: 125px; }
-      :root { --chat-avatar-size: 24px; }
-      .message-group { padding-left: 30px; padding-right: 30px;}
-      .message-actions-wrapper button .svg-icon { width: 11px; height: 11px; }
-  }
-*/
- 
 .ollama-chat-menu .menu-option.danger-option:hover {
   background-color: var(--background-modifier-error-hover);
     color: var(--text-on-error);
@@ -663,12 +709,47 @@
           background-color: rgba(255, 255, 255, 0.2) !important;
       }
 
-      .chat-input-container { gap: 6px; }
-      .input-area-left { /* Можна сховати/змінити відображення моделі на мобільному */ display: none; } /* Ховаємо ліву зону (модель, переклад) */
-      .chat-input-container textarea { padding-left: 10px; padding-right: 110px; /* Місце для 3 кнопок (30+6)*3 + 6 */ }
-      .buttons-container { gap: 6px; right: 8px; padding-bottom: 2px;}
-      .buttons-container button { width: 30px; height: 30px; }
+      .chat-input-container { 
+        gap: 6px; 
+        flex-direction: column;
+      }
+      .input-controls-container { /* Контроли в один ряд */
+        flex-wrap: wrap; /* Дозволяємо перенос, якщо не влазить */
+        justify-content: center; /* Центруємо групи на малих екранах */
+        gap: 8px;
+     }
+     .input-area-left { /* Показуємо модель/переклад знову (можливо, поруч?) */
+         /* display: flex; */ /* Розкоментуйте, якщо хочете їх показувати */
+         order: 1; /* Ліва група */
+         flex-grow: 1; /* Дозволяємо рости */
+         justify-content: flex-start; /* Вирівнюємо по лівому краю */
+     }
+     .input-controls-right { /* Права група */
+         order: 2;
+         flex-grow: 1; /* Дозволяємо рости */
+         justify-content: flex-end; /* Вирівнюємо по правому краю */
+     }
+      .chat-input-container textarea { 
+        padding-left: 10px; 
+        margin-bottom: 6px; /* Менший відступ */
+        padding-right: 15px; /* Скидаємо великий відступ */
+      }
+
+      .buttons-container { 
+        padding-bottom: 0; /* Прибираємо зайвий відступ */
+        gap: 4px;
+      }
+      .buttons-container button, 
+      .input-area-left .translate-input-button { width: 30px; height: 30px; }
+
       .buttons-container .translate-input-button { display: none; } /* Переконуємось, що приховано */
+
+      .ollama-chat-menu .model-submenu-section {
+        display: block !important; /* Гарантовано показуємо */
+    }
+    .ollama-chat-menu .model-submenu-section + hr {
+         display: block !important; /* Показуємо роздільник */
+    }
   }
 
 /* --- Звичайні телефони (портрет) --- */
@@ -702,6 +783,15 @@
   .buttons-container button {
     width: 28px; height: 28px;
   }
+
+  .buttons-container button,
+  .input-area-left .translate-input-button {
+      width: 28px; height: 28px;
+  }
+  .input-controls-left, .input-controls-right {
+       flex-basis: 45%; /* Дозволяємо групам займати приблизно по половині */
+  } 
+
   /* Ховаємо кнопку перекладу вводу на малих екранах */
   .buttons-container .translate-input-button {
       display: none;
@@ -792,11 +882,6 @@
 
  /* --- Десктоп (і ширші планшети) --- */
  @media screen and (min-width: 769px) {
-  /* Мінімальна висота для контейнера чату */
-  .workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
-      min-height: 65vh; /* Приклад: 65% висоти вьюпорта */
-      /* або min-height: 550px; */
-  }
 
   /* Приховуємо секцію вибору моделі у головному меню (...) */
   .ollama-chat-menu .model-submenu-section {
@@ -806,4 +891,8 @@
    .ollama-chat-menu .model-submenu-section + hr {
        display: none;
    }
+
+   .workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
+    min-height: 65vh; /* Мінімальна висота */
+}
 }
