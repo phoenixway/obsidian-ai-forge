@@ -738,30 +738,51 @@ This action cannot be undone.`, async () => {
       this.userScrolledUp = false;
     };
     // OllamaView.ts
+    // OllamaView.ts
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
         if (!this.inputEl)
           return;
         const textarea = this.inputEl;
         const computedStyle = window.getComputedStyle(textarea);
-        const minHeight = parseFloat(computedStyle.minHeight) || 40;
+        const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
         const maxHeight = parseFloat(computedStyle.maxHeight);
+        const currentClientHeight = textarea.clientHeight;
+        const originalMinHeightStyle = textarea.style.minHeight;
         textarea.style.height = "auto";
+        if (originalMinHeightStyle) {
+          textarea.style.minHeight = "0";
+        }
         requestAnimationFrame(() => {
           if (!this.inputEl)
             return;
           const scrollHeight = textarea.scrollHeight;
-          let newHeight = Math.max(minHeight, scrollHeight);
-          if (!isNaN(maxHeight) && newHeight > maxHeight) {
-            newHeight = maxHeight;
+          textarea.style.minHeight = originalMinHeightStyle || "";
+          console.log(`adjustTextareaHeight MH+: Measured scrollH=${scrollHeight}, currentClientH=${currentClientHeight}, CSS maxH=${maxHeight}`);
+          let newMinHeight = Math.max(baseMinHeight, scrollHeight);
+          let isCapped = false;
+          if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
+            newMinHeight = maxHeight;
+            isCapped = true;
             if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
               textarea.style.overflowY = "auto";
             }
+            console.log(`adjustTextareaHeight MH+: Capped by CSS max-height (${maxHeight}px).`);
           }
-          textarea.style.height = `${newHeight}px`;
-          console.log(`adjustTextareaHeight SIMPLE_H: Set style.height=${newHeight}px`);
+          if (newMinHeight < currentClientHeight - 1) {
+            console.log(`adjustTextareaHeight MH+: Shrinking required. Target minH=${newMinHeight}px.`);
+            textarea.style.height = `${newMinHeight}px`;
+            textarea.style.minHeight = `${newMinHeight}px`;
+            textarea.style.height = "auto";
+            console.log(`adjustTextareaHeight MH+: SHRINK Applied H=${newMinHeight}px then minH=${newMinHeight}px, H=auto`);
+          } else {
+            textarea.style.minHeight = `${newMinHeight}px`;
+            textarea.style.height = "auto";
+            console.log(`adjustTextareaHeight MH+: GROW/STABLE Set minH=${newMinHeight}px, H=auto`);
+          }
           const renderedHeight = textarea.clientHeight;
-          console.log(`adjustTextareaHeight SIMPLE_H: Rendered clientHeight=${renderedHeight}`);
+          const finalMinHeight = parseFloat(window.getComputedStyle(textarea).minHeight);
+          console.log(`adjustTextareaHeight MH+: Final Rendered clientH=${renderedHeight}, computed minH=${finalMinHeight}`);
         });
       });
     };
