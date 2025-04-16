@@ -9,14 +9,18 @@
   box-sizing: border-box;
   padding:
     calc(var(--chat-spacing-unit) * 2)    // Top
-    calc(var(--chat-spacing-unit) * 10)    // Right (ЗБІЛЬШЕНО)
+    calc(var(--chat-spacing-unit) * 5)    // Right (ЗБІЛЬШЕНО)
     calc(var(--chat-spacing-unit) * 2)    // Bottom
     calc(var(--chat-spacing-unit) * 3);
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
   z-index: 20;
   border-radius: 12px;
-  margin: calc(var(--chat-spacing-unit) * 2);
+  margin:
+    0                                     // Top
+    calc(var(--chat-spacing-unit) * 5)    // Right (ЗБІЛЬШЕНО ЗОВНІШНІЙ ВІДСТУП)
+    calc(var(--chat-spacing-unit) * 2)    // Bottom
+    calc(var(--chat-spacing-unit) * 2);   // Left
   margin-top: 0;
   position: relative;
   box-shadow: none;
@@ -50,7 +54,7 @@
     &:focus {
       outline: none;
       border-color: var(--interactive-accent); 
-      background-color: var(--background-secondary);
+      // background-color: var(--background-secondary);
       box-shadow: none; 
     }
   }
