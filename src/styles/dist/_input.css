@@ -13,7 +13,6 @@
   margin: calc(var(--chat-spacing-unit) * 2);
   margin-top: 0;
   position: relative;
-  overflow: hidden;
   box-shadow: none;
 }
 .chat-input-container:focus-within {

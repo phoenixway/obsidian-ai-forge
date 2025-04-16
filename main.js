@@ -737,47 +737,31 @@ This action cannot be undone.`, async () => {
       (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
+    // OllamaView.ts
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
-        if (!this.inputEl || !this.inputEl.parentElement)
+        if (!this.inputEl)
           return;
         const textarea = this.inputEl;
-        const container = textarea.parentElement;
-        const controlsContainer = container.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`);
-        if (!controlsContainer) {
-          console.error("Controls container not found inside input container.");
-          return;
-        }
-        const computedTextareaStyle = window.getComputedStyle(textarea);
-        const computedContainerStyle = window.getComputedStyle(container);
-        const minTextareaHeight = parseFloat(computedTextareaStyle.minHeight) || 40;
-        const maxTextareaHeight = parseFloat(computedTextareaStyle.maxHeight);
-        console.log("adjustTextareaHeight BOTH: Fired.");
-        const originalTextareaHeight = textarea.style.height;
+        const computedStyle = window.getComputedStyle(textarea);
+        const minHeight = parseFloat(computedStyle.minHeight) || 40;
+        const maxHeight = parseFloat(computedStyle.maxHeight);
         textarea.style.height = "auto";
         requestAnimationFrame(() => {
-          if (!textarea || !container || !controlsContainer)
+          if (!this.inputEl)
             return;
           const scrollHeight = textarea.scrollHeight;
-          let newTextareaHeight = Math.max(minTextareaHeight, scrollHeight);
-          if (!isNaN(maxTextareaHeight) && newTextareaHeight > maxTextareaHeight) {
-            newTextareaHeight = maxTextareaHeight;
-            console.log(`adjustTextareaHeight BOTH: Textarea capped by CSS max-height (${maxTextareaHeight}px).`);
+          let newHeight = Math.max(minHeight, scrollHeight);
+          if (!isNaN(maxHeight) && newHeight > maxHeight) {
+            newHeight = maxHeight;
             if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
               textarea.style.overflowY = "auto";
             }
           }
-          const controlsHeight = controlsContainer.offsetHeight;
-          const containerPaddingTop = parseFloat(computedContainerStyle.paddingTop) || 0;
-          const containerPaddingBottom = parseFloat(computedContainerStyle.paddingBottom) || 0;
-          const textareaMarginBottom = parseFloat(computedTextareaStyle.marginBottom) || 0;
-          const newContainerHeight = containerPaddingTop + newTextareaHeight + textareaMarginBottom + controlsHeight + containerPaddingBottom;
-          textarea.style.height = `${newTextareaHeight}px`;
-          container.style.height = `${newContainerHeight}px`;
-          console.log(`adjustTextareaHeight BOTH: Set textarea H=${newTextareaHeight}px, container H=${newContainerHeight}px`);
-          const renderedTextareaHeight = textarea.clientHeight;
-          const renderedContainerHeight = container.clientHeight;
-          console.log(`adjustTextareaHeight BOTH: Rendered textarea H=${renderedTextareaHeight}, container H=${renderedContainerHeight}`);
+          textarea.style.height = `${newHeight}px`;
+          console.log(`adjustTextareaHeight SIMPLE_H: Set style.height=${newHeight}px`);
+          const renderedHeight = textarea.clientHeight;
+          console.log(`adjustTextareaHeight SIMPLE_H: Rendered clientHeight=${renderedHeight}`);
         });
       });
     };

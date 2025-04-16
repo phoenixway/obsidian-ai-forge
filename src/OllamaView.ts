@@ -618,76 +618,44 @@ export class OllamaView extends ItemView {
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
 
+  // OllamaView.ts
+
   private adjustTextareaHeight = (): void => {
-    // Використовуємо requestAnimationFrame для плавності
+    // Використовуємо подвійний requestAnimationFrame для стабільності вимірювань
     requestAnimationFrame(() => {
-      // Перевіряємо наявність textarea та її батька
-      if (!this.inputEl || !this.inputEl.parentElement) return;
-
+      if (!this.inputEl) return;
       const textarea = this.inputEl;
-      const container = textarea.parentElement as HTMLElement; // Батько = .chat-input-container
-      // Знаходимо контроли всередині батька
-      const controlsContainer = container.querySelector(`.${CSS_CLASS_INPUT_CONTROLS_CONTAINER}`) as HTMLElement;
+      const computedStyle = window.getComputedStyle(textarea);
+      // Читаємо min/max з CSS
+      const minHeight = parseFloat(computedStyle.minHeight) || 40;
+      const maxHeight = parseFloat(computedStyle.maxHeight);
 
-      // Додаткова перевірка наявності контейнера контролів
-      if (!controlsContainer) {
-        console.error("Controls container not found inside input container.");
-        return;
-      }
+      // Фаза 1: Скидання висоти для вимірювання
+      textarea.style.height = 'auto';
 
-      const computedTextareaStyle = window.getComputedStyle(textarea);
-      const computedContainerStyle = window.getComputedStyle(container);
-
-      // Обмеження висоти для textarea з її CSS
-      const minTextareaHeight = parseFloat(computedTextareaStyle.minHeight) || 40;
-      const maxTextareaHeight = parseFloat(computedTextareaStyle.maxHeight); // max-height самої textarea
-
-      console.log("adjustTextareaHeight BOTH: Fired.");
-
-      const originalTextareaHeight = textarea.style.height;
-      textarea.style.height = 'auto'; // Скидання для вимірювання
-
-      // Вимірювання в наступному кадрі
-      requestAnimationFrame(() => {
-        if (!textarea || !container || !controlsContainer) return; // Повторна перевірка
-
+      requestAnimationFrame(() => { // Фаза 2: Вимірювання та встановлення
+        if (!this.inputEl) return;
         const scrollHeight = textarea.scrollHeight;
-        // Можна прибрати відновлення originalTextareaHeight, оскільки ми все одно встановимо нову висоту
-        // textarea.style.height = originalTextareaHeight;
 
-        // --- 1. Обчислення висоти для Textarea ---
-        let newTextareaHeight = Math.max(minTextareaHeight, scrollHeight);
+        // Обчислюємо нову висоту: між minHeight та scrollHeight
+        let newHeight = Math.max(minHeight, scrollHeight);
 
-        // Застосовуємо обмеження CSS max-height до textarea
-        if (!isNaN(maxTextareaHeight) && newTextareaHeight > maxTextareaHeight) {
-          newTextareaHeight = maxTextareaHeight;
-          console.log(`adjustTextareaHeight BOTH: Textarea capped by CSS max-height (${maxTextareaHeight}px).`);
-          // Переконуємося, що overflow увімкнено для textarea
+        // Обмежуємо зверху значенням maxHeight з CSS (якщо воно є)
+        if (!isNaN(maxHeight) && newHeight > maxHeight) {
+          newHeight = maxHeight;
+          // Переконуємося, що скролінг увімкнено, якщо досягли межі
           if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
             textarea.style.overflowY = 'auto';
           }
         }
+        // --- ЗМІНА: Встановлюємо ТІЛЬКИ висоту textarea ---
+        textarea.style.height = `${newHeight}px`;
+        // --- container.style.height = ... ВИДАЛЕНО ---
 
-        // --- 2. Обчислення висоти для Контейнера ---
-        const controlsHeight = controlsContainer.offsetHeight; // Реальна висота блоку контролів
-        const containerPaddingTop = parseFloat(computedContainerStyle.paddingTop) || 0;
-        const containerPaddingBottom = parseFloat(computedContainerStyle.paddingBottom) || 0;
-        // Відступ між textarea та controls (зазвичай margin-bottom на textarea)
-        const textareaMarginBottom = parseFloat(computedTextareaStyle.marginBottom) || 0;
-
-        // Формула: Паддінг_Верх + Висота_Textarea + Марджін_Textarea + Висота_Контролів + Паддінг_Низ
-        const newContainerHeight = containerPaddingTop + newTextareaHeight + textareaMarginBottom + controlsHeight + containerPaddingBottom;
-
-        // --- 3. Встановлення ОБИДВОХ висот ---
-        textarea.style.height = `${newTextareaHeight}px`;
-        container.style.height = `${newContainerHeight}px`; // Встановлюємо висоту контейнера
-
-        console.log(`adjustTextareaHeight BOTH: Set textarea H=${newTextareaHeight}px, container H=${newContainerHeight}px`);
-
-        // Логування реальних розмірів після встановлення (для діагностики)
-        const renderedTextareaHeight = textarea.clientHeight;
-        const renderedContainerHeight = container.clientHeight;
-        console.log(`adjustTextareaHeight BOTH: Rendered textarea H=${renderedTextareaHeight}, container H=${renderedContainerHeight}`);
+        // Логування для перевірки
+        console.log(`adjustTextareaHeight SIMPLE_H: Set style.height=${newHeight}px`);
+        const renderedHeight = textarea.clientHeight;
+        console.log(`adjustTextareaHeight SIMPLE_H: Rendered clientHeight=${renderedHeight}`);
       });
     });
   }
