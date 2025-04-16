@@ -760,7 +760,7 @@ var OllamaView = /** @class */ (function (_super) {
                     }
                 }
                 // textarea.style.height = `${newHeight}px`;
-                textarea.style.setProperty('height', newHeight + "px", 'important');
+                textarea.style.height = newHeight + "px"; // Встановлюємо висоту без !important
                 console.log("adjustTextareaHeight: Set style.height=" + newHeight + "px"); // Старий ЛОГ 4
             });
         };

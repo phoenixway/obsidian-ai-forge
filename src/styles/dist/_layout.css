@@ -45,11 +45,12 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: visible !important;
 }
 .workspace-leaf-content[data-type=ollama-personas-chat-view] .view-content .ollama-container {
   flex-grow: 1;
-  min-height: 65vh;
+  height: auto;
+  min-height: 0;
 }
 
 .chat-date-separator {
