@@ -1,3 +1,8 @@
+/**
+**********************************
+// --- Tablet & Smaller Desktop ---
+**********************************
+*/
 @media screen and (max-width: 768px) {
   :root {
     --chat-message-max-width: 90%;
@@ -77,7 +82,22 @@
   .menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
     display: block !important;
   }
+
+  .input-controls-left .role-display {
+    display: none;
+  }
+  .input-controls-left .model-display {
+    max-width: 150px;
+  }
+  .input-controls-left .model-display + .translate-input-button {
+    margin-left: 4px;
+  }
 }
+/*
+*************************************************************************************
+// --- Regular Phones (Portrait) ---
+*************************************************************************************
+*/
 @media screen and (max-width: 480px) {
   :root {
     --chat-spacing-unit: 3px;
@@ -112,6 +132,9 @@
     height: 28px;
   }
   .chat-input-container .input-controls-left .translate-input-button {
+    display: none;
+  }
+  .chat-input-container .input-controls-left .role-display {
     display: none;
   }
 
@@ -194,6 +217,11 @@
     max-height: 150px;
   }
 }
+/**
+**********************************
+// --- Very Narrow Screens ---
+**********************************
+*/
 @media screen and (max-width: 360px) {
   :root {
     --chat-avatar-size: 24px;
@@ -219,7 +247,16 @@
     width: 11px;
     height: 11px;
   }
+
+  .input-controls-left .role-display {
+    display: none;
+  }
 }
+/**
+**********************************
+// --- Desktop and Larger Screens ---
+**********************************
+*/
 @media screen and (min-width: 769px) {
   .workspace-leaf-content[data-type=ollama-personas-chat-view] .ollama-container {
     min-height: 65vh;

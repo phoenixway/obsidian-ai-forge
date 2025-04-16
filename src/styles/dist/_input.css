@@ -59,7 +59,8 @@
   gap: 6px;
   flex-shrink: 0;
 }
-.chat-input-container .input-controls-container .input-controls-left .model-display {
+.chat-input-container .input-controls-container .input-controls-left .model-display,
+.chat-input-container .input-controls-container .input-controls-left .role-display {
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
   padding: 4px 8px;
@@ -69,15 +70,19 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 150px;
+  max-width: 120px;
   border: 1px solid transparent;
   background-color: var(--background-primary);
   transition: all 0.2s ease;
 }
-.chat-input-container .input-controls-container .input-controls-left .model-display:hover {
+.chat-input-container .input-controls-container .input-controls-left .model-display:hover,
+.chat-input-container .input-controls-container .input-controls-left .role-display:hover {
   background-color: var(--background-modifier-hover);
   border-color: var(--background-modifier-border);
   color: var(--text-normal);
+}
+.chat-input-container .input-controls-container .input-controls-left .model-display + .role-display {
+  margin-left: 4px;
 }
 .chat-input-container .input-controls-container .input-controls-left .translate-input-button {
   width: 28px;

@@ -1,6 +1,11 @@
 // src/styles/_responsive.scss
 
+
+/**
+**********************************
 // --- Tablet & Smaller Desktop ---
+**********************************
+*/
 @media screen and (max-width: 768px) {
     :root {
       --chat-message-max-width: 90%; // Wider messages
@@ -66,10 +71,6 @@
         gap: 8px;
       }
   
-      // Adjust layout of controls if needed
-      // .input-controls-left { order: 1; flex-grow: 1; justify-content: flex-start; }
-      // .input-controls-right { order: 2; flex-grow: 1; justify-content: flex-end; }
-  
       textarea {
         padding-left: 10px;
         margin-bottom: 6px;
@@ -92,10 +93,27 @@
             display: block !important;
         }
     }
+
+    .input-controls-left {
+        .role-display { // <-- Приховуємо індикатор ролі
+            display: none;
+        }
+        // Можливо, потрібно трохи змінити відступи чи max-width для model-display
+        .model-display {
+            max-width: 150px; // Повернути більше місця для моделі
+        }
+         .model-display + .translate-input-button { // Відступ кнопки перекладу від моделі
+              margin-left: 4px;
+         }
+    }
+  
   }
   
-  
+  /*
+  *************************************************************************************
   // --- Regular Phones (Portrait) ---
+  *************************************************************************************
+  */
   @media screen and (max-width: 480px) {
     :root {
       --chat-spacing-unit: 3px; // Even smaller spacing unit
@@ -133,8 +151,9 @@
       .input-controls-left .translate-input-button {
           display: none;
       }
-       // Maybe hide model display too?
-       // .input-controls-left .model-display { display: none; }
+      .input-controls-left .role-display {
+        display: none;
+    }
     }
   
   
@@ -208,7 +227,12 @@
     }
   }
   
-  // --- Very Narrow Screens ---
+  /**
+**********************************
+// --- Very Narrow Screens ---
+**********************************
+*/
+  
   @media screen and (max-width: 360px) {
     :root {
       --chat-avatar-size: 24px;
@@ -231,9 +255,19 @@
     .message-actions-wrapper button .svg-icon {
       width: 11px; height: 11px;
     }
+
+    .input-controls-left .role-display {
+        display: none;
+    }
+
   }
   
-  // --- Desktop and Larger Screens ---
+    /**
+**********************************
+// --- Desktop and Larger Screens ---
+**********************************
+*/
+  
   @media screen and (min-width: 769px) {
      // Specific desktop layout adjustments
      .workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
@@ -257,4 +291,5 @@
          transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
          // Hover effect is handled by the base rule + parent hover
      }
+
   }

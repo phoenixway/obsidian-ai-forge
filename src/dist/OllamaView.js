@@ -145,6 +145,7 @@ var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_DANGER_OPTION = "danger-option"; // Для небезпечних дій
 var CSS_CLASS_INPUT_AREA_LEFT = "input-area-left";
 var CSS_CLASS_MODEL_DISPLAY = "model-display";
+var CSS_CLASS_ROLE_DISPLAY = "role-display";
 var CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
 var CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 var CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
@@ -650,6 +651,7 @@ var OllamaView = /** @class */ (function (_super) {
             var displayRole = roleName || "Default Assistant";
             // Оновлюємо плейсхолдер при зміні ролі
             _this.updateInputPlaceholder(displayRole);
+            _this.updateRoleDisplay(displayRole);
             if (_this.currentMessages.length > 0) {
                 _this.addMessageToDisplay("system", "Role changed to: " + displayRole, new Date());
             }
@@ -728,6 +730,122 @@ var OllamaView = /** @class */ (function (_super) {
                 });
             });
         };
+        _this.handleRoleDisplayClick = function (event) { return __awaiter(_this, void 0, void 0, function () {
+            var menu, itemsAdded, roles, activeChat_1, currentRolePath_1, error_6;
+            var _this = this;
+            var _a, _b, _c;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
+                    case 0:
+                        console.log("[OllamaView Debug] Role display clicked, creating native menu.");
+                        menu = new obsidian_1.Menu();
+                        itemsAdded = false;
+                        _d.label = 1;
+                    case 1:
+                        _d.trys.push([1, 4, 5, 6]);
+                        return [4 /*yield*/, this.plugin.listRoleFiles(true)];
+                    case 2:
+                        roles = _d.sent();
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 3:
+                        activeChat_1 = _d.sent();
+                        currentRolePath_1 = (_c = (_b = activeChat_1 === null || activeChat_1 === void 0 ? void 0 : activeChat_1.metadata) === null || _b === void 0 ? void 0 : _b.selectedRolePath) !== null && _c !== void 0 ? _c : this.plugin.settings.selectedRolePath;
+                        // loadingNotice?.hide();
+                        // --- 1. Додаємо опцію "None (Default)" ---
+                        menu.addItem(function (item) {
+                            item
+                                .setTitle("None (Default)")
+                                .setIcon(!currentRolePath_1 ? "check" : "slash") // Перевірка чи шлях пустий
+                                .onClick(function () { return __awaiter(_this, void 0, void 0, function () {
+                                var newRolePath;
+                                var _a, _b;
+                                return __generator(this, function (_c) {
+                                    switch (_c.label) {
+                                        case 0:
+                                            newRolePath = "";
+                                            if (!(currentRolePath_1 !== newRolePath)) return [3 /*break*/, 4];
+                                            if (!activeChat_1) return [3 /*break*/, 2];
+                                            return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath })];
+                                        case 1:
+                                            _c.sent();
+                                            return [3 /*break*/, 4];
+                                        case 2:
+                                            // Якщо чату немає, змінюємо глобальне налаштування
+                                            this.plugin.settings.selectedRolePath = newRolePath;
+                                            return [4 /*yield*/, this.plugin.saveSettings()];
+                                        case 3:
+                                            _c.sent();
+                                            // Емітуємо подію зміни ролі вручну, бо менеджер чату не викликався
+                                            this.plugin.emit('role-changed', "Default Assistant");
+                                            (_b = (_a = this.plugin.promptService) === null || _a === void 0 ? void 0 : _a.clearRoleCache) === null || _b === void 0 ? void 0 : _b.call(_a);
+                                            _c.label = 4;
+                                        case 4: return [2 /*return*/];
+                                    }
+                                });
+                            }); });
+                            itemsAdded = true;
+                        });
+                        // --- 2. Додаємо роздільник, якщо є ролі ---
+                        if (roles.length > 0) {
+                            menu.addSeparator();
+                            itemsAdded = true;
+                        }
+                        // --- 3. Додаємо список ролей ---
+                        roles.forEach(function (roleInfo) {
+                            menu.addItem(function (item) {
+                                item
+                                    .setTitle(roleInfo.name)
+                                    .setIcon(roleInfo.path === currentRolePath_1 ? "check" : (roleInfo.isCustom ? 'user' : 'file-text')) // Іконки: обрана, кастомна, звичайна
+                                    .onClick(function () { return __awaiter(_this, void 0, void 0, function () {
+                                    var newRolePath;
+                                    var _a, _b;
+                                    return __generator(this, function (_c) {
+                                        switch (_c.label) {
+                                            case 0:
+                                                newRolePath = roleInfo.path;
+                                                if (!(currentRolePath_1 !== newRolePath)) return [3 /*break*/, 4];
+                                                if (!activeChat_1) return [3 /*break*/, 2];
+                                                return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath })];
+                                            case 1:
+                                                _c.sent();
+                                                return [3 /*break*/, 4];
+                                            case 2:
+                                                // Якщо чату немає, змінюємо глобальне налаштування
+                                                this.plugin.settings.selectedRolePath = newRolePath;
+                                                return [4 /*yield*/, this.plugin.saveSettings()];
+                                            case 3:
+                                                _c.sent();
+                                                this.plugin.emit('role-changed', roleInfo.name);
+                                                (_b = (_a = this.plugin.promptService) === null || _a === void 0 ? void 0 : _a.clearRoleCache) === null || _b === void 0 ? void 0 : _b.call(_a);
+                                                _c.label = 4;
+                                            case 4: return [2 /*return*/];
+                                        }
+                                    });
+                                }); });
+                                itemsAdded = true;
+                            });
+                        });
+                        return [3 /*break*/, 6];
+                    case 4:
+                        error_6 = _d.sent();
+                        // loadingNotice?.hide();
+                        console.error("Error loading roles for role selection menu:", error_6);
+                        // Додаємо елемент помилки в меню, лише якщо нічого іншого не додалося
+                        if (!itemsAdded) {
+                            menu.addItem(function (item) { return item.setTitle("Error loading roles").setDisabled(true); });
+                            itemsAdded = true;
+                        }
+                        new obsidian_1.Notice("Failed to load roles.");
+                        return [3 /*break*/, 6];
+                    case 5:
+                        if (itemsAdded) {
+                            menu.showAtMouseEvent(event); // Показуємо меню
+                        }
+                        return [7 /*endfinally*/];
+                    case 6: return [2 /*return*/];
+                }
+            });
+        }); };
         _this.plugin = plugin;
         _this.initSpeechWorker();
         // Переконуємось, що handleScroll визначено ПЕРЕД цим рядком
@@ -746,7 +864,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.getIcon = function () { return "message-square"; };
     OllamaView.prototype.onOpen = function () {
         return __awaiter(this, void 0, Promise, function () {
-            var error_6;
+            var error_7;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
@@ -772,11 +890,14 @@ var OllamaView = /** @class */ (function (_super) {
                         _a.sent();
                         return [3 /*break*/, 4];
                     case 3:
-                        error_6 = _a.sent();
-                        console.error("[OllamaView] Error during initial chat load:", error_6);
+                        error_7 = _a.sent();
+                        console.error("[OllamaView] Error during initial chat load:", error_7);
                         this.showEmptyState();
                         // Якщо завантаження чату не вдалось, все одно встановимо плейсхолдер і модель
-                        this.getCurrentRoleDisplayName().then(function (roleName) { return _this.updateInputPlaceholder(roleName); });
+                        this.getCurrentRoleDisplayName().then(function (roleName) {
+                            _this.updateInputPlaceholder(roleName);
+                            _this.updateRoleDisplay(roleName); // <-- Оновлюємо дисплей ролі
+                        });
                         this.updateModelDisplay(this.plugin.settings.modelName);
                         return [3 /*break*/, 4];
                     case 4:
@@ -836,6 +957,9 @@ var OllamaView = /** @class */ (function (_super) {
         this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
         this.modelDisplayEl.setText("..."); // Початковий текст
         this.modelDisplayEl.title = "Click to select model";
+        this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
+        this.roleDisplayEl.setText("..."); // Початковий текст
+        this.roleDisplayEl.title = "Click to select role";
         // 2b. Права група контролів (старий buttonsContainer)
         this.buttonsContainer = controlsContainer.createDiv({ cls: CSS_CLASS_BUTTONS_CONTAINER + " " + CSS_CLASS_INPUT_CONTROLS_RIGHT });
         this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } });
@@ -1032,6 +1156,13 @@ var OllamaView = /** @class */ (function (_super) {
         if (this.newMessagesIndicatorEl) {
             this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick);
         }
+        if (this.roleDisplayEl) { // <-- Новий слухач
+            this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
+            console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
+        }
+        else {
+            console.error("roleDisplayEl missing!");
+        }
         // Plugin/ChatManager Event Listeners
         this.register(this.plugin.on('model-changed', this.handleModelChange));
         this.register(this.plugin.on('role-changed', this.handleRoleChange));
@@ -1054,7 +1185,7 @@ var OllamaView = /** @class */ (function (_super) {
     // Handles clicks on submenu headers (Model, Role, Chat)
     OllamaView.prototype.toggleSubmenu = function (headerEl, contentEl, type) {
         return __awaiter(this, void 0, Promise, function () {
-            var iconEl, isHidden, _a, error_7;
+            var iconEl, isHidden, _a, error_8;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
@@ -1104,8 +1235,8 @@ var OllamaView = /** @class */ (function (_super) {
                         } });
                         return [3 /*break*/, 10];
                     case 9:
-                        error_7 = _b.sent();
-                        console.error("Error rendering " + type + " list:", error_7);
+                        error_8 = _b.sent();
+                        console.error("Error rendering " + type + " list:", error_8);
                         contentEl.empty();
                         contentEl.createDiv({ cls: "menu-error-text", text: "Error loading " + type + "." });
                         contentEl.style.maxHeight = '50px';
@@ -1160,6 +1291,13 @@ var OllamaView = /** @class */ (function (_super) {
         this.collapseAllSubmenus(null);
     } };
     OllamaView.prototype.autoResizeTextarea = function () { this.adjustTextareaHeight(); };
+    OllamaView.prototype.updateRoleDisplay = function (roleName) {
+        if (this.roleDisplayEl) {
+            var displayName = roleName || "Default"; // Якщо роль не вибрана
+            this.roleDisplayEl.setText(displayName);
+            this.roleDisplayEl.title = "Current role: " + displayName + ". Click to change.";
+        }
+    };
     OllamaView.prototype.updateSendButtonState = function () { if (!this.inputEl || !this.sendButton)
         return; var isDisabled = this.inputEl.value.trim() === '' || this.isProcessing; this.sendButton.disabled = isDisabled; this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled); };
     OllamaView.prototype.showEmptyState = function () { var _a, _b; if (this.currentMessages.length === 0 && !this.emptyStateEl && this.chatContainer) {
@@ -1187,7 +1325,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.loadAndDisplayActiveChat = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var currentModelName, currentRoleName, activeChat, error_8;
+            var currentModelName, currentRoleName, activeChat, error_9;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
@@ -1229,14 +1367,15 @@ var OllamaView = /** @class */ (function (_super) {
                         }
                         return [3 /*break*/, 6];
                     case 4:
-                        error_8 = _b.sent();
-                        console.error("[OllamaView] Error getting active chat:", error_8);
+                        error_9 = _b.sent();
+                        console.error("[OllamaView] Error getting active chat:", error_9);
                         this.showEmptyState();
                         new obsidian_1.Notice("Error loading chat history.");
                         return [3 /*break*/, 6];
                     case 5:
                         // Оновлюємо плейсхолдер РОЛІ та дисплей МОДЕЛІ в кінці
                         this.updateInputPlaceholder(currentRoleName);
+                        this.updateRoleDisplay(currentRoleName);
                         this.updateModelDisplay(currentModelName);
                         return [7 /*endfinally*/];
                     case 6: return [2 /*return*/];
@@ -1286,7 +1425,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.sendMessage = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var content, activeChat, userMessageContent, loadingEl, userMessage, assistantMessage, error_9;
+            var content, activeChat, userMessageContent, loadingEl, userMessage, assistantMessage, error_10;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
@@ -1338,14 +1477,14 @@ var OllamaView = /** @class */ (function (_super) {
                         _b.label = 7;
                     case 7: return [3 /*break*/, 10];
                     case 8:
-                        error_9 = _b.sent();
+                        error_10 = _b.sent();
                         //console.error("[OllamaView] Send/receive cycle error:", error);
                         if (loadingEl) {
                             this.removeLoadingIndicator(loadingEl);
                             loadingEl = null;
                         } // Ensure indicator removed on error
                         // Add error directly to display
-                        this.addMessageToDisplay("error", "Error: " + (error_9.message || 'Unknown error.'), new Date());
+                        this.addMessageToDisplay("error", "Error: " + (error_10.message || 'Unknown error.'), new Date());
                         return [3 /*break*/, 10];
                     case 9:
                         // Ensure indicator is removed in all cases (if somehow missed)
@@ -1493,7 +1632,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.handleTranslateClick = function (originalContent, contentEl, buttonEl) {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var targetLang, apiKey, textToTranslate, translatedText, translationContainer, targetLangName, error_10, targetLangName;
+            var targetLang, apiKey, textToTranslate, translatedText, translationContainer, targetLangName, error_11, targetLangName;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
@@ -1531,7 +1670,7 @@ var OllamaView = /** @class */ (function (_super) {
                         } // Error notice shown by service if null
                         return [3 /*break*/, 5];
                     case 3:
-                        error_10 = _b.sent();
+                        error_11 = _b.sent();
                         //console.error("Error during translation click handling:", error);
                         new obsidian_1.Notice("An unexpected error occurred during translation.");
                         return [3 /*break*/, 5];
@@ -1642,7 +1781,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.renderModelList = function () {
         var _a, _b;
         return __awaiter(this, void 0, Promise, function () {
-            var container, modelIconMap, defaultIcon, models, activeChat, currentModelName_2, error_11;
+            var container, modelIconMap, defaultIcon, models, activeChat, currentModelName_2, error_12;
             var _this = this;
             return __generator(this, function (_c) {
                 switch (_c.label) {
@@ -1723,7 +1862,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
                     case 4:
-                        error_11 = _c.sent();
+                        error_12 = _c.sent();
                         container.empty();
                         container.createEl("div", { cls: "menu-error-text", text: "Error models." });
                         this.updateSubmenuHeight(container);
@@ -1736,7 +1875,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.renderRoleList = function () {
         var _a, _b, _c;
         return __awaiter(this, void 0, Promise, function () {
-            var container, roles, activeChat, currentChatRolePath_1, noRoleOptionEl, noRoleIconSpan, error_12;
+            var container, roles, activeChat, currentChatRolePath_1, noRoleOptionEl, noRoleIconSpan, error_13;
             var _this = this;
             return __generator(this, function (_d) {
                 switch (_d.label) {
@@ -1838,7 +1977,7 @@ var OllamaView = /** @class */ (function (_super) {
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
                     case 4:
-                        error_12 = _d.sent();
+                        error_13 = _d.sent();
                         container.empty();
                         container.createEl("div", { cls: "menu-error-text", text: "Error roles." });
                         this.updateSubmenuHeight(container);
@@ -2015,7 +2154,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.startVoiceRecognition = function () {
         var _a;
         return __awaiter(this, void 0, Promise, function () {
-            var _b, recorderOptions, preferredMimeType, audioChunks_1, error_13;
+            var _b, recorderOptions, preferredMimeType, audioChunks_1, error_14;
             var _this = this;
             return __generator(this, function (_c) {
                 switch (_c.label) {
@@ -2091,12 +2230,12 @@ var OllamaView = /** @class */ (function (_super) {
                         this.mediaRecorder.start();
                         return [3 /*break*/, 4];
                     case 3:
-                        error_13 = _c.sent();
+                        error_14 = _c.sent();
                         //console.error("Error accessing microphone or starting recording:", error);
-                        if (error_13 instanceof DOMException && error_13.name === 'NotAllowedError') {
+                        if (error_14 instanceof DOMException && error_14.name === 'NotAllowedError') {
                             new obsidian_1.Notice("Microphone access denied. Please grant permission.");
                         }
-                        else if (error_13 instanceof DOMException && error_13.name === 'NotFoundError') {
+                        else if (error_14 instanceof DOMException && error_14.name === 'NotFoundError') {
                             new obsidian_1.Notice("Microphone not found. Please ensure it's connected and enabled.");
                         }
                         else {
@@ -2375,93 +2514,10 @@ var OllamaView = /** @class */ (function (_super) {
         });
         return markdown.trim();
     };
-    // private handleRenameChatClick = async (): Promise<void> => {
-    //   this.closeMenu();
-    //   const activeChat = await this.plugin.chatManager?.getActiveChat();
-    //   if (!activeChat) {
-    //     new Notice("No active chat to rename.");
-    //     return;
-    //   }
-    //   const currentName = activeChat.metadata.name;
-    //   // --- Використання PromptModal ---
-    //   new PromptModal(
-    //     this.app,
-    //     'Rename Chat', // Заголовок вікна
-    //     `Enter new name for "${currentName}":`, // Текст підказки
-    //     currentName, // Початкове значення
-    //     async (newName) => { // Функція, що виконається при Submit
-    //       if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-    //         //console.log(`[OllamaView] Renaming chat <span class="math-inline">\{activeChat\.metadata\.id\} to "</span>{newName.trim()}"`);
-    //         const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
-    //         if (success) { new Notice(`Chat renamed to "${newName.trim()}"`); }
-    //         else { new Notice("Failed to rename chat."); }
-    //       } else {
-    //         // Порожнє ім'я або не змінилося (або користувач нічого не ввів і натиснув Submit)
-    //         // Можна додати перевірку на порожнє значення в самому PromptModal перед onSubmit
-    //         if (newName?.trim() === currentName) {
-    //           new Notice("Name unchanged.");
-    //         } else {
-    //           new Notice("Rename cancelled or invalid name entered.");
-    //         }
-    //       }
-    //     }
-    //   ).open(); // Відкриваємо модальне вікно
-    //   // --- Кінець використання PromptModal ---
-    // }
-    // private handleDeleteChatClick = async (): Promise<void> => {
-    //   this.closeMenu();
-    //   const activeChat = await this.plugin.chatManager?.getActiveChat();
-    //   if (!activeChat) {
-    //     new Notice("No active chat to delete.");
-    //     return;
-    //   }
-    //   const chatName = activeChat.metadata.name;
-    //   // --- Використання ConfirmModal ---
-    //   new ConfirmModal(
-    //     this.app,
-    //     'Delete Chat', // Заголовок
-    //     `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення
-    //     async () => { // Функція, що виконається при Confirm
-    //       //console.log(`[OllamaView] Deleting chat <span class="math-inline">\{activeChat\.metadata\.id\} \("</span>{chatName}")`);
-    //       const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
-    //       if (success) { new Notice(`Chat "${chatName}" deleted.`); }
-    //       else { new Notice(`Failed to delete chat "${chatName}".`); }
-    //     }
-    //   ).open(); // Відкриваємо модальне вікно
-    //   // --- Кінець використання ConfirmModal ---
-    // }
-    // private handleCloneChatClick = async (): Promise<void> => {
-    //   this.closeMenu();
-    //   const activeChat = await this.plugin.chatManager?.getActiveChat();
-    //   if (!activeChat) {
-    //     new Notice("No active chat to clone.");
-    //     return;
-    //   }
-    //   const originalName = activeChat.metadata.name;
-    //   //console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
-    //   const cloningNotice = new Notice("Cloning chat...", 0); // Повідомлення без автозникання
-    //   try {
-    //     // Викликаємо новий метод в ChatManager
-    //     const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
-    //     if (clonedChat) {
-    //       cloningNotice.hide(); // Ховаємо повідомлення про клонування
-    //       new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
-    //       // View оновить себе через подію 'active-chat-changed',
-    //       // яку викличе setActiveChat всередині cloneChat.
-    //     } else {
-    //       cloningNotice.hide();
-    //       new Notice("Failed to clone chat.");
-    //     }
-    //   } catch (error) {
-    //     cloningNotice.hide();
-    //     //console.error("Error cloning chat:", error);
-    //     new Notice("An error occurred while cloning the chat.");
-    //   }
-    // }
     OllamaView.prototype.getCurrentRoleDisplayName = function () {
         var _a, _b, _c, _d;
         return __awaiter(this, void 0, Promise, function () {
-            var activeChat, rolePath_1, allRoles, foundRole, error_14;
+            var activeChat, rolePath_1, allRoles, foundRole, error_15;
             return __generator(this, function (_e) {
                 switch (_e.label) {
                     case 0:
@@ -2486,8 +2542,8 @@ var OllamaView = /** @class */ (function (_super) {
                         _e.label = 3;
                     case 3: return [3 /*break*/, 5];
                     case 4:
-                        error_14 = _e.sent();
-                        console.error("Error getting current role display name:", error_14);
+                        error_15 = _e.sent();
+                        console.error("Error getting current role display name:", error_15);
                         return [3 /*break*/, 5];
                     case 5: 
                     // Повертаємо стандартне ім'я, якщо роль не вибрана або сталася помилка

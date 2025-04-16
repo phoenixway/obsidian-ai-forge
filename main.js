@@ -202,6 +202,7 @@ var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_DANGER_OPTION = "danger-option";
 var CSS_CLASS_MODEL_DISPLAY = "model-display";
+var CSS_CLASS_ROLE_DISPLAY = "role-display";
 var CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
 var CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 var CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
@@ -649,6 +650,7 @@ This action cannot be undone.`, async () => {
     this.handleRoleChange = (roleName) => {
       const displayRole = roleName || "Default Assistant";
       this.updateInputPlaceholder(displayRole);
+      this.updateRoleDisplay(displayRole);
       if (this.currentMessages.length > 0) {
         this.addMessageToDisplay("system", `Role changed to: ${displayRole}`, new Date());
       } else {
@@ -764,6 +766,68 @@ This action cannot be undone.`, async () => {
         });
       });
     };
+    this.handleRoleDisplayClick = async (event) => {
+      var _a, _b, _c;
+      console.log("[OllamaView Debug] Role display clicked, creating native menu.");
+      const menu = new import_obsidian3.Menu();
+      let itemsAdded = false;
+      try {
+        const roles = await this.plugin.listRoleFiles(true);
+        const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+        const currentRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
+        menu.addItem((item) => {
+          item.setTitle("None (Default)").setIcon(!currentRolePath ? "check" : "slash").onClick(async () => {
+            var _a2, _b2;
+            const newRolePath = "";
+            if (currentRolePath !== newRolePath) {
+              if (activeChat) {
+                await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+              } else {
+                this.plugin.settings.selectedRolePath = newRolePath;
+                await this.plugin.saveSettings();
+                this.plugin.emit("role-changed", "Default Assistant");
+                (_b2 = (_a2 = this.plugin.promptService) == null ? void 0 : _a2.clearRoleCache) == null ? void 0 : _b2.call(_a2);
+              }
+            }
+          });
+          itemsAdded = true;
+        });
+        if (roles.length > 0) {
+          menu.addSeparator();
+          itemsAdded = true;
+        }
+        roles.forEach((roleInfo) => {
+          menu.addItem((item) => {
+            item.setTitle(roleInfo.name).setIcon(roleInfo.path === currentRolePath ? "check" : roleInfo.isCustom ? "user" : "file-text").onClick(async () => {
+              var _a2, _b2;
+              const newRolePath = roleInfo.path;
+              if (currentRolePath !== newRolePath) {
+                if (activeChat) {
+                  await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+                } else {
+                  this.plugin.settings.selectedRolePath = newRolePath;
+                  await this.plugin.saveSettings();
+                  this.plugin.emit("role-changed", roleInfo.name);
+                  (_b2 = (_a2 = this.plugin.promptService) == null ? void 0 : _a2.clearRoleCache) == null ? void 0 : _b2.call(_a2);
+                }
+              }
+            });
+            itemsAdded = true;
+          });
+        });
+      } catch (error) {
+        console.error("Error loading roles for role selection menu:", error);
+        if (!itemsAdded) {
+          menu.addItem((item) => item.setTitle("Error loading roles").setDisabled(true));
+          itemsAdded = true;
+        }
+        new import_obsidian3.Notice("Failed to load roles.");
+      } finally {
+        if (itemsAdded) {
+          menu.showAtMouseEvent(event);
+        }
+      }
+    };
     this.plugin = plugin;
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian3.debounce)(this.handleScroll, 150, true);
@@ -799,7 +863,10 @@ This action cannot be undone.`, async () => {
     } catch (error) {
       console.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState();
-      this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
+      this.getCurrentRoleDisplayName().then((roleName) => {
+        this.updateInputPlaceholder(roleName);
+        this.updateRoleDisplay(roleName);
+      });
       this.updateModelDisplay(this.plugin.settings.modelName);
     }
     setTimeout(() => {
@@ -845,6 +912,9 @@ This action cannot be undone.`, async () => {
     this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
+    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
+    this.roleDisplayEl.setText("...");
+    this.roleDisplayEl.title = "Click to select role";
     this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
@@ -1024,6 +1094,12 @@ This action cannot be undone.`, async () => {
     if (this.newMessagesIndicatorEl) {
       this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
     }
+    if (this.roleDisplayEl) {
+      this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
+      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
+    } else {
+      console.error("roleDisplayEl missing!");
+    }
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));
     this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));
@@ -1130,6 +1206,13 @@ This action cannot be undone.`, async () => {
   autoResizeTextarea() {
     this.adjustTextareaHeight();
   }
+  updateRoleDisplay(roleName) {
+    if (this.roleDisplayEl) {
+      const displayName = roleName || "Default";
+      this.roleDisplayEl.setText(displayName);
+      this.roleDisplayEl.title = `Current role: ${displayName}. Click to change.`;
+    }
+  }
   updateSendButtonState() {
     if (!this.inputEl || !this.sendButton)
       return;
@@ -1207,6 +1290,7 @@ This action cannot be undone.`, async () => {
       new import_obsidian3.Notice("Error loading chat history.");
     } finally {
       this.updateInputPlaceholder(currentRoleName);
+      this.updateRoleDisplay(currentRoleName);
       this.updateModelDisplay(currentModelName);
     }
   }
@@ -2228,89 +2312,6 @@ ${contentPrefix}`) + "\n\n";
     });
     return markdown.trim();
   }
-  // private handleRenameChatClick = async (): Promise<void> => {
-  //   this.closeMenu();
-  //   const activeChat = await this.plugin.chatManager?.getActiveChat();
-  //   if (!activeChat) {
-  //     new Notice("No active chat to rename.");
-  //     return;
-  //   }
-  //   const currentName = activeChat.metadata.name;
-  //   // --- Використання PromptModal ---
-  //   new PromptModal(
-  //     this.app,
-  //     'Rename Chat', // Заголовок вікна
-  //     `Enter new name for "${currentName}":`, // Текст підказки
-  //     currentName, // Початкове значення
-  //     async (newName) => { // Функція, що виконається при Submit
-  //       if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-  //         //console.log(`[OllamaView] Renaming chat <span class="math-inline">\{activeChat\.metadata\.id\} to "</span>{newName.trim()}"`);
-  //         const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
-  //         if (success) { new Notice(`Chat renamed to "${newName.trim()}"`); }
-  //         else { new Notice("Failed to rename chat."); }
-  //       } else {
-  //         // Порожнє ім'я або не змінилося (або користувач нічого не ввів і натиснув Submit)
-  //         // Можна додати перевірку на порожнє значення в самому PromptModal перед onSubmit
-  //         if (newName?.trim() === currentName) {
-  //           new Notice("Name unchanged.");
-  //         } else {
-  //           new Notice("Rename cancelled or invalid name entered.");
-  //         }
-  //       }
-  //     }
-  //   ).open(); // Відкриваємо модальне вікно
-  //   // --- Кінець використання PromptModal ---
-  // }
-  // private handleDeleteChatClick = async (): Promise<void> => {
-  //   this.closeMenu();
-  //   const activeChat = await this.plugin.chatManager?.getActiveChat();
-  //   if (!activeChat) {
-  //     new Notice("No active chat to delete.");
-  //     return;
-  //   }
-  //   const chatName = activeChat.metadata.name;
-  //   // --- Використання ConfirmModal ---
-  //   new ConfirmModal(
-  //     this.app,
-  //     'Delete Chat', // Заголовок
-  //     `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, // Повідомлення
-  //     async () => { // Функція, що виконається при Confirm
-  //       //console.log(`[OllamaView] Deleting chat <span class="math-inline">\{activeChat\.metadata\.id\} \("</span>{chatName}")`);
-  //       const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
-  //       if (success) { new Notice(`Chat "${chatName}" deleted.`); }
-  //       else { new Notice(`Failed to delete chat "${chatName}".`); }
-  //     }
-  //   ).open(); // Відкриваємо модальне вікно
-  //   // --- Кінець використання ConfirmModal ---
-  // }
-  // private handleCloneChatClick = async (): Promise<void> => {
-  //   this.closeMenu();
-  //   const activeChat = await this.plugin.chatManager?.getActiveChat();
-  //   if (!activeChat) {
-  //     new Notice("No active chat to clone.");
-  //     return;
-  //   }
-  //   const originalName = activeChat.metadata.name;
-  //   //console.log(`[OllamaView] Cloning chat ${activeChat.metadata.id} ("${originalName}")`);
-  //   const cloningNotice = new Notice("Cloning chat...", 0); // Повідомлення без автозникання
-  //   try {
-  //     // Викликаємо новий метод в ChatManager
-  //     const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
-  //     if (clonedChat) {
-  //       cloningNotice.hide(); // Ховаємо повідомлення про клонування
-  //       new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
-  //       // View оновить себе через подію 'active-chat-changed',
-  //       // яку викличе setActiveChat всередині cloneChat.
-  //     } else {
-  //       cloningNotice.hide();
-  //       new Notice("Failed to clone chat.");
-  //     }
-  //   } catch (error) {
-  //     cloningNotice.hide();
-  //     //console.error("Error cloning chat:", error);
-  //     new Notice("An error occurred while cloning the chat.");
-  //   }
-  // }
   async getCurrentRoleDisplayName() {
     var _a, _b, _c, _d;
     try {
@@ -2331,7 +2332,6 @@ ${contentPrefix}`) + "\n\n";
     }
     return "Default Assistant";
   }
-  // --- КІНЕЦЬ ПЕРЕПИСАНОЇ ФУНКЦІЇ ---
 };
 
 // src/settings.ts
