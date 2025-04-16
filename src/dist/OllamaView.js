@@ -1069,7 +1069,7 @@ var OllamaView = /** @class */ (function (_super) {
             this.menuButton.addEventListener("click", this.handleMenuClick); // Головне кастомне меню
         if (this.modelDisplayEl)
             this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick); // Спливаюче меню моделей
-        console.log("OllamaView.ts ->  ROLEDISPLAY : " + this.roleDisplayEl);
+        console.log("OllamaView.ts ->  ROLEDISPLAY: " + this.roleDisplayEl);
         if (this.roleDisplayEl) {
             this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
             console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
