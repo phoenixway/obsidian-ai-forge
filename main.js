@@ -784,29 +784,32 @@ This action cannot be undone.`, async () => {
         if (!this.inputEl)
           return;
         const textarea = this.inputEl;
-        console.log("adjustTextareaHeight Phase 1: Resetting height to auto.");
-        const currentStyleHeightBeforeReset = textarea.style.height;
+        const computedStyle = window.getComputedStyle(textarea);
+        const currentMinHeight = parseFloat(computedStyle.minHeight) || 40;
+        const maxHeight = parseFloat(computedStyle.maxHeight);
+        console.log("adjustTextareaHeight MH: Fired.");
+        const originalMinHeight = textarea.style.minHeight;
+        textarea.style.minHeight = "0";
         textarea.style.height = "auto";
         requestAnimationFrame(() => {
           if (!this.inputEl)
             return;
-          const computedStyle = window.getComputedStyle(textarea);
-          const minHeight = parseFloat(computedStyle.minHeight) || 40;
-          const maxHeight = parseFloat(computedStyle.maxHeight);
           const scrollHeight = textarea.scrollHeight;
-          console.log(`adjustTextareaHeight Phase 2: Measured scrollHeight=<span class="math-inline">{scrollHeight}, CSS MaxHeight=</span>{maxHeight}, Height before reset=${currentStyleHeightBeforeReset}`);
-          let newHeight = Math.max(minHeight, scrollHeight);
-          if (!isNaN(maxHeight) && newHeight > maxHeight) {
-            console.log(`adjustTextareaHeight: Capped by CSS max-height (${maxHeight}px).`);
-            newHeight = maxHeight;
+          textarea.style.minHeight = originalMinHeight;
+          console.log(`adjustTextareaHeight MH: Measured scrollHeight=<span class="math-inline">{scrollHeight}, CSS MaxHeight=</span>{maxHeight}`);
+          let newMinHeight = Math.max(40, scrollHeight);
+          if (!isNaN(maxHeight) && newMinHeight > maxHeight) {
+            console.log(`adjustTextareaHeight MH: Capped by CSS max-height (${maxHeight}px).`);
+            newMinHeight = maxHeight;
             if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
               textarea.style.overflowY = "auto";
             }
           }
-          textarea.style.height = `${newHeight}px`;
-          console.log(`adjustTextareaHeight Phase 2: Set style.height=${newHeight}px`);
+          textarea.style.minHeight = `${newMinHeight}px`;
+          textarea.style.height = "auto";
+          console.log(`adjustTextareaHeight MH: Set style.minHeight=${newMinHeight}px, style.height=auto`);
           const renderedHeight = textarea.clientHeight;
-          console.log(`adjustTextareaHeight Phase 2: Rendered clientHeight=${renderedHeight}`);
+          console.log(`adjustTextareaHeight MH: Rendered clientHeight=${renderedHeight}`);
         });
       });
     };
