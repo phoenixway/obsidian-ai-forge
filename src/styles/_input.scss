@@ -33,7 +33,7 @@
   }
 
   textarea {
-    width: 100% ; 
+    width: 100%;
     box-sizing: border-box;
     resize: none;
     border: none;
@@ -41,15 +41,21 @@
     padding: 10px 15px; // Стандартний padding
     line-height: 1.5;   // Стандартний line-height
     min-height: 40px;
-    max-height: 60vh; // Обмеження висоти textarea
-    overflow-y: auto; 
-
+    max-height: 60vh;
+    overflow-y: auto;
     background-color: var(--background-primary);
     color: var(--text-normal);
     font-size: 14px;
-    transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
+    transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out; // Можна тимчасово закоментувати transition, щоб бачити зміни миттєво
     margin-bottom: calc(var(--chat-spacing-unit) * 2);
     box-shadow: none !important;
+
+    // --- ДОДАЄМО ВЛАСТИВОСТІ FLEX ITEM ---
+    flex-grow: 0; // Не рости за рахунок вільного місця flex-контейнера
+    flex-shrink: 0; // ЗАБОРОНЯЄМО стискання textarea по висоті!
+    // flex-basis: auto; // Базовий розмір - автоматичний (зазвичай від height/min-height)
+    // --- КІНЕЦЬ ДОДАВАННЯ ---
+
 
     &:focus {
       outline: none;
