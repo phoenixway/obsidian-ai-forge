@@ -1,56 +1,59 @@
 // src/styles/_input.scss
 
 .chat-input-container {
-    display: flex;
-    flex-direction: column;
-    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
-    border-top: 1px solid var(--divider-color);
-    background-color: var(--background-primary); // Фон як у textarea
-    z-index: 20;
-    border-radius: 12px;
-    margin: calc(var(--chat-spacing-unit) * 2);
-    margin-top: 0;
-    box-sizing: border-box;
-    position: relative; /* Для позиціонування меню */
-    // --- FIX: Limit growth and hide container scrollbar ---
-    // max-height: 66vh;
-    // overflow: hidden;
-    // --- FIX: Remove shadow ---
+  display: flex;
+  flex-direction: column;
+  // --- ДОДАНО/ПЕРЕВІРЕНО: Налаштування flex для самого контейнера вводу ---
+  flex-grow: 0;    // Не розтягувати по вертикалі автоматично
+  flex-shrink: 0;  // Не стискати по вертикалі
+  // --- КІНЕЦЬ ЗМІН ---
+  padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+  border-top: 1px solid var(--divider-color);
+  background-color: var(--background-primary);
+  z-index: 20;
+  border-radius: 12px;
+  margin: calc(var(--chat-spacing-unit) * 2);
+  margin-top: 0;
+  box-sizing: border-box;
+  position: relative;
+  // --- ПОВЕРНІТЬ ЦІ РЯДКИ: Обмеження висоти та overflow ---
+  max-height: 66vh; // Обмежуємо висоту 2/3 висоти вікна
+  overflow: hidden; // Важливо, щоб скролбар з'явився на textarea, а не тут
+  // --- КІНЕЦЬ ПОВЕРНЕННЯ ---
+  box-shadow: none;
+
+  &:focus-within {
+    border-color: var(--interactive-accent);
     box-shadow: none;
-    // border: 1px solid transparent; // Add border for focus instead?
-  
-    &:focus-within {
-      // border-color: var(--interactive-accent); // Optional focus indicator
-      box-shadow: none; // Ensure no shadow on focus-within either
+  }
+
+  textarea {
+    width: 100%;
+    resize: none;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 15px;
+    min-height: 40px;
+    // --- ПОВЕРНІТЬ ЦЕЙ РЯДОК (АБО ПРИБЕРІТЬ): overflow має бути тут ---
+    overflow-y: auto; // Дозволяємо скролінг всередині textarea
+    // --- КІНЕЦЬ ПОВЕРНЕННЯ ---
+    // max-height: 50vh; // Цей max-height, ймовірно, вже НЕ ПОТРІБЕН тут, оскільки обмежується контейнером
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-size: 14px;
+    line-height: 1.5;
+    transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
+    box-sizing: border-box;
+    margin-bottom: calc(var(--chat-spacing-unit) * 2);
+    box-shadow: none !important;
+
+    &:focus {
+      outline: none;
+      border-color: var(--interactive-accent);
+      background-color: var(--background-secondary);
+      box-shadow: none !important;
     }
-  
-    textarea {
-      width: 100%;
-      resize: none;
-      border: none; // Or set a default border
-      border-radius: 8px;
-      padding: 10px 15px;
-      min-height: 40px;
-      // --- FIX: Allow scrolling within textarea & set max-height ---
-      //max-height: 50vh; 
-      overflow-y: auto;
-      background-color: var(--background-primary);
-      color: var(--text-normal);
-      font-size: 14px;
-      line-height: 1.5;
-      transition: border-color 0.3s, background-color 0.3s, height 0.15s ease-out;
-      box-sizing: border-box;
-      margin-bottom: calc(var(--chat-spacing-unit) * 2);
-      // --- FIX: Remove shadow ---
-      box-shadow: none !important; // Use !important as a last resort if needed
-  
-      &:focus {
-        outline: none;
-        // border-color: var(--interactive-accent); // Optional focus indicator
-        background-color: var(--background-secondary); // Optional focus indicator
-        box-shadow: none !important; // Ensure no shadow on focus
-      }
-    }
+  }
   
     .input-controls-container {
       display: flex;

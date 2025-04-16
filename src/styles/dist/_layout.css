@@ -8,7 +8,7 @@
 }
 
 .ollama-chat-container {
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
   padding: calc(var(--chat-spacing-unit) * 4);
   /* 16px */
