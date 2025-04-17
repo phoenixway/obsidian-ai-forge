@@ -1123,6 +1123,7 @@ This action cannot be undone.`, async () => {
   }
   updateModelDisplay(modelName) {
     if (this.modelDisplayEl) {
+      console.log(`OllamaView.ts ->       : updateModelDisplay: ${modelName}`);
       const displayName = modelName || "Default";
       const shortName = displayName.replace(/:latest$/, "");
       this.modelDisplayEl.setText(shortName);

@@ -1203,6 +1203,7 @@ var OllamaView = /** @class */ (function (_super) {
     };
     OllamaView.prototype.updateModelDisplay = function (modelName) {
         if (this.modelDisplayEl) {
+            console.log("OllamaView.ts ->       : updateModelDisplay: " + modelName);
             var displayName = modelName || "Default"; // Або "Select Model"
             // Забираємо ':latest', якщо воно є, для коротшого відображення
             var shortName = displayName.replace(/:latest$/, '');

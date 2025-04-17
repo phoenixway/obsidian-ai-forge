@@ -489,6 +489,7 @@ export class OllamaView extends ItemView {
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
+      console.log(`OllamaView.ts ->       : updateModelDisplay: ${modelName}`);
       const displayName = modelName || "Default"; // Або "Select Model"
       // Забираємо ':latest', якщо воно є, для коротшого відображення
       const shortName = displayName.replace(/:latest$/, '');
