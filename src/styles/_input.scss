@@ -5,7 +5,7 @@
   flex-direction: column;
   flex-grow: 0;
   flex-shrink: 0; 
-  width: 100%;
+  width: 60%;
   box-sizing: border-box;
   padding:
     calc(var(--chat-spacing-unit) * 2)    // Top
@@ -18,7 +18,7 @@
   border-radius: 12px;
   margin:
     0                                     // Top
-    calc(var(--chat-spacing-unit) * 150)    // Right (ЗБІЛЬШЕНО ЗОВНІШНІЙ ВІДСТУП)
+    calc(var(--chat-spacing-unit) * 5)    // Right (ЗБІЛЬШЕНО ЗОВНІШНІЙ ВІДСТУП)
     calc(var(--chat-spacing-unit) * 2)    // Bottom
     calc(var(--chat-spacing-unit) * 2);   // Left
   margin-top: 0;
