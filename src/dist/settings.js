@@ -284,16 +284,6 @@ var OllamaSettingTab = /** @class */ (function (_super) {
             });
         }); });
         // --- КІНЕЦЬ КОДУ З КНОПКОЮ ---
-        new obsidian_1.Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats (e.g., 'llama3:latest', 'mistral'). Needs to be available on your server.").addText(function (text) { return text.setPlaceholder("Enter model name").setValue(_this.plugin.settings.modelName).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
-            switch (_a.label) {
-                case 0:
-                    this.plugin.settings.modelName = value.trim();
-                    return [4 /*yield*/, this.plugin.saveSettings()];
-                case 1:
-                    _a.sent();
-                    return [2 /*return*/];
-            }
-        }); }); }); });
         new obsidian_1.Setting(containerEl).setName("Default Temperature").setDesc("Controls randomness. Lower values (e.g., 0.2) make output more deterministic, higher values (e.g., 0.8) make it more creative.").addSlider(function (slider) { return slider.setLimits(0, 1, 0.1).setValue(_this.plugin.settings.temperature).setDynamicTooltip().onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:

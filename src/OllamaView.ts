@@ -1127,7 +1127,12 @@ export class OllamaView extends ItemView {
       else { setIcon(noRoleIconSpan, "slash"); noRoleIconSpan.style.minWidth = "18px"; }
       noRoleOptionEl.createEl("span", {
         cls: "menu-option-text", text: "None"
-      }); this.registerDomEvent(noRoleOptionEl, 'click', async () => { const nrp = ""; if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) { this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings(); const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); } this.plugin.emit('role-changed', "Default Assistant"); } this.closeMenu(); });
+      }); this.registerDomEvent(noRoleOptionEl, 'click', async () => {
+        const nrp = ""; if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) {
+          this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings(); const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); }
+          this.plugin.emit('role-changed', "None");
+        } this.closeMenu();
+      });
       if (roles.length > 0) container.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
       roles.forEach(roleInfo => {
         const roleOptionEl = container.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
@@ -1143,12 +1148,14 @@ export class OllamaView extends ItemView {
         }
         roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
         this.registerDomEvent(roleOptionEl, 'click', async () => {
-          const nrp = roleInfo.path; if (
+          const nrp = roleInfo.path;
+          if (
             this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) {
             this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings();
             const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); }
             this.plugin.emit('role-changed', roleInfo.name);
-          } this.closeMenu();
+          }
+          this.closeMenu();
         });
       });
       this.updateSubmenuHeight(container);

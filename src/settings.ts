@@ -217,7 +217,6 @@ export class OllamaSettingTab extends PluginSettingTab {
     });
     // --- КІНЕЦЬ КОДУ З КНОПКОЮ ---
 
-    new Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats (e.g., 'llama3:latest', 'mistral'). Needs to be available on your server.").addText(text => text.setPlaceholder("Enter model name").setValue(this.plugin.settings.modelName).onChange(async (value) => { this.plugin.settings.modelName = value.trim(); await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Default Temperature").setDesc("Controls randomness. Lower values (e.g., 0.2) make output more deterministic, higher values (e.g., 0.8) make it more creative.").addSlider(slider => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => { this.plugin.settings.temperature = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Context Window Size (Tokens)").setDesc("Maximum number of tokens (input + output) the model considers. Adjust based on model and available memory.").addText(text => text.setPlaceholder(DEFAULT_SETTINGS.contextWindow.toString()).setValue(this.plugin.settings.contextWindow.toString()).onChange(async (value) => { const num = parseInt(value.trim(), 10); if (!isNaN(num) && num > 0) { this.plugin.settings.contextWindow = num; } else { this.plugin.settings.contextWindow = DEFAULT_SETTINGS.contextWindow; } await this.plugin.saveSettings(); }));
 

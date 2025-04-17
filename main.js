@@ -1713,7 +1713,7 @@ This action cannot be undone.`, async () => {
             await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp });
             (_c2 = (_b2 = this.plugin.promptService) == null ? void 0 : _b2.clearRoleCache) == null ? void 0 : _c2.call(_b2);
           }
-          this.plugin.emit("role-changed", "Default Assistant");
+          this.plugin.emit("role-changed", "None");
         }
         this.closeMenu();
       });
@@ -2578,10 +2578,6 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
       (0, import_obsidian4.setIcon)(refreshButton, "refresh-cw");
       refreshButton.disabled = false;
     });
-    new import_obsidian4.Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats (e.g., 'llama3:latest', 'mistral'). Needs to be available on your server.").addText((text) => text.setPlaceholder("Enter model name").setValue(this.plugin.settings.modelName).onChange(async (value) => {
-      this.plugin.settings.modelName = value.trim();
-      await this.plugin.saveSettings();
-    }));
     new import_obsidian4.Setting(containerEl).setName("Default Temperature").setDesc("Controls randomness. Lower values (e.g., 0.2) make output more deterministic, higher values (e.g., 0.8) make it more creative.").addSlider((slider) => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
       this.plugin.settings.temperature = value;
       await this.plugin.saveSettings();
