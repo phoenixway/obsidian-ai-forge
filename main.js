@@ -649,17 +649,16 @@ This action cannot be undone.`, async () => {
       }
     };
     // --- Plugin Event Handlers ---
-    // private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
     this.handleModelChange = (modelName) => {
+      console.log(`[AI Forge View Debug] handleModelChange received modelName: '${modelName}'`);
       this.updateModelDisplay(modelName);
       if (this.currentMessages.length > 0) {
         this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
       }
     };
-    // --- ЗМІНЕНО ---
     this.handleRoleChange = (roleName) => {
+      console.log(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
       const displayRole = roleName || "None";
-      console.log(`[OllamaView Debug] handleRoleChange TRIGGERED! Received roleName: '${roleName}'`);
       this.updateInputPlaceholder(displayRole);
       this.updateRoleDisplay(displayRole);
       if (this.currentMessages.length > 0) {

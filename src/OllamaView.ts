@@ -619,19 +619,21 @@ export class OllamaView extends ItemView {
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.isMenuOpen() && !this.menuButton?.contains(e.target as Node) && !this.menuDropdown?.contains(e.target as Node)) { this.closeMenu(); } }
 
   // --- Plugin Event Handlers ---
-  // private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
   private handleModelChange = (modelName: string): void => {
-    // this.updateInputPlaceholder(modelName); // Більше не оновлюємо плейсхолдер тут
-    this.updateModelDisplay(modelName); // Тільки дисплей моделі
+    // Цей обробник реагує на ЗМІНУ МОДЕЛІ АКТИВНОГО ЧАТУ
+    console.log(`[AI Forge View Debug] handleModelChange received modelName: '${modelName}'`);
+    this.updateModelDisplay(modelName);
+    // Не оновлюємо плейсхолдер тут, бо він залежить від ролі
+    // Повідомлення про зміну моделі додається ЛИШЕ якщо ця зміна стосується поточного чату,
+    // а не глобального дефолтного налаштування. Потрібно розрізняти ці випадки,
+    // але поки що залишимо так - при зміні дефолту може з'явитися системне повідомлення.
     if (this.currentMessages.length > 0) {
       this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
     }
   }
-  // --- ЗМІНЕНО ---
   private handleRoleChange = (roleName: string): void => {
+    console.log(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
     const displayRole = roleName || "None";
-    console.log(`[OllamaView Debug] handleRoleChange TRIGGERED! Received roleName: '${roleName}'`);
-    // Оновлюємо плейсхолдер при зміні ролі
     this.updateInputPlaceholder(displayRole);
     this.updateRoleDisplay(displayRole);
     if (this.currentMessages.length > 0) {

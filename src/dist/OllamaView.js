@@ -660,19 +660,21 @@ var OllamaView = /** @class */ (function (_super) {
             _this.closeMenu();
         } };
         // --- Plugin Event Handlers ---
-        // private handleModelChange = (modelName: string): void => { this.updateInputPlaceholder(modelName); if (this.currentMessages.length > 0) this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date()); }
         _this.handleModelChange = function (modelName) {
-            // this.updateInputPlaceholder(modelName); // Більше не оновлюємо плейсхолдер тут
-            _this.updateModelDisplay(modelName); // Тільки дисплей моделі
+            // Цей обробник реагує на ЗМІНУ МОДЕЛІ АКТИВНОГО ЧАТУ
+            console.log("[AI Forge View Debug] handleModelChange received modelName: '" + modelName + "'");
+            _this.updateModelDisplay(modelName);
+            // Не оновлюємо плейсхолдер тут, бо він залежить від ролі
+            // Повідомлення про зміну моделі додається ЛИШЕ якщо ця зміна стосується поточного чату,
+            // а не глобального дефолтного налаштування. Потрібно розрізняти ці випадки,
+            // але поки що залишимо так - при зміні дефолту може з'явитися системне повідомлення.
             if (_this.currentMessages.length > 0) {
                 _this.addMessageToDisplay("system", "Model changed to: " + modelName, new Date());
             }
         };
-        // --- ЗМІНЕНО ---
         _this.handleRoleChange = function (roleName) {
+            console.log("[AI Forge View Debug] handleRoleChange received roleName: '" + roleName + "'");
             var displayRole = roleName || "None";
-            console.log("[OllamaView Debug] handleRoleChange TRIGGERED! Received roleName: '" + roleName + "'");
-            // Оновлюємо плейсхолдер при зміні ролі
             _this.updateInputPlaceholder(displayRole);
             _this.updateRoleDisplay(displayRole);
             if (_this.currentMessages.length > 0) {
