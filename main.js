@@ -335,10 +335,14 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.userScrolledUp = false;
     // OllamaView.ts -> handleModelDisplayClick
     this.handleSettingsUpdated = async () => {
-      var _a, _b;
+      var _a, _b, _c, _d;
+      console.log("[AI Forge View] handleSettingsUpdated: TRIGGERED!");
       console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
+      console.log("[AI Forge View] Current plugin.settings.modelName in handler:", this.plugin.settings.modelName);
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-      const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+      console.log("[AI Forge View] Active chat in handler:", (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.id, "Chat model:", (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.modelName);
+      const currentModelName = ((_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.modelName) || this.plugin.settings.modelName;
+      console.log(`[AI Forge View] Determined modelName for display: ${currentModelName}`);
       const currentRoleName = await this.getCurrentRoleDisplayName();
       this.updateModelDisplay(currentModelName);
       this.updateRoleDisplay(currentRoleName);

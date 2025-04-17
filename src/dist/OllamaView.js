@@ -193,19 +193,26 @@ var OllamaView = /** @class */ (function (_super) {
         // OllamaView.ts -> handleModelDisplayClick
         _this.handleSettingsUpdated = function () { return __awaiter(_this, void 0, Promise, function () {
             var activeChat, currentModelName, currentRoleName;
-            var _a, _b;
-            return __generator(this, function (_c) {
-                switch (_c.label) {
+            var _a, _b, _c, _d;
+            return __generator(this, function (_e) {
+                switch (_e.label) {
                     case 0:
+                        console.log("[AI Forge View] handleSettingsUpdated: TRIGGERED!"); // Припустимо, це з'являється
                         console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
+                        // ЛОГ А: Яке значення налаштування бачить обробник?
+                        console.log("[AI Forge View] Current plugin.settings.modelName in handler:", this.plugin.settings.modelName);
                         return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
                     case 1:
-                        activeChat = _c.sent();
-                        currentModelName = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                        activeChat = _e.sent();
+                        console.log("[AI Forge View] Active chat in handler:", (_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.id, "Chat model:", (_c = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _c === void 0 ? void 0 : _c.modelName);
+                        currentModelName = ((_d = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _d === void 0 ? void 0 : _d.modelName) || this.plugin.settings.modelName;
+                        // --------------------------
+                        // ЛОГ Б: Яке значення було вибрано для оновлення?
+                        console.log("[AI Forge View] Determined modelName for display: " + currentModelName);
                         return [4 /*yield*/, this.getCurrentRoleDisplayName()];
                     case 2:
-                        currentRoleName = _c.sent();
-                        // Оновлюємо відповідні елементи UI
+                        currentRoleName = _e.sent();
+                        // ЛОГ В (ваш лог): Яке значення ПЕРЕДАЄТЬСЯ в updateModelDisplay?
                         this.updateModelDisplay(currentModelName);
                         this.updateRoleDisplay(currentRoleName);
                         this.updateInputPlaceholder(currentRoleName);
@@ -1203,9 +1210,9 @@ var OllamaView = /** @class */ (function (_super) {
     };
     OllamaView.prototype.updateModelDisplay = function (modelName) {
         if (this.modelDisplayEl) {
-            console.log("OllamaView.ts ->       : updateModelDisplay: " + modelName);
-            var displayName = modelName || "Default"; // Або "Select Model"
-            // Забираємо ':latest', якщо воно є, для коротшого відображення
+            // ЛОГ Г (ваш лог): Яке значення ОТРИМАНО функцією?
+            console.log("OllamaView.ts ->       : updateModelDisplay: " + modelName); // Ви кажете, тут стара назва
+            var displayName = modelName || "Default";
             var shortName = displayName.replace(/:latest$/, '');
             this.modelDisplayEl.setText(shortName);
             this.modelDisplayEl.title = "Current model: " + displayName + ". Click to change.";

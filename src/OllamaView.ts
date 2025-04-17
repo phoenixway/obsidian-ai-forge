@@ -410,22 +410,28 @@ export class OllamaView extends ItemView {
 
 
   private handleSettingsUpdated = async (): Promise<void> => {
+    console.log("[AI Forge View] handleSettingsUpdated: TRIGGERED!"); // Припустимо, це з'являється
+
     console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
+    // ЛОГ А: Яке значення налаштування бачить обробник?
+    console.log("[AI Forge View] Current plugin.settings.modelName in handler:", this.plugin.settings.modelName);
 
-    // Перевіряємо, яку модель і роль показувати ЗАРАЗ
-    // (з активного чату або дефолтну)
-    const activeChat = await this.plugin.chatManager?.getActiveChat(); // Переотримуємо активний чат
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    console.log("[AI Forge View] Active chat in handler:", activeChat?.metadata?.id, "Chat model:", activeChat?.metadata?.modelName);
+
+    // --- Ось КЛЮЧОВИЙ РЯДОК ---
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-    const currentRoleName = await this.getCurrentRoleDisplayName(); // Перераховуємо поточну роль
+    // --------------------------
 
-    // Оновлюємо відповідні елементи UI
+    // ЛОГ Б: Яке значення було вибрано для оновлення?
+    console.log(`[AI Forge View] Determined modelName for display: ${currentModelName}`);
+
+    const currentRoleName = await this.getCurrentRoleDisplayName();
+
+    // ЛОГ В (ваш лог): Яке значення ПЕРЕДАЄТЬСЯ в updateModelDisplay?
     this.updateModelDisplay(currentModelName);
     this.updateRoleDisplay(currentRoleName);
     this.updateInputPlaceholder(currentRoleName);
-
-    // Тут також можна оновити інші елементи View, що залежать від налаштувань,
-    // наприклад, увімкнення/вимкнення кнопки перекладу, якщо це налаштування
-    // this.updateTranslateButtonState(); // Приклад
   }
 
   private handleModelDisplayClick = async (event: MouseEvent) => {
@@ -489,9 +495,9 @@ export class OllamaView extends ItemView {
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
-      console.log(`OllamaView.ts ->       : updateModelDisplay: ${modelName}`);
-      const displayName = modelName || "Default"; // Або "Select Model"
-      // Забираємо ':latest', якщо воно є, для коротшого відображення
+      // ЛОГ Г (ваш лог): Яке значення ОТРИМАНО функцією?
+      console.log(`OllamaView.ts ->       : updateModelDisplay: ${modelName}`); // Ви кажете, тут стара назва
+      const displayName = modelName || "Default";
       const shortName = displayName.replace(/:latest$/, '');
       this.modelDisplayEl.setText(shortName);
       this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
