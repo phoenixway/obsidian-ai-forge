@@ -1009,32 +1009,45 @@ export class OllamaView extends ItemView {
     }
     if (!textToTranslate) return; // Nothing to translate
 
-    // Remove previous translation if exists
-    contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
+     // Remove previous translation if exists
+     contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
 
-    // Set loading state
-    setIcon(buttonEl, "loader"); buttonEl.disabled = true;
-    buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); buttonEl.setAttribute("title", "Translating...");
-
-    try {
-      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
-      if (translatedText !== null) {
-        const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
-        translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT, text: translatedText });
-        const targetLangName = LANGUAGES[targetLang] || targetLang;
-        translationContainer.createEl('div', { cls: 'translation-indicator', text: `[Translated to ${targetLangName}]` });
-        this.guaranteedScrollToBottom(50, false); // Scroll if needed
-      } // Error notice shown by service if null
-    } catch (error) {
-      //console.error("Error during translation click handling:", error);
-      new Notice("An unexpected error occurred during translation.");
-    } finally {
-      // Restore button state
-      setIcon(buttonEl, "languages"); buttonEl.disabled = false;
-      buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
-      const targetLangName = LANGUAGES[targetLang] || targetLang;
-      buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
-    }
+     // Set loading state
+     setIcon(buttonEl, "loader"); buttonEl.disabled = true;
+     buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); buttonEl.setAttribute("title", "Translating...");
+ 
+     try {
+         const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+         if (translatedText !== null) {
+             const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+ 
+             // --- ЗМІНЕНО: Рендеринг Markdown ---
+             // Створюємо div для відрендереного контенту
+             const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
+             // Рендеримо Markdown в цей div
+             await MarkdownRenderer.renderMarkdown(
+                 translatedText,
+                 translationContentEl,
+                 this.plugin.app.vault.getRoot()?.path ?? '', // Шлях контексту (корінь сховища)
+                 this // Компонент (View)
+             );
+             // --- КІНЕЦЬ ЗМІНИ ---
+ 
+             // Додаємо індикатор мови
+             const targetLangName = LANGUAGES[targetLang] || targetLang;
+             translationContainer.createEl('div', { cls: 'translation-indicator', text: `[Translated to ${targetLangName}]` });
+             this.guaranteedScrollToBottom(50, false); // Scroll if needed
+         } // Error notice shown by service if null
+     } catch (error) {
+         //console.error("Error during translation click handling:", error);
+         new Notice("An unexpected error occurred during translation.");
+     } finally {
+         // Restore button state
+         setIcon(buttonEl, "languages"); buttonEl.disabled = false;
+         buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+         const targetLangName = LANGUAGES[targetLang] || targetLang;
+         buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
+     }
   }
 
   // --- Rendering Helpers ---

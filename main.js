@@ -1509,7 +1509,7 @@ This action cannot be undone.`, async () => {
     });
   }
   async handleTranslateClick(originalContent, contentEl, buttonEl) {
-    var _a;
+    var _a, _b, _c;
     const targetLang = this.plugin.settings.translationTargetLanguage;
     const apiKey = this.plugin.settings.googleTranslationApiKey;
     if (!targetLang || !apiKey) {
@@ -1531,7 +1531,15 @@ This action cannot be undone.`, async () => {
       const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
       if (translatedText !== null) {
         const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
-        translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT, text: translatedText });
+        const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
+        await import_obsidian3.MarkdownRenderer.renderMarkdown(
+          translatedText,
+          translationContentEl,
+          (_c = (_b = this.plugin.app.vault.getRoot()) == null ? void 0 : _b.path) != null ? _c : "",
+          // Шлях контексту (корінь сховища)
+          this
+          // Компонент (View)
+        );
         const targetLangName = LANGUAGES[targetLang] || targetLang;
         translationContainer.createEl("div", { cls: "translation-indicator", text: `[Translated to ${targetLangName}]` });
         this.guaranteedScrollToBottom(50, false);
