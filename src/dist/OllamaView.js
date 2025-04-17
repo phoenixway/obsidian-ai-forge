@@ -649,6 +649,7 @@ var OllamaView = /** @class */ (function (_super) {
         // --- ЗМІНЕНО ---
         _this.handleRoleChange = function (roleName) {
             var displayRole = roleName || "None";
+            console.log("[OllamaView Debug] handleRoleChange TRIGGERED! Received roleName: '" + roleName + "'");
             // Оновлюємо плейсхолдер при зміні ролі
             _this.updateInputPlaceholder(displayRole);
             _this.updateRoleDisplay(displayRole);

@@ -649,6 +649,7 @@ This action cannot be undone.`, async () => {
     // --- ЗМІНЕНО ---
     this.handleRoleChange = (roleName) => {
       const displayRole = roleName || "None";
+      console.log(`[OllamaView Debug] handleRoleChange TRIGGERED! Received roleName: '${roleName}'`);
       this.updateInputPlaceholder(displayRole);
       this.updateRoleDisplay(displayRole);
       if (this.currentMessages.length > 0) {

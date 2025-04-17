@@ -607,6 +607,7 @@ export class OllamaView extends ItemView {
   // --- ЗМІНЕНО ---
   private handleRoleChange = (roleName: string): void => {
     const displayRole = roleName || "None";
+    console.log(`[OllamaView Debug] handleRoleChange TRIGGERED! Received roleName: '${roleName}'`);
     // Оновлюємо плейсхолдер при зміні ролі
     this.updateInputPlaceholder(displayRole);
     this.updateRoleDisplay(displayRole);
