@@ -88,6 +88,25 @@
     .translation-content {
       white-space: pre-wrap; /* Preserve line breaks from translation */
       line-height: 1.45;
+
+      p {
+        margin-top: 0;       // Прибрати відступ зверху
+        margin-bottom: 0.5em; // Залишити невеликий відступ знизу (можна змінити на 0.25em, 4px, тощо)
+  
+        // Для останнього абзацу прибираємо і нижній відступ
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+  
+      // Опціонально: Зменшити відступи для інших блокових елементів (якщо потрібно)
+      ul, ol, blockquote, pre {
+          margin-top: 0.5em;
+          margin-bottom: 0.5em;
+           &:last-child {
+             margin-bottom: 0;
+           }
+      }
     }
   
     .translation-indicator {
