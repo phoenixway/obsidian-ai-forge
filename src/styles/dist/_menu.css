@@ -1,5 +1,4 @@
 .menu-dropdown.ollama-chat-menu {
-  /* Target specific menu */
   position: absolute;
   right: calc(var(--chat-spacing-unit) * 1);
   bottom: calc(100% + var(--chat-spacing-unit));

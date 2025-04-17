@@ -1,17 +1,42 @@
 // src/styles/main.scss
 
-// Базові змінні та стилі
-@use 'base';
+// Імпортуйте базові змінні/міксини за допомогою @use, якщо вони є
+// @use 'variables';
 
-// Основні компоненти та секції
-@use 'layout';
-@use 'input';
-@use 'messages';
-@use 'system_error';
-@use 'markdown';
-@use 'actions';
-@use 'indicators';
-@use 'menu';
+// Імпортуйте базові та компонентні стилі. Можна використовувати @use або @import.
+// Використання @import тут для одноманітності з адаптивними стилями нижче:
+@import 'base';
+@import 'layout';
+@import 'input';
+@import 'messages';
+@import 'system_error';
+@import 'markdown';
+@import 'actions';
+@import 'indicators';
+@import 'menu';
 
-// Адаптивні стилі (мають бути в кінці)
-@use 'responsive';
+// --- АДАПТИВНІ СТИЛІ ---
+
+// Стилі ТІЛЬКИ для Десктопу (> 768px)
+@media screen and (min-width: 769px) {
+  // --- ЗМІНЕНО: @use на @import ---
+  @import 'responsive/desktop';
+}
+
+// Стилі для Планшетів (<= 768px)
+@media screen and (max-width: 768px) {
+  // --- ЗМІНЕНО: @use на @import ---
+  @import 'responsive/tablet';
+}
+
+// Стилі для Телефонів (<= 480px)
+@media screen and (max-width: 480px) {
+  // --- ЗМІНЕНО: @use на @import ---
+  @import 'responsive/phone';
+}
+
+// Стилі для Вузьких Телефонів (<= 360px)
+@media screen and (max-width: 360px) {
+  // --- ЗМІНЕНО: @use на @import ---
+  @import 'responsive/phone-narrow';
+}

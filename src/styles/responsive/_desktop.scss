@@ -1,0 +1,25 @@
+// src/styles/responsive/_desktop.scss
+// Стилі для екранів >= 769px
+
+ // Specific desktop layout adjustments
+ .workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
+    min-height: 65vh; // Set min-height only on desktop
+}
+
+.menu-dropdown.ollama-chat-menu {
+   // Hide model section in menu on desktop (use display instead)
+   .model-submenu-section {
+       display: none;
+   }
+   .model-submenu-section + hr { // Hide separator too
+       display: none;
+   }
+}
+
+// Action buttons in messages hidden by default on desktop
+// Hover effect is handled by the base rule + parent hover in _actions.scss
+.message-actions-wrapper {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
+}

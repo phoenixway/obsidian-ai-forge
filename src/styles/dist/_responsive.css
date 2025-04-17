@@ -222,7 +222,17 @@
 .menu-dropdown.ollama-chat-menu .submenu-content.chat-list-container {
     max-height: 150px;
   }
+  .menu-dropdown.ollama-chat-menu .role-submenu-section {
+    display: block !important;
+  }
+  .menu-dropdown.ollama-chat-menu .role-submenu-section + hr.menu-separator {
+    display: block !important;
+  }
 }
+.input-controls-left .role-display {
+  display: none;
+}
+
 /**
 **********************************
 // --- Very Narrow Screens ---

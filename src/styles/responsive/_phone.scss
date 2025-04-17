@@ -1,0 +1,113 @@
+// src/styles/responsive/_phone.scss
+// Стилі для екранів <= 480px (застосовуються ПОВЕРХ стилів _tablet.scss)
+
+:root {
+    --chat-spacing-unit: 3px; // Even smaller spacing unit
+    --chat-avatar-size: 26px; // Smaller avatar
+    --chat-message-max-width: 92%; // Wider messages
+  }
+  
+  .ollama-chat-container {
+    padding: calc(var(--chat-spacing-unit) * 3); /* 9px */
+    padding-bottom: calc(var(--chat-spacing-unit) * 1); /* 3px */
+  }
+  
+  .chat-input-container {
+    margin: 4px 8px; // Less outer margin
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2); // Less inner padding
+    border-radius: 10px;
+    max-height: 60vh; // Limit height further
+  
+    textarea {
+      font-size: 13px; // Smaller font
+      padding: 8px 10px; // Less padding
+      min-height: 36px;
+    }
+  
+    .input-controls-container {
+       gap: 4px;
+    }
+  
+    .input-controls-right button,
+    .input-controls-left .translate-input-button {
+      width: 28px; height: 28px;
+    }
+  
+    // Hide input translate button to save space
+    .input-controls-left .translate-input-button {
+        display: none;
+    }
+    // Role display is already hidden by _tablet.scss styles, no need to repeat usually
+    // .input-controls-left .role-display { display: none; }
+  }
+  
+  .message {
+    font-size: 13px; // Smaller message font
+    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+    border-radius: 15px; // Less rounded
+  }
+  
+  // Adjust corner radii for consecutive messages
+  .user-message-group .message-wrapper {
+      .message:not(:last-child) { border-bottom-right-radius: 4px; }
+      .message:last-child { border-bottom-right-radius: 15px; }
+      .message:not(:first-child) { border-top-right-radius: 4px; }
+      .message:first-child { border-top-right-radius: 15px; }
+  }
+  .ollama-message-group .message-wrapper {
+      .message:not(:last-child) { border-bottom-left-radius: 4px; }
+      .message:last-child { border-bottom-left-radius: 15px; }
+      .message:not(:first-child) { border-top-left-radius: 4px; }
+      .message:first-child { border-top-left-radius: 15px; }
+  }
+  
+  .message-group {
+    // Adjust spacing for smaller avatar
+     &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 26+6 = 32px
+     &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 26+6 = 32px
+    margin-bottom: calc(var(--chat-spacing-unit) * 3);
+  }
+  // .message-group-avatar { } // No changes needed from tablet?
+  
+  .message-timestamp {
+    font-size: 0.7em; // Very small timestamp
+    margin-top: 2px;
+  }
+  
+  // Action buttons inside messages
+  .message-actions-wrapper {
+    top: 2px;
+    right: 4px;
+    gap: 3px;
+  
+    button .svg-icon {
+      width: 12px; height: 12px; // Very small icons
+    }
+  }
+  
+  // --- Menu adjustments ---
+  .menu-dropdown.ollama-chat-menu {
+    min-width: 180px; // Narrower menu
+    max-width: calc(100vw - 20px); // Prevent overflow
+  
+    .menu-option, .menu-header-item {
+      padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); // Less padding
+    }
+    .submenu-content .menu-option {
+       padding-left: calc(var(--chat-spacing-unit) * 2) !important;
+    }
+    .menu-option-text { font-size: 13px; }
+    .chat-option .chat-option-date { font-size: 0.75em; }
+  
+    .submenu-content.model-list-container,
+    .submenu-content.role-list-container,
+    .submenu-content.chat-list-container {
+        max-height: 150px; // Limit list height
+    }
+  
+    // Role section is already shown by _tablet.scss styles
+    // .role-submenu-section { display: block !important; }
+    // .role-submenu-section + hr.menu-separator { display: block !important; }
+  }
+  // Role display is already hidden
+  // .input-controls-left .role-display { display: none; }

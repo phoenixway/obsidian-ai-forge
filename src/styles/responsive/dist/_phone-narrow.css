@@ -1,0 +1,24 @@
+:root {
+  --chat-avatar-size: 24px;
+}
+
+.chat-input-container .input-controls-right button,
+.chat-input-container .input-controls-left .translate-input-button {
+  width: 26px;
+  height: 26px;
+}
+.chat-input-container .input-controls-container {
+  gap: 3px;
+}
+
+.message-group.user-message-group .message-wrapper {
+  margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+}
+.message-group.ollama-message-group .message-wrapper {
+  margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+}
+
+.message-actions-wrapper button .svg-icon {
+  width: 11px;
+  height: 11px;
+}

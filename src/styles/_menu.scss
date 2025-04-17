@@ -1,6 +1,6 @@
 // src/styles/_menu.scss
 
-.menu-dropdown.ollama-chat-menu { /* Target specific menu */
+.menu-dropdown.ollama-chat-menu {
     position: absolute;
     right: calc(var(--chat-spacing-unit) * 1);
     bottom: calc(100% + var(--chat-spacing-unit)); /* Above controls */
@@ -17,15 +17,13 @@
     flex-direction: column;
   
     .role-submenu-section {
-      display: none; // Ховаємо секцію вибору ролі за замовчуванням
-  
-       // Також ховаємо роздільник, що йде ОДРАЗУ ПІСЛЯ цієї секції
+      display: none; 
+       
        + hr.menu-separator {
           display: none;
        }
     }
 
-    // Hide model selection section on desktop (handled by media query later)
     .model-submenu-section {
        // display: none; // Default hidden, shown in responsive
     }

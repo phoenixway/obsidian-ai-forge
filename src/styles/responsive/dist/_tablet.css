@@ -1,0 +1,94 @@
+:root {
+  --chat-message-max-width: 90%;
+  --chat-avatar-size: 28px;
+}
+
+.ollama-chat-container {
+  padding: calc(var(--chat-spacing-unit) * 3);
+  padding-bottom: calc(var(--chat-spacing-unit) * 1.5);
+}
+
+.message-group {
+  margin-bottom: calc(var(--chat-spacing-unit) * 3);
+}
+.message-group.user-message-group .message-wrapper {
+  margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+}
+.message-group.ollama-message-group .message-wrapper {
+  margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+}
+
+.message {
+  padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+  font-size: calc(var(--font-ui-small) * 0.98);
+}
+
+.message-actions-wrapper {
+  opacity: 0.6;
+  visibility: visible;
+  transition: none;
+}
+.message-actions-wrapper button {
+  background-color: transparent;
+  border: none;
+  padding: 1px;
+}
+.message-actions-wrapper button .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+.message-actions-wrapper button:hover {
+  background-color: var(--background-modifier-hover);
+  transform: scale(1.1);
+}
+.user-message .message-actions-wrapper button {
+  background-color: transparent;
+  border: none;
+  opacity: 0.7;
+}
+.user-message .message-actions-wrapper button:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.chat-input-container {
+  gap: 6px;
+  max-height: 75vh;
+}
+.chat-input-container .input-controls-container {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.chat-input-container textarea {
+  padding-left: 10px;
+  margin-bottom: 6px;
+  padding-right: 15px;
+}
+.chat-input-container .input-controls-right button,
+.chat-input-container .input-controls-left .translate-input-button {
+  width: 30px;
+  height: 30px;
+}
+
+.menu-dropdown.ollama-chat-menu .model-submenu-section {
+  display: block !important;
+}
+.menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
+  display: block !important;
+}
+.menu-dropdown.ollama-chat-menu .role-submenu-section {
+  display: block !important;
+}
+.menu-dropdown.ollama-chat-menu .role-submenu-section + hr.menu-separator {
+  display: block !important;
+}
+
+.input-controls-left .role-display {
+  display: none;
+}
+.input-controls-left .model-display {
+  max-width: 150px;
+}
+.input-controls-left .model-display + .translate-input-button {
+  margin-left: 4px;
+}

@@ -1,0 +1,16 @@
+.workspace-leaf-content[data-type=ollama-personas-chat-view] .ollama-container {
+  min-height: 65vh;
+}
+
+.menu-dropdown.ollama-chat-menu .model-submenu-section {
+  display: none;
+}
+.menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
+  display: none;
+}
+
+.message-actions-wrapper {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
+}
