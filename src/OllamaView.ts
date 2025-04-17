@@ -400,10 +400,33 @@ export class OllamaView extends ItemView {
     this.register(this.plugin.on('message-added', this.handleMessageAdded));
     this.register(this.plugin.on('messages-cleared', this.handleMessagesCleared));
     this.register(this.plugin.on('chat-list-updated', this.handleChatListUpdated));
+
+    this.register(this.plugin.on('settings-updated', this.handleSettingsUpdated));
+
     console.log("[OllamaView Debug] Attaching event listeners END");
   }
 
   // OllamaView.ts -> handleModelDisplayClick
+
+
+  private handleSettingsUpdated = async (): Promise<void> => {
+    console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
+
+    // Перевіряємо, яку модель і роль показувати ЗАРАЗ
+    // (з активного чату або дефолтну)
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); // Переотримуємо активний чат
+    const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+    const currentRoleName = await this.getCurrentRoleDisplayName(); // Перераховуємо поточну роль
+
+    // Оновлюємо відповідні елементи UI
+    this.updateModelDisplay(currentModelName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateInputPlaceholder(currentRoleName);
+
+    // Тут також можна оновити інші елементи View, що залежать від налаштувань,
+    // наприклад, увімкнення/вимкнення кнопки перекладу, якщо це налаштування
+    // this.updateTranslateButtonState(); // Приклад
+  }
 
   private handleModelDisplayClick = async (event: MouseEvent) => {
     console.log("[OllamaView Debug] Model display clicked, creating native menu.");

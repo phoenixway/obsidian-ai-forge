@@ -334,6 +334,16 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
     // OllamaView.ts -> handleModelDisplayClick
+    this.handleSettingsUpdated = async () => {
+      var _a, _b;
+      console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+      const currentRoleName = await this.getCurrentRoleDisplayName();
+      this.updateModelDisplay(currentModelName);
+      this.updateRoleDisplay(currentRoleName);
+      this.updateInputPlaceholder(currentRoleName);
+    };
     this.handleModelDisplayClick = async (event) => {
       var _a, _b;
       console.log("[OllamaView Debug] Model display clicked, creating native menu.");
@@ -1109,6 +1119,7 @@ This action cannot be undone.`, async () => {
     this.register(this.plugin.on("message-added", this.handleMessageAdded));
     this.register(this.plugin.on("messages-cleared", this.handleMessagesCleared));
     this.register(this.plugin.on("chat-list-updated", this.handleChatListUpdated));
+    this.register(this.plugin.on("settings-updated", this.handleSettingsUpdated));
     console.log("[OllamaView Debug] Attaching event listeners END");
   }
   updateModelDisplay(modelName) {

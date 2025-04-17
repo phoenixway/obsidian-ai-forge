@@ -191,6 +191,28 @@ var OllamaView = /** @class */ (function (_super) {
         _this.newMessagesIndicatorEl = null;
         _this.userScrolledUp = false;
         // OllamaView.ts -> handleModelDisplayClick
+        _this.handleSettingsUpdated = function () { return __awaiter(_this, void 0, Promise, function () {
+            var activeChat, currentModelName, currentRoleName;
+            var _a, _b;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
+                    case 0:
+                        console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
+                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                    case 1:
+                        activeChat = _c.sent();
+                        currentModelName = ((_b = activeChat === null || activeChat === void 0 ? void 0 : activeChat.metadata) === null || _b === void 0 ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+                        return [4 /*yield*/, this.getCurrentRoleDisplayName()];
+                    case 2:
+                        currentRoleName = _c.sent();
+                        // Оновлюємо відповідні елементи UI
+                        this.updateModelDisplay(currentModelName);
+                        this.updateRoleDisplay(currentRoleName);
+                        this.updateInputPlaceholder(currentRoleName);
+                        return [2 /*return*/];
+                }
+            });
+        }); };
         _this.handleModelDisplayClick = function (event) { return __awaiter(_this, void 0, void 0, function () {
             var menu, itemsAdded, loadingNotice, models, activeChat, currentModelName_1, error_1;
             var _this = this;
@@ -1174,6 +1196,7 @@ var OllamaView = /** @class */ (function (_super) {
         this.register(this.plugin.on('message-added', this.handleMessageAdded));
         this.register(this.plugin.on('messages-cleared', this.handleMessagesCleared));
         this.register(this.plugin.on('chat-list-updated', this.handleChatListUpdated));
+        this.register(this.plugin.on('settings-updated', this.handleSettingsUpdated));
         console.log("[OllamaView Debug] Attaching event listeners END");
     };
     OllamaView.prototype.updateModelDisplay = function (modelName) {
