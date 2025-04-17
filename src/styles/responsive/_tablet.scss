@@ -77,7 +77,6 @@
     }
   }
   
-  // --- Menu adjustments ---
   .menu-dropdown.ollama-chat-menu {
       // Show model section in menu on mobile/tablet
       .model-submenu-section {
@@ -100,9 +99,9 @@
   
   // Hide dedicated role indicator on mobile/tablet
   .input-controls-left {
-      .role-display {
-          display: none;
-      }
+      // .role-display {
+      //     display: none;
+      // }
       // Adjust model display width/margin
       .model-display {
           max-width: 150px;
