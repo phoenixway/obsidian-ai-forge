@@ -1,0 +1,42 @@
+// Стилізуємо controlEl налаштування, щоб розмістити елементи поруч
+.setting-item-control.ollama-model-setting-control {
+    display: flex;
+    align-items: center;
+    gap: 5px; // Відстань між списком та кнопкою
+  
+    // Дозволяємо списку займати доступне місце
+    select {
+      flex-grow: 1;
+    }
+  }
+  
+  // Стилі для самої кнопки оновлення
+  button.ollama-refresh-button {
+    // Можете використати стандартні стилі кнопок Obsidian або задати свої
+    padding: 5px !important; // Може знадобитися !important для перевизначення
+    height: var(--input-height); // Стандартна висота полів вводу
+    width: var(--input-height);
+    min-width: var(--input-height); // Запобігти стисканню
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    flex-shrink: 0; // Не стискати кнопку
+  
+    &:hover {
+      color: var(--text-normal);
+    }
+  
+    &[disabled] {
+      cursor: default;
+      opacity: 0.5;
+    }
+  
+    // Анімація для іконки завантаження
+    .svg-icon.lucide-loader {
+       animation: spin 1s linear infinite;
+    }
+  }
+  
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  

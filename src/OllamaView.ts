@@ -203,8 +203,8 @@ export class OllamaView extends ItemView {
 
   // --- Obsidian View Methods ---
   getViewType(): string { return VIEW_TYPE_OLLAMA_PERSONAS; }
-  getDisplayText(): string { return "Ollama Personas"; }
-  getIcon(): string { return "message-square"; }
+  getDisplayText(): string { return "AI Forge"; }
+  getIcon(): string { return "brain-circuit"; }
 
   async onOpen(): Promise<void> {
     console.log("[OllamaView] onOpen START");
@@ -606,7 +606,7 @@ export class OllamaView extends ItemView {
   }
   // --- ЗМІНЕНО ---
   private handleRoleChange = (roleName: string): void => {
-    const displayRole = roleName || "Default Assistant";
+    const displayRole = roleName || "None";
     // Оновлюємо плейсхолдер при зміні ролі
     this.updateInputPlaceholder(displayRole);
     this.updateRoleDisplay(displayRole);
@@ -681,7 +681,7 @@ export class OllamaView extends ItemView {
 
   private updateRoleDisplay(roleName: string | null | undefined): void {
     if (this.roleDisplayEl) {
-      const displayName = roleName || "Default"; // Якщо роль не вибрана
+      const displayName = roleName || "None"; // Якщо роль не вибрана
       this.roleDisplayEl.setText(displayName);
       this.roleDisplayEl.title = `Current role: ${displayName}. Click to change.`;
     }
@@ -1118,13 +1118,44 @@ export class OllamaView extends ItemView {
     const container = this.roleSubmenuContent; if (!container) return; container.empty();
     try {
       const roles = await this.plugin.listRoleFiles(true); const activeChat = await this.plugin.chatManager?.getActiveChat(); const currentChatRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-      const noRoleOptionEl = container.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` }); const noRoleIconSpan = noRoleOptionEl.createEl("span", { cls: "menu-option-icon" }); if (!currentChatRolePath) { setIcon(noRoleIconSpan, "check"); noRoleOptionEl.addClass("is-selected"); } else { setIcon(noRoleIconSpan, "slash"); noRoleIconSpan.style.minWidth = "18px"; } noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default)" }); this.registerDomEvent(noRoleOptionEl, 'click', async () => { const nrp = ""; if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) { this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings(); const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); } this.plugin.emit('role-changed', "Default Assistant"); } this.closeMenu(); });
+      const noRoleOptionEl = container.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+      const noRoleIconSpan = noRoleOptionEl.createEl("span", { cls: "menu-option-icon" });
+      if (!currentChatRolePath) {
+        setIcon(noRoleIconSpan, "check");
+        noRoleOptionEl.addClass("is-selected");
+      }
+      else { setIcon(noRoleIconSpan, "slash"); noRoleIconSpan.style.minWidth = "18px"; }
+      noRoleOptionEl.createEl("span", {
+        cls: "menu-option-text", text: "None"
+      }); this.registerDomEvent(noRoleOptionEl, 'click', async () => { const nrp = ""; if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) { this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings(); const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); } this.plugin.emit('role-changed', "Default Assistant"); } this.closeMenu(); });
       if (roles.length > 0) container.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
       roles.forEach(roleInfo => {
-        const roleOptionEl = container.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` }); if (roleInfo.isCustom) roleOptionEl.addClass("is-custom"); const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" }); if (roleInfo.path === currentChatRolePath) { setIcon(iconSpan, "check"); roleOptionEl.addClass("is-selected"); } else { setIcon(iconSpan, roleInfo.isCustom ? 'user' : 'box'); iconSpan.style.minWidth = "18px"; } roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name }); this.registerDomEvent(roleOptionEl, 'click', async () => { const nrp = roleInfo.path; if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) { this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings(); const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); } this.plugin.emit('role-changed', roleInfo.name); } this.closeMenu(); });
+        const roleOptionEl = container.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}` });
+        if (roleInfo.isCustom) roleOptionEl.addClass("is-custom");
+        const iconSpan = roleOptionEl.createEl("span", { cls: "menu-option-icon" });
+        if (roleInfo.path === currentChatRolePath) {
+          setIcon(iconSpan, "check");
+          roleOptionEl.addClass("is-selected");
+        }
+        else {
+          setIcon(iconSpan, roleInfo.isCustom ? 'user' : 'box');
+          iconSpan.style.minWidth = "18px";
+        }
+        roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
+        this.registerDomEvent(roleOptionEl, 'click', async () => {
+          const nrp = roleInfo.path; if (
+            this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) {
+            this.plugin.settings.selectedRolePath = nrp; await this.plugin.saveSettings();
+            const chat = await this.plugin.chatManager?.getActiveChat(); if (chat && chat.metadata.selectedRolePath !== nrp) { await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp }); this.plugin.promptService?.clearRoleCache?.(); }
+            this.plugin.emit('role-changed', roleInfo.name);
+          } this.closeMenu();
+        });
       });
       this.updateSubmenuHeight(container);
-    } catch (error) { container.empty(); container.createEl("div", { cls: "menu-error-text", text: "Error roles." }); this.updateSubmenuHeight(container); }
+    } catch (error) {
+      container.empty(); container.createEl("div", { cls: "menu-error-text", text: "Error roles." });
+      this.updateSubmenuHeight(container);
+    }
   }
   private async renderChatListMenu(): Promise<void> {
     const container = this.chatSubmenuContent; if (!container) return; container.empty();
@@ -1616,7 +1647,7 @@ export class OllamaView extends ItemView {
       console.error("Error getting current role display name:", error);
     }
     // Повертаємо стандартне ім'я, якщо роль не вибрана або сталася помилка
-    return "Default Assistant";
+    return "None";
   }
 
 
@@ -1638,7 +1669,7 @@ export class OllamaView extends ItemView {
       // --- 1. Додаємо опцію "None (Default)" ---
       menu.addItem((item) => {
         item
-          .setTitle("None (Default)")
+          .setTitle("None")
           .setIcon(!currentRolePath ? "check" : "slash") // Перевірка чи шлях пустий
           .onClick(async () => {
             const newRolePath = ""; // Порожній шлях для "без ролі"
@@ -1650,7 +1681,7 @@ export class OllamaView extends ItemView {
                 this.plugin.settings.selectedRolePath = newRolePath;
                 await this.plugin.saveSettings();
                 // Емітуємо подію зміни ролі вручну, бо менеджер чату не викликався
-                this.plugin.emit('role-changed', "Default Assistant");
+                this.plugin.emit('role-changed', "None");
                 this.plugin.promptService?.clearRoleCache?.();
               }
             }

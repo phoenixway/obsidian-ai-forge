@@ -168,10 +168,9 @@ var OllamaPlugin = /** @class */ (function (_super) {
                         }));
                         // -----------------------------------------
                         // --- Ribbon & Commands ---
-                        this.addRibbonIcon("message-square", "Open Ollama Personas Chat", function () { _this.activateView(); }); // Оновлено назву
-                        // !!! ВИПРАВЛЕНО: ID команд краще зробити відносними до плагіна !!!
-                        this.addCommand({ id: "open-chat-view", name: "Open Ollama Personas Chat", callback: function () { _this.activateView(); } });
-                        this.addCommand({ id: "index-rag-documents", name: "Ollama: Index documents for RAG", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+                        this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", function () { _this.activateView(); });
+                        this.addCommand({ id: "open-chat-view", name: "Open AI Forge Chat", callback: function () { _this.activateView(); } });
+                        this.addCommand({ id: "index-rag-documents", name: "AI Forge: Index documents for RAG", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.ragService.indexDocuments()];
                                     case 1:
@@ -179,7 +178,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                                         return [2 /*return*/];
                                 }
                             }); }); } });
-                        this.addCommand({ id: "clear-active-chat-history", name: "Ollama: Clear Active Chat History", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+                        this.addCommand({ id: "clear-active-chat-history", name: "AI Forge: Clear Active Chat History", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.clearMessageHistory()];
                                     case 1:
@@ -187,7 +186,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                                         return [2 /*return*/];
                                 }
                             }); }); } }); // Викликаємо локальний метод
-                        this.addCommand({ id: "refresh-roles", name: "Ollama: Refresh Roles List", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+                        this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.listRoleFiles(true)];
                                     case 1:
@@ -197,7 +196,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                                         return [2 /*return*/];
                                 }
                             }); }); } });
-                        this.addCommand({ id: "new-chat", name: "Ollama: New Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { var newChat; return __generator(this, function (_a) {
+                        this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { var newChat; return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.chatManager.createNewChat()];
                                     case 1:
@@ -208,7 +207,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                                         return [2 /*return*/];
                                 }
                             }); }); } });
-                        this.addCommand({ id: "switch-chat", name: "Ollama: Switch Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+                        this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.showChatSwitcher()];
                                     case 1:
@@ -216,7 +215,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                                         return [2 /*return*/];
                                 }
                             }); }); } });
-                        this.addCommand({ id: "rename-active-chat", name: "Ollama: Rename Active Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+                        this.addCommand({ id: "rename-active-chat", name: "AI Forge: Rename Active Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.renameActiveChat()];
                                     case 1:
@@ -224,7 +223,7 @@ var OllamaPlugin = /** @class */ (function (_super) {
                                         return [2 /*return*/];
                                 }
                             }); }); } });
-                        this.addCommand({ id: "delete-active-chat", name: "Ollama: Delete Active Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
+                        this.addCommand({ id: "delete-active-chat", name: "AI Forge: Delete Active Chat", callback: function () { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
                                 switch (_a.label) {
                                     case 0: return [4 /*yield*/, this.deleteActiveChatWithConfirmation()];
                                     case 1:

@@ -126,16 +126,15 @@ export default class OllamaPlugin extends Plugin {
     // -----------------------------------------
 
     // --- Ribbon & Commands ---
-    this.addRibbonIcon("message-square", "Open Ollama Personas Chat", () => { this.activateView(); }); // Оновлено назву
-    // !!! ВИПРАВЛЕНО: ID команд краще зробити відносними до плагіна !!!
-    this.addCommand({ id: "open-chat-view", name: "Open Ollama Personas Chat", callback: () => { this.activateView(); }, });
-    this.addCommand({ id: "index-rag-documents", name: "Ollama: Index documents for RAG", callback: async () => { await this.ragService.indexDocuments(); }, });
-    this.addCommand({ id: "clear-active-chat-history", name: "Ollama: Clear Active Chat History", callback: async () => { await this.clearMessageHistory(); }, }); // Викликаємо локальний метод
-    this.addCommand({ id: "refresh-roles", name: "Ollama: Refresh Roles List", callback: async () => { await this.listRoleFiles(true); this.emit('roles-updated'); new Notice("Role list refreshed."); } });
-    this.addCommand({ id: "new-chat", name: "Ollama: New Chat", callback: async () => { const newChat = await this.chatManager.createNewChat(); if (newChat) { /* await this.activateView(); - Не потрібно, setActiveChat активує */ new Notice(`Created new chat: ${newChat.metadata.name}`); } } });
-    this.addCommand({ id: "switch-chat", name: "Ollama: Switch Chat", callback: async () => { await this.showChatSwitcher(); } });
-    this.addCommand({ id: "rename-active-chat", name: "Ollama: Rename Active Chat", callback: async () => { await this.renameActiveChat(); } });
-    this.addCommand({ id: "delete-active-chat", name: "Ollama: Delete Active Chat", callback: async () => { await this.deleteActiveChatWithConfirmation(); } });
+    this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => { this.activateView(); });
+    this.addCommand({ id: "open-chat-view", name: "Open AI Forge Chat", callback: () => { this.activateView(); }, });
+    this.addCommand({ id: "index-rag-documents", name: "AI Forge: Index documents for RAG", callback: async () => { await this.ragService.indexDocuments(); }, });
+    this.addCommand({ id: "clear-active-chat-history", name: "AI Forge: Clear Active Chat History", callback: async () => { await this.clearMessageHistory(); }, }); // Викликаємо локальний метод
+    this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: async () => { await this.listRoleFiles(true); this.emit('roles-updated'); new Notice("Role list refreshed."); } });
+    this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: async () => { const newChat = await this.chatManager.createNewChat(); if (newChat) { /* await this.activateView(); - Не потрібно, setActiveChat активує */ new Notice(`Created new chat: ${newChat.metadata.name}`); } } });
+    this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: async () => { await this.showChatSwitcher(); } });
+    this.addCommand({ id: "rename-active-chat", name: "AI Forge: Rename Active Chat", callback: async () => { await this.renameActiveChat(); } });
+    this.addCommand({ id: "delete-active-chat", name: "AI Forge: Delete Active Chat", callback: async () => { await this.deleteActiveChatWithConfirmation(); } });
     // --------------------------
 
     // Settings Tab

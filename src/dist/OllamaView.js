@@ -648,7 +648,7 @@ var OllamaView = /** @class */ (function (_super) {
         };
         // --- ЗМІНЕНО ---
         _this.handleRoleChange = function (roleName) {
-            var displayRole = roleName || "Default Assistant";
+            var displayRole = roleName || "None";
             // Оновлюємо плейсхолдер при зміні ролі
             _this.updateInputPlaceholder(displayRole);
             _this.updateRoleDisplay(displayRole);
@@ -754,7 +754,7 @@ var OllamaView = /** @class */ (function (_super) {
                         // --- 1. Додаємо опцію "None (Default)" ---
                         menu.addItem(function (item) {
                             item
-                                .setTitle("None (Default)")
+                                .setTitle("None")
                                 .setIcon(!currentRolePath_1 ? "check" : "slash") // Перевірка чи шлях пустий
                                 .onClick(function () { return __awaiter(_this, void 0, void 0, function () {
                                 var newRolePath;
@@ -776,7 +776,7 @@ var OllamaView = /** @class */ (function (_super) {
                                         case 3:
                                             _c.sent();
                                             // Емітуємо подію зміни ролі вручну, бо менеджер чату не викликався
-                                            this.plugin.emit('role-changed', "Default Assistant");
+                                            this.plugin.emit('role-changed', "None");
                                             (_b = (_a = this.plugin.promptService) === null || _a === void 0 ? void 0 : _a.clearRoleCache) === null || _b === void 0 ? void 0 : _b.call(_a);
                                             _c.label = 4;
                                         case 4: return [2 /*return*/];
@@ -860,8 +860,8 @@ var OllamaView = /** @class */ (function (_super) {
     };
     // --- Obsidian View Methods ---
     OllamaView.prototype.getViewType = function () { return exports.VIEW_TYPE_OLLAMA_PERSONAS; };
-    OllamaView.prototype.getDisplayText = function () { return "Ollama Personas"; };
-    OllamaView.prototype.getIcon = function () { return "message-square"; };
+    OllamaView.prototype.getDisplayText = function () { return "AI Forge"; };
+    OllamaView.prototype.getIcon = function () { return "brain-circuit"; };
     OllamaView.prototype.onOpen = function () {
         return __awaiter(this, void 0, Promise, function () {
             var error_7;
@@ -1295,7 +1295,7 @@ var OllamaView = /** @class */ (function (_super) {
     OllamaView.prototype.autoResizeTextarea = function () { this.adjustTextareaHeight(); };
     OllamaView.prototype.updateRoleDisplay = function (roleName) {
         if (this.roleDisplayEl) {
-            var displayName = roleName || "Default"; // Якщо роль не вибрана
+            var displayName = roleName || "None"; // Якщо роль не вибрана
             this.roleDisplayEl.setText(displayName);
             this.roleDisplayEl.title = "Current role: " + displayName + ". Click to change.";
         }
@@ -1906,7 +1906,9 @@ var OllamaView = /** @class */ (function (_super) {
                             obsidian_1.setIcon(noRoleIconSpan, "slash");
                             noRoleIconSpan.style.minWidth = "18px";
                         }
-                        noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default)" });
+                        noRoleOptionEl.createEl("span", {
+                            cls: "menu-option-text", text: "None"
+                        });
                         this.registerDomEvent(noRoleOptionEl, 'click', function () { return __awaiter(_this, void 0, void 0, function () { var nrp, chat; var _a, _b, _c; return __generator(this, function (_d) {
                             switch (_d.label) {
                                 case 0:
@@ -1949,32 +1951,36 @@ var OllamaView = /** @class */ (function (_super) {
                                 iconSpan.style.minWidth = "18px";
                             }
                             roleOptionEl.createEl("span", { cls: "menu-option-text", text: roleInfo.name });
-                            _this.registerDomEvent(roleOptionEl, 'click', function () { return __awaiter(_this, void 0, void 0, function () { var nrp, chat; var _a, _b, _c; return __generator(this, function (_d) {
-                                switch (_d.label) {
-                                    case 0:
-                                        nrp = roleInfo.path;
-                                        if (!(this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath_1 !== nrp)) return [3 /*break*/, 5];
-                                        this.plugin.settings.selectedRolePath = nrp;
-                                        return [4 /*yield*/, this.plugin.saveSettings()];
-                                    case 1:
-                                        _d.sent();
-                                        return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
-                                    case 2:
-                                        chat = _d.sent();
-                                        if (!(chat && chat.metadata.selectedRolePath !== nrp)) return [3 /*break*/, 4];
-                                        return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp })];
-                                    case 3:
-                                        _d.sent();
-                                        (_c = (_b = this.plugin.promptService) === null || _b === void 0 ? void 0 : _b.clearRoleCache) === null || _c === void 0 ? void 0 : _c.call(_b);
-                                        _d.label = 4;
-                                    case 4:
-                                        this.plugin.emit('role-changed', roleInfo.name);
-                                        _d.label = 5;
-                                    case 5:
-                                        this.closeMenu();
-                                        return [2 /*return*/];
-                                }
-                            }); }); });
+                            _this.registerDomEvent(roleOptionEl, 'click', function () { return __awaiter(_this, void 0, void 0, function () {
+                                var nrp, chat;
+                                var _a, _b, _c;
+                                return __generator(this, function (_d) {
+                                    switch (_d.label) {
+                                        case 0:
+                                            nrp = roleInfo.path;
+                                            if (!(this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath_1 !== nrp)) return [3 /*break*/, 5];
+                                            this.plugin.settings.selectedRolePath = nrp;
+                                            return [4 /*yield*/, this.plugin.saveSettings()];
+                                        case 1:
+                                            _d.sent();
+                                            return [4 /*yield*/, ((_a = this.plugin.chatManager) === null || _a === void 0 ? void 0 : _a.getActiveChat())];
+                                        case 2:
+                                            chat = _d.sent();
+                                            if (!(chat && chat.metadata.selectedRolePath !== nrp)) return [3 /*break*/, 4];
+                                            return [4 /*yield*/, this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: nrp })];
+                                        case 3:
+                                            _d.sent();
+                                            (_c = (_b = this.plugin.promptService) === null || _b === void 0 ? void 0 : _b.clearRoleCache) === null || _c === void 0 ? void 0 : _c.call(_b);
+                                            _d.label = 4;
+                                        case 4:
+                                            this.plugin.emit('role-changed', roleInfo.name);
+                                            _d.label = 5;
+                                        case 5:
+                                            this.closeMenu();
+                                            return [2 /*return*/];
+                                    }
+                                });
+                            }); });
                         });
                         this.updateSubmenuHeight(container);
                         return [3 /*break*/, 5];
@@ -2549,7 +2555,7 @@ var OllamaView = /** @class */ (function (_super) {
                         return [3 /*break*/, 5];
                     case 5: 
                     // Повертаємо стандартне ім'я, якщо роль не вибрана або сталася помилка
-                    return [2 /*return*/, "Default Assistant"];
+                    return [2 /*return*/, "None"];
                 }
             });
         });

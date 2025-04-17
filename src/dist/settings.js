@@ -171,7 +171,7 @@ var OllamaSettingTab = /** @class */ (function (_super) {
         var _this = this;
         var containerEl = this.containerEl;
         containerEl.empty();
-        containerEl.createEl("h2", { text: "Ollama Chat Settings" });
+        containerEl.createEl("h2", { text: "AI Forge Settings" });
         // --- Connection & Model ---
         containerEl.createEl('h3', { text: 'Connection & Model' });
         // ... (Ollama Server URL, Default Model Name, Default Temperature, Context Window Size) ...
@@ -186,6 +186,104 @@ var OllamaSettingTab = /** @class */ (function (_super) {
                     return [2 /*return*/];
             }
         }); }); }); });
+        // --- Default Model Name ---
+        var modelSetting = new obsidian_1.Setting(containerEl)
+            .setName("Default Model Name")
+            .setDesc("The default Ollama model to use for new chats. Select from available models.");
+        var modelDropdown = null;
+        // Функція для оновлення опцій
+        var updateOptions = function (dropdown) { return __awaiter(_this, void 0, void 0, function () {
+            var models, error_1;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        if (!dropdown)
+                            return [2 /*return*/];
+                        dropdown.selectEl.innerHTML = ''; // Очищуємо
+                        dropdown.addOption('', 'Loading models...');
+                        dropdown.setDisabled(true);
+                        _a.label = 1;
+                    case 1:
+                        _a.trys.push([1, 3, , 4]);
+                        return [4 /*yield*/, this.plugin.ollamaService.getModels()];
+                    case 2:
+                        models = _a.sent();
+                        dropdown.selectEl.innerHTML = ''; // Очищуємо
+                        dropdown.addOption('', '-- Select default model --');
+                        if (models && models.length > 0) {
+                            models.forEach(function (modelName) { dropdown.addOption(modelName, modelName); });
+                        }
+                        else {
+                            dropdown.addOption('', 'No models found');
+                        }
+                        dropdown.setValue(this.plugin.settings.modelName);
+                        dropdown.setDisabled(false);
+                        return [3 /*break*/, 4];
+                    case 3:
+                        error_1 = _a.sent();
+                        console.error("Error fetching models for settings:", error_1);
+                        dropdown.selectEl.innerHTML = '';
+                        dropdown.addOption('', 'Error loading models!');
+                        dropdown.setValue(this.plugin.settings.modelName);
+                        dropdown.setDisabled(true);
+                        return [3 /*break*/, 4];
+                    case 4: return [2 /*return*/];
+                }
+            });
+        }); };
+        modelSetting.addDropdown(function (dropdown) { return __awaiter(_this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        modelDropdown = dropdown; // Зберігаємо посилання
+                        dropdown.onChange(function (value) { return __awaiter(_this, void 0, void 0, function () {
+                            return __generator(this, function (_a) {
+                                switch (_a.label) {
+                                    case 0:
+                                        this.plugin.settings.modelName = value;
+                                        return [4 /*yield*/, this.plugin.saveSettings()];
+                                    case 1:
+                                        _a.sent();
+                                        return [2 /*return*/];
+                                }
+                            });
+                        }); });
+                        return [4 /*yield*/, updateOptions(dropdown)];
+                    case 1:
+                        _a.sent(); // Початкове завантаження
+                        return [2 /*return*/];
+                }
+            });
+        }); });
+        modelSetting.controlEl.addClass('ollama-model-setting-control');
+        var refreshButton = modelSetting.controlEl.createEl('button', {
+            cls: 'ollama-refresh-button',
+            attr: { 'aria-label': 'Refresh model list' }
+        });
+        // Тепер setIcon має бути знайдено
+        obsidian_1.setIcon(refreshButton, 'refresh-cw');
+        refreshButton.addEventListener('click', function (e) { return __awaiter(_this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        e.preventDefault();
+                        if (!modelDropdown)
+                            return [2 /*return*/];
+                        // Тепер setIcon має бути знайдено
+                        obsidian_1.setIcon(refreshButton, 'loader');
+                        refreshButton.disabled = true;
+                        return [4 /*yield*/, updateOptions(modelDropdown)];
+                    case 1:
+                        _a.sent();
+                        // Тепер setIcon має бути знайдено
+                        obsidian_1.setIcon(refreshButton, 'refresh-cw');
+                        refreshButton.disabled = false;
+                        return [2 /*return*/];
+                }
+            });
+        }); });
+        // --- КІНЕЦЬ КОДУ З КНОПКОЮ ---
         new obsidian_1.Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats (e.g., 'llama3:latest', 'mistral'). Needs to be available on your server.").addText(function (text) { return text.setPlaceholder("Enter model name").setValue(_this.plugin.settings.modelName).onChange(function (value) { return __awaiter(_this, void 0, void 0, function () { return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:

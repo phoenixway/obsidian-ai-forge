@@ -1,5 +1,5 @@
 // settings.ts
-import { App, PluginSettingTab, Setting, TFolder, debounce } from "obsidian";
+import { App, PluginSettingTab, Setting, DropdownComponent, setIcon, TFolder, debounce } from "obsidian";
 import OllamaPlugin from "./main";
 
 // --- Мови (залишаємо як є) ---
@@ -149,12 +149,74 @@ export class OllamaSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Ollama Chat Settings" });
+    containerEl.createEl("h2", { text: "AI Forge Settings" });
 
     // --- Connection & Model ---
     containerEl.createEl('h3', { text: 'Connection & Model' });
     // ... (Ollama Server URL, Default Model Name, Default Temperature, Context Window Size) ...
     new Setting(containerEl).setName("Ollama Server URL").setDesc("The URL of your running Ollama server.").addText(text => text.setPlaceholder(DEFAULT_SETTINGS.ollamaServerUrl).setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => { this.plugin.settings.ollamaServerUrl = value.trim() || DEFAULT_SETTINGS.ollamaServerUrl; await this.plugin.saveSettings(); this.plugin.updateOllamaServiceConfig(); }));
+
+    // --- Default Model Name ---
+    const modelSetting = new Setting(containerEl)
+      .setName("Default Model Name")
+      .setDesc("The default Ollama model to use for new chats. Select from available models.");
+
+    let modelDropdown: DropdownComponent | null = null;
+
+    // Функція для оновлення опцій
+    const updateOptions = async (dropdown: DropdownComponent | null) => {
+      if (!dropdown) return;
+      dropdown.selectEl.innerHTML = ''; // Очищуємо
+      dropdown.addOption('', 'Loading models...');
+      dropdown.setDisabled(true);
+      try {
+        const models = await this.plugin.ollamaService.getModels();
+        dropdown.selectEl.innerHTML = ''; // Очищуємо
+        dropdown.addOption('', '-- Select default model --');
+        if (models && models.length > 0) { models.forEach(modelName => { dropdown.addOption(modelName, modelName); }); }
+        else { dropdown.addOption('', 'No models found'); }
+        dropdown.setValue(this.plugin.settings.modelName);
+        dropdown.setDisabled(false);
+      } catch (error) {
+        console.error("Error fetching models for settings:", error);
+        dropdown.selectEl.innerHTML = '';
+        dropdown.addOption('', 'Error loading models!');
+        dropdown.setValue(this.plugin.settings.modelName);
+        dropdown.setDisabled(true);
+      }
+    };
+
+    modelSetting.addDropdown(async (dropdown) => {
+      modelDropdown = dropdown; // Зберігаємо посилання
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.modelName = value;
+        await this.plugin.saveSettings();
+      });
+      await updateOptions(dropdown); // Початкове завантаження
+    });
+
+    modelSetting.controlEl.addClass('ollama-model-setting-control');
+
+    const refreshButton = modelSetting.controlEl.createEl('button', {
+      cls: 'ollama-refresh-button',
+      attr: { 'aria-label': 'Refresh model list' }
+    });
+    // Тепер setIcon має бути знайдено
+    setIcon(refreshButton, 'refresh-cw');
+
+    refreshButton.addEventListener('click', async (e: MouseEvent) => {
+      e.preventDefault();
+      if (!modelDropdown) return;
+      // Тепер setIcon має бути знайдено
+      setIcon(refreshButton, 'loader');
+      refreshButton.disabled = true;
+      await updateOptions(modelDropdown);
+      // Тепер setIcon має бути знайдено
+      setIcon(refreshButton, 'refresh-cw');
+      refreshButton.disabled = false;
+    });
+    // --- КІНЕЦЬ КОДУ З КНОПКОЮ ---
+
     new Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats (e.g., 'llama3:latest', 'mistral'). Needs to be available on your server.").addText(text => text.setPlaceholder("Enter model name").setValue(this.plugin.settings.modelName).onChange(async (value) => { this.plugin.settings.modelName = value.trim(); await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Default Temperature").setDesc("Controls randomness. Lower values (e.g., 0.2) make output more deterministic, higher values (e.g., 0.8) make it more creative.").addSlider(slider => slider.setLimits(0, 1, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => { this.plugin.settings.temperature = value; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("Context Window Size (Tokens)").setDesc("Maximum number of tokens (input + output) the model considers. Adjust based on model and available memory.").addText(text => text.setPlaceholder(DEFAULT_SETTINGS.contextWindow.toString()).setValue(this.plugin.settings.contextWindow.toString()).onChange(async (value) => { const num = parseInt(value.trim(), 10); if (!isNaN(num) && num > 0) { this.plugin.settings.contextWindow = num; } else { this.plugin.settings.contextWindow = DEFAULT_SETTINGS.contextWindow; } await this.plugin.saveSettings(); }));

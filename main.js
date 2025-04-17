@@ -648,7 +648,7 @@ This action cannot be undone.`, async () => {
     };
     // --- ЗМІНЕНО ---
     this.handleRoleChange = (roleName) => {
-      const displayRole = roleName || "Default Assistant";
+      const displayRole = roleName || "None";
       this.updateInputPlaceholder(displayRole);
       this.updateRoleDisplay(displayRole);
       if (this.currentMessages.length > 0) {
@@ -776,7 +776,7 @@ This action cannot be undone.`, async () => {
         const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
         const currentRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
         menu.addItem((item) => {
-          item.setTitle("None (Default)").setIcon(!currentRolePath ? "check" : "slash").onClick(async () => {
+          item.setTitle("None").setIcon(!currentRolePath ? "check" : "slash").onClick(async () => {
             var _a2, _b2;
             const newRolePath = "";
             if (currentRolePath !== newRolePath) {
@@ -785,7 +785,7 @@ This action cannot be undone.`, async () => {
               } else {
                 this.plugin.settings.selectedRolePath = newRolePath;
                 await this.plugin.saveSettings();
-                this.plugin.emit("role-changed", "Default Assistant");
+                this.plugin.emit("role-changed", "None");
                 (_b2 = (_a2 = this.plugin.promptService) == null ? void 0 : _a2.clearRoleCache) == null ? void 0 : _b2.call(_a2);
               }
             }
@@ -843,10 +843,10 @@ This action cannot be undone.`, async () => {
     return VIEW_TYPE_OLLAMA_PERSONAS;
   }
   getDisplayText() {
-    return "Ollama Personas";
+    return "AI Forge";
   }
   getIcon() {
-    return "message-square";
+    return "brain-circuit";
   }
   async onOpen() {
     console.log("[OllamaView] onOpen START");
@@ -1209,7 +1209,7 @@ This action cannot be undone.`, async () => {
   }
   updateRoleDisplay(roleName) {
     if (this.roleDisplayEl) {
-      const displayName = roleName || "Default";
+      const displayName = roleName || "None";
       this.roleDisplayEl.setText(displayName);
       this.roleDisplayEl.title = `Current role: ${displayName}. Click to change.`;
     }
@@ -1698,7 +1698,10 @@ This action cannot be undone.`, async () => {
         (0, import_obsidian3.setIcon)(noRoleIconSpan, "slash");
         noRoleIconSpan.style.minWidth = "18px";
       }
-      noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None (Default)" });
+      noRoleOptionEl.createEl("span", {
+        cls: "menu-option-text",
+        text: "None"
+      });
       this.registerDomEvent(noRoleOptionEl, "click", async () => {
         var _a2, _b2, _c2;
         const nrp = "";
@@ -2331,7 +2334,7 @@ ${contentPrefix}`) + "\n\n";
     } catch (error) {
       console.error("Error getting current role display name:", error);
     }
-    return "Default Assistant";
+    return "None";
   }
 };
 
@@ -2515,13 +2518,66 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Ollama Chat Settings" });
+    containerEl.createEl("h2", { text: "AI Forge Settings" });
     containerEl.createEl("h3", { text: "Connection & Model" });
     new import_obsidian4.Setting(containerEl).setName("Ollama Server URL").setDesc("The URL of your running Ollama server.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.ollamaServerUrl).setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
       this.plugin.settings.ollamaServerUrl = value.trim() || DEFAULT_SETTINGS.ollamaServerUrl;
       await this.plugin.saveSettings();
       this.plugin.updateOllamaServiceConfig();
     }));
+    const modelSetting = new import_obsidian4.Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats. Select from available models.");
+    let modelDropdown = null;
+    const updateOptions = async (dropdown) => {
+      if (!dropdown)
+        return;
+      dropdown.selectEl.innerHTML = "";
+      dropdown.addOption("", "Loading models...");
+      dropdown.setDisabled(true);
+      try {
+        const models = await this.plugin.ollamaService.getModels();
+        dropdown.selectEl.innerHTML = "";
+        dropdown.addOption("", "-- Select default model --");
+        if (models && models.length > 0) {
+          models.forEach((modelName) => {
+            dropdown.addOption(modelName, modelName);
+          });
+        } else {
+          dropdown.addOption("", "No models found");
+        }
+        dropdown.setValue(this.plugin.settings.modelName);
+        dropdown.setDisabled(false);
+      } catch (error) {
+        console.error("Error fetching models for settings:", error);
+        dropdown.selectEl.innerHTML = "";
+        dropdown.addOption("", "Error loading models!");
+        dropdown.setValue(this.plugin.settings.modelName);
+        dropdown.setDisabled(true);
+      }
+    };
+    modelSetting.addDropdown(async (dropdown) => {
+      modelDropdown = dropdown;
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.modelName = value;
+        await this.plugin.saveSettings();
+      });
+      await updateOptions(dropdown);
+    });
+    modelSetting.controlEl.addClass("ollama-model-setting-control");
+    const refreshButton = modelSetting.controlEl.createEl("button", {
+      cls: "ollama-refresh-button",
+      attr: { "aria-label": "Refresh model list" }
+    });
+    (0, import_obsidian4.setIcon)(refreshButton, "refresh-cw");
+    refreshButton.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!modelDropdown)
+        return;
+      (0, import_obsidian4.setIcon)(refreshButton, "loader");
+      refreshButton.disabled = true;
+      await updateOptions(modelDropdown);
+      (0, import_obsidian4.setIcon)(refreshButton, "refresh-cw");
+      refreshButton.disabled = false;
+    });
     new import_obsidian4.Setting(containerEl).setName("Default Model Name").setDesc("The default Ollama model to use for new chats (e.g., 'llama3:latest', 'mistral'). Needs to be available on your server.").addText((text) => text.setPlaceholder("Enter model name").setValue(this.plugin.settings.modelName).onChange(async (value) => {
       this.plugin.settings.modelName = value.trim();
       await this.plugin.saveSettings();
@@ -4144,36 +4200,36 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
       (_a = this.promptService) == null ? void 0 : _a.clearRoleCache();
       this.emit("roles-updated");
     }));
-    this.addRibbonIcon("message-square", "Open Ollama Personas Chat", () => {
+    this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => {
       this.activateView();
     });
-    this.addCommand({ id: "open-chat-view", name: "Open Ollama Personas Chat", callback: () => {
+    this.addCommand({ id: "open-chat-view", name: "Open AI Forge Chat", callback: () => {
       this.activateView();
     } });
-    this.addCommand({ id: "index-rag-documents", name: "Ollama: Index documents for RAG", callback: async () => {
+    this.addCommand({ id: "index-rag-documents", name: "AI Forge: Index documents for RAG", callback: async () => {
       await this.ragService.indexDocuments();
     } });
-    this.addCommand({ id: "clear-active-chat-history", name: "Ollama: Clear Active Chat History", callback: async () => {
+    this.addCommand({ id: "clear-active-chat-history", name: "AI Forge: Clear Active Chat History", callback: async () => {
       await this.clearMessageHistory();
     } });
-    this.addCommand({ id: "refresh-roles", name: "Ollama: Refresh Roles List", callback: async () => {
+    this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: async () => {
       await this.listRoleFiles(true);
       this.emit("roles-updated");
       new import_obsidian9.Notice("Role list refreshed.");
     } });
-    this.addCommand({ id: "new-chat", name: "Ollama: New Chat", callback: async () => {
+    this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: async () => {
       const newChat = await this.chatManager.createNewChat();
       if (newChat) {
         new import_obsidian9.Notice(`Created new chat: ${newChat.metadata.name}`);
       }
     } });
-    this.addCommand({ id: "switch-chat", name: "Ollama: Switch Chat", callback: async () => {
+    this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: async () => {
       await this.showChatSwitcher();
     } });
-    this.addCommand({ id: "rename-active-chat", name: "Ollama: Rename Active Chat", callback: async () => {
+    this.addCommand({ id: "rename-active-chat", name: "AI Forge: Rename Active Chat", callback: async () => {
       await this.renameActiveChat();
     } });
-    this.addCommand({ id: "delete-active-chat", name: "Ollama: Delete Active Chat", callback: async () => {
+    this.addCommand({ id: "delete-active-chat", name: "AI Forge: Delete Active Chat", callback: async () => {
       await this.deleteActiveChatWithConfirmation();
     } });
     this.settingTab = new OllamaSettingTab(this.app, this);
