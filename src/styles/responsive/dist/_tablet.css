@@ -71,16 +71,16 @@
 }
 
 .menu-dropdown.ollama-chat-menu .model-submenu-section {
-  display: block !important;
+  display: none !important;
 }
 .menu-dropdown.ollama-chat-menu .model-submenu-section + hr {
-  display: block !important;
+  display: none !important;
 }
 .menu-dropdown.ollama-chat-menu .role-submenu-section {
-  display: block !important;
+  display: none !important;
 }
 .menu-dropdown.ollama-chat-menu .role-submenu-section + hr.menu-separator {
-  display: block !important;
+  display: none !important;
 }
 
 .input-controls-left .model-display {
@@ -88,4 +88,7 @@
 }
 .input-controls-left .model-display + .translate-input-button {
   margin-left: 4px;
+}
+.input-controls-left .role-display {
+  max-width: 150px;
 }

@@ -80,33 +80,31 @@
   .menu-dropdown.ollama-chat-menu {
       // Show model section in menu on mobile/tablet
       .model-submenu-section {
-          display: block !important;
+          display: none !important;
       }
       .model-submenu-section + hr { // Show separator too
-          display: block !important;
+          display: none !important;
       }
   
       // Show role section in menu on mobile/tablet
       .role-submenu-section {
-          display: block !important; // Показуємо секцію
+          display: none !important; // Показуємо секцію
   
           // Показуємо роздільник після неї теж
           + hr.menu-separator {
-            display: block !important;
+            display: none !important;
           }
         }
   }
   
-  // Hide dedicated role indicator on mobile/tablet
   .input-controls-left {
-      // .role-display {
-      //     display: none;
-      // }
-      // Adjust model display width/margin
-      .model-display {
+          .model-display {
           max-width: 150px;
       }
        .model-display + .translate-input-button { // Should be model-display + role-display + translate? Check order
             margin-left: 4px; // Adjust if role-display was between them
        }
+       .role-display {
+        max-width: 150px;
+    }
   }
