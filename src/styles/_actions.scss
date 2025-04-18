@@ -130,7 +130,7 @@ $translation-hacked-line-height: 0.6;
           // Control space BETWEEN list items using margin here
           margin: 0.2em 0; // Small top/bottom margin between LIs (adjust value)
           padding: 0;
-          line-height: inherit; // Ensure LI text inherits base line-height
+          line-height: $translation-base-line-height; // Ensure LI text inherits base line-height
   
           // Optional: Adjust paragraphs within list items
           p {
