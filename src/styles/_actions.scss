@@ -103,6 +103,7 @@
           margin-top: 0 !important;
           margin-bottom: 0.5em !important;
           padding: 0 !important;
+          line-height: 0;
       }
       > :last-child {
           margin-bottom: 0 !important;
@@ -111,8 +112,6 @@
       > ul, > ol {
           padding-left: 1.5em !important;
           margin-bottom: 0.5em !important; // Відступ ПІСЛЯ списку
-          line-height: 1.45 !important; 
-
            &:last-child {
              margin-bottom: 0 !important;
            }
@@ -125,8 +124,6 @@
           // Стилі для самого списку ul/ol (якщо потрібно, вже є вище)
           // margin-top: 0;
           // margin-bottom: 0.5em;
-          line-height: 1.45 !important; 
-
   
           // Стилізуємо LI всередині цих списків
           li {
@@ -143,16 +140,12 @@
                  &:last-child {
                    margin-bottom: 0 !important; // Останньому <p> в <Li> відступ не потрібен
                  }
-          line-height: 1.45 !important; // Можна встановити явно, якщо успадкований завеликий
-
             }
   
             // Якщо всередині LI є вкладені списки
             ul, ol {
                 margin-top: 0.25em !important; // Невеликий відступ перед вкладеним списком
                 margin-bottom: 0.25em !important; // Невеликий відступ після вкладеного списку
-          line-height: 1.45 !important; // Можна встановити явно, якщо успадкований завеликий
-
             }
           }
       }
