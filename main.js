@@ -4799,7 +4799,6 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
   async listRoleFiles(forceRefresh = false) {
     var _a;
     if (this.roleListCache && !forceRefresh) {
-      console.log("[OllamaPlugin] Returning cached roles.");
       return this.roleListCache;
     }
     console.log("[OllamaPlugin] Fetching roles (including built-in)...");
@@ -4810,12 +4809,12 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md";
     const builtInRolePath = (0, import_obsidian10.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
-    console.log(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
+    this.logger.debug(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
     try {
       if (await adapter.exists(builtInRolePath)) {
         const stat = await adapter.stat(builtInRolePath);
         if ((stat == null ? void 0 : stat.type) === "file") {
-          console.log(`[OllamaPlugin] Found built-in role: ${builtInRoleName}`);
+          this.logger.debug(`[OllamaPlugin] Found built-in role: ${builtInRoleName}`);
           roles.push({
             name: builtInRoleName,
             path: builtInRolePath,
@@ -4826,17 +4825,17 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
           });
           addedNamesLowerCase.add(builtInRoleName.toLowerCase());
         } else {
-          console.warn(`[OllamaPlugin] Built-in role path exists but is not a file: ${builtInRolePath}`);
+          this.logger.warn(`[OllamaPlugin] Built-in role path exists but is not a file: ${builtInRolePath}`);
         }
       } else {
-        console.warn(`[OllamaPlugin] Built-in role file NOT FOUND at: ${builtInRolePath}. Productivity features might rely on it.`);
+        this.logger.warn(`[OllamaPlugin] Built-in role file NOT FOUND at: ${builtInRolePath}. Productivity features might rely on it.`);
       }
     } catch (error) {
-      console.error(`[OllamaPlugin] Error checking/adding built-in role at ${builtInRolePath}:`, error);
+      this.logger.error(`[OllamaPlugin] Error checking/adding built-in role at ${builtInRolePath}:`, error);
     }
     const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath) {
-      console.log(`[OllamaPlugin] Processing user roles from: ${userRolesFolderPath}`);
+      this.logger.info(`[OllamaPlugin] Processing user roles from: ${userRolesFolderPath}`);
       try {
         if (await adapter.exists(userRolesFolderPath) && ((_a = await adapter.stat(userRolesFolderPath)) == null ? void 0 : _a.type) === "folder") {
           const listResult = await adapter.list(userRolesFolderPath);
@@ -4845,26 +4844,26 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
               const fileName = path2.basename(filePath);
               const roleName = fileName.substring(0, fileName.length - 3);
               if (!addedNamesLowerCase.has(roleName.toLowerCase())) {
-                console.log(`[OllamaPlugin] Adding user role: ${roleName}`);
+                this.logger.info(`[OllamaPlugin] Adding user role: ${roleName}`);
                 roles.push({ name: roleName, path: filePath, isCustom: true });
                 addedNamesLowerCase.add(roleName.toLowerCase());
               } else {
-                console.warn(`[OllamaPlugin] Skipping user role "${roleName}" from "${userRolesFolderPath}" due to name conflict.`);
+                this.logger.warn(`[OllamaPlugin] Skipping user role "${roleName}" from "${userRolesFolderPath}" due to name conflict.`);
               }
             }
           }
         } else if (userRolesFolderPath !== "/") {
-          console.warn(`[OllamaPlugin] User roles path not found or not a folder: ${userRolesFolderPath}`);
+          this.logger.warn(`[OllamaPlugin] User roles path not found or not a folder: ${userRolesFolderPath}`);
         }
       } catch (e) {
-        console.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
+        this.logger.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
       }
     }
     roles.sort((a, b) => {
       return a.name.localeCompare(b.name);
     });
     this.roleListCache = roles;
-    console.log(`[OllamaPlugin] Found total ${roles.length} roles (including built-in if present).`);
+    this.logger.debug(`[OllamaPlugin] Found total ${roles.length} roles (including built-in if present).`);
     return roles;
   }
   // Execute System Command Method
