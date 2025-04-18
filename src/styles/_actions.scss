@@ -92,86 +92,60 @@ $translation-hacked-line-height: 0.6;
 
     .translation-content {
       white-space: pre-wrap;
-
-      line-height: $translation-base-line-height;
-      font-size: inherit;
+      line-height: 1.6; // Базова висота рядка для тексту
   
-      > p,
-      > blockquote,
-      > pre,
-      > h1, > h2, > h3, > h4, > h5, > h6,
-      > hr,
-      > div {
-        margin-top: 0; 
-        margin-bottom: 0.6em; 
-        padding: 0; 
-        line-height: inherit; 
-      }
-  
+      // Загальні стилі для списків ul, ol
       > ul,
       > ol {
-        line-height: $translation-hacked-line-height;
-      }
-
-      // Remove margin after the very last direct child element
-      > :last-child {
-        margin-bottom: 0;
-      }
+        padding-left: 1.8em; // Відступ для списків
+        margin-bottom: 0.75em; // Відступ після списку
+        line-height: 1.4; // Базова висота рядка для списків
   
-      // --- SPECIFIC ELEMENT STYLING / PADDING RESTORATION ---
-  
-      // Lists UL, OL (Direct Children)
-      > ul, > ol {
-        padding-left: 1.8em; // Restore list indentation (adjust if needed)
-        // margin-top/bottom handled above
-        // line-height is inherited
+        // Вкладені списки
+        ul,
+        ol {
+          margin-top: 0.5em; // Відступ перед вкладеним списком
+          margin-bottom: 0.5em; // Відступ після вкладеного списку
+          padding-left: 1.5em; // Відступ для вкладених списків
+          line-height: 1.3; // Менша висота рядка для вкладених списків
+        }
   
         li {
-          // Control space BETWEEN list items using margin here
-          margin: 0.2em 0; // Small top/bottom margin between LIs (adjust value)
-          padding: 0;
-          line-height: $translation-base-line-height; // Ensure LI text inherits base line-height
+          margin-top: 0.25em; // Відступ між елементами списку
+          margin-bottom: 0.25em;
+          line-height: inherit; // Успадковує line-height від списку
   
-          // Optional: Adjust paragraphs within list items
+          // Текст всередині li
           p {
             margin-top: 0;
-            margin-bottom: 0.25em; // Smaller margin for paragraphs within li
-            // line-height: inherit;
-            line-height: $translation-base-line-height;
-             &:last-child { margin-bottom: 0; }
+            margin-bottom: 0.5em; // Відступ для абзаців у списках
+            line-height: 1.6; // Читабельна висота рядка для тексту
           }
   
-          // Optional: Adjust nested lists within list items
-          // These will inherit the base line-height and the li margin rules
-          ul, ol {
-            margin-top: 0.3em; // Adjust space before/after nested lists
+          // Вкладені списки всередині li
+          ul,
+          ol {
+            margin-top: 0.3em; // Відступ перед вкладеним списком
             margin-bottom: 0.3em;
-            padding-left: 1.8em; // Ensure nested lists are also indented
-            // line-height is inherited
+            line-height: 1.3; // Менша висота рядка для вкладених списків
           }
         }
       }
   
-      // Restore padding/styles for other elements if needed
-       > blockquote {
-          padding: 0.5em 1em;
-          margin-left: 0; // Reset margin if padding is added
-       }
-       > pre {
-          padding: 0.8em;
-       }
-  
-      // Optional: Tighter line-height specifically for headings
-      > h1, > h2, > h3, > h4, > h5, > h6 {
-          line-height: 1.3;
+      // Інші елементи (p, blockquote, pre, тощо)
+      > p,
+      > blockquote,
+      > pre,
+      > h1, > h2, > h3, > h4, > h5, > h6,
+      > hr {
+        margin-top: 0;
+        margin-bottom: 0.75em; // Відступ між блоками
+        line-height: 1.6; // Читабельна висота рядка
       }
   
-      // Ensure direct child paragraphs inherit line-height correctly
-       > p {
-          // line-height: inherit;
-          line-height: $translation-base-line-height;
-       }
-  
+      > :last-child {
+        margin-bottom: 0; // Прибираємо відступ у останнього елемента
+      }
     } // end .translation-content
   
   
