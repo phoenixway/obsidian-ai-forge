@@ -463,7 +463,7 @@ export default class OllamaPlugin extends Plugin {
         this.logger.debug("Returning cached roles."); // Use logger
         return this.roleListCache;
     }
-    this.logger.info("Fetching roles (including built-in)..."); // Use logger
+    // this.logger.info("Fetching roles (including built-in)..."); // Use logger
 
     const roles: RoleInfo[] = [];
     const addedNamesLowerCase = new Set<string>();
@@ -474,13 +474,13 @@ export default class OllamaPlugin extends Plugin {
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md";
     const builtInRolePath = normalizePath(`${pluginDir}/roles/${builtInRoleFileName}`);
-    this.logger.debug(`Checking for built-in role at: ${builtInRolePath}`);
+    // this.logger.debug(`Checking for built-in role at: ${builtInRolePath}`);
 
     try {
         if (await adapter.exists(builtInRolePath)) {
             const stat = await adapter.stat(builtInRolePath);
             if (stat?.type === 'file') {
-                this.logger.debug(`Found built-in role: ${builtInRoleName}`);
+                // this.logger.debug(`Found built-in role: ${builtInRoleName}`);
                 roles.push({
                     name: builtInRoleName,
                     path: builtInRolePath,
@@ -516,11 +516,11 @@ export default class OllamaPlugin extends Plugin {
                         const roleName = fileName.substring(0, fileName.length - 3); // Remove .md
 
                         if (!addedNamesLowerCase.has(roleName.toLowerCase())) {
-                            this.logger.debug(`Adding user role: ${roleName} from path: ${filePath}`);
+                            // this.logger.debug(`Adding user role: ${roleName} from path: ${filePath}`);
                             roles.push({ name: roleName, path: filePath, isCustom: true });
                             addedNamesLowerCase.add(roleName.toLowerCase());
                         } else {
-                            this.logger.warn(`Skipping user role "${roleName}" from "${filePath}" due to name conflict.`);
+                            // this.logger.warn(`Skipping user role "${roleName}" from "${filePath}" due to name conflict.`);
                         }
                     }
                 }
@@ -535,7 +535,7 @@ export default class OllamaPlugin extends Plugin {
     // --- 3. Sorting & Caching ---
     roles.sort((a, b) => a.name.localeCompare(b.name));
     this.roleListCache = roles;
-    this.logger.info(`Found total ${roles.length} roles (including built-in if present).`);
+    // this.logger.info(`Found total ${roles.length} roles (including built-in if present).`);
     return roles;
 }
 

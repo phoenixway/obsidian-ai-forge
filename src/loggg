@@ -1,0 +1,19 @@
+2025-04-18T19:42:58.311Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Hi...". Button exists: false
+2025-04-18T19:42:58.312Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 32. Comparing with max: 300
+2025-04-18T19:43:13.184Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Hi...". Button exists: false
+2025-04-18T19:43:13.187Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 32. Comparing with max: 300
+2025-04-18T19:43:15.909Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Hi...". Button exists: false
+2025-04-18T19:43:15.911Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 32. Comparing with max: 300
+2025-04-18T19:43:24.420Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Hi...". Button exists: false
+2025-04-18T19:43:24.420Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 32. Comparing with max: 300
+2025-04-18T19:43:24.420Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Hi...". Button exists: false
+2025-04-18T19:43:24.420Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 32. Comparing with max: 300
+2025-04-18T19:43:28.932Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Hi there! How's it going?  
+Is...". Button exists: false
+2025-04-18T19:43:28.932Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 121. Comparing with max: 300
+2025-04-18T19:43:39.148Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "Fuck u ...". Button exists: false
+2025-04-18T19:43:39.156Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 58. Comparing with max: 300
+2025-04-18T19:43:40.918Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Inside rAF. Msg content: "My dear fellow, your language ...". Button exists: false
+2025-04-18T19:43:40.925Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Measured scrollHeight AFTER reset: 710. Comparing with max: 300
+2025-04-18T19:43:40.925Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Applying collapse. Setting max-height: 300px
+2025-04-18T19:43:40.926Z [DEBUG] [Logger.debug] [Mobile Collapse Debug] Added 'Show More' button.

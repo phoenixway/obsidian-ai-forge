@@ -4814,7 +4814,6 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
       this.logger.debug("Returning cached roles.");
       return this.roleListCache;
     }
-    this.logger.info("Fetching roles (including built-in)...");
     const roles = [];
     const addedNamesLowerCase = /* @__PURE__ */ new Set();
     const adapter = this.app.vault.adapter;
@@ -4822,12 +4821,10 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md";
     const builtInRolePath = (0, import_obsidian10.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
-    this.logger.debug(`Checking for built-in role at: ${builtInRolePath}`);
     try {
       if (await adapter.exists(builtInRolePath)) {
         const stat = await adapter.stat(builtInRolePath);
         if ((stat == null ? void 0 : stat.type) === "file") {
-          this.logger.debug(`Found built-in role: ${builtInRoleName}`);
           roles.push({
             name: builtInRoleName,
             path: builtInRolePath,
@@ -4854,11 +4851,9 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
               const fileName = filePath.split("/").pop() || filePath;
               const roleName = fileName.substring(0, fileName.length - 3);
               if (!addedNamesLowerCase.has(roleName.toLowerCase())) {
-                this.logger.debug(`Adding user role: ${roleName} from path: ${filePath}`);
                 roles.push({ name: roleName, path: filePath, isCustom: true });
                 addedNamesLowerCase.add(roleName.toLowerCase());
               } else {
-                this.logger.warn(`Skipping user role "${roleName}" from "${filePath}" due to name conflict.`);
               }
             }
           }
@@ -4871,7 +4866,6 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     }
     roles.sort((a, b) => a.name.localeCompare(b.name));
     this.roleListCache = roles;
-    this.logger.info(`Found total ${roles.length} roles (including built-in if present).`);
     return roles;
   }
   // async listRoleFiles(forceRefresh: boolean = false): Promise<RoleInfo[]> {

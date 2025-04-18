@@ -177,3 +177,71 @@
     opacity: 0.9;
     clear: both; /* Ensure it doesn't overlap floated elements if any */
   }
+
+
+  // --- Message Collapsing Styles ---
+
+// Container for content that might collapse
+.message-content-collapsible {
+  // CRITICAL: Content must be hidden when max-height is applied
+  overflow: hidden;
+  // Optional: Smooth transition when height changes
+  transition: max-height 0.3s ease-out;
+  // position: relative; // Needed if using absolute positioning for button/mask
+}
+
+// Class added by JS when content IS collapsed
+.message-content-collapsed {
+  // max-height is set via inline style by JS (e.g., style="max-height: 300px;")
+
+  // Optional: Fade-out effect at the bottom
+  // NOTE: Masking can sometimes cause issues on mobile, remove if problematic
+  position: relative; // Needed for the mask pseudo-element
+  &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 40px; // Height of the fade gradient
+      background: linear-gradient(to bottom, transparent, var(--background-primary)); // Adjust background color to match bubble
+      pointer-events: none; // Allow clicking through the gradient
+  }
+  // Alternative using mask-image (might have compatibility issues)
+  // -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  // mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+// Button to expand/collapse
+.show-more-button {
+  display: block; // Ensure it's visible
+  margin: 8px auto 0 auto; // Center below the collapsed content
+  padding: 4px 12px;
+  font-size: 0.85em;
+  color: var(--text-accent);
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 15px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  text-align: center;
+  width: fit-content; // Take minimum width needed
+
+  &:hover {
+      background-color: var(--background-modifier-hover);
+      border-color: var(--interactive-accent-translucent);
+      color: var(--text-accent-hover);
+  }
+}
+
+// Ensure button is visible inside user messages too
+.user-message .show-more-button {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-on-accent);
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+}
+
+// --- End Message Collapsing Styles ---
