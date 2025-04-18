@@ -87,11 +87,16 @@
   
 
     .translation-content {
-      line-height: 1.5; // Базовий міжрядковий інтервал (налаштуйте)
-      font-size: inherit;
-      // white-space: pre-wrap; // Залиште, якщо потрібен
+      white-space: pre-wrap; // Keep if needed
   
-      // --- ВІДСТУПИ МІЖ БЛОКОВИМИ ЕЛЕМЕНТАМИ (з !important) ---
+      // --- BASE TYPOGRAPHY ---
+      // *** THIS CONTROLS SPACING BETWEEN TEXT LINES within p, li, etc. ***
+      // *** Adjust this value (e.g., 1.4, 1.5, 1.6) for readability ***
+      line-height: 1.5; // Default: 1.5 (adjust as needed)
+      font-size: inherit;
+  
+      // --- SPACING BETWEEN DIRECT CHILD BLOCK ELEMENTS ---
+      // Add consistent space AFTER common block elements using margin-bottom
       > p,
       > ul,
       > ol,
@@ -100,63 +105,71 @@
       > h1, > h2, > h3, > h4, > h5, > h6,
       > hr,
       > div {
-        margin-top: 0 !important; // <-- Повертаємо !important
-        margin-bottom: 0.6em !important; // <-- Повертаємо !important (значення можна змінити)
-        padding: 0; // Залишаємо без !important, якщо можливо
-        line-height: inherit; // Успадковуємо базовий line-height
+        margin-top: 0; // No space above blocks
+        margin-bottom: 0.6em; // Space AFTER blocks (adjust value as needed)
+        padding: 0; // Reset padding
+        line-height: inherit; // CRITICAL: Let blocks inherit the base line-height
+                               // REMOVES the problematic line-height: 0.3 / 1
       }
   
-      // Прибираємо відступ у останнього елемента
+      // Remove margin after the very last direct child element
       > :last-child {
-        margin-bottom: 0 !important; // <-- Повертаємо !important
+        margin-bottom: 0;
       }
-      // --- КІНЕЦЬ БЛОКУ ВІДСТУПІВ ---
   
+      // --- SPECIFIC ELEMENT STYLING / PADDING RESTORATION ---
   
-      // --- СПЕЦИФІЧНІ СТИЛІ ЕЛЕМЕНТІВ ---
-      // Списки UL, OL
+      // Lists UL, OL (Direct Children)
       > ul, > ol {
-        padding-left: 1.8em; // Відступ для маркерів
-        // margin керується правилом вище
-        line-height: inherit;
+        padding-left: 1.8em; // Restore list indentation (adjust if needed)
+        // margin-top/bottom handled above
+        // line-height is inherited
   
         li {
-          margin: 0.15em 0; // Відступи між LI (можна теж додати !important, якщо потрібно)
+          // Control space BETWEEN list items using margin here
+          margin: 0.2em 0; // Small top/bottom margin between LIs (adjust value)
           padding: 0;
-          line-height: inherit;
+          line-height: inherit; // Ensure LI text inherits base line-height
   
-          // Абзаци всередині LI
+          // Optional: Adjust paragraphs within list items
           p {
-            margin-top: 0 !important; // !important для надійності
-            margin-bottom: 0.25em !important;
+            margin-top: 0;
+            margin-bottom: 0.25em; // Smaller margin for paragraphs within li
             line-height: inherit;
-             &:last-child { margin-bottom: 0 !important; }
+             &:last-child { margin-bottom: 0; }
           }
   
-          // Вкладені списки всередині LI
+          // Optional: Adjust nested lists within list items
+          // These will inherit the base line-height and the li margin rules
           ul, ol {
-            margin-top: 0.3em !important; // !important для надійності
-            margin-bottom: 0.3em !important;
-            line-height: inherit;
+            margin-top: 0.3em; // Adjust space before/after nested lists
+            margin-bottom: 0.3em;
+            padding-left: 1.8em; // Ensure nested lists are also indented
+            // line-height is inherited
           }
         }
       }
   
-      // Заголовки H1-H6
+      // Restore padding/styles for other elements if needed
+       > blockquote {
+          padding: 0.5em 1em;
+          margin-left: 0; // Reset margin if padding is added
+       }
+       > pre {
+          padding: 0.8em;
+       }
+  
+      // Optional: Tighter line-height specifically for headings
       > h1, > h2, > h3, > h4, > h5, > h6 {
-          line-height: 1.3; // Окремий line-height для заголовків
-          // margin керується правилом вище
+          line-height: 1.3;
       }
   
-       // Блоки коду <pre> та цитати <blockquote> (відновлюємо padding)
-       > pre, > blockquote {
-          padding: 0.5em 1em;
+      // Ensure direct child paragraphs inherit line-height correctly
+       > p {
+          line-height: inherit;
        }
-       > blockquote { margin-left: 0; }
   
-       > p { line-height: inherit; }
-  
-    } // кінець .translation-content
+    } // end .translation-content
   
     .translation-indicator {
       font-size: 0.8em;
