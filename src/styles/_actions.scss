@@ -103,6 +103,7 @@
           margin-top: 0 !important;
           margin-bottom: 0.5em !important;
           padding: 0 !important;
+          line-height: 1; 
       }
       > :last-child {
           margin-bottom: 0 !important;
@@ -133,7 +134,7 @@
             margin-bottom: 0.1em !important; // Дуже малий або нульовий відступ знизу LI
             padding-top: 0 !important;       // Прибираємо внутрішній відступ зверху LI
             padding-bottom: 0 !important;    // Прибираємо внутрішній відступ знизу LI
-            line-height: 1.45; // Можна встановити явно, якщо успадкований завеликий
+            line-height: 1; // Можна встановити явно, якщо успадкований завеликий
   
             // Якщо всередині LI є абзаци, робимо їм менші відступи
             p {
