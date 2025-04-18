@@ -130,13 +130,14 @@ $translation-hacked-line-height: 0.6;
           // Control space BETWEEN list items using margin here
           margin: 0.2em 0; // Small top/bottom margin between LIs (adjust value)
           padding: 0;
-          line-height: inherit; // Ensure LI text inherits base line-height
+          line-height: $translation-base-line-height; // Ensure LI text inherits base line-height
   
           // Optional: Adjust paragraphs within list items
           p {
             margin-top: 0;
             margin-bottom: 0.25em; // Smaller margin for paragraphs within li
-            line-height: inherit;
+            // line-height: inherit;
+            line-height: $translation-base-line-height;
              &:last-child { margin-bottom: 0; }
           }
   
@@ -147,6 +148,7 @@ $translation-hacked-line-height: 0.6;
             margin-bottom: 0.3em;
             padding-left: 1.8em; // Ensure nested lists are also indented
             // line-height is inherited
+            line-height: $translation-base-line-height;
           }
         }
       }
@@ -167,7 +169,8 @@ $translation-hacked-line-height: 0.6;
   
       // Ensure direct child paragraphs inherit line-height correctly
        > p {
-          line-height: inherit;
+          // line-height: inherit;
+          line-height: $translation-base-line-height;
        }
   
     } // end .translation-content
