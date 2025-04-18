@@ -639,7 +639,7 @@ export class OllamaView extends ItemView {
     }
   }
   private handleRoleChange = (roleName: string): void => {
-    console.log(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
+    this.plugin.logger.debug(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
     const displayRole = roleName || "None";
     this.updateInputPlaceholder(displayRole);
     this.updateRoleDisplay(displayRole);
@@ -649,7 +649,10 @@ export class OllamaView extends ItemView {
       new Notice(`Role set to: ${displayRole}`);
     }
   }
-  private handleRolesUpdated = (): void => { this.plugin.promptService?.clearRoleCache(); console.log("[OllamaView] Roles updated: Cleared prompt service role cache."); if (this.isMenuOpen()) { this.renderRoleList(); } }; // Refresh list if open
+  private handleRolesUpdated = (): void => { 
+    this.plugin.promptService?.clearRoleCache(); 
+    if (this.isMenuOpen()) { this.renderRoleList(); } 
+  }; 
   private handleChatListUpdated = (): void => { console.log("[OllamaView] Chat list updated event received."); if (this.isMenuOpen()) { this.renderChatListMenu(); } }; // Refresh list if open
   private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => { console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`); this.loadAndDisplayActiveChat(); }
   private handleMessageAdded = (data: { chatId: string, message: Message }): void => { if (data.chatId === this.plugin.chatManager?.getActiveChatId()) { this.addMessageToDisplay(data.message.role, data.message.content, data.message.timestamp); if (this.isMenuOpen()) { this.renderChatListMenu(); } } } // Refresh list date if open
@@ -1705,7 +1708,7 @@ export class OllamaView extends ItemView {
 
 
   private handleRoleDisplayClick = async (event: MouseEvent) => {
-    console.log("[OllamaView Debug] Role display clicked, creating native menu.");
+    this.plugin.logger.debug("[OllamaView Debug] Role display clicked, creating native menu.");
     const menu = new Menu();
     let itemsAdded = false;
 
@@ -1714,9 +1717,10 @@ export class OllamaView extends ItemView {
 
     try {
       const roles = await this.plugin.listRoleFiles(true); // Отримуємо всі ролі
+      this.plugin.logger.debug("[OllamaView Debug] Roles loaded:", roles);
       const activeChat = await this.plugin.chatManager?.getActiveChat();
       const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-
+      this.plugin.logger.debug("[OllamaView Debug] Current role path:", currentRolePath);
       // loadingNotice?.hide();
 
       // --- 1. Додаємо опцію "None (Default)" ---

@@ -661,7 +661,7 @@ This action cannot be undone.`, async () => {
       }
     };
     this.handleRoleChange = (roleName) => {
-      console.log(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
+      this.plugin.logger.debug(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
       const displayRole = roleName || "None";
       this.updateInputPlaceholder(displayRole);
       this.updateRoleDisplay(displayRole);
@@ -674,12 +674,10 @@ This action cannot be undone.`, async () => {
     this.handleRolesUpdated = () => {
       var _a;
       (_a = this.plugin.promptService) == null ? void 0 : _a.clearRoleCache();
-      console.log("[OllamaView] Roles updated: Cleared prompt service role cache.");
       if (this.isMenuOpen()) {
         this.renderRoleList();
       }
     };
-    // Refresh list if open
     this.handleChatListUpdated = () => {
       console.log("[OllamaView] Chat list updated event received.");
       if (this.isMenuOpen()) {
@@ -782,13 +780,15 @@ This action cannot be undone.`, async () => {
     };
     this.handleRoleDisplayClick = async (event) => {
       var _a, _b, _c;
-      console.log("[OllamaView Debug] Role display clicked, creating native menu.");
+      this.plugin.logger.debug("[OllamaView Debug] Role display clicked, creating native menu.");
       const menu = new import_obsidian3.Menu();
       let itemsAdded = false;
       try {
         const roles = await this.plugin.listRoleFiles(true);
+        this.plugin.logger.debug("[OllamaView Debug] Roles loaded:", roles);
         const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
         const currentRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
+        this.plugin.logger.debug("[OllamaView Debug] Current role path:", currentRolePath);
         menu.addItem((item) => {
           item.setTitle("None").setIcon(!currentRolePath ? "check" : "slash").onClick(async () => {
             var _a2, _b2;
