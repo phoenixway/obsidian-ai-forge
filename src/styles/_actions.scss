@@ -93,12 +93,9 @@ $translation-hacked-line-height: 0.9;
     .translation-content {
       white-space: pre-wrap;
   
-      // --- BASE Readable Line Height for ALL text content ---
-      line-height: 1.5; // Default readable line height (Adjust 1.4-1.6)
+      line-height: $translation-base-line-height; 
       font-size: inherit;
-  
-      // --- Reset Margins/Padding for Direct Children ---
-      // Controls space BETWEEN block elements
+
       > p,
       > ul, > ol,
       > blockquote, > pre,
@@ -113,20 +110,11 @@ $translation-hacked-line-height: 0.9;
         margin-bottom: 0; // No margin after last element
       }
   
-      // --- List Specific Handling ---
-  
-      // ** STEP 1: Apply the low line-height ONLY to DIRECT child UL/OL **
-      // This collapses space between their direct child LIs, per user observation.
-      // Use a slightly less extreme value than 0.3 if possible (e.g., 1 or lower). Test 0.5?
       > ul, > ol {
-        line-height: 0.5; // ADJUST THIS VALUE (Try 0.5, 0.8, 1, or 0.3 if absolutely needed)
-                         // This is the "hack" for inter-LI spacing via container line-height.
+        line-height: $translation-hacked-line-height; // Adjust line-height for lists
         padding-left: 1.8em; // Restore indentation
-        // Margins handled by universal rule above
       }
   
-      // ** STEP 2: Reset line-height INSIDE ALL List Items (li) back to readable **
-      // Targets li within ANY ul/ol inside .translation-content
       ul li, ol li { // Select ALL li elements within any list
         line-height: inherit; // Inherit the BASE readable line-height (e.g., 1.5) from .translation-content
         margin: 0.2em 0; // Control spacing between LI items via margin
