@@ -37,7 +37,7 @@ __export(main_exports, {
   default: () => OllamaPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 
 // src/OllamaView.ts
 var import_obsidian3 = require("obsidian");
@@ -2483,10 +2483,12 @@ var DEFAULT_SETTINGS = {
   temperature: 0.7,
   contextWindow: 4096,
   userRolesFolderPath: "/etc/roles",
+  // Змінено на більш нейтральний шлях
   selectedRolePath: "",
   saveMessageHistory: true,
   ragEnabled: false,
-  ragFolderPath: "",
+  ragFolderPath: "/etc/RAG",
+  // Змінено
   googleApiKey: "",
   speechLanguage: "uk-UA",
   userAvatarType: "initials",
@@ -2498,23 +2500,29 @@ var DEFAULT_SETTINGS = {
   translationTargetLanguage: "uk",
   googleTranslationApiKey: "",
   chatHistoryFolderPath: "/etc/chats",
-  chatExportFolderPath: "/etc/chats",
+  // Змінено
+  chatExportFolderPath: "/etc/xports",
+  // Змінено
   enableProductivityFeatures: false,
-  // <-- За замовчуванням вимкнено
   dailyTaskFileName: "Tasks_Today.md",
-  // <-- Ім'я файлу за замовчуванням  useAdvancedContextStrategy: false, // За замовчуванням - вимкнено
   useAdvancedContextStrategy: false,
   enableSummarization: false,
-  // За замовчуванням - вимкнено
-  summarizationPrompt: "Summarize the key points of the preceding conversation concisely, focusing on information relevant for future interactions:\n{text_to_summarize}",
-  // Приклад промпту
+  summarizationPrompt: "Summarize the key points...",
   keepLastNMessagesBeforeSummary: 10,
-  // Зберігати останні 10 повідомлень
   summarizationChunkSize: 1500,
-  // Розмір блоку для підсумовування (токени)
-  followRole: true
-  // За замовчуванням - використовувати роль
-  // --------------------------------------
+  followRole: true,
+  // --- Нові налаштування логера ---
+  consoleLogLevel: "INFO",
+  // Рівень для консолі за замовчуванням
+  fileLoggingEnabled: false,
+  // Логування у файл вимкнено за замовчуванням
+  fileLogLevel: "WARN",
+  // Рівень для файлу за замовчуванням
+  logCallerInfo: false
+  // НЕ записувати ім'я викликаючого методу за замовчуванням (для продуктивності)
+  // logFilePath: undefined, // Шлях за замовчуванням буде в папці плагіна
+  // logFileMaxSizeMB: 5, // Макс. розмір за замовчуванням
+  // ---------------------------------
 };
 var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
@@ -2780,6 +2788,26 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
       this.plugin.settings.chatExportFolderPath = value.trim();
       await this.plugin.saveSettings();
     }));
+    containerEl.createEl("h3", { text: "Logging" });
+    new import_obsidian4.Setting(containerEl).setName("Console Log Level").setDesc("Minimum level of messages to show in the developer console (DEBUG shows all).").addDropdown((dropdown) => dropdown.addOption("DEBUG", "Debug").addOption("INFO", "Info").addOption("WARN", "Warning").addOption("ERROR", "Error").addOption("NONE", "None").setValue(this.plugin.settings.consoleLogLevel || "INFO").onChange(async (value) => {
+      this.plugin.settings.consoleLogLevel = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Enable File Logging").setDesc(`Log messages to a file (${this.plugin.manifest.dir}/ai-forge.log). Useful for debugging on mobile.`).addToggle((toggle) => toggle.setValue(this.plugin.settings.fileLoggingEnabled).onChange(async (value) => {
+      this.plugin.settings.fileLoggingEnabled = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    if (this.plugin.settings.fileLoggingEnabled) {
+      new import_obsidian4.Setting(containerEl).setName("File Log Level").setDesc("Minimum level of messages to write to the log file.").addDropdown((dropdown) => dropdown.addOption("DEBUG", "Debug").addOption("INFO", "Info").addOption("WARN", "Warning").addOption("ERROR", "Error").setValue(this.plugin.settings.fileLogLevel || "WARN").onChange(async (value) => {
+        this.plugin.settings.fileLogLevel = value;
+        await this.plugin.saveSettings();
+      }));
+      new import_obsidian4.Setting(containerEl).setName("Log Caller Method Name").setDesc("Include the calling method name in logs ([MethodName] Message). WARNING: May slightly impact performance, especially with frequent DEBUG/INFO logging.").addToggle((toggle) => toggle.setValue(this.plugin.settings.logCallerInfo).onChange(async (value) => {
+        this.plugin.settings.logCallerInfo = value;
+        await this.plugin.saveSettings();
+      }));
+    }
   }
 };
 
@@ -4149,9 +4177,215 @@ var TranslationService = class {
   }
 };
 
+// src/Logger.ts
+var import_obsidian9 = require("obsidian");
+var LogLevel = /* @__PURE__ */ ((LogLevel3) => {
+  LogLevel3[LogLevel3["DEBUG"] = 1] = "DEBUG";
+  LogLevel3[LogLevel3["INFO"] = 2] = "INFO";
+  LogLevel3[LogLevel3["WARN"] = 3] = "WARN";
+  LogLevel3[LogLevel3["ERROR"] = 4] = "ERROR";
+  LogLevel3[LogLevel3["NONE"] = 5] = "NONE";
+  return LogLevel3;
+})(LogLevel || {});
+var Logger = class {
+  constructor(plugin, initialSettings) {
+    this.consoleLogLevel = 2 /* INFO */;
+    this.fileLogLevel = 3 /* WARN */;
+    this.fileLoggingEnabled = false;
+    this.logCallerInfo = false;
+    // <--- Прапорець для опції
+    this.logFileMaxSizeMB = 5;
+    this.logQueue = [];
+    // Буфер для запису у файл
+    this.isWritingToFile = false;
+    this.writeDebounceTimeout = null;
+    this.plugin = plugin;
+    this.adapter = plugin.app.vault.adapter;
+    this.logFilePath = (0, import_obsidian9.normalizePath)(initialSettings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
+    this.logFileMaxSizeMB = initialSettings.logFileMaxSizeMB || 5;
+    this.updateSettings(initialSettings);
+    console.log(`[Logger] Initialized. Console Level: ${this.getLogLevelName(this.consoleLogLevel)}, File Logging: ${this.fileLoggingEnabled}, File Level: ${this.getLogLevelName(this.fileLogLevel)}, Log Caller: ${this.logCallerInfo}, Path: ${this.logFilePath}`);
+    if (this.fileLoggingEnabled) {
+      this.rotateLogFileIfNeeded().then(() => {
+        this.info("Logger initialized & file rotation checked.");
+      });
+    } else {
+      this.info("Logger initialized.");
+    }
+  }
+  getLogLevelName(level) {
+    return LogLevel[level] || "UNKNOWN";
+  }
+  getLogLevelFromString(levelString, defaultLevel = 2 /* INFO */) {
+    switch (levelString == null ? void 0 : levelString.toUpperCase()) {
+      case "DEBUG":
+        return 1 /* DEBUG */;
+      case "INFO":
+        return 2 /* INFO */;
+      case "WARN":
+        return 3 /* WARN */;
+      case "ERROR":
+        return 4 /* ERROR */;
+      case "NONE":
+        return 5 /* NONE */;
+      default:
+        return defaultLevel;
+    }
+  }
+  // --- Оновлення Налаштувань ---
+  updateSettings(settings) {
+    if (settings.consoleLogLevel !== void 0) {
+      this.consoleLogLevel = this.getLogLevelFromString(settings.consoleLogLevel, 2 /* INFO */);
+      console.log(`[Logger] Console log level set to: ${this.getLogLevelName(this.consoleLogLevel)}`);
+    }
+    if (settings.fileLogLevel !== void 0) {
+      this.fileLogLevel = this.getLogLevelFromString(settings.fileLogLevel, 3 /* WARN */);
+      console.log(`[Logger] File log level set to: ${this.getLogLevelName(this.fileLogLevel)}`);
+    }
+    if (settings.fileLoggingEnabled !== void 0) {
+      const wasEnabled = this.fileLoggingEnabled;
+      this.fileLoggingEnabled = settings.fileLoggingEnabled;
+      console.log(`[Logger] File logging enabled: ${this.fileLoggingEnabled}`);
+      if (!wasEnabled && this.fileLoggingEnabled) {
+        this.rotateLogFileIfNeeded();
+      }
+    }
+    if (settings.logCallerInfo !== void 0) {
+      this.logCallerInfo = settings.logCallerInfo;
+      console.log(`[Logger] Log Caller Info enabled: ${this.logCallerInfo}`);
+    }
+  }
+  // --- Отримання Інформації про Викликаючого ---
+  /**
+   * Намагається визначити ім'я/контекст функції, що викликала метод логера.
+   * УВАГА: Має вплив на продуктивність! Використовуйте обережно.
+   */
+  getCallerInfo() {
+    var _a, _b;
+    if (!this.logCallerInfo) {
+      return "unknown";
+    }
+    try {
+      const err = new Error();
+      const stackLines = (_a = err.stack) == null ? void 0 : _a.split("\n");
+      if (stackLines && stackLines.length > 3) {
+        const callerLine = stackLines[3];
+        const match = callerLine.match(/at (?:new )?([\w$.<>\[\] ]+)?(?: \[as \w+\])? ?\(?/);
+        let callerName = (_b = match == null ? void 0 : match[1]) == null ? void 0 : _b.trim();
+        if (callerName) {
+          callerName = callerName.replace(/^Object\./, "");
+          callerName = callerName.replace(/<anonymous>/, "anonymous");
+          if (callerName.includes("/") || callerName.includes("\\")) {
+            return "(file context)";
+          }
+          return callerName;
+        }
+      }
+    } catch (e) {
+    }
+    return "unknown";
+  }
+  // --- Методи Логування ---
+  debug(...args) {
+    this.log(1 /* DEBUG */, console.debug, ...args);
+  }
+  info(...args) {
+    this.log(2 /* INFO */, console.info, ...args);
+  }
+  warn(...args) {
+    this.log(3 /* WARN */, console.warn, ...args);
+  }
+  error(...args) {
+    this.log(4 /* ERROR */, console.error, ...args);
+  }
+  // --- Ядро Логування ---
+  log(level, consoleMethod, ...args) {
+    const caller = this.getCallerInfo();
+    if (level >= this.consoleLogLevel) {
+      const prefix = this.logCallerInfo && caller !== "unknown" ? `[${this.getLogLevelName(level)}] [${caller}]` : `[${this.getLogLevelName(level)}]`;
+      consoleMethod(prefix, ...args);
+    }
+    if (this.fileLoggingEnabled && level >= this.fileLogLevel) {
+      this.queueOrWriteToFile(level, caller, args);
+    }
+  }
+  // --- Робота з Файлом (з чергою/буфером) ---
+  queueOrWriteToFile(level, caller, args) {
+    try {
+      const timestamp = new Date().toISOString();
+      const levelName = this.getLogLevelName(level);
+      const message = args.map((arg) => {
+        if (typeof arg === "string")
+          return arg;
+        if (arg instanceof Error)
+          return arg.stack || arg.message;
+        try {
+          return JSON.stringify(arg);
+        } catch (e) {
+          return String(arg);
+        }
+      }).join(" ");
+      const callerInfo = this.logCallerInfo && caller !== "unknown" ? ` [${caller}]` : "";
+      const logLine = `${timestamp} [${levelName}]${callerInfo} ${message}
+`;
+      this.logQueue.push(logLine);
+      if (!this.isWritingToFile) {
+        this.triggerWriteToFile();
+      }
+    } catch (error) {
+      console.error("[Logger] Error formatting log line:", error);
+    }
+  }
+  triggerWriteToFile() {
+    if (this.writeDebounceTimeout) {
+      clearTimeout(this.writeDebounceTimeout);
+    }
+    this.writeDebounceTimeout = setTimeout(async () => {
+      if (this.isWritingToFile || this.logQueue.length === 0) {
+        return;
+      }
+      this.isWritingToFile = true;
+      const linesToWrite = [...this.logQueue];
+      this.logQueue = [];
+      try {
+        const contentToWrite = linesToWrite.join("");
+        await this.adapter.append(this.logFilePath, contentToWrite);
+      } catch (error) {
+        console.error("[Logger] Failed to write batch to log file:", error);
+        this.logQueue.unshift(...linesToWrite);
+      } finally {
+        this.isWritingToFile = false;
+        if (this.logQueue.length > 0) {
+          this.triggerWriteToFile();
+        }
+      }
+    }, 500);
+  }
+  async rotateLogFileIfNeeded() {
+    if (!this.fileLoggingEnabled)
+      return;
+    try {
+      if (await this.adapter.exists(this.logFilePath)) {
+        const stats = await this.adapter.stat(this.logFilePath);
+        const maxSizeInBytes = (this.logFileMaxSizeMB || 5) * 1024 * 1024;
+        if (stats && stats.type === "file" && stats.size > maxSizeInBytes) {
+          const backupPath = this.logFilePath + ".bak";
+          console.log(`[Logger] Rotating log file (size ${stats.size} > ${maxSizeInBytes}). Backup: ${backupPath}`);
+          if (await this.adapter.exists(backupPath)) {
+            await this.adapter.remove(backupPath);
+          }
+          await this.adapter.rename(this.logFilePath, backupPath);
+        }
+      }
+    } catch (error) {
+      console.error("[Logger] Error rotating log file:", error);
+    }
+  }
+};
+
 // src/main.ts
 var ACTIVE_SESSION_ID_KEY2 = "activeChatSessionId_v1";
-var OllamaPlugin = class extends import_obsidian9.Plugin {
+var OllamaPlugin = class extends import_obsidian10.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -4208,6 +4442,16 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
   async onload() {
     console.log("Loading Ollama Personas Plugin...");
     await this.loadSettings();
+    const isProduction = true;
+    const initialConsoleLogLevel = isProduction ? this.settings.consoleLogLevel || "INFO" : "DEBUG";
+    const loggerSettings = {
+      consoleLogLevel: initialConsoleLogLevel,
+      fileLoggingEnabled: this.settings.fileLoggingEnabled,
+      fileLogLevel: this.settings.fileLogLevel,
+      logCallerInfo: this.settings.logCallerInfo
+      // Можна додати logFilePath, logFileMaxSizeMB, якщо вони є в OllamaPluginSettings
+    };
+    this.logger = new Logger(this, loggerSettings);
     this.ollamaService = new OllamaService(this);
     this.translationService = new TranslationService(this);
     this.promptService = new PromptService(this);
@@ -4226,7 +4470,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
       console.error("[OllamaPlugin] Connection error event:", error);
       this.emit("ollama-connection-error", error.message);
       if (!this.view) {
-        new import_obsidian9.Notice(`Failed to connect to Ollama: ${error.message}`);
+        new import_obsidian10.Notice(`Failed to connect to Ollama: ${error.message}`);
       }
     });
     this.register(this.on("ollama-connection-error", (message) => {
@@ -4239,7 +4483,8 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     }));
     this.register(this.on("settings-updated", () => {
       var _a;
-      console.log("[OllamaPlugin] Event 'settings-updated' received.");
+      this.logger.info("[Plugin] Event 'settings-updated' received.");
+      this.logger.updateSettings(this.settings);
       this.updateDailyTaskFilePath();
       this.loadAndProcessInitialTasks();
       this.updateOllamaServiceConfig();
@@ -4262,12 +4507,12 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: async () => {
       await this.listRoleFiles(true);
       this.emit("roles-updated");
-      new import_obsidian9.Notice("Role list refreshed.");
+      new import_obsidian10.Notice("Role list refreshed.");
     } });
     this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: async () => {
       const newChat = await this.chatManager.createNewChat();
       if (newChat) {
-        new import_obsidian9.Notice(`Created new chat: ${newChat.metadata.name}`);
+        new import_obsidian10.Notice(`Created new chat: ${newChat.metadata.name}`);
       }
     } });
     this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: async () => {
@@ -4289,7 +4534,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
         }, 5e3);
       }
     });
-    const debouncedRoleClear = (0, import_obsidian9.debounce)(() => {
+    const debouncedRoleClear = (0, import_obsidian10.debounce)(() => {
       var _a, _b;
       console.log("[OllamaPlugin] Role change detected, clearing cache & emitting.");
       this.roleListCache = null;
@@ -4352,7 +4597,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     var _a, _b;
     const folderPath = (_a = this.settings.ragFolderPath) == null ? void 0 : _a.trim();
     const fileName = (_b = this.settings.dailyTaskFileName) == null ? void 0 : _b.trim();
-    const newPath = folderPath && fileName ? (0, import_obsidian9.normalizePath)(`${folderPath}/${fileName}`) : null;
+    const newPath = folderPath && fileName ? (0, import_obsidian10.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
       console.log(`[Plugin] Daily task file path changed to: ${newPath}`);
       this.dailyTaskFilePath = newPath;
@@ -4431,16 +4676,16 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
   // --- Кінець логіки файлу завдань ---
   // Обробник змін для ролей та RAG
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear) {
-    const normPath = (0, import_obsidian9.normalizePath)(changedPath);
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian9.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const defaultRolesPath = (0, import_obsidian9.normalizePath)(this.manifest.dir + "/roles");
+    const normPath = (0, import_obsidian10.normalizePath)(changedPath);
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const defaultRolesPath = (0, import_obsidian10.normalizePath)(this.manifest.dir + "/roles");
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/") || normPath.startsWith(defaultRolesPath + "/")) {
         console.log(`[Plugin] Role file change detected: ${normPath}`);
         debouncedRoleClear();
       }
     }
-    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian9.normalizePath)(this.settings.ragFolderPath) : null;
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && normPath.startsWith(ragFolderPath + "/")) {
       console.log(`[Plugin] RAG file change detected: ${normPath}`);
       this.debounceIndexUpdate();
@@ -4542,7 +4787,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
       await this.chatManager.clearActiveChatMessages();
     } else {
       console.error("ChatManager not ready when clearMessageHistory called.");
-      new import_obsidian9.Notice("Error: Chat Manager not ready.");
+      new import_obsidian10.Notice("Error: Chat Manager not ready.");
     }
   }
   // List Role Files Method
@@ -4564,7 +4809,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     const pluginDir = this.manifest.dir;
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md";
-    const builtInRolePath = (0, import_obsidian9.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+    const builtInRolePath = (0, import_obsidian10.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
     console.log(`[OllamaPlugin] Checking for built-in role at: ${builtInRolePath}`);
     try {
       if (await adapter.exists(builtInRolePath)) {
@@ -4589,7 +4834,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     } catch (error) {
       console.error(`[OllamaPlugin] Error checking/adding built-in role at ${builtInRolePath}:`, error);
     }
-    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian9.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath) {
       console.log(`[OllamaPlugin] Processing user roles from: ${userRolesFolderPath}`);
       try {
@@ -4631,7 +4876,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     }
     if (typeof process === "undefined" || !((_a = process == null ? void 0 : process.versions) == null ? void 0 : _a.node)) {
       console.error("Node.js environment not available. Cannot execute system command.");
-      new import_obsidian9.Notice("Cannot execute system command.");
+      new import_obsidian10.Notice("Cannot execute system command.");
       return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required") };
     }
     return new Promise((resolve) => {
@@ -4649,13 +4894,13 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
   // --- Session Management Command Helpers ---
   // Ці методи зараз не використовуються View, але можуть бути корисними для команд
   async showChatSwitcher() {
-    new import_obsidian9.Notice("Switch Chat UI not implemented yet.");
+    new import_obsidian10.Notice("Switch Chat UI not implemented yet.");
   }
   async renameActiveChat() {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian9.Notice("No active chat.");
+      new import_obsidian10.Notice("No active chat.");
       return;
     }
     const currentName = activeChat.metadata.name;
@@ -4668,7 +4913,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
         if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
           await this.chatManager.renameChat(activeChat.metadata.id, newName.trim());
         } else if (newName !== null) {
-          new import_obsidian9.Notice("Rename cancelled or name unchanged.");
+          new import_obsidian10.Notice("Rename cancelled or name unchanged.");
         }
       }
     ).open();
@@ -4677,7 +4922,7 @@ var OllamaPlugin = class extends import_obsidian9.Plugin {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian9.Notice("No active chat.");
+      new import_obsidian10.Notice("No active chat.");
       return;
     }
     const chatName = activeChat.metadata.name;

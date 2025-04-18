@@ -27,6 +27,7 @@ import * as path from 'path';
 import { TranslationService } from './TranslationService'; // <-- Import new service
 import { PromptModal } from "./PromptModal";
 import { ConfirmModal } from "./ConfirmModal";
+import { Logger, LogLevel, LoggerSettings } from "./Logger"; // <-- Імпортуємо логер
 
 // --- КОНСТАНТИ ДЛЯ ЗБЕРЕЖЕННЯ ---
 const SESSIONS_INDEX_KEY = 'chatSessionsIndex_v1';
@@ -51,6 +52,7 @@ export default class OllamaPlugin extends Plugin {
   promptService!: PromptService;
   chatManager!: ChatManager;
   translationService!: TranslationService;
+  logger!: Logger; 
 
   // Події та кеш
   private eventHandlers: Record<string, Array<(data: any) => any>> = {};
@@ -83,6 +85,21 @@ export default class OllamaPlugin extends Plugin {
 
     await this.loadSettings();
 
+    const isProduction = process.env.NODE_ENV === 'production';
+    const initialConsoleLogLevel = isProduction
+                                   ? (this.settings.consoleLogLevel || 'INFO') // Беремо з налаштувань або INFO
+                                   : 'DEBUG'; // Завжди DEBUG для розробки
+
+    // Передаємо початкові налаштування логеру
+    const loggerSettings: LoggerSettings = {
+        consoleLogLevel: initialConsoleLogLevel as keyof typeof LogLevel,
+        fileLoggingEnabled: this.settings.fileLoggingEnabled,
+        fileLogLevel: this.settings.fileLogLevel,
+        logCallerInfo: this.settings.logCallerInfo,
+        // Можна додати logFilePath, logFileMaxSizeMB, якщо вони є в OllamaPluginSettings
+    };
+    this.logger = new Logger(this, loggerSettings);
+
     // Ініціалізація сервісів
     this.ollamaService = new OllamaService(this);
     this.translationService = new TranslationService(this);
@@ -93,7 +110,6 @@ export default class OllamaPlugin extends Plugin {
     await this.chatManager.initialize();
 
     // --- Реєстрація View ---
-    // !!! ВИПРАВЛЕНО: Використовуємо правильний ID типу View !!!
     this.registerView(
       VIEW_TYPE_OLLAMA_PERSONAS,
       (leaf) => {
@@ -111,19 +127,18 @@ export default class OllamaPlugin extends Plugin {
     this.register(this.on('ollama-connection-error', (message) => { this.view?.addMessageToDisplay?.('error', message, new Date()); }));
     this.register(this.on('active-chat-changed', this.handleActiveChatChangedLocally.bind(this)));
     this.register(this.on('chat-list-updated', () => { console.log("[OllamaPlugin] Event 'chat-list-updated' received."); }));
+
     this.register(this.on('settings-updated', () => {
-      console.log("[OllamaPlugin] Event 'settings-updated' received.");
-      // Оновлюємо шлях до файлу завдань при зміні налаштувань
+      this.logger.info("[Plugin] Event 'settings-updated' received."); // Використовуємо логер
+      this.logger.updateSettings(this.settings); // Передаємо весь об'єкт налаштувань
+
       this.updateDailyTaskFilePath();
-      this.loadAndProcessInitialTasks(); // Перезавантажуємо завдання
-      // Оновлення конфігурації сервісу Ollama (URL, тощо)
+      this.loadAndProcessInitialTasks();
       this.updateOllamaServiceConfig();
-      // Очистка кешів, пов'язаних з ролями
       this.roleListCache = null;
       this.promptService?.clearRoleCache();
-      this.emit('roles-updated'); // Повідомляємо View про можливу зміну списку ролей
+      this.emit('roles-updated');
     }));
-    // -----------------------------------------
 
     // --- Ribbon & Commands ---
     this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => { this.activateView(); });

@@ -1,8 +1,9 @@
-// settings.ts
+// src/settings.ts
 import { App, PluginSettingTab, Setting, DropdownComponent, setIcon, TFolder, debounce } from "obsidian";
 import OllamaPlugin from "./main";
+import { LogLevel, LoggerSettings } from "./Logger"; // Імпортуємо LogLevel та LoggerSettings
 
-// --- Мови (залишаємо як є) ---
+// --- Мови ---
 const LANGUAGES: Record<string, string> = { /* ... ваш довгий список мов ... */
   "af": "Afrikaans", "sq": "Albanian", "am": "Amharic", "ar": "Arabic", "hy": "Armenian",
   "az": "Azerbaijani", "eu": "Basque", "be": "Belarusian", "bn": "Bengali", "bs": "Bosnian",
@@ -27,19 +28,18 @@ const LANGUAGES: Record<string, string> = { /* ... ваш довгий спис�
   "uk": "Ukrainian", "ur": "Urdu", "ug": "Uyghur", "uz": "Uzbek", "vi": "Vietnamese",
   "cy": "Welsh", "xh": "Xhosa", "yi": "Yiddish", "yo": "Yoruba", "zu": "Zulu"
 };
-
 // --- Інтерфейс налаштувань ---
-export interface OllamaPluginSettings {
+export interface OllamaPluginSettings extends LoggerSettings { // Розширюємо інтерфейс
   ollamaServerUrl: string;
   modelName: string;
   temperature: number;
-  contextWindow: number; // max tokens for context
+  contextWindow: number;
   userRolesFolderPath: string;
   selectedRolePath: string;
   saveMessageHistory: boolean;
   ragEnabled: boolean;
   ragFolderPath: string;
-  googleApiKey: string; // Speech-to-Text
+  googleApiKey: string;
   speechLanguage: string;
   userAvatarType: AvatarType;
   userAvatarContent: string;
@@ -48,21 +48,17 @@ export interface OllamaPluginSettings {
   maxMessageHeight: number;
   enableTranslation: boolean;
   translationTargetLanguage: string;
-  googleTranslationApiKey: string; // Translation
-  chatHistoryFolderPath: string; // History .json path in vault
-  chatExportFolderPath: string; // Export .md path in vault
-
-  enableProductivityFeatures: boolean; // <-- ГОЛОВНИЙ ПЕРЕМИКАЧ
-  dailyTaskFileName: string;           // <-- Назва файлу завдань
-
-  // --- Додані властивості для PromptService ---
-  useAdvancedContextStrategy: boolean; // Використовувати розширену стратегію контексту?
-  enableSummarization: boolean;        // Увімкнути підсумовування старих повідомлень?
-  summarizationPrompt: string;         // Промпт для підсумовування
-  keepLastNMessagesBeforeSummary: number; // Скільки останніх повідомлень зберігати перед блоком для підсумовування
-  summarizationChunkSize: number;      // Розмір блоку (в токенах) для підсумовування
-  followRole: boolean;                 // Чи повинен PromptService завжди завантажувати/використовувати роль (якщо вона вибрана)
-  // --------------------------------------------
+  googleTranslationApiKey: string;
+  chatHistoryFolderPath: string;
+  chatExportFolderPath: string;
+  enableProductivityFeatures: boolean;
+  dailyTaskFileName: string;
+  useAdvancedContextStrategy: boolean;
+  enableSummarization: boolean;
+  summarizationPrompt: string;
+  keepLastNMessagesBeforeSummary: number;
+  summarizationChunkSize: number;
+  followRole: boolean;
 }
 
 // --- Значення за замовчуванням ---
@@ -71,11 +67,11 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   modelName: "",
   temperature: 0.7,
   contextWindow: 4096,
-  userRolesFolderPath: "/etc/roles",
+  userRolesFolderPath: "/etc/roles", // Змінено на більш нейтральний шлях
   selectedRolePath: "",
   saveMessageHistory: true,
   ragEnabled: false,
-  ragFolderPath: "",
+  ragFolderPath: "/etc/RAG", // Змінено
   googleApiKey: "",
   speechLanguage: "uk-UA",
   userAvatarType: 'initials',
@@ -86,19 +82,27 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   enableTranslation: false,
   translationTargetLanguage: "uk",
   googleTranslationApiKey: "",
-  chatHistoryFolderPath: "/etc/chats",
-  chatExportFolderPath: "/etc/chats",
+  chatHistoryFolderPath: "/etc/chats", // Змінено
+  chatExportFolderPath: "/etc/xports", // Змінено
 
-  enableProductivityFeatures: false, // <-- За замовчуванням вимкнено
-  dailyTaskFileName: "Tasks_Today.md", // <-- Ім'я файлу за замовчуванням  useAdvancedContextStrategy: false, // За замовчуванням - вимкнено
+  enableProductivityFeatures: false,
+  dailyTaskFileName: "Tasks_Today.md",
 
   useAdvancedContextStrategy: false,
-  enableSummarization: false,        // За замовчуванням - вимкнено
-  summarizationPrompt: "Summarize the key points of the preceding conversation concisely, focusing on information relevant for future interactions:\n{text_to_summarize}", // Приклад промпту
-  keepLastNMessagesBeforeSummary: 10, // Зберігати останні 10 повідомлень
-  summarizationChunkSize: 1500,       // Розмір блоку для підсумовування (токени)
-  followRole: true,                  // За замовчуванням - використовувати роль
-  // --------------------------------------
+  enableSummarization: false,
+  summarizationPrompt: "Summarize the key points...",
+  keepLastNMessagesBeforeSummary: 10,
+  summarizationChunkSize: 1500,
+  followRole: true,
+
+  // --- Нові налаштування логера ---
+  consoleLogLevel: 'INFO', // Рівень для консолі за замовчуванням
+  fileLoggingEnabled: false, // Логування у файл вимкнено за замовчуванням
+  fileLogLevel: 'WARN', // Рівень для файлу за замовчуванням
+  logCallerInfo: false, // НЕ записувати ім'я викликаючого методу за замовчуванням (для продуктивності)
+  // logFilePath: undefined, // Шлях за замовчуванням буде в папці плагіна
+  // logFileMaxSizeMB: 5, // Макс. розмір за замовчуванням
+  // ---------------------------------
 };
 
 // --- Тип аватара ---
@@ -424,6 +428,70 @@ export class OllamaSettingTab extends PluginSettingTab {
     containerEl.createEl('h3', { text: 'Export Settings' });
     // ... (Chat Export Folder Path) ...
     new Setting(containerEl).setName('Chat Export Folder Path').setDesc('Folder within your vault to save exported Markdown chats. Leave empty to save in the vault root.').addText(text => text.setPlaceholder(DEFAULT_SETTINGS.chatExportFolderPath || 'Vault Root').setValue(this.plugin.settings.chatExportFolderPath).onChange(async (value) => { this.plugin.settings.chatExportFolderPath = value.trim(); await this.plugin.saveSettings(); }));
+
+    containerEl.createEl('h3', { text: 'Logging' });
+
+    new Setting(containerEl)
+        .setName('Console Log Level')
+        .setDesc('Minimum level of messages to show in the developer console (DEBUG shows all).')
+        .addDropdown(dropdown => dropdown
+             .addOption('DEBUG', 'Debug')
+             .addOption('INFO', 'Info')
+             .addOption('WARN', 'Warning')
+             .addOption('ERROR', 'Error')
+             .addOption('NONE', 'None')
+             .setValue(this.plugin.settings.consoleLogLevel || 'INFO')
+             .onChange(async (value: keyof typeof LogLevel) => {
+                 this.plugin.settings.consoleLogLevel = value;
+                 await this.plugin.saveSettings();
+                 // Негайно оновлюємо рівень в логері
+                //  this.plugin.logger?.setConsoleLogLevel(value);
+             }));
+
+     new Setting(containerEl)
+        .setName('Enable File Logging')
+        .setDesc(`Log messages to a file (${this.plugin.manifest.dir}/ai-forge.log). Useful for debugging on mobile.`)
+        .addToggle(toggle => toggle
+             .setValue(this.plugin.settings.fileLoggingEnabled)
+             .onChange(async (value) => {
+                 this.plugin.settings.fileLoggingEnabled = value;
+                 await this.plugin.saveSettings();
+                  // Негайно оновлюємо статус в логері
+                //  this.plugin.logger?.setFileLoggingEnabled(value);
+                 this.display(); // Перемалювати, щоб показати/сховати залежні налаштування
+             }));
+
+     if (this.plugin.settings.fileLoggingEnabled) {
+         new Setting(containerEl)
+            .setName('File Log Level')
+            .setDesc('Minimum level of messages to write to the log file.')
+            .addDropdown(dropdown => dropdown
+                 .addOption('DEBUG', 'Debug')
+                 .addOption('INFO', 'Info')
+                 .addOption('WARN', 'Warning')
+                 .addOption('ERROR', 'Error')
+                 // Немає сенсу вибирати NONE для файлу, якщо він увімкнений
+                 .setValue(this.plugin.settings.fileLogLevel || 'WARN')
+                 .onChange(async (value: keyof typeof LogLevel) => {
+                     this.plugin.settings.fileLogLevel = value;
+                     await this.plugin.saveSettings();
+                     // Негайно оновлюємо рівень в логері
+                    //  this.plugin.logger?.setFileLogLevel(value);
+                 }));
+
+         new Setting(containerEl)
+            .setName('Log Caller Method Name')
+            .setDesc('Include the calling method name in logs ([MethodName] Message). WARNING: May slightly impact performance, especially with frequent DEBUG/INFO logging.')
+            .addToggle(toggle => toggle
+                 .setValue(this.plugin.settings.logCallerInfo)
+                 .onChange(async (value) => {
+                     this.plugin.settings.logCallerInfo = value;
+                     await this.plugin.saveSettings();
+                     // Негайно оновлюємо прапорець в логері
+                    //  this.plugin.logger?.setLogCallerInfo?.(value); // Додамо метод setLogCallerInfo в Logger
+                 }));
+          // Можна додати налаштування шляху та розміру файлу, якщо потрібно
+     }
 
   }
 }
