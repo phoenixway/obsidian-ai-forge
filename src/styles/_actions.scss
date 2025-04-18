@@ -103,7 +103,7 @@
           margin-top: 0 !important;
           margin-bottom: 0.5em !important;
           padding: 0 !important;
-          line-height: 1.45; // Можна встановити явно, якщо успадкований завеликий
+          line-height: 1.45 !important; // Можна встановити явно, якщо успадкований завеликий
       }
       > :last-child {
           margin-bottom: 0 !important;
