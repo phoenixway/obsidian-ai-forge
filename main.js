@@ -2118,19 +2118,32 @@ This action cannot be undone.`, async () => {
   checkMessageForCollapsing(messageEl) {
     const c = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
     const h = this.plugin.settings.maxMessageHeight;
-    if (!c || h <= 0)
+    console.log(`[Mobile Collapse Debug] checkMessageForCollapsing called. MaxHeight Setting: ${h}. Content Element found: ${!!c}`);
+    if (!c || h <= 0) {
+      if (c && h <= 0)
+        console.log(`[Mobile Collapse Debug] Collapsing disabled (maxMessageHeight=${h}).`);
       return;
+    }
     requestAnimationFrame(() => {
+      var _a;
+      if (!c)
+        return;
       const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      this.plugin.logger.debug(`[Mobile Collapse Debug] Inside rAF. Msg content: "${(_a = c.textContent) == null ? void 0 : _a.substring(0, 30)}...". Button exists: ${!!b}`);
       b == null ? void 0 : b.remove();
       c.style.maxHeight = "";
       c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       const sh = c.scrollHeight;
+      this.plugin.logger.debug(`[Mobile Collapse Debug] Measured scrollHeight AFTER reset: ${sh}. Comparing with max: ${h}`);
       if (sh > h) {
+        this.plugin.logger.debug(`[Mobile Collapse Debug] Applying collapse. Setting max-height: ${h}px`);
         c.style.maxHeight = `${h}px`;
         c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
         const smb = messageEl.createEl("button", { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: "Show More \u25BC" });
         this.registerDomEvent(smb, "click", () => this.toggleMessageCollapse(c, smb));
+        this.plugin.logger.debug(`[Mobile Collapse Debug] Added 'Show More' button.`);
+      } else {
+        console.log(`[Mobile Collapse Debug] No collapse needed (scrollHeight <= maxMessageHeight).`);
       }
     });
   }
