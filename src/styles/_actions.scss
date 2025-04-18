@@ -85,31 +85,34 @@
       color: rgba(255, 255, 255, 0.85);
     }
   
+
     .translation-content {
-      white-space: pre-wrap; /* Preserve line breaks from translation */
-      line-height: 1.45;
-
-      p {
-
-        margin: 0 !important;    // Прибрати ВСІ margin
-        padding: 0 !important;   // Прибрати ВСІ padding
-        line-height: 1.2 !important; // Спробувати щільніший рядок (опціонально)
-
-        // margin-top: 0;       // Прибрати відступ зверху
-        // margin-bottom: 0.5em; // Залишити невеликий відступ знизу (можна змінити на 0.25em, 4px, тощо)
+      white-space: pre-wrap;
+      line-height: 1.45; // Базова висота рядка
   
-        // Для останнього абзацу прибираємо і нижній відступ
-        &:last-child {
-          margin-bottom: 0;
-        }
+      // Загальний скидання для блоків (якщо воно допомагає для p, h*, тощо)
+      > p,
+      > ul, // Це правило впливає на сам список ul/ol
+      > ol, // Це правило впливає на сам список ul/ol
+      > blockquote,
+      > pre,
+      > h1, > h2, > h3, > h4, > h5, > h6,
+      > div,
+      > hr
+      {
+          margin-top: 0 !important;
+          margin-bottom: 0.5em !important;
+          padding: 0 !important;
       }
-  
-      // Опціонально: Зменшити відступи для інших блокових елементів (якщо потрібно)
-      ul, ol, blockquote, pre {
-          margin-top: 0.5em;
-          margin-bottom: 0.5em;
+      > :last-child {
+          margin-bottom: 0 !important;
+      }
+      // Відновлення відступу для самого списку
+      > ul, > ol {
+          padding-left: 1.5em !important;
+          margin-bottom: 0.5em !important; // Відступ ПІСЛЯ списку
            &:last-child {
-             margin-bottom: 0;
+             margin-bottom: 0 !important;
            }
       }
     }
