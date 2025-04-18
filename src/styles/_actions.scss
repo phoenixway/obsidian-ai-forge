@@ -103,7 +103,7 @@
           margin-top: 0 !important;
           margin-bottom: 0.5em !important;
           padding: 0 !important;
-          line-height: 1 !important;
+          line-height: 0.3 !important; // Висота рядка для загального скидання
       }
       > :last-child {
           margin-bottom: 0 !important;
@@ -112,7 +112,6 @@
       > ul, > ol {
           padding-left: 1.5em !important;
           margin-bottom: 0.5em !important; // Відступ ПІСЛЯ списку
-          line-height: 1 !important;
            &:last-child {
              margin-bottom: 0 !important;
            }
@@ -125,15 +124,15 @@
           // Стилі для самого списку ul/ol (якщо потрібно, вже є вище)
           // margin-top: 0;
           // margin-bottom: 0.5em;
-          line-height: 1 !important;
+  
           // Стилізуємо LI всередині цих списків
           li {
             margin-top: 0.1em !important;    // Дуже малий або нульовий відступ зверху LI
             margin-bottom: 0.1em !important; // Дуже малий або нульовий відступ знизу LI
             padding-top: 0 !important;       // Прибираємо внутрішній відступ зверху LI
             padding-bottom: 0 !important;    // Прибираємо внутрішній відступ знизу LI
-            // line-height: 1.45; // Можна встановити явно, якщо успадкований завеликий
-            line-height: 1 !important;
+            line-height: 1.45; // Можна встановити явно, якщо успадкований завеликий
+  
             // Якщо всередині LI є абзаци, робимо їм менші відступи
             p {
                margin-top: 0 !important;
@@ -147,7 +146,6 @@
             ul, ol {
                 margin-top: 0.25em !important; // Невеликий відступ перед вкладеним списком
                 margin-bottom: 0.25em !important; // Невеликий відступ після вкладеного списку
-                line-height: 1 !important;
             }
           }
       }
