@@ -81,51 +81,66 @@ export default class OllamaPlugin extends Plugin {
   }
 
   async onload() {
+    // Використовуємо console.log тут, бо логер ще не створено
+    console.log("Loading AI Forge Plugin...");
+
     await this.loadSettings();
 
+    // --- Ініціалізація Логера ---
     const isProduction = process.env.NODE_ENV === 'production';
-    const initialConsoleLogLevel = isProduction
-                                   ? (this.settings.consoleLogLevel || 'INFO') // Беремо з налаштувань або INFO
-                                   : 'DEBUG'; // Завжди DEBUG для розробки
-
-    // Передаємо початкові налаштування логеру
+    const initialConsoleLogLevel = isProduction ? (this.settings.consoleLogLevel || 'INFO') : 'DEBUG';
     const loggerSettings: LoggerSettings = {
         consoleLogLevel: initialConsoleLogLevel as keyof typeof LogLevel,
         fileLoggingEnabled: this.settings.fileLoggingEnabled,
         fileLogLevel: this.settings.fileLogLevel,
         logCallerInfo: this.settings.logCallerInfo,
-        // Можна додати logFilePath, logFileMaxSizeMB, якщо вони є в OllamaPluginSettings
+        logFilePath: this.settings.logFilePath, // Передаємо налаштування шляху
+        logFileMaxSizeMB: this.settings.logFileMaxSizeMB // Передаємо налаштування розміру
     };
     this.logger = new Logger(this, loggerSettings);
+    // --- Кінець Ініціалізації Логера ---
 
-    // Ініціалізація сервісів
-    this.ollamaService = new OllamaService(this);
-    this.translationService = new TranslationService(this);
+    // --- Ініціалізація Сервісів (ПРАВИЛЬНИЙ ПОРЯДОК) ---
+    this.logger.info("Initializing services...");
+
+    // 1. PromptService (може бути потрібен іншим)
     this.promptService = new PromptService(this);
+
+    // 2. OllamaService (залежить від promptService через this.plugin)
+    this.ollamaService = new OllamaService(this);
+
+    // 3. TranslationService (ймовірно, залежить від ollamaService або тільки від plugin)
+    this.translationService = new TranslationService(this);
+
+    // 4. RagService (ймовірно, залежить від ollamaService для embeddings)
     this.ragService = new RagService(this);
+
+    // 5. ChatManager (може залежати від інших)
     this.chatManager = new ChatManager(this);
 
+    this.logger.info("Services initialized.");
+    // --- Кінець Ініціалізації Сервісів ---
+
+    // Ініціалізуємо ChatManager ПІСЛЯ створення всіх сервісів, від яких він може залежати
     await this.chatManager.initialize();
 
-    // --- Реєстрація View ---
+    // Реєстрація View
     this.registerView(
       VIEW_TYPE_OLLAMA_PERSONAS,
       (leaf) => {
-        console.log("OllamaPersonasPlugin: Registering view.");
+        this.logger.debug("AI Forge Plugin: Registering view."); // Логер
         this.view = new OllamaView(leaf, this);
         return this.view;
       }
     );
-    // ----------------------
 
-    // Обробник помилок з'єднання
-    this.ollamaService.on('connection-error', (error) => { console.error("[OllamaPlugin] Connection error event:", error); this.emit('ollama-connection-error', error.message); if (!this.view) { new Notice(`Failed to connect to Ollama: ${error.message}`); } });
+    // Обробник помилок з'єднання (можна залишити, він використовує emit)
+    this.ollamaService.on('connection-error', (error) => { this.logger.error("[Plugin] Connection error event received:", error); this.emit('ollama-connection-error', error.message); if (!this.view) { new Notice(`Failed to connect to Ollama: ${error.message}`); } });
 
-    // --- Реєстрація обробників подій плагіна ---
+    // Реєстрація обробників подій плагіна (використовуємо logger)
     this.register(this.on('ollama-connection-error', (message) => { this.view?.addMessageToDisplay?.('error', message, new Date()); }));
     this.register(this.on('active-chat-changed', this.handleActiveChatChangedLocally.bind(this)));
-    this.register(this.on('chat-list-updated', () => { console.log("[OllamaPlugin] Event 'chat-list-updated' received."); }));
-
+    this.register(this.on('chat-list-updated', () => { this.logger.debug("[Plugin] Event 'chat-list-updated' received."); }));
     this.register(this.on('settings-updated', () => {
       this.logger.info("[Plugin] Event 'settings-updated' received."); // Використовуємо логер
       this.logger.updateSettings(this.settings); // Передаємо весь об'єкт налаштувань

@@ -4676,6 +4676,7 @@ var OllamaPlugin = class extends import_obsidian12.Plugin {
     return this.taskFileNeedsUpdate;
   }
   async onload() {
+    console.log("Loading AI Forge Plugin...");
     await this.loadSettings();
     const isProduction = true;
     const initialConsoleLogLevel = isProduction ? this.settings.consoleLogLevel || "INFO" : "DEBUG";
@@ -4683,26 +4684,31 @@ var OllamaPlugin = class extends import_obsidian12.Plugin {
       consoleLogLevel: initialConsoleLogLevel,
       fileLoggingEnabled: this.settings.fileLoggingEnabled,
       fileLogLevel: this.settings.fileLogLevel,
-      logCallerInfo: this.settings.logCallerInfo
-      // Можна додати logFilePath, logFileMaxSizeMB, якщо вони є в OllamaPluginSettings
+      logCallerInfo: this.settings.logCallerInfo,
+      logFilePath: this.settings.logFilePath,
+      // Передаємо налаштування шляху
+      logFileMaxSizeMB: this.settings.logFileMaxSizeMB
+      // Передаємо налаштування розміру
     };
     this.logger = new Logger(this, loggerSettings);
+    this.logger.info("Initializing services...");
+    this.promptService = new PromptService(this);
     this.ollamaService = new OllamaService(this);
     this.translationService = new TranslationService(this);
-    this.promptService = new PromptService(this);
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this);
+    this.logger.info("Services initialized.");
     await this.chatManager.initialize();
     this.registerView(
       VIEW_TYPE_OLLAMA_PERSONAS,
       (leaf) => {
-        console.log("OllamaPersonasPlugin: Registering view.");
+        this.logger.debug("AI Forge Plugin: Registering view.");
         this.view = new OllamaView(leaf, this);
         return this.view;
       }
     );
     this.ollamaService.on("connection-error", (error) => {
-      console.error("[OllamaPlugin] Connection error event:", error);
+      this.logger.error("[Plugin] Connection error event received:", error);
       this.emit("ollama-connection-error", error.message);
       if (!this.view) {
         new import_obsidian12.Notice(`Failed to connect to Ollama: ${error.message}`);
@@ -4714,7 +4720,7 @@ var OllamaPlugin = class extends import_obsidian12.Plugin {
     }));
     this.register(this.on("active-chat-changed", this.handleActiveChatChangedLocally.bind(this)));
     this.register(this.on("chat-list-updated", () => {
-      console.log("[OllamaPlugin] Event 'chat-list-updated' received.");
+      this.logger.debug("[Plugin] Event 'chat-list-updated' received.");
     }));
     this.register(this.on("settings-updated", () => {
       var _a;
