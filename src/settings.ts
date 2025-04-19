@@ -1,6 +1,5 @@
 // src/settings.ts
-import { App, PluginSettingTab, Setting, DropdownComponent, setIcon, TFolder, debounce } from "obsidian";
-import OllamaPlugin from "./main";
+import { App, PluginSettingTab, Setting, DropdownComponent, setIcon, TFolder, debounce, ExtraButtonComponent, SliderComponent } from "obsidian";import OllamaPlugin from "./main";
 import { LogLevel, LoggerSettings } from "./Logger"; // Імпортуємо LogLevel та LoggerSettings
 
 // --- Мови ---
@@ -60,6 +59,12 @@ export interface OllamaPluginSettings extends LoggerSettings { // Розширю
   summarizationChunkSize: number;
   followRole: boolean;
   maxCharsPerDoc: number;
+
+  ragEnableSemanticSearch: boolean; // Увімкнути семантичний пошук? (Може замінити старий)
+  ragEmbeddingModel: string; // Назва embedding моделі в Ollama
+  ragChunkSize: number; // Розмір чанків (у символах)
+  ragSimilarityThreshold: number; // Поріг подібності (0-1)
+  ragTopK: number; // Кількість релевантних чанків для контексту
 }
 
 // --- Значення за замовчуванням ---
@@ -104,6 +109,12 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   // logFilePath: undefined, // Шлях за замовчуванням буде в папці плагіна
   // logFileMaxSizeMB: 5, // Макс. розмір за замовчуванням
   maxCharsPerDoc: 1500,
+
+  ragEnableSemanticSearch: true,    // Вмикаємо за замовчуванням, якщо RAG взагалі увімкнено
+  ragEmbeddingModel: "nomic-embed-text", // Рекомендована модель
+  ragChunkSize: 512,               // Популярний розмір чанку
+  ragSimilarityThreshold: 0.5,     // Середній поріг подібності
+  ragTopK: 3,                       // Брати топ-3 результати
 };
 
 // --- Тип аватара ---
@@ -269,35 +280,183 @@ export class OllamaSettingTab extends PluginSettingTab {
           this.debouncedUpdateChatPath();
           // ---------------------------
         }));
+        containerEl.createEl('h3', { text: 'Retrieval-Augmented Generation (RAG)' });
+        new Setting(containerEl)
+            .setName('Enable RAG')
+            .setDesc('Allow the chat to retrieve information from your notes for context.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.ragEnabled)
+                .onChange(async (value) => {
+                    this.plugin.settings.ragEnabled = value;
+                    await this.plugin.saveSettings();
+                    this.display(); // Re-render to show/hide RAG options
+                    if (value) this.debouncedUpdateRagPath(); // Trigger index if enabled
+                }));
 
-    containerEl.createEl('h3', { text: 'Retrieval-Augmented Generation (RAG)' });
-    new Setting(containerEl)
-      .setName('Enable RAG')
-      .setDesc('Allow the chat to retrieve information from your notes for context (requires indexing).')
-      .addToggle(toggle => toggle
-        .setValue(this.plugin.settings.ragEnabled)
-        .onChange(async (value) => {
-          this.plugin.settings.ragEnabled = value;
-          await this.plugin.saveSettings();
-          this.display();
-          // Запускаємо індексацію при увімкненні (з затримкою)
-          if (value) this.debouncedUpdateRagPath();
-        }));
-    if (this.plugin.settings.ragEnabled) {
-      new Setting(containerEl)
-        .setName('RAG Documents Folder Path')
-        .setDesc('Folder within your vault containing notes to use for RAG context.')
-        .addText(text => text
-          .setPlaceholder('Example: Knowledge Base/RAG Docs')
-          .setValue(this.plugin.settings.ragFolderPath)
-          .onChange(async (value) => {
-            this.plugin.settings.ragFolderPath = value.trim();
-            await this.plugin.saveSettings(); // Зберігаємо саме налаштування одразу
-            this.debouncedUpdateRagPath();
-            this.plugin.updateDailyTaskFilePath?.();
-            this.plugin.loadAndProcessInitialTasks?.();
-          }));
-    }
+        // Show RAG options only if RAG is enabled
+        if (this.plugin.settings.ragEnabled) {
+            new Setting(containerEl)
+                .setName('RAG Documents Folder Path')
+                .setDesc('Folder containing notes for RAG context.')
+                .addText(text => text
+                    .setPlaceholder('Example: Knowledge Base/RAG Docs')
+                    .setValue(this.plugin.settings.ragFolderPath)
+                    .onChange(async (value) => {
+                        this.plugin.settings.ragFolderPath = value.trim();
+                        await this.plugin.saveSettings();
+                        this.debouncedUpdateRagPath(); // Re-index on path change
+                        // Також оновлюємо шлях для завдань, якщо він залежить від RAG папки
+                        this.plugin.updateDailyTaskFilePath?.();
+                        this.plugin.loadAndProcessInitialTasks?.();
+                    }));
+
+            // --- ДОДАНО: Налаштування Семантичного Пошуку ---
+            new Setting(containerEl)
+                .setName('Enable Semantic Search')
+                .setDesc('Use embedding models for context retrieval (more accurate, requires indexing). If disabled, might fall back to basic keyword search (if implemented).')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.ragEnableSemanticSearch)
+                    .onChange(async (value) => {
+                        this.plugin.settings.ragEnableSemanticSearch = value;
+                        await this.plugin.saveSettings();
+                        this.display(); // Re-render to show/hide dependent settings
+                        // Re-index might be good idea when switching search type?
+                        this.debouncedUpdateRagPath();
+                    }));
+
+            // Show semantic search options only if enabled
+            if (this.plugin.settings.ragEnableSemanticSearch) {
+
+                // -- Embedding Model Selector --
+                 const embeddingModelSetting = new Setting(containerEl)
+                    .setName("Embedding Model Name")
+                    .setDesc("Ollama model for generating text embeddings (e.g., nomic-embed-text, all-minilm). Ensure the model is pulled.")
+                    .setClass('ollama-model-setting-container'); // Reuse class for layout
+
+                let embeddingDropdown: DropdownComponent | null = null;
+
+                const updateEmbeddingOptions = async (dropdown: DropdownComponent | null) => {
+                    if (!dropdown) return;
+                    const previousValue = dropdown.getValue();
+                    dropdown.selectEl.innerHTML = '';
+                    dropdown.addOption('', 'Loading models...');
+                    dropdown.setDisabled(true);
+                    try {
+                        // Using getModels - user needs to know which are embedding models
+                        const models = await this.plugin.ollamaService.getModels();
+                        dropdown.selectEl.innerHTML = '';
+                        dropdown.addOption('', '-- Select Embedding Model --'); // Default empty option
+
+                        // Add some common known embedding models first for convenience
+                        const commonEmbedModels = ["nomic-embed-text", "all-minilm", "mxbai-embed-large", "bge-base-en", "gte-base"];
+                        commonEmbedModels.forEach(modelName => {
+                            // Add only if maybe present or just add them directly? Add directly.
+                             dropdown.addOption(modelName, modelName);
+                        });
+                         dropdown.addOption('---', '--- Other Installed Models ---').setDisabled(true);
+
+                        // Add all other models found
+                        if (models && models.length > 0) {
+                            models.forEach(modelName => {
+                                if (!commonEmbedModels.includes(modelName)) { // Avoid duplicates
+                                    dropdown.addOption(modelName, modelName);
+                                }
+                            });
+                        } else {
+                            // Keep common ones even if no models found from server? Or show error?
+                            // dropdown.addOption('', 'No models found from server');
+                        }
+                        // Try to set the saved value, otherwise default to empty/first option
+                        dropdown.setValue(this.plugin.settings.ragEmbeddingModel || commonEmbedModels[0]); // Default to nomic if setting is empty?
+                        dropdown.setDisabled(false);
+                    } catch (error) {
+                        console.error("Error fetching models for embedding dropdown:", error);
+                        dropdown.selectEl.innerHTML = '';
+                        dropdown.addOption('', 'Error loading models!');
+                        dropdown.setValue(this.plugin.settings.ragEmbeddingModel);
+                        dropdown.setDisabled(true);
+                    }
+                };
+
+                embeddingModelSetting.addDropdown(async (dropdown) => {
+                    embeddingDropdown = dropdown;
+                    dropdown.onChange(async (value) => {
+                        this.plugin.settings.ragEmbeddingModel = value;
+                        await this.plugin.saveSettings();
+                        // Re-index needed when embedding model changes
+                        this.debouncedUpdateRagPath();
+                    });
+                    await updateEmbeddingOptions(dropdown);
+                });
+
+                embeddingModelSetting.controlEl.addClass('ollama-model-setting-control');
+                const refreshEmbeddingButton = embeddingModelSetting.controlEl.createEl('button', {
+                    cls: 'ollama-refresh-button', attr: { 'aria-label': 'Refresh model list' } });
+                setIcon(refreshEmbeddingButton, 'refresh-cw');
+                refreshEmbeddingButton.addEventListener('click', async (e: MouseEvent) => {
+                    e.preventDefault(); if (!embeddingDropdown) return;
+                    setIcon(refreshEmbeddingButton, 'loader'); refreshEmbeddingButton.disabled = true;
+                    await updateEmbeddingOptions(embeddingDropdown);
+                    setIcon(refreshEmbeddingButton, 'refresh-cw'); refreshEmbeddingButton.disabled = false;
+                });
+                // -- End Embedding Model Selector --
+
+                new Setting(containerEl)
+                    .setName('Chunk Size (Characters)')
+                    .setDesc('Size of text chunks for indexing. Smaller chunks = more specific context, larger = broader context.')
+                    .addText(text => text
+                        .setPlaceholder(String(DEFAULT_SETTINGS.ragChunkSize))
+                        .setValue(String(this.plugin.settings.ragChunkSize))
+                        .onChange(async (value) => {
+                            const num = parseInt(value.trim(), 10);
+                            this.plugin.settings.ragChunkSize = (!isNaN(num) && num > 50) ? num : DEFAULT_SETTINGS.ragChunkSize; // Min size 50
+                            await this.plugin.saveSettings();
+                            // Re-index needed on chunk size change
+                             this.debouncedUpdateRagPath();
+                        }));
+
+                        new Setting(containerEl)
+                        .setName('Similarity Threshold')
+                        .setDesc('Minimum relevance score (0.0 to 1.0) for a chunk to be included in context. Higher = more strict.')
+                        .addSlider((slider: SliderComponent) => slider // Added type SliderComponent
+                            .setLimits(0, 1, 0.05) // Range 0 to 1, step 0.05
+                            .setValue(this.plugin.settings.ragSimilarityThreshold)
+                            .setDynamicTooltip() // Use built-in dynamic tooltip to show value
+                            .onChange(async (value) => {
+                                this.plugin.settings.ragSimilarityThreshold = value;
+                                await this.plugin.saveSettings();
+                                // No need to update extra button text anymore
+                            }));
+                      
+                }
+
+                new Setting(containerEl)
+                    .setName('Top K Results')
+                    .setDesc('Maximum number of relevant document chunks to include in the context.')
+                    .addText(text => text
+                        .setPlaceholder(String(DEFAULT_SETTINGS.ragTopK))
+                        .setValue(String(this.plugin.settings.ragTopK))
+                        .onChange(async (value) => {
+                            const num = parseInt(value.trim(), 10);
+                            this.plugin.settings.ragTopK = (!isNaN(num) && num > 0) ? num : DEFAULT_SETTINGS.ragTopK; // Min 1 result
+                            await this.plugin.saveSettings();
+                            // No re-index needed, affects retrieval
+                        }));
+
+            } // End if ragEnableSemanticSearch
+
+             // --- Додаємо старе налаштування maxCharsPerDoc (можливо, воно більше не потрібне при чанкінгу?) ---
+             new Setting(containerEl)
+                .setName('Max Characters Per Document (Fallback/Display?)')
+                .setDesc('Maximum characters to display or process from a single RAG document chunk if needed (Legacy?). Set 0 for no limit.')
+                .addText(text => text
+                    .setPlaceholder(String(DEFAULT_SETTINGS.maxCharsPerDoc))
+                    .setValue(String(this.plugin.settings.maxCharsPerDoc))
+                    .onChange(async (value) => {
+                        const num = parseInt(value.trim(), 10);
+                        this.plugin.settings.maxCharsPerDoc = (!isNaN(num) && num >= 0) ? num : DEFAULT_SETTINGS.maxCharsPerDoc;
+                        await this.plugin.saveSettings();
+                    }));
 
     containerEl.createEl('h3', { text: 'Productivity Assistant Features' });
 

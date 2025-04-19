@@ -2483,7 +2483,17 @@ var DEFAULT_SETTINGS = {
   // НЕ записувати ім'я викликаючого методу за замовчуванням (для продуктивності)
   // logFilePath: undefined, // Шлях за замовчуванням буде в папці плагіна
   // logFileMaxSizeMB: 5, // Макс. розмір за замовчуванням
-  maxCharsPerDoc: 1500
+  maxCharsPerDoc: 1500,
+  ragEnableSemanticSearch: true,
+  // Вмикаємо за замовчуванням, якщо RAG взагалі увімкнено
+  ragEmbeddingModel: "nomic-embed-text",
+  // Рекомендована модель
+  ragChunkSize: 512,
+  // Популярний розмір чанку
+  ragSimilarityThreshold: 0.5,
+  // Середній поріг подібності
+  ragTopK: 3
+  // Брати топ-3 результати
 };
 var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
@@ -2605,7 +2615,7 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
       this.debouncedUpdateChatPath();
     }));
     containerEl.createEl("h3", { text: "Retrieval-Augmented Generation (RAG)" });
-    new import_obsidian4.Setting(containerEl).setName("Enable RAG").setDesc("Allow the chat to retrieve information from your notes for context (requires indexing).").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Enable RAG").setDesc("Allow the chat to retrieve information from your notes for context.").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
       this.plugin.settings.ragEnabled = value;
       await this.plugin.saveSettings();
       this.display();
@@ -2613,7 +2623,7 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
         this.debouncedUpdateRagPath();
     }));
     if (this.plugin.settings.ragEnabled) {
-      new import_obsidian4.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder within your vault containing notes to use for RAG context.").addText((text) => text.setPlaceholder("Example: Knowledge Base/RAG Docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
+      new import_obsidian4.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder containing notes for RAG context.").addText((text) => text.setPlaceholder("Example: Knowledge Base/RAG Docs").setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
         var _a, _b, _c, _d;
         this.plugin.settings.ragFolderPath = value.trim();
         await this.plugin.saveSettings();
@@ -2621,7 +2631,96 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
         (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
         (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
       }));
+      new import_obsidian4.Setting(containerEl).setName("Enable Semantic Search").setDesc("Use embedding models for context retrieval (more accurate, requires indexing). If disabled, might fall back to basic keyword search (if implemented).").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnableSemanticSearch).onChange(async (value) => {
+        this.plugin.settings.ragEnableSemanticSearch = value;
+        await this.plugin.saveSettings();
+        this.display();
+        this.debouncedUpdateRagPath();
+      }));
+      if (this.plugin.settings.ragEnableSemanticSearch) {
+        const embeddingModelSetting = new import_obsidian4.Setting(containerEl).setName("Embedding Model Name").setDesc("Ollama model for generating text embeddings (e.g., nomic-embed-text, all-minilm). Ensure the model is pulled.").setClass("ollama-model-setting-container");
+        let embeddingDropdown = null;
+        const updateEmbeddingOptions = async (dropdown) => {
+          if (!dropdown)
+            return;
+          const previousValue = dropdown.getValue();
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "Loading models...");
+          dropdown.setDisabled(true);
+          try {
+            const models = await this.plugin.ollamaService.getModels();
+            dropdown.selectEl.innerHTML = "";
+            dropdown.addOption("", "-- Select Embedding Model --");
+            const commonEmbedModels = ["nomic-embed-text", "all-minilm", "mxbai-embed-large", "bge-base-en", "gte-base"];
+            commonEmbedModels.forEach((modelName) => {
+              dropdown.addOption(modelName, modelName);
+            });
+            dropdown.addOption("---", "--- Other Installed Models ---").setDisabled(true);
+            if (models && models.length > 0) {
+              models.forEach((modelName) => {
+                if (!commonEmbedModels.includes(modelName)) {
+                  dropdown.addOption(modelName, modelName);
+                }
+              });
+            } else {
+            }
+            dropdown.setValue(this.plugin.settings.ragEmbeddingModel || commonEmbedModels[0]);
+            dropdown.setDisabled(false);
+          } catch (error) {
+            console.error("Error fetching models for embedding dropdown:", error);
+            dropdown.selectEl.innerHTML = "";
+            dropdown.addOption("", "Error loading models!");
+            dropdown.setValue(this.plugin.settings.ragEmbeddingModel);
+            dropdown.setDisabled(true);
+          }
+        };
+        embeddingModelSetting.addDropdown(async (dropdown) => {
+          embeddingDropdown = dropdown;
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.ragEmbeddingModel = value;
+            await this.plugin.saveSettings();
+            this.debouncedUpdateRagPath();
+          });
+          await updateEmbeddingOptions(dropdown);
+        });
+        embeddingModelSetting.controlEl.addClass("ollama-model-setting-control");
+        const refreshEmbeddingButton = embeddingModelSetting.controlEl.createEl("button", {
+          cls: "ollama-refresh-button",
+          attr: { "aria-label": "Refresh model list" }
+        });
+        (0, import_obsidian4.setIcon)(refreshEmbeddingButton, "refresh-cw");
+        refreshEmbeddingButton.addEventListener("click", async (e) => {
+          e.preventDefault();
+          if (!embeddingDropdown)
+            return;
+          (0, import_obsidian4.setIcon)(refreshEmbeddingButton, "loader");
+          refreshEmbeddingButton.disabled = true;
+          await updateEmbeddingOptions(embeddingDropdown);
+          (0, import_obsidian4.setIcon)(refreshEmbeddingButton, "refresh-cw");
+          refreshEmbeddingButton.disabled = false;
+        });
+        new import_obsidian4.Setting(containerEl).setName("Chunk Size (Characters)").setDesc("Size of text chunks for indexing. Smaller chunks = more specific context, larger = broader context.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragChunkSize)).setValue(String(this.plugin.settings.ragChunkSize)).onChange(async (value) => {
+          const num = parseInt(value.trim(), 10);
+          this.plugin.settings.ragChunkSize = !isNaN(num) && num > 50 ? num : DEFAULT_SETTINGS.ragChunkSize;
+          await this.plugin.saveSettings();
+          this.debouncedUpdateRagPath();
+        }));
+        new import_obsidian4.Setting(containerEl).setName("Similarity Threshold").setDesc("Minimum relevance score (0.0 to 1.0) for a chunk to be included in context. Higher = more strict.").addSlider((slider) => slider.setLimits(0, 1, 0.05).setValue(this.plugin.settings.ragSimilarityThreshold).setDynamicTooltip().onChange(async (value) => {
+          this.plugin.settings.ragSimilarityThreshold = value;
+          await this.plugin.saveSettings();
+        }));
+      }
+      new import_obsidian4.Setting(containerEl).setName("Top K Results").setDesc("Maximum number of relevant document chunks to include in the context.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragTopK)).setValue(String(this.plugin.settings.ragTopK)).onChange(async (value) => {
+        const num = parseInt(value.trim(), 10);
+        this.plugin.settings.ragTopK = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.ragTopK;
+        await this.plugin.saveSettings();
+      }));
     }
+    new import_obsidian4.Setting(containerEl).setName("Max Characters Per Document (Fallback/Display?)").setDesc("Maximum characters to display or process from a single RAG document chunk if needed (Legacy?). Set 0 for no limit.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.maxCharsPerDoc)).setValue(String(this.plugin.settings.maxCharsPerDoc)).onChange(async (value) => {
+      const num = parseInt(value.trim(), 10);
+      this.plugin.settings.maxCharsPerDoc = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.maxCharsPerDoc;
+      await this.plugin.saveSettings();
+    }));
     containerEl.createEl("h3", { text: "Productivity Assistant Features" });
     new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate features like daily task integration and advanced context management for planning-oriented personas.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
       this.plugin.settings.enableProductivityFeatures = value;
