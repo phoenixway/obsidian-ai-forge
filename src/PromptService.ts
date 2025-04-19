@@ -44,7 +44,7 @@ export class PromptService {
     }
 
 
-   private _countTokens(text: string): number {
+    private _countTokens(text: string): number {
         if (!text) return 0;
         // Груба оцінка: ~4 символи на токен для англійської, може відрізнятися для української
         // Можливо, знадобиться точніший підрахунок залежно від моделі
@@ -62,9 +62,34 @@ export class PromptService {
      */
     async getSystemPromptForAPI(chatMetadata: ChatMetadata): Promise<string | null> {
         const settings = this.plugin.settings;
-        const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
-        const roleDefinition = await this.getRoleDefinition(selectedRolePath); // Завантажуємо визначення ролі
 
+        // --- ДОДАЄМО ЛОГИ ДЛЯ ДІАГНОСТИКИ ---
+        this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Received chatMetadata.selectedRolePath = '${chatMetadata.selectedRolePath}'`);
+        this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Current settings.selectedRolePath = '${settings.selectedRolePath}'`);
+        // --- КІНЕЦЬ ЛОГІВ ---
+
+
+        // Визначаємо шлях: пріоритет у метаданих чату
+        const selectedRolePath = chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
+            ? chatMetadata.selectedRolePath // Беремо з чату (може бути "")
+            : settings.selectedRolePath;    // Або беремо з налаштувань (може бути "")
+
+        // --- ЛОГ ВИЗНАЧЕНОГО ШЛЯХУ ---
+        this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Determined selectedRolePath = '${selectedRolePath}' before calling getRoleDefinition.`);
+        // --- КІНЕЦЬ ЛОГУ ---
+
+
+        // Перевіряємо, чи взагалі потрібно завантажувати роль
+        let roleDefinition: RoleDefinition | null = null;
+        if (selectedRolePath && settings.followRole) { // Порожній рядок "" дасть false тут
+            this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Attempting to load role definition for path: '${selectedRolePath}'`);
+            roleDefinition = await this.getRoleDefinition(selectedRolePath);
+        } else {
+            this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: No role path ('${selectedRolePath}') or followRole is false ('${settings.followRole}'). Skipping role load.`);
+        }
+
+
+        // --- Базовий системний промпт з ролі (або null) ---
         // --- Базовий системний промпт з ролі (або null) ---
         let roleSystemPrompt = roleDefinition?.systemPrompt || null;
         // --------------------------------------------------
@@ -85,7 +110,7 @@ export class PromptService {
 
         // Додаємо інструкції RAG, якщо RAG увімкнено
         if (settings.ragEnabled && this.plugin.ragService) { // Перевіряємо і наявність сервісу
-             finalSystemPrompt += ragInstructions + "\n\n";
+            finalSystemPrompt += ragInstructions + "\n\n";
         }
 
         // Додаємо системний промпт ролі (якщо він є)
@@ -208,17 +233,17 @@ export class PromptService {
         if (isProductivityActive && this.plugin.chatManager) { // Додано перевірку наявності chatManager
             // ... (логіка отримання taskContext залишається без змін, але переконайтесь, що this.plugin.chatManager існує) ...
             if (this.plugin.chatManager?.filePlanExists) {
-                 const needsUpdateBefore = this.plugin.isTaskFileUpdated?.(); // Використовуємо ?. для безпеки
-                 await this.plugin.checkAndProcessTaskUpdate?.();
-                 const tasksWereUpdated = needsUpdateBefore && !this.plugin.isTaskFileUpdated?.();
+                const needsUpdateBefore = this.plugin.isTaskFileUpdated?.(); // Використовуємо ?. для безпеки
+                await this.plugin.checkAndProcessTaskUpdate?.();
+                const tasksWereUpdated = needsUpdateBefore && !this.plugin.isTaskFileUpdated?.();
 
-                 taskContext = tasksWereUpdated
+                taskContext = tasksWereUpdated
                     ? "\n--- Updated Tasks Context ---\n"
                     : "\n--- Today's Tasks Context ---\n";
-                 taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(', ') : "None"}\n`;
-                 taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(', ') : "None"}\n`;
-                 taskContext += "--- End Tasks Context ---";
-                 console.log(`[PromptService] Injecting task context (Updated: ${tasksWereUpdated}).`);
+                taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(', ') : "None"}\n`;
+                taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(', ') : "None"}\n`;
+                taskContext += "--- End Tasks Context ---";
+                console.log(`[PromptService] Injecting task context (Updated: ${tasksWereUpdated}).`);
             }
         }
         // -----------------------------------------
@@ -257,7 +282,7 @@ export class PromptService {
                     ragContext = "\n[Error retrieving RAG context]\n"; // Повідомляємо про помилку
                 }
             } else {
-                 console.log("[PromptService] RAG enabled, but no last user message found to generate context.");
+                console.log("[PromptService] RAG enabled, but no last user message found to generate context.");
             }
         }
         // --------------------------------
@@ -366,7 +391,7 @@ export class PromptService {
                     processedParts.unshift(olderHistoryString); // Додаємо на початок
                     currentTokens += this._countTokens(olderHistoryString);
                 } else {
-                     console.log("[PromptService] Not enough space for older messages without summarization.");
+                    console.log("[PromptService] Not enough space for older messages without summarization.");
                 }
             }
         }

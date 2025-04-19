@@ -517,7 +517,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.handleCloneChatClick = async () => {
       var _a;
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: Clone Chat");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (!activeChat) {
         new import_obsidian3.Notice("No active chat to clone.");
@@ -541,7 +540,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.handleClearChatClick = async () => {
       var _a;
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: Clear Chat");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (activeChat) {
         const chatName = activeChat.metadata.name;
@@ -556,7 +554,6 @@ This action cannot be undone.`, () => {
     this.handleDeleteChatClick = async () => {
       var _a;
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: Delete Chat");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (activeChat) {
         const chatName = activeChat.metadata.name;
@@ -576,7 +573,6 @@ This action cannot be undone.`, async () => {
     this.handleExportChatClick = async () => {
       var _a, _b;
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: Export Chat");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (!activeChat || activeChat.messages.length === 0) {
         new import_obsidian3.Notice("Chat empty, nothing to export.");
@@ -626,7 +622,6 @@ This action cannot be undone.`, async () => {
     this.handleSettingsClick = async () => {
       var _a, _b, _c, _d;
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: Settings");
       (_b = (_a = this.app.setting) == null ? void 0 : _a.open) == null ? void 0 : _b.call(_a);
       (_d = (_c = this.app.setting) == null ? void 0 : _c.openTabById) == null ? void 0 : _d.call(_c, this.plugin.manifest.id);
     };
@@ -1216,7 +1211,6 @@ This action cannot be undone.`, async () => {
     }
   }
   setLoadingState(isLoading) {
-    console.log(`[OllamaView Debug] setLoadingState CALLED with: ${isLoading}`);
     this.isProcessing = isLoading;
     if (this.inputEl)
       this.inputEl.disabled = isLoading;
@@ -1237,7 +1231,6 @@ This action cannot be undone.`, async () => {
   }
   async loadAndDisplayActiveChat() {
     var _a;
-    console.log("[OllamaView] Loading and displaying active chat...");
     this.clearChatContainerInternal();
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
@@ -3178,8 +3171,17 @@ var PromptService = class {
    */
   async getSystemPromptForAPI(chatMetadata) {
     const settings = this.plugin.settings;
-    const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
-    const roleDefinition = await this.getRoleDefinition(selectedRolePath);
+    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Received chatMetadata.selectedRolePath = '${chatMetadata.selectedRolePath}'`);
+    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Current settings.selectedRolePath = '${settings.selectedRolePath}'`);
+    const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
+    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Determined selectedRolePath = '${selectedRolePath}' before calling getRoleDefinition.`);
+    let roleDefinition = null;
+    if (selectedRolePath && settings.followRole) {
+      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Attempting to load role definition for path: '${selectedRolePath}'`);
+      roleDefinition = await this.getRoleDefinition(selectedRolePath);
+    } else {
+      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: No role path ('${selectedRolePath}') or followRole is false ('${settings.followRole}'). Skipping role load.`);
+    }
     let roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
     const ragInstructions = `
 --- RAG Data Interpretation Rules ---
