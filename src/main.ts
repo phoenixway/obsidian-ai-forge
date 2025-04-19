@@ -81,8 +81,6 @@ export default class OllamaPlugin extends Plugin {
   }
 
   async onload() {
-    console.log("Loading Ollama Personas Plugin..."); // Оновлено назву
-
     await this.loadSettings();
 
     const isProduction = process.env.NODE_ENV === 'production';
@@ -325,12 +323,7 @@ export default class OllamaPlugin extends Plugin {
 
 
   async onunload() {
-    console.log("Unloading Ollama Personas Plugin...");
-
-    // --- ВИПРАВЛЕНО: Використання нового ID ---
     this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS).forEach(l => l.detach());
-    // ------------------------------------
-
     if (this.indexUpdateTimeout) clearTimeout(this.indexUpdateTimeout);
     if (this.roleCacheClearTimeout) clearTimeout(this.roleCacheClearTimeout);
 

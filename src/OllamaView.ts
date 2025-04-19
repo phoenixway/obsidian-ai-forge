@@ -1497,40 +1497,25 @@ export class OllamaView extends ItemView {
   private checkMessageForCollapsing(messageEl: HTMLElement): void {
     const c = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
     const h = this.plugin.settings.maxMessageHeight;
-    // --- ЛОГ 1: Перевірка на вході ---
-    console.log(`[Mobile Collapse Debug] checkMessageForCollapsing called. MaxHeight Setting: ${h}. Content Element found: ${!!c}`);
     if (!c || h <= 0) {
-         if(c && h <=0) console.log(`[Mobile Collapse Debug] Collapsing disabled (maxMessageHeight=${h}).`);
+         if(c && h <=0) {
+         }
          return;
     }
 
     requestAnimationFrame(() => { // Вимірювання в наступному кадрі
          if (!c) return; // Повторна перевірка елемента
          const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-         // --- ЛОГ 2: Перед вимірюванням ---
-         this.plugin.logger.debug(`[Mobile Collapse Debug] Inside rAF. Msg content: "${c.textContent?.substring(0,30)}...". Button exists: ${!!b}`);
-
          b?.remove(); // Видаляємо стару кнопку, якщо є
          c.style.maxHeight = ''; // Скидаємо max-height для вимірювання
          c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-         // Можна спробувати додати примусовий перерахунок макету (не завжди працює)
-         // const _unused = c.offsetHeight;
-
          const sh = c.scrollHeight; // Вимірюємо реальну висоту вмісту
-         // --- ЛОГ 3: Результат вимірювання ---
-         this.plugin.logger.debug(`[Mobile Collapse Debug] Measured scrollHeight AFTER reset: ${sh}. Comparing with max: ${h}`);
-
          if (sh > h) {
-             // --- ЛОГ 4: Застосування згортання ---
-             this.plugin.logger.debug(`[Mobile Collapse Debug] Applying collapse. Setting max-height: ${h}px`);
              c.style.maxHeight = `${h}px`;
              c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
              const smb = messageEl.createEl('button', { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: 'Show More ▼' });
              this.registerDomEvent(smb, 'click', () => this.toggleMessageCollapse(c, smb));
-             this.plugin.logger.debug(`[Mobile Collapse Debug] Added 'Show More' button.`);
          } else {
-              // --- ЛОГ 5: Згортання не потрібне ---
-              console.log(`[Mobile Collapse Debug] No collapse needed (scrollHeight <= maxMessageHeight).`);
          }
     });
 }
