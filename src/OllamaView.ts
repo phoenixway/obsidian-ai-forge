@@ -332,11 +332,11 @@ export class OllamaView extends ItemView {
   private attachEventListeners(): void {
     console.log("[OllamaView Debug] Attaching event listeners START");
     // Перевірки існування елементів
-    if (!this.inputEl) console.error("inputEl missing!"); else console.log("[OllamaView Debug] inputEl FOUND");
-    if (!this.sendButton) console.error("sendButton missing!"); else console.log("[OllamaView Debug] sendButton FOUND");
-    if (!this.menuButton) console.error("menuButton missing!"); else console.log("[OllamaView Debug] menuButton FOUND");
-    if (!this.modelDisplayEl) console.error("modelDisplayEl missing!"); else console.log("[OllamaView Debug] modelDisplayEl FOUND");
-    if (!this.translateInputButton) console.error("translateInputButton missing!"); else console.log("[OllamaView Debug] translateInputButton FOUND");
+    if (!this.inputEl) console.error("inputEl missing!"); 
+    if (!this.sendButton) console.error("sendButton missing!"); 
+    if (!this.menuButton) console.error("menuButton missing!"); 
+    if (!this.modelDisplayEl) console.error("modelDisplayEl missing!"); 
+    if (!this.translateInputButton) console.error("translateInputButton missing!"); 
 
     // Слухачі поля вводу
     if (this.inputEl) {
@@ -353,7 +353,6 @@ export class OllamaView extends ItemView {
     console.log(`OllamaView.ts ->  ROLEDISPLAY: ` + this.roleDisplayEl);
     if (this.roleDisplayEl) {
       this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
-      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
     } else {
       console.error("roleDisplayEl missing!");
     }
@@ -403,39 +402,18 @@ export class OllamaView extends ItemView {
 
     this.register(this.plugin.on('settings-updated', this.handleSettingsUpdated));
 
-    console.log("[OllamaView Debug] Attaching event listeners END");
   }
 
-  // OllamaView.ts -> handleModelDisplayClick
-
-
   private handleSettingsUpdated = async (): Promise<void> => {
-    console.log("[AI Forge View] handleSettingsUpdated: TRIGGERED!"); // Припустимо, це з'являється
-
-    console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
-    // ЛОГ А: Яке значення налаштування бачить обробник?
-    console.log("[AI Forge View] Current plugin.settings.modelName in handler:", this.plugin.settings.modelName);
-
     const activeChat = await this.plugin.chatManager?.getActiveChat();
-    console.log("[AI Forge View] Active chat in handler:", activeChat?.metadata?.id, "Chat model:", activeChat?.metadata?.modelName);
-
-    // --- Ось КЛЮЧОВИЙ РЯДОК ---
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-    // --------------------------
-
-    // ЛОГ Б: Яке значення було вибрано для оновлення?
-    console.log(`[AI Forge View] Determined modelName for display: ${currentModelName}`);
-
     const currentRoleName = await this.getCurrentRoleDisplayName();
-
-    // ЛОГ В (ваш лог): Яке значення ПЕРЕДАЄТЬСЯ в updateModelDisplay?
     this.updateModelDisplay(currentModelName);
     this.updateRoleDisplay(currentRoleName);
     this.updateInputPlaceholder(currentRoleName);
   }
 
   private handleModelDisplayClick = async (event: MouseEvent) => {
-    console.log("[OllamaView Debug] Model display clicked, creating native menu.");
     const menu = new Menu();
     let itemsAdded = false; // <-- Прапорець: чи додали ми щось до меню?
 
@@ -495,8 +473,6 @@ export class OllamaView extends ItemView {
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
-      // ЛОГ Г (ваш лог): Яке значення ОТРИМАНО функцією?
-      console.log(`OllamaView.ts ->       : updateModelDisplay: ${modelName}`); // Ви кажете, тут стара назва
       const displayName = modelName || "Default";
       const shortName = displayName.replace(/:latest$/, '');
       this.modelDisplayEl.setText(shortName);
@@ -508,20 +484,15 @@ export class OllamaView extends ItemView {
 
   // Input & Sending
   private handleKeyDown = (e: KeyboardEvent): void => {
-    console.log(`[OllamaView Debug] handleKeyDown FIRED: Key=<span class="math-inline">\{e\.key\}, Shift\=</span>{e.shiftKey}, isProcessing=<span class="math-inline">\{this\.isProcessing\}, sendButtonDisabled\=</span>{this.sendButton?.disabled}`);
     if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !this.sendButton?.disabled) {
-      console.log("[OllamaView Debug] Enter condition met - sending.");
       e.preventDefault();
       this.sendMessage();
     }
   }
   private handleSendClick = (): void => {
-    console.log(`[OllamaView Debug] handleSendClick FIRED: isProcessing=<span class="math-inline">\{this\.isProcessing\}, sendButtonDisabled\=</span>{this.sendButton?.disabled}`);
     if (!this.isProcessing && !this.sendButton?.disabled) {
-      console.log("[OllamaView Debug] Send button clicked - sending message.");
       this.sendMessage();
     } else {
-      console.log("[OllamaView Debug] Send button clicked, but ignored (processing or disabled).");
     }
   }
   private handleInputForResize = (): void => {

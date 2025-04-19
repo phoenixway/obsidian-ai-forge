@@ -333,16 +333,10 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    // OllamaView.ts -> handleModelDisplayClick
     this.handleSettingsUpdated = async () => {
-      var _a, _b, _c, _d;
-      console.log("[AI Forge View] handleSettingsUpdated: TRIGGERED!");
-      console.log("[AI Forge View] Settings updated event received. Refreshing relevant UI parts.");
-      console.log("[AI Forge View] Current plugin.settings.modelName in handler:", this.plugin.settings.modelName);
+      var _a, _b;
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-      console.log("[AI Forge View] Active chat in handler:", (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.id, "Chat model:", (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.modelName);
-      const currentModelName = ((_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.modelName) || this.plugin.settings.modelName;
-      console.log(`[AI Forge View] Determined modelName for display: ${currentModelName}`);
+      const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRoleName = await this.getCurrentRoleDisplayName();
       this.updateModelDisplay(currentModelName);
       this.updateRoleDisplay(currentRoleName);
@@ -350,7 +344,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
     };
     this.handleModelDisplayClick = async (event) => {
       var _a, _b;
-      console.log("[OllamaView Debug] Model display clicked, creating native menu.");
       const menu = new import_obsidian3.Menu();
       let itemsAdded = false;
       const loadingNotice = new import_obsidian3.Notice("Loading models...", 0);
@@ -399,21 +392,16 @@ var OllamaView = class extends import_obsidian3.ItemView {
     // Input & Sending
     this.handleKeyDown = (e) => {
       var _a;
-      console.log(`[OllamaView Debug] handleKeyDown FIRED: Key=<span class="math-inline">{e.key}, Shift=</span>{e.shiftKey}, isProcessing=<span class="math-inline">{this.isProcessing}, sendButtonDisabled=</span>{this.sendButton?.disabled}`);
       if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !((_a = this.sendButton) == null ? void 0 : _a.disabled)) {
-        console.log("[OllamaView Debug] Enter condition met - sending.");
         e.preventDefault();
         this.sendMessage();
       }
     };
     this.handleSendClick = () => {
       var _a;
-      console.log(`[OllamaView Debug] handleSendClick FIRED: isProcessing=<span class="math-inline">{this.isProcessing}, sendButtonDisabled=</span>{this.sendButton?.disabled}`);
       if (!this.isProcessing && !((_a = this.sendButton) == null ? void 0 : _a.disabled)) {
-        console.log("[OllamaView Debug] Send button clicked - sending message.");
         this.sendMessage();
       } else {
-        console.log("[OllamaView Debug] Send button clicked, but ignored (processing or disabled).");
       }
     };
     this.handleInputForResize = () => {
@@ -994,24 +982,14 @@ This action cannot be undone.`, async () => {
     console.log("[OllamaView Debug] Attaching event listeners START");
     if (!this.inputEl)
       console.error("inputEl missing!");
-    else
-      console.log("[OllamaView Debug] inputEl FOUND");
     if (!this.sendButton)
       console.error("sendButton missing!");
-    else
-      console.log("[OllamaView Debug] sendButton FOUND");
     if (!this.menuButton)
       console.error("menuButton missing!");
-    else
-      console.log("[OllamaView Debug] menuButton FOUND");
     if (!this.modelDisplayEl)
       console.error("modelDisplayEl missing!");
-    else
-      console.log("[OllamaView Debug] modelDisplayEl FOUND");
     if (!this.translateInputButton)
       console.error("translateInputButton missing!");
-    else
-      console.log("[OllamaView Debug] translateInputButton FOUND");
     if (this.inputEl) {
       this.inputEl.addEventListener("keydown", this.handleKeyDown);
       this.inputEl.addEventListener("input", this.handleInputForResize);
@@ -1029,7 +1007,6 @@ This action cannot be undone.`, async () => {
     console.log(`OllamaView.ts ->  ROLEDISPLAY: ` + this.roleDisplayEl);
     if (this.roleDisplayEl) {
       this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
-      console.log("[OllamaView Debug] roleDisplayEl FOUND & Listener Attached");
     } else {
       console.error("roleDisplayEl missing!");
     }
@@ -1123,11 +1100,9 @@ This action cannot be undone.`, async () => {
     this.register(this.plugin.on("messages-cleared", this.handleMessagesCleared));
     this.register(this.plugin.on("chat-list-updated", this.handleChatListUpdated));
     this.register(this.plugin.on("settings-updated", this.handleSettingsUpdated));
-    console.log("[OllamaView Debug] Attaching event listeners END");
   }
   updateModelDisplay(modelName) {
     if (this.modelDisplayEl) {
-      console.log(`OllamaView.ts ->       : updateModelDisplay: ${modelName}`);
       const displayName = modelName || "Default";
       const shortName = displayName.replace(/:latest$/, "");
       this.modelDisplayEl.setText(shortName);
