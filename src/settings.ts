@@ -59,6 +59,7 @@ export interface OllamaPluginSettings extends LoggerSettings { // Розширю
   keepLastNMessagesBeforeSummary: number;
   summarizationChunkSize: number;
   followRole: boolean;
+  maxCharsPerDoc: number;
 }
 
 // --- Значення за замовчуванням ---
@@ -102,7 +103,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   logCallerInfo: false, // НЕ записувати ім'я викликаючого методу за замовчуванням (для продуктивності)
   // logFilePath: undefined, // Шлях за замовчуванням буде в папці плагіна
   // logFileMaxSizeMB: 5, // Макс. розмір за замовчуванням
-  // ---------------------------------
+  maxCharsPerDoc: 1500,
 };
 
 // --- Тип аватара ---

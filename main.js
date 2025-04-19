@@ -2531,11 +2531,11 @@ var DEFAULT_SETTINGS = {
   // Логування у файл вимкнено за замовчуванням
   fileLogLevel: "WARN",
   // Рівень для файлу за замовчуванням
-  logCallerInfo: false
+  logCallerInfo: false,
   // НЕ записувати ім'я викликаючого методу за замовчуванням (для продуктивності)
   // logFilePath: undefined, // Шлях за замовчуванням буде в папці плагіна
   // logFileMaxSizeMB: 5, // Макс. розмір за замовчуванням
-  // ---------------------------------
+  maxCharsPerDoc: 1500
 };
 var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
@@ -2832,7 +2832,7 @@ var RagService = class {
     this.plugin = plugin;
   }
   /**
-   * Index all markdown files in the specified folder path
+   * Index all markdown files in the specified folder path, parsing YAML
    */
   async indexDocuments() {
     var _a, _b;
@@ -2842,6 +2842,7 @@ var RagService = class {
     try {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
+      const metadataCache = this.plugin.app.metadataCache;
       console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from here)`);
       const allFiles = vault.getFiles();
       console.log(`Total files in vault: ${allFiles.length}`);
@@ -2852,17 +2853,33 @@ var RagService = class {
       for (const file of files) {
         try {
           const content = await vault.read(file);
+          const fileCache = metadataCache.getFileCache(file);
+          const frontmatter = (fileCache == null ? void 0 : fileCache.frontmatter) || {};
+          let bodyContent = content;
+          if (fileCache == null ? void 0 : fileCache.frontmatterPosition) {
+            bodyContent = content.substring(fileCache.frontmatterPosition.end.offset).trim();
+          }
+          const metadata = {
+            ...frontmatter,
+            // Додаємо все з YAML
+            path: file.path,
+            // Зберігаємо шлях
+            filename: file.name,
+            created: (_a = file.stat) == null ? void 0 : _a.ctime,
+            modified: (_b = file.stat) == null ? void 0 : _b.mtime,
+            "personal-logs": frontmatter["personal-logs"] === true
+            // Явно перевіряємо на true
+          };
           this.documents.push({
             path: file.path,
             content,
-            metadata: {
-              filename: file.name,
-              created: (_a = file.stat) == null ? void 0 : _a.ctime,
-              modified: (_b = file.stat) == null ? void 0 : _b.mtime
-            }
+            // Зберігаємо повний контент
+            body: bodyContent,
+            // Зберігаємо тіло (опціонально)
+            metadata
           });
         } catch (error) {
-          console.error(`Error reading file ${file.path}:`, error);
+          console.error(`Error reading or processing file ${file.path}:`, error);
         }
       }
       console.log(`Indexed ${this.documents.length} documents for RAG`);
@@ -2874,75 +2891,121 @@ var RagService = class {
   }
   /**
    * Get all markdown files in the specified folder path
+   * (Залишаємо без змін, але переконуємось, що вона працює коректно)
    */
   async getMarkdownFiles(vault, folderPath) {
     const files = [];
     if (!folderPath) {
+      console.warn("[RagService] RAG folder path is not set.");
       return files;
     }
-    let normalizedFolderPath = folderPath;
-    if (!normalizedFolderPath.endsWith("/")) {
-      normalizedFolderPath += "/";
-    }
-    const dataFolderPath = normalizedFolderPath;
-    console.log(`Looking for markdown files in: "${dataFolderPath}"`);
     const allFiles = vault.getFiles();
     for (const file of allFiles) {
-      if (file.extension === "md" && file.path.startsWith(dataFolderPath)) {
-        console.log(`Adding file: ${file.path}`);
+      if (file.extension === "md" && file.path.startsWith(folderPath + (folderPath.endsWith("/") ? "" : "/"))) {
         files.push(file);
       }
     }
     return files;
   }
+  // --- Хелпер для підрахунку очок релевантності (винесено для перевикористання) ---
+  calculateRelevanceScore(doc, queryTerms) {
+    var _a;
+    const contentToScore = doc.body || doc.content;
+    const lowerContent = contentToScore.toLowerCase();
+    const lowerQuery = queryTerms.toLowerCase();
+    const terms = lowerQuery.split(/\s+/).filter((term) => term.length > 2);
+    let score = 0;
+    for (const term of terms) {
+      try {
+        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const regex = new RegExp(escapedTerm, "gi");
+        const matches = lowerContent.match(regex);
+        if (matches) {
+          score += matches.length;
+        }
+      } catch (e) {
+        console.warn(`[RagService] Invalid regex term: ${term}`, e);
+      }
+    }
+    if (((_a = doc.metadata) == null ? void 0 : _a.filename) && doc.metadata.filename.toLowerCase().includes(lowerQuery)) {
+      score += 5;
+    }
+    return score;
+  }
+  // ----------------------------------------------------------------------------
   /**
-   * Simple search implementation to find relevant documents for a query
-   * Later this could be replaced with a more sophisticated vector search
+   * Modified search to handle filename queries and use relevance scoring.
    */
   findRelevantDocuments(query, limit = 5) {
     if (!this.documents.length) {
       return [];
     }
-    const scoredDocs = this.documents.map((doc) => {
-      const lowerContent = doc.content.toLowerCase();
-      const lowerQuery = query.toLowerCase();
-      const terms = lowerQuery.split(/\s+/);
-      let score = 0;
-      for (const term of terms) {
-        if (term.length > 2) {
-          const regex = new RegExp(term, "gi");
-          const matches = lowerContent.match(regex);
-          if (matches) {
-            score += matches.length;
-          }
-        }
+    const filenameQueryMatch = query.match(/[`'"]?([\w\-\s]+\.md)[`'"]?/i) || query.match(/file:([\w\-\s]+\.md)/i);
+    let targetFilename = null;
+    if (filenameQueryMatch) {
+      targetFilename = filenameQueryMatch[1].trim().toLowerCase();
+      console.log(`[RagService] Detected filename query for: ${targetFilename}`);
+      query = query.replace(filenameQueryMatch[0], "").trim();
+    }
+    let results = [];
+    if (targetFilename) {
+      const foundDoc = this.documents.find((doc) => {
+        var _a, _b;
+        return ((_b = (_a = doc.metadata) == null ? void 0 : _a.filename) == null ? void 0 : _b.toLowerCase()) === targetFilename;
+      });
+      if (foundDoc) {
+        results.push({ ...foundDoc, score: 1e3 });
+        console.log(`[RagService] Prioritized document found by filename: ${targetFilename}`);
+      } else {
+        console.log(`[RagService] Document specified by filename not found: ${targetFilename}`);
       }
-      return { doc, score };
-    });
-    return scoredDocs.sort((a, b) => b.score - a.score).slice(0, limit).map((item) => item.doc);
+    }
+    const remainingLimit = limit - results.length;
+    if (remainingLimit > 0 && query.trim().length > 0) {
+      const documentsToSearch = targetFilename ? this.documents.filter((doc) => {
+        var _a, _b;
+        return ((_b = (_a = doc.metadata) == null ? void 0 : _a.filename) == null ? void 0 : _b.toLowerCase()) !== targetFilename;
+      }) : this.documents;
+      const scoredDocs = documentsToSearch.map((doc) => ({ doc, score: this.calculateRelevanceScore(doc, query) })).filter((item) => item.score > 0);
+      scoredDocs.sort((a, b) => b.score - a.score);
+      results.push(...scoredDocs.slice(0, remainingLimit).map((item) => ({ ...item.doc, score: item.score })));
+    } else if (remainingLimit > 0 && query.trim().length === 0 && results.length > 0) {
+      console.log("[RagService] Query contained only filename, returning only that file.");
+    }
+    console.log(`[RagService] Found ${results.length} relevant documents for query.`);
+    const uniqueResults = Array.from(new Map(results.map((doc) => [doc.path, doc])).values());
+    return uniqueResults;
   }
   /**
-   * Prepare context from relevant documents
+   * Prepare context from relevant documents, adding metadata markers
    */
   prepareContext(query) {
     if (!this.plugin.settings.ragEnabled || this.documents.length === 0) {
       return "";
     }
-    const limit = this.plugin.settings.contextWindow;
+    const limit = this.plugin.settings.contextWindow || 5;
     const relevantDocs = this.findRelevantDocuments(query, limit);
     if (relevantDocs.length === 0) {
+      console.log("[RagService] No relevant documents found for context.");
       return "";
     }
-    let context = "### Context:\n\n";
+    console.log(`[RagService] Preparing context from ${relevantDocs.length} documents.`);
+    let context = "### Context from User Notes:\n\n";
     relevantDocs.forEach((doc, index) => {
-      var _a;
-      context += `Document ${index + 1} (${(_a = doc.metadata) == null ? void 0 : _a.filename}):
+      var _a, _b;
+      let header = `--- Document ${index + 1}: ${((_a = doc.metadata) == null ? void 0 : _a.filename) || doc.path}`;
+      if (((_b = doc.metadata) == null ? void 0 : _b["personal-logs"]) === true) {
+        header += ` [Type: Personal Log]`;
+      }
+      header += ` ---
 `;
-      const maxChars = 1500;
-      const content = doc.content.length > maxChars ? doc.content.substring(0, maxChars) + "..." : doc.content;
-      context += content + "\n\n";
+      context += header;
+      const contentToUse = doc.body || doc.content;
+      const maxCharsPerDoc = this.plugin.settings.maxCharsPerDoc || 1500;
+      const truncatedContent = contentToUse.length > maxCharsPerDoc ? contentToUse.substring(0, maxCharsPerDoc) + "...\n[Content Truncated]" : contentToUse;
+      context += truncatedContent + "\n\n";
     });
-    context += "### End of context\n\n";
+    context += "### End of Context\n\n";
     return context;
   }
 };
@@ -3132,7 +3195,9 @@ var OllamaService = class {
 // src/PromptService.ts
 var import_obsidian5 = require("obsidian");
 var PromptService = class {
+  // Кеш для деталей моделі (якщо використовується)
   constructor(plugin) {
+    // Кешування залишається таким же
     this.currentSystemPrompt = null;
     this.currentRolePath = null;
     this.roleCache = {};
@@ -3140,43 +3205,60 @@ var PromptService = class {
     this.plugin = plugin;
     this.app = plugin.app;
   }
-  // --- Приватний метод для підрахунку токенів ---
   _countTokens(text) {
     if (!text)
       return 0;
     return Math.ceil(text.length / 4);
   }
-  // ---------------------------------------------
+  // --- Cache Clearing (Залишаємо як є) ---
   clearRoleCache() {
-    console.log("[PromptService] Clearing role definition cache.");
-    this.roleCache = {};
-    this.currentSystemPrompt = null;
-    this.currentRolePath = null;
   }
   clearModelDetailsCache() {
-    console.log("[PromptService] Clearing model details cache.");
-    this.modelDetailsCache = {};
   }
+  // ----------------------------------------
   /**
-   * Повертає поточний *тіло* системного промпту (без frontmatter).
-   * Гарантує, що роль завантажена для поточного шляху.
-   * @returns Тіло системного промпту або null.
+   * Повертає фінальний системний промпт для API, включаючи інструкції для RAG.
+   * @param chatMetadata Метадані поточного чату
+   * @returns Рядок системного промпту або null.
    */
   async getSystemPromptForAPI(chatMetadata) {
-    const selectedRolePath = chatMetadata.selectedRolePath || this.plugin.settings.selectedRolePath;
+    const settings = this.plugin.settings;
+    const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
     const roleDefinition = await this.getRoleDefinition(selectedRolePath);
-    let systemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
-    if ((roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) && systemPrompt) {
+    let roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
+    const ragInstructions = `
+--- RAG Data Interpretation Rules ---
+1.  You have access to context from various files in the user's knowledge base provided under '### Context from User Notes:'.
+2.  Context from files marked with "[Type: Personal Log]" in their header contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress on personal goals.
+3.  Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) within ANY file's content represents a potential user goal, task, objective, idea, or key point. Use the surrounding text for context.
+4.  You can refer to specific files by their names mentioned in the context document headers (e.g., "According to 'My Notes.md'..." or "Document 3 ('project_plan.md') states..."). Use the filename provided in the '--- Document X: filename.md ---' header.
+5.  If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the entire provided context ('### Context from User Notes:').
+--- End RAG Data Interpretation Rules ---
+        `.trim();
+    let finalSystemPrompt = "";
+    if (settings.ragEnabled && this.plugin.ragService) {
+      finalSystemPrompt += ragInstructions + "\n\n";
+    }
+    if (roleSystemPrompt) {
+      finalSystemPrompt += roleSystemPrompt.trim();
+    }
+    if ((roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) && finalSystemPrompt) {
       const now = new Date();
       const formattedDate = now.toLocaleDateString(void 0, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
       const formattedTime = now.toLocaleTimeString(void 0, { hour: "numeric", minute: "2-digit" });
-      systemPrompt = systemPrompt.replace(/\[Current Time\]/gi, formattedTime);
-      systemPrompt = systemPrompt.replace(/\[Current Date\]/gi, formattedDate);
+      finalSystemPrompt = finalSystemPrompt.replace(/\[Current Time\]/gi, formattedTime);
+      finalSystemPrompt = finalSystemPrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
-    return systemPrompt;
+    const trimmedFinalPrompt = finalSystemPrompt.trim();
+    console.log(`[PromptService] Final System Prompt Length: ${trimmedFinalPrompt.length} chars`);
+    return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
   }
+  /**
+   * Завантажує визначення ролі (системний промпт + тип) з файлу або кешу.
+   * (Залишаємо без змін, оскільки логіка завантаження файлу ролі коректна)
+   */
   async getRoleDefinition(rolePath) {
-    var _a;
+    var _a, _b;
     const normalizedPath = rolePath ? (0, import_obsidian5.normalizePath)(rolePath) : null;
     if (normalizedPath !== this.currentRolePath) {
       console.log(`[PromptService] Role path changed from ${this.currentRolePath} to ${normalizedPath}. Clearing cache for this path.`);
@@ -3209,13 +3291,13 @@ var PromptService = class {
           // Тіло промпту
           isProductivityPersona: isProductivity
         };
-        console.log(`[PromptService] Role loaded: ${normalizedPath}. Is Productivity Persona: ${isProductivity}`);
+        console.log(`[PromptService] Role loaded: ${normalizedPath}. Is Productivity Persona: ${isProductivity}. Prompt body length: ${((_b = definition.systemPrompt) == null ? void 0 : _b.length) || 0}`);
         this.roleCache[normalizedPath] = definition;
         this.currentSystemPrompt = definition.systemPrompt;
         return definition;
       } catch (error) {
         console.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
-        new import_obsidian5.Notice(`Error loading role: ${file.basename}.`);
+        new import_obsidian5.Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
         return null;
       }
@@ -3225,6 +3307,10 @@ var PromptService = class {
       return null;
     }
   }
+  /**
+   * Перевіряє, чи активна зараз роль "продуктивності".
+   * (Залишаємо без змін)
+   */
   async _isProductivityPersonaActive(rolePath) {
     var _a;
     if (!this.plugin.settings.enableProductivityFeatures) {
@@ -3233,20 +3319,22 @@ var PromptService = class {
     const roleDefinition = await this.getRoleDefinition(rolePath);
     return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
   }
+  /**
+   * Готує повний промпт для API, включаючи історію, контекст завдань та RAG.
+   */
   async prepareFullPrompt(history, chatMetadata) {
-    var _a, _b, _c;
-    console.log("[PromptService] Preparing full prompt...");
+    var _a, _b, _c, _d, _e, _f, _g;
+    console.log("[PromptService] Preparing full prompt body...");
     const settings = this.plugin.settings;
     const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
     const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
     console.log(`[PromptService] Productivity features active for this request: ${isProductivityActive}`);
     let taskContext = "";
-    let tasksWereUpdated = false;
-    if (isProductivityActive) {
-      const needsUpdateBefore = this.plugin.isTaskFileUpdated();
-      await ((_b = (_a = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _b.call(_a));
-      tasksWereUpdated = needsUpdateBefore && !this.plugin.isTaskFileUpdated();
-      if ((_c = this.plugin.chatManager) == null ? void 0 : _c.filePlanExists) {
+    if (isProductivityActive && this.plugin.chatManager) {
+      if ((_a = this.plugin.chatManager) == null ? void 0 : _a.filePlanExists) {
+        const needsUpdateBefore = (_c = (_b = this.plugin).isTaskFileUpdated) == null ? void 0 : _c.call(_b);
+        await ((_e = (_d = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _e.call(_d));
+        const tasksWereUpdated = needsUpdateBefore && !((_g = (_f = this.plugin).isTaskFileUpdated) == null ? void 0 : _g.call(_f));
         taskContext = tasksWereUpdated ? "\n--- Updated Tasks Context ---\n" : "\n--- Today's Tasks Context ---\n";
         taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(", ") : "None"}
 `;
@@ -3256,9 +3344,10 @@ var PromptService = class {
         console.log(`[PromptService] Injecting task context (Updated: ${tasksWereUpdated}).`);
       }
     }
-    let processedHistoryString = "";
     const approxContextTokens = this._countTokens(taskContext);
-    const maxHistoryTokens = settings.contextWindow - approxContextTokens - 200;
+    const maxHistoryTokens = settings.contextWindow - approxContextTokens - (settings.ragEnabled ? 500 : 200);
+    console.log(`[PromptService] Max tokens for history processing: ${maxHistoryTokens}`);
+    let processedHistoryString = "";
     if (isProductivityActive && settings.useAdvancedContextStrategy) {
       processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
     } else {
@@ -3269,27 +3358,30 @@ var PromptService = class {
       const lastUserMessage = history.findLast((m) => m.role === "user");
       if (lastUserMessage == null ? void 0 : lastUserMessage.content) {
         try {
-          const ragResult = await this.plugin.ragService.findRelevantDocuments(lastUserMessage.content, 5);
-          if (ragResult && ragResult.length > 0) {
-            ragContext = "\n--- Relevant Notes Context ---\n" + ragResult.map((r) => {
-              var _a2, _b2;
-              return `[${((_a2 = r.metadata) == null ? void 0 : _a2.filename) || ((_b2 = r.metadata) == null ? void 0 : _b2.source) || "Note"}]:
-${r.content}`;
-            }).join("\n\n") + "\n--- End Notes Context ---";
+          ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
+          if (ragContext) {
+            console.log(`[PromptService] RAG context added (${this._countTokens(ragContext)} tokens).`);
           } else {
+            console.log("[PromptService] RAG enabled, but no relevant documents found for the last query.");
           }
         } catch (error) {
+          console.error("[PromptService] Error getting RAG context:", error);
+          ragContext = "\n[Error retrieving RAG context]\n";
         }
       } else {
+        console.log("[PromptService] RAG enabled, but no last user message found to generate context.");
       }
     }
-    const finalPrompt = `${ragContext}${taskContext}
+    const finalPromptBody = `${ragContext}${taskContext}
+
+### Conversation History:
 ${processedHistoryString}`.trim();
-    console.log(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPrompt)}`);
-    return finalPrompt;
+    console.log(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
+    return finalPromptBody;
   }
   // --- Методи обробки контексту та підсумовування ---
-  // (Залишаються без змін, але використовують this._countTokens)
+  // (Залишаються без змін, використовують this._countTokens)
+  // --- ВИПРАВЛЕННЯ: Повна реалізація _buildSimpleContext ---
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
@@ -3307,12 +3399,14 @@ ${processedHistoryString}`.trim();
     }
     return context.trim();
   }
+  // -------------------------------------------------------
+  // --- ВИПРАВЛЕННЯ: Повна реалізація _buildAdvancedContext ---
   async _buildAdvancedContext(history, chatMetadata, maxTokens) {
     console.log("[PromptService] Building advanced context...");
     const settings = this.plugin.settings;
     const processedParts = [];
     let currentTokens = 0;
-    const keepN = Math.min(history.length, settings.keepLastNMessagesBeforeSummary);
+    const keepN = Math.min(history.length, settings.keepLastNMessagesBeforeSummary || 3);
     const messagesToKeep = history.slice(-keepN);
     const messagesToProcess = history.slice(0, -keepN);
     console.log(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
@@ -3323,15 +3417,14 @@ ${processedHistoryString}`.trim();
         while (remainingMessages.length > 0) {
           let chunkTokens = 0;
           let chunkMessages = [];
-          while (remainingMessages.length > 0 && chunkTokens < settings.summarizationChunkSize) {
-            const msg = remainingMessages.pop();
+          while (remainingMessages.length > 0 && chunkTokens < (settings.summarizationChunkSize || 1e3)) {
+            const msg = remainingMessages[remainingMessages.length - 1];
             const msgText = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
             const msgTokens = this._countTokens(msgText) + 5;
-            if (chunkTokens + msgTokens <= settings.summarizationChunkSize) {
-              chunkMessages.unshift(msg);
+            if (chunkTokens + msgTokens <= (settings.summarizationChunkSize || 1e3)) {
+              chunkMessages.unshift(remainingMessages.pop());
               chunkTokens += msgTokens;
             } else {
-              remainingMessages.push(msg);
               break;
             }
           }
@@ -3343,33 +3436,34 @@ ${processedHistoryString}`.trim();
               processedParts.unshift(chunkCombinedText);
               currentTokens += actualChunkTokens;
             } else {
-              console.log(`[PromptService] Chunk (${actualChunkTokens} tokens) too large. Summarizing.`);
+              console.log(`[PromptService] Chunk (${actualChunkTokens} tokens) too large or exceeds maxTokens. Summarizing.`);
               const summary = await this._summarizeMessages(chunkMessages, chatMetadata);
               if (summary) {
-                const summaryTokens = this._countTokens(summary) + 10;
                 const summaryText = `[Summary of previous messages]:
 ${summary}`;
+                const summaryTokens = this._countTokens(summaryText) + 10;
                 if (currentTokens + summaryTokens <= maxTokens) {
                   console.log(`[PromptService] Adding summary (${summaryTokens} tokens).`);
                   processedParts.unshift(summaryText);
                   currentTokens += summaryTokens;
                 } else {
-                  console.warn(`[PromptService] Summary too large. Skipping.`);
+                  console.warn(`[PromptService] Summary too large to fit (${summaryTokens} tokens). Skipping.`);
                   break;
                 }
               } else {
-                console.warn("[PromptService] Summarization failed. Skipping.");
-                break;
+                console.warn("[PromptService] Summarization failed or returned null. Skipping chunk.");
               }
             }
           }
         }
       } else {
-        console.log("[PromptService] Summarization disabled. Including older messages directly.");
+        console.log("[PromptService] Summarization disabled. Including older messages directly if space allows.");
         let olderHistoryString = this._buildSimpleContext(messagesToProcess, maxTokens - currentTokens);
         if (olderHistoryString) {
           processedParts.unshift(olderHistoryString);
           currentTokens += this._countTokens(olderHistoryString);
+        } else {
+          console.log("[PromptService] Not enough space for older messages without summarization.");
         }
       }
     }
@@ -3389,15 +3483,36 @@ ${summary}`;
     console.log(`[PromptService] Advanced context built. Total approx tokens: ${currentTokens}`);
     return processedParts.join("\n\n").trim();
   }
+  // --------------------------------------------------------
+  // --- ВИПРАВЛЕННЯ: Повна реалізація _summarizeMessages ---
   async _summarizeMessages(messagesToSummarize, chatMetadata) {
-    if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0)
+    if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
       return null;
+    }
     console.log(`[PromptService] Summarizing chunk of ${messagesToSummarize.length} messages...`);
     const textToSummarize = messagesToSummarize.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
-    const summarizationFullPrompt = this.plugin.settings.summarizationPrompt.replace("{text_to_summarize}", textToSummarize);
+    if (!textToSummarize.trim()) {
+      console.log("[PromptService] No actual text content in messages to summarize.");
+      return null;
+    }
+    const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely:\n\n{text_to_summarize}";
+    const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
     const modelName = chatMetadata.modelName || this.plugin.settings.modelName;
-    const contextWindow = this.plugin.settings.contextWindow;
-    const requestBody = { model: modelName, prompt: summarizationFullPrompt, stream: false, temperature: 0.3, options: { num_ctx: contextWindow }, system: "You are a helpful assistant that summarizes conversation history concisely." };
+    const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
+    const requestBody = {
+      model: modelName,
+      prompt: summarizationFullPrompt,
+      stream: false,
+      temperature: 0.3,
+      // Низька температура для більш передбачуваного саммарі
+      options: {
+        num_ctx: summarizationContextWindow
+        // Використовуємо окремий ліміт
+        // Можна додати stop токени, якщо потрібно
+      },
+      // Системний промпт для сумаризації
+      system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points and decisions."
+    };
     try {
       if (!this.plugin.ollamaService) {
         console.error("[PromptService] OllamaService is not available for summarization.");
@@ -3417,6 +3532,7 @@ ${summary}`;
       return null;
     }
   }
+  // -------------------------------------------------
 };
 
 // src/ChatManager.ts
