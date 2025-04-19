@@ -37,7 +37,7 @@ __export(main_exports, {
   default: () => OllamaPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian10 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 
 // src/OllamaView.ts
 var import_obsidian3 = require("obsidian");
@@ -2872,32 +2872,80 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
 };
 
 // src/ragService.ts
+var import_obsidian5 = require("obsidian");
 var RagService = class {
+  // Модель за замовчуванням
   constructor(plugin) {
-    this.documents = [];
+    // --- ЗМІНЕНО: Зберігаємо ембединги чанків ---
+    this.chunkEmbeddings = [];
+    // ------------------------------------------
     this.isIndexing = false;
+    this.embeddingModelName = "nomic-embed-text";
     this.plugin = plugin;
+    this.adapter = plugin.app.vault.adapter;
+    this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
   }
   /**
-   * Index all markdown files in the specified folder path, parsing YAML
+   * Розбиває текст на чанки (проста версія - за абзацами).
+   * @param text Вхідний текст документа (бажано без YAML).Я
+   * @param chunkSize Максимальна довжина чанка в символах (з налаштувань).
+   * @returns Масив текстових чанків.
+   */
+  splitIntoChunks(text, chunkSize) {
+    if (!text)
+      return [];
+    const paragraphs = text.split(/\n\s*\n/);
+    const chunks = [];
+    for (const p of paragraphs) {
+      const trimmedP = p.trim();
+      if (trimmedP.length === 0)
+        continue;
+      if (trimmedP.length > chunkSize) {
+        for (let i = 0; i < trimmedP.length; i += chunkSize) {
+          chunks.push(trimmedP.substring(i, i + chunkSize));
+        }
+      } else {
+        chunks.push(trimmedP);
+      }
+    }
+    return chunks.filter((chunk) => chunk.length > 20);
+  }
+  /**
+   * Індексує markdown файли: розбиває на чанки, генерує embeddings, зберігає в пам'яті.
    */
   async indexDocuments() {
     var _a, _b;
-    if (this.isIndexing)
+    if (!this.plugin.settings.ragEnabled) {
+      this.plugin.logger.info("[RagService] RAG indexing skipped (disabled in settings).");
+      this.chunkEmbeddings = [];
       return;
+    }
+    if (!this.plugin.settings.ragEnableSemanticSearch) {
+      this.plugin.logger.info("[RagService] Semantic Search indexing skipped (disabled in settings).");
+      this.chunkEmbeddings = [];
+      return;
+    }
+    if (this.isIndexing) {
+      this.plugin.logger.warn("[RagService] Indexing already in progress.");
+      return;
+    }
     this.isIndexing = true;
+    this.plugin.logger.info("[RagService] Starting semantic indexing...");
+    const startTime = Date.now();
+    this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
+    const chunkSize = this.plugin.settings.ragChunkSize || DEFAULT_SETTINGS.ragChunkSize;
+    this.plugin.logger.debug(`[RagService] Using embedding model: ${this.embeddingModelName}, Chunk size: ${chunkSize}`);
+    const newEmbeddings = [];
     try {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
       const metadataCache = this.plugin.app.metadataCache;
-      console.log(`AI Assistant path: "${folderPath}" (RAG documents will be loaded from here)`);
-      const allFiles = vault.getFiles();
-      console.log(`Total files in vault: ${allFiles.length}`);
+      this.plugin.logger.info(`[RagService] RAG folder path: "${folderPath}"`);
       const files = await this.getMarkdownFiles(vault, folderPath);
-      console.log(`Found ${files.length} markdown files from "${folderPath}"`);
-      console.log(`Indexing ${files.length} markdown files from ${folderPath}`);
-      this.documents = [];
+      this.plugin.logger.info(`[RagService] Found ${files.length} markdown files in "${folderPath}".`);
+      let processedFiles = 0;
       for (const file of files) {
+        this.plugin.logger.debug(`[RagService] Processing file: ${file.path}`);
         try {
           const content = await vault.read(file);
           const fileCache = metadataCache.getFileCache(file);
@@ -2906,168 +2954,212 @@ var RagService = class {
           if (fileCache == null ? void 0 : fileCache.frontmatterPosition) {
             bodyContent = content.substring(fileCache.frontmatterPosition.end.offset).trim();
           }
-          const metadata = {
-            ...frontmatter,
-            // Додаємо все з YAML
-            path: file.path,
-            // Зберігаємо шлях
-            filename: file.name,
-            created: (_a = file.stat) == null ? void 0 : _a.ctime,
-            modified: (_b = file.stat) == null ? void 0 : _b.mtime,
-            "personal-logs": frontmatter["personal-logs"] === true
-            // Явно перевіряємо на true
-          };
-          this.documents.push({
-            path: file.path,
-            content,
-            // Зберігаємо повний контент
-            body: bodyContent,
-            // Зберігаємо тіло (опціонально)
-            metadata
-          });
+          const chunks = this.splitIntoChunks(bodyContent, chunkSize);
+          if (!chunks || chunks.length === 0) {
+            this.plugin.logger.debug(`[RagService] No valid chunks found in ${file.path}, skipping.`);
+            continue;
+          }
+          this.plugin.logger.debug(`[RagService] Generating ${chunks.length} embeddings for ${file.path} using ${this.embeddingModelName}...`);
+          const vectors = await this.plugin.ollamaService.generateEmbeddings(chunks, this.embeddingModelName);
+          if (vectors && vectors.length === chunks.length) {
+            const metadata = {
+              ...frontmatter,
+              path: file.path,
+              filename: file.name,
+              created: (_a = file.stat) == null ? void 0 : _a.ctime,
+              modified: (_b = file.stat) == null ? void 0 : _b.mtime,
+              "personal-logs": frontmatter["personal-logs"] === true
+            };
+            for (let i = 0; i < chunks.length; i++) {
+              newEmbeddings.push({
+                text: chunks[i],
+                vector: vectors[i],
+                metadata
+                // Додаємо однакові метадані до всіх чанків файлу
+              });
+            }
+            this.plugin.logger.debug(`[RagService] Successfully embedded ${vectors.length} chunks from ${file.path}`);
+            processedFiles++;
+          } else {
+            this.plugin.logger.warn(`[RagService] Mismatch or error generating embeddings for ${file.path}. Expected ${chunks.length}, got ${vectors == null ? void 0 : vectors.length}`);
+          }
         } catch (error) {
-          console.error(`Error reading or processing file ${file.path}:`, error);
+          this.plugin.logger.error(`[RagService] Error processing file ${file.path}:`, error);
         }
       }
-      console.log(`Indexed ${this.documents.length} documents for RAG`);
+      this.chunkEmbeddings = newEmbeddings;
+      const duration = (Date.now() - startTime) / 1e3;
+      this.plugin.logger.info(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files.`);
+      new import_obsidian5.Notice(`RAG index updated: ${this.chunkEmbeddings.length} chunks indexed.`);
     } catch (error) {
-      console.error("Error indexing documents:", error);
+      this.plugin.logger.error("[RagService] Error during indexing process:", error);
+      new import_obsidian5.Notice("RAG indexing failed. See console for details.");
     } finally {
       this.isIndexing = false;
     }
   }
   /**
    * Get all markdown files in the specified folder path
-   * (Залишаємо без змін, але переконуємось, що вона працює коректно)
    */
   async getMarkdownFiles(vault, folderPath) {
     const files = [];
     if (!folderPath) {
-      console.warn("[RagService] RAG folder path is not set.");
+      this.plugin.logger.warn("[RagService] RAG folder path is not set.");
       return files;
     }
-    const allFiles = vault.getFiles();
+    const folder = vault.getAbstractFileByPath((0, import_obsidian5.normalizePath)(folderPath));
+    if (!(folder instanceof import_obsidian5.TFolder)) {
+      this.plugin.logger.warn(`[RagService] RAG folder path "${folderPath}" not found or is not a folder.`);
+      return files;
+    }
+    const allFiles = vault.getMarkdownFiles();
     for (const file of allFiles) {
-      if (file.extension === "md" && file.path.startsWith(folderPath + (folderPath.endsWith("/") ? "" : "/"))) {
+      if (file.path.startsWith(folder.path + "/")) {
         files.push(file);
       }
     }
     return files;
   }
-  // --- Хелпер для підрахунку очок релевантності (винесено для перевикористання) ---
-  calculateRelevanceScore(doc, queryTerms) {
-    var _a;
-    const contentToScore = doc.body || doc.content;
-    const lowerContent = contentToScore.toLowerCase();
-    const lowerQuery = queryTerms.toLowerCase();
-    const terms = lowerQuery.split(/\s+/).filter((term) => term.length > 2);
-    let score = 0;
-    for (const term of terms) {
-      try {
-        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(escapedTerm, "gi");
-        const matches = lowerContent.match(regex);
-        if (matches) {
-          score += matches.length;
-        }
-      } catch (e) {
-        console.warn(`[RagService] Invalid regex term: ${term}`, e);
-      }
+  // --- Обчислення Косинусної Подібності ---
+  calculateCosineSimilarity(vecA, vecB) {
+    if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) {
+      return 0;
     }
-    if (((_a = doc.metadata) == null ? void 0 : _a.filename) && doc.metadata.filename.toLowerCase().includes(lowerQuery)) {
-      score += 5;
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
     }
-    return score;
+    if (normA === 0 || normB === 0)
+      return 0;
+    const magnitude = Math.sqrt(normA) * Math.sqrt(normB);
+    if (magnitude === 0)
+      return 0;
+    return dotProduct / magnitude;
   }
   // ----------------------------------------------------------------------------
   /**
-   * Modified search to handle filename queries and use relevance scoring.
+   * Знаходить релевантні ЧАНКИ документів за допомогою семантичної подібності.
+   * @param query Запит користувача.
+   * @param limit Максимальна кількість чанків для повернення (з налаштувань topK).
+   * @returns Масив об'єктів ChunkVector, відсортований за подібністю.
    */
-  findRelevantDocuments(query, limit = 5) {
-    if (!this.documents.length) {
+  async findRelevantDocuments(query, limit) {
+    var _a;
+    if (!this.plugin.settings.ragEnableSemanticSearch) {
+      this.plugin.logger.info("[RagService] Semantic search disabled, skipping retrieval.");
       return [];
     }
-    const filenameQueryMatch = query.match(/[`'"]?([\w\-\s]+\.md)[`'"]?/i) || query.match(/file:([\w\-\s]+\.md)/i);
-    let targetFilename = null;
-    if (filenameQueryMatch) {
-      targetFilename = filenameQueryMatch[1].trim().toLowerCase();
-      console.log(`[RagService] Detected filename query for: ${targetFilename}`);
-      query = query.replace(filenameQueryMatch[0], "").trim();
+    if (!this.chunkEmbeddings || this.chunkEmbeddings.length === 0 || !query) {
+      if (((_a = this.chunkEmbeddings) == null ? void 0 : _a.length) === 0)
+        this.plugin.logger.warn("[RagService] No chunk embeddings available for search. Index might be empty or disabled.");
+      return [];
     }
-    let results = [];
-    if (targetFilename) {
-      const foundDoc = this.documents.find((doc) => {
-        var _a, _b;
-        return ((_b = (_a = doc.metadata) == null ? void 0 : _a.filename) == null ? void 0 : _b.toLowerCase()) === targetFilename;
-      });
-      if (foundDoc) {
-        results.push({ ...foundDoc, score: 1e3 });
-        console.log(`[RagService] Prioritized document found by filename: ${targetFilename}`);
-      } else {
-        console.log(`[RagService] Document specified by filename not found: ${targetFilename}`);
+    this.plugin.logger.debug(`[RagService] Performing semantic search for query: "${query}"`);
+    const startTime = Date.now();
+    try {
+      const queryEmbeddings = await this.plugin.ollamaService.generateEmbeddings([query], this.embeddingModelName);
+      if (!queryEmbeddings || queryEmbeddings.length === 0 || !queryEmbeddings[0]) {
+        this.plugin.logger.error("[RagService] Failed to generate embedding for the query.");
+        return [];
       }
+      const queryVector = queryEmbeddings[0];
+      const scoredChunks = this.chunkEmbeddings.map((chunk) => {
+        const similarity = this.calculateCosineSimilarity(queryVector, chunk.vector);
+        return { ...chunk, score: similarity };
+      });
+      const similarityThreshold = this.plugin.settings.ragSimilarityThreshold || DEFAULT_SETTINGS.ragSimilarityThreshold;
+      const relevantChunks = scoredChunks.filter((chunk) => chunk.score >= similarityThreshold);
+      relevantChunks.sort((a, b) => b.score - a.score);
+      const duration = Date.now() - startTime;
+      this.plugin.logger.info(`[RagService] Semantic search completed in ${duration}ms. Found ${relevantChunks.length} chunks above threshold ${similarityThreshold}.`);
+      return relevantChunks.slice(0, limit);
+    } catch (error) {
+      this.plugin.logger.error("[RagService] Error during semantic search:", error);
+      return [];
     }
-    const remainingLimit = limit - results.length;
-    if (remainingLimit > 0 && query.trim().length > 0) {
-      const documentsToSearch = targetFilename ? this.documents.filter((doc) => {
-        var _a, _b;
-        return ((_b = (_a = doc.metadata) == null ? void 0 : _a.filename) == null ? void 0 : _b.toLowerCase()) !== targetFilename;
-      }) : this.documents;
-      const scoredDocs = documentsToSearch.map((doc) => ({ doc, score: this.calculateRelevanceScore(doc, query) })).filter((item) => item.score > 0);
-      scoredDocs.sort((a, b) => b.score - a.score);
-      results.push(...scoredDocs.slice(0, remainingLimit).map((item) => ({ ...item.doc, score: item.score })));
-    } else if (remainingLimit > 0 && query.trim().length === 0 && results.length > 0) {
-      console.log("[RagService] Query contained only filename, returning only that file.");
-    }
-    console.log(`[RagService] Found ${results.length} relevant documents for query.`);
-    const uniqueResults = Array.from(new Map(results.map((doc) => [doc.path, doc])).values());
-    return uniqueResults;
   }
   /**
-   * Prepare context from relevant documents, adding metadata markers
+   * Готує контекст для LLM з найбільш релевантних чанків документів.
+   * @param query Запит користувача для пошуку релевантних чанків.
+   * @returns Рядок з форматованим контекстом або порожній рядок.
    */
-  prepareContext(query) {
-    if (!this.plugin.settings.ragEnabled || this.documents.length === 0) {
+  async prepareContext(query) {
+    if (!this.plugin.settings.ragEnabled) {
       return "";
     }
-    const limit = this.plugin.settings.contextWindow || 5;
-    const relevantDocs = this.findRelevantDocuments(query, limit);
-    if (relevantDocs.length === 0) {
-      console.log("[RagService] No relevant documents found for context.");
-      return "";
-    }
-    console.log(`[RagService] Preparing context from ${relevantDocs.length} documents.`);
-    let context = "### Context from User Notes:\n\n";
-    relevantDocs.forEach((doc, index) => {
-      var _a, _b;
-      let header = `--- Document ${index + 1}: ${((_a = doc.metadata) == null ? void 0 : _a.filename) || doc.path}`;
-      if (((_b = doc.metadata) == null ? void 0 : _b["personal-logs"]) === true) {
-        header += ` [Type: Personal Log]`;
+    if (this.plugin.settings.ragEnableSemanticSearch) {
+      const topK = this.plugin.settings.ragTopK || DEFAULT_SETTINGS.ragTopK;
+      const relevantChunks = await this.findRelevantDocuments(query, topK);
+      if (relevantChunks.length === 0) {
+        this.plugin.logger.info("[RagService] No relevant documents found via semantic search for context.");
+        return "";
       }
-      header += ` ---
+      this.plugin.logger.info(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
+      let context = "### Context from User Notes (Semantic Search):\n\n";
+      relevantChunks.forEach((chunk, index) => {
+        var _a, _b, _c, _d;
+        let header = `--- Chunk ${index + 1} from: ${((_a = chunk.metadata) == null ? void 0 : _a.filename) || chunk.metadata.path}`;
+        if (((_b = chunk.metadata) == null ? void 0 : _b["personal-logs"]) === true)
+          header += ` [Type: Personal Log]`;
+        header += ` (Score: ${(_d = (_c = chunk.score) == null ? void 0 : _c.toFixed(3)) != null ? _d : "N/A"}) ---
 `;
-      context += header;
-      const contentToUse = doc.body || doc.content;
-      const maxCharsPerDoc = this.plugin.settings.maxCharsPerDoc || 1500;
-      const truncatedContent = contentToUse.length > maxCharsPerDoc ? contentToUse.substring(0, maxCharsPerDoc) + "...\n[Content Truncated]" : contentToUse;
-      context += truncatedContent + "\n\n";
-    });
-    context += "### End of Context\n\n";
-    return context;
+        context += header;
+        context += chunk.text.trim() + "\n\n";
+      });
+      context += "### End of Context\n\n";
+      return context.trim();
+    } else {
+      this.plugin.logger.info("[RagService] Semantic search disabled. Using legacy keyword search (if implemented) or skipping RAG.");
+      return "";
+    }
   }
+  // Додатково: Функції для старого пошуку, якщо ви їх залишаєте
+  /*
+      private findRelevantDocuments_Keyword(query: string, limit: number): DocumentVector[] {
+          // ... ваша стара логіка пошуку за ключовими словами ...
+          const scoredDocs = this.documents
+            .map(doc => ({ doc, score: this.calculateRelevanceScore(doc, query) }))
+            .filter(item => item.score > 0);
+          scoredDocs.sort((a, b) => b.score - a.score);
+          return scoredDocs.slice(0, limit).map(item => ({...item.doc, score: item.score}));
+      }
+  
+      private formatKeywordContext(docs: DocumentVector[]): string {
+           let context = "### Context from User Notes (Keyword Search):\n\n";
+           docs.forEach((doc, index) => {
+               let header = `--- Document ${index + 1}: ${doc.metadata?.filename || doc.path} (Score: ${doc.score?.toFixed(0)}) ---\n`;
+               // ... решта форматування ...
+               const contentToUse = doc.body || doc.content;
+               const maxCharsPerDoc = this.plugin.settings.maxCharsPerDoc || 1500;
+               const truncatedContent = contentToUse.length > maxCharsPerDoc
+                 ? contentToUse.substring(0, maxCharsPerDoc) + "...\n[Content Truncated]"
+                 : contentToUse;
+               context += header + truncatedContent + "\n\n";
+           });
+           context += "### End of Context\n\n";
+           return context.trim();
+      }
+      */
 };
 
 // src/OllamaService.ts
+var import_obsidian6 = require("obsidian");
 var OllamaService = class {
   // Keep event emitter for connection errors
   constructor(plugin) {
-    // private promptService: PromptService;
-    // No direct view reference needed now
-    // private ollamaView: OllamaView | null = null;
     this.eventHandlers = {};
     this.plugin = plugin;
+    if (!plugin.promptService) {
+      const errorMsg = "[OllamaService] CRITICAL: PromptService not available on plugin instance during OllamaService construction!";
+      plugin.logger.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+    this.promptService = plugin.promptService;
   }
-  // --- Event Emitter for internal errors (like connection) ---
   on(event, callback) {
     if (!this.eventHandlers[event])
       this.eventHandlers[event] = [];
@@ -3090,164 +3182,236 @@ var OllamaService = class {
         }
       });
   }
-  // --- End Event Emitter ---
-  // setOllamaView(view: OllamaView): void { // No longer needed
-  //   this.ollamaView = view;
-  // }
   setBaseUrl(url) {
   }
-  // --- NEW: Low-level method for /api/generate ---
   /**
    * Sends a raw request body to the Ollama /api/generate endpoint.
-   * @param requestBody The complete request body including model, prompt, options, etc.
-   * @returns The parsed OllamaGenerateResponse.
    */
   async generateRaw(requestBody) {
     var _a;
-    console.log("[OllamaService] Sending RAW request to /api/generate:", JSON.stringify({ ...requestBody, prompt: ((_a = requestBody.prompt) == null ? void 0 : _a.substring(0, 100)) + "..." }));
+    this.plugin.logger.debug("[OllamaService] Sending RAW request to /api/generate:", { model: requestBody.model, temp: requestBody.temperature, system: !!requestBody.system, prompt_len: (_a = requestBody.prompt) == null ? void 0 : _a.length });
     if (!requestBody.model || !requestBody.prompt) {
       throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
     }
     if (!requestBody.system) {
       delete requestBody.system;
     }
-    return await this._ollamaFetch("/api/generate", {
-      method: "POST",
-      body: JSON.stringify(requestBody)
-    });
+    return await this._ollamaFetch(
+      "/api/generate",
+      "POST",
+      // Explicitly pass method
+      JSON.stringify(requestBody)
+      // Pass the stringified body
+    );
   }
-  // --- END NEW METHOD ---
   /**
-   * Generates a chat response based on the current chat state.
-   * Orchestrates prompt preparation and API call using generateRaw.
+   * Generates embeddings for a list of text prompts.
    */
+  async generateEmbeddings(prompts, model) {
+    if (!prompts || prompts.length === 0)
+      return [];
+    const endpoint = "/api/embeddings";
+    this.plugin.logger.info(`[OllamaService] Generating ${prompts.length} embeddings using model ${model}...`);
+    const embeddingsList = [];
+    try {
+      for (const prompt of prompts) {
+        const trimmedPrompt = prompt.trim();
+        if (!trimmedPrompt) {
+          this.plugin.logger.warn("[OllamaService] Skipping empty prompt for embedding.");
+          continue;
+        }
+        const requestBody = JSON.stringify({ model, prompt: trimmedPrompt });
+        try {
+          const embeddingResponse = await this._ollamaFetch(
+            endpoint,
+            "POST",
+            // Explicitly pass method
+            requestBody
+            // Pass the stringified body
+          );
+          if (embeddingResponse && embeddingResponse.embedding) {
+            embeddingsList.push(embeddingResponse.embedding);
+          } else {
+            this.plugin.logger.warn(`[OllamaService] Invalid structure in embedding response for model ${model}. Prompt (start): "${trimmedPrompt.substring(0, 50)}..."`);
+          }
+        } catch (singleError) {
+          this.plugin.logger.error(`[OllamaService] Failed to generate embedding for one prompt using model ${model}. Prompt (start): "${trimmedPrompt.substring(0, 50)}..."`, singleError);
+        }
+      }
+      this.plugin.logger.info(`[OllamaService] Successfully generated ${embeddingsList.length} embeddings (out of ${prompts.length} prompts).`);
+      return embeddingsList.length > 0 ? embeddingsList : null;
+    } catch (error) {
+      this.plugin.logger.error(`[OllamaService] General error during embedding generation for model ${model}:`, error);
+      return null;
+    }
+  }
+  async getModels(forceRefresh = false) {
+    const url = `${this.plugin.settings.ollamaServerUrl}/api/tags`;
+    this.plugin.logger.debug(`[OllamaService] Fetching models from ${url}`);
+    let modelListResult = [];
+    try {
+      const data = await this._ollamaFetch(url, "GET");
+      if (data && Array.isArray(data.models)) {
+        const modelNames = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
+        this.plugin.logger.info(`[OllamaService] Found ${modelNames.length} models.`);
+        modelListResult = modelNames;
+      } else {
+        this.plugin.logger.warn("[OllamaService] Invalid response structure received from /api/tags (expected { models: [...] }):", data);
+      }
+    } catch (e) {
+      this.plugin.logger.error(`[OllamaService] Failed to fetch models:`, e);
+    }
+    return modelListResult;
+  }
+  // End getModels
+  async getModelDetails(modelName) {
+    this.plugin.logger.debug(`[OllamaService] Fetching details for model: ${modelName}`);
+    const endpoint = "/api/show";
+    try {
+      const data = await this._ollamaFetch(
+        endpoint,
+        "POST",
+        // Explicitly pass method
+        JSON.stringify({ name: modelName })
+        // Pass the stringified body
+      );
+      return data;
+    } catch (e) {
+      this.plugin.logger.warn(`[OllamaService] Failed to get details for model ${modelName}:`, e);
+      return null;
+    }
+  }
+  /**
+       * Private helper for fetch requests to Ollama API.
+       * Now accepts method and optional string body.
+       */
+  // --- FIX: Changed method signature and implementation ---
+  async _ollamaFetch(endpoint, method, body) {
+    var _a, _b;
+    const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
+    const headers = { "Content-Type": "application/json" };
+    try {
+      const requestParams = { url, method, headers, body, throw: false };
+      const response = await (0, import_obsidian6.requestUrl)(requestParams);
+      if (response.status >= 400) {
+        let errorText = `Ollama API error! Status: ${response.status} at ${endpoint}`;
+        try {
+          errorText += `: ${response.text || ((_a = response.json) == null ? void 0 : _a.error) || "No details"}`;
+        } catch (e) {
+        }
+        this.plugin.logger.error(`[OllamaService] ${errorText}`);
+        this.emit("connection-error", new Error(errorText));
+        throw new Error(errorText);
+      }
+      if (response.status === 204 || !response.text) {
+        const errorMsg = `Ollama API success status (${response.status}) but empty response body at ${endpoint}`;
+        this.plugin.logger.warn(`[OllamaService] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+      try {
+        const jsonData = response.json;
+        if (jsonData === null || jsonData === void 0) {
+          throw new Error(`Ollama API returned null/undefined JSON at ${endpoint}`);
+        }
+        return jsonData;
+      } catch (jsonError) {
+        this.plugin.logger.error(`[OllamaService] Failed to parse JSON response from ${url}. Status: ${response.status}`, jsonError, "Response Text:", response.text);
+        throw new Error(`Failed to parse Ollama JSON response from ${endpoint}`);
+      }
+    } catch (error) {
+      this.plugin.logger.error(`[OllamaService] Error in _ollamaFetch (${url}):`, error);
+      const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: ${endpoint})`;
+      if (!((_b = error.message) == null ? void 0 : _b.includes("Ollama API error"))) {
+        this.emit("connection-error", new Error(connectionErrorMsg));
+      }
+      throw new Error(error.message || connectionErrorMsg);
+    }
+  }
+  /**
+       * Генерує відповідь чату, готуючи промпт та викликаючи generateRaw.
+       */
   async generateChatResponse(chat) {
-    var _a;
+    var _a, _b;
     if (!chat) {
-      console.error("[OllamaService] generateChatResponse called with null chat.");
+      this.plugin.logger.error("[OllamaService] generateChatResponse called with null chat.");
+      return null;
+    }
+    if (!this.promptService) {
+      this.plugin.logger.error("[OllamaService] PromptService is not initialized!");
+      new import_obsidian6.Notice("Error: Prompt service is unavailable.");
       return null;
     }
     const currentSettings = this.plugin.settings;
     const modelName = chat.metadata.modelName || currentSettings.modelName;
     const temperature = (_a = chat.metadata.temperature) != null ? _a : currentSettings.temperature;
-    const selectedRolePath = chat.metadata.selectedRolePath || currentSettings.selectedRolePath;
+    if (!modelName) {
+      this.plugin.logger.error("[OllamaService] No model specified in chat metadata or settings.");
+      new import_obsidian6.Notice("Error: No Ollama model selected.");
+      return null;
+    }
     try {
       const history = chat.getMessages();
-      const lastUserMessage = history.findLast((m) => m.role === "user");
-      if (!lastUserMessage) {
-        console.warn("[OllamaService] No user message in history for response.");
+      this.plugin.logger.debug("[OllamaService] Getting system prompt from PromptService...");
+      const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
+      this.plugin.logger.debug("[OllamaService] Preparing prompt body from PromptService...");
+      const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
+      if (promptBody === null || promptBody === void 0) {
+        this.plugin.logger.error("[OllamaService] Prompt body generation failed (returned null/undefined).");
+        new import_obsidian6.Notice("Error: Could not generate prompt body.");
         return null;
       }
-      const formattedPrompt = await this.plugin.promptService.prepareFullPrompt(history, chat.metadata);
-      const systemPrompt = await this.plugin.promptService.getSystemPromptForAPI(chat.metadata);
       const requestBody = {
         model: modelName,
-        prompt: formattedPrompt,
+        prompt: promptBody,
+        // Тут вже є історія + RAG + завдання
         stream: false,
         temperature,
         options: { num_ctx: currentSettings.contextWindow },
-        system: systemPrompt != null ? systemPrompt : void 0
+        // Додаємо system, тільки якщо він існує і не порожній
+        ...systemPrompt && { system: systemPrompt }
       };
-      console.log(`[OllamaService] Calling generateRaw for chat response: Model:"${modelName}", Temp:${temperature}`);
+      this.plugin.logger.info(`[OllamaService] Calling generateRaw for chat response: Model:"${modelName}", Temp:${temperature}, System Prompt Provided: ${!!systemPrompt}`);
+      this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", { ...requestBody, prompt: promptBody.substring(0, 200) + "..." });
       const responseData = await this.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
+        this.plugin.logger.info(`[OllamaService] Received response. Length: ${responseData.response.length} chars`);
         const assistantMessage = {
           role: "assistant",
           content: responseData.response.trim(),
           timestamp: new Date(responseData.created_at || Date.now())
+          // Використовуємо час відповіді або поточний
         };
         return assistantMessage;
       } else {
-        console.warn("[OllamaService] generateRaw returned unexpected structure:", responseData);
+        this.plugin.logger.warn("[OllamaService] generateRaw returned unexpected structure or no response.", responseData);
         throw new Error("Received unexpected or empty response from the model.");
       }
     } catch (error) {
-      console.error("[OllamaService] Error during chat response generation cycle:", error);
+      this.plugin.logger.error("[OllamaService] Error during chat response generation cycle:", error);
       let errorMessage = error instanceof Error ? error.message : "Unknown error generating response.";
       if (errorMessage.includes("model not found")) {
-        errorMessage = `Model '${modelName}' not found. Check Ollama server or model name in settings/chat.`;
+        errorMessage = `Model '${modelName}' not found. Check Ollama server or model name.`;
       } else if (errorMessage.includes("context window")) {
         errorMessage = `Context window error (${currentSettings.contextWindow} tokens): ${error.message}. Adjust context settings.`;
-      } else if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError")) {
+      } else if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError") || ((_b = error.message) == null ? void 0 : _b.includes("Failed to connect"))) {
         errorMessage = `Connection Error: Failed to reach Ollama at ${currentSettings.ollamaServerUrl}. Is it running?`;
       }
-      throw new Error(errorMessage);
-    }
-  }
-  /**
-   * Gets available models from Ollama (/api/tags).
-   */
-  async getModels() {
-    try {
-      const data = await this._ollamaFetch("/api/tags", { method: "GET" });
-      if (Array.isArray(data == null ? void 0 : data.models)) {
-        return data.models.map((m) => typeof m === "object" ? m.name : m).sort();
-      }
-      return [];
-    } catch (e) {
-      console.error("Err fetch models:", e);
-      return [];
-    }
-  }
-  /**
-   * Gets detailed information about a specific model (/api/show).
-   */
-  async getModelDetails(modelName) {
-    console.log(`Workspaceing details for: ${modelName}`);
-    try {
-      const data = await this._ollamaFetch("/api/show", { method: "POST", body: JSON.stringify({ name: modelName }) });
-      return data;
-    } catch (e) {
-      console.warn(`Fail get details for ${modelName}:`, e);
+      new import_obsidian6.Notice(errorMessage);
       return null;
-    }
-  }
-  /**
-   * Private helper for fetch requests to Ollama API.
-   */
-  async _ollamaFetch(endpoint, options) {
-    const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
-    const headers = { ...options.headers, "Content-Type": "application/json" };
-    try {
-      const response = await fetch(url, { ...options, headers });
-      if (!response.ok) {
-        let errorText = `Ollama API error! Status: ${response.status} at ${endpoint}`;
-        try {
-          const bodyText = await response.text();
-          try {
-            const errorJson = JSON.parse(bodyText);
-            errorText += `: ${errorJson.error || bodyText}`;
-          } catch (e) {
-            errorText += `: ${bodyText}`;
-          }
-        } catch (e) {
-        }
-        console.error(errorText);
-        throw new Error(errorText);
-      }
-      const text = await response.text();
-      if (!text) {
-        return null;
-      }
-      return JSON.parse(text);
-    } catch (error) {
-      console.error(`Workspace error calling Ollama (${url}):`, error);
-      const connectionErrorMsg = `Failed to connect to Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: ${endpoint})`;
-      this.emit("connection-error", new Error(connectionErrorMsg));
-      throw new Error(connectionErrorMsg);
     }
   }
 };
 
 // src/PromptService.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var PromptService = class {
-  // Кеш для деталей моделі (якщо використовується)
   constructor(plugin) {
-    // Кешування залишається таким же
     this.currentSystemPrompt = null;
+    // Кеш для системного промпту ролі
     this.currentRolePath = null;
+    // Кеш для шляху поточної ролі
     this.roleCache = {};
+    // Кеш для завантажених ролей
     this.modelDetailsCache = {};
     this.plugin = plugin;
     this.app = plugin.app;
@@ -3257,31 +3421,101 @@ var PromptService = class {
       return 0;
     return Math.ceil(text.length / 4);
   }
-  // --- Cache Clearing (Залишаємо як є) ---
   clearRoleCache() {
+    this.plugin.logger.debug("[PromptService] Clearing role definition cache.");
+    this.roleCache = {};
+    this.currentRolePath = null;
+    this.currentSystemPrompt = null;
   }
   clearModelDetailsCache() {
+    this.plugin.logger.debug("[PromptService] Clearing model details cache.");
+    this.modelDetailsCache = {};
   }
-  // ----------------------------------------
   /**
-   * Повертає фінальний системний промпт для API, включаючи інструкції для RAG.
-   * @param chatMetadata Метадані поточного чату
-   * @returns Рядок системного промпту або null.
+   * Завантажує визначення ролі (системний промпт + тип) з файлу або кешу.
    */
+  async getRoleDefinition(rolePath) {
+    var _a, _b, _c;
+    const normalizedPath = rolePath ? (0, import_obsidian7.normalizePath)(rolePath) : null;
+    if (normalizedPath === this.currentRolePath && normalizedPath && this.roleCache[normalizedPath]) {
+      return this.roleCache[normalizedPath];
+    }
+    if (normalizedPath !== this.currentRolePath) {
+      this.plugin.logger.info(`[PromptService] Role path changing from '${this.currentRolePath}' to '${normalizedPath}'. Clearing cache.`);
+      if (this.currentRolePath && this.roleCache[this.currentRolePath]) {
+        delete this.roleCache[this.currentRolePath];
+      }
+      this.currentRolePath = normalizedPath;
+      this.currentSystemPrompt = null;
+    }
+    if (!normalizedPath || !this.plugin.settings.followRole) {
+      this.plugin.logger.debug("[PromptService] No role path or followRole disabled. Role definition is null.");
+      return { systemPrompt: null, isProductivityPersona: false };
+    }
+    if (this.roleCache[normalizedPath]) {
+      this.plugin.logger.debug(`[PromptService] Returning newly cached role definition for: ${normalizedPath}`);
+      this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
+      return this.roleCache[normalizedPath];
+    }
+    this.plugin.logger.debug(`[PromptService] Loading role definition from file: ${normalizedPath}`);
+    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
+    if (file instanceof import_obsidian7.TFile) {
+      try {
+        const fileCache = this.app.metadataCache.getFileCache(file);
+        const frontmatter = fileCache == null ? void 0 : fileCache.frontmatter;
+        const content = await this.app.vault.cachedRead(file);
+        const systemPromptBody = ((_a = fileCache == null ? void 0 : fileCache.frontmatterPosition) == null ? void 0 : _a.end) ? content.substring(fileCache.frontmatterPosition.end.offset).trim() : content.trim();
+        const isProductivity = ((_b = frontmatter == null ? void 0 : frontmatter.assistant_type) == null ? void 0 : _b.toLowerCase()) === "productivity" || (frontmatter == null ? void 0 : frontmatter.is_planner) === true;
+        const definition = {
+          systemPrompt: systemPromptBody || null,
+          isProductivityPersona: isProductivity
+        };
+        this.plugin.logger.info(`[PromptService] Role loaded: ${normalizedPath}. Is Productivity: ${isProductivity}. Prompt length: ${((_c = definition.systemPrompt) == null ? void 0 : _c.length) || 0}`);
+        this.roleCache[normalizedPath] = definition;
+        this.currentSystemPrompt = definition.systemPrompt;
+        return definition;
+      } catch (error) {
+        this.plugin.logger.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
+        new import_obsidian7.Notice(`Error loading role: ${file.basename}. Check console.`);
+        this.currentSystemPrompt = null;
+        return null;
+      }
+    } else {
+      this.plugin.logger.warn(`[PromptService] Role file not found or not a file: ${normalizedPath}`);
+      this.currentSystemPrompt = null;
+      return null;
+    }
+  }
+  /**
+   * Перевіряє, чи активна зараз роль "продуктивності".
+   */
+  async _isProductivityPersonaActive(rolePath) {
+    var _a;
+    if (!this.plugin.settings.enableProductivityFeatures) {
+      return false;
+    }
+    const roleDefinition = await this.getRoleDefinition(rolePath);
+    return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
+  }
+  /**
+  * Повертає фінальний системний промпт для API, можливо включаючи RAG інструкції.
+  * Не включає RAG контент чи історію.
+  */
   async getSystemPromptForAPI(chatMetadata) {
+    var _a;
     const settings = this.plugin.settings;
-    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Received chatMetadata.selectedRolePath = '${chatMetadata.selectedRolePath}'`);
-    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Current settings.selectedRolePath = '${settings.selectedRolePath}'`);
+    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI checking chat path: '${chatMetadata.selectedRolePath}', settings path: '${settings.selectedRolePath}'`);
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
-    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Determined selectedRolePath = '${selectedRolePath}' before calling getRoleDefinition.`);
+    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI using determined path: '${selectedRolePath}'`);
     let roleDefinition = null;
     if (selectedRolePath && settings.followRole) {
-      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: Attempting to load role definition for path: '${selectedRolePath}'`);
+      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI loading definition for: '${selectedRolePath}'`);
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
     } else {
-      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI: No role path ('${selectedRolePath}') or followRole is false ('${settings.followRole}'). Skipping role load.`);
+      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI skipping role load (Path: '${selectedRolePath}', Follow: ${settings.followRole})`);
     }
     let roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
+    const isProductivityActive = (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
     const ragInstructions = `
 --- RAG Data Interpretation Rules ---
 1.  You have access to context from various files in the user's knowledge base provided under '### Context from User Notes:'.
@@ -3298,7 +3532,7 @@ var PromptService = class {
     if (roleSystemPrompt) {
       finalSystemPrompt += roleSystemPrompt.trim();
     }
-    if ((roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) && finalSystemPrompt) {
+    if (isProductivityActive && finalSystemPrompt && settings.enableProductivityFeatures) {
       const now = new Date();
       const formattedDate = now.toLocaleDateString(void 0, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
       const formattedTime = now.toLocaleTimeString(void 0, { hour: "numeric", minute: "2-digit" });
@@ -3306,103 +3540,38 @@ var PromptService = class {
       finalSystemPrompt = finalSystemPrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
     const trimmedFinalPrompt = finalSystemPrompt.trim();
-    console.log(`[PromptService] Final System Prompt Length: ${trimmedFinalPrompt.length} chars`);
+    this.plugin.logger.debug(`[PromptService] Final System Prompt Length: ${trimmedFinalPrompt.length} chars. Has content: ${trimmedFinalPrompt.length > 0}`);
     return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
   }
   /**
-   * Завантажує визначення ролі (системний промпт + тип) з файлу або кешу.
-   * (Залишаємо без змін, оскільки логіка завантаження файлу ролі коректна)
+   * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
    */
-  async getRoleDefinition(rolePath) {
-    var _a, _b;
-    const normalizedPath = rolePath ? (0, import_obsidian5.normalizePath)(rolePath) : null;
-    if (normalizedPath !== this.currentRolePath) {
-      console.log(`[PromptService] Role path changed from ${this.currentRolePath} to ${normalizedPath}. Clearing cache for this path.`);
-      if (normalizedPath && this.roleCache[normalizedPath]) {
-        delete this.roleCache[normalizedPath];
-      }
-      this.currentRolePath = normalizedPath;
-      this.currentSystemPrompt = null;
-    } else if (normalizedPath && this.roleCache[normalizedPath]) {
-      this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
-      return this.roleCache[normalizedPath];
-    }
-    if (!normalizedPath || !this.plugin.settings.followRole) {
-      this.currentSystemPrompt = null;
-      return { systemPrompt: null, isProductivityPersona: false };
-    }
-    console.log(`[PromptService] Loading role definition using metadataCache for: ${normalizedPath}`);
-    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (file instanceof import_obsidian5.TFile) {
-      try {
-        const fileCache = this.app.metadataCache.getFileCache(file);
-        const frontmatter = fileCache == null ? void 0 : fileCache.frontmatter;
-        const frontmatterPos = fileCache == null ? void 0 : fileCache.frontmatterPosition;
-        const content = await this.app.vault.cachedRead(file);
-        const systemPromptBody = (frontmatterPos == null ? void 0 : frontmatterPos.end) ? content.substring(frontmatterPos.end.offset).trim() : content.trim();
-        const assistantType = (_a = frontmatter == null ? void 0 : frontmatter.assistant_type) == null ? void 0 : _a.toLowerCase();
-        const isProductivity = assistantType === "productivity" || (frontmatter == null ? void 0 : frontmatter.is_planner) === true;
-        const definition = {
-          systemPrompt: systemPromptBody || null,
-          // Тіло промпту
-          isProductivityPersona: isProductivity
-        };
-        console.log(`[PromptService] Role loaded: ${normalizedPath}. Is Productivity Persona: ${isProductivity}. Prompt body length: ${((_b = definition.systemPrompt) == null ? void 0 : _b.length) || 0}`);
-        this.roleCache[normalizedPath] = definition;
-        this.currentSystemPrompt = definition.systemPrompt;
-        return definition;
-      } catch (error) {
-        console.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
-        new import_obsidian5.Notice(`Error loading role: ${file.basename}. Check console.`);
-        this.currentSystemPrompt = null;
-        return null;
-      }
-    } else {
-      console.warn(`[PromptService] Role file not found or not a file: ${normalizedPath}`);
-      this.currentSystemPrompt = null;
-      return null;
-    }
-  }
-  /**
-   * Перевіряє, чи активна зараз роль "продуктивності".
-   * (Залишаємо без змін)
-   */
-  async _isProductivityPersonaActive(rolePath) {
-    var _a;
-    if (!this.plugin.settings.enableProductivityFeatures) {
-      return false;
-    }
-    const roleDefinition = await this.getRoleDefinition(rolePath);
-    return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
-  }
-  /**
-   * Готує повний промпт для API, включаючи історію, контекст завдань та RAG.
-   */
-  async prepareFullPrompt(history, chatMetadata) {
+  async preparePromptBody(history, chatMetadata) {
     var _a, _b, _c, _d, _e, _f, _g;
-    console.log("[PromptService] Preparing full prompt body...");
+    this.plugin.logger.debug("[PromptService] Preparing prompt body...");
     const settings = this.plugin.settings;
-    const selectedRolePath = chatMetadata.selectedRolePath || settings.selectedRolePath;
+    const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
     const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
-    console.log(`[PromptService] Productivity features active for this request: ${isProductivityActive}`);
+    this.plugin.logger.debug(`[PromptService] Productivity features potentially active for body: ${isProductivityActive}`);
     let taskContext = "";
-    if (isProductivityActive && this.plugin.chatManager) {
+    if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
       if ((_a = this.plugin.chatManager) == null ? void 0 : _a.filePlanExists) {
         const needsUpdateBefore = (_c = (_b = this.plugin).isTaskFileUpdated) == null ? void 0 : _c.call(_b);
         await ((_e = (_d = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _e.call(_d));
         const tasksWereUpdated = needsUpdateBefore && !((_g = (_f = this.plugin).isTaskFileUpdated) == null ? void 0 : _g.call(_f));
         taskContext = tasksWereUpdated ? "\n--- Updated Tasks Context ---\n" : "\n--- Today's Tasks Context ---\n";
-        taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.length > 0 ? this.plugin.chatManager.fileUrgentTasks.join(", ") : "None"}
+        taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.join(", ") || "None"}
 `;
-        taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.length > 0 ? this.plugin.chatManager.fileRegularTasks.join(", ") : "None"}
+        taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.join(", ") || "None"}
 `;
         taskContext += "--- End Tasks Context ---";
-        console.log(`[PromptService] Injecting task context (Updated: ${tasksWereUpdated}).`);
+        this.plugin.logger.debug(`[PromptService] Injecting task context.`);
       }
     }
-    const approxContextTokens = this._countTokens(taskContext);
-    const maxHistoryTokens = settings.contextWindow - approxContextTokens - (settings.ragEnabled ? 500 : 200);
-    console.log(`[PromptService] Max tokens for history processing: ${maxHistoryTokens}`);
+    const approxTaskTokens = this._countTokens(taskContext);
+    const maxRagTokens = settings.ragEnabled ? settings.ragTopK * settings.ragChunkSize / 4 * 1.5 : 0;
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 200;
+    this.plugin.logger.debug(`[PromptService] Max tokens available for history processing: ${maxHistoryTokens}`);
     let processedHistoryString = "";
     if (isProductivityActive && settings.useAdvancedContextStrategy) {
       processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
@@ -3413,31 +3582,22 @@ var PromptService = class {
     if (settings.ragEnabled && this.plugin.ragService) {
       const lastUserMessage = history.findLast((m) => m.role === "user");
       if (lastUserMessage == null ? void 0 : lastUserMessage.content) {
-        try {
-          ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
-          if (ragContext) {
-            console.log(`[PromptService] RAG context added (${this._countTokens(ragContext)} tokens).`);
-          } else {
-            console.log("[PromptService] RAG enabled, but no relevant documents found for the last query.");
-          }
-        } catch (error) {
-          console.error("[PromptService] Error getting RAG context:", error);
-          ragContext = "\n[Error retrieving RAG context]\n";
-        }
+        ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
+        if (!ragContext)
+          this.plugin.logger.info("[PromptService] RAG prepareContext returned empty.");
       } else {
-        console.log("[PromptService] RAG enabled, but no last user message found to generate context.");
+        this.plugin.logger.warn("[PromptService] RAG enabled, but no last user message found.");
       }
     }
     const finalPromptBody = `${ragContext}${taskContext}
 
 ### Conversation History:
 ${processedHistoryString}`.trim();
-    console.log(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
-    return finalPromptBody;
+    this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
+    return finalPromptBody.length > 0 ? finalPromptBody : null;
   }
-  // --- Методи обробки контексту та підсумовування ---
-  // (Залишаються без змін, використовують this._countTokens)
-  // --- ВИПРАВЛЕННЯ: Повна реалізація _buildSimpleContext ---
+  // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages залишаються
+  // але мають використовувати this.plugin.logger замість console.log/warn
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
@@ -3449,106 +3609,39 @@ ${processedHistoryString}`.trim();
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
       } else {
-        console.log(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens).`);
+        this.plugin.logger.debug(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens).`);
         break;
       }
     }
     return context.trim();
   }
-  // -------------------------------------------------------
-  // --- ВИПРАВЛЕННЯ: Повна реалізація _buildAdvancedContext ---
   async _buildAdvancedContext(history, chatMetadata, maxTokens) {
-    console.log("[PromptService] Building advanced context...");
+    this.plugin.logger.debug("[PromptService] Building advanced context...");
     const settings = this.plugin.settings;
     const processedParts = [];
     let currentTokens = 0;
     const keepN = Math.min(history.length, settings.keepLastNMessagesBeforeSummary || 3);
     const messagesToKeep = history.slice(-keepN);
     const messagesToProcess = history.slice(0, -keepN);
-    console.log(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
+    this.plugin.logger.debug(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
     if (messagesToProcess.length > 0) {
       if (settings.enableSummarization) {
-        console.log("[PromptService] Summarization enabled...");
-        let remainingMessages = [...messagesToProcess];
-        while (remainingMessages.length > 0) {
-          let chunkTokens = 0;
-          let chunkMessages = [];
-          while (remainingMessages.length > 0 && chunkTokens < (settings.summarizationChunkSize || 1e3)) {
-            const msg = remainingMessages[remainingMessages.length - 1];
-            const msgText = `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content.trim()}`;
-            const msgTokens = this._countTokens(msgText) + 5;
-            if (chunkTokens + msgTokens <= (settings.summarizationChunkSize || 1e3)) {
-              chunkMessages.unshift(remainingMessages.pop());
-              chunkTokens += msgTokens;
-            } else {
-              break;
-            }
-          }
-          if (chunkMessages.length > 0) {
-            const chunkCombinedText = chunkMessages.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n\n");
-            const actualChunkTokens = this._countTokens(chunkCombinedText);
-            if (currentTokens + actualChunkTokens <= maxTokens) {
-              console.log(`[PromptService] Adding chunk (${actualChunkTokens} tokens) directly.`);
-              processedParts.unshift(chunkCombinedText);
-              currentTokens += actualChunkTokens;
-            } else {
-              console.log(`[PromptService] Chunk (${actualChunkTokens} tokens) too large or exceeds maxTokens. Summarizing.`);
-              const summary = await this._summarizeMessages(chunkMessages, chatMetadata);
-              if (summary) {
-                const summaryText = `[Summary of previous messages]:
-${summary}`;
-                const summaryTokens = this._countTokens(summaryText) + 10;
-                if (currentTokens + summaryTokens <= maxTokens) {
-                  console.log(`[PromptService] Adding summary (${summaryTokens} tokens).`);
-                  processedParts.unshift(summaryText);
-                  currentTokens += summaryTokens;
-                } else {
-                  console.warn(`[PromptService] Summary too large to fit (${summaryTokens} tokens). Skipping.`);
-                  break;
-                }
-              } else {
-                console.warn("[PromptService] Summarization failed or returned null. Skipping chunk.");
-              }
-            }
-          }
-        }
+        this.plugin.logger.info("[PromptService] Summarization enabled...");
       } else {
-        console.log("[PromptService] Summarization disabled. Including older messages directly if space allows.");
-        let olderHistoryString = this._buildSimpleContext(messagesToProcess, maxTokens - currentTokens);
-        if (olderHistoryString) {
-          processedParts.unshift(olderHistoryString);
-          currentTokens += this._countTokens(olderHistoryString);
-        } else {
-          console.log("[PromptService] Not enough space for older messages without summarization.");
-        }
+        this.plugin.logger.info("[PromptService] Summarization disabled. Including older messages directly if space allows.");
       }
     }
-    const keepHistoryString = messagesToKeep.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n\n");
-    const keepHistoryTokens = this._countTokens(keepHistoryString);
-    if (currentTokens + keepHistoryTokens <= maxTokens) {
-      processedParts.push(keepHistoryString);
-      currentTokens += keepHistoryTokens;
-    } else {
-      console.warn(`[PromptService] Cannot fit all 'keepLastNMessages'. Truncating.`);
-      const truncatedKeepHistory = this._buildSimpleContext(messagesToKeep, maxTokens - currentTokens);
-      if (truncatedKeepHistory) {
-        processedParts.push(truncatedKeepHistory);
-        currentTokens += this._countTokens(truncatedKeepHistory);
-      }
-    }
-    console.log(`[PromptService] Advanced context built. Total approx tokens: ${currentTokens}`);
+    this.plugin.logger.debug(`[PromptService] Advanced context built. Total approx tokens: ${currentTokens}`);
     return processedParts.join("\n\n").trim();
   }
-  // --------------------------------------------------------
-  // --- ВИПРАВЛЕННЯ: Повна реалізація _summarizeMessages ---
   async _summarizeMessages(messagesToSummarize, chatMetadata) {
     if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
       return null;
     }
-    console.log(`[PromptService] Summarizing chunk of ${messagesToSummarize.length} messages...`);
+    this.plugin.logger.info(`[PromptService] Summarizing chunk of ${messagesToSummarize.length} messages...`);
     const textToSummarize = messagesToSummarize.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
     if (!textToSummarize.trim()) {
-      console.log("[PromptService] No actual text content in messages to summarize.");
+      this.plugin.logger.warn("[PromptService] No actual text content in messages to summarize.");
       return null;
     }
     const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely:\n\n{text_to_summarize}";
@@ -3560,42 +3653,37 @@ ${summary}`;
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.3,
-      // Низька температура для більш передбачуваного саммарі
       options: {
         num_ctx: summarizationContextWindow
-        // Використовуємо окремий ліміт
-        // Можна додати stop токени, якщо потрібно
       },
-      // Системний промпт для сумаризації
       system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points and decisions."
     };
     try {
       if (!this.plugin.ollamaService) {
-        console.error("[PromptService] OllamaService is not available for summarization.");
+        this.plugin.logger.error("[PromptService] OllamaService is not available for summarization.");
         return null;
       }
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
         const summary = responseData.response.trim();
-        console.log(`[PromptService] Summarization successful (${this._countTokens(summary)} tokens).`);
+        this.plugin.logger.info(`[PromptService] Summarization successful (${this._countTokens(summary)} tokens).`);
         return summary;
       } else {
-        console.warn("[PromptService] Summarization request returned unexpected structure:", responseData);
+        this.plugin.logger.warn("[PromptService] Summarization request returned unexpected structure:", responseData);
         return null;
       }
     } catch (error) {
-      console.error("[PromptService] Error during summarization request:", error);
+      this.plugin.logger.error("[PromptService] Error during summarization request:", error, "Request body (first 100 chars):", JSON.stringify(requestBody).substring(0, 100));
       return null;
     }
   }
-  // -------------------------------------------------
 };
 
 // src/ChatManager.ts
-var import_obsidian7 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/Chat.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 var Chat = class {
   // Debounced function for saving
   /**
@@ -3613,9 +3701,9 @@ var Chat = class {
       const errorMsg = "[Chat] Critical Error: Chat constructor called without a valid filePath.";
       console.error(errorMsg, { settings, data });
       this.filePath = `INVALID_PATH_${((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) || Date.now()}.json`;
-      new import_obsidian6.Notice("Critical Error: Chat created without a valid save path!");
+      new import_obsidian8.Notice("Critical Error: Chat created without a valid save path!");
     } else {
-      this.filePath = (0, import_obsidian6.normalizePath)(filePath);
+      this.filePath = (0, import_obsidian8.normalizePath)(filePath);
     }
     console.log(`[Chat ${(_c = (_b = data == null ? void 0 : data.metadata) == null ? void 0 : _b.id) != null ? _c : "initializing"}] Initialized. File path set to: ${this.filePath}`);
     this.metadata = data.metadata;
@@ -3624,7 +3712,7 @@ var Chat = class {
       timestamp: new Date(m.timestamp)
       // Ensure timestamp is a Date object
     }));
-    this.debouncedSave = (0, import_obsidian6.debounce)(this._saveToFile.bind(this), 1500, true);
+    this.debouncedSave = (0, import_obsidian8.debounce)(this._saveToFile.bind(this), 1500, true);
   }
   // --- Message Management ---
   /**
@@ -3718,7 +3806,7 @@ var Chat = class {
       return true;
     } catch (error) {
       console.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
-      new import_obsidian6.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
+      new import_obsidian8.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
@@ -3732,7 +3820,7 @@ var Chat = class {
    */
   static async loadFromFile(filePath, adapter, settings) {
     var _a;
-    const normPath = (0, import_obsidian6.normalizePath)(filePath);
+    const normPath = (0, import_obsidian8.normalizePath)(filePath);
     console.log(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
     try {
       if (!await adapter.exists(normPath)) {
@@ -3746,12 +3834,12 @@ var Chat = class {
         return new Chat(adapter, settings, data, normPath);
       } else {
         console.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
-        new import_obsidian6.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
+        new import_obsidian8.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
         return null;
       }
     } catch (e) {
       console.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
-      new import_obsidian6.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
+      new import_obsidian8.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
       return null;
     }
   }
@@ -3771,7 +3859,7 @@ var Chat = class {
       return true;
     } catch (e) {
       console.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
-      new import_obsidian6.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
+      new import_obsidian8.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
@@ -3809,7 +3897,7 @@ var ChatManager = class {
   updateChatsFolderPath() {
     var _a;
     const settingsPath = (_a = this.plugin.settings.chatHistoryFolderPath) == null ? void 0 : _a.trim();
-    this.chatsFolderPath = settingsPath ? (0, import_obsidian7.normalizePath)(settingsPath) : "/";
+    this.chatsFolderPath = settingsPath ? (0, import_obsidian9.normalizePath)(settingsPath) : "/";
     console.log(`[ChatManager] Updated chatsFolderPath to: ${this.chatsFolderPath}`);
   }
   /** Оновлює стан завдань на основі даних, отриманих з плагіна. */
@@ -3854,13 +3942,13 @@ var ChatManager = class {
         if ((stat == null ? void 0 : stat.type) !== "folder") {
           const errorMsg = `Error: Configured chat history path '${this.chatsFolderPath}' exists but is not a folder.`;
           console.error(`[ChatManager] ${errorMsg}`);
-          new import_obsidian7.Notice(errorMsg);
+          new import_obsidian9.Notice(errorMsg);
         }
       }
     } catch (error) {
       const errorMsg = `Error creating/checking chat history directory '${this.chatsFolderPath}'.`;
       console.error(`[ChatManager] ${errorMsg}`, error);
-      new import_obsidian7.Notice(errorMsg);
+      new import_obsidian9.Notice(errorMsg);
     }
   }
   /**
@@ -3892,7 +3980,7 @@ var ChatManager = class {
       filesScanned = chatFiles.length;
       this.plugin.logger.info(`[ChatManager] Found ${filesScanned} potential chat files.`);
       for (const filePath of chatFiles) {
-        const fullPath = (0, import_obsidian7.normalizePath)(filePath);
+        const fullPath = (0, import_obsidian9.normalizePath)(filePath);
         const fileName = path.basename(fullPath);
         const chatId = fileName.endsWith(".json") ? fileName.slice(0, -5) : null;
         if (!chatId) {
@@ -3927,7 +4015,7 @@ var ChatManager = class {
       console.error(`[ChatManager] Critical error during index rebuild:`, error);
       this.sessionIndex = {};
       await this.saveChatIndex();
-      new import_obsidian7.Notice("Error rebuilding chat index.");
+      new import_obsidian9.Notice("Error rebuilding chat index.");
     }
   }
   /** Зберігає поточний індекс чатів у сховище плагіна. */
@@ -3937,7 +4025,7 @@ var ChatManager = class {
   /** Генерує повний шлях до файлу чату. */
   getChatFilePath(id) {
     const fileName = `${id}.json`;
-    return this.chatsFolderPath === "/" || !this.chatsFolderPath ? (0, import_obsidian7.normalizePath)(fileName) : (0, import_obsidian7.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
+    return this.chatsFolderPath === "/" || !this.chatsFolderPath ? (0, import_obsidian9.normalizePath)(fileName) : (0, import_obsidian9.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
   }
   /** Зберігає дані вказаного чату у файл. */
   async saveChat(chat) {
@@ -3956,7 +4044,7 @@ var ChatManager = class {
       return true;
     } catch (error) {
       console.error(`[ChatManager] Error saving chat ${chat.metadata.id} to ${chat.filePath}:`, error);
-      new import_obsidian7.Notice(`Error saving chat: ${chat.metadata.name}`);
+      new import_obsidian9.Notice(`Error saving chat: ${chat.metadata.name}`);
       return false;
     }
   }
@@ -3988,7 +4076,7 @@ var ChatManager = class {
       return newChat;
     } catch (error) {
       console.error("[ChatManager] Error creating new chat:", error);
-      new import_obsidian7.Notice("Error creating new chat session.");
+      new import_obsidian9.Notice("Error creating new chat session.");
       return null;
     }
   }
@@ -4082,7 +4170,7 @@ var ChatManager = class {
       return newMessage;
     } else {
       console.error("[ChatManager] Cannot add message, no active chat.");
-      new import_obsidian7.Notice("Error: No active chat session to add message to.");
+      new import_obsidian9.Notice("Error: No active chat session to add message to.");
       return null;
     }
   }
@@ -4094,7 +4182,7 @@ var ChatManager = class {
       this.plugin.emit("messages-cleared", activeChat.metadata.id);
     } else {
       console.warn("[ChatManager] Cannot clear messages, no active chat.");
-      new import_obsidian7.Notice("No active chat to clear.");
+      new import_obsidian9.Notice("No active chat to clear.");
     }
   }
   /** Оновлює метадані активного чату та генерує відповідні події. */
@@ -4105,7 +4193,7 @@ var ChatManager = class {
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
       console.warn("[ChatManager] Cannot update metadata, no active chat.");
-      new import_obsidian7.Notice("No active chat to update metadata for.");
+      new import_obsidian9.Notice("No active chat to update metadata for.");
       return false;
     }
     const oldRolePath = activeChat.metadata.selectedRolePath;
@@ -4132,7 +4220,7 @@ var ChatManager = class {
       return true;
     } else {
       console.error(`[ChatManager] Failed to save chat file after metadata update for ${activeChat.metadata.id}.`);
-      new import_obsidian7.Notice("Error saving chat after metadata update.");
+      new import_obsidian9.Notice("Error saving chat after metadata update.");
       return false;
     }
   }
@@ -4150,7 +4238,7 @@ var ChatManager = class {
       deletedFile = true;
     } catch (error) {
       console.error(`[ChatManager] Error deleting chat file ${filePath}:`, error);
-      new import_obsidian7.Notice(`Error deleting chat file for ID ${id}.`);
+      new import_obsidian9.Notice(`Error deleting chat file for ID ${id}.`);
       deletedFile = false;
     }
     if (this.sessionIndex[id]) {
@@ -4173,29 +4261,29 @@ var ChatManager = class {
   async renameChat(id, newName) {
     const trimmedName = newName.trim();
     if (!trimmedName) {
-      new import_obsidian7.Notice("Chat name cannot be empty.");
+      new import_obsidian9.Notice("Chat name cannot be empty.");
       return false;
     }
     if (!this.sessionIndex[id]) {
       console.warn(`[ChatManager] Cannot rename chat ${id}: Not found in index.`);
-      new import_obsidian7.Notice(`Chat with ID ${id} not found.`);
+      new import_obsidian9.Notice(`Chat with ID ${id} not found.`);
       return false;
     }
     console.log(`[ChatManager] Renaming chat ${id} to "${trimmedName}"`);
     const chatToRename = await this.getChat(id);
     if (!chatToRename) {
       console.error(`[ChatManager] Failed to load chat ${id} for renaming.`);
-      new import_obsidian7.Notice(`Error loading chat data for rename.`);
+      new import_obsidian9.Notice(`Error loading chat data for rename.`);
       return false;
     }
     chatToRename.updateMetadata({ name: trimmedName });
     const saved = await this.saveChat(chatToRename);
     if (saved) {
-      new import_obsidian7.Notice(`Chat renamed to "${trimmedName}"`);
+      new import_obsidian9.Notice(`Chat renamed to "${trimmedName}"`);
       return true;
     } else {
       console.error(`[ChatManager] Failed to save renamed chat file for ${id}.`);
-      new import_obsidian7.Notice(`Error saving renamed chat ${trimmedName}.`);
+      new import_obsidian9.Notice(`Error saving renamed chat ${trimmedName}.`);
       return false;
     }
   }
@@ -4204,7 +4292,7 @@ var ChatManager = class {
     const originalChat = await this.getChat(chatIdToClone);
     if (!originalChat) {
       console.error(`[ChatManager] Cannot clone: Original chat ${chatIdToClone} not found.`);
-      new import_obsidian7.Notice("Original chat not found for cloning.");
+      new import_obsidian9.Notice("Original chat not found for cloning.");
       return null;
     }
     try {
@@ -4234,7 +4322,7 @@ var ChatManager = class {
       return clonedChat;
     } catch (error) {
       console.error("[ChatManager] Error cloning chat:", error);
-      new import_obsidian7.Notice("An error occurred while cloning the chat.");
+      new import_obsidian9.Notice("An error occurred while cloning the chat.");
       return null;
     }
   }
@@ -4244,7 +4332,7 @@ var ChatManager = class {
 var import_child_process = require("child_process");
 
 // src/TranslationService.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 var GOOGLE_TRANSLATE_API_URL = "https://translation.googleapis.com/language/translate/v2";
 var TranslationService = class {
   constructor(plugin) {
@@ -4265,7 +4353,7 @@ var TranslationService = class {
     }
     if (!apiKey) {
       console.error("Google Translation API Key is missing.");
-      new import_obsidian8.Notice("Translation Error: Google Cloud Translation API Key is not configured in settings.");
+      new import_obsidian10.Notice("Translation Error: Google Cloud Translation API Key is not configured in settings.");
       return null;
     }
     if (!text) {
@@ -4274,7 +4362,7 @@ var TranslationService = class {
     }
     if (!targetLang) {
       console.error("Target language is not set for translation.");
-      new import_obsidian8.Notice("Translation Error: Target language not configured.");
+      new import_obsidian10.Notice("Translation Error: Target language not configured.");
       return null;
     }
     console.log(`[TranslationService] Translating to ${targetLang}...`);
@@ -4295,7 +4383,7 @@ var TranslationService = class {
       if (!response.ok) {
         const errorMsg = ((_a = data.error) == null ? void 0 : _a.message) || `HTTP error ${response.status}`;
         console.error(`Google Translate API error: ${errorMsg}`, data);
-        new import_obsidian8.Notice(`Translation Error: ${errorMsg}`);
+        new import_obsidian10.Notice(`Translation Error: ${errorMsg}`);
         return null;
       }
       if (((_b = data.data) == null ? void 0 : _b.translations) && data.data.translations.length > 0) {
@@ -4304,12 +4392,12 @@ var TranslationService = class {
         return translatedText;
       } else {
         console.error("Google Translate API returned unexpected response structure:", data);
-        new import_obsidian8.Notice("Translation Error: Unexpected response from API.");
+        new import_obsidian10.Notice("Translation Error: Unexpected response from API.");
         return null;
       }
     } catch (error) {
       console.error("Error calling Google Translate API:", error);
-      new import_obsidian8.Notice(`Translation Error: Failed to fetch. ${error.message}`);
+      new import_obsidian10.Notice(`Translation Error: Failed to fetch. ${error.message}`);
       return null;
     }
   }
@@ -4326,7 +4414,7 @@ var TranslationService = class {
 };
 
 // src/Logger.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 var LogLevel = /* @__PURE__ */ ((LogLevel3) => {
   LogLevel3[LogLevel3["DEBUG"] = 1] = "DEBUG";
   LogLevel3[LogLevel3["INFO"] = 2] = "INFO";
@@ -4349,7 +4437,7 @@ var Logger = class {
     this.writeDebounceTimeout = null;
     this.plugin = plugin;
     this.adapter = plugin.app.vault.adapter;
-    this.logFilePath = (0, import_obsidian9.normalizePath)(initialSettings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
+    this.logFilePath = (0, import_obsidian11.normalizePath)(initialSettings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
     this.logFileMaxSizeMB = initialSettings.logFileMaxSizeMB || 5;
     this.updateSettings(initialSettings);
     console.log(`[Logger] Initialized. Console Level: ${this.getLogLevelName(this.consoleLogLevel)}, File Logging: ${this.fileLoggingEnabled}, File Level: ${this.getLogLevelName(this.fileLogLevel)}, Log Caller: ${this.logCallerInfo}, Path: ${this.logFilePath}`);
@@ -4533,7 +4621,7 @@ var Logger = class {
 
 // src/main.ts
 var ACTIVE_SESSION_ID_KEY2 = "activeChatSessionId_v1";
-var OllamaPlugin = class extends import_obsidian10.Plugin {
+var OllamaPlugin = class extends import_obsidian12.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -4617,7 +4705,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
       console.error("[OllamaPlugin] Connection error event:", error);
       this.emit("ollama-connection-error", error.message);
       if (!this.view) {
-        new import_obsidian10.Notice(`Failed to connect to Ollama: ${error.message}`);
+        new import_obsidian12.Notice(`Failed to connect to Ollama: ${error.message}`);
       }
     });
     this.register(this.on("ollama-connection-error", (message) => {
@@ -4654,12 +4742,12 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: async () => {
       await this.listRoleFiles(true);
       this.emit("roles-updated");
-      new import_obsidian10.Notice("Role list refreshed.");
+      new import_obsidian12.Notice("Role list refreshed.");
     } });
     this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: async () => {
       const newChat = await this.chatManager.createNewChat();
       if (newChat) {
-        new import_obsidian10.Notice(`Created new chat: ${newChat.metadata.name}`);
+        new import_obsidian12.Notice(`Created new chat: ${newChat.metadata.name}`);
       }
     } });
     this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: async () => {
@@ -4681,7 +4769,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
         }, 5e3);
       }
     });
-    const debouncedRoleClear = (0, import_obsidian10.debounce)(() => {
+    const debouncedRoleClear = (0, import_obsidian12.debounce)(() => {
       var _a, _b;
       console.log("[OllamaPlugin] Role change detected, clearing cache & emitting.");
       this.roleListCache = null;
@@ -4743,7 +4831,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     var _a, _b;
     const folderPath = (_a = this.settings.ragFolderPath) == null ? void 0 : _a.trim();
     const fileName = (_b = this.settings.dailyTaskFileName) == null ? void 0 : _b.trim();
-    const newPath = folderPath && fileName ? (0, import_obsidian10.normalizePath)(`${folderPath}/${fileName}`) : null;
+    const newPath = folderPath && fileName ? (0, import_obsidian12.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
       console.log(`[Plugin] Daily task file path changed to: ${newPath}`);
       this.dailyTaskFilePath = newPath;
@@ -4822,16 +4910,16 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
   // --- Кінець логіки файлу завдань ---
   // Обробник змін для ролей та RAG
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear) {
-    const normPath = (0, import_obsidian10.normalizePath)(changedPath);
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const defaultRolesPath = (0, import_obsidian10.normalizePath)(this.manifest.dir + "/roles");
+    const normPath = (0, import_obsidian12.normalizePath)(changedPath);
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian12.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const defaultRolesPath = (0, import_obsidian12.normalizePath)(this.manifest.dir + "/roles");
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/") || normPath.startsWith(defaultRolesPath + "/")) {
         console.log(`[Plugin] Role file change detected: ${normPath}`);
         debouncedRoleClear();
       }
     }
-    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.ragFolderPath) : null;
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian12.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && normPath.startsWith(ragFolderPath + "/")) {
       console.log(`[Plugin] RAG file change detected: ${normPath}`);
       this.debounceIndexUpdate();
@@ -4932,7 +5020,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
       await this.chatManager.clearActiveChatMessages();
     } else {
       console.error("ChatManager not ready when clearMessageHistory called.");
-      new import_obsidian10.Notice("Error: Chat Manager not ready.");
+      new import_obsidian12.Notice("Error: Chat Manager not ready.");
     }
   }
   // List Role Files Method
@@ -4953,7 +5041,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     const pluginDir = this.manifest.dir;
     const builtInRoleName = "Productivity Assistant";
     const builtInRoleFileName = "Productivity_Assistant.md";
-    const builtInRolePath = (0, import_obsidian10.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+    const builtInRolePath = (0, import_obsidian12.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
     try {
       if (await adapter.exists(builtInRolePath)) {
         const stat = await adapter.stat(builtInRolePath);
@@ -4973,7 +5061,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     } catch (error) {
       this.logger.error(`Error checking/adding built-in role at ${builtInRolePath}:`, error);
     }
-    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian10.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian12.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath) {
       this.logger.debug(`Processing user roles from: ${userRolesFolderPath}`);
       try {
@@ -5100,7 +5188,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     }
     if (typeof process === "undefined" || !((_a = process == null ? void 0 : process.versions) == null ? void 0 : _a.node)) {
       console.error("Node.js environment not available. Cannot execute system command.");
-      new import_obsidian10.Notice("Cannot execute system command.");
+      new import_obsidian12.Notice("Cannot execute system command.");
       return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required") };
     }
     return new Promise((resolve) => {
@@ -5118,13 +5206,13 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
   // --- Session Management Command Helpers ---
   // Ці методи зараз не використовуються View, але можуть бути корисними для команд
   async showChatSwitcher() {
-    new import_obsidian10.Notice("Switch Chat UI not implemented yet.");
+    new import_obsidian12.Notice("Switch Chat UI not implemented yet.");
   }
   async renameActiveChat() {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian10.Notice("No active chat.");
+      new import_obsidian12.Notice("No active chat.");
       return;
     }
     const currentName = activeChat.metadata.name;
@@ -5137,7 +5225,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
         if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
           await this.chatManager.renameChat(activeChat.metadata.id, newName.trim());
         } else if (newName !== null) {
-          new import_obsidian10.Notice("Rename cancelled or name unchanged.");
+          new import_obsidian12.Notice("Rename cancelled or name unchanged.");
         }
       }
     ).open();
@@ -5146,7 +5234,7 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian10.Notice("No active chat.");
+      new import_obsidian12.Notice("No active chat.");
       return;
     }
     const chatName = activeChat.metadata.name;
