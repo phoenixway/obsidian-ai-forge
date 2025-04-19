@@ -192,7 +192,6 @@ export class OllamaView extends ItemView {
     this.initSpeechWorker();
     // Переконуємось, що handleScroll визначено ПЕРЕД цим рядком
     this.scrollListenerDebounced = debounce(this.handleScroll, 150, true);
-    console.log("[OllamaView] Constructed.");
   }
 
   // --- Getters ---
@@ -207,7 +206,6 @@ export class OllamaView extends ItemView {
   getIcon(): string { return "brain-circuit"; }
 
   async onOpen(): Promise<void> {
-    console.log("[OllamaView] onOpen START");
     this.createUIElements();
     // Оновлюємо плейсхолдер на основі ролі при відкритті
     this.getCurrentRoleDisplayName().then(roleName => {
@@ -222,7 +220,7 @@ export class OllamaView extends ItemView {
       // loadAndDisplayActiveChat тепер сам оновить і модель, і роль/плейсхолдер
       await this.loadAndDisplayActiveChat();
     } catch (error) {
-      console.error("[OllamaView] Error during initial chat load:", error);
+      this.plugin.logger.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState();
       // Якщо завантаження чату не вдалось, все одно встановимо плейсхолдер і модель
       this.getCurrentRoleDisplayName().then(roleName => {
@@ -234,12 +232,10 @@ export class OllamaView extends ItemView {
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event('input'));
     }
-    console.log("[OllamaView] onOpen END");
   }
 
 
   async onClose(): Promise<void> {
-    console.log("[OllamaView] onClose: Cleaning up...");
     if (this.speechWorker) { this.speechWorker.terminate(); this.speechWorker = null; }
     this.stopVoiceRecording(false);
     if (this.audioStream) { this.audioStream.getTracks().forEach(t => t.stop()); this.audioStream = null; }
@@ -330,7 +326,6 @@ export class OllamaView extends ItemView {
 
   // --- Event Listeners (with Custom Div Menu) ---
   private attachEventListeners(): void {
-    console.log("[OllamaView Debug] Attaching event listeners START");
     // Перевірки існування елементів
     if (!this.inputEl) console.error("inputEl missing!"); 
     if (!this.sendButton) console.error("sendButton missing!"); 
@@ -350,11 +345,10 @@ export class OllamaView extends ItemView {
     if (this.menuButton) this.menuButton.addEventListener("click", this.handleMenuClick); // Головне кастомне меню
     if (this.modelDisplayEl) this.registerDomEvent(this.modelDisplayEl, 'click', this.handleModelDisplayClick); // Спливаюче меню моделей
 
-    console.log(`OllamaView.ts ->  ROLEDISPLAY: ` + this.roleDisplayEl);
     if (this.roleDisplayEl) {
       this.registerDomEvent(this.roleDisplayEl, 'click', this.handleRoleDisplayClick);
     } else {
-      console.error("roleDisplayEl missing!");
+      this.plugin.logger.error("roleDisplayEl missing!");
     }
 
     // Слухачі для кастомного меню (акордеон)
@@ -386,7 +380,9 @@ export class OllamaView extends ItemView {
     this.registerDomEvent(document, 'click', this.handleDocumentClickForMenu);
     this.registerDomEvent(document, 'visibilitychange', this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange));
-    if (this.chatContainer) { this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced); console.log("[OllamaView] Attached listener to chatContainer scroll"); } else { console.error("chatContainer missing!") }
+    if (this.chatContainer) { this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced); 
+    } else { 
+      this.plugin.logger.error("chatContainer missing!") }
     if (this.newMessagesIndicatorEl) { this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick); }
 
 
@@ -524,11 +520,9 @@ export class OllamaView extends ItemView {
     if (!this.menuDropdown) { console.error("menuDropdown missing!"); return; } // Safety check
     const isHidden = this.menuDropdown.style.display === 'none';
     if (isHidden) {
-      console.log("[OllamaView Debug] Opening menu...");
       this.menuDropdown.style.display = "block";
       this.collapseAllSubmenus(null); // Collapse all when opening main menu
     } else {
-      console.log("[OllamaView Debug] Closing menu...");
       this.closeMenu();
     }
   }
@@ -538,7 +532,6 @@ export class OllamaView extends ItemView {
     if (!headerEl || !contentEl) return;
     const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
     const isHidden = contentEl.style.maxHeight === '0px' || contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-    console.log(`[OllamaView Debug] Toggling submenu '${type}'. Hidden: ${isHidden}`);
     if (isHidden) { this.collapseAllSubmenus(contentEl); } // Collapse others first
 
     if (isHidden) {
@@ -555,7 +548,9 @@ export class OllamaView extends ItemView {
           case 'chats': await this.renderChatListMenu(); break;
         }
         requestAnimationFrame(() => { if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) { contentEl.style.maxHeight = contentEl.scrollHeight + 'px'; } });
-      } catch (error) { console.error(`Error rendering ${type} list:`, error); contentEl.empty(); contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` }); contentEl.style.maxHeight = '50px'; }
+      } catch (error) { 
+        this.plugin.logger.error(`Error rendering ${type} list:`, error); 
+        contentEl.empty(); contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` }); contentEl.style.maxHeight = '50px'; }
     } else {
       // --- Collapse ---
       contentEl.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
@@ -587,8 +582,10 @@ export class OllamaView extends ItemView {
   }
 
   // --- Action Handlers (Must call closeMenu) ---
-  private handleNewChatClick = async (): Promise<void> => { this.closeMenu(); console.log("[OllamaView Debug] Action: New Chat"); try { const newChat = await this.plugin.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); this.focusInput(); } else { new Notice("Failed to create new chat."); } } catch (error) { new Notice("Error creating new chat."); } }
-  private handleRenameChatClick = async (): Promise<void> => { this.closeMenu(); console.log("[OllamaView Debug] Action: Rename Chat"); const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to rename."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { let noticeMessage = "Rename cancelled or name unchanged."; if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { noticeMessage = `Chat renamed to "${newName.trim()}"`; } else { noticeMessage = "Failed to rename chat."; } } else if (newName?.trim() === currentName) { noticeMessage = "Name unchanged."; } else { noticeMessage = "Rename cancelled or invalid name entered."; } new Notice(noticeMessage); this.focusInput(); }).open(); }
+  private handleNewChatClick = async (): Promise<void> => { this.closeMenu(); 
+    try { const newChat = await this.plugin.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); this.focusInput(); } else { new Notice("Failed to create new chat."); } } catch (error) { new Notice("Error creating new chat."); } }
+  private handleRenameChatClick = async (): Promise<void> => { this.closeMenu(); 
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to rename."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { let noticeMessage = "Rename cancelled or name unchanged."; if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { noticeMessage = `Chat renamed to "${newName.trim()}"`; } else { noticeMessage = "Failed to rename chat."; } } else if (newName?.trim() === currentName) { noticeMessage = "Name unchanged."; } else { noticeMessage = "Rename cancelled or invalid name entered."; } new Notice(noticeMessage); this.focusInput(); }).open(); }
   private handleCloneChatClick = async (): Promise<void> => { this.closeMenu(); console.log("[OllamaView Debug] Action: Clone Chat"); const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to clone."); return; } const originalName = activeChat.metadata.name; const cloningNotice = new Notice("Cloning chat...", 0); try { const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id); if (clonedChat) { new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`); } else { new Notice("Failed to clone chat."); } } catch (error) { new Notice("An error occurred while cloning the chat."); } finally { cloningNotice.hide(); } }
   private handleClearChatClick = async (): Promise<void> => { this.closeMenu(); console.log("[OllamaView Debug] Action: Clear Chat"); const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Clear Chat Messages', `Are you sure you want to clear all messages in chat "${chatName}"?\nThis action cannot be undone.`, () => { this.plugin.chatManager.clearActiveChatMessages(); }).open(); } else { new Notice("No active chat to clear."); } }
   private handleDeleteChatClick = async (): Promise<void> => { this.closeMenu(); console.log("[OllamaView Debug] Action: Delete Chat"); const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Delete Chat', `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, async () => { const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id); if (success) { new Notice(`Chat "${chatName}" deleted.`); } else { new Notice(`Failed to delete chat "${chatName}".`); } }).open(); } else { new Notice("No active chat to delete."); } }
@@ -598,13 +595,7 @@ export class OllamaView extends ItemView {
 
   // --- Plugin Event Handlers ---
   private handleModelChange = (modelName: string): void => {
-    // Цей обробник реагує на ЗМІНУ МОДЕЛІ АКТИВНОГО ЧАТУ
-    console.log(`[AI Forge View Debug] handleModelChange received modelName: '${modelName}'`);
     this.updateModelDisplay(modelName);
-    // Не оновлюємо плейсхолдер тут, бо він залежить від ролі
-    // Повідомлення про зміну моделі додається ЛИШЕ якщо ця зміна стосується поточного чату,
-    // а не глобального дефолтного налаштування. Потрібно розрізняти ці випадки,
-    // але поки що залишимо так - при зміні дефолту може з'явитися системне повідомлення.
     if (this.currentMessages.length > 0) {
       this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
     }

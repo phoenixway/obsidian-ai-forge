@@ -466,18 +466,15 @@ var OllamaView = class extends import_obsidian3.ItemView {
       }
       const isHidden = this.menuDropdown.style.display === "none";
       if (isHidden) {
-        console.log("[OllamaView Debug] Opening menu...");
         this.menuDropdown.style.display = "block";
         this.collapseAllSubmenus(null);
       } else {
-        console.log("[OllamaView Debug] Closing menu...");
         this.closeMenu();
       }
     };
     // --- Action Handlers (Must call closeMenu) ---
     this.handleNewChatClick = async () => {
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: New Chat");
       try {
         const newChat = await this.plugin.chatManager.createNewChat();
         if (newChat) {
@@ -493,7 +490,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.handleRenameChatClick = async () => {
       var _a;
       this.closeMenu();
-      console.log("[OllamaView Debug] Action: Rename Chat");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       if (!activeChat) {
         new import_obsidian3.Notice("No active chat to rename.");
@@ -642,7 +638,6 @@ This action cannot be undone.`, async () => {
     };
     // --- Plugin Event Handlers ---
     this.handleModelChange = (modelName) => {
-      console.log(`[AI Forge View Debug] handleModelChange received modelName: '${modelName}'`);
       this.updateModelDisplay(modelName);
       if (this.currentMessages.length > 0) {
         this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
@@ -833,7 +828,6 @@ This action cannot be undone.`, async () => {
     this.plugin = plugin;
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian3.debounce)(this.handleScroll, 150, true);
-    console.log("[OllamaView] Constructed.");
   }
   // --- Getters ---
   /** Checks if the custom menu dropdown is currently visible */
@@ -851,7 +845,6 @@ This action cannot be undone.`, async () => {
     return "brain-circuit";
   }
   async onOpen() {
-    console.log("[OllamaView] onOpen START");
     this.createUIElements();
     this.getCurrentRoleDisplayName().then((roleName) => {
       this.updateInputPlaceholder(roleName);
@@ -863,7 +856,7 @@ This action cannot be undone.`, async () => {
     try {
       await this.loadAndDisplayActiveChat();
     } catch (error) {
-      console.error("[OllamaView] Error during initial chat load:", error);
+      this.plugin.logger.error("[OllamaView] Error during initial chat load:", error);
       this.showEmptyState();
       this.getCurrentRoleDisplayName().then((roleName) => {
         this.updateInputPlaceholder(roleName);
@@ -878,10 +871,8 @@ This action cannot be undone.`, async () => {
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
     }
-    console.log("[OllamaView] onOpen END");
   }
   async onClose() {
-    console.log("[OllamaView] onClose: Cleaning up...");
     if (this.speechWorker) {
       this.speechWorker.terminate();
       this.speechWorker = null;
@@ -979,7 +970,6 @@ This action cannot be undone.`, async () => {
   }
   // --- Event Listeners (with Custom Div Menu) ---
   attachEventListeners() {
-    console.log("[OllamaView Debug] Attaching event listeners START");
     if (!this.inputEl)
       console.error("inputEl missing!");
     if (!this.sendButton)
@@ -1004,11 +994,10 @@ This action cannot be undone.`, async () => {
       this.menuButton.addEventListener("click", this.handleMenuClick);
     if (this.modelDisplayEl)
       this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
-    console.log(`OllamaView.ts ->  ROLEDISPLAY: ` + this.roleDisplayEl);
     if (this.roleDisplayEl) {
       this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
     } else {
-      console.error("roleDisplayEl missing!");
+      this.plugin.logger.error("roleDisplayEl missing!");
     }
     if (this.modelSubmenuHeader)
       this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"));
@@ -1085,9 +1074,8 @@ This action cannot be undone.`, async () => {
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
     if (this.chatContainer) {
       this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
-      console.log("[OllamaView] Attached listener to chatContainer scroll");
     } else {
-      console.error("chatContainer missing!");
+      this.plugin.logger.error("chatContainer missing!");
     }
     if (this.newMessagesIndicatorEl) {
       this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
@@ -1115,7 +1103,6 @@ This action cannot be undone.`, async () => {
       return;
     const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
     const isHidden = contentEl.style.maxHeight === "0px" || contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-    console.log(`[OllamaView Debug] Toggling submenu '${type}'. Hidden: ${isHidden}`);
     if (isHidden) {
       this.collapseAllSubmenus(contentEl);
     }
@@ -1146,7 +1133,7 @@ This action cannot be undone.`, async () => {
           }
         });
       } catch (error) {
-        console.error(`Error rendering ${type} list:`, error);
+        this.plugin.logger.error(`Error rendering ${type} list:`, error);
         contentEl.empty();
         contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` });
         contentEl.style.maxHeight = "50px";
