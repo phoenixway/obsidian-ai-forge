@@ -4644,7 +4644,6 @@ var OllamaPlugin = class extends import_obsidian10.Plugin {
       }
     };
     const handleCreate = (file) => {
-      console.log("Create event:", file.path);
       fileChangeHandler(file);
       if (file.path === this.dailyTaskFilePath) {
         console.log(`[Plugin] Task file ${this.dailyTaskFilePath} created.`);

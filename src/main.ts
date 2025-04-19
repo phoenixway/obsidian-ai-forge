@@ -211,7 +211,7 @@ export default class OllamaPlugin extends Plugin {
       }
     };
     const handleCreate = (file: TAbstractFile) => { // file має тип TAbstractFile
-      console.log("Create event:", file.path); // Debug log
+      // console.log("Create event:", file.path); // Debug log
       fileChangeHandler(file); // Передаємо TAbstractFile - тепер коректно
       if (file.path === this.dailyTaskFilePath) {
         console.log(`[Plugin] Task file ${this.dailyTaskFilePath} created.`);
