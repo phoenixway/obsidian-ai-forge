@@ -142,31 +142,46 @@ export class PromptService {
         let roleSystemPrompt = roleDefinition?.systemPrompt || null;
         const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
 
+        // --- ОНОВЛЕНІ Інструкції для інтерпретації RAG даних ---
         const ragInstructions = `
 --- RAG Data Interpretation Rules ---
-1.  You have access to context from various files in the user's knowledge base provided under '### Context from User Notes:'.
-2.  Context from files marked with "[Type: Personal Log]" in their header contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress on personal goals.
-3.  Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) within ANY file's content represents a potential user goal, task, objective, idea, or key point. Use the surrounding text for context.
-4.  You can refer to specific files by their names mentioned in the context document headers (e.g., "According to 'My Notes.md'..." or "Document 3 ('project_plan.md') states..."). Use the filename provided in the '--- Document X: filename.md ---' header.
-5.  If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the entire provided context ('### Context from User Notes:').
+1.  You have access to context chunks from the user's notes provided under '### Context from User Notes (...)'. Each chunk originates from a specific file indicated in its header.
+2.  Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress.
+3.  Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) represents a potential user goal, task, objective, idea, or key point. **Pay special attention to categorizing these:**
+    * **Critical Goals/Tasks:** Identify these if the line contains tags like #critical, #critical🆘 or keywords like "критично", "critical", "терміново", "urgent". **Prioritize discussing these items, potential blockers, and progress.**
+    * **Weekly Goals/Tasks:** Identify these if the line contains tags like #week, #weekly or keywords like "weekly", "тижнева", "тижневий". Consider their relevance for the current or upcoming week's planning.
+    * Use the surrounding text and the source document name for context for all identified items.
+4.  You can refer to specific source files by their names mentioned in the context chunk headers (e.g., "Chunk 2 from 'My Notes.md' suggests...").
+5.  If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the entire provided context ('### Context from User Notes (...)'). Analyze themes across different chunks and documents.
 --- End RAG Data Interpretation Rules ---
         `.trim();
+        // --- Кінець ОНОВЛЕНИХ інструкцій ---
 
         let finalSystemPrompt = "";
-        if (settings.ragEnabled && this.plugin.ragService) {
+        if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) { // Додано перевірку ragEnableSemanticSearch
              finalSystemPrompt += ragInstructions + "\n\n";
-        }
-        if (roleSystemPrompt) {
-            finalSystemPrompt += roleSystemPrompt.trim();
+             this.plugin.logger.debug("[PromptService] RAG instructions added to system prompt.");
+        } else {
+            this.plugin.logger.debug("[PromptService] RAG instructions NOT added (RAG disabled or semantic search disabled).");
         }
 
+        if (roleSystemPrompt) {
+            finalSystemPrompt += roleSystemPrompt.trim();
+            this.plugin.logger.debug(`[PromptService] Role system prompt added (Length: ${roleSystemPrompt.trim().length})`);
+        } else {
+             this.plugin.logger.debug("[PromptService] No role system prompt to add.");
+        }
+
+        // --- Динамічна дата/час (без змін) ---
         if (isProductivityActive && finalSystemPrompt && settings.enableProductivityFeatures) {
             const now = new Date();
             const formattedDate = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             const formattedTime = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
             finalSystemPrompt = finalSystemPrompt.replace(/\[Current Time\]/gi, formattedTime);
             finalSystemPrompt = finalSystemPrompt.replace(/\[Current Date\]/gi, formattedDate);
+            this.plugin.logger.debug("[PromptService] Dynamic date/time injected.");
         }
+        // --------------------------------------
 
         const trimmedFinalPrompt = finalSystemPrompt.trim();
         this.plugin.logger.debug(`[PromptService] Final System Prompt Length: ${trimmedFinalPrompt.length} chars. Has content: ${trimmedFinalPrompt.length > 0}`);
