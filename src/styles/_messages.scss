@@ -243,35 +243,38 @@
 
 // Кнопка "Показати більше/менше" (стилі залишаються, як у Варіанті 1)
 .show-more-button {
-   display: block;
-   margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto;
-   padding: 2px 10px;
-   font-size: 0.8em;
-   color: var(--text-muted);
-   background-color: transparent;
-   border: 1px solid transparent;
-   border-radius: 12px;
-   cursor: pointer;
-   transition: all 0.2s ease;
-   text-align: center;
-   width: fit-content;
-   z-index: 2;
+  display: block;
+  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto; // Маленький відступ зверху
+  padding: 2px 10px;
+  font-size: 0.8em;
+  color: var(--text-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  width: fit-content;
+  position: relative; // На випадок потреби в z-index
+  z-index: 2;       // Вище замаскованого контенту
 
-   &:hover {
-       background-color: var(--background-modifier-hover);
-       color: var(--text-accent-hover);
-       border-color: var(--background-modifier-border-hover);
-   }
+  &:hover {
+      background-color: var(--background-modifier-hover);
+      color: var(--text-accent-hover);
+      border-color: var(--background-modifier-border-hover);
+  }
 }
+
+// Стиль кнопки для повідомлень користувача (простий варіант)
 .user-message .show-more-button {
-     background-color: transparent;
-     border-color: transparent;
-     color: rgba(255, 255, 255, 0.7);
-     &:hover {
-         background-color: rgba(255, 255, 255, 0.2);
-         color: white;
-     }
- }
+    background-color: transparent;
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.7); // Напівпрозорий білий на акцентному фоні
+    &:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+}
 
 // Button to expand/collapse
 .show-more-button {
