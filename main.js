@@ -206,6 +206,9 @@ var CSS_CLASS_ROLE_DISPLAY = "role-display";
 var CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
 var CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 var CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
+var CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
+var CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
+var CHAT_LIST_MAX_HEIGHT = "250px";
 var LANGUAGES = {
   "af": "Afrikaans",
   "sq": "Albanian",
@@ -334,12 +337,14 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
     this.handleSettingsUpdated = async () => {
-      var _a, _b;
+      var _a, _b, _c, _d;
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRoleName = await this.getCurrentRoleDisplayName();
+      const currentTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
       this.updateModelDisplay(currentModelName);
       this.updateRoleDisplay(currentRoleName);
+      this.updateTemperatureIndicator(currentTemperature);
       this.updateInputPlaceholder(currentRoleName);
     };
     this.handleModelDisplayClick = async (event) => {
@@ -648,9 +653,15 @@ This action cannot be undone.`, async () => {
         this.closeMenu();
       }
     };
-    // --- Plugin Event Handlers ---
+    // Plugin Event Handlers
     this.handleModelChange = (modelName) => {
+      var _a;
       this.updateModelDisplay(modelName);
+      (_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat().then((chat) => {
+        var _a2, _b;
+        const temp = (_b = (_a2 = chat == null ? void 0 : chat.metadata) == null ? void 0 : _a2.temperature) != null ? _b : this.plugin.settings.temperature;
+        this.updateTemperatureIndicator(temp);
+      });
       if (this.currentMessages.length > 0) {
         this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
       }
@@ -843,6 +854,42 @@ This action cannot be undone.`, async () => {
         }
       }
     };
+    this.handleTemperatureClick = async () => {
+      var _a, _b;
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      if (!activeChat) {
+        new import_obsidian3.Notice("Select or create a chat to change temperature.");
+        return;
+      }
+      const currentTemp = (_b = activeChat.metadata.temperature) != null ? _b : this.plugin.settings.temperature;
+      const currentTempString = currentTemp !== null && currentTemp !== void 0 ? String(currentTemp) : "";
+      new PromptModal(
+        this.app,
+        "Set Temperature",
+        `Enter new temperature (e.g., 0.7). Higher values = more creative, lower = more focused.`,
+        currentTempString,
+        // Попередньо заповнюємо поточним значенням
+        async (newValue) => {
+          if (newValue === null || newValue.trim() === "") {
+            new import_obsidian3.Notice("Temperature change cancelled.");
+            return;
+          }
+          const newTemp = parseFloat(newValue.trim());
+          if (isNaN(newTemp) || newTemp < 0 || newTemp > 2) {
+            new import_obsidian3.Notice("Invalid temperature. Please enter a number between 0.0 and 2.0.", 4e3);
+            return;
+          }
+          try {
+            await this.plugin.chatManager.updateActiveChatMetadata({ temperature: newTemp });
+            this.updateTemperatureIndicator(newTemp);
+            new import_obsidian3.Notice(`Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`);
+          } catch (error) {
+            this.plugin.logger.error("Failed to update chat temperature:", error);
+            new import_obsidian3.Notice("Error setting temperature.");
+          }
+        }
+      ).open();
+    };
     this.plugin = plugin;
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian3.debounce)(this.handleScroll, 150, true);
@@ -868,6 +915,7 @@ This action cannot be undone.`, async () => {
       this.updateInputPlaceholder(roleName);
     });
     this.updateModelDisplay(this.plugin.settings.modelName);
+    this.updateTemperatureIndicator(this.plugin.settings.temperature);
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
@@ -881,6 +929,7 @@ This action cannot be undone.`, async () => {
         this.updateRoleDisplay(roleName);
       });
       this.updateModelDisplay(this.plugin.settings.modelName);
+      this.updateTemperatureIndicator(this.plugin.settings.temperature);
     }
     setTimeout(() => {
       var _a;
@@ -926,6 +975,9 @@ This action cannot be undone.`, async () => {
     this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
     this.roleDisplayEl.setText("...");
     this.roleDisplayEl.title = "Click to select role";
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
+    this.temperatureIndicatorEl.setText("?");
+    this.temperatureIndicatorEl.title = "Click to set temperature";
     this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
@@ -943,7 +995,8 @@ This action cannot be undone.`, async () => {
       (0, import_obsidian3.setIcon)(header.createSpan({ cls: "menu-option-icon" }), icon);
       header.createSpan({ cls: "menu-option-text", text: title });
       (0, import_obsidian3.setIcon)(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
-      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass}` });
+      const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
+      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}` });
       content.style.maxHeight = "0";
       content.style.overflow = "hidden";
       content.style.transition = "max-height 0.3s ease-out, padding 0.3s ease-out";
@@ -1016,6 +1069,11 @@ This action cannot be undone.`, async () => {
       this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
     } else {
       this.plugin.logger.error("roleDisplayEl missing!");
+    }
+    if (this.temperatureIndicatorEl) {
+      this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
+    } else {
+      this.plugin.logger.error("temperatureIndicatorEl missing!");
     }
     if (this.modelSubmenuHeader)
       this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"));
@@ -1126,6 +1184,7 @@ This action cannot be undone.`, async () => {
     }
   }
   // Handles clicks on submenu headers (Model, Role, Chat)
+  // Змінено: Логіка розгортання підменю
   async toggleSubmenu(headerEl, contentEl, type) {
     if (!headerEl || !contentEl)
       return;
@@ -1140,9 +1199,10 @@ This action cannot be undone.`, async () => {
       contentEl.empty();
       contentEl.createDiv({ cls: "menu-loading", text: `Loading ${type}...` });
       contentEl.classList.remove(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      contentEl.style.maxHeight = "40px";
       contentEl.style.paddingTop = "5px";
       contentEl.style.paddingBottom = "5px";
-      contentEl.style.maxHeight = "40px";
+      contentEl.style.overflowY = "hidden";
       try {
         switch (type) {
           case "models":
@@ -1157,7 +1217,13 @@ This action cannot be undone.`, async () => {
         }
         requestAnimationFrame(() => {
           if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-            contentEl.style.maxHeight = contentEl.scrollHeight + "px";
+            if (type === "chats") {
+              contentEl.style.maxHeight = CHAT_LIST_MAX_HEIGHT;
+              contentEl.style.overflowY = "auto";
+            } else {
+              contentEl.style.maxHeight = contentEl.scrollHeight + "px";
+              contentEl.style.overflowY = "hidden";
+            }
           }
         });
       } catch (error) {
@@ -1165,12 +1231,14 @@ This action cannot be undone.`, async () => {
         contentEl.empty();
         contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` });
         contentEl.style.maxHeight = "50px";
+        contentEl.style.overflowY = "hidden";
       }
     } else {
       contentEl.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
       contentEl.style.maxHeight = "0";
       contentEl.style.paddingTop = "0";
       contentEl.style.paddingBottom = "0";
+      contentEl.style.overflowY = "hidden";
       if (iconEl instanceof HTMLElement)
         (0, import_obsidian3.setIcon)(iconEl, "chevron-right");
     }
@@ -1261,8 +1329,9 @@ This action cannot be undone.`, async () => {
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
   }
+  // Load and Display Chat (Тепер оновлює і температуру)
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
     this.clearChatContainerInternal();
     this.currentMessages = [];
@@ -1270,59 +1339,53 @@ This action cannot be undone.`, async () => {
     let activeChat = null;
     let availableModels = [];
     let finalModelName = null;
+    let finalTemperature = void 0;
     let errorOccurred = false;
     try {
       activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
-      this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.name) || "None"}`);
       availableModels = await this.plugin.ollamaService.getModels();
+      this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.name) || "None"}`);
       this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(", ")}`);
     } catch (error) {
       console.error("[OllamaView] Error fetching active chat or available models:", error);
-      new import_obsidian3.Notice("Error connecting to Ollama or loading chat data. Please check connection and settings.", 5e3);
+      new import_obsidian3.Notice("Error connecting to Ollama or loading chat data.", 5e3);
       this.showEmptyState();
       errorOccurred = true;
       finalModelName = null;
+      finalTemperature = this.plugin.settings.temperature;
     }
     if (!errorOccurred) {
-      let preferredModel = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.modelName;
-      this.plugin.logger.debug(`[OllamaView] Model from active chat metadata: ${preferredModel}`);
-      if (!preferredModel) {
-        preferredModel = this.plugin.settings.modelName;
-        this.plugin.logger.debug(`[OllamaView] No model in chat metadata, using settings model: ${preferredModel}`);
-      } else {
-        this.plugin.logger.debug(`[OllamaView] Using model from chat metadata: ${preferredModel}`);
-      }
+      let preferredModel = ((_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.modelName) || this.plugin.settings.modelName;
       if (availableModels.length > 0) {
         if (preferredModel && availableModels.includes(preferredModel)) {
           finalModelName = preferredModel;
-          this.plugin.logger.debug(`[OllamaView] Preferred model "${finalModelName}" is available.`);
         } else {
           finalModelName = availableModels[0];
           if (preferredModel) {
-            this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" is not available. Falling back to first available: "${finalModelName}".`);
-            new import_obsidian3.Notice(`Model "${preferredModel}" not found, using "${finalModelName}".`, 3e3);
+            this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" not available. Falling back to "${finalModelName}".`);
           } else {
-            this.plugin.logger.info(`[OllamaView] No preferred model specified or found. Using first available model: "${finalModelName}".`);
+            this.plugin.logger.info(`[OllamaView] No preferred model specified. Using first available: "${finalModelName}".`);
           }
         }
       } else {
-        this.plugin.logger.warn("[OllamaView] No models available from Ollama service.");
+        this.plugin.logger.warn("[OllamaView] No models available from Ollama.");
         finalModelName = null;
       }
       if (activeChat && activeChat.metadata.modelName !== finalModelName) {
-        this.plugin.logger.info(`[OllamaView] Model for active chat "${activeChat.metadata.name}" resolved to "${finalModelName}" (was "${activeChat.metadata.modelName}"). Updating metadata.`);
+        this.plugin.logger.info(`[OllamaView] Model for chat "${activeChat.metadata.name}" resolved to "${finalModelName}". Updating metadata if necessary.`);
         try {
           if (finalModelName !== null) {
             await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (activeChat.metadata)
               activeChat.metadata.modelName = finalModelName;
           } else {
-            this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat metadata.`);
+            this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat model metadata.`);
           }
         } catch (updateError) {
-          console.error(`[OllamaView] Failed to update active chat model metadata:`, updateError);
         }
       }
+      finalTemperature = (_e = (_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
+      this.plugin.logger.debug(`[OllamaView] Resolved temperature: ${finalTemperature}`);
     }
     const currentRoleName = await this.getCurrentRoleDisplayName();
     if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
@@ -1338,6 +1401,7 @@ This action cannot be undone.`, async () => {
     this.updateInputPlaceholder(currentRoleName);
     this.updateRoleDisplay(currentRoleName);
     this.updateModelDisplay(finalModelName);
+    this.updateTemperatureIndicator(finalTemperature);
     if (finalModelName === null) {
       if (this.inputEl) {
         this.inputEl.disabled = true;
@@ -2414,6 +2478,24 @@ This action cannot be undone.`, async () => {
       console.error("Error getting current role display name:", error);
     }
     return "None";
+  }
+  updateTemperatureIndicator(temperature) {
+    if (!this.temperatureIndicatorEl)
+      return;
+    const tempValue = temperature != null ? temperature : this.plugin.settings.temperature;
+    const emoji = this.getTemperatureEmoji(tempValue);
+    this.temperatureIndicatorEl.setText(emoji);
+    this.temperatureIndicatorEl.title = `Temperature: ${tempValue.toFixed(1)}. Click to change.`;
+  }
+  // --- Нова допоміжна функція для отримання емодзі температури ---
+  getTemperatureEmoji(temperature) {
+    if (temperature < 0.5) {
+      return "\u{1F9D0}";
+    } else if (temperature < 1.2) {
+      return "\u{1F642}";
+    } else {
+      return "\u{1F525}";
+    }
   }
 };
 

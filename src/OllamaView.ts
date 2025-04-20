@@ -111,6 +111,10 @@ const CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
 const CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 const CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
 
+const CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
+const CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
+
+const CHAT_LIST_MAX_HEIGHT = '250px';
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -172,6 +176,7 @@ export class OllamaView extends ItemView {
   private exportChatOption!: HTMLElement; // Назва змінної залишається та ж
   private deleteChatOption!: HTMLElement;
   private settingsOption!: HTMLElement;
+  private temperatureIndicatorEl!: HTMLElement;
 
   // --- State ---
   private isProcessing: boolean = false;
@@ -214,6 +219,7 @@ export class OllamaView extends ItemView {
     });
     // Модель оновлюється окремо, можливо, з кешу налаштувань спочатку
     this.updateModelDisplay(this.plugin.settings.modelName);
+    this.updateTemperatureIndicator(this.plugin.settings.temperature);
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
@@ -227,7 +233,9 @@ export class OllamaView extends ItemView {
       this.getCurrentRoleDisplayName().then(roleName => {
         this.updateInputPlaceholder(roleName);
         this.updateRoleDisplay(roleName); // <-- Оновлюємо дисплей ролі
-      }); this.updateModelDisplay(this.plugin.settings.modelName);
+      });
+      this.updateModelDisplay(this.plugin.settings.modelName);
+      this.updateTemperatureIndicator(this.plugin.settings.temperature);
     }
     setTimeout(() => this.inputEl?.focus(), 150);
     if (this.inputEl) {
@@ -278,6 +286,10 @@ export class OllamaView extends ItemView {
     this.roleDisplayEl.setText("..."); // Початковий текст
     this.roleDisplayEl.title = "Click to select role";
 
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
+    this.temperatureIndicatorEl.setText("?"); // Початковий стан
+    this.temperatureIndicatorEl.title = "Click to set temperature";
+
     // 2b. Права група контролів (старий buttonsContainer)
     this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send");
@@ -291,12 +303,21 @@ export class OllamaView extends ItemView {
     this.menuDropdown.style.display = "none"; // Приховано
 
     // Helper для секцій акордеону
+    // Helper для секцій акордеону
     const createSubmenuSection = (title: string, icon: string, listContainerClass: string, sectionClass?: string): { header: HTMLElement, content: HTMLElement, section: HTMLElement } => {
       const section = this.menuDropdown.createDiv(); if (sectionClass) section.addClass(sectionClass);
       const header = section.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
       setIcon(header.createSpan({ cls: "menu-option-icon" }), icon); header.createSpan({ cls: "menu-option-text", text: title }); setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
-      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass}` });
-      content.style.maxHeight = '0'; content.style.overflow = 'hidden'; content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out'; content.style.paddingTop = '0'; content.style.paddingBottom = '0';
+      // Додаємо CSS_CLASS_CHAT_LIST_SCROLLABLE для списку чатів
+      const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
+      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ''}` });
+      // Початкові стилі для анімації
+      content.style.maxHeight = '0';
+      content.style.overflow = 'hidden'; // Початково приховано
+      content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out';
+      content.style.paddingTop = '0';
+      content.style.paddingBottom = '0';
+      // Встановлюємо overflow-y: auto для списку чатів у CSS
       return { header, content, section };
     };
 
@@ -358,10 +379,19 @@ export class OllamaView extends ItemView {
       this.plugin.logger.error("roleDisplayEl missing!");
     }
 
-    // Слухачі для кастомного меню (акордеон)
+    if (this.temperatureIndicatorEl) {
+      this.registerDomEvent(this.temperatureIndicatorEl, 'click', this.handleTemperatureClick);
+    } else {
+      this.plugin.logger.error("temperatureIndicatorEl missing!");
+    }
+    // --- Кінець доданого слухача ---
+
+
+    // Слухачі для підменю (акордеон)
     if (this.modelSubmenuHeader) this.registerDomEvent(this.modelSubmenuHeader, 'click', () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, 'models')); else console.error("modelSubmenuHeader missing!");
     if (this.roleSubmenuHeader) this.registerDomEvent(this.roleSubmenuHeader, 'click', () => this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, 'roles')); else console.error("roleSubmenuHeader missing!");
     if (this.chatSubmenuHeader) this.registerDomEvent(this.chatSubmenuHeader, 'click', () => this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, 'chats')); else console.error("chatSubmenuHeader missing!");
+
 
     // Слухачі для прямих опцій меню
     if (this.settingsOption) this.settingsOption.addEventListener("click", this.handleSettingsClick); else console.error("settingsOption missing!");
@@ -387,9 +417,11 @@ export class OllamaView extends ItemView {
     this.registerDomEvent(document, 'click', this.handleDocumentClickForMenu);
     this.registerDomEvent(document, 'visibilitychange', this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange));
-    if (this.chatContainer) { this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced);
+    if (this.chatContainer) {
+      this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced);
     } else {
-      this.plugin.logger.error("chatContainer missing!") }
+      this.plugin.logger.error("chatContainer missing!")
+    }
     if (this.newMessagesIndicatorEl) { this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick); }
 
 
@@ -411,8 +443,10 @@ export class OllamaView extends ItemView {
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
     const currentRoleName = await this.getCurrentRoleDisplayName();
+    const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
     this.updateModelDisplay(currentModelName);
     this.updateRoleDisplay(currentRoleName);
+    this.updateTemperatureIndicator(currentTemperature);
     this.updateInputPlaceholder(currentRoleName);
   }
 
@@ -476,27 +510,27 @@ export class OllamaView extends ItemView {
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
-        this.plugin.logger.debug(`[OllamaView] updateModelDisplay called with: ${modelName}`); // Додано для відладки
+      this.plugin.logger.debug(`[OllamaView] updateModelDisplay called with: ${modelName}`); // Додано для відладки
 
-        if (modelName) {
-            // Якщо модель є (не null і не undefined), відображаємо її ім'я
-            const displayName = modelName; // "Default" тут більше не потрібен як запасний варіант
-            const shortName = displayName.replace(/:latest$/, ''); // Прибираємо ':latest' для коротшого вигляду
-            this.modelDisplayEl.setText(shortName);
-            this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
-            // Опціонально: прибираємо клас помилки, якщо він був
-            this.modelDisplayEl.removeClass("model-not-available");
-        } else {
-            // Якщо modelName === null або undefined (тобто моделей немає або сталася помилка)
-            this.modelDisplayEl.setText("Not available");
-            this.modelDisplayEl.title = "No Ollama models detected. Check Ollama connection and ensure models are installed.";
-            // Опціонально: додаємо клас для стилізації стану помилки/недоступності
-            this.modelDisplayEl.addClass("model-not-available");
-        }
+      if (modelName) {
+        // Якщо модель є (не null і не undefined), відображаємо її ім'я
+        const displayName = modelName; // "Default" тут більше не потрібен як запасний варіант
+        const shortName = displayName.replace(/:latest$/, ''); // Прибираємо ':latest' для коротшого вигляду
+        this.modelDisplayEl.setText(shortName);
+        this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
+        // Опціонально: прибираємо клас помилки, якщо він був
+        this.modelDisplayEl.removeClass("model-not-available");
+      } else {
+        // Якщо modelName === null або undefined (тобто моделей немає або сталася помилка)
+        this.modelDisplayEl.setText("Not available");
+        this.modelDisplayEl.title = "No Ollama models detected. Check Ollama connection and ensure models are installed.";
+        // Опціонально: додаємо клас для стилізації стану помилки/недоступності
+        this.modelDisplayEl.addClass("model-not-available");
+      }
     } else {
-         console.error("[OllamaView] modelDisplayEl is missing!");
+      console.error("[OllamaView] modelDisplayEl is missing!");
     }
-}
+  }
 
   // --- Event Handlers ---
 
@@ -551,36 +585,67 @@ export class OllamaView extends ItemView {
   }
 
   // Handles clicks on submenu headers (Model, Role, Chat)
+  // Змінено: Логіка розгортання підменю
   private async toggleSubmenu(headerEl: HTMLElement | null, contentEl: HTMLElement | null, type: 'models' | 'roles' | 'chats'): Promise<void> {
     if (!headerEl || !contentEl) return;
     const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
     const isHidden = contentEl.style.maxHeight === '0px' || contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-    if (isHidden) { this.collapseAllSubmenus(contentEl); } // Collapse others first
+
+    if (isHidden) { this.collapseAllSubmenus(contentEl); } // Згортаємо інші перед розгортанням
 
     if (isHidden) {
-      // --- Expand ---
+      // --- Розгортання ---
       if (iconEl instanceof HTMLElement) setIcon(iconEl, 'chevron-down');
       contentEl.empty();
       contentEl.createDiv({ cls: "menu-loading", text: `Loading ${type}...` });
       contentEl.classList.remove(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-      contentEl.style.paddingTop = '5px'; contentEl.style.paddingBottom = '5px'; contentEl.style.maxHeight = '40px'; // For loading text
+      // Тимчасова висота для індикатора завантаження
+      contentEl.style.maxHeight = '40px';
+      contentEl.style.paddingTop = '5px';
+      contentEl.style.paddingBottom = '5px';
+      // Скидаємо overflow, поки завантажуємо
+      contentEl.style.overflowY = 'hidden';
+
+
       try {
         switch (type) {
-          case 'models': await this.renderModelList(); break; // Рендеримо в контейнер
+          case 'models': await this.renderModelList(); break;
           case 'roles': await this.renderRoleList(); break;
           case 'chats': await this.renderChatListMenu(); break;
         }
-        requestAnimationFrame(() => { if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) { contentEl.style.maxHeight = contentEl.scrollHeight + 'px'; } });
+
+        // Після рендерингу, обчислюємо потрібну висоту
+        requestAnimationFrame(() => {
+          if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+            if (type === 'chats') {
+              // Для списку чатів: встановлюємо фіксовану max-height і дозволяємо скрол
+              contentEl.style.maxHeight = CHAT_LIST_MAX_HEIGHT;
+              contentEl.style.overflowY = 'auto'; // Дозволяємо скрол
+            } else {
+              // Для інших списків: встановлюємо висоту за вмістом
+              contentEl.style.maxHeight = contentEl.scrollHeight + 'px';
+              contentEl.style.overflowY = 'hidden'; // Скрол не потрібен
+            }
+          }
+        });
       } catch (error) {
         this.plugin.logger.error(`Error rendering ${type} list:`, error);
-        contentEl.empty(); contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` }); contentEl.style.maxHeight = '50px'; }
+        contentEl.empty();
+        contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` });
+        contentEl.style.maxHeight = '50px'; // Висота для повідомлення про помилку
+        contentEl.style.overflowY = 'hidden';
+      }
     } else {
-      // --- Collapse ---
+      // --- Згортання ---
       contentEl.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-      contentEl.style.maxHeight = '0'; contentEl.style.paddingTop = '0'; contentEl.style.paddingBottom = '0';
+      contentEl.style.maxHeight = '0';
+      contentEl.style.paddingTop = '0';
+      contentEl.style.paddingBottom = '0';
+      contentEl.style.overflowY = 'hidden'; // Приховуємо скрол при згортанні
       if (iconEl instanceof HTMLElement) setIcon(iconEl, 'chevron-right');
     }
   }
+
 
   // Helper to collapse all submenus except the one potentially being opened
   private collapseAllSubmenus(exceptContent?: HTMLElement | null): void {
@@ -605,116 +670,135 @@ export class OllamaView extends ItemView {
   }
 
   // --- Action Handlers (Must call closeMenu) ---
-  private handleNewChatClick = async (): Promise<void> => { this.closeMenu();
-    try { const newChat = await this.plugin.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); this.focusInput(); } else { new Notice("Failed to create new chat."); } } catch (error) { new Notice("Error creating new chat."); } }
-  private handleRenameChatClick = async (): Promise<void> => { this.closeMenu();
-    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to rename."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { let noticeMessage = "Rename cancelled or name unchanged."; if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { noticeMessage = `Chat renamed to "${newName.trim()}"`; } else { noticeMessage = "Failed to rename chat."; } } else if (newName?.trim() === currentName) { noticeMessage = "Name unchanged."; } else { noticeMessage = "Rename cancelled or invalid name entered."; } new Notice(noticeMessage); this.focusInput(); }).open(); }
-  private handleCloneChatClick = async (): Promise<void> => { this.closeMenu();
-    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to clone."); return; } const originalName = activeChat.metadata.name; const cloningNotice = new Notice("Cloning chat...", 0); try { const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id); if (clonedChat) { new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`); } else { new Notice("Failed to clone chat."); } } catch (error) { new Notice("An error occurred while cloning the chat."); } finally { cloningNotice.hide(); } }
-  private handleClearChatClick = async (): Promise<void> => { this.closeMenu();
-    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Clear Chat Messages', `Are you sure you want to clear all messages in chat "${chatName}"?\nThis action cannot be undone.`, () => { this.plugin.chatManager.clearActiveChatMessages(); }).open(); } else { new Notice("No active chat to clear."); } }
-  private handleDeleteChatClick = async (): Promise<void> => { this.closeMenu();
-    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Delete Chat', `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, async () => { const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id); if (success) { new Notice(`Chat "${chatName}" deleted.`); } else { new Notice(`Failed to delete chat "${chatName}".`); } }).open(); } else { new Notice("No active chat to delete."); } }
+  private handleNewChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    try { const newChat = await this.plugin.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); this.focusInput(); } else { new Notice("Failed to create new chat."); } } catch (error) { new Notice("Error creating new chat."); }
+  }
+  private handleRenameChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to rename."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { let noticeMessage = "Rename cancelled or name unchanged."; if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { noticeMessage = `Chat renamed to "${newName.trim()}"`; } else { noticeMessage = "Failed to rename chat."; } } else if (newName?.trim() === currentName) { noticeMessage = "Name unchanged."; } else { noticeMessage = "Rename cancelled or invalid name entered."; } new Notice(noticeMessage); this.focusInput(); }).open();
+  }
+  private handleCloneChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to clone."); return; } const originalName = activeChat.metadata.name; const cloningNotice = new Notice("Cloning chat...", 0); try { const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id); if (clonedChat) { new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`); } else { new Notice("Failed to clone chat."); } } catch (error) { new Notice("An error occurred while cloning the chat."); } finally { cloningNotice.hide(); }
+  }
+  private handleClearChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Clear Chat Messages', `Are you sure you want to clear all messages in chat "${chatName}"?\nThis action cannot be undone.`, () => { this.plugin.chatManager.clearActiveChatMessages(); }).open(); } else { new Notice("No active chat to clear."); }
+  }
+  private handleDeleteChatClick = async (): Promise<void> => {
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Delete Chat', `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, async () => { const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id); if (success) { new Notice(`Chat "${chatName}" deleted.`); } else { new Notice(`Failed to delete chat "${chatName}".`); } }).open(); } else { new Notice("No active chat to delete."); }
+  }
 
   // Цей обробник події викликається при натисканні на "Export to Note"
   private handleExportChatClick = async (): Promise<void> => {
-      this.closeMenu();
-      const activeChat = await this.plugin.chatManager?.getActiveChat();
-      if (!activeChat || activeChat.messages.length === 0) {
-          new Notice("Chat empty, nothing to export.");
-          return;
-      }
-      try {
-          const markdownContent = this.formatChatToMarkdown(activeChat.messages);
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const safeName = activeChat.metadata.name.replace(/[\\/?:*"<>|]/g, '-'); // Make filename safe
-          const filename = `ollama-chat-${safeName}-${timestamp}.md`;
+    this.closeMenu();
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat || activeChat.messages.length === 0) {
+      new Notice("Chat empty, nothing to export.");
+      return;
+    }
+    try {
+      const markdownContent = this.formatChatToMarkdown(activeChat.messages);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const safeName = activeChat.metadata.name.replace(/[\\/?:*"<>|]/g, '-'); // Make filename safe
+      const filename = `ollama-chat-${safeName}-${timestamp}.md`;
 
-          let targetFolderPath = this.plugin.settings.chatExportFolderPath?.trim();
-          let targetFolder: TFolder | null = null;
+      let targetFolderPath = this.plugin.settings.chatExportFolderPath?.trim();
+      let targetFolder: TFolder | null = null;
 
-          // Determine target folder
-          if (targetFolderPath) {
-              targetFolderPath = normalizePath(targetFolderPath);
-              const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
-              if (!abstractFile) {
-                  try {
-                      await this.app.vault.createFolder(targetFolderPath);
-                      targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath) as TFolder;
-                      if (targetFolder) {
-                          new Notice(`Created export folder: ${targetFolderPath}`);
-                      } else {
-                          // This case should ideally not happen if createFolder succeeds without error
-                          this.plugin.logger.error("Failed to get folder even after creation attempt:", targetFolderPath);
-                          new Notice(`Error creating export folder. Saving to vault root.`);
-                          targetFolder = this.app.vault.getRoot();
-                      }
-                  } catch (err) {
-                    this.plugin.logger.error("Error creating export folder:", err);
-                      new Notice(`Error creating export folder. Saving to vault root.`);
-                      targetFolder = this.app.vault.getRoot();
-                  }
-              } else if (abstractFile instanceof TFolder) {
-                  targetFolder = abstractFile;
-              } else {
-                  // The path exists but is not a folder
-                  this.plugin.logger.warn(`Export path exists but is not a folder: ${targetFolderPath}`);
-                  new Notice(`Error: Export path is not a folder. Saving to vault root.`);
-                  targetFolder = this.app.vault.getRoot();
-              }
-          } else {
-              // No folder path specified, use vault root
+      // Determine target folder
+      if (targetFolderPath) {
+        targetFolderPath = normalizePath(targetFolderPath);
+        const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
+        if (!abstractFile) {
+          try {
+            await this.app.vault.createFolder(targetFolderPath);
+            targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath) as TFolder;
+            if (targetFolder) {
+              new Notice(`Created export folder: ${targetFolderPath}`);
+            } else {
+              // This case should ideally not happen if createFolder succeeds without error
+              this.plugin.logger.error("Failed to get folder even after creation attempt:", targetFolderPath);
+              new Notice(`Error creating export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
+            }
+          } catch (err) {
+            this.plugin.logger.error("Error creating export folder:", err);
+            new Notice(`Error creating export folder. Saving to vault root.`);
+            targetFolder = this.app.vault.getRoot();
           }
-
-          if (!targetFolder) {
-            this.plugin.logger.error("Failed to determine a valid target folder for export.");
-              new Notice("Error determining export folder. Cannot save file.");
-              return;
-          }
-
-          // Create the file
-          const filePath = normalizePath(`${targetFolder.path}/${filename}`);
-
-          // Check if file already exists (optional, but good practice)
-          const existingFile = this.app.vault.getAbstractFileByPath(filePath);
-          if (existingFile) {
-              // Maybe prompt user or append timestamp/number? For now, log and overwrite.
-              this.plugin.logger.warn(`Export file already exists, overwriting: ${filePath}`);
-              // If you want to avoid overwriting, handle it here (e.g., throw error, rename)
-          }
-
-          const file = await this.app.vault.create(filePath, markdownContent);
-          new Notice(`Chat exported to ${file.path}`);
-
-      } catch (error) {
-        this.plugin.logger.error("Error exporting chat:", error);
-          // Provide more specific error if possible
-          if (error instanceof Error && error.message.includes('File already exists')) {
-              new Notice("Error exporting chat: File already exists.");
-          } else {
-              new Notice("An unexpected error occurred during chat export.");
-          }
+        } else if (abstractFile instanceof TFolder) {
+          targetFolder = abstractFile;
+        } else {
+          // The path exists but is not a folder
+          this.plugin.logger.warn(`Export path exists but is not a folder: ${targetFolderPath}`);
+          new Notice(`Error: Export path is not a folder. Saving to vault root.`);
+          targetFolder = this.app.vault.getRoot();
+        }
+      } else {
+        // No folder path specified, use vault root
+        targetFolder = this.app.vault.getRoot();
       }
+
+      if (!targetFolder) {
+        this.plugin.logger.error("Failed to determine a valid target folder for export.");
+        new Notice("Error determining export folder. Cannot save file.");
+        return;
+      }
+
+      // Create the file
+      const filePath = normalizePath(`${targetFolder.path}/${filename}`);
+
+      // Check if file already exists (optional, but good practice)
+      const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+      if (existingFile) {
+        // Maybe prompt user or append timestamp/number? For now, log and overwrite.
+        this.plugin.logger.warn(`Export file already exists, overwriting: ${filePath}`);
+        // If you want to avoid overwriting, handle it here (e.g., throw error, rename)
+      }
+
+      const file = await this.app.vault.create(filePath, markdownContent);
+      new Notice(`Chat exported to ${file.path}`);
+
+    } catch (error) {
+      this.plugin.logger.error("Error exporting chat:", error);
+      // Provide more specific error if possible
+      if (error instanceof Error && error.message.includes('File already exists')) {
+        new Notice("Error exporting chat: File already exists.");
+      } else {
+        new Notice("An unexpected error occurred during chat export.");
+      }
+    }
   }
 
 
-  private handleSettingsClick = async (): Promise<void> => { this.closeMenu();
-    (this.app as any).setting?.open?.(); (this.app as any).setting?.openTabById?.(this.plugin.manifest.id); }
+  private handleSettingsClick = async (): Promise<void> => {
+    this.closeMenu();
+    (this.app as any).setting?.open?.(); (this.app as any).setting?.openTabById?.(this.plugin.manifest.id);
+  }
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.isMenuOpen() && !this.menuButton?.contains(e.target as Node) && !this.menuDropdown?.contains(e.target as Node)) { this.closeMenu(); } }
 
-  // --- Plugin Event Handlers ---
+  // Plugin Event Handlers
   private handleModelChange = (modelName: string): void => {
     this.updateModelDisplay(modelName);
+    // Оновити температуру, використовуючи поточне значення (з чату або глобальне)
+    this.plugin.chatManager?.getActiveChat().then(chat => {
+      const temp = chat?.metadata?.temperature ?? this.plugin.settings.temperature;
+      this.updateTemperatureIndicator(temp);
+    });
     if (this.currentMessages.length > 0) {
       this.addMessageToDisplay("system", `Model changed to: ${modelName}`, new Date());
     }
   }
   private handleRoleChange = (roleName: string): void => {
+    // ... (оновлення ролі, плейсхолдера) ...
     this.plugin.logger.debug(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
     const displayRole = roleName || "None";
     this.updateInputPlaceholder(displayRole);
     this.updateRoleDisplay(displayRole);
+    // Температура не змінюється при зміні ролі, оновлювати індикатор не треба
     if (this.currentMessages.length > 0) {
       this.addMessageToDisplay("system", `Role changed to: ${displayRole}`, new Date());
     } else {
@@ -779,10 +863,10 @@ export class OllamaView extends ItemView {
             textarea.style.overflowY = 'auto';
           }
         } else {
-           // Вимикаємо overflow, якщо не досягли межі
-           if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
-             textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
-           }
+          // Вимикаємо overflow, якщо не досягли межі
+          if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
+            textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
+          }
         }
 
         // Встановлюємо обчислену min-height та height: auto
@@ -808,135 +892,104 @@ export class OllamaView extends ItemView {
     // console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
   }
 
-  async loadAndDisplayActiveChat(): Promise<void> {
-    this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
-    this.clearChatContainerInternal();
-    this.currentMessages = [];
-    this.lastRenderedMessageDate = null;
+// Load and Display Chat (Тепер оновлює і температуру)
+async loadAndDisplayActiveChat(): Promise<void> {
+  this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
+  this.clearChatContainerInternal();
+  this.currentMessages = [];
+  this.lastRenderedMessageDate = null;
 
-    let activeChat: Chat | null = null;
-    let availableModels: string[] = [];
-    let finalModelName: string | null = null; // Модель, яка буде фактично використана та відображена
-    let errorOccurred = false;
+  let activeChat: Chat | null = null;
+  let availableModels: string[] = [];
+  let finalModelName: string | null = null;
+  let finalTemperature: number | null | undefined = undefined; // Для температури
+  let errorOccurred = false;
 
-    // --- Крок 1: Отримати активний чат та список доступних моделей ---
-    try {
+  // Крок 1: Отримати чат та моделі
+  try {
       activeChat = await this.plugin.chatManager?.getActiveChat() || null;
-      this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${activeChat?.metadata?.name || 'None'}`);
       availableModels = await this.plugin.ollamaService.getModels();
-      this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(', ')}`);
-    } catch (error) {
-      console.error("[OllamaView] Error fetching active chat or available models:", error);
-      new Notice("Error connecting to Ollama or loading chat data. Please check connection and settings.", 5000);
-      this.showEmptyState();
-      errorOccurred = true;
-      finalModelName = null; // Немає доступної моделі
-    }
+       this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${activeChat?.metadata?.name || 'None'}`);
+       this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(', ')}`);
+  } catch (error) {
+       console.error("[OllamaView] Error fetching active chat or available models:", error);
+       new Notice("Error connecting to Ollama or loading chat data.", 5000);
+       this.showEmptyState();
+       errorOccurred = true;
+       finalModelName = null;
+       finalTemperature = this.plugin.settings.temperature; // Використовуємо глобальну при помилці
+  }
 
-    // --- Крок 2: Визначити цільову модель (з чату або налаштувань) ---
-    // Цей крок виконується, тільки якщо не було помилки на попередньому етапі
-    if (!errorOccurred) {
-        // Спочатку беремо модель з активного чату, якщо вона є
-        let preferredModel = activeChat?.metadata?.modelName;
-        this.plugin.logger.debug(`[OllamaView] Model from active chat metadata: ${preferredModel}`);
+  // Крок 2, 3, 4: Визначення моделі та оновлення метаданих (якщо не було помилки)
+  if (!errorOccurred) {
+       let preferredModel = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+       // ... (логіка вибору finalModelName як раніше) ...
+       if (availableModels.length > 0) {
+           if (preferredModel && availableModels.includes(preferredModel)) {
+               finalModelName = preferredModel;
+           } else {
+               finalModelName = availableModels[0];
+               if (preferredModel) {
+                    this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" not available. Falling back to "${finalModelName}".`);
+                   // new Notice(`Model "${preferredModel}" not found, using "${finalModelName}".`, 3000);
+               } else {
+                    this.plugin.logger.info(`[OllamaView] No preferred model specified. Using first available: "${finalModelName}".`);
+               }
+           }
+       } else {
+           this.plugin.logger.warn("[OllamaView] No models available from Ollama.");
+           // new Notice("No Ollama models available.", 0); // Можна вимкнути, щоб не набридало
+           finalModelName = null;
+       }
+       // Оновлення метаданих чату для моделі
+       if (activeChat && activeChat.metadata.modelName !== finalModelName) {
+          // ... (логіка оновлення метаданих моделі, як раніше) ...
+            this.plugin.logger.info(`[OllamaView] Model for chat "${activeChat.metadata.name}" resolved to "${finalModelName}". Updating metadata if necessary.`);
+           try {
+               if (finalModelName !== null) {
+                   await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
+                   if(activeChat.metadata) activeChat.metadata.modelName = finalModelName;
+               } else {
+                    this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat model metadata.`);
+               }
+           } catch (updateError) { /* ... */ }
+       }
+        // Визначаємо температуру: з чату або глобальну
+        finalTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+        this.plugin.logger.debug(`[OllamaView] Resolved temperature: ${finalTemperature}`);
 
-        // Якщо в чаті немає моделі, беремо з глобальних налаштувань
-        if (!preferredModel) {
-            preferredModel = this.plugin.settings.modelName;
-            this.plugin.logger.debug(`[OllamaView] No model in chat metadata, using settings model: ${preferredModel}`);
-        } else {
-             this.plugin.logger.debug(`[OllamaView] Using model from chat metadata: ${preferredModel}`);
-        }
+  } // кінець if (!errorOccurred)
 
+  // Крок 5: Завантаження повідомлень та ролі
+  const currentRoleName = await this.getCurrentRoleDisplayName();
 
-      // --- Крок 3: Перевірити доступність і вибрати остаточну модель ---
-      if (availableModels.length > 0) {
-        // Перевіряємо, чи бажана модель (з чату/налаштувань) є в списку доступних
-        if (preferredModel && availableModels.includes(preferredModel)) {
-          finalModelName = preferredModel;
-          this.plugin.logger.debug(`[OllamaView] Preferred model "${finalModelName}" is available.`);
-        } else {
-          // Якщо бажана модель недоступна або не вказана, беремо першу доступну
-          finalModelName = availableModels[0];
-          if (preferredModel) {
-            this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" is not available. Falling back to first available: "${finalModelName}".`);
-            // Можна додати Notice, якщо бажана модель була явно вказана, але недоступна
-             new Notice(`Model "${preferredModel}" not found, using "${finalModelName}".`, 3000);
-          } else {
-            this.plugin.logger.info(`[OllamaView] No preferred model specified or found. Using first available model: "${finalModelName}".`);
-          }
-        }
-      } else {
-        // Доступних моделей немає
-        this.plugin.logger.warn("[OllamaView] No models available from Ollama service.");
-        // new Notice("No Ollama models available. El;l;nsure Ollama is running and models are installed.", 0); // Постійне сповіщення
-        finalModelName = null; // Встановлюємо null, щоб відобразити відсутність моделі
-      }
-
-      // --- Крок 4: (Опціонально) Оновити метадані чату, якщо вибрана модель змінилася ---
-      // Якщо активний чат існує, і його модель відрізняється від остаточної (наприклад, через недоступність),
-      // або якщо в чаті не було моделі, а ми вибрали першу доступну.
-      // Можна оновлювати метадані чату, щоб зберегти вибір.
-      if (activeChat && activeChat.metadata.modelName !== finalModelName) {
-        this.plugin.logger.info(`[OllamaView] Model for active chat "${activeChat.metadata.name}" resolved to "${finalModelName}" (was "${activeChat.metadata.modelName}"). Updating metadata.`);
-        try {
-            // Оновлюємо лише якщо finalModelName не null
-            if (finalModelName !== null) {
-                await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
-                 // Оновлюємо локальну копію для консистентності в цьому запуску функції
-                 if(activeChat.metadata) activeChat.metadata.modelName = finalModelName;
-            } else {
-                // Якщо доступних моделей немає, можливо, варто скинути модель і в чаті?
-                // Або залишити як є, щоб зберегти попереднє значення на випадок, якщо модель з'явиться знову.
-                 // Поки що не оновлюємо, якщо finalModelName is null.
-                 this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat metadata.`);
-            }
-        } catch (updateError) {
-          console.error(`[OllamaView] Failed to update active chat model metadata:`, updateError);
-        }
-      }
-    } // кінець блоку if (!errorOccurred)
-
-    // --- Крок 5: Завантажити повідомлення та визначити роль ---
-    // Роль визначається незалежно від моделі
-    const currentRoleName = await this.getCurrentRoleDisplayName();
-
-    if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
-      // console.log(`[OllamaView] Rendering ${activeChat.messages.length} messages for chat '${activeChat.metadata.name}'.`);
+  if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
       this.hideEmptyState();
       this.renderMessages(activeChat.messages);
       this.checkAllMessagesForCollapsing();
       setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150);
-    } else if (!errorOccurred) {
-      // Не було помилки, але чат порожній або не існує
-      // console.log(`[OllamaView] No messages to render (Chat: ${activeChat?.metadata?.name || 'None'}). Showing empty state.`);
+  } else if (!errorOccurred) {
       this.showEmptyState();
-    }
-    // Якщо була помилка (errorOccurred = true), порожній стан вже показано в блоці catch
-
-    // --- Крок 6: Оновити UI (плейсхолдер, дисплеї ролі та моделі) ---
-    this.updateInputPlaceholder(currentRoleName);
-    this.updateRoleDisplay(currentRoleName);
-    this.updateModelDisplay(finalModelName); // Відображаємо остаточно вибрану модель (або null)
-
-    // --- Крок 7: Налаштувати поле вводу залежно від наявності моделі ---
-    if (finalModelName === null) {
-      // Моделей немає, вимикаємо ввід
-      if (this.inputEl) {
-        this.inputEl.disabled = true;
-        this.inputEl.placeholder = "No models available...";
-      }
-      if (this.sendButton) this.sendButton.disabled = true;
-      this.setLoadingState(false); // Переконатися, що isProcessing вимкнено
-    } else {
-      // Модель є, стан вводу залежить від isProcessing
-      if (this.inputEl) {
-        this.inputEl.disabled = this.isProcessing; // Стан залежить від процесу обробки
-        // Плейсхолдер вже встановлено раніше
-      }
-       this.updateSendButtonState(); // Оновити стан кнопки Send
-    }
   }
+
+  // Крок 6: Оновлення UI
+  this.updateInputPlaceholder(currentRoleName);
+  this.updateRoleDisplay(currentRoleName);
+  this.updateModelDisplay(finalModelName);
+  this.updateTemperatureIndicator(finalTemperature); // Оновлюємо індикатор температури
+
+  // Крок 7: Налаштування поля вводу
+  if (finalModelName === null) {
+      if (this.inputEl) { this.inputEl.disabled = true; this.inputEl.placeholder = "No models available..."; }
+      if (this.sendButton) this.sendButton.disabled = true;
+      this.setLoadingState(false);
+  } else {
+      if (this.inputEl) { this.inputEl.disabled = this.isProcessing; }
+      this.updateSendButtonState();
+  }
+}
+
+
   /** Renders a list of messages to the chat container */
   private renderMessages(messagesToRender: Message[]): void {
     this.clearChatContainerInternal(); // Ensure container is empty first
@@ -1172,45 +1225,45 @@ export class OllamaView extends ItemView {
     }
     if (!textToTranslate) return; // Nothing to translate
 
-     // Remove previous translation if exists
-     contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
+    // Remove previous translation if exists
+    contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
 
-     // Set loading state
-     setIcon(buttonEl, "loader"); buttonEl.disabled = true;
-     buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); buttonEl.setAttribute("title", "Translating...");
+    // Set loading state
+    setIcon(buttonEl, "loader"); buttonEl.disabled = true;
+    buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); buttonEl.setAttribute("title", "Translating...");
 
-     try {
-         const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
-         if (translatedText !== null) {
-             const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+    try {
+      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+      if (translatedText !== null) {
+        const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
 
-             // --- ЗМІНЕНО: Рендеринг Markdown ---
-             // Створюємо div для відрендереного контенту
-             const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
-             // Рендеримо Markdown в цей div
-             await MarkdownRenderer.renderMarkdown(
-                 translatedText,
-                 translationContentEl,
-                 this.plugin.app.vault.getRoot()?.path ?? '', // Шлях контексту (корінь сховища)
-                 this // Компонент (View)
-             );
-             // --- КІНЕЦЬ ЗМІНИ ---
+        // --- ЗМІНЕНО: Рендеринг Markdown ---
+        // Створюємо div для відрендереного контенту
+        const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
+        // Рендеримо Markdown в цей div
+        await MarkdownRenderer.renderMarkdown(
+          translatedText,
+          translationContentEl,
+          this.plugin.app.vault.getRoot()?.path ?? '', // Шлях контексту (корінь сховища)
+          this // Компонент (View)
+        );
+        // --- КІНЕЦЬ ЗМІНИ ---
 
-             // Додаємо індикатор мови
-             const targetLangName = LANGUAGES[targetLang] || targetLang;
-             translationContainer.createEl('div', { cls: 'translation-indicator', text: `[Translated to ${targetLangName}]` });
-             this.guaranteedScrollToBottom(50, false); // Scroll if needed
-         } // Error notice shown by service if null
-     } catch (error) {
-         //console.error("Error during translation click handling:", error);
-         new Notice("An unexpected error occurred during translation.");
-     } finally {
-         // Restore button state
-         setIcon(buttonEl, "languages"); buttonEl.disabled = false;
-         buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
-         const targetLangName = LANGUAGES[targetLang] || targetLang;
-         buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
-     }
+        // Додаємо індикатор мови
+        const targetLangName = LANGUAGES[targetLang] || targetLang;
+        translationContainer.createEl('div', { cls: 'translation-indicator', text: `[Translated to ${targetLangName}]` });
+        this.guaranteedScrollToBottom(50, false); // Scroll if needed
+      } // Error notice shown by service if null
+    } catch (error) {
+      //console.error("Error during translation click handling:", error);
+      new Notice("An unexpected error occurred during translation.");
+    } finally {
+      // Restore button state
+      setIcon(buttonEl, "languages"); buttonEl.disabled = false;
+      buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+      const targetLangName = LANGUAGES[targetLang] || targetLang;
+      buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
+    }
   }
 
   // --- Rendering Helpers ---
@@ -1689,39 +1742,39 @@ export class OllamaView extends ItemView {
 
   // --- Message Collapsing ---
   private checkMessageForCollapsing(messageEl: HTMLElement): void {
-     const c = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
-     const h = this.plugin.settings.maxMessageHeight;
-     if (!c || h <= 0) {
-        // Якщо контент є, але висота не обмежена, просто видаляємо кнопку і стиль, якщо вони були
-        if (c && h <= 0) {
-             const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-             b?.remove();
-             c.style.maxHeight = '';
-             c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-        }
-        return;
-     }
+    const c = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const h = this.plugin.settings.maxMessageHeight;
+    if (!c || h <= 0) {
+      // Якщо контент є, але висота не обмежена, просто видаляємо кнопку і стиль, якщо вони були
+      if (c && h <= 0) {
+        const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+        b?.remove();
+        c.style.maxHeight = '';
+        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      }
+      return;
+    }
 
-     requestAnimationFrame(() => { // Вимірювання в наступному кадрі
-         if (!c) return; // Повторна перевірка елемента
-         const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-         b?.remove(); // Видаляємо стару кнопку, якщо є
-         c.style.maxHeight = ''; // Скидаємо max-height для вимірювання
-         c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-         const sh = c.scrollHeight; // Вимірюємо реальну висоту вмісту
-         if (sh > h) {
-             c.style.maxHeight = `${h}px`;
-             c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-             const smb = messageEl.createEl('button', { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: 'Show More ▼' });
-             this.registerDomEvent(smb, 'click', () => this.toggleMessageCollapse(c, smb));
-         } else {
-             // Висота менша або дорівнює ліміту, кнопка не потрібна
-             // Переконуємося, що стилі зняті (про всяк випадок)
-             c.style.maxHeight = '';
-             c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-         }
-     });
- }
+    requestAnimationFrame(() => { // Вимірювання в наступному кадрі
+      if (!c) return; // Повторна перевірка елемента
+      const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      b?.remove(); // Видаляємо стару кнопку, якщо є
+      c.style.maxHeight = ''; // Скидаємо max-height для вимірювання
+      c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      const sh = c.scrollHeight; // Вимірюємо реальну висоту вмісту
+      if (sh > h) {
+        c.style.maxHeight = `${h}px`;
+        c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+        const smb = messageEl.createEl('button', { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: 'Show More ▼' });
+        this.registerDomEvent(smb, 'click', () => this.toggleMessageCollapse(c, smb));
+      } else {
+        // Висота менша або дорівнює ліміту, кнопка не потрібна
+        // Переконуємося, що стилі зняті (про всяк випадок)
+        c.style.maxHeight = '';
+        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      }
+    });
+  }
   private checkAllMessagesForCollapsing(): void { /* ... (Implementation from previous responses) ... */ this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => { this.checkMessageForCollapsing(msgEl); }); }
   private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void { /* ... (Implementation from previous responses) ... */ const i = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED); const h = this.plugin.settings.maxMessageHeight; if (i) { contentEl.style.maxHeight = ''; contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show Less ▲'); } else { contentEl.style.maxHeight = `${h}px`; contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show More ▼'); } }
 
@@ -1831,7 +1884,7 @@ export class OllamaView extends ItemView {
     let localLastDate: Date | null = null;
     const exportTimestamp = new Date();
     let markdown = `# AI Forge Chat Export\n` + // Можна змінити заголовок, якщо треба
-     `> Exported on: ${exportTimestamp.toLocaleString(undefined)}\n\n`; // Use locale default date/time
+      `> Exported on: ${exportTimestamp.toLocaleString(undefined)}\n\n`; // Use locale default date/time
 
     messagesToFormat.forEach(message => {
       // Skip empty messages if any exist (shouldn't normally happen)
@@ -1850,9 +1903,9 @@ export class OllamaView extends ItemView {
 
       // Remove <think> tags from assistant messages before formatting
       if (message.role === 'assistant') {
-         content = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-         // Skip if content becomes empty after removing think tags
-         if (!content) return;
+        content = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        // Skip if content becomes empty after removing think tags
+        if (!content) return;
       }
 
       switch (message.role) {
@@ -1992,10 +2045,75 @@ export class OllamaView extends ItemView {
       if (itemsAdded) {
         menu.showAtMouseEvent(event); // Показуємо меню
       } else {
-         console.warn("Role menu was not shown because no items were added.");
+        console.warn("Role menu was not shown because no items were added.");
       }
     }
   }
 
+  private handleTemperatureClick = async (): Promise<void> => {
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+
+    if (!activeChat) {
+      new Notice("Select or create a chat to change temperature.");
+      // Альтернативно: можна дозволити змінювати глобальну температуру
+      // const currentTemp = this.plugin.settings.temperature;
+      // ... відкрити модалку для зміни this.plugin.settings.temperature ...
+      return;
+    }
+
+    const currentTemp = activeChat.metadata.temperature ?? this.plugin.settings.temperature;
+    const currentTempString = currentTemp !== null && currentTemp !== undefined ? String(currentTemp) : '';
+
+    new PromptModal(
+      this.app,
+      'Set Temperature',
+      `Enter new temperature (e.g., 0.7). Higher values = more creative, lower = more focused.`,
+      currentTempString, // Попередньо заповнюємо поточним значенням
+      async (newValue) => {
+        if (newValue === null || newValue.trim() === "") {
+          new Notice("Temperature change cancelled.");
+          return;
+        }
+
+        const newTemp = parseFloat(newValue.trim());
+
+        if (isNaN(newTemp) || newTemp < 0 || newTemp > 2.0) { // Додамо перевірку діапазону
+          new Notice("Invalid temperature. Please enter a number between 0.0 and 2.0.", 4000);
+          return;
+        }
+
+        try {
+          await this.plugin.chatManager.updateActiveChatMetadata({ temperature: newTemp });
+          this.updateTemperatureIndicator(newTemp); // Оновлюємо UI
+          new Notice(`Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`);
+        } catch (error) {
+          this.plugin.logger.error("Failed to update chat temperature:", error);
+          new Notice("Error setting temperature.");
+        }
+      }
+    ).open();
+  }
+
+  private updateTemperatureIndicator(temperature: number | null | undefined): void {
+    if (!this.temperatureIndicatorEl) return;
+
+    // Використовуємо глобальне значення за замовчуванням, якщо не передано конкретне
+    const tempValue = temperature ?? this.plugin.settings.temperature;
+
+    const emoji = this.getTemperatureEmoji(tempValue);
+    this.temperatureIndicatorEl.setText(emoji);
+    this.temperatureIndicatorEl.title = `Temperature: ${tempValue.toFixed(1)}. Click to change.`; // Показуємо значення
+  }
+
+  // --- Нова допоміжна функція для отримання емодзі температури ---
+  private getTemperatureEmoji(temperature: number): string {
+    if (temperature < 0.5) {
+      return '🧐'; // Strict/Focused (Monocle face)
+    } else if (temperature < 1.2) {
+      return '🙂'; // Neutral (Slightly smiling face)
+    } else {
+      return '🔥'; // Creative/Wild (Fire)
+    }
+  }
 
 } // END OF OllamaView CLASS

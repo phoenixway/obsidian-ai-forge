@@ -188,6 +188,43 @@
         border-left-color: var(--background-modifier-border-hover);
         margin-bottom: calc(var(--chat-spacing-unit) * 1);
       }
+
+      &.chat-list-scrollable {
+        // max-height встановлюється динамічно через JS/стилі, але можна задати і тут
+        // max-height: 250px; // Наприклад
+        overflow-y: auto; // Дозволяє вертикальний скролбар при переповненні
+  
+        // --- Стилізація скролбару (опціонально, для кращого вигляду) ---
+  
+        // Для Firefox
+        scrollbar-width: thin;
+        // Можна використовувати змінні Obsidian або ваші SCSS змінні
+        scrollbar-color: var(--interactive-accent) var(--background-secondary);
+        // scrollbar-color: $interactive-accent $background-secondary; // Якщо є SCSS змінні
+  
+        // Для Webkit (Chrome, Edge, Safari, Brave)
+        &::-webkit-scrollbar {
+          width: 6px; // Вузький скролбар
+        }
+  
+        &::-webkit-scrollbar-track {
+          background: var(--background-secondary); // Фон треку
+          // background: $background-secondary; // Якщо є SCSS змінна
+          border-radius: 3px;
+        }
+  
+        &::-webkit-scrollbar-thumb {
+          background-color: var(--interactive-accent); // Колір повзунка
+          // background-color: $interactive-accent; // Якщо є SCSS змінна
+          border-radius: 3px;
+          border: 1px solid var(--background-secondary); // Рамка кольору треку для візуального відступу
+          // border: 1px solid $background-secondary; // Якщо є SCSS змінна
+  
+          &:hover {
+            background-color: var(--interactive-accent-hover); // Колір при наведенні
+            // background-color: $interactive-accent-hover; // Якщо є SCSS змінна
+          }
+        }}
     }
   
     // Class to explicitly hide content (used by JS)

@@ -136,6 +136,37 @@
              }
            }
         }
+
+        .temperature-indicator {
+          cursor: pointer;
+          padding: 5px 8px; // Або як у role-display/model-display для консистентності
+          margin-left: 5px; // Відступ від попереднього елемента
+          border-radius: 4px; // Або змінна $border-radius
+          transition: background-color 0.2s ease;
+          font-size: 1.2em; // Можна налаштувати
+          line-height: 1;
+          user-select: none;
+          display: inline-flex; // Для кращого вирівнювання
+          align-items: center;
+          justify-content: center;
+          min-width: 28px; // Щоб розмір був стабільним
+
+          &:hover {
+            // Використовуйте змінну, якщо вона визначена, або CSS змінну Obsidian
+            background-color: var(--background-modifier-hover);
+            // background-color: $background-modifier-hover; // Якщо є SCSS змінна
+          }
+
+          // Додатковий стиль для стану "недоступно", якщо ви додали клас в updateModelDisplay
+          &.model-not-available {
+             // Наприклад, зробити його сірим і менш помітним
+             opacity: 0.6;
+             cursor: not-allowed;
+             &:hover {
+                 background-color: transparent; // Заборонити зміну фону при наведенні
+             }
+          }
+        }
       }
   
       // Right controls group (assuming .input-controls-right is used in TS)
