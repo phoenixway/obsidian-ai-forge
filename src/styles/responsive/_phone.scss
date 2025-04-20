@@ -28,11 +28,29 @@
        gap: 4px;
     }
   
-    .input-controls-right button,
+
     .input-controls-left .translate-input-button {
       width: 28px; height: 28px;
     }
-  
+
+    .input-controls-left .voice-button {
+      width: 28px; height: 28px;
+      background-color: red;
+      display: none;
+    }
+
+    .input-controls-right button {
+      background-color: aqua;
+      width: 28px; height: 28px;
+
+    }
+
+    .input-controls-right .voice-button {
+      background-color: aqua;
+      width: 28px; height: 28px;
+
+    }
+
     // Hide input translate button to save space
     .input-controls-left .translate-input-button {
         display: none;
@@ -103,6 +121,10 @@
     .submenu-content.role-list-container,
     .submenu-content.chat-list-container {
         max-height: 150px; // Limit list height
+    }
+  
+    .voice-button   &.recording {
+      display: none  !important;
     }
   
   }

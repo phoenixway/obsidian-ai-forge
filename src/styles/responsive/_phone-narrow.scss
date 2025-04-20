@@ -23,3 +23,9 @@
     width: 11px; height: 11px;
   }
   
+   .voice-button {
+      &.recording {
+      display: none  !important;
+    }
+   }
+    
