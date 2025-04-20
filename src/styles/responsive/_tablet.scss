@@ -71,10 +71,23 @@
       padding-right: 15px; // Reset large padding
     }
   
-    .input-controls-right button, // Includes Send, Voice, Menu
-    .input-controls-left .translate-input-button {
+   .input-controls-left .translate-input-button {
       width: 30px; height: 30px;
     }
+
+    .input-controls-right {
+      button {
+        width: 30px; height: 30px;
+        background-color: red;
+
+        .voice-button   &.recording{
+          display: none !important;
+        }
+      }
+ 
+      
+    }
+
   }
   
   .menu-dropdown.ollama-chat-menu {
@@ -106,9 +119,5 @@
        }
        .role-display {
         max-width: 150px;
-    }
-
-    .voice-button   &.recording{
-      display: none !important;
     }
   }
