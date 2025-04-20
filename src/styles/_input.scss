@@ -75,7 +75,7 @@
         flex-shrink: 0;
   
         .model-display,
-        .role-display {
+        .role-display { // <-- Додаємо новий клас сюди
           font-size: var(--font-ui-smaller);
           color: var(--text-muted);
           padding: 4px 8px;
@@ -85,7 +85,7 @@
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          max-width: 105px; // Можливо, трохи менше, щоб вмістилися обидва
+          max-width: 120px; // Можливо, трохи менше, щоб вмістилися обидва
           border: 1px solid transparent;
           background-color: var(--background-primary); // Або var(--background-secondary);
           transition: all 0.2s ease;
@@ -106,7 +106,7 @@
     
         // Щоб дати трохи місця між ними
         .model-display + .role-display {
-            margin-left: 2px;
+            margin-left: 4px;
       
         }
   
@@ -258,5 +258,3 @@
       }
     }
   }
-
-  
