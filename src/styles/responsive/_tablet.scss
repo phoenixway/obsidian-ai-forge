@@ -109,6 +109,6 @@
     }
 
     .voice-button   &.recording{
-      display: none;
+      display: none !important;
     }
   }
