@@ -146,7 +146,8 @@ export class ChatManager {
 
             for (const filePath of chatFiles) {
                 const fullPath = normalizePath(filePath); // list() повертає повні шляхи
-                const fileName = path.basename(fullPath); // Використовуємо path.basename
+                // const fileName = path.basename(fullPath); 
+                const fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
                 const chatId = fileName.endsWith('.json') ? fileName.slice(0, -5) : null;
 
                 if (!chatId) {
@@ -177,7 +178,6 @@ export class ChatManager {
                 }
             }
 
-            this.plugin.logger.info(`[ChatManager] Index rebuild complete. Scanned: ${filesScanned}, Loaded metadata for: ${chatsLoaded}`);
             this.sessionIndex = newIndex;
             await this.saveChatIndex();
 
