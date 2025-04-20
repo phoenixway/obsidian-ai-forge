@@ -2490,11 +2490,11 @@ This action cannot be undone.`, async () => {
   // --- Нова допоміжна функція для отримання емодзі температури ---
   getTemperatureEmoji(temperature) {
     if (temperature < 0.5) {
-      return "\u{1F9D0}";
+      return "\u{1F9CA}";
     } else if (temperature < 1.2) {
       return "\u{1F642}";
     } else {
-      return "\u{1F525}";
+      return "\u{1F92A}";
     }
   }
 };
