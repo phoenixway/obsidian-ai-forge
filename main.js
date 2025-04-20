@@ -3341,11 +3341,17 @@ var OllamaService = class {
     }
   }
   async getModels(forceRefresh = false) {
-    const url = `${this.plugin.settings.ollamaServerUrl}/api/tags`;
-    this.plugin.logger.debug(`[OllamaService] Fetching models from ${url}`);
+    const endpoint = "/api/tags";
+    const fullUrlForLogging = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
+    this.plugin.logger.debug(`[OllamaService] Fetching models from ${fullUrlForLogging}`);
     let modelListResult = [];
     try {
-      const data = await this._ollamaFetch(url, "GET");
+      const data = await this._ollamaFetch(
+        endpoint,
+        // Передаємо '/api/tags'
+        "GET"
+        // Передаємо метод
+      );
       if (data && Array.isArray(data.models)) {
         const modelNames = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
         this.plugin.logger.info(`[OllamaService] Found ${modelNames.length} models.`);

@@ -88,16 +88,20 @@ export class OllamaService {
         }
     }
 
-
     async getModels(forceRefresh: boolean = false): Promise<string[]> {
         // TODO: Add caching with forceRefresh
-        const url = `${this.plugin.settings.ollamaServerUrl}/api/tags`; // For logging only now
-        this.plugin.logger.debug(`[OllamaService] Fetching models from ${url}`);
+        const endpoint = '/api/tags'; // Визначаємо тільки шлях кінцевої точки
+        const fullUrlForLogging = `${this.plugin.settings.ollamaServerUrl}${endpoint}`; // Для логування
+        this.plugin.logger.debug(`[OllamaService] Fetching models from ${fullUrlForLogging}`);
         let modelListResult: string[] = []; // Initialize default
 
         try {
-            // Expect data to be { models: Array<{name: string, ...}> }
-            const data = await this._ollamaFetch<{ models: Array<{name: string}> }>(url, 'GET');
+            // --- ВИПРАВЛЕНО: Передаємо тільки endpoint, а не повний URL ---
+            const data = await this._ollamaFetch<{ models: Array<{name: string}> }>(
+                endpoint, // Передаємо '/api/tags'
+                'GET'     // Передаємо метод
+            );
+            // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
             // Explicitly check if data and data.models array exist
             if (data && Array.isArray(data.models)) {
