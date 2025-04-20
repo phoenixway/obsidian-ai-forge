@@ -377,7 +377,7 @@ export default class OllamaPlugin extends Plugin {
   private debounceIndexUpdate() {
     if (this.indexUpdateTimeout) clearTimeout(this.indexUpdateTimeout);
     this.indexUpdateTimeout = setTimeout(async () => { // Зробимо async
-      console.log("[OllamaPlugin] Debounced RAG index update starting...");
+      this.logger.debug("[OllamaPlugin] Debounced RAG index update starting...");
       if (this.settings.ragEnabled && this.ragService) { // Перевірка перед викликом
         await this.ragService.indexDocuments();
       }

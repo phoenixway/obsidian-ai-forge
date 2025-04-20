@@ -5075,7 +5075,7 @@ var OllamaPlugin = class extends import_obsidian12.Plugin {
     if (this.indexUpdateTimeout)
       clearTimeout(this.indexUpdateTimeout);
     this.indexUpdateTimeout = setTimeout(async () => {
-      console.log("[OllamaPlugin] Debounced RAG index update starting...");
+      this.logger.debug("[OllamaPlugin] Debounced RAG index update starting...");
       if (this.settings.ragEnabled && this.ragService) {
         await this.ragService.indexDocuments();
       }
