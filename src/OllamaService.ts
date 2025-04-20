@@ -51,7 +51,7 @@ export class OllamaService {
     async generateEmbeddings(prompts: string[], model: string): Promise<number[][] | null> {
         if (!prompts || prompts.length === 0) return [];
         const endpoint = '/api/embeddings';
-        this.plugin.logger.info(`[OllamaService] Generating ${prompts.length} embeddings using model ${model}...`);
+        this.plugin.logger.debug(`[OllamaService] Generating ${prompts.length} embeddings using model ${model}...`);
 
         const embeddingsList: number[][] = [];
         try {
@@ -79,7 +79,7 @@ export class OllamaService {
                     this.plugin.logger.error(`[OllamaService] Failed to generate embedding for one prompt using model ${model}. Prompt (start): "${trimmedPrompt.substring(0, 50)}..."`, singleError);
                 }
             } // End for loop
-            this.plugin.logger.info(`[OllamaService] Successfully generated ${embeddingsList.length} embeddings (out of ${prompts.length} prompts).`);
+            this.plugin.logger.debug(`[OllamaService] Successfully generated ${embeddingsList.length} embeddings (out of ${prompts.length} prompts).`);
             return embeddingsList.length > 0 ? embeddingsList : null;
         } catch (error) {
             this.plugin.logger.error(`[OllamaService] General error during embedding generation for model ${model}:`, error);
@@ -109,7 +109,7 @@ export class OllamaService {
                   .map((m) => m?.name) // Get name property
                   .filter((name): name is string => typeof name === 'string' && name.length > 0) // Filter out non-strings/empty
                   .sort();
-                this.plugin.logger.info(`[OllamaService] Found ${modelNames.length} models.`);
+                this.plugin.logger.debug(`[OllamaService] Found ${modelNames.length} models.`);
                 modelListResult = modelNames; // Assign result
             } else {
                 // Log if structure is invalid, even if _ollamaFetch didn't throw
@@ -256,13 +256,13 @@ async generateChatResponse(chat: Chat): Promise<Message | null> {
             ...(systemPrompt && { system: systemPrompt })
         };
 
-        this.plugin.logger.info(`[OllamaService] Calling generateRaw for chat response: Model:"${modelName}", Temp:${temperature}, System Prompt Provided: ${!!systemPrompt}`);
+        this.plugin.logger.debug(`[OllamaService] Calling generateRaw for chat response: Model:"${modelName}", Temp:${temperature}, System Prompt Provided: ${!!systemPrompt}`);
         this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", {...requestBody, prompt: promptBody.substring(0, 200) + "..."}); // Логуємо скорочений промпт
 
         const responseData = await this.generateRaw(requestBody);
 
         if (responseData && typeof responseData.response === 'string') {
-            this.plugin.logger.info(`[OllamaService] Received response. Length: ${responseData.response.length} chars`);
+            this.plugin.logger.debug(`[OllamaService] Received response. Length: ${responseData.response.length} chars`);
             const assistantMessage: Message = {
                 role: 'assistant',
                 content: responseData.response.trim(),
