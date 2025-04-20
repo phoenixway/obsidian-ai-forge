@@ -2,30 +2,62 @@
 // Стилі для екранів <= 360px (застосовуються ПОВЕРХ стилів _phone.scss)
 
 :root {
-    --chat-avatar-size: 24px;
+    --chat-avatar-size: 24px; // Ще менший аватар
+    // --chat-spacing-unit залишається 3px з _phone.scss
   }
-  
+
   .chat-input-container {
-     .input-controls-right button,
-     .input-controls-left .translate-input-button { // Translate button likely already hidden
-        width: 26px; height: 26px;
+     padding: 2px 4px; // Мінімальні падінги
+     border-radius: 8px; // Менший радіус
+
+     textarea {
+         min-height: 32px;
+         padding: 6px 8px;
      }
-     .input-controls-container { gap: 3px; }
+
+     .input-controls-container {
+         gap: 2px; // Мінімальний відступ між групами
+     }
+
+     .input-controls-left {
+         gap: 3px; // Мінімальний відступ між елементами
+         // .translate-input-button вже приховано
+         // .role-display вже приховано
+
+         .model-display {
+             max-width: 80px; // Ще обмежуємо
+             padding: 2px 4px;
+             font-size: calc(var(--font-ui-smaller) * 0.85);
+         }
+         .temperature-indicator {
+            padding: 2px;
+            min-width: 20px;
+         }
+     }
+     .input-controls-right {
+         gap: 3px;
+         button { // Кнопка меню
+            width: 26px; height: 26px;
+            .svg-icon { width: 15px; height: 15px; }
+         }
+     }
+     // Правила display: none успадковуються
   }
-  
+
   .message-group {
-    // Adjust spacing for very small avatar
-     &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6 = 30px
-     &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6 = 30px
+    // Відступи для ще меншого аватара
+     &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6=30px
+     &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6=30px
+     margin-bottom: calc(var(--chat-spacing-unit) * 2); // Ще менше
   }
-  
+
+  .message {
+    padding: calc(var(--chat-spacing-unit) * 1) calc(var(--chat-spacing-unit) * 1.5); // Менше падінгу
+  }
+
   .message-actions-wrapper button .svg-icon {
-    width: 11px; height: 11px;
+    width: 11px; height: 11px; // Ще менше
   }
-  
-   .voice-button {
-      &.recording {
-      display: none  !important;
-    }
-   }
-    
+
+  // Меню (можна ще зменшити падінги, якщо потрібно)
+  // .menu-dropdown.ollama-chat-menu { ... }

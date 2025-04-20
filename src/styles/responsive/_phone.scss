@@ -2,129 +2,115 @@
 // Стилі для екранів <= 480px (застосовуються ПОВЕРХ стилів _tablet.scss)
 
 :root {
-    --chat-spacing-unit: 3px; // Even smaller spacing unit
-    --chat-avatar-size: 26px; // Smaller avatar
-    --chat-message-max-width: 92%; // Wider messages
-  }
-  
-  .ollama-chat-container {
-    padding: calc(var(--chat-spacing-unit) * 3); /* 9px */
-    padding-bottom: calc(var(--chat-spacing-unit) * 1); /* 3px */
-  }
-  
-  .chat-input-container {
-    margin: 4px 8px; // Less outer margin
-    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2); // Less inner padding
-    border-radius: 10px;
-    max-height: 60vh; // Limit height further
-  
-    textarea {
-      font-size: 13px; // Smaller font
-      padding: 8px 10px; // Less padding
-      min-height: 36px;
-    }
-  
-    .input-controls-container {
-       gap: 4px;
-    }
-  
+  --chat-spacing-unit: 3px; // Ще менший відступ
+  --chat-avatar-size: 26px;
+  --chat-message-max-width: 94%; // Ще ширші повідомлення
+}
 
-    .input-controls-left .translate-input-button {
-      width: 28px; height: 28px;
-    }
+.ollama-chat-container {
+  padding: calc(var(--chat-spacing-unit) * 2); /* 6px */
+  padding-bottom: var(--chat-spacing-unit); /* 3px */
+}
 
-    .input-controls-left .voice-button {
-      width: 28px; height: 28px;
-      background-color: red;
-      display: none;
-    }
+.chat-input-container {
+  margin: 4px; // Мінімальні зовнішні відступи
+  padding: var(--chat-spacing-unit) calc(var(--chat-spacing-unit) * 2); // Мінімальні внутрішні падінги
+  border-radius: 10px;
+  gap: 4px; // Менший відступ між textarea та controls
 
-    .input-controls-right button {
-      background-color: aqua;
-      width: 28px; height: 28px;
+  textarea {
+    font-size: var(--font-ui-smaller); // Менший шрифт
+    padding: 8px 10px;
+    min-height: 34px; // Ще менша висота
+    margin-bottom: 4px;
+  }
 
-    }
+  .input-controls-container {
+     gap: 4px; // Менший відступ між групами контролів
+     justify-content: space-between;
+  }
 
-    .input-controls-right .voice-button {
-      background-color: aqua;
-      width: 28px; height: 28px;
+  .input-controls-left {
+      gap: 4px; // Менший відступ між елементами
 
-    }
+      // Приховуємо кнопку перекладу для економії місця
+      .translate-input-button {
+           display: none;
+      }
 
-    // Hide input translate button to save space
-    .input-controls-left .translate-input-button {
-        display: none;
-    }
-    // Role display is already hidden by _tablet.scss styles, no need to repeat usually
-    // .input-controls-left .role-display { display: none; }
+      // Зменшуємо решту
+      .model-display {
+          padding: 2px 5px;
+          font-size: calc(var(--font-ui-smaller) * 0.9);
+          max-width: 100px; // Ще менше
+      }
+      .temperature-indicator {
+          padding: 2px 3px;
+          font-size: 1em; // Звичайний розмір емодзі
+          min-width: 22px;
+      }
   }
-  
-  .message {
-    font-size: 13px; // Smaller message font
-    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
-    border-radius: 15px; // Less rounded
+
+  .input-controls-right {
+      gap: 4px; // Менший відступ
+      // Кнопка меню
+      button {
+          width: 28px; height: 28px;
+           .svg-icon { width: 16px; height: 16px; }
+      }
   }
-  
-  // Adjust corner radii for consecutive messages
-  .user-message-group .message-wrapper {
-      .message:not(:last-child) { border-bottom-right-radius: 4px; }
-      .message:last-child { border-bottom-right-radius: 15px; }
-      .message:not(:first-child) { border-top-right-radius: 4px; }
-      .message:first-child { border-top-right-radius: 15px; }
+  // Правила display: none для voice/send/role успадковуються з _tablet.scss
+}
+
+.message {
+  font-size: var(--font-ui-small); // Менший шрифт повідомлень
+  padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2);
+  border-radius: 15px; // Менш заокруглені
+}
+
+// Радіуси кутів (можна залишити як у tablet або прибрати)
+// ... (селектори .user-message-group .message-wrapper ..., .ollama-message-group .message-wrapper ...) ...
+
+.message-group {
+   &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
+   &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
+   margin-bottom: calc(var(--chat-spacing-unit) * 2.5); // Менший відступ між групами
+}
+
+.message-timestamp {
+  font-size: 0.7em;
+  margin-top: 2px;
+}
+
+// Кнопки дій у повідомленнях
+.message-actions-wrapper {
+  top: 1px;
+  right: 2px; // Ближче до краю
+  gap: 2px; // Менший відступ
+
+  button .svg-icon {
+    width: 12px; height: 12px; // Дуже малі іконки
   }
-  .ollama-message-group .message-wrapper {
-      .message:not(:last-child) { border-bottom-left-radius: 4px; }
-      .message:last-child { border-bottom-left-radius: 15px; }
-      .message:not(:first-child) { border-top-left-radius: 4px; }
-      .message:first-child { border-top-left-radius: 15px; }
+}
+
+// Меню
+.menu-dropdown.ollama-chat-menu {
+  min-width: 160px; // Ще вужче меню
+  font-size: var(--font-ui-small); // Менший шрифт в меню
+
+  .menu-option, .menu-header-item {
+    padding: var(--chat-spacing-unit) calc(var(--chat-spacing-unit) * 2);
   }
-  
-  .message-group {
-    // Adjust spacing for smaller avatar
-     &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 26+6 = 32px
-     &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 26+6 = 32px
-    margin-bottom: calc(var(--chat-spacing-unit) * 3);
+  .submenu-content .menu-option {
+     padding-left: var(--chat-spacing-unit) !important; // Менший відступ в підменю
   }
-  // .message-group-avatar { } // No changes needed from tablet?
-  
-  .message-timestamp {
-    font-size: 0.7em; // Very small timestamp
-    margin-top: 2px;
+  .menu-option-text { font-size: 1em; } // Відносно базового шрифта меню
+  .chat-option .chat-option-date { font-size: 0.7em; }
+
+  // Менша висота для списків у меню
+  .submenu-content.model-list-container,
+  .submenu-content.role-list-container,
+  .submenu-content.chat-list-container {
+      max-height: 120px;
   }
-  
-  // Action buttons inside messages
-  .message-actions-wrapper {
-    top: 2px;
-    right: 4px;
-    gap: 3px;
-  
-    button .svg-icon {
-      width: 12px; height: 12px; // Very small icons
-    }
-  }
-  
-  // --- Menu adjustments ---
-  .menu-dropdown.ollama-chat-menu {
-    min-width: 180px; // Narrower menu
-    max-width: calc(100vw - 20px); // Prevent overflow
-  
-    .menu-option, .menu-header-item {
-      padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); // Less padding
-    }
-    .submenu-content .menu-option {
-       padding-left: calc(var(--chat-spacing-unit) * 2) !important;
-    }
-    .menu-option-text { font-size: 13px; }
-    .chat-option .chat-option-date { font-size: 0.75em; }
-  
-    .submenu-content.model-list-container,
-    .submenu-content.role-list-container,
-    .submenu-content.chat-list-container {
-        max-height: 150px; // Limit list height
-    }
-  
-    .voice-button   &.recording {
-      display: none  !important;
-    }
-  
-  }
+}

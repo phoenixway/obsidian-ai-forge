@@ -4,259 +4,271 @@
   display: flex;
   flex-direction: column;
   flex-grow: 0;
-  flex-shrink: 0; 
-  width: 98%;
+  flex-shrink: 0;
+  width: 98%; // Трохи менше, щоб уникнути горизонтального скролу в деяких випадках
   box-sizing: border-box;
   padding:
     calc(var(--chat-spacing-unit) * 2)    // Top
-    calc(var(--chat-spacing-unit) * 5)    // Right (ЗБІЛЬШЕНО)
+    calc(var(--chat-spacing-unit) * 3)    // Right (зменшено порівняно з вашим варіантом)
     calc(var(--chat-spacing-unit) * 2)    // Bottom
-    calc(var(--chat-spacing-unit) * 3);
+    calc(var(--chat-spacing-unit) * 3);   // Left
   border-top: 1px solid var(--divider-color);
   background-color: var(--background-primary);
   z-index: 20;
   border-radius: 12px;
   margin:
     0                                     // Top
-    calc(var(--chat-spacing-unit) * 5)    // Right (ЗБІЛЬШЕНО ЗОВНІШНІЙ ВІДСТУП)
+    calc(var(--chat-spacing-unit) * 2)    // Right
     calc(var(--chat-spacing-unit) * 2)    // Bottom
     calc(var(--chat-spacing-unit) * 2);   // Left
-  margin-top: 0;
-  position: relative;
-  box-shadow: none;
+  position: relative; // Потрібно для позиціонування меню
+  box-shadow: none; // Прибираємо тінь за замовчуванням
 
   &:focus-within {
-    border-color: var(--interactive-accent);
-    box-shadow: none;
+    // Стилі при фокусі на textarea (можна прибрати, якщо не потрібно)
+    // border-color: var(--interactive-accent);
   }
-
 
   textarea {
     width: 100%;
     box-sizing: border-box;
     resize: none;
-    border: none;
+    border: none; // Прибираємо рамку за замовчуванням
     border-radius: 8px;
     padding: 10px 15px;
     line-height: 1.5;
-    min-height: 40px;
-    max-height: 60vh;
-    height: auto; 
-    overflow-y: auto;
-    background-color: var(--background-primary);
+    min-height: 40px; // Базова мінімальна висота
+    max-height: 60vh; // Обмеження максимальної висоти
+    height: auto;     // Дозволяє автовисоту
+    overflow-y: auto; // Додаємо скрол при переповненні max-height
+    background-color: var(--background-secondary); // Трохи інший фон для поля
     color: var(--text-normal);
-    font-size: 14px;
+    font-size: var(--font-ui-small); // Використовуємо змінну Obsidian
     transition: border-color 0.3s, background-color 0.3s;
-    margin-bottom: calc(var(--chat-spacing-unit) * 2); 
+    margin-bottom: calc(var(--chat-spacing-unit) * 2); // Відступ знизу до контролів
     box-shadow: none;
-    flex-shrink: 0;
+    flex-shrink: 0; // Не стискати textarea
 
     &:focus {
-      outline: none;
-      border-color: var(--interactive-accent); 
-      // background-color: var(--background-secondary);
-      box-shadow: none; 
+      outline: none; // Прибираємо стандартний outline
+      background-color: var(--background-primary); // Можна змінювати фон при фокусі
+      box-shadow: none;
+    }
+
+    &::placeholder { // Стилізація плейсхолдера
+      color: var(--text-faint);
+      opacity: 0.8;
     }
   }
-  
+
   .input-controls-container {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    justify-content: space-between; // Розносимо ліву і праву групи
+    align-items: center;          // Вирівнюємо по центру вертикально
     width: 100%;
     box-sizing: border-box;
-    flex-shrink: 0; 
-   
-  
-      .input-controls-left {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex-shrink: 0;
-  
-        .model-display,
-        .role-display { // <-- Додаємо новий клас сюди
-          font-size: var(--font-ui-smaller);
-          color: var(--text-muted);
-          padding: 4px 8px;
-          border-radius: var(--radius-s);
-          cursor: pointer;
-          text-align: center;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 120px; // Можливо, трохи менше, щоб вмістилися обидва
-          border: 1px solid transparent;
-          background-color: var(--background-primary); // Або var(--background-secondary);
-          transition: all 0.2s ease;
-    
-          // Можна додати іконку через ::before, якщо не додавали в TS
-          // &::before {
-          //   content: ''; // Додати іконку фоном або через content: '👤';
-          //   margin-right: 4px;
-          //   opacity: 0.7;
-          // }
-    
-          &:hover {
-            background-color: var(--background-modifier-hover);
-            border-color: var(--background-modifier-border);
-            color: var(--text-normal);
-          }
-        }
-    
-        // Щоб дати трохи місця між ними
-        .model-display + .role-display {
-            margin-left: 4px;
-      
-        }
-  
-        // Translate button in left group
-        .translate-input-button {
-           width: 28px;
-           height: 28px;
-           border: none;
-           border-radius: var(--radius-s);
-           background-color: transparent;
-           color: var(--text-muted);
-           cursor: pointer;
-           display: flex; align-items: center; justify-content: center; padding: 0; transition: all 0.15s ease-in-out; opacity: 0.7; outline: none; flex-shrink: 0;
-  
-           &:hover {
-             background-color: var(--background-modifier-hover);
-             color: var(--text-normal);
-             opacity: 1;
-             transform: scale(1.05);
-           }
-  
-           &.translating-input {
-             cursor: default;
-             opacity: 0.5;
-             .svg-icon {
-                animation: spin 1s linear infinite;
-             }
-           }
-        }
+    flex-shrink: 0;               // Не стискати контейнер контролів
+    gap: calc(var(--chat-spacing-unit) * 2); // Відступ між лівою та правою групами
+  }
 
-        .temperature-indicator {
-          cursor: pointer;
-          padding: 5px 8px; // Або як у role-display/model-display для консистентності
-          margin-left: 5px; // Відступ від попереднього елемента
-          border-radius: 4px; // Або змінна $border-radius
-          transition: background-color 0.2s ease;
-          font-size: 1.2em; // Можна налаштувати
-          line-height: 1;
-          user-select: none;
-          display: inline-flex; // Для кращого вирівнювання
-          align-items: center;
-          justify-content: center;
-          min-width: 28px; // Щоб розмір був стабільним
+  .input-controls-left {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--chat-spacing-unit) * 1.5); // Відступ між елементами ліворуч
+    flex-shrink: 1; // Дозволяємо стискатись, якщо потрібно
+    min-width: 0; // Дозволяє flex-shrink працювати коректно
+    overflow: hidden; // Приховувати контент, що не влазить
 
-          &:hover {
-            // Використовуйте змінну, якщо вона визначена, або CSS змінну Obsidian
-            background-color: var(--background-modifier-hover);
-            // background-color: $background-modifier-hover; // Якщо є SCSS змінна
-          }
+    .model-display,
+    .role-display {
+      font-size: var(--font-ui-smaller);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 140px; // Обмеження ширини
+      border: 1px solid transparent; // Рамка для hover-ефекту
+      background-color: transparent;
+      transition: all 0.2s ease;
 
-          // Додатковий стиль для стану "недоступно", якщо ви додали клас в updateModelDisplay
-          &.model-not-available {
-             // Наприклад, зробити його сірим і менш помітним
-             opacity: 0.6;
-             cursor: not-allowed;
-             &:hover {
-                 background-color: transparent; // Заборонити зміну фону при наведенні
-             }
-          }
+      &:hover {
+        background-color: var(--background-modifier-hover);
+        border-color: var(--background-modifier-border-hover); // Змінено для кращого контрасту
+        color: var(--text-normal);
+      }
+      // Стиль для стану "недоступно" (з updateModelDisplay)
+      &.model-not-available {
+         opacity: 0.6;
+         cursor: not-allowed;
+         &:hover {
+             background-color: transparent;
+             border-color: transparent;
+         }
+      }
+    }
+
+    .temperature-indicator {
+      font-size: 1.2em; // Емодзі трохи більший
+      color: var(--text-muted);
+      padding: 4px; // Менші падінги для компактності
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      line-height: 1;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 26px; // Мінімальна ширина
+      background-color: transparent;
+      border: 1px solid transparent;
+      transition: all 0.2s ease;
+
+      &:hover {
+        background-color: var(--background-modifier-hover);
+        border-color: var(--background-modifier-border-hover);
+        color: var(--text-normal);
+      }
+    }
+
+    // Кнопка Перекладу (ліворуч)
+    .translate-input-button {
+      width: 28px; height: 28px; // Розмір за замовчуванням
+      border: none;
+      border-radius: var(--radius-s);
+      background-color: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; padding: 0;
+      transition: all 0.15s ease-in-out;
+      opacity: 0.7;
+      outline: none;
+      flex-shrink: 0; // Не стискати кнопку
+
+      .svg-icon { width: 16px; height: 16px; } // Розмір іконки
+
+      &:hover {
+        background-color: var(--background-modifier-hover);
+        color: var(--text-normal);
+        opacity: 1;
+      }
+
+      &.translating-input {
+        cursor: default;
+        opacity: 0.5;
+        .svg-icon {
+           animation: spin 1s linear infinite;
         }
       }
-  
-      // Right controls group (assuming .input-controls-right is used in TS)
-      .input-controls-right {
-        display: flex;
-        align-items: center;
-        gap: calc(var(--chat-spacing-unit) * 1.5);
-        flex-shrink: 0;
-  
-        // Base button styles
-        button {
-          width: 32px;
-          height: 32px;
-          border: none;
-          border-radius: 50%;
-          background-color: transparent;
-          color: var(--text-muted);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0;
-          transition: all 0.15s ease-in-out;
-          opacity: 0.7;
-          outline: none;
-          flex-shrink: 0;
-  
-          &:hover {
-            background-color: var(--background-modifier-hover);
-            color: var(--text-normal);
-            opacity: 1;
-            transform: scale(1.05);
-          }
-  
-          &.disabled {
+       &.disabled { // Стиль для вимкненої кнопки
             opacity: 0.4 !important;
             cursor: not-allowed;
             background-color: transparent !important;
-            transform: none !important;
-            box-shadow: none !important; // Ensure no shadow when disabled
-          }
-  
-           &:focus-visible { // Style for keyboard navigation focus
-             opacity: 1;
-             background-color: var(--background-modifier-hover);
-             box-shadow: 0 0 0 2px var(--interactive-accent-translucent);
-           }
-        }
-  
-        // Send Button
-        .send-button {
-          background-color: var(--interactive-accent);
-          color: var(--text-on-accent);
-          opacity: 1;
-          // box-shadow: 0 1px 3px rgba(var(--interactive-accent-rgb), 0.2); // Removed shadow
-  
-          &:hover {
-            background-color: var(--interactive-accent-hover);
-            transform: scale(1.08);
-            // box-shadow: 0 2px 6px rgba(var(--interactive-accent-rgb), 0.3); // Removed shadow
-          }
-  
-          &:active {
-            transform: scale(1.02);
-            background-color: var(--interactive-accent);
-          }
-  
-          &.disabled {
-            background-color: var(--background-modifier-border) !important;
-            color: var(--text-muted) !important;
-            opacity: 0.6 !important;
-            box-shadow: none !important;
-          }
-        }
-  
-        // Voice Button
-        .voice-button {
-          &.recording {
-            background-color: var(--text-error);
-            color: white;
-            opacity: 1;
-            animation: pulse-recording 1.5s infinite ease-in-out;
-            box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); // Keep pulse animation shadow
-          }
-        }
-  
-        // Menu Button - Add specific styles if needed
-        // .menu-button { }
-      }
+       }
     }
   }
 
-  
+  // Права група контролів
+  .input-controls-right {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--chat-spacing-unit) * 1.5); // Відступ між кнопками праворуч
+    flex-shrink: 0; // Не стискати цю групу
+
+    // Базові стилі для всіх кнопок праворуч
+    button {
+      width: 32px; // Розмір за замовчуванням
+      height: 32px;
+      border: none;
+      border-radius: 50%; // Круглі кнопки
+      background-color: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.15s ease-in-out;
+      opacity: 0.7;
+      outline: none;
+      flex-shrink: 0; // Не стискати кнопки
+
+      .svg-icon { width: 18px; height: 18px; } // Розмір іконок
+
+      &:hover {
+        background-color: var(--background-modifier-hover);
+        color: var(--text-normal);
+        opacity: 1;
+        transform: scale(1.05); // Невелике збільшення при наведенні
+      }
+
+      &.disabled {
+        opacity: 0.4 !important;
+        cursor: not-allowed;
+        background-color: transparent !important;
+        transform: none !important;
+      }
+
+       &:focus-visible { // Стиль фокусу для навігації клавіатурою
+         opacity: 1;
+         background-color: var(--background-modifier-hover);
+         box-shadow: 0 0 0 2px var(--interactive-accent-translucent);
+       }
+    }
+
+    // Кнопка Відправки
+    .send-button {
+      background-color: var(--interactive-accent);
+      color: var(--text-on-accent);
+      opacity: 1;
+
+      &:hover {
+        background-color: var(--interactive-accent-hover);
+        transform: scale(1.08);
+      }
+
+      &:active {
+        transform: scale(1.02);
+        background-color: var(--interactive-accent); // Трохи темніший при натисканні
+      }
+
+      &.disabled {
+        background-color: var(--background-modifier-border) !important; // Сірий фон для вимкненої
+        color: var(--text-faint) !important; // Тьмяніший текст
+        opacity: 0.6 !important;
+      }
+    }
+
+    // Кнопка Голосового Вводу
+    .voice-button {
+      // Стилі для стану запису
+      &.recording {
+        background-color: var(--text-error);
+        color: white;
+        opacity: 1;
+        animation: pulse-recording 1.5s infinite ease-in-out;
+        // boxShadow для анімації пульсації (опціонально)
+        box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5);
+      }
+    }
+
+    // Кнопка Меню
+    // .menu-button { } // Додаткові стилі, якщо потрібні
+  }
+}
+
+// Анімація пульсації для кнопки запису
+@keyframes pulse-recording {
+  0% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(var(--text-error-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); }
+}
+
+// Анімація обертання для іконки завантаження
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

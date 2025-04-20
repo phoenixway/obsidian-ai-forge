@@ -2,128 +2,124 @@
 // Стилі для екранів <= 768px
 
 :root {
-    --chat-message-max-width: 90%; // Wider messages
-    --chat-avatar-size: 28px; // Smaller avatar
-  }
-  
-  .ollama-chat-container {
-    padding: calc(var(--chat-spacing-unit) * 3); // Less padding
-    padding-bottom: calc(var(--chat-spacing-unit) * 1.5);
-  }
-  
-  .message-group {
-     // Adjust spacing based on new layout
-     &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
-     &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
-     margin-bottom: calc(var(--chat-spacing-unit) * 3); // Less spacing between groups
-  }
-  
-  .message {
-    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5); // Less padding
-    font-size: calc(var(--font-ui-small) * 0.98); // Slightly smaller font
-  }
-  
-  // Make action buttons always visible on touch devices
-  .message-actions-wrapper {
-    opacity: 0.6; // Semi-transparent
-    visibility: visible;
-    transition: none;
-  
-    button {
-      background-color: transparent; // More transparent background
-      border: none;
-      padding: 1px; // Less padding
-  
-      .svg-icon {
-        width: 13px; height: 13px; // Smaller icon
-      }
-  
-       &:hover { // Style for tap/hover
-         background-color: var(--background-modifier-hover);
-         transform: scale(1.1);
-       }
-    }
-  
-    // User message button overrides
-    .user-message & button {
-       background-color: transparent;
-       border: none;
-       opacity: 0.7;
-       &:hover {
-           background-color: rgba(255, 255, 255, 0.2) !important;
-       }
-    }
-  }
-  
-  .chat-input-container {
-    gap: 6px;
-    max-height: 75vh; // Allow more height on tablets
-  
-    .input-controls-container {
-      flex-wrap: wrap; // Allow wrapping if needed
-      justify-content: center;
-      gap: 8px;
-    }
-  
-    textarea {
-      padding-left: 10px;
-      margin-bottom: 6px;
-      padding-right: 15px; // Reset large padding
-    }
-  
-   .input-controls-left .translate-input-button {
-      width: 30px; height: 30px;
+  // Змінні, специфічні для планшета (можна коригувати)
+  --chat-message-max-width: 90%;
+  --chat-avatar-size: 28px;
+  --chat-spacing-unit: 4px; // Можливо, трохи менший базовий відступ
+}
+
+.ollama-chat-container {
+  padding: calc(var(--chat-spacing-unit) * 3);
+  padding-bottom: calc(var(--chat-spacing-unit) * 1.5);
+}
+
+.message-group {
+   // Adjust spacing based on avatar size
+   &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
+   &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
+   margin-bottom: calc(var(--chat-spacing-unit) * 3);
+}
+
+.message {
+  padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+  font-size: calc(var(--font-ui-small) * 0.98);
+}
+
+// Кнопки дій у повідомленнях (завжди видимі на тач-пристроях)
+.message-actions-wrapper {
+  opacity: 0.65; // Трохи помітніші
+  visibility: visible;
+  transition: none; // Без анімації появи
+
+  button {
+    background-color: rgba(var(--background-primary-rgb), 0.5); // Напівпрозорий фон
+    backdrop-filter: blur(2px); // Ефект розмиття (якщо підтримується)
+    border: 1px solid rgba(var(--background-modifier-border-rgb), 0.3);
+    border-radius: var(--radius-s);
+    padding: 1px 2px; // Невеликі падінги
+
+    .svg-icon {
+      width: 13px; height: 13px;
     }
 
-    .input-controls-left .voice-button {
-      width: 28px; height: 28px;
-      background-color: red;
-      display: none;
-    }
-    
-    .input-controls-right {
-      button {
-        width: 30px; height: 30px;
-        background-color: red;
-
-        .voice-button   &.recording{
-          display: none !important;
-        }
-      }
- 
-      
-    }
-
+     &:hover { // Стиль при натисканні/наведенні
+       background-color: var(--background-modifier-hover);
+       transform: none; // Прибираємо scale на тач-пристроях
+       opacity: 1;
+     }
   }
-  
-  .menu-dropdown.ollama-chat-menu {
-      // Show model section in menu on mobile/tablet
-      .model-submenu-section {
-          display: none !important;
-      }
-      .model-submenu-section + hr { // Show separator too
-          display: none !important;
-      }
-  
-      // Show role section in menu on mobile/tablet
-      .role-submenu-section {
-          display: none !important; // Показуємо секцію
-  
-          // Показуємо роздільник після неї теж
-          + hr.menu-separator {
-            display: none !important;
-          }
-        }
+
+  // Специфічні стилі для кнопок на повідомленнях користувача (якщо потрібні)
+  // .user-message & button { ... }
+}
+
+.chat-input-container {
+  gap: 6px; // Менший відступ між textarea та controls
+  max-height: 75vh; // Можна обмежити висоту
+
+  .input-controls-container {
+    flex-wrap: nowrap; // Забороняємо перенос за замовчуванням для планшета
+    justify-content: space-between; // Залишаємо рознесення
+    gap: 6px; // Менший відступ між групами контролів
   }
-  
+
+  textarea {
+    // padding-left: 10px; // З _input.scss
+    margin-bottom: 6px; // Відступ знизу
+    // padding-right: 15px; // З _input.scss
+  }
+
+  // Приховуємо непотрібні кнопки
+  .input-controls-right {
+      .voice-button,
+      .send-button {
+          display: none; // Ховаємо голос та відправку
+      }
+  }
+
   .input-controls-left {
-          .model-display {
-          max-width: 150px;
+      .role-display {
+          display: none; // Ховаємо роль для економії місця
       }
-       .model-display + .translate-input-button { // Should be model-display + role-display + translate? Check order
-            margin-left: 4px; // Adjust if role-display was between them
-       }
-       .role-display {
-        max-width: 150px;
-    }
+      // Зменшуємо кнопки/індикатори, що залишились
+      .translate-input-button, button { // Стиль для translate
+           width: 30px; height: 30px;
+           .svg-icon { width: 16px; height: 16px; }
+      }
+      .model-display, .temperature-indicator {
+           padding: 3px 6px; // Менші падінги
+           font-size: calc(var(--font-ui-smaller) * 0.95);
+      }
+      .temperature-indicator {
+          min-width: 24px; // Трохи менша ширина
+          font-size: 1.1em;
+      }
   }
+  // Кнопка меню праворуч
+  .input-controls-right {
+       button { // Стиль для меню
+          width: 30px; height: 30px;
+          .svg-icon { width: 17px; height: 17px; }
+       }
+  }
+}
+
+// Меню: Залишаємо секції видимими (прибираємо !important з display: none)
+// Якщо вони мають бути приховані, поверніть display: none
+.menu-dropdown.ollama-chat-menu {
+    .model-submenu-section,
+    .role-submenu-section {
+        display: none; //block; // Або flex/grid, залежно від базового стилю .menu-option
+         + hr.menu-separator {
+            display: none; //block; // Показуємо роздільник теж
+         }
+    }
+}
+
+// Стилі для лівих контролів (обмеження ширини)
+.input-controls-left {
+      .model-display {
+        max-width: 130px; // Трохи менше місця
+      }
+      // .role-display вже прихований
+}
