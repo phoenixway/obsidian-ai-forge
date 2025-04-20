@@ -1,5 +1,5 @@
 // src/ragService.ts
-import { TFile, Vault, normalizePath, DataAdapter, Notice, TFolder } from "obsidian"; // Додано DataAdapter
+import { TFile, Vault, normalizePath, DataAdapter, TFolder } from "obsidian"; // Додано DataAdapter
 import OllamaPlugin from "./main";
 import { DEFAULT_SETTINGS } from "./settings";
 
@@ -72,13 +72,13 @@ export class RagService {
    */
   async indexDocuments(): Promise<void> {
     if (!this.plugin.settings.ragEnabled) {
-      this.plugin.logger.info("[RagService] RAG indexing skipped (disabled in settings).");
+      this.plugin.logger.debug("[RagService] RAG indexing skipped (disabled in settings).");
       this.chunkEmbeddings = []; // Очищаємо індекс, якщо RAG вимкнено
       return;
     }
      // Перевіряємо, чи увімкнено семантичний пошук
      if (!this.plugin.settings.ragEnableSemanticSearch) {
-        this.plugin.logger.info("[RagService] Semantic Search indexing skipped (disabled in settings).");
+        this.plugin.logger.debug("[RagService] Semantic Search indexing skipped (disabled in settings).");
         // Можна або очистити chunkEmbeddings, або залишити старий keyword-індекс (this.documents)
         this.chunkEmbeddings = []; // Очищаємо, бо цей сервіс тепер для семантики
         // Тут могла б бути логіка для старого індексування, якщо потрібно
@@ -90,7 +90,7 @@ export class RagService {
         return;
     }
     this.isIndexing = true;
-    this.plugin.logger.info("[RagService] Starting semantic indexing...");
+    this.plugin.logger.debug("[RagService] Starting semantic indexing...");
     const startTime = Date.now();
 
     // Оновлюємо назву моделі з налаштувань
@@ -105,9 +105,9 @@ export class RagService {
       const vault = this.plugin.app.vault;
       const metadataCache = this.plugin.app.metadataCache;
 
-      this.plugin.logger.info(`[RagService] RAG folder path: "${folderPath}"`);
+      this.plugin.logger.debug(`[RagService] RAG folder path: "${folderPath}"`);
       const files = await this.getMarkdownFiles(vault, folderPath);
-      this.plugin.logger.info(`[RagService] Found ${files.length} markdown files in "${folderPath}".`);
+      this.plugin.logger.debug(`[RagService] Found ${files.length} markdown files in "${folderPath}".`);
 
       let processedFiles = 0;
       for (const file of files) {
@@ -162,12 +162,12 @@ export class RagService {
 
       this.chunkEmbeddings = newEmbeddings; // Оновлюємо індекс
       const duration = (Date.now() - startTime) / 1000;
-      this.plugin.logger.info(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files.`);
-      new Notice(`RAG index updated: ${this.chunkEmbeddings.length} chunks indexed.`);
+      this.plugin.logger.debug(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files.`);
+      // new Notice(`RAG index updated: ${this.chunkEmbeddings.length} chunks indexed.`);
 
     } catch (error) {
       this.plugin.logger.error("[RagService] Error during indexing process:", error);
-      new Notice("RAG indexing failed. See console for details.");
+      // new Notice("RAG indexing failed. See console for details.");
     } finally {
       this.isIndexing = false;
     }
@@ -230,7 +230,7 @@ export class RagService {
    */
   async findRelevantDocuments(query: string, limit: number): Promise<ChunkVector[]> {
     if (!this.plugin.settings.ragEnableSemanticSearch) {
-        this.plugin.logger.info("[RagService] Semantic search disabled, skipping retrieval.");
+        this.plugin.logger.debug("[RagService] Semantic search disabled, skipping retrieval.");
         return []; // Повертаємо порожньо, якщо семантичний пошук вимкнено
     }
     if (!this.chunkEmbeddings || this.chunkEmbeddings.length === 0 || !query) {
@@ -263,7 +263,7 @@ export class RagService {
         relevantChunks.sort((a, b) => b.score - a.score);
 
         const duration = Date.now() - startTime;
-        this.plugin.logger.info(`[RagService] Semantic search completed in ${duration}ms. Found ${relevantChunks.length} chunks above threshold ${similarityThreshold}.`);
+        this.plugin.logger.debug(`[RagService] Semantic search completed in ${duration}ms. Found ${relevantChunks.length} chunks above threshold ${similarityThreshold}.`);
 
         // --- 5. Повертаємо Топ K результатів ---
         return relevantChunks.slice(0, limit);
@@ -290,11 +290,11 @@ export class RagService {
            const relevantChunks = await this.findRelevantDocuments(query, topK);
 
            if (relevantChunks.length === 0) {
-               this.plugin.logger.info("[RagService] No relevant documents found via semantic search for context.");
+               this.plugin.logger.debug("[RagService] No relevant documents found via semantic search for context.");
                return "";
            }
 
-           this.plugin.logger.info(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
+           this.plugin.logger.debug(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
            let context = "### Context from User Notes (Semantic Search):\n\n";
            relevantChunks.forEach((chunk, index) => {
                let header = `--- Chunk ${index + 1} from: ${chunk.metadata?.filename || chunk.metadata.path}`;
@@ -312,7 +312,7 @@ export class RagService {
            // Якщо семантичний пошук вимкнено, можна повернутись до старої логіки
            // findRelevantDocuments (з пошуком за ключовими словами)
            // Або просто повернути порожній рядок, якщо старий пошук не підтримується
-           this.plugin.logger.info("[RagService] Semantic search disabled. Using legacy keyword search (if implemented) or skipping RAG.");
+           this.plugin.logger.debug("[RagService] Semantic search disabled. Using legacy keyword search (if implemented) or skipping RAG.");
            // Приклад виклику старої функції (якщо вона існує)
            // const keywordLimit = 3; // Або інше значення
            // const keywordDocs = this.findRelevantDocuments_Keyword(query, keywordLimit); // Перейменуйте стару функцію

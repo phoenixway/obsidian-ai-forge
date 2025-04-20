@@ -182,10 +182,10 @@ export class ChatManager {
             await this.saveChatIndex();
 
         } catch (error) {
-            console.error(`[ChatManager] Critical error during index rebuild:`, error);
+            this.plugin.logger.error(`[ChatManager] Critical error during index rebuild:`, error);
             this.sessionIndex = {};
             await this.saveChatIndex();
-            new Notice("Error rebuilding chat index.");
+            // new Notice("Error rebuilding chat index.");
         }
     }
 

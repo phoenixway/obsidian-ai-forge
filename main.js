@@ -3010,12 +3010,12 @@ var RagService = class {
   async indexDocuments() {
     var _a, _b;
     if (!this.plugin.settings.ragEnabled) {
-      this.plugin.logger.info("[RagService] RAG indexing skipped (disabled in settings).");
+      this.plugin.logger.debug("[RagService] RAG indexing skipped (disabled in settings).");
       this.chunkEmbeddings = [];
       return;
     }
     if (!this.plugin.settings.ragEnableSemanticSearch) {
-      this.plugin.logger.info("[RagService] Semantic Search indexing skipped (disabled in settings).");
+      this.plugin.logger.debug("[RagService] Semantic Search indexing skipped (disabled in settings).");
       this.chunkEmbeddings = [];
       return;
     }
@@ -3024,7 +3024,7 @@ var RagService = class {
       return;
     }
     this.isIndexing = true;
-    this.plugin.logger.info("[RagService] Starting semantic indexing...");
+    this.plugin.logger.debug("[RagService] Starting semantic indexing...");
     const startTime = Date.now();
     this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
     const chunkSize = this.plugin.settings.ragChunkSize || DEFAULT_SETTINGS.ragChunkSize;
@@ -3034,9 +3034,9 @@ var RagService = class {
       const folderPath = this.plugin.settings.ragFolderPath;
       const vault = this.plugin.app.vault;
       const metadataCache = this.plugin.app.metadataCache;
-      this.plugin.logger.info(`[RagService] RAG folder path: "${folderPath}"`);
+      this.plugin.logger.debug(`[RagService] RAG folder path: "${folderPath}"`);
       const files = await this.getMarkdownFiles(vault, folderPath);
-      this.plugin.logger.info(`[RagService] Found ${files.length} markdown files in "${folderPath}".`);
+      this.plugin.logger.debug(`[RagService] Found ${files.length} markdown files in "${folderPath}".`);
       let processedFiles = 0;
       for (const file of files) {
         this.plugin.logger.debug(`[RagService] Processing file: ${file.path}`);
@@ -3083,11 +3083,9 @@ var RagService = class {
       }
       this.chunkEmbeddings = newEmbeddings;
       const duration = (Date.now() - startTime) / 1e3;
-      this.plugin.logger.info(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files.`);
-      new import_obsidian5.Notice(`RAG index updated: ${this.chunkEmbeddings.length} chunks indexed.`);
+      this.plugin.logger.debug(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files.`);
     } catch (error) {
       this.plugin.logger.error("[RagService] Error during indexing process:", error);
-      new import_obsidian5.Notice("RAG indexing failed. See console for details.");
     } finally {
       this.isIndexing = false;
     }
@@ -3144,7 +3142,7 @@ var RagService = class {
   async findRelevantDocuments(query, limit) {
     var _a;
     if (!this.plugin.settings.ragEnableSemanticSearch) {
-      this.plugin.logger.info("[RagService] Semantic search disabled, skipping retrieval.");
+      this.plugin.logger.debug("[RagService] Semantic search disabled, skipping retrieval.");
       return [];
     }
     if (!this.chunkEmbeddings || this.chunkEmbeddings.length === 0 || !query) {
@@ -3169,7 +3167,7 @@ var RagService = class {
       const relevantChunks = scoredChunks.filter((chunk) => chunk.score >= similarityThreshold);
       relevantChunks.sort((a, b) => b.score - a.score);
       const duration = Date.now() - startTime;
-      this.plugin.logger.info(`[RagService] Semantic search completed in ${duration}ms. Found ${relevantChunks.length} chunks above threshold ${similarityThreshold}.`);
+      this.plugin.logger.debug(`[RagService] Semantic search completed in ${duration}ms. Found ${relevantChunks.length} chunks above threshold ${similarityThreshold}.`);
       return relevantChunks.slice(0, limit);
     } catch (error) {
       this.plugin.logger.error("[RagService] Error during semantic search:", error);
@@ -3189,10 +3187,10 @@ var RagService = class {
       const topK = this.plugin.settings.ragTopK || DEFAULT_SETTINGS.ragTopK;
       const relevantChunks = await this.findRelevantDocuments(query, topK);
       if (relevantChunks.length === 0) {
-        this.plugin.logger.info("[RagService] No relevant documents found via semantic search for context.");
+        this.plugin.logger.debug("[RagService] No relevant documents found via semantic search for context.");
         return "";
       }
-      this.plugin.logger.info(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
+      this.plugin.logger.debug(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
       let context = "### Context from User Notes (Semantic Search):\n\n";
       relevantChunks.forEach((chunk, index) => {
         var _a, _b, _c, _d;
@@ -3207,7 +3205,7 @@ var RagService = class {
       context += "### End of Context\n\n";
       return context.trim();
     } else {
-      this.plugin.logger.info("[RagService] Semantic search disabled. Using legacy keyword search (if implemented) or skipping RAG.");
+      this.plugin.logger.debug("[RagService] Semantic search disabled. Using legacy keyword search (if implemented) or skipping RAG.");
       return "";
     }
   }
@@ -4122,10 +4120,9 @@ var ChatManager = class {
       this.sessionIndex = newIndex;
       await this.saveChatIndex();
     } catch (error) {
-      console.error(`[ChatManager] Critical error during index rebuild:`, error);
+      this.plugin.logger.error(`[ChatManager] Critical error during index rebuild:`, error);
       this.sessionIndex = {};
       await this.saveChatIndex();
-      new import_obsidian9.Notice("Error rebuilding chat index.");
     }
   }
   /** Зберігає поточний індекс чатів у сховище плагіна. */
