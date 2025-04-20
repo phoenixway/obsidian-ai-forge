@@ -12,17 +12,10 @@
 }
 
 .message-group {
-
-  // Adjust spacing based on new layout
-  &.user-message-group .message-wrapper {
-    margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
-  }
-
-  &.ollama-message-group .message-wrapper {
-    margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
-  }
-
-  margin-bottom: calc(var(--chat-spacing-unit) * 3); // Less spacing between groups
+   // Adjust spacing based on new layout
+   &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
+   &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); }
+   margin-bottom: calc(var(--chat-spacing-unit) * 3); // Less spacing between groups
 }
 
 .message {
@@ -42,26 +35,23 @@
     padding: 1px; // Less padding
 
     .svg-icon {
-      width: 13px;
-      height: 13px; // Smaller icon
+      width: 13px; height: 13px; // Smaller icon
     }
 
-    &:hover {
-      // Style for tap/hover
-      background-color: var(--background-modifier-hover);
-      transform: scale(1.1);
-    }
+     &:hover { // Style for tap/hover
+       background-color: var(--background-modifier-hover);
+       transform: scale(1.1);
+     }
   }
 
   // User message button overrides
   .user-message & button {
-    background-color: transparent;
-    border: none;
-    opacity: 0.7;
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.2) !important;
-    }
+     background-color: transparent;
+     border: none;
+     opacity: 0.7;
+     &:hover {
+         background-color: rgba(255, 255, 255, 0.2) !important;
+     }
   }
 }
 
@@ -75,16 +65,15 @@
     gap: 8px;
 
 
-    .input-controls-right {
+  .input-controls-right {
+    // ... (можливо, існуючі стилі для .input-controls-right) ...
 
-      .voice-button {
-        display: none; // Ховаємо кнопку голосового вводу на планшетах і менших екранах
-      }
-
-      .send-button {
-        display: none; // Ховаємо кнопку відправки на планшетах і менших екранах
-      }
+    // --- ДОДАТИ ЦЕ ПРАВИЛО ---
+    .voice-button {
+      display: none; // Ховаємо кнопку голосового вводу на планшетах і менших екранах
     }
+    // --- КІНЕЦЬ ДОДАНОГО ПРАВИЛА ---
+  }
   }
 
   textarea {
@@ -93,49 +82,41 @@
     padding-right: 15px; // Reset large padding
   }
 
-  .input-controls-right button,
-  // Includes Send, Voice, Menu
+  .input-controls-right button, // Includes Send, Voice, Menu
   .input-controls-left .translate-input-button {
-    width: 30px;
-    height: 30px;
+    width: 30px; height: 30px;
   }
 }
 
 .menu-dropdown.ollama-chat-menu {
-
-  // Show model section in menu on mobile/tablet
-  .model-submenu-section {
-    display: none !important;
-  }
-
-  .model-submenu-section+hr {
-    // Show separator too
-    display: none !important;
-  }
-
-  // Show role section in menu on mobile/tablet
-  .role-submenu-section {
-    display: none !important; // Показуємо секцію
-
-    // Показуємо роздільник після неї теж
-    +hr.menu-separator {
-      display: none !important;
+    // Show model section in menu on mobile/tablet
+    .model-submenu-section {
+        display: none !important;
     }
-  }
+    .model-submenu-section + hr { // Show separator too
+        display: none !important;
+    }
+
+    // Show role section in menu on mobile/tablet
+    .role-submenu-section {
+        display: none !important; // Показуємо секцію
+
+        // Показуємо роздільник після неї теж
+        + hr.menu-separator {
+          display: none !important;
+        }
+      }
 }
 
 .input-controls-left {
-  .model-display {
-    max-width: 150px;
-  }
-
-  .model-display+.translate-input-button {
-    // Should be model-display + role-display + translate? Check order
-    margin-left: 4px; // Adjust if role-display was between them
-  }
-
-  .role-display {
-    max-width: 150px;
+        .model-display {
+        max-width: 150px;
+    }
+     .model-display + .translate-input-button { // Should be model-display + role-display + translate? Check order
+          margin-left: 4px; // Adjust if role-display was between them
+     }
+     .role-display {
+      max-width: 150px;
   }
 
 }
