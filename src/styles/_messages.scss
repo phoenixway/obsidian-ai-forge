@@ -29,6 +29,7 @@
       align-items: flex-end; // Align bubbles right
       order: 1; // Place messages before avatar
       margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+      margin-left: auto;
     }
   }
 
@@ -47,6 +48,7 @@
       align-items: flex-start; // Align bubbles left
       order: 2; // Place messages after avatar
       margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+      margin-right: auto;
     }
   }
 }
