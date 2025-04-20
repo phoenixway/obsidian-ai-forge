@@ -229,56 +229,49 @@
 
 // Class added by JS when content IS collapsed
 .message-content-collapsed {
-  // max-height is set via inline style by JS (e.g., style="max-height: 300px;")
+  position: relative;
+  // --- ВИДАЛИТИ блок &::after ---
 
-  // Optional: Fade-out effect at the bottom
-  // NOTE: Masking can sometimes cause issues on mobile, remove if problematic
-  position: relative; // Needed for the mask pseudo-element
-
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 40px; // Height of the fade gradient
-    background: linear-gradient(to bottom, transparent, var(--background-primary)); // Adjust background color to match bubble
-    pointer-events: none; // Allow clicking through the gradient
-  }
-
-  // Alternative using mask-image (might have compatibility issues)
-  // -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-  // mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-
-  .user-message {
-    .message-content-collapsed::after {
-        // Припускаємо темну тему, де текст користувача світлий
-        // Градієнт до напівпрозорого чорного, щоб "затемнити" текст
-        background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.7));
-        // АБО, якщо тема має змінну для оверлею:
-        // background: linear-gradient(to bottom, transparent, var(--overlay-color-fade, rgba(0,0,0,0.7)));
-    }
-    // Стилі кнопки користувача залишаються як були
-     .show-more-button {
-        background-color: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 255, 255, 0.2);
-        color: var(--text-on-accent);
-        &:hover {
-            background-color: rgba(255, 255, 255, 0.25);
-        }
-    }
+  // --- ДОДАТИ властивості маски ---
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  // Потрібен префікс для кращої сумісності
+  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
 }
 
-body.theme-light {
-  .user-message {
-      .message-content-collapsed::after {
-           // Градієнт до напівпрозорого білого
-           background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.85));
-      }
-  }
-}
+// --- Видалити селектор .user-message .message-content-collapsed::after ---
 
+
+// Кнопка "Показати більше/менше" (стилі залишаються, як у Варіанті 1)
+.show-more-button {
+   display: block;
+   margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto;
+   padding: 2px 10px;
+   font-size: 0.8em;
+   color: var(--text-muted);
+   background-color: transparent;
+   border: 1px solid transparent;
+   border-radius: 12px;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   text-align: center;
+   width: fit-content;
+   z-index: 2;
+
+   &:hover {
+       background-color: var(--background-modifier-hover);
+       color: var(--text-accent-hover);
+       border-color: var(--background-modifier-border-hover);
+   }
 }
+.user-message .show-more-button {
+     background-color: transparent;
+     border-color: transparent;
+     color: rgba(255, 255, 255, 0.7);
+     &:hover {
+         background-color: rgba(255, 255, 255, 0.2);
+         color: white;
+     }
+ }
 
 // Button to expand/collapse
 .show-more-button {
