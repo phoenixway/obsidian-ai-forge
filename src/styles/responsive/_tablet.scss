@@ -86,7 +86,7 @@
   }
   .input-controls-left {
       .role-display {
-          display: none; // Ховаємо роль
+          // display: none; // Ховаємо роль
       }
   }
   // --- Кінець приховування ---
@@ -121,9 +121,9 @@
 .menu-dropdown.ollama-chat-menu {
     .model-submenu-section,
     .role-submenu-section {
-        display: block; // Або flex
+        display: none; //block; // Або flex
          + hr.menu-separator {
-            display: block;
+            display: none; //block;
          }
     }
      // Обмеження висоти списків
