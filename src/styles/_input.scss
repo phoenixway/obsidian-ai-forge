@@ -37,8 +37,12 @@
     border-radius: 8px;
     padding: 10px 15px;
     line-height: 1.5;
-    min-height: 40px; // Базова мінімальна висота
-    max-height: 60vh; // Обмеження максимальної висоти
+    field-sizing: content; // Нова властивість CSS
+    // Можливо, знадобляться префікси або стара назва:
+    // form-sizing: content;
+    // Переконайтеся, що min-height і max-height все ще працюють
+    min-height: 40px;
+    max-height: 60vh;
     height: auto;     // Дозволяє автовисоту
     overflow-y: auto; // Додаємо скрол при переповненні max-height
     background-color: var(--background-secondary); // Трохи інший фон для поля

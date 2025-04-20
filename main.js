@@ -405,7 +405,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
       this.resizeTimeout = setTimeout(() => {
         this.adjustTextareaHeight();
         this.updateSendButtonState();
-      }, 50);
+      }, 75);
     };
     // Input Area Buttons
     this.handleVoiceClick = () => {
@@ -744,35 +744,64 @@ This action cannot be undone.`, async () => {
       (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
+    // private adjustTextareaHeight = (): void => {
+    //   requestAnimationFrame(() => { // Кадр 1: Скидання
+    //     if (!this.inputEl) return;
+    //     const textarea = this.inputEl;
+    //     const originalMinHeightStyle = textarea.style.minHeight;
+    //     // Скидаємо height та inline min-height для коректного вимірювання
+    //     textarea.style.height = 'auto';
+    //     textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
+    //     requestAnimationFrame(() => { // Кадр 2: Вимірювання та встановлення
+    //       if (!this.inputEl) return;
+    //       const computedStyle = window.getComputedStyle(textarea);
+    //       // Читаємо базовий min-height (з CSS) та max-height
+    //       const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
+    //       const maxHeight = parseFloat(computedStyle.maxHeight);
+    //       // Вимірюємо scrollHeight ПІСЛЯ скидання
+    //       const scrollHeight = textarea.scrollHeight;
+    //       // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
+    //       let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
+    //       // Застосовуємо обмеження max-height
+    //       if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
+    //         targetMinHeight = maxHeight;
+    //         // Переконуємося, що overflow увімкнено при досягненні межі
+    //         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
+    //           textarea.style.overflowY = 'auto';
+    //         }
+    //       } else {
+    //         // Вимикаємо overflow, якщо не досягли межі
+    //         if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
+    //           textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
+    //         }
+    //       }
+    //       // Встановлюємо обчислену min-height та height: auto
+    //       textarea.style.minHeight = `${targetMinHeight}px`;
+    //       textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
+    //     });
+    //   });
+    // }
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
         if (!this.inputEl)
           return;
         const textarea = this.inputEl;
-        const originalMinHeightStyle = textarea.style.minHeight;
+        const computedStyle = window.getComputedStyle(textarea);
+        const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
+        const maxHeight = parseFloat(computedStyle.maxHeight);
+        const currentScrollTop = textarea.scrollTop;
         textarea.style.height = "auto";
-        textarea.style.minHeight = "0";
-        requestAnimationFrame(() => {
-          if (!this.inputEl)
-            return;
-          const computedStyle = window.getComputedStyle(textarea);
-          const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
-          const maxHeight = parseFloat(computedStyle.maxHeight);
-          const scrollHeight = textarea.scrollHeight;
-          let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
-          if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
-            targetMinHeight = maxHeight;
-            if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
-              textarea.style.overflowY = "auto";
-            }
-          } else {
-            if (textarea.style.overflowY === "auto" || textarea.style.overflowY === "scroll") {
-              textarea.style.overflowY = "hidden";
-            }
-          }
-          textarea.style.minHeight = `${targetMinHeight}px`;
-          textarea.style.height = "auto";
-        });
+        const scrollHeight = textarea.scrollHeight;
+        let targetHeight = Math.max(baseMinHeight, scrollHeight);
+        let applyOverflow = false;
+        if (!isNaN(maxHeight) && targetHeight > maxHeight) {
+          targetHeight = maxHeight;
+          applyOverflow = true;
+        }
+        textarea.style.height = `${targetHeight}px`;
+        textarea.style.overflowY = applyOverflow ? "auto" : "hidden";
+        textarea.scrollTop = currentScrollTop;
+        this.plugin.logger.debug(`[AdjustHeight] scrollH: ${scrollHeight}, baseMin: ${baseMinHeight}, targetH: ${targetHeight}, overflow: ${applyOverflow}`);
       });
     };
     this.handleRoleDisplayClick = async (event) => {

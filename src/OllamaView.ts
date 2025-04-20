@@ -551,7 +551,7 @@ export class OllamaView extends ItemView {
     this.resizeTimeout = setTimeout(() => {
       this.adjustTextareaHeight();
       this.updateSendButtonState();
-    }, 50);
+    }, 75);
   };
 
   // Input Area Buttons
@@ -828,48 +828,81 @@ export class OllamaView extends ItemView {
   private closeMenu(): void { if (this.menuDropdown) { this.menuDropdown.style.display = "none"; this.collapseAllSubmenus(null); } }
   private autoResizeTextarea(): void { this.adjustTextareaHeight(); }
 
+  // private adjustTextareaHeight = (): void => {
+  //   requestAnimationFrame(() => { // Кадр 1: Скидання
+  //     if (!this.inputEl) return;
+  //     const textarea = this.inputEl;
+  //     const originalMinHeightStyle = textarea.style.minHeight;
+
+  //     // Скидаємо height та inline min-height для коректного вимірювання
+  //     textarea.style.height = 'auto';
+  //     textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
+
+  //     requestAnimationFrame(() => { // Кадр 2: Вимірювання та встановлення
+  //       if (!this.inputEl) return;
+  //       const computedStyle = window.getComputedStyle(textarea);
+  //       // Читаємо базовий min-height (з CSS) та max-height
+  //       const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
+  //       const maxHeight = parseFloat(computedStyle.maxHeight);
+  //       // Вимірюємо scrollHeight ПІСЛЯ скидання
+  //       const scrollHeight = textarea.scrollHeight;
+
+  //       // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
+  //       let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
+
+  //       // Застосовуємо обмеження max-height
+  //       if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
+  //         targetMinHeight = maxHeight;
+  //         // Переконуємося, що overflow увімкнено при досягненні межі
+  //         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
+  //           textarea.style.overflowY = 'auto';
+  //         }
+  //       } else {
+  //         // Вимикаємо overflow, якщо не досягли межі
+  //         if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
+  //           textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
+  //         }
+  //       }
+
+  //       // Встановлюємо обчислену min-height та height: auto
+  //       textarea.style.minHeight = `${targetMinHeight}px`;
+  //       textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
+  //     });
+  //   });
+  // }
+
   private adjustTextareaHeight = (): void => {
-    requestAnimationFrame(() => { // Кадр 1: Скидання
-      if (!this.inputEl) return;
-      const textarea = this.inputEl;
-      const originalMinHeightStyle = textarea.style.minHeight;
-
-      // Скидаємо height та inline min-height для коректного вимірювання
-      textarea.style.height = 'auto';
-      textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
-
-      requestAnimationFrame(() => { // Кадр 2: Вимірювання та встановлення
+    requestAnimationFrame(() => {
         if (!this.inputEl) return;
+        const textarea = this.inputEl;
         const computedStyle = window.getComputedStyle(textarea);
-        // Читаємо базовий min-height (з CSS) та max-height
+        // Читаємо базовий min-height та max-height з CSS
         const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
         const maxHeight = parseFloat(computedStyle.maxHeight);
-        // Вимірюємо scrollHeight ПІСЛЯ скидання
+
+        // Тимчасово скидаємо height, щоб виміряти реальну висоту контенту
+        const currentScrollTop = textarea.scrollTop; // Зберігаємо позицію скролу
+        textarea.style.height = 'auto';
+
         const scrollHeight = textarea.scrollHeight;
 
-        // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
-        let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
+        // Обчислюємо цільову висоту, обмежену min/max
+        let targetHeight = Math.max(baseMinHeight, scrollHeight);
+        let applyOverflow = false;
 
-        // Застосовуємо обмеження max-height
-        if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
-          targetMinHeight = maxHeight;
-          // Переконуємося, що overflow увімкнено при досягненні межі
-          if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-            textarea.style.overflowY = 'auto';
-          }
-        } else {
-          // Вимикаємо overflow, якщо не досягли межі
-          if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
-            textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
-          }
+        if (!isNaN(maxHeight) && targetHeight > maxHeight) {
+            targetHeight = maxHeight;
+            applyOverflow = true; // Потрібен скролбар
         }
 
-        // Встановлюємо обчислену min-height та height: auto
-        textarea.style.minHeight = `${targetMinHeight}px`;
-        textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
-      });
+        // Застосовуємо обчислену висоту та стиль overflow
+        textarea.style.height = `${targetHeight}px`;
+        textarea.style.overflowY = applyOverflow ? 'auto' : 'hidden';
+        textarea.scrollTop = currentScrollTop; // Відновлюємо позицію скролу
+
+        this.plugin.logger.debug(`[AdjustHeight] scrollH: ${scrollHeight}, baseMin: ${baseMinHeight}, targetH: ${targetHeight}, overflow: ${applyOverflow}`);
     });
-  }
+}
 
   private updateRoleDisplay(roleName: string | null | undefined): void {
     if (this.roleDisplayEl) {
