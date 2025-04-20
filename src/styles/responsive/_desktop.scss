@@ -1,25 +1,75 @@
 // src/styles/responsive/_desktop.scss
-// Стилі для екранів >= 769px
+// Стилі для екранів >= 769px (скасовують/перевизначають мобільні/планшетні стилі)
 
- // Specific desktop layout adjustments
+ // Мінімальна висота чату на десктопі
  .workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
-    min-height: 65vh; // Set min-height only on desktop
-}
+    min-height: 300px; // Або інше значення, напр. 50vh
+ }
 
-.menu-dropdown.ollama-chat-menu {
-   // Hide model section in menu on desktop (use display instead)
-   .model-submenu-section {
-       display: none;
-   }
-   .model-submenu-section + hr { // Hide separator too
-       display: none;
-   }
-}
+ // Панель керування: Відновлюємо видимість прихованих елементів
+ .chat-input-container {
+    .input-controls-container {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+    }
+    .input-controls-right {
+        .voice-button,
+        .send-button {
+            display: flex; // Явно показуємо кнопки
+        }
+    }
+    .input-controls-left {
+        .role-display {
+             display: inline-flex; // Явно показуємо роль
+        }
+        .translate-input-button {
+            display: flex; // Явно показуємо переклад
+        }
+    }
+ }
 
-// Action buttons in messages hidden by default on desktop
-// Hover effect is handled by the base rule + parent hover in _actions.scss
-.message-actions-wrapper {
-    opacity: 0;
+ // Кнопки дій у повідомленнях (повертаємо поведінку "з'являтись при наведенні")
+ .message-actions-wrapper {
+    opacity: 0; // Сховані за замовчуванням
     visibility: hidden;
-    transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
-}
+    transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s; // Повертаємо анімацію
+
+    button {
+       // Повертаємо стандартні стилі кнопки, якщо потрібно (розмір іконки тощо)
+       // .svg-icon { width: 14px; height: 14px; }
+       // Повертаємо стандартні background/border/padding, якщо вони змінювались у _tablet
+       background-color: transparent;
+       border: none;
+       padding: 2px; // Можливо, трохи більші
+
+        &:hover { // Стандартний hover-ефект для десктопу
+            background-color: var(--background-modifier-hover);
+            transform: scale(1.1); // Повертаємо scale
+            opacity: 1;
+        }
+    }
+ }
+ // Показуємо кнопки при наведенні на повідомлення
+ .message:hover .message-actions-wrapper {
+    opacity: 0.8;
+    visibility: visible;
+    transition-delay: 0s; // Показываем сразу при наведении на сообщение
+ }
+
+
+ // Меню: Приховуємо секції Моделі та Ролі на десктопі
+ .menu-dropdown.ollama-chat-menu {
+   .model-submenu-section,
+   .role-submenu-section {
+       display: none !important; // Використовуємо !important, щоб перебити display: block з _tablet
+   }
+   // Приховуємо також роздільники ПІСЛЯ цих секцій
+   .model-submenu-section + hr.menu-separator,
+   .role-submenu-section + hr.menu-separator {
+       display: none !important;
+   }
+    // Повертаємо більшу висоту для списку чатів на десктопі
+   .submenu-content.chat-list-container {
+        max-height: 300px; // Більше місця на десктопі
+   }
+ }

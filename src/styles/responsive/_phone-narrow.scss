@@ -2,62 +2,66 @@
 // Стилі для екранів <= 360px (застосовуються ПОВЕРХ стилів _phone.scss)
 
 :root {
-    --chat-avatar-size: 24px; // Ще менший аватар
-    // --chat-spacing-unit залишається 3px з _phone.scss
-  }
+   --chat-avatar-size: 24px; // Найменший аватар
+ }
 
-  .chat-input-container {
-     padding: 2px 4px; // Мінімальні падінги
-     border-radius: 8px; // Менший радіус
+ .chat-input-container {
+    padding: 2px 4px; // Мінімальні внутрішні відступи
+    border-radius: 8px;
+    gap: 3px; // Між textarea та controls
 
-     textarea {
-         min-height: 32px;
-         padding: 6px 8px;
-     }
+    textarea {
+        min-height: 32px; // Ще трохи менше
+        padding: 6px 8px;
+        font-size: calc(var(--font-ui-smaller) * 0.95); // Дуже маленький шрифт
+    }
 
-     .input-controls-container {
-         gap: 2px; // Мінімальний відступ між групами
-     }
+    .input-controls-container {
+        gap: 3px; // Мінімальний відступ між групами
+        align-items: center; // Переконуємось, що все вирівняно
+    }
 
-     .input-controls-left {
-         gap: 3px; // Мінімальний відступ між елементами
-         // .translate-input-button вже приховано
-         // .role-display вже приховано
+    .input-controls-left {
+        gap: 3px; // Мінімальний відступ між елементами
+        // translate та role приховані
 
-         .model-display {
-             max-width: 80px; // Ще обмежуємо
-             padding: 2px 4px;
-             font-size: calc(var(--font-ui-smaller) * 0.85);
-         }
-         .temperature-indicator {
-            padding: 2px;
-            min-width: 20px;
-         }
-     }
-     .input-controls-right {
-         gap: 3px;
-         button { // Кнопка меню
-            width: 26px; height: 26px;
-            .svg-icon { width: 15px; height: 15px; }
-         }
-     }
-     // Правила display: none успадковуються
-  }
+        .model-display {
+            max-width: 70px; // Дуже обмежуємо
+            padding: 2px 4px;
+            font-size: calc(var(--font-ui-smaller) * 0.85); // Супер маленький
+        }
+        .temperature-indicator {
+           padding: 2px;
+           min-width: 20px;
+        }
+    }
+    .input-controls-right {
+        gap: 3px;
+        button { // Кнопка меню
+           width: 26px; height: 26px; // Найменші кнопки
+           .svg-icon { width: 15px; height: 15px; }
+        }
+        // voice та send приховані
+    }
+ }
 
-  .message-group {
-    // Відступи для ще меншого аватара
-     &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6=30px
-     &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6=30px
-     margin-bottom: calc(var(--chat-spacing-unit) * 2); // Ще менше
-  }
+ .message-group {
+   // Відступи для найменшого аватара
+    &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6=30px
+    &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 24+6=30px
+    margin-bottom: calc(var(--chat-spacing-unit) * 2); // 6px - мінімальний відступ
+ }
 
-  .message {
-    padding: calc(var(--chat-spacing-unit) * 1) calc(var(--chat-spacing-unit) * 1.5); // Менше падінгу
-  }
+ .message {
+    padding: calc(var(--chat-spacing-unit) * 1) calc(var(--chat-spacing-unit) * 1.5); // 3px 4.5px
+    border-radius: 12px; // Менший радіус
+ }
 
-  .message-actions-wrapper button .svg-icon {
-    width: 11px; height: 11px; // Ще менше
-  }
+ .message-actions-wrapper button .svg-icon {
+   width: 11px; height: 11px; // Найменші іконки
+ }
 
-  // Меню (можна ще зменшити падінги, якщо потрібно)
-  // .menu-dropdown.ollama-chat-menu { ... }
+ // Меню (можна ще зменшити min-width або падінги, якщо потрібно)
+ .menu-dropdown.ollama-chat-menu {
+    min-width: 150px; // Залишаємо з _phone
+ }
