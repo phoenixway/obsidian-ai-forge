@@ -78,9 +78,9 @@
   }
 
   .input-controls-left {
-      .role-display {
-          display: none; // Ховаємо роль для економії місця
-      }
+      // .role-display {
+      //     display: none; // Ховаємо роль для економії місця
+      // }
       // Зменшуємо кнопки/індикатори, що залишились
       .translate-input-button, button { // Стиль для translate
            width: 30px; height: 30px;
