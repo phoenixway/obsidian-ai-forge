@@ -320,7 +320,7 @@ export class OllamaView extends ItemView {
     // --- ЗМІНЕНО ТУТ ---
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
-    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export to Note" }); // Змінено текст
+    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" }); // Змінено текст
     // --- КІНЕЦЬ ЗМІНИ ---
 
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });

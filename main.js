@@ -973,7 +973,7 @@ This action cannot be undone.`, async () => {
     this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     (0, import_obsidian3.setIcon)(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
-    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export to Note" });
+    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
     (0, import_obsidian3.setIcon)(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash");
