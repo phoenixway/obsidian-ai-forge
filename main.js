@@ -3470,6 +3470,8 @@ var OllamaService = class {
     var _a, _b;
     const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
     const headers = { "Content-Type": "application/json" };
+    this.plugin.logger.debug(url);
+    this.plugin.logger.debug(headers);
     try {
       const requestParams = { url, method, headers, body, throw: false };
       const response = await (0, import_obsidian6.requestUrl)(requestParams);

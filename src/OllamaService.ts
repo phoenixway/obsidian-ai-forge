@@ -156,6 +156,8 @@ export class OllamaService {
     ): Promise<T> { // Still returns Promise<T>
         const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        this.plugin.logger.debug(url);
+        this.plugin.logger.debug(headers);
 
         try {
             const requestParams: RequestUrlParam = { url, method, headers, body, throw: false };
