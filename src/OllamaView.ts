@@ -2107,9 +2107,9 @@ async loadAndDisplayActiveChat(): Promise<void> {
 
   // --- Нова допоміжна функція для отримання емодзі температури ---
   private getTemperatureEmoji(temperature: number): string {
-    if (temperature < 0.5) {
+    if (temperature <= 0.4) {
       return '🧊'; // Strict/Focused (Monocle face)
-    } else if (temperature < 1.2) {
+    } else if ( temperature > 0.4 && temperature <= 0.6) {
       return '🙂'; // Neutral (Slightly smiling face)
     } else {
       return '🤪'; // Creative/Wild (Fire)

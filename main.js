@@ -2489,9 +2489,9 @@ This action cannot be undone.`, async () => {
   }
   // --- Нова допоміжна функція для отримання емодзі температури ---
   getTemperatureEmoji(temperature) {
-    if (temperature < 0.5) {
+    if (temperature <= 0.4) {
       return "\u{1F9CA}";
-    } else if (temperature < 1.2) {
+    } else if (temperature > 0.4 && temperature <= 0.6) {
       return "\u{1F642}";
     } else {
       return "\u{1F92A}";
