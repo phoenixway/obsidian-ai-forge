@@ -3455,8 +3455,8 @@ var OllamaService = class {
     const headers = { "Content-Type": "application/json" };
     try {
       const requestParams = { url, method, headers, body, throw: false };
-      const response = await (0, import_obsidian6.requestUrl)(requestParams);
       this.plugin.logger.debug(`[OllamaService] Calling requestUrl with params:`, JSON.stringify(requestParams));
+      const response = await (0, import_obsidian6.requestUrl)(requestParams);
       if (response.status >= 400) {
         let errorText = `Ollama API error! Status: ${response.status} at ${endpoint}`;
         try {

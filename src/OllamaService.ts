@@ -158,9 +158,10 @@ export class OllamaService {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         try {
             const requestParams: RequestUrlParam = { url, method, headers, body, throw: false };
+            this.plugin.logger.debug(`[OllamaService] Calling requestUrl with params:`, JSON.stringify(requestParams));
+
             const response = await requestUrl(requestParams);
 
-            this.plugin.logger.debug(`[OllamaService] Calling requestUrl with params:`, JSON.stringify(requestParams));
             
             // Check for non-OK status first
             if (response.status >= 400) {
