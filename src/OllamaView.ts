@@ -869,7 +869,7 @@ export class OllamaView extends ItemView {
       } else {
         // Доступних моделей немає
         this.plugin.logger.warn("[OllamaView] No models available from Ollama service.");
-        new Notice("No Ollama models available. Ensure Ollama is running and models are installed.", 0); // Постійне сповіщення
+        // new Notice("No Ollama models available. Ensure Ollama is running and models are installed.", 0); // Постійне сповіщення
         finalModelName = null; // Встановлюємо null, щоб відобразити відсутність моделі
       }
 

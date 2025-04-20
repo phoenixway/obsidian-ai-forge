@@ -1307,7 +1307,6 @@ This action cannot be undone.`, async () => {
         }
       } else {
         this.plugin.logger.warn("[OllamaView] No models available from Ollama service.");
-        new import_obsidian3.Notice("No Ollama models available. Ensure Ollama is running and models are installed.", 0);
         finalModelName = null;
       }
       if (activeChat && activeChat.metadata.modelName !== finalModelName) {
