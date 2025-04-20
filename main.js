@@ -613,7 +613,6 @@ This action cannot be undone.`, async () => {
           } else if (abstractFile instanceof import_obsidian3.TFolder) {
             targetFolder = abstractFile;
           } else {
-            this.plugin.logger.warn(`Export path exists but is not a folder: ${targetFolderPath}`);
             new import_obsidian3.Notice(`Error: Export path is not a folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
@@ -628,7 +627,6 @@ This action cannot be undone.`, async () => {
         const filePath = (0, import_obsidian3.normalizePath)(`${targetFolder.path}/${filename}`);
         const existingFile = this.app.vault.getAbstractFileByPath(filePath);
         if (existingFile) {
-          this.plugin.logger.warn(`Export file already exists, overwriting: ${filePath}`);
         }
         const file = await this.app.vault.create(filePath, markdownContent);
         new import_obsidian3.Notice(`Chat exported to ${file.path}`);
@@ -667,7 +665,6 @@ This action cannot be undone.`, async () => {
       }
     };
     this.handleRoleChange = (roleName) => {
-      this.plugin.logger.debug(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
       const displayRole = roleName || "None";
       this.updateInputPlaceholder(displayRole);
       this.updateRoleDisplay(displayRole);
@@ -790,15 +787,12 @@ This action cannot be undone.`, async () => {
     };
     this.handleRoleDisplayClick = async (event) => {
       var _a, _b, _c;
-      this.plugin.logger.debug("[OllamaView Debug] Role display clicked, creating native menu.");
       const menu = new import_obsidian3.Menu();
       let itemsAdded = false;
       try {
         const roles = await this.plugin.listRoleFiles(true);
-        this.plugin.logger.debug("[OllamaView Debug] Roles loaded:", roles);
         const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
         const currentRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
-        this.plugin.logger.debug("[OllamaView Debug] Current role path:", currentRolePath);
         menu.addItem((item) => {
           item.setTitle("None").setIcon(!currentRolePath ? "check" : "slash").onClick(async () => {
             var _a2, _b2;
@@ -850,7 +844,6 @@ This action cannot be undone.`, async () => {
         if (itemsAdded) {
           menu.showAtMouseEvent(event);
         } else {
-          console.warn("Role menu was not shown because no items were added.");
         }
       }
     };
@@ -1167,7 +1160,6 @@ This action cannot be undone.`, async () => {
   }
   updateModelDisplay(modelName) {
     if (this.modelDisplayEl) {
-      this.plugin.logger.debug(`[OllamaView] updateModelDisplay called with: ${modelName}`);
       if (modelName) {
         const displayName = modelName;
         const shortName = displayName.replace(/:latest$/, "");
@@ -1331,8 +1323,7 @@ This action cannot be undone.`, async () => {
   }
   // Load and Display Chat (Тепер оновлює і температуру)
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e;
-    this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
+    var _a, _b, _c, _d;
     this.clearChatContainerInternal();
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
@@ -1344,8 +1335,6 @@ This action cannot be undone.`, async () => {
     try {
       activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
       availableModels = await this.plugin.ollamaService.getModels();
-      this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.name) || "None"}`);
-      this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(", ")}`);
     } catch (error) {
       console.error("[OllamaView] Error fetching active chat or available models:", error);
       new import_obsidian3.Notice("Error connecting to Ollama or loading chat data.", 5e3);
@@ -1355,37 +1344,31 @@ This action cannot be undone.`, async () => {
       finalTemperature = this.plugin.settings.temperature;
     }
     if (!errorOccurred) {
-      let preferredModel = ((_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.modelName) || this.plugin.settings.modelName;
+      let preferredModel = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       if (availableModels.length > 0) {
         if (preferredModel && availableModels.includes(preferredModel)) {
           finalModelName = preferredModel;
         } else {
           finalModelName = availableModels[0];
           if (preferredModel) {
-            this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" not available. Falling back to "${finalModelName}".`);
           } else {
-            this.plugin.logger.info(`[OllamaView] No preferred model specified. Using first available: "${finalModelName}".`);
           }
         }
       } else {
-        this.plugin.logger.warn("[OllamaView] No models available from Ollama.");
         finalModelName = null;
       }
       if (activeChat && activeChat.metadata.modelName !== finalModelName) {
-        this.plugin.logger.info(`[OllamaView] Model for chat "${activeChat.metadata.name}" resolved to "${finalModelName}". Updating metadata if necessary.`);
         try {
           if (finalModelName !== null) {
             await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (activeChat.metadata)
               activeChat.metadata.modelName = finalModelName;
           } else {
-            this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat model metadata.`);
           }
         } catch (updateError) {
         }
       }
-      finalTemperature = (_e = (_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
-      this.plugin.logger.debug(`[OllamaView] Resolved temperature: ${finalTemperature}`);
+      finalTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
     }
     const currentRoleName = await this.getCurrentRoleDisplayName();
     if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
@@ -3470,11 +3453,10 @@ var OllamaService = class {
     var _a, _b;
     const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
     const headers = { "Content-Type": "application/json" };
-    this.plugin.logger.debug(url);
-    this.plugin.logger.debug(headers);
     try {
       const requestParams = { url, method, headers, body, throw: false };
       const response = await (0, import_obsidian6.requestUrl)(requestParams);
+      this.plugin.logger.debug(`[OllamaService] Calling requestUrl with params:`, JSON.stringify(requestParams));
       if (response.status >= 400) {
         let errorText = `Ollama API error! Status: ${response.status} at ${endpoint}`;
         try {

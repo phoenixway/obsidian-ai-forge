@@ -156,13 +156,12 @@ export class OllamaService {
     ): Promise<T> { // Still returns Promise<T>
         const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        this.plugin.logger.debug(url);
-        this.plugin.logger.debug(headers);
-
         try {
             const requestParams: RequestUrlParam = { url, method, headers, body, throw: false };
             const response = await requestUrl(requestParams);
 
+            this.plugin.logger.debug(`[OllamaService] Calling requestUrl with params:`, JSON.stringify(requestParams));
+            
             // Check for non-OK status first
             if (response.status >= 400) {
                 let errorText = `Ollama API error! Status: ${response.status} at ${endpoint}`;

@@ -510,8 +510,6 @@ export class OllamaView extends ItemView {
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
-      this.plugin.logger.debug(`[OllamaView] updateModelDisplay called with: ${modelName}`); // Додано для відладки
-
       if (modelName) {
         // Якщо модель є (не null і не undefined), відображаємо її ім'я
         const displayName = modelName; // "Default" тут більше не потрібен як запасний варіант
@@ -733,7 +731,6 @@ export class OllamaView extends ItemView {
           targetFolder = abstractFile;
         } else {
           // The path exists but is not a folder
-          this.plugin.logger.warn(`Export path exists but is not a folder: ${targetFolderPath}`);
           new Notice(`Error: Export path is not a folder. Saving to vault root.`);
           targetFolder = this.app.vault.getRoot();
         }
@@ -755,7 +752,6 @@ export class OllamaView extends ItemView {
       const existingFile = this.app.vault.getAbstractFileByPath(filePath);
       if (existingFile) {
         // Maybe prompt user or append timestamp/number? For now, log and overwrite.
-        this.plugin.logger.warn(`Export file already exists, overwriting: ${filePath}`);
         // If you want to avoid overwriting, handle it here (e.g., throw error, rename)
       }
 
@@ -794,7 +790,6 @@ export class OllamaView extends ItemView {
   }
   private handleRoleChange = (roleName: string): void => {
     // ... (оновлення ролі, плейсхолдера) ...
-    this.plugin.logger.debug(`[AI Forge View Debug] handleRoleChange received roleName: '${roleName}'`);
     const displayRole = roleName || "None";
     this.updateInputPlaceholder(displayRole);
     this.updateRoleDisplay(displayRole);
@@ -894,7 +889,6 @@ export class OllamaView extends ItemView {
 
 // Load and Display Chat (Тепер оновлює і температуру)
 async loadAndDisplayActiveChat(): Promise<void> {
-  this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
   this.clearChatContainerInternal();
   this.currentMessages = [];
   this.lastRenderedMessageDate = null;
@@ -909,8 +903,6 @@ async loadAndDisplayActiveChat(): Promise<void> {
   try {
       activeChat = await this.plugin.chatManager?.getActiveChat() || null;
       availableModels = await this.plugin.ollamaService.getModels();
-       this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${activeChat?.metadata?.name || 'None'}`);
-       this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(', ')}`);
   } catch (error) {
        console.error("[OllamaView] Error fetching active chat or available models:", error);
        new Notice("Error connecting to Ollama or loading chat data.", 5000);
@@ -930,33 +922,25 @@ async loadAndDisplayActiveChat(): Promise<void> {
            } else {
                finalModelName = availableModels[0];
                if (preferredModel) {
-                    this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" not available. Falling back to "${finalModelName}".`);
-                   // new Notice(`Model "${preferredModel}" not found, using "${finalModelName}".`, 3000);
                } else {
-                    this.plugin.logger.info(`[OllamaView] No preferred model specified. Using first available: "${finalModelName}".`);
                }
            }
        } else {
-           this.plugin.logger.warn("[OllamaView] No models available from Ollama.");
-           // new Notice("No Ollama models available.", 0); // Можна вимкнути, щоб не набридало
            finalModelName = null;
        }
        // Оновлення метаданих чату для моделі
        if (activeChat && activeChat.metadata.modelName !== finalModelName) {
           // ... (логіка оновлення метаданих моделі, як раніше) ...
-            this.plugin.logger.info(`[OllamaView] Model for chat "${activeChat.metadata.name}" resolved to "${finalModelName}". Updating metadata if necessary.`);
            try {
                if (finalModelName !== null) {
                    await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
                    if(activeChat.metadata) activeChat.metadata.modelName = finalModelName;
                } else {
-                    this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat model metadata.`);
                }
            } catch (updateError) { /* ... */ }
        }
         // Визначаємо температуру: з чату або глобальну
         finalTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
-        this.plugin.logger.debug(`[OllamaView] Resolved temperature: ${finalTemperature}`);
 
   } // кінець if (!errorOccurred)
 
@@ -1963,7 +1947,6 @@ async loadAndDisplayActiveChat(): Promise<void> {
 
 
   private handleRoleDisplayClick = async (event: MouseEvent) => {
-    this.plugin.logger.debug("[OllamaView Debug] Role display clicked, creating native menu.");
     const menu = new Menu();
     let itemsAdded = false;
 
@@ -1972,10 +1955,8 @@ async loadAndDisplayActiveChat(): Promise<void> {
 
     try {
       const roles = await this.plugin.listRoleFiles(true); // Отримуємо всі ролі
-      this.plugin.logger.debug("[OllamaView Debug] Roles loaded:", roles);
       const activeChat = await this.plugin.chatManager?.getActiveChat();
       const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-      this.plugin.logger.debug("[OllamaView Debug] Current role path:", currentRolePath);
       // loadingNotice?.hide();
 
       // --- 1. Додаємо опцію "None (Default)" ---
@@ -2045,7 +2026,6 @@ async loadAndDisplayActiveChat(): Promise<void> {
       if (itemsAdded) {
         menu.showAtMouseEvent(event); // Показуємо меню
       } else {
-        console.warn("Role menu was not shown because no items were added.");
       }
     }
   }
