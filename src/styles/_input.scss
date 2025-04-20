@@ -90,12 +90,12 @@
           background-color: var(--background-primary); // Або var(--background-secondary);
           transition: all 0.2s ease;
     
-          Можна додати іконку через ::before, якщо не додавали в TS
-          &::before {
-            content: '👤';
-            margin-right: 4px;
-            opacity: 0.7;
-          }
+          // Можна додати іконку через ::before, якщо не додавали в TS
+          // &::before {
+          //   content: ''; // Додати іконку фоном або через content: '👤';
+          //   margin-right: 4px;
+          //   opacity: 0.7;
+          // }
     
           &:hover {
             background-color: var(--background-modifier-hover);
@@ -258,3 +258,5 @@
       }
     }
   }
+
+  
