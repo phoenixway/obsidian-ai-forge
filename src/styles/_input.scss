@@ -5,6 +5,12 @@
   flex-direction: column;
   flex-grow: 0;
   flex-shrink: 0;
+
+  max-width: 1500px; // Встановіть бажану максимальну ширину чату (напр., 1000px, 1200px)
+  // width: 100%; // Дозволяє йому бути вужчим на менших екранах
+  margin-left: auto; // Центрування
+  margin-right: auto; // Центрування
+  
   width: 98%; // Трохи менше, щоб уникнути горизонтального скролу в деяких випадках
   box-sizing: border-box;
   padding:
