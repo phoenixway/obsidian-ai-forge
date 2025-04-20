@@ -261,24 +261,36 @@
 
 // Button to expand/collapse
 .show-more-button {
-  display: block; // Ensure it's visible
-  margin: 8px auto 0 auto; // Center below the collapsed content
-  padding: 4px 12px;
-  font-size: 0.85em;
-  color: var(--text-accent);
-  background-color: var(--background-secondary);
+  position: absolute; // Абсолютне позиціонування
+  bottom: 4px; // Відступ від нижнього краю
+  right: 8px; // Відступ від правого краю (або left/right/margin auto для центру)
+  z-index: 10; // Має бути вище тексту та градієнта
+  margin: 0; // Скидаємо зовнішні відступи
+  padding: 2px 8px; // Маленькі падінги
+  font-size: 0.75em; // Дуже маленький шрифт
+  color: var(--text-muted);
+  background-color: rgba(var(--background-secondary-rgb), 0.8); // Напівпрозорий фон
+  backdrop-filter: blur(2px); // Розмиття фону
   border: 1px solid var(--background-modifier-border);
-  border-radius: 15px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
-  text-align: center;
-  width: fit-content; // Take minimum width needed
+  transition: all 0.2s ease;
 
   &:hover {
     background-color: var(--background-modifier-hover);
-    border-color: var(--interactive-accent-translucent);
     color: var(--text-accent-hover);
   }
+}
+
+.user-message .show-more-button {
+    background-color: rgba(var(--interactive-accent-rgb), 0.7); // Фон на основі акценту
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-on-accent);
+    opacity: 0.9;
+    &:hover {
+        background-color: rgba(var(--interactive-accent-rgb), 0.9);
+        opacity: 1;
+    }
 }
 
 // Ensure button is visible inside user messages too
