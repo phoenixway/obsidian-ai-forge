@@ -439,7 +439,8 @@ export class OllamaView extends ItemView {
 
   }
 
-  private handleSettingsUpdated = async (): Promise<void> => {
+  public handleSettingsUpdated = async (): Promise<void> => {
+    
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
     const currentRoleName = await this.getCurrentRoleDisplayName();
@@ -1393,7 +1394,7 @@ async loadAndDisplayActiveChat(): Promise<void> {
       this.updateSubmenuHeight(container);
     } catch (error) { container.empty(); container.createEl("div", { cls: "menu-error-text", text: "Error models." }); this.updateSubmenuHeight(container); }
   }
-  private async renderRoleList(): Promise<void> {
+  public async renderRoleList(): Promise<void> {
     const container = this.roleSubmenuContent; if (!container) return; container.empty();
     try {
       const roles = await this.plugin.listRoleFiles(true); const activeChat = await this.plugin.chatManager?.getActiveChat(); const currentChatRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
@@ -1443,7 +1444,7 @@ async loadAndDisplayActiveChat(): Promise<void> {
       this.updateSubmenuHeight(container);
     }
   }
-  private async renderChatListMenu(): Promise<void> {
+  public async renderChatListMenu(): Promise<void> {
     const container = this.chatSubmenuContent; if (!container) return; container.empty();
     try {
       const chats = this.plugin.chatManager?.listAvailableChats() || []; const currentActiveId = this.plugin.chatManager?.getActiveChatId();
@@ -1792,7 +1793,7 @@ async loadAndDisplayActiveChat(): Promise<void> {
       }
     });
   }
-  private checkAllMessagesForCollapsing(): void { /* ... (Implementation from previous responses) ... */ this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => { this.checkMessageForCollapsing(msgEl); }); }
+  public checkAllMessagesForCollapsing(): void { /* ... (Implementation from previous responses) ... */ this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => { this.checkMessageForCollapsing(msgEl); }); }
   private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void { /* ... (Implementation from previous responses) ... */ const i = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED); const h = this.plugin.settings.maxMessageHeight; if (i) { contentEl.style.maxHeight = ''; contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show Less ▲'); } else { contentEl.style.maxHeight = `${h}px`; contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show More ▼'); } }
 
   // --- Helpers & Utilities ---

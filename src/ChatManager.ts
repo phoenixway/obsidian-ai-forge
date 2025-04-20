@@ -1,6 +1,6 @@
 // ChatManager.ts
 import { App, Notice, DataAdapter, normalizePath, TFolder } from "obsidian";
-import OllamaPlugin from "./main";
+import OllamaPlugin, { ACTIVE_CHAT_ID_KEY } from "./main";
 import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat";
 import { MessageRole, Message } from './OllamaView';
 import * as path from 'path'; // Додаємо імпорт path
@@ -298,8 +298,7 @@ export class ChatManager {
         }
 
         this.activeChatId = id;
-        await this.plugin.saveDataKey(ACTIVE_SESSION_ID_KEY, id);
-        // console.log(`[ChatManager] Persisted active chat ID: ${id}`);
+        await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, id); // Використовуємо новий ключ v2        // console.log(`[ChatManager] Persisted active chat ID: ${id}`);
 
         let loadedChat: Chat | null = null;
         if (id) {
@@ -609,6 +608,27 @@ export class ChatManager {
             console.error("[ChatManager] Error cloning chat:", error);
             new Notice("An error occurred while cloning the chat.");
             return null;
+        }
+    }
+
+    // У класі ChatManager
+    public async ensureFoldersExist(): Promise<void> {
+        const historyPath = this.plugin.settings.chatHistoryFolderPath;
+        const exportPath = this.plugin.settings.chatExportFolderPath;
+        this.plugin.logger.debug(`Ensuring folders exist: History='<span class="math-inline">\{historyPath\}', Export\='</span>{exportPath}'`);
+
+        try {
+            if (historyPath && !(await this.adapter.exists(historyPath))) {
+                this.plugin.logger.info(`History folder doesn't exist. Creating: ${historyPath}`);
+                await this.adapter.mkdir(historyPath);
+            }
+            if (exportPath && !(await this.adapter.exists(exportPath))) {
+                this.plugin.logger.info(`Export folder doesn't exist. Creating: ${exportPath}`);
+                await this.adapter.mkdir(exportPath);
+            }
+        } catch (error) {
+            this.plugin.logger.error("Error ensuring chat folders exist:", error);
+            new Notice("Error creating necessary chat folders. Check plugin settings and vault permissions.");
         }
     }
 
