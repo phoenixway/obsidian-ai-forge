@@ -1252,38 +1252,96 @@ This action cannot be undone.`, async () => {
     }
   }
   async loadAndDisplayActiveChat() {
-    var _a;
+    var _a, _b, _c;
+    this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
     this.clearChatContainerInternal();
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
-    let currentModelName = this.plugin.settings.modelName;
-    let currentRoleName = await this.getCurrentRoleDisplayName();
+    let activeChat = null;
+    let availableModels = [];
+    let finalModelName = null;
+    let errorOccurred = false;
     try {
-      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-      if (activeChat) {
-        currentModelName = activeChat.metadata.modelName || this.plugin.settings.modelName;
-        if (activeChat.messages.length > 0) {
-          this.hideEmptyState();
-          this.renderMessages(activeChat.messages);
-          this.checkAllMessagesForCollapsing();
-          setTimeout(() => {
-            this.guaranteedScrollToBottom(100, true);
-          }, 150);
+      activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
+      this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.name) || "None"}`);
+      availableModels = await this.plugin.ollamaService.getModels();
+      this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(", ")}`);
+    } catch (error) {
+      console.error("[OllamaView] Error fetching active chat or available models:", error);
+      new import_obsidian3.Notice("Error connecting to Ollama or loading chat data. Please check connection and settings.", 5e3);
+      this.showEmptyState();
+      errorOccurred = true;
+      finalModelName = null;
+    }
+    if (!errorOccurred) {
+      let preferredModel = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.modelName;
+      this.plugin.logger.debug(`[OllamaView] Model from active chat metadata: ${preferredModel}`);
+      if (!preferredModel) {
+        preferredModel = this.plugin.settings.modelName;
+        this.plugin.logger.debug(`[OllamaView] No model in chat metadata, using settings model: ${preferredModel}`);
+      } else {
+        this.plugin.logger.debug(`[OllamaView] Using model from chat metadata: ${preferredModel}`);
+      }
+      if (availableModels.length > 0) {
+        if (preferredModel && availableModels.includes(preferredModel)) {
+          finalModelName = preferredModel;
+          this.plugin.logger.debug(`[OllamaView] Preferred model "${finalModelName}" is available.`);
         } else {
-          this.showEmptyState();
+          finalModelName = availableModels[0];
+          if (preferredModel) {
+            this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" is not available. Falling back to first available: "${finalModelName}".`);
+            new import_obsidian3.Notice(`Model "${preferredModel}" not found, using "${finalModelName}".`, 3e3);
+          } else {
+            this.plugin.logger.info(`[OllamaView] No preferred model specified or found. Using first available model: "${finalModelName}".`);
+          }
         }
       } else {
-        console.warn("[OllamaView] No active chat found or failed to load.");
-        this.showEmptyState();
+        this.plugin.logger.warn("[OllamaView] No models available from Ollama service.");
+        new import_obsidian3.Notice("No Ollama models available. Ensure Ollama is running and models are installed.", 0);
+        finalModelName = null;
       }
-    } catch (error) {
-      console.error("[OllamaView] Error getting active chat:", error);
+      if (activeChat && activeChat.metadata.modelName !== finalModelName) {
+        this.plugin.logger.info(`[OllamaView] Model for active chat "${activeChat.metadata.name}" resolved to "${finalModelName}" (was "${activeChat.metadata.modelName}"). Updating metadata.`);
+        try {
+          if (finalModelName !== null) {
+            await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
+            if (activeChat.metadata)
+              activeChat.metadata.modelName = finalModelName;
+          } else {
+            this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat metadata.`);
+          }
+        } catch (updateError) {
+          console.error(`[OllamaView] Failed to update active chat model metadata:`, updateError);
+        }
+      }
+    }
+    const currentRoleName = await this.getCurrentRoleDisplayName();
+    if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
+      this.hideEmptyState();
+      this.renderMessages(activeChat.messages);
+      this.checkAllMessagesForCollapsing();
+      setTimeout(() => {
+        this.guaranteedScrollToBottom(100, true);
+      }, 150);
+    } else if (!errorOccurred) {
       this.showEmptyState();
-      new import_obsidian3.Notice("Error loading chat history.");
-    } finally {
-      this.updateInputPlaceholder(currentRoleName);
-      this.updateRoleDisplay(currentRoleName);
-      this.updateModelDisplay(currentModelName);
+    }
+    this.updateInputPlaceholder(currentRoleName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateModelDisplay(finalModelName);
+    if (finalModelName === null) {
+      if (this.inputEl) {
+        this.inputEl.disabled = true;
+        this.inputEl.placeholder = "No models available...";
+      }
+      if (this.sendButton)
+        this.sendButton.disabled = true;
+      this.setLoadingState(false);
+    } else {
+      if (this.inputEl) {
+        this.inputEl.disabled = this.isProcessing;
+      }
+      this.updateSendButtonState();
     }
   }
   /** Renders a list of messages to the chat container */

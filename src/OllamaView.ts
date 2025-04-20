@@ -794,50 +794,134 @@ export class OllamaView extends ItemView {
   }
 
   async loadAndDisplayActiveChat(): Promise<void> {
+    this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat called");
     this.clearChatContainerInternal();
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
 
-    let currentModelName = this.plugin.settings.modelName;
-    // Викликаємо переписаний getCurrentRoleDisplayName, він сам визначить потрібну роль
-    let currentRoleName = await this.getCurrentRoleDisplayName();
+    let activeChat: Chat | null = null;
+    let availableModels: string[] = [];
+    let finalModelName: string | null = null; // Модель, яка буде фактично використана та відображена
+    let errorOccurred = false;
 
+    // --- Крок 1: Отримати активний чат та список доступних моделей ---
     try {
-      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      activeChat = await this.plugin.chatManager?.getActiveChat() || null;
+      this.plugin.logger.debug(`[OllamaView] Active chat loaded: ${activeChat?.metadata?.name || 'None'}`);
+      availableModels = await this.plugin.ollamaService.getModels();
+      this.plugin.logger.debug(`[OllamaView] Available models fetched: ${availableModels.join(', ')}`);
+    } catch (error) {
+      console.error("[OllamaView] Error fetching active chat or available models:", error);
+      new Notice("Error connecting to Ollama or loading chat data. Please check connection and settings.", 5000);
+      this.showEmptyState();
+      errorOccurred = true;
+      finalModelName = null; // Немає доступної моделі
+    }
 
-      if (activeChat) {
-        // Отримуємо модель з метаданих активного чату
-        currentModelName = activeChat.metadata.modelName || this.plugin.settings.modelName;
-        // Роль вже визначена вище через getCurrentRoleDisplayName, яка враховує activeChat
+    // --- Крок 2: Визначити цільову модель (з чату або налаштувань) ---
+    // Цей крок виконується, тільки якщо не було помилки на попередньому етапі
+    if (!errorOccurred) {
+        // Спочатку беремо модель з активного чату, якщо вона є
+        let preferredModel = activeChat?.metadata?.modelName;
+        this.plugin.logger.debug(`[OllamaView] Model from active chat metadata: ${preferredModel}`);
 
-        if (activeChat.messages.length > 0) {
-          // console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
-          this.hideEmptyState();
-          this.renderMessages(activeChat.messages);
-          this.checkAllMessagesForCollapsing();
-          setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150);
+        // Якщо в чаті немає моделі, беремо з глобальних налаштувань
+        if (!preferredModel) {
+            preferredModel = this.plugin.settings.modelName;
+            this.plugin.logger.debug(`[OllamaView] No model in chat metadata, using settings model: ${preferredModel}`);
         } else {
-          // console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
-          this.showEmptyState();
+             this.plugin.logger.debug(`[OllamaView] Using model from chat metadata: ${preferredModel}`);
+        }
+
+
+      // --- Крок 3: Перевірити доступність і вибрати остаточну модель ---
+      if (availableModels.length > 0) {
+        // Перевіряємо, чи бажана модель (з чату/налаштувань) є в списку доступних
+        if (preferredModel && availableModels.includes(preferredModel)) {
+          finalModelName = preferredModel;
+          this.plugin.logger.debug(`[OllamaView] Preferred model "${finalModelName}" is available.`);
+        } else {
+          // Якщо бажана модель недоступна або не вказана, беремо першу доступну
+          finalModelName = availableModels[0];
+          if (preferredModel) {
+            this.plugin.logger.warn(`[OllamaView] Preferred model "${preferredModel}" is not available. Falling back to first available: "${finalModelName}".`);
+            // Можна додати Notice, якщо бажана модель була явно вказана, але недоступна
+             new Notice(`Model "${preferredModel}" not found, using "${finalModelName}".`, 3000);
+          } else {
+            this.plugin.logger.info(`[OllamaView] No preferred model specified or found. Using first available model: "${finalModelName}".`);
+          }
         }
       } else {
-        console.warn("[OllamaView] No active chat found or failed to load.");
-        this.showEmptyState();
-        // Модель та роль вже встановлені на глобальні значення за замовчуванням вище
+        // Доступних моделей немає
+        this.plugin.logger.warn("[OllamaView] No models available from Ollama service.");
+        new Notice("No Ollama models available. Ensure Ollama is running and models are installed.", 0); // Постійне сповіщення
+        finalModelName = null; // Встановлюємо null, щоб відобразити відсутність моделі
       }
-    } catch (error) {
-      console.error("[OllamaView] Error getting active chat:", error);
+
+      // --- Крок 4: (Опціонально) Оновити метадані чату, якщо вибрана модель змінилася ---
+      // Якщо активний чат існує, і його модель відрізняється від остаточної (наприклад, через недоступність),
+      // або якщо в чаті не було моделі, а ми вибрали першу доступну.
+      // Можна оновлювати метадані чату, щоб зберегти вибір.
+      if (activeChat && activeChat.metadata.modelName !== finalModelName) {
+        this.plugin.logger.info(`[OllamaView] Model for active chat "${activeChat.metadata.name}" resolved to "${finalModelName}" (was "${activeChat.metadata.modelName}"). Updating metadata.`);
+        try {
+            // Оновлюємо лише якщо finalModelName не null
+            if (finalModelName !== null) {
+                await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
+                 // Оновлюємо локальну копію для консистентності в цьому запуску функції
+                 if(activeChat.metadata) activeChat.metadata.modelName = finalModelName;
+            } else {
+                // Якщо доступних моделей немає, можливо, варто скинути модель і в чаті?
+                // Або залишити як є, щоб зберегти попереднє значення на випадок, якщо модель з'явиться знову.
+                 // Поки що не оновлюємо, якщо finalModelName is null.
+                 this.plugin.logger.warn(`[OllamaView] No available models, not updating active chat metadata.`);
+            }
+        } catch (updateError) {
+          console.error(`[OllamaView] Failed to update active chat model metadata:`, updateError);
+        }
+      }
+    } // кінець блоку if (!errorOccurred)
+
+    // --- Крок 5: Завантажити повідомлення та визначити роль ---
+    // Роль визначається незалежно від моделі
+    const currentRoleName = await this.getCurrentRoleDisplayName();
+
+    if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
+      // console.log(`[OllamaView] Rendering ${activeChat.messages.length} messages for chat '${activeChat.metadata.name}'.`);
+      this.hideEmptyState();
+      this.renderMessages(activeChat.messages);
+      this.checkAllMessagesForCollapsing();
+      setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150);
+    } else if (!errorOccurred) {
+      // Не було помилки, але чат порожній або не існує
+      // console.log(`[OllamaView] No messages to render (Chat: ${activeChat?.metadata?.name || 'None'}). Showing empty state.`);
       this.showEmptyState();
-      new Notice("Error loading chat history.");
-      // Модель та роль вже встановлені на глобальні значення за замовчуванням вище
-    } finally {
-      // Оновлюємо плейсхолдер РОЛІ та дисплей МОДЕЛІ в кінці
-      this.updateInputPlaceholder(currentRoleName);
-      this.updateRoleDisplay(currentRoleName);
-      this.updateModelDisplay(currentModelName);
+    }
+    // Якщо була помилка (errorOccurred = true), порожній стан вже показано в блоці catch
+
+    // --- Крок 6: Оновити UI (плейсхолдер, дисплеї ролі та моделі) ---
+    this.updateInputPlaceholder(currentRoleName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateModelDisplay(finalModelName); // Відображаємо остаточно вибрану модель (або null)
+
+    // --- Крок 7: Налаштувати поле вводу залежно від наявності моделі ---
+    if (finalModelName === null) {
+      // Моделей немає, вимикаємо ввід
+      if (this.inputEl) {
+        this.inputEl.disabled = true;
+        this.inputEl.placeholder = "No models available...";
+      }
+      if (this.sendButton) this.sendButton.disabled = true;
+      this.setLoadingState(false); // Переконатися, що isProcessing вимкнено
+    } else {
+      // Модель є, стан вводу залежить від isProcessing
+      if (this.inputEl) {
+        this.inputEl.disabled = this.isProcessing; // Стан залежить від процесу обробки
+        // Плейсхолдер вже встановлено раніше
+      }
+       this.updateSendButtonState(); // Оновити стан кнопки Send
     }
   }
-
   /** Renders a list of messages to the chat container */
   private renderMessages(messagesToRender: Message[]): void {
     this.clearChatContainerInternal(); // Ensure container is empty first
