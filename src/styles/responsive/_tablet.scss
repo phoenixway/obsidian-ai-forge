@@ -75,6 +75,12 @@
       width: 30px; height: 30px;
     }
 
+    .input-controls-left .voice-button {
+      width: 28px; height: 28px;
+      background-color: red;
+      display: none;
+    }
+    
     .input-controls-right {
       button {
         width: 30px; height: 30px;

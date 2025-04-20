@@ -33,7 +33,19 @@
       width: 28px; height: 28px;
     }
 
+    .input-controls-left .voice-button {
+      width: 28px; height: 28px;
+      background-color: red;
+      display: none;
+    }
+
     .input-controls-right button {
+      background-color: aqua;
+      width: 28px; height: 28px;
+
+    }
+
+    .input-controls-right .voice-button {
       background-color: aqua;
       width: 28px; height: 28px;
 
