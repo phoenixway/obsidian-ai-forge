@@ -451,7 +451,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
         console.error("Input translation error:", error);
         new import_obsidian3.Notice("Input translation error.");
       } finally {
-        (0, import_obsidian3.setIcon)(this.translateInputButton, "replace");
+        (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
         this.translateInputButton.disabled = this.isProcessing;
         this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT);
         this.translateInputButton.title = "Translate input to English";
@@ -570,6 +570,7 @@ This action cannot be undone.`, async () => {
         new import_obsidian3.Notice("No active chat to delete.");
       }
     };
+    // Цей обробник події викликається при натисканні на "Export to Note"
     this.handleExportChatClick = async () => {
       var _a, _b;
       this.closeMenu();
@@ -579,10 +580,10 @@ This action cannot be undone.`, async () => {
         return;
       }
       try {
-        const md = this.formatChatToMarkdown(activeChat.messages);
-        const ts = new Date().toISOString().replace(/[:.]/g, "-");
-        const safeName = activeChat.metadata.name.replace(/[/\\?%*:|"<>]/g, "-");
-        const fName = `ollama-chat-<span class="math-inline">{safeName}-</span>{ts}.md`;
+        const markdownContent = this.formatChatToMarkdown(activeChat.messages);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const safeName = activeChat.metadata.name.replace(/[\\/?:*"<>|]/g, "-");
+        const filename = `ollama-chat-${safeName}-${timestamp}.md`;
         let targetFolderPath = (_b = this.plugin.settings.chatExportFolderPath) == null ? void 0 : _b.trim();
         let targetFolder = null;
         if (targetFolderPath) {
@@ -592,31 +593,47 @@ This action cannot be undone.`, async () => {
             try {
               await this.app.vault.createFolder(targetFolderPath);
               targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath);
-              if (targetFolder)
+              if (targetFolder) {
                 new import_obsidian3.Notice(`Created export folder: ${targetFolderPath}`);
+              } else {
+                this.plugin.logger.error("Failed to get folder even after creation attempt:", targetFolderPath);
+                new import_obsidian3.Notice(`Error creating export folder. Saving to vault root.`);
+                targetFolder = this.app.vault.getRoot();
+              }
             } catch (err) {
+              this.plugin.logger.error("Error creating export folder:", err);
               new import_obsidian3.Notice(`Error creating export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
             }
           } else if (abstractFile instanceof import_obsidian3.TFolder) {
             targetFolder = abstractFile;
           } else {
-            new import_obsidian3.Notice(`Error: Export path not a folder. Saving to vault root.`);
+            this.plugin.logger.warn(`Export path exists but is not a folder: ${targetFolderPath}`);
+            new import_obsidian3.Notice(`Error: Export path is not a folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
         } else {
           targetFolder = this.app.vault.getRoot();
         }
         if (!targetFolder) {
-          new import_obsidian3.Notice("Error determining export folder.");
+          this.plugin.logger.error("Failed to determine a valid target folder for export.");
+          new import_obsidian3.Notice("Error determining export folder. Cannot save file.");
           return;
         }
-        const filePath = (0, import_obsidian3.normalizePath)(`<span class="math-inline">{targetFolder.path}/</span>{fName}`);
-        const file = await this.app.vault.create(filePath, md);
+        const filePath = (0, import_obsidian3.normalizePath)(`${targetFolder.path}/${filename}`);
+        const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+        if (existingFile) {
+          this.plugin.logger.warn(`Export file already exists, overwriting: ${filePath}`);
+        }
+        const file = await this.app.vault.create(filePath, markdownContent);
         new import_obsidian3.Notice(`Chat exported to ${file.path}`);
       } catch (error) {
-        new import_obsidian3.Notice("Error exporting chat.");
-        console.error(error);
+        this.plugin.logger.error("Error exporting chat:", error);
+        if (error instanceof Error && error.message.includes("File already exists")) {
+          new import_obsidian3.Notice("Error exporting chat: File already exists.");
+        } else {
+          new import_obsidian3.Notice("An unexpected error occurred during chat export.");
+        }
       }
     };
     this.handleSettingsClick = async () => {
@@ -750,6 +767,10 @@ This action cannot be undone.`, async () => {
             if (textarea.style.overflowY !== "auto" && textarea.style.overflowY !== "scroll") {
               textarea.style.overflowY = "auto";
             }
+          } else {
+            if (textarea.style.overflowY === "auto" || textarea.style.overflowY === "scroll") {
+              textarea.style.overflowY = "hidden";
+            }
           }
           textarea.style.minHeight = `${targetMinHeight}px`;
           textarea.style.height = "auto";
@@ -817,6 +838,8 @@ This action cannot be undone.`, async () => {
       } finally {
         if (itemsAdded) {
           menu.showAtMouseEvent(event);
+        } else {
+          console.warn("Role menu was not shown because no items were added.");
         }
       }
     };
@@ -950,7 +973,7 @@ This action cannot be undone.`, async () => {
     this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     (0, import_obsidian3.setIcon)(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
-    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat" });
+    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export to Note" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
     (0, import_obsidian3.setIcon)(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash");
@@ -1227,7 +1250,6 @@ This action cannot be undone.`, async () => {
       this.menuButton.disabled = isLoading;
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
-    console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
   }
   async loadAndDisplayActiveChat() {
     var _a;
@@ -1241,7 +1263,6 @@ This action cannot be undone.`, async () => {
       if (activeChat) {
         currentModelName = activeChat.metadata.modelName || this.plugin.settings.modelName;
         if (activeChat.messages.length > 0) {
-          console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
           this.hideEmptyState();
           this.renderMessages(activeChat.messages);
           this.checkAllMessagesForCollapsing();
@@ -1249,7 +1270,6 @@ This action cannot be undone.`, async () => {
             this.guaranteedScrollToBottom(100, true);
           }, 150);
         } else {
-          console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
           this.showEmptyState();
         }
       } else {
@@ -1796,81 +1816,81 @@ This action cannot be undone.`, async () => {
         return btoa(binary);
       };
       const workerCode = `
-          // Worker Scope
-          self.onmessage = async (event) => {
-            const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+             // Worker Scope
+             self.onmessage = async (event) => {
+                 const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
 
-            if (!apiKey || apiKey.trim() === '') {
-              self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
-              return;
-            }
+                 if (!apiKey || apiKey.trim() === '') {
+                     self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
+                     return;
+                 }
 
-            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+                 const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
 
-            try {
-              const arrayBuffer = await audioBlob.arrayBuffer();
+                 try {
+                     const arrayBuffer = await audioBlob.arrayBuffer();
 
-              // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
-              // Simpler approach: pass buffer directly if API allows, or use efficient base64:
-              let base64Audio;
-              if (typeof TextDecoder !== 'undefined') { // Browser environment check
-                   // Modern approach (often faster if native)
-                   const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                   base64Audio = base64String;
+                     // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
+                     // Simpler approach: pass buffer directly if API allows, or use efficient base64:
+                     let base64Audio;
+                     if (typeof TextDecoder !== 'undefined') { // Browser environment check
+                             // Modern approach (often faster if native)
+                             const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                             base64Audio = base64String;
 
-              } else {
-                   // Fallback (similar to original, ensure correctness)
-                   base64Audio = btoa(
-                     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                   );
-              }
+                     } else {
+                             // Fallback (similar to original, ensure correctness)
+                             base64Audio = btoa(
+                                 new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                             );
+                     }
 
 
-              const response = await fetch(url, {
-                method: 'POST',
-                body: JSON.stringify({
-                  config: {
-                    encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
-                    sampleRateHertz: 48000, // Match sample rate if possible
-                    languageCode: languageCode,
-                    model: 'latest_long', // Consider other models if needed
-                    enableAutomaticPunctuation: true,
-                  },
-                  audio: { content: base64Audio },
-                }),
-                headers: { 'Content-Type': 'application/json' },
-              });
+                     const response = await fetch(url, {
+                         method: 'POST',
+                         body: JSON.stringify({
+                             config: {
+                                 encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
+                                 sampleRateHertz: 48000, // Match sample rate if possible
+                                 languageCode: languageCode,
+                                 model: 'latest_long', // Consider other models if needed
+                                 enableAutomaticPunctuation: true,
+                             },
+                             audio: { content: base64Audio },
+                         }),
+                         headers: { 'Content-Type': 'application/json' },
+                     });
 
-              const responseData = await response.json();
+                     const responseData = await response.json();
 
-              if (!response.ok) {
-                //console.error("Google Speech API Error:", responseData);
-                self.postMessage({
-                  error: true,
-                  message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
-                });
-                return;
-              }
+                     if (!response.ok) {
+                         //console.error("Google Speech API Error:", responseData);
+                         self.postMessage({
+                             error: true,
+                             message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
+                         });
+                         return;
+                     }
 
-              if (responseData.results && responseData.results.length > 0) {
-                const transcript = responseData.results
-                  .map(result => result.alternatives[0].transcript)
-                  .join(' ')
-                  .trim();
-                self.postMessage(transcript); // Send back only the transcript string
-              } else {
-                 // Handle cases where API returns ok but no results (e.g., silence)
-                 self.postMessage({ error: true, message: 'No speech detected or recognized.' });
-              }
-            } catch (error) {
-               //console.error("Error in speech worker processing:", error);
-               self.postMessage({
-                 error: true,
-                 message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
-               });
-            }
-          };
-        `;
+                     if (responseData.results && responseData.results.length > 0) {
+                         const transcript = responseData.results
+                             .map(result => result.alternatives[0].transcript)
+                             .join(' ')
+                             .trim();
+                         self.postMessage(transcript); // Send back only the transcript string
+                     } else {
+                         // Handle cases where API returns ok but no results (e.g., silence)
+                         self.postMessage({ error: true, message: 'No speech detected or recognized.' });
+                     }
+                 } catch (error) {
+                     //console.error("Error in speech worker processing:", error);
+                     self.postMessage({
+                         error: true,
+                         message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
+                     });
+                 }
+             };
+           `;
       const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const workerUrl = URL.createObjectURL(workerBlob);
       this.speechWorker = new Worker(workerUrl);
@@ -1941,8 +1961,9 @@ This action cannot be undone.`, async () => {
       new import_obsidian3.Notice("\u0424\u0443\u043D\u043A\u0446\u0456\u044F \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 (worker \u043D\u0435 \u0456\u043D\u0456\u0446\u0456\u0430\u043B\u0456\u0437\u043E\u0432\u0430\u043D\u043E).");
       return;
     }
-    if (!this.plugin.settings.googleApiKey) {
-      new import_obsidian3.Notice("\u041A\u043B\u044E\u0447 Google API \u043D\u0435 \u043D\u0430\u043B\u0430\u0448\u0442\u043E\u0432\u0430\u043D\u043E. \u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u0434\u043E\u0434\u0430\u0439\u0442\u0435 \u0439\u043E\u0433\u043E \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u043F\u043B\u0430\u0433\u0456\u043D\u0430 \u0434\u043B\u044F \u0432\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u0430\u043D\u043D\u044F \u0433\u043E\u043B\u043E\u0441\u043E\u0432\u043E\u0433\u043E \u0432\u0432\u043E\u0434\u0443.");
+    const speechApiKey = this.plugin.settings.googleApiKey;
+    if (!speechApiKey) {
+      new import_obsidian3.Notice("\u041A\u043B\u044E\u0447 Google API \u0434\u043B\u044F \u0440\u043E\u0437\u043F\u0456\u0437\u043D\u0430\u0432\u0430\u043D\u043D\u044F \u043C\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u043D\u0435 \u043D\u0430\u043B\u0430\u0448\u0442\u043E\u0432\u0430\u043D\u043E. \u0411\u0443\u0434\u044C \u043B\u0430\u0441\u043A\u0430, \u0434\u043E\u0434\u0430\u0439\u0442\u0435 \u0439\u043E\u0433\u043E \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u043F\u043B\u0430\u0433\u0456\u043D\u0430.");
       return;
     }
     try {
@@ -1970,12 +1991,13 @@ This action cannot be undone.`, async () => {
           const audioBlob = new Blob(audioChunks, { type: ((_a2 = this.mediaRecorder) == null ? void 0 : _a2.mimeType) || "audio/webm" });
           this.inputEl.placeholder = "Processing speech...";
           this.speechWorker.postMessage({
-            apiKey: this.plugin.settings.googleApiKey,
+            apiKey: speechApiKey,
+            // Використовуємо правильний ключ
             audioBlob,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA"
           });
         } else if (audioChunks.length === 0) {
-          this.updateInputPlaceholder(this.plugin.settings.modelName);
+          this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState();
         }
       };
@@ -2002,8 +2024,8 @@ This action cannot be undone.`, async () => {
     } else if (!processAudio && ((_a = this.mediaRecorder) == null ? void 0 : _a.state) === "inactive") {
     }
     (_b = this.voiceButton) == null ? void 0 : _b.classList.remove(CSS_CLASS_RECORDING);
-    (0, import_obsidian3.setIcon)(this.voiceButton, "microphone");
-    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
+    this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
     this.updateSendButtonState();
     if (this.audioStream) {
       this.audioStream.getTracks().forEach((track) => track.stop());
@@ -2075,6 +2097,10 @@ This action cannot be undone.`, async () => {
     const h = this.plugin.settings.maxMessageHeight;
     if (!c || h <= 0) {
       if (c && h <= 0) {
+        const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+        b == null ? void 0 : b.remove();
+        c.style.maxHeight = "";
+        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       }
       return;
     }
@@ -2092,6 +2118,8 @@ This action cannot be undone.`, async () => {
         const smb = messageEl.createEl("button", { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: "Show More \u25BC" });
         this.registerDomEvent(smb, "click", () => this.toggleMessageCollapse(c, smb));
       } else {
+        c.style.maxHeight = "";
+        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       }
     });
   }
@@ -2236,24 +2264,18 @@ This action cannot be undone.`, async () => {
   isSameDay(date1, date2) {
     return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate();
   }
-  // /** Sets the loading state for the UI (disables/enables input elements) */
-  // public setLoadingState(isLoading: boolean): void {
-  //   this.isProcessing = isLoading;
-  //   if (this.inputEl) this.inputEl.disabled = isLoading;
-  //   this.updateSendButtonState(); // Send button depends on both text and processing state
-  //   if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
-  //   if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
-  //   if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
-  // }
   // Formatting function used by export
   formatChatToMarkdown(messagesToFormat) {
     let localLastDate = null;
     const exportTimestamp = new Date();
-    let markdown = `# Ollama Chat Export
+    let markdown = `# AI Forge Chat Export
 > Exported on: ${exportTimestamp.toLocaleString(void 0)}
 
 `;
     messagesToFormat.forEach((message) => {
+      var _a;
+      if (!((_a = message.content) == null ? void 0 : _a.trim()))
+        return;
       if (localLastDate === null || !this.isSameDay(localLastDate, message.timestamp)) {
         if (localLastDate !== null)
           markdown += `***
@@ -2267,6 +2289,12 @@ This action cannot be undone.`, async () => {
       const time = this.formatTime(message.timestamp);
       let prefix = "";
       let contentPrefix = "";
+      let content = message.content.trim();
+      if (message.role === "assistant") {
+        content = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        if (!content)
+          return;
+      }
       switch (message.role) {
         case "user":
           prefix = `**User (${time}):**
@@ -2288,15 +2316,14 @@ This action cannot be undone.`, async () => {
           break;
       }
       markdown += prefix;
-      let content = message.content.trim();
       if (contentPrefix) {
-        markdown += content.split("\n").join(`
-${contentPrefix}`) + "\n\n";
+        markdown += content.split("\n").map((line) => line.trim() ? `${contentPrefix}${line}` : contentPrefix.trim()).join(`
+`) + "\n\n";
       } else if (content.includes("```")) {
-        content = content.replace(/(\n*)```/g, "\n\n```").replace(/```(\n*)/g, "```\n\n");
+        content = content.replace(/(\n*\s*)```/g, "\n\n```").replace(/```(\s*\n*)/g, "```\n\n");
         markdown += content.trim() + "\n\n";
       } else {
-        markdown += content + "\n\n";
+        markdown += content.split("\n").map((line) => line.trim() ? line : "").join("\n") + "\n\n";
       }
     });
     return markdown.trim();

@@ -10,6 +10,7 @@ import {
   TFolder,
   TFile,
   Menu,
+  Platform // <-- Додано для перевірки платформи, якщо знадобиться
 } from "obsidian";
 // Імпортуємо модальні вікна
 import { ConfirmModal } from './ConfirmModal';
@@ -85,7 +86,7 @@ const CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 const CSS_CLASS_VISIBLE = "visible";
 const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
-const CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option";
+const CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option"; // Назву класу залишаємо
 const CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
 const CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
 const CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
@@ -168,7 +169,7 @@ export class OllamaView extends ItemView {
   private renameChatOption!: HTMLElement;
   private cloneChatOption!: HTMLElement;
   private clearChatOption!: HTMLElement;
-  private exportChatOption!: HTMLElement;
+  private exportChatOption!: HTMLElement; // Назва змінної залишається та ж
   private deleteChatOption!: HTMLElement;
   private settingsOption!: HTMLElement;
 
@@ -315,7 +316,13 @@ export class OllamaView extends ItemView {
     this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` }); setIcon(this.newChatOption.createSpan({ cls: "menu-option-icon" }), "plus-circle"); this.newChatOption.createSpan({ cls: "menu-option-text", text: "New Chat" });
     this.renameChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}` }); setIcon(this.renameChatOption.createSpan({ cls: "menu-option-icon" }), "pencil"); this.renameChatOption.createSpan({ cls: "menu-option-text", text: "Rename Chat" });
     this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` }); setIcon(this.cloneChatOption.createSpan({ cls: "menu-option-icon" }), "copy-plus"); this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
-    this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` }); setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download"); this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat" });
+
+    // --- ЗМІНЕНО ТУТ ---
+    this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
+    setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
+    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export to Note" }); // Змінено текст
+    // --- КІНЕЦЬ ЗМІНИ ---
+
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); setIcon(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash"); this.clearChatOption.createSpan({ cls: "menu-option-text", text: "Clear Messages" });
     this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); setIcon(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2"); this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
@@ -327,11 +334,11 @@ export class OllamaView extends ItemView {
   // --- Event Listeners (with Custom Div Menu) ---
   private attachEventListeners(): void {
     // Перевірки існування елементів
-    if (!this.inputEl) console.error("inputEl missing!"); 
-    if (!this.sendButton) console.error("sendButton missing!"); 
-    if (!this.menuButton) console.error("menuButton missing!"); 
-    if (!this.modelDisplayEl) console.error("modelDisplayEl missing!"); 
-    if (!this.translateInputButton) console.error("translateInputButton missing!"); 
+    if (!this.inputEl) console.error("inputEl missing!");
+    if (!this.sendButton) console.error("sendButton missing!");
+    if (!this.menuButton) console.error("menuButton missing!");
+    if (!this.modelDisplayEl) console.error("modelDisplayEl missing!");
+    if (!this.translateInputButton) console.error("translateInputButton missing!");
 
     // Слухачі поля вводу
     if (this.inputEl) {
@@ -359,7 +366,7 @@ export class OllamaView extends ItemView {
     // Слухачі для прямих опцій меню
     if (this.settingsOption) this.settingsOption.addEventListener("click", this.handleSettingsClick); else console.error("settingsOption missing!");
     if (this.clearChatOption) this.clearChatOption.addEventListener("click", this.handleClearChatClick); else console.error("clearChatOption missing!");
-    if (this.exportChatOption) this.exportChatOption.addEventListener("click", this.handleExportChatClick); else console.error("exportChatOption missing!");
+    if (this.exportChatOption) this.exportChatOption.addEventListener("click", this.handleExportChatClick); else console.error("exportChatOption missing!"); // Обробник залишається той самий
     if (this.newChatOption) this.newChatOption.addEventListener("click", this.handleNewChatClick); else console.error("newChatOption missing!");
     if (this.renameChatOption) this.renameChatOption.addEventListener("click", this.handleRenameChatClick); else console.error("renameChatOption missing!");
     if (this.cloneChatOption) this.cloneChatOption.addEventListener("click", this.handleCloneChatClick); else console.error("cloneChatOption missing!");
@@ -380,8 +387,8 @@ export class OllamaView extends ItemView {
     this.registerDomEvent(document, 'click', this.handleDocumentClickForMenu);
     this.registerDomEvent(document, 'visibilitychange', this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange));
-    if (this.chatContainer) { this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced); 
-    } else { 
+    if (this.chatContainer) { this.registerDomEvent(this.chatContainer, 'scroll', this.scrollListenerDebounced);
+    } else {
       this.plugin.logger.error("chatContainer missing!") }
     if (this.newMessagesIndicatorEl) { this.registerDomEvent(this.newMessagesIndicatorEl, 'click', this.handleNewMessageIndicatorClick); }
 
@@ -489,6 +496,7 @@ export class OllamaView extends ItemView {
     if (!this.isProcessing && !this.sendButton?.disabled) {
       this.sendMessage();
     } else {
+      // console.log("Send button clicked but processing or disabled."); // Debug log
     }
   }
   private handleInputForResize = (): void => {
@@ -511,7 +519,7 @@ export class OllamaView extends ItemView {
       const translatedText = await this.plugin.translationService.translate(currentText, targetLang); if (translatedText !== null) { this.inputEl.value = translatedText; this.inputEl.dispatchEvent(new Event('input')); this.inputEl.focus(); const end = translatedText.length; this.inputEl.setSelectionRange(end, end); } else { console.warn("Input translation failed."); }
     } catch (error) {
       console.error("Input translation error:", error); new Notice("Input translation error.");
-    } finally { setIcon(this.translateInputButton, "replace"); this.translateInputButton.disabled = this.isProcessing; this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT); this.translateInputButton.title = "Translate input to English"; }
+    } finally { setIcon(this.translateInputButton, "languages"); this.translateInputButton.disabled = this.isProcessing; this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT); this.translateInputButton.title = "Translate input to English"; }
   }
 
   // Menu Button Click (Toggles Custom Div)
@@ -548,8 +556,8 @@ export class OllamaView extends ItemView {
           case 'chats': await this.renderChatListMenu(); break;
         }
         requestAnimationFrame(() => { if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) { contentEl.style.maxHeight = contentEl.scrollHeight + 'px'; } });
-      } catch (error) { 
-        this.plugin.logger.error(`Error rendering ${type} list:`, error); 
+      } catch (error) {
+        this.plugin.logger.error(`Error rendering ${type} list:`, error);
         contentEl.empty(); contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` }); contentEl.style.maxHeight = '50px'; }
     } else {
       // --- Collapse ---
@@ -582,19 +590,101 @@ export class OllamaView extends ItemView {
   }
 
   // --- Action Handlers (Must call closeMenu) ---
-  private handleNewChatClick = async (): Promise<void> => { this.closeMenu(); 
+  private handleNewChatClick = async (): Promise<void> => { this.closeMenu();
     try { const newChat = await this.plugin.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); this.focusInput(); } else { new Notice("Failed to create new chat."); } } catch (error) { new Notice("Error creating new chat."); } }
-  private handleRenameChatClick = async (): Promise<void> => { this.closeMenu(); 
+  private handleRenameChatClick = async (): Promise<void> => { this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to rename."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { let noticeMessage = "Rename cancelled or name unchanged."; if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { noticeMessage = `Chat renamed to "${newName.trim()}"`; } else { noticeMessage = "Failed to rename chat."; } } else if (newName?.trim() === currentName) { noticeMessage = "Name unchanged."; } else { noticeMessage = "Rename cancelled or invalid name entered."; } new Notice(noticeMessage); this.focusInput(); }).open(); }
-  private handleCloneChatClick = async (): Promise<void> => { this.closeMenu(); 
+  private handleCloneChatClick = async (): Promise<void> => { this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to clone."); return; } const originalName = activeChat.metadata.name; const cloningNotice = new Notice("Cloning chat...", 0); try { const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id); if (clonedChat) { new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`); } else { new Notice("Failed to clone chat."); } } catch (error) { new Notice("An error occurred while cloning the chat."); } finally { cloningNotice.hide(); } }
-  private handleClearChatClick = async (): Promise<void> => { this.closeMenu(); 
+  private handleClearChatClick = async (): Promise<void> => { this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Clear Chat Messages', `Are you sure you want to clear all messages in chat "${chatName}"?\nThis action cannot be undone.`, () => { this.plugin.chatManager.clearActiveChatMessages(); }).open(); } else { new Notice("No active chat to clear."); } }
-  private handleDeleteChatClick = async (): Promise<void> => { this.closeMenu(); 
+  private handleDeleteChatClick = async (): Promise<void> => { this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat(); if (activeChat) { const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Delete Chat', `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, async () => { const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id); if (success) { new Notice(`Chat "${chatName}" deleted.`); } else { new Notice(`Failed to delete chat "${chatName}".`); } }).open(); } else { new Notice("No active chat to delete."); } }
-  private handleExportChatClick = async (): Promise<void> => { this.closeMenu(); 
-    /* ... (export logic) ... */ const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat || activeChat.messages.length === 0) { new Notice("Chat empty, nothing to export."); return; } try { const md = this.formatChatToMarkdown(activeChat.messages); const ts = new Date().toISOString().replace(/[:.]/g, '-'); const safeName = activeChat.metadata.name.replace(/[/\\?%*:|"<>]/g, '-'); const fName = `ollama-chat-<span class="math-inline">\{safeName\}\-</span>{ts}.md`; let targetFolderPath = this.plugin.settings.chatExportFolderPath?.trim(); let targetFolder: TFolder | null = null; if (targetFolderPath) { targetFolderPath = normalizePath(targetFolderPath); const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath); if (!abstractFile) { try { await this.app.vault.createFolder(targetFolderPath); targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath) as TFolder; if (targetFolder) new Notice(`Created export folder: ${targetFolderPath}`); } catch (err) { new Notice(`Error creating export folder. Saving to vault root.`); targetFolder = this.app.vault.getRoot(); } } else if (abstractFile instanceof TFolder) { targetFolder = abstractFile; } else { new Notice(`Error: Export path not a folder. Saving to vault root.`); targetFolder = this.app.vault.getRoot(); } } else { targetFolder = this.app.vault.getRoot(); } if (!targetFolder) { new Notice("Error determining export folder."); return; } const filePath = normalizePath(`<span class="math-inline">\{targetFolder\.path\}/</span>{fName}`); const file = await this.app.vault.create(filePath, md); new Notice(`Chat exported to ${file.path}`); } catch (error) { new Notice("Error exporting chat."); console.error(error); } }
-  private handleSettingsClick = async (): Promise<void> => { this.closeMenu(); 
+
+  // Цей обробник події викликається при натисканні на "Export to Note"
+  private handleExportChatClick = async (): Promise<void> => {
+      this.closeMenu();
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      if (!activeChat || activeChat.messages.length === 0) {
+          new Notice("Chat empty, nothing to export.");
+          return;
+      }
+      try {
+          const markdownContent = this.formatChatToMarkdown(activeChat.messages);
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const safeName = activeChat.metadata.name.replace(/[\\/?:*"<>|]/g, '-'); // Make filename safe
+          const filename = `ollama-chat-${safeName}-${timestamp}.md`;
+
+          let targetFolderPath = this.plugin.settings.chatExportFolderPath?.trim();
+          let targetFolder: TFolder | null = null;
+
+          // Determine target folder
+          if (targetFolderPath) {
+              targetFolderPath = normalizePath(targetFolderPath);
+              const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
+              if (!abstractFile) {
+                  try {
+                      await this.app.vault.createFolder(targetFolderPath);
+                      targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath) as TFolder;
+                      if (targetFolder) {
+                          new Notice(`Created export folder: ${targetFolderPath}`);
+                      } else {
+                          // This case should ideally not happen if createFolder succeeds without error
+                          this.plugin.logger.error("Failed to get folder even after creation attempt:", targetFolderPath);
+                          new Notice(`Error creating export folder. Saving to vault root.`);
+                          targetFolder = this.app.vault.getRoot();
+                      }
+                  } catch (err) {
+                    this.plugin.logger.error("Error creating export folder:", err);
+                      new Notice(`Error creating export folder. Saving to vault root.`);
+                      targetFolder = this.app.vault.getRoot();
+                  }
+              } else if (abstractFile instanceof TFolder) {
+                  targetFolder = abstractFile;
+              } else {
+                  // The path exists but is not a folder
+                  this.plugin.logger.warn(`Export path exists but is not a folder: ${targetFolderPath}`);
+                  new Notice(`Error: Export path is not a folder. Saving to vault root.`);
+                  targetFolder = this.app.vault.getRoot();
+              }
+          } else {
+              // No folder path specified, use vault root
+              targetFolder = this.app.vault.getRoot();
+          }
+
+          if (!targetFolder) {
+            this.plugin.logger.error("Failed to determine a valid target folder for export.");
+              new Notice("Error determining export folder. Cannot save file.");
+              return;
+          }
+
+          // Create the file
+          const filePath = normalizePath(`${targetFolder.path}/${filename}`);
+
+          // Check if file already exists (optional, but good practice)
+          const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+          if (existingFile) {
+              // Maybe prompt user or append timestamp/number? For now, log and overwrite.
+              this.plugin.logger.warn(`Export file already exists, overwriting: ${filePath}`);
+              // If you want to avoid overwriting, handle it here (e.g., throw error, rename)
+          }
+
+          const file = await this.app.vault.create(filePath, markdownContent);
+          new Notice(`Chat exported to ${file.path}`);
+
+      } catch (error) {
+        this.plugin.logger.error("Error exporting chat:", error);
+          // Provide more specific error if possible
+          if (error instanceof Error && error.message.includes('File already exists')) {
+              new Notice("Error exporting chat: File already exists.");
+          } else {
+              new Notice("An unexpected error occurred during chat export.");
+          }
+      }
+  }
+
+
+  private handleSettingsClick = async (): Promise<void> => { this.closeMenu();
     (this.app as any).setting?.open?.(); (this.app as any).setting?.openTabById?.(this.plugin.manifest.id); }
   private handleDocumentClickForMenu = (e: MouseEvent): void => { if (this.isMenuOpen() && !this.menuButton?.contains(e.target as Node) && !this.menuDropdown?.contains(e.target as Node)) { this.closeMenu(); } }
 
@@ -616,10 +706,10 @@ export class OllamaView extends ItemView {
       new Notice(`Role set to: ${displayRole}`);
     }
   }
-  private handleRolesUpdated = (): void => { 
-    this.plugin.promptService?.clearRoleCache(); 
-    if (this.isMenuOpen()) { this.renderRoleList(); } 
-  }; 
+  private handleRolesUpdated = (): void => {
+    this.plugin.promptService?.clearRoleCache();
+    if (this.isMenuOpen()) { this.renderRoleList(); }
+  };
   private handleChatListUpdated = (): void => { console.log("[OllamaView] Chat list updated event received."); if (this.isMenuOpen()) { this.renderChatListMenu(); } }; // Refresh list if open
   private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => { console.log(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`); this.loadAndDisplayActiveChat(); }
   private handleMessageAdded = (data: { chatId: string, message: Message }): void => { if (data.chatId === this.plugin.chatManager?.getActiveChatId()) { this.addMessageToDisplay(data.message.role, data.message.content, data.message.timestamp); if (this.isMenuOpen()) { this.renderChatListMenu(); } } } // Refresh list date if open
@@ -673,6 +763,11 @@ export class OllamaView extends ItemView {
           if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
             textarea.style.overflowY = 'auto';
           }
+        } else {
+           // Вимикаємо overflow, якщо не досягли межі
+           if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
+             textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
+           }
         }
 
         // Встановлюємо обчислену min-height та height: auto
@@ -693,8 +788,10 @@ export class OllamaView extends ItemView {
   private updateSendButtonState(): void { if (!this.inputEl || !this.sendButton) return; const isDisabled = this.inputEl.value.trim() === '' || this.isProcessing; this.sendButton.disabled = isDisabled; this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled); }
   public showEmptyState(): void { if (this.currentMessages.length === 0 && !this.emptyStateEl && this.chatContainer) { this.chatContainer.empty(); this.emptyStateEl = this.chatContainer.createDiv({ cls: CSS_CLASS_EMPTY_STATE }); this.emptyStateEl.createDiv({ cls: "empty-state-message", text: "No messages yet" }); const modelName = this.plugin?.settings?.modelName || "the AI"; this.emptyStateEl.createDiv({ cls: "empty-state-tip", text: `Type a message or use the menu options to start interacting with ${modelName}.` }); } }
   public hideEmptyState(): void { if (this.emptyStateEl) { this.emptyStateEl.remove(); this.emptyStateEl = null; } }
-  public setLoadingState(isLoading: boolean): void { 
-    this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`); }
+  public setLoadingState(isLoading: boolean): void {
+    this.isProcessing = isLoading; if (this.inputEl) this.inputEl.disabled = isLoading; this.updateSendButtonState(); if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); } if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
+    // console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
+  }
 
   async loadAndDisplayActiveChat(): Promise<void> {
     this.clearChatContainerInternal();
@@ -714,13 +811,13 @@ export class OllamaView extends ItemView {
         // Роль вже визначена вище через getCurrentRoleDisplayName, яка враховує activeChat
 
         if (activeChat.messages.length > 0) {
-          console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
+          // console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found with ${activeChat.messages.length} messages.`);
           this.hideEmptyState();
           this.renderMessages(activeChat.messages);
           this.checkAllMessagesForCollapsing();
           setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150);
         } else {
-          console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
+          // console.log(`[OllamaView] Active chat '${activeChat.metadata.name}' found but is empty.`);
           this.showEmptyState();
         }
       } else {
@@ -886,9 +983,6 @@ export class OllamaView extends ItemView {
     }
 
     // --- Element Creation ---
-    //TODO: checkit
-    // const messageEl = messageGroup.createDiv({ cls: messageClass });
-
     let messageWrapper = messageGroup.querySelector('.message-wrapper') as HTMLElement;
     if (!messageWrapper) {
       messageWrapper = messageGroup.createDiv({ cls: 'message-wrapper' });
@@ -985,12 +1079,12 @@ export class OllamaView extends ItemView {
      // Set loading state
      setIcon(buttonEl, "loader"); buttonEl.disabled = true;
      buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); buttonEl.setAttribute("title", "Translating...");
- 
+
      try {
          const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
          if (translatedText !== null) {
              const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
- 
+
              // --- ЗМІНЕНО: Рендеринг Markdown ---
              // Створюємо div для відрендереного контенту
              const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
@@ -1002,7 +1096,7 @@ export class OllamaView extends ItemView {
                  this // Компонент (View)
              );
              // --- КІНЕЦЬ ЗМІНИ ---
- 
+
              // Додаємо індикатор мови
              const targetLangName = LANGUAGES[targetLang] || targetLang;
              translationContainer.createEl('div', { cls: 'translation-indicator', text: `[Translated to ${targetLangName}]` });
@@ -1104,7 +1198,7 @@ export class OllamaView extends ItemView {
           setIcon(copyBtn, "check"); copyBtn.setAttribute("title", "Copied!");
           setTimeout(() => { setIcon(copyBtn, "copy"); copyBtn.setAttribute("title", "Copy Code"); }, 1500);
         }).catch(err => {
-          //console.error("Code block copy failed:", err); 
+          //console.error("Code block copy failed:", err);
           new Notice("Failed to copy code.");
         });
       });
@@ -1212,81 +1306,81 @@ export class OllamaView extends ItemView {
 
       // Worker code as a template literal for better readability
       const workerCode = `
-          // Worker Scope
-          self.onmessage = async (event) => {
-            const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+             // Worker Scope
+             self.onmessage = async (event) => {
+                 const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
 
-            if (!apiKey || apiKey.trim() === '') {
-              self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
-              return;
-            }
+                 if (!apiKey || apiKey.trim() === '') {
+                     self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
+                     return;
+                 }
 
-            const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+                 const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
 
-            try {
-              const arrayBuffer = await audioBlob.arrayBuffer();
+                 try {
+                     const arrayBuffer = await audioBlob.arrayBuffer();
 
-              // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
-              // Simpler approach: pass buffer directly if API allows, or use efficient base64:
-              let base64Audio;
-              if (typeof TextDecoder !== 'undefined') { // Browser environment check
-                   // Modern approach (often faster if native)
-                   const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                   base64Audio = base64String;
+                     // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
+                     // Simpler approach: pass buffer directly if API allows, or use efficient base64:
+                     let base64Audio;
+                     if (typeof TextDecoder !== 'undefined') { // Browser environment check
+                             // Modern approach (often faster if native)
+                             const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                             base64Audio = base64String;
 
-              } else {
-                   // Fallback (similar to original, ensure correctness)
-                   base64Audio = btoa(
-                     new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                   );
-              }
+                     } else {
+                             // Fallback (similar to original, ensure correctness)
+                             base64Audio = btoa(
+                                 new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                             );
+                     }
 
 
-              const response = await fetch(url, {
-                method: 'POST',
-                body: JSON.stringify({
-                  config: {
-                    encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
-                    sampleRateHertz: 48000, // Match sample rate if possible
-                    languageCode: languageCode,
-                    model: 'latest_long', // Consider other models if needed
-                    enableAutomaticPunctuation: true,
-                  },
-                  audio: { content: base64Audio },
-                }),
-                headers: { 'Content-Type': 'application/json' },
-              });
+                     const response = await fetch(url, {
+                         method: 'POST',
+                         body: JSON.stringify({
+                             config: {
+                                 encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
+                                 sampleRateHertz: 48000, // Match sample rate if possible
+                                 languageCode: languageCode,
+                                 model: 'latest_long', // Consider other models if needed
+                                 enableAutomaticPunctuation: true,
+                             },
+                             audio: { content: base64Audio },
+                         }),
+                         headers: { 'Content-Type': 'application/json' },
+                     });
 
-              const responseData = await response.json();
+                     const responseData = await response.json();
 
-              if (!response.ok) {
-                //console.error("Google Speech API Error:", responseData);
-                self.postMessage({
-                  error: true,
-                  message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
-                });
-                return;
-              }
+                     if (!response.ok) {
+                         //console.error("Google Speech API Error:", responseData);
+                         self.postMessage({
+                             error: true,
+                             message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
+                         });
+                         return;
+                     }
 
-              if (responseData.results && responseData.results.length > 0) {
-                const transcript = responseData.results
-                  .map(result => result.alternatives[0].transcript)
-                  .join(' ')
-                  .trim();
-                self.postMessage(transcript); // Send back only the transcript string
-              } else {
-                 // Handle cases where API returns ok but no results (e.g., silence)
-                 self.postMessage({ error: true, message: 'No speech detected or recognized.' });
-              }
-            } catch (error) {
-               //console.error("Error in speech worker processing:", error);
-               self.postMessage({
-                 error: true,
-                 message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
-               });
-            }
-          };
-        `;
+                     if (responseData.results && responseData.results.length > 0) {
+                         const transcript = responseData.results
+                             .map(result => result.alternatives[0].transcript)
+                             .join(' ')
+                             .trim();
+                         self.postMessage(transcript); // Send back only the transcript string
+                     } else {
+                         // Handle cases where API returns ok but no results (e.g., silence)
+                         self.postMessage({ error: true, message: 'No speech detected or recognized.' });
+                     }
+                 } catch (error) {
+                     //console.error("Error in speech worker processing:", error);
+                     self.postMessage({
+                         error: true,
+                         message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
+                     });
+                 }
+             };
+           `;
 
       const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
       const workerUrl = URL.createObjectURL(workerBlob);
@@ -1381,8 +1475,10 @@ export class OllamaView extends ItemView {
       return;
     }
     // Перевірка наявності ключа Google API
-    if (!this.plugin.settings.googleApiKey) {
-      new Notice("Ключ Google API не налаштовано. Будь ласка, додайте його в налаштуваннях плагіна для використання голосового вводу.");
+    // Важливо: ключ для Speech-to-Text може бути іншим, ніж для Translation
+    const speechApiKey = this.plugin.settings.googleApiKey; // ПОТРІБНО ПЕРЕВІРИТИ НАЗВУ В НАЛАШТУВАННЯХ!
+    if (!speechApiKey) {
+      new Notice("Ключ Google API для розпізнавання мовлення не налаштовано. Будь ласка, додайте його в налаштуваннях плагіна.");
       return;
     }
 
@@ -1425,13 +1521,14 @@ export class OllamaView extends ItemView {
           //console.log(`Sending audio blob to worker: type=${audioBlob.type}, size=${audioBlob.size}`);
           this.inputEl.placeholder = "Processing speech..."; // Update placeholder
           this.speechWorker.postMessage({
-            apiKey: this.plugin.settings.googleApiKey,
+            apiKey: speechApiKey, // Використовуємо правильний ключ
             audioBlob,
             languageCode: this.plugin.settings.speechLanguage || 'uk-UA'
           });
         } else if (audioChunks.length === 0) {
           //console.log("No audio data recorded.");
-          this.updateInputPlaceholder(this.plugin.settings.modelName); // Restore placeholder if nothing was recorded
+          // Використовуємо getCurrentRoleDisplayName для відновлення плейсхолдера
+          this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState(); // Ensure button state is correct
         }
       };
@@ -1468,8 +1565,10 @@ export class OllamaView extends ItemView {
 
     // UI Cleanup & Resource Release
     this.voiceButton?.classList.remove(CSS_CLASS_RECORDING);
-    setIcon(this.voiceButton, "microphone");
-    this.updateInputPlaceholder(this.plugin.settings.modelName);
+    setIcon(this.voiceButton, "mic"); // <-- Змінено з microphone на mic
+
+    // Використовуємо getCurrentRoleDisplayName для відновлення плейсхолдера
+    this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
     this.updateSendButtonState(); // Update button state
 
     if (this.audioStream) {
@@ -1483,23 +1582,28 @@ export class OllamaView extends ItemView {
 
 
   // --- Thinking Tag Handling ---
-  private processThinkingTags(content: string): string { /* ... (Implementation from previous responses) ... */ const r = /<think>([\s\S]*?)<\/think>/g; let i = 0; const p: string[] = []; let m; while ((m = r.exec(content)) !== null) { if (m.index > i) p.push(this.markdownToHtml(content.substring(i, m.index))); const c = m[1]; const h = `<div class="${CSS_CLASS_THINKING_BLOCK}"><div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">►</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div><div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${this.markdownToHtml(c)}</div></div>`; p.push(h); i = r.lastIndex; } if (i < content.length) p.push(this.markdownToHtml(content.substring(i))); return p.join(""); }
-  private markdownToHtml(markdown: string): string { /* ... (Implementation from previous responses) ... */ if (!markdown?.trim()) return ""; const d = document.createElement("div"); MarkdownRenderer.renderMarkdown(markdown, d, this.app.workspace.getActiveFile()?.path ?? "", this); return d.innerHTML; }
-  private addThinkingToggleListeners(contentEl: HTMLElement): void { /* ... (Implementation from previous responses) ... */ const h = contentEl.querySelectorAll<HTMLElement>(`.${CSS_CLASS_THINKING_HEADER}`); h.forEach(hdr => { this.registerDomEvent(hdr, "click", () => { const c = hdr.nextElementSibling as HTMLElement; const t = hdr.querySelector<HTMLElement>(`.${CSS_CLASS_THINKING_TOGGLE}`); if (!c || !t) return; const f = hdr.getAttribute("data-fold-state") === "folded"; if (f) { c.style.display = "block"; t.textContent = "▼"; hdr.setAttribute("data-fold-state", "expanded"); } else { c.style.display = "none"; t.textContent = "►"; hdr.setAttribute("data-fold-state", "folded"); } }); }); }
-  private decodeHtmlEntities(text: string): string { /* ... (Implementation from previous responses) ... */ if (typeof document === 'undefined') { return text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"); } const ta = document.createElement("textarea"); ta.innerHTML = text; return ta.value; }
-  private detectThinkingTags(content: string): { hasThinkingTags: boolean; format: string } { /* ... (Implementation from previous responses) ... */ return /<think>[\s\S]*?<\/think>/gi.test(content) ? { hasThinkingTags: true, format: "standard" } : { hasThinkingTags: false, format: "none" }; }
+  private processThinkingTags(content: string): string { const r = /<think>([\s\S]*?)<\/think>/g; let i = 0; const p: string[] = []; let m; while ((m = r.exec(content)) !== null) { if (m.index > i) p.push(this.markdownToHtml(content.substring(i, m.index))); const c = m[1]; const h = `<div class="${CSS_CLASS_THINKING_BLOCK}"><div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">►</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div><div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${this.markdownToHtml(c)}</div></div>`; p.push(h); i = r.lastIndex; } if (i < content.length) p.push(this.markdownToHtml(content.substring(i))); return p.join(""); }
+  private markdownToHtml(markdown: string): string { if (!markdown?.trim()) return ""; const d = document.createElement("div"); MarkdownRenderer.renderMarkdown(markdown, d, this.app.workspace.getActiveFile()?.path ?? "", this); return d.innerHTML; }
+  private addThinkingToggleListeners(contentEl: HTMLElement): void { const h = contentEl.querySelectorAll<HTMLElement>(`.${CSS_CLASS_THINKING_HEADER}`); h.forEach(hdr => { this.registerDomEvent(hdr, "click", () => { const c = hdr.nextElementSibling as HTMLElement; const t = hdr.querySelector<HTMLElement>(`.${CSS_CLASS_THINKING_TOGGLE}`); if (!c || !t) return; const f = hdr.getAttribute("data-fold-state") === "folded"; if (f) { c.style.display = "block"; t.textContent = "▼"; hdr.setAttribute("data-fold-state", "expanded"); } else { c.style.display = "none"; t.textContent = "►"; hdr.setAttribute("data-fold-state", "folded"); } }); }); }
+  private decodeHtmlEntities(text: string): string { if (typeof document === 'undefined') { return text.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'"); } const ta = document.createElement("textarea"); ta.innerHTML = text; return ta.value; }
+  private detectThinkingTags(content: string): { hasThinkingTags: boolean; format: string } { return /<think>[\s\S]*?<\/think>/gi.test(content) ? { hasThinkingTags: true, format: "standard" } : { hasThinkingTags: false, format: "none" }; }
 
   // --- Message Collapsing ---
   private checkMessageForCollapsing(messageEl: HTMLElement): void {
-    const c = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
-    const h = this.plugin.settings.maxMessageHeight;
-    if (!c || h <= 0) {
-         if(c && h <=0) {
-         }
-         return;
-    }
+     const c = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+     const h = this.plugin.settings.maxMessageHeight;
+     if (!c || h <= 0) {
+        // Якщо контент є, але висота не обмежена, просто видаляємо кнопку і стиль, якщо вони були
+        if (c && h <= 0) {
+             const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+             b?.remove();
+             c.style.maxHeight = '';
+             c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        }
+        return;
+     }
 
-    requestAnimationFrame(() => { // Вимірювання в наступному кадрі
+     requestAnimationFrame(() => { // Вимірювання в наступному кадрі
          if (!c) return; // Повторна перевірка елемента
          const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
          b?.remove(); // Видаляємо стару кнопку, якщо є
@@ -1512,9 +1616,13 @@ export class OllamaView extends ItemView {
              const smb = messageEl.createEl('button', { cls: CSS_CLASS_SHOW_MORE_BUTTON, text: 'Show More ▼' });
              this.registerDomEvent(smb, 'click', () => this.toggleMessageCollapse(c, smb));
          } else {
+             // Висота менша або дорівнює ліміту, кнопка не потрібна
+             // Переконуємося, що стилі зняті (про всяк випадок)
+             c.style.maxHeight = '';
+             c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
          }
-    });
-}
+     });
+ }
   private checkAllMessagesForCollapsing(): void { /* ... (Implementation from previous responses) ... */ this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => { this.checkMessageForCollapsing(msgEl); }); }
   private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void { /* ... (Implementation from previous responses) ... */ const i = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED); const h = this.plugin.settings.maxMessageHeight; if (i) { contentEl.style.maxHeight = ''; contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show Less ▲'); } else { contentEl.style.maxHeight = `${h}px`; contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED); buttonEl.setText('Show More ▼'); } }
 
@@ -1607,7 +1715,7 @@ export class OllamaView extends ItemView {
       const diffHours = Math.floor(diffSeconds / (60 * 60));
       if (diffHours < 1) return "Just now";
       if (diffHours === 1) return "1 hour ago";
-      if (diffHours < now.getHours()) return `${diffHours} hours ago`;
+      if (diffHours < now.getHours()) return `${diffHours} hours ago`; // Fixed: Compare diffHours with current hour
       else return "Today";
     } else if (diffDays === 1) {
       return "Yesterday";
@@ -1619,24 +1727,17 @@ export class OllamaView extends ItemView {
   }
   isSameDay(date1: Date, date2: Date): boolean { return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate(); }
 
-  // /** Sets the loading state for the UI (disables/enables input elements) */
-  // public setLoadingState(isLoading: boolean): void {
-  //   this.isProcessing = isLoading;
-  //   if (this.inputEl) this.inputEl.disabled = isLoading;
-  //   this.updateSendButtonState(); // Send button depends on both text and processing state
-  //   if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
-  //   if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
-  //   if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading); }
-  // }
-
   // Formatting function used by export
   private formatChatToMarkdown(messagesToFormat: Message[]): string {
     let localLastDate: Date | null = null;
     const exportTimestamp = new Date();
-    let markdown = `# Ollama Chat Export\n` +
-      `> Exported on: ${exportTimestamp.toLocaleString(undefined)}\n\n`; // Use locale default date/time
+    let markdown = `# AI Forge Chat Export\n` + // Можна змінити заголовок, якщо треба
+     `> Exported on: ${exportTimestamp.toLocaleString(undefined)}\n\n`; // Use locale default date/time
 
     messagesToFormat.forEach(message => {
+      // Skip empty messages if any exist (shouldn't normally happen)
+      if (!message.content?.trim()) return;
+
       if (localLastDate === null || !this.isSameDay(localLastDate, message.timestamp)) {
         if (localLastDate !== null) markdown += `***\n`; // Separator between days
         markdown += `**${this.formatDateSeparator(message.timestamp)}**\n***\n\n`;
@@ -1646,6 +1747,15 @@ export class OllamaView extends ItemView {
       const time = this.formatTime(message.timestamp);
       let prefix = "";
       let contentPrefix = "";
+      let content = message.content.trim(); // Trim content initially
+
+      // Remove <think> tags from assistant messages before formatting
+      if (message.role === 'assistant') {
+         content = this.decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+         // Skip if content becomes empty after removing think tags
+         if (!content) return;
+      }
+
       switch (message.role) {
         case 'user': prefix = `**User (${time}):**\n`; break;
         case 'assistant': prefix = `**Assistant (${time}):**\n`; break;
@@ -1653,19 +1763,21 @@ export class OllamaView extends ItemView {
         case 'error': prefix = `> [!ERROR] Error (${time}):\n> `; contentPrefix = "> "; break; // Admonition block
       }
       markdown += prefix;
-      let content = message.content.trim();
       if (contentPrefix) {
-        markdown += content.split('\n').join(`\n${contentPrefix}`) + "\n\n"; // Add prefix to each line
+        markdown += content.split('\n').map(line => line.trim() ? `${contentPrefix}${line}` : contentPrefix.trim()).join(`\n`) + "\n\n"; // Add prefix to each line, handle empty lines
       } else if (content.includes('```')) {
         // Ensure blank lines around code blocks for proper rendering
-        content = content.replace(/(\n*)```/g, "\n\n```").replace(/```(\n*)/g, "```\n\n");
+        // Improved regex to handle potential multiple empty lines
+        content = content.replace(/(\n*\s*)```/g, "\n\n```").replace(/```(\s*\n*)/g, "```\n\n");
         markdown += content.trim() + "\n\n";
       } else {
-        markdown += content + "\n\n";
+        // Standard message content - ensure proper line breaks are kept
+        markdown += content.split('\n').map(line => line.trim() ? line : '').join('\n') + "\n\n";
       }
     });
-    return markdown.trim();
+    return markdown.trim(); // Trim final result
   }
+
 
   private async getCurrentRoleDisplayName(): Promise<string> {
     try {
@@ -1741,7 +1853,7 @@ export class OllamaView extends ItemView {
       // --- 2. Додаємо роздільник, якщо є ролі ---
       if (roles.length > 0) {
         menu.addSeparator();
-        itemsAdded = true;
+        itemsAdded = true; // Не потрібно, бо вже true, але для ясності
       }
 
       // --- 3. Додаємо список ролей ---
@@ -1780,6 +1892,8 @@ export class OllamaView extends ItemView {
     } finally {
       if (itemsAdded) {
         menu.showAtMouseEvent(event); // Показуємо меню
+      } else {
+         console.warn("Role menu was not shown because no items were added.");
       }
     }
   }
