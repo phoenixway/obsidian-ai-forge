@@ -63,6 +63,17 @@
       flex-wrap: wrap; // Allow wrapping if needed
       justify-content: center;
       gap: 8px;
+
+
+    .input-controls-right {
+      // ... (можливо, існуючі стилі для .input-controls-right) ...
+
+      // --- ДОДАТИ ЦЕ ПРАВИЛО ---
+      .voice-button {
+        display: none; // Ховаємо кнопку голосового вводу на планшетах і менших екранах
+      }
+      // --- КІНЕЦЬ ДОДАНОГО ПРАВИЛА ---
+    }
     }
   
     textarea {
@@ -71,29 +82,10 @@
       padding-right: 15px; // Reset large padding
     }
   
-   .input-controls-left .translate-input-button {
+    .input-controls-right button, // Includes Send, Voice, Menu
+    .input-controls-left .translate-input-button {
       width: 30px; height: 30px;
     }
-
-    .input-controls-left .voice-button {
-      width: 28px; height: 28px;
-      background-color: red;
-      display: none;
-    }
-    
-    .input-controls-right {
-      button {
-        width: 30px; height: 30px;
-        background-color: red;
-
-        .voice-button   &.recording{
-          display: none !important;
-        }
-      }
- 
-      
-    }
-
   }
   
   .menu-dropdown.ollama-chat-menu {
@@ -126,4 +118,5 @@
        .role-display {
         max-width: 150px;
     }
+    
   }
