@@ -6,12 +6,17 @@
   flex-grow: 0;
   flex-shrink: 0;
 
-  max-width: 1500px; // Встановіть бажану максимальну ширину чату (напр., 1000px, 1200px)
-  // width: 100%; // Дозволяє йому бути вужчим на менших екранах
-  margin-left: auto; // Центрування
-  margin-right: auto; // Центрування
-  
+  max-width: 1500px; // SAME value as .ollama-chat-container
+  // width: 100%; /     // Use 100% so it shrinks below max-width
+  margin-left: auto;
+  margin-right: auto;
+  // --- END ADD ---
+  // Adjust existing margin if needed (remove horizontal auto from here if set previously)
+  margin-top: 0; // Keep vertical margins as needed
+  margin-bottom: calc(var(--chat-spacing-unit) * 2);
+
   width: 98%; // Трохи менше, щоб уникнути горизонтального скролу в деяких випадках
+
   box-sizing: border-box;
   padding:
     calc(var(--chat-spacing-unit) * 2)    // Top
@@ -22,11 +27,11 @@
   background-color: var(--background-primary);
   z-index: 20;
   border-radius: 12px;
-  margin:
-    0                                     // Top
-    calc(var(--chat-spacing-unit) * 2)    // Right
-    calc(var(--chat-spacing-unit) * 2)    // Bottom
-    calc(var(--chat-spacing-unit) * 2);   // Left
+  // margin:
+    // 0                                     // Top
+    // calc(var(--chat-spacing-unit) * 2)    // Right
+    // calc(var(--chat-spacing-unit) * 2)    // Bottom
+    // calc(var(--chat-spacing-unit) * 2);   // Left
   position: relative; // Потрібно для позиціонування меню
   box-shadow: none; // Прибираємо тінь за замовчуванням
 
