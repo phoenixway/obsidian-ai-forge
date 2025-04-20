@@ -4880,19 +4880,19 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     return this.taskFileNeedsUpdate;
   }
   async onload() {
-    console.log("[AI Forge] Loading Plugin...");
-    await this.loadSettingsAndMigrate();
+    const initialSettingsData = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     const loggerSettings = {
-      consoleLogLevel: true ? this.settings.consoleLogLevel || "INFO" : "DEBUG",
-      fileLoggingEnabled: this.settings.fileLoggingEnabled,
-      fileLogLevel: this.settings.fileLogLevel,
-      logCallerInfo: this.settings.logCallerInfo,
-      logFilePath: this.settings.logFilePath,
-      logFileMaxSizeMB: this.settings.logFileMaxSizeMB
+      consoleLogLevel: true ? initialSettingsData.consoleLogLevel || "INFO" : "DEBUG",
+      // Використовуємо initialSettingsData
+      fileLoggingEnabled: initialSettingsData.fileLoggingEnabled,
+      fileLogLevel: initialSettingsData.fileLogLevel,
+      logCallerInfo: initialSettingsData.logCallerInfo,
+      logFilePath: initialSettingsData.logFilePath,
+      logFileMaxSizeMB: initialSettingsData.logFileMaxSizeMB
     };
     this.logger = new Logger(this, loggerSettings);
     this.logger.info("Logger initialized.");
-    this.logger.info("Initializing services...");
+    await this.loadSettingsAndMigrate();
     this.promptService = new PromptService(this);
     this.ollamaService = new OllamaService(this);
     this.translationService = new TranslationService(this);
@@ -4900,6 +4900,14 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     this.chatManager = new ChatManager(this);
     this.logger.info("Services initialized.");
     await this.chatManager.initialize();
+    this.logger.updateSettings({
+      consoleLogLevel: this.settings.consoleLogLevel,
+      fileLoggingEnabled: this.settings.fileLoggingEnabled,
+      fileLogLevel: this.settings.fileLogLevel,
+      logCallerInfo: this.settings.logCallerInfo,
+      logFilePath: this.settings.logFilePath,
+      logFileMaxSizeMB: this.settings.logFileMaxSizeMB
+    });
     this.registerView(
       VIEW_TYPE_OLLAMA_PERSONAS,
       (leaf) => {
