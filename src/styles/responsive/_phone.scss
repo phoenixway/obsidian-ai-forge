@@ -105,9 +105,8 @@
         max-height: 150px; // Limit list height
     }
   
-    // Role section is already shown by _tablet.scss styles
-    // .role-submenu-section { display: block !important; }
-    // .role-submenu-section + hr.menu-separator { display: block !important; }
+    .voice-button {
+      display: none;
+    }
+  
   }
-  // Role display is already hidden
-  // .input-controls-left .role-display { display: none; }

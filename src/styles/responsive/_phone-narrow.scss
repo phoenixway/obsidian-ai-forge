@@ -21,7 +21,10 @@
   
   .message-actions-wrapper button .svg-icon {
     width: 11px; height: 11px;
-  }
+   }
   
-  // Role display is already hidden
-  // .input-controls-left .role-display { display: none; }
+   .voice-button {
+      display: none;
+    }
+
+    
