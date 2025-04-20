@@ -108,7 +108,7 @@
         max-width: 150px;
     }
 
-    .voice-button {
+    .voice-button   &.recording{
       display: none;
     }
   }

@@ -105,7 +105,7 @@
         max-height: 150px; // Limit list height
     }
   
-    .voice-button {
+    .voice-button   &.recording {
       display: none;
     }
   

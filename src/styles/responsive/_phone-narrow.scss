@@ -24,7 +24,8 @@
    }
   
    .voice-button {
+      &.recording {
       display: none;
     }
-
+   }
     
