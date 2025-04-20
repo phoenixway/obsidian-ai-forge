@@ -476,12 +476,27 @@ export class OllamaView extends ItemView {
 
   private updateModelDisplay(modelName: string | null | undefined): void {
     if (this.modelDisplayEl) {
-      const displayName = modelName || "Default";
-      const shortName = displayName.replace(/:latest$/, '');
-      this.modelDisplayEl.setText(shortName);
-      this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
+        this.plugin.logger.debug(`[OllamaView] updateModelDisplay called with: ${modelName}`); // Додано для відладки
+
+        if (modelName) {
+            // Якщо модель є (не null і не undefined), відображаємо її ім'я
+            const displayName = modelName; // "Default" тут більше не потрібен як запасний варіант
+            const shortName = displayName.replace(/:latest$/, ''); // Прибираємо ':latest' для коротшого вигляду
+            this.modelDisplayEl.setText(shortName);
+            this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
+            // Опціонально: прибираємо клас помилки, якщо він був
+            this.modelDisplayEl.removeClass("model-not-available");
+        } else {
+            // Якщо modelName === null або undefined (тобто моделей немає або сталася помилка)
+            this.modelDisplayEl.setText("Not available");
+            this.modelDisplayEl.title = "No Ollama models detected. Check Ollama connection and ensure models are installed.";
+            // Опціонально: додаємо клас для стилізації стану помилки/недоступності
+            this.modelDisplayEl.addClass("model-not-available");
+        }
+    } else {
+         console.error("[OllamaView] modelDisplayEl is missing!");
     }
-  }
+}
 
   // --- Event Handlers ---
 

@@ -1109,10 +1109,20 @@ This action cannot be undone.`, async () => {
   }
   updateModelDisplay(modelName) {
     if (this.modelDisplayEl) {
-      const displayName = modelName || "Default";
-      const shortName = displayName.replace(/:latest$/, "");
-      this.modelDisplayEl.setText(shortName);
-      this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
+      this.plugin.logger.debug(`[OllamaView] updateModelDisplay called with: ${modelName}`);
+      if (modelName) {
+        const displayName = modelName;
+        const shortName = displayName.replace(/:latest$/, "");
+        this.modelDisplayEl.setText(shortName);
+        this.modelDisplayEl.title = `Current model: ${displayName}. Click to change.`;
+        this.modelDisplayEl.removeClass("model-not-available");
+      } else {
+        this.modelDisplayEl.setText("Not available");
+        this.modelDisplayEl.title = "No Ollama models detected. Check Ollama connection and ensure models are installed.";
+        this.modelDisplayEl.addClass("model-not-available");
+      }
+    } else {
+      console.error("[OllamaView] modelDisplayEl is missing!");
     }
   }
   // Handles clicks on submenu headers (Model, Role, Chat)
