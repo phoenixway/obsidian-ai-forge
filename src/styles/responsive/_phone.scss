@@ -28,11 +28,17 @@
        gap: 4px;
     }
   
-    .input-controls-right button,
+    
     .input-controls-left .translate-input-button {
       width: 28px; height: 28px;
     }
-  
+
+    .input-controls-right button {
+      background-color: aqua;
+      width: 28px; height: 28px;
+
+    }
+
     // Hide input translate button to save space
     .input-controls-left .translate-input-button {
         display: none;
