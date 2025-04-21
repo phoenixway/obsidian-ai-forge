@@ -152,6 +152,7 @@
   visibility: hidden;
   transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
   z-index: 6; // Ensure clickable
+  margin-left: 10px;
 
   // Base button style inside actions
   button {
