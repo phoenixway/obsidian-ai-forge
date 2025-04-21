@@ -1251,19 +1251,23 @@ private handleRenameChatClick = async (): Promise<void> => {
     let messageWrapper = messageGroup.querySelector('.message-wrapper') as HTMLElement;
     if (!messageWrapper) {
       messageWrapper = messageGroup.createDiv({ cls: 'message-wrapper' });
-      // Ensure correct order relative to avatar based on group type
       if (messageGroup.classList.contains(CSS_CLASS_USER_GROUP)) {
-        messageWrapper.style.order = '1'; // Messages first
+        messageWrapper.style.order = '1';
       } else {
-        messageWrapper.style.order = '2'; // Messages second
+        messageWrapper.style.order = '2';
       }
     }
-    const messageEl = messageWrapper.createDiv({ cls: messageClass }); // Append message to wrapper
-    messageEl.style.position = 'relative';
+
+    // --- ЗМІНЕНО: Створюємо messageEl та buttonsWrapper як СЕСТРИ всередині messageWrapper ---
+
+    // 1. Створюємо бульбашку повідомлення
+    const messageEl = messageWrapper.createDiv({ cls: messageClass });
+    // НЕ додаємо position: relative сюди
 
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
 
+    // --- Рендеримо контент (як раніше) ---
     // --- Render Content ---
     switch (message.role) {
       case "assistant":
@@ -1287,60 +1291,44 @@ private handleRenameChatClick = async (): Promise<void> => {
         contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
         break;
     }
-
+    this.checkMessageForCollapsing(messageEl);
     // --- Action Buttons ---
-    const buttonsWrapper = messageEl.createDiv({ cls: 'message-actions-wrapper' }); // Створюємо обгортку
-
-    // --- Кнопка Регенерації (ТІЛЬКИ для user messages) ---
+    const buttonsWrapper = messageWrapper.createDiv({ cls: 'message-actions-wrapper' });
+    
+    // --- Додаємо кнопки до buttonsWrapper (логіка та ж) ---
     if (message.role === "user") {
-      const regenerateBtn = buttonsWrapper.createEl("button", {
-        cls: CSS_CLASS_REGENERATE_BUTTON,
-        attr: { title: "Regenerate response", 'aria-label': "Regenerate AI response based on this message" }
-      });
-      setIcon(regenerateBtn, "refresh-cw"); // Або "redo"
-      // Передаємо сам об'єкт повідомлення в обробник
-      this.registerDomEvent(regenerateBtn, "click", (e) => {
-        e.stopPropagation();
-        this.handleRegenerateClick(message); // Викликаємо новий обробник
-      });
-    }
-
-// Кнопки Копіювання та Перекладу (для user та assistant)
-if (message.role === "user" || message.role === "assistant") {
-  // Кнопка копіювання
-  const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
-  setIcon(copyBtn, "copy");
-  this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
-
-  // Кнопка перекладу (якщо увімкнено)
-  if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage) {
-      const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
-      const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, 'aria-label': "Translate message" } });
-      setIcon(translateBtn, "languages");
-      this.registerDomEvent(translateBtn, "click", (e) => { e.stopPropagation(); this.handleTranslateClick(message.content, contentEl, translateBtn); });
+      const regenerateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_REGENERATE_BUTTON, attr: { /*...*/ } });
+      setIcon(regenerateBtn, "refresh-cw");
+      this.registerDomEvent(regenerateBtn, "click", (e) => { e.stopPropagation(); this.handleRegenerateClick(message); });
   }
+  if (message.role === "user" || message.role === "assistant") {
+      const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { /*...*/ } });
+      setIcon(copyBtn, "copy");
+      this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
+      if (this.plugin.settings.enableTranslation /*...*/) {
+          const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { /*...*/ } });
+          setIcon(translateBtn, "languages");
+          this.registerDomEvent(translateBtn, "click", (e) => { e.stopPropagation(); this.handleTranslateClick(message.content, contentEl, translateBtn); });
+      }
+  }
+  // --- Кінець додавання кнопок ---
+
+
+  // 3. Мітка часу (залишається всередині messageEl після contentContainer)
+  messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+
+
+  // --- Анімація ---
+  // Застосовуємо анімацію до messageEl (бульбашки)
+  messageEl.addClass(CSS_CLASS_MESSAGE_ARRIVING);
+  setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+
+  // Повертаємо messageEl (або messageWrapper, якщо потрібно для інших цілей?)
+  // Повернемо messageEl, бо checkMessageForCollapsing працює з ним
+  return messageEl;
+  // --- КІНЕЦЬ ЗМІН ---
 }
 
-    // if (message.role !== "system" && message.role !== "error") {
-    //   const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
-    //   setIcon(copyBtn, "copy");
-    //   this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
-    // }
-    // if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
-    //   const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
-    //   const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, 'aria-label': "Translate message" } });
-    //   setIcon(translateBtn, "languages");
-    //   this.registerDomEvent(translateBtn, "click", (e) => { e.stopPropagation(); this.handleTranslateClick(message.content, contentEl, translateBtn); });
-    // }
-
-    // --- Timestamp ---
-    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
-
-    // --- Animation Cleanup ---
-    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
-
-    return messageEl;
-  }
 
   // --- Новий обробник для кнопки Регенерації ---
   private async handleRegenerateClick(userMessage: Message): Promise<void> {

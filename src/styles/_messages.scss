@@ -1,63 +1,69 @@
 // src/styles/_messages.scss
+// Styling for message groups, bubbles, avatars, actions, timestamps etc.
+
+// Assumes these variables are defined elsewhere (e.g., in :root or _variables.scss)
+// :root {
+//   --chat-spacing-unit: 5px; // Example base spacing
+//   --chat-avatar-size: 32px; // Example default avatar size
+//   --chat-message-max-width: 700px; // Example fixed max width for messages
+//   --chat-column-max-width: 1000px; // Example reduced max width for the whole chat column
+// }
+
+// Center the entire chat column
+.ollama-chat-container {
+  max-width: var(--chat-column-max-width); // Apply overall max width
+  width: 100%;      // Allow shrinking
+  margin-left: auto;
+  margin-right: auto;
+  // Keep existing padding, flex properties for vertical layout if needed
+  // padding: calc(var(--chat-spacing-unit) * 4);
+  // box-sizing: border-box;
+}
 
 .message-group {
   display: flex;
-  // --- CHANGE: Changed from flex-direction: column to align items based on role ---
-  // flex-direction: column;
-  width: 100%;
-  margin-bottom: calc(var(--chat-spacing-unit) * 10);
-  /* Increased spacing */
-  position: relative;
-  // --- CHANGE: Padding removed, alignment handled by group type ---
-  // padding-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
-  // padding-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2);
+  width: 100%; // Takes width of the centered container now
+  margin-bottom: calc(var(--chat-spacing-unit) * 5); // Vertical space between groups
+  position: relative; // Context for potential absolute elements if ever needed
   box-sizing: border-box;
 
-  // Group alignment based on role
+  // Group alignment dictates order and avatar margin side
   &.user-message-group {
-    justify-content: flex-end; // Align items (avatar + messages) to the right
-
-    .message-group-avatar {
-      right: 0; // Position avatar right
-      order: 2; // Place avatar after messages visually
-    }
-
+    // justify-content: flex-end; // No longer needed if wrapper handles margin
+    .message-group-avatar { order: 2; } // Avatar on the right
     .message-wrapper {
-      // New wrapper for messages within the group
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end; // Align bubbles right
-      order: 1; // Place messages before avatar
-      margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
-      margin-left: auto;
+       order: 1; // Messages on the left
+       align-items: flex-end; // Align bubbles & actions to the right inside wrapper
+       margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+       margin-left: auto; // Push wrapper away from left edge
     }
   }
 
   &.ollama-message-group {
-    justify-content: flex-start; // Align items (avatar + messages) to the left
-
-    .message-group-avatar {
-      left: 0; // Position avatar left
-      order: 1; // Place avatar before messages visually
-    }
-
-    .message-wrapper {
-      // New wrapper for messages within the group
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start; // Align bubbles left
-      order: 2; // Place messages after avatar
-      margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
-      margin-right: auto;
+    // justify-content: flex-start; // No longer needed
+    .message-group-avatar { order: 1; } // Avatar on the left
+     .message-wrapper {
+       order: 2; // Messages on the right
+       align-items: flex-start; // Align bubbles & actions to the left inside wrapper
+       margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+       margin-right: auto; // Push wrapper away from right edge
     }
   }
 }
 
-// Avatars
+// Wrapper for one or more message bubbles + their action buttons
+.message-wrapper {
+   display: flex;
+   flex-direction: column;
+   max-width: var(--chat-message-max-width); // Apply the fixed PX max-width here
+   gap: calc(var(--chat-spacing-unit) * 0.75); // Vertical gap between message bubble and action buttons below it
+   // align-items (flex-start/flex-end) are set by the parent group rule
+}
+
+
+// Avatar Styles
 .message-group-avatar {
-  // position: absolute; // --- CHANGE: No longer absolute positioned ---
-  // bottom: calc(var(--chat-spacing-unit) * 2.5);
-  align-self: flex-end; // Stick to the bottom of the flex container (message-group)
+  align-self: flex-end; // Stick to the bottom of the group's vertical space
   width: var(--chat-avatar-size);
   height: var(--chat-avatar-size);
   border-radius: 50%;
@@ -68,194 +74,173 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  z-index: 5;
-  flex-shrink: 0; // Prevent avatar from shrinking
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  z-index: 5; // Above potential background elements
+  flex-shrink: 0;
 
-  .svg-icon {
-    width: 60%;
-    height: 60%;
-  }
+  .svg-icon { width: 60%; height: 60%; }
 
-  // Specific Avatar Styles
   .user-message-group & {
-    // Nesting for user avatar
     background-color: var(--interactive-accent-translucent);
     color: var(--interactive-accent);
   }
 }
 
-// Base message bubble style
+// Message Bubble Styles
 .message {
-  margin-bottom: calc(var(--chat-spacing-unit) * 1);
-  /* Small gap between messages in group */
+  // margin-bottom: calc(var(--chat-spacing-unit) * 1); // Use gap in wrapper instead
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
-  position: relative; // Для абсолютного позиціонування кнопок
-  padding-bottom: calc(var(--chat-spacing-unit) * 5); // Додатковий відступ знизу для кнопок та мітки часу
-  width: fit-content;
-  max-width: 100%; // Обмеження ширини тепер на .message-wrapper
-
+  // position: relative; // No longer needed for buttons
+  // padding-bottom: calc(var(--chat-spacing-unit) * 5); // No longer needed
   border-radius: 18px;
-  // max-width: var(--chat-message-max-width);
+  width: fit-content; // Bubble width based on content
+  max-width: 100%; // Max width is constrained by message-wrapper
   word-wrap: break-word;
-  position: relative;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
   line-height: 1.5;
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 
-  &.message-arriving {
-    // Animation class
-    animation: message-appear 0.3s ease-out forwards;
-  }
-
-  // Remove bottom margin for the last message in the wrapper
-  .message-wrapper>&:last-child {
-    margin-bottom: 0;
-  }
+  &.message-arriving { animation: message-appear 0.3s ease-out forwards; }
 }
 
-// --- CHANGE: Grouping logic simplified with wrapper ---
-// Consecutive messages styling (adjusting corners)
+// Corner Radius logic for consecutive messages within the same wrapper
+// Applied to the .message elements
 .user-message-group .message-wrapper {
-  .message:not(:last-child) {
-    border-bottom-right-radius: 5px;
-  }
-
-  .message:last-child {
-    border-bottom-right-radius: 18px;
-  }
-
-  .message:not(:first-child) {
-    border-top-right-radius: 5px;
-  }
-
-  .message:first-child {
-    border-top-right-radius: 18px;
-  }
-
-  .message { border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
+  .message:not(:last-child) { border-bottom-right-radius: 5px; }
+  .message:last-child { border-bottom-right-radius: 18px; }
+  .message:not(:first-child) { border-top-right-radius: 5px; }
+  .message:first-child { border-top-right-radius: 18px; }
+   .message { border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
 }
-
 .ollama-message-group .message-wrapper {
-  .message:not(:last-child) {
-    border-bottom-left-radius: 5px;
-  }
-
-  .message:last-child {
-    border-bottom-left-radius: 18px;
-  }
-
-  .message:not(:first-child) {
-    border-top-left-radius: 5px;
-  }
-
-  .message:first-child {
-    border-top-left-radius: 18px;
-  }
-
-  .message { border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
+  .message:not(:last-child) { border-bottom-left-radius: 5px; }
+  .message:last-child { border-bottom-left-radius: 18px; }
+  .message:not(:first-child) { border-top-left-radius: 5px; }
+  .message:first-child { border-top-left-radius: 18px; }
+   .message { border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
 }
 
 
-// User messages specific styles
+// Role-specific message bubble styles
 .user-message {
   background-color: var(--interactive-accent);
-  background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
+  // background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
   color: var(--text-on-accent);
-  // align-self: flex-end; // Handled by wrapper
-  border-top-left-radius: 18px;
-  border-bottom-left-radius: 18px;
-  // border-top-right-radius: 18px; // Handled by group logic
-  // border-bottom-right-radius: 5px; // Handled by group logic
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-
-  &:hover {
-    box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
-    transform: translateY(-1px) scale(1.01);
-  }
-
-  .message-timestamp {
-    // Timestamp color for user messages
-    color: var(--text-on-accent);
-    opacity: 0.75;
-  }
+  &:hover { box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3); transform: translateY(-1px); }
+  .message-timestamp { color: var(--text-on-accent); opacity: 0.75; }
 }
-
-// AI messages specific styles
 .ollama-message {
-  background-color: var(--background-primary);
+  background-color: var(--background-primary-alt);
   color: var(--text-normal);
-  // align-self: flex-start; // Handled by wrapper
-  border-top-right-radius: 18px;
-  border-bottom-right-radius: 18px;
-  // border-top-left-radius: 18px; // Handled by group logic
-  // border-bottom-left-radius: 5px; // Handled by group logic
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); transform: translateY(-1px); }
+   pre { background-color: var(--background-secondary) !important; }
+}
 
-  &:hover {
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-    transform: translateY(-1px) scale(1.01);
+// --- Action Buttons Styling & Positioning ---
+.message-actions-wrapper {
+  // Removed absolute positioning
+  display: flex;
+  gap: calc(var(--chat-spacing-unit) * 1.5); // Space between buttons
+  width: fit-content; // Only as wide as needed
+  // align-self will be controlled by parent .message-wrapper's align-items
+
+  // Desktop hover visibility (default hidden)
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
+  z-index: 6; // Ensure clickable
+
+  // Base button style inside actions
+  button {
+    background: rgba(var(--background-secondary-rgb), 0.7);
+    backdrop-filter: blur(3px);
+    border: 1px solid rgba(var(--background-modifier-border-rgb), 0.5);
+    border-radius: var(--radius-s);
+    padding: 2px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+
+    .svg-icon { width: 14px; height: 14px; }
+
+    &:hover {
+      background-color: var(--background-modifier-hover);
+      color: var(--text-normal);
+      border-color: var(--background-modifier-border-hover);
+      transform: scale(1.05);
+    }
+  }
+  // Style for Regenerate button (optional)
+  .regenerate-button {
+     // color: var(--text-warning); // Example accent
   }
 }
 
-// Message Content & Meta
-.message-content-container {
-  position: relative;
-  /* Needed for absolute positioning of action buttons */
-  width: 100%;
+// Show buttons on hover of the MESSAGE BUBBLE (as buttons are now siblings)
+// Or hover of the wrapper containing both? Let's try wrapper for larger target.
+.message-wrapper:hover .message-actions-wrapper {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
+// Specific button styles for user messages (actions appear below user bubble)
+.user-message-group .message-actions-wrapper button {
+   background: rgba(255, 255, 255, 0.1);
+   border-color: rgba(255, 255, 255, 0.2);
+   color: rgba(255, 255, 255, 0.8);
+   &:hover {
+      background-color: rgba(255, 255, 255, 0.25);
+      color: white;
+   }
+}
+// --- End Action Buttons Styling ---
+
+// Message Content & Meta Containers
+.message-content-container { /* Probably no longer needed if actions are outside */ }
 .message-content {
-  padding-bottom: calc(var(--chat-spacing-unit) * 2);
-  /* Space below text before timestamp/translation */
+  padding-bottom: calc(var(--chat-spacing-unit) * 1); // Smaller padding is okay now
   box-sizing: border-box;
   width: 100%;
-  /* Ensure it spans width for padding */
+  p { margin-bottom: calc(var(--p-spacing) / 2); }
+  p:last-child { margin-bottom: 0; }
 }
 
+// Timestamp - should be inside .message, maybe after content? Let's keep it simple for now.
 .message-timestamp {
   font-size: 0.75em;
   color: var(--text-faint);
-  margin-top: var(--chat-spacing-unit);
+  margin-top: var(--chat-spacing-unit); // Add space above timestamp if needed
   text-align: right;
   display: block;
   width: 100%;
   opacity: 0.9;
-  clear: both;
-  /* Ensure it doesn't overlap floated elements if any */
 }
 
 
 // --- Message Collapsing Styles ---
-
-// Container for content that might collapse
 .message-content-collapsible {
-  // CRITICAL: Content must be hidden when max-height is applied
   overflow: hidden;
-  // Optional: Smooth transition when height changes
   transition: max-height 0.3s ease-out;
-  // position: relative; // Needed if using absolute positioning for button/mask
 }
 
-// Class added by JS when content IS collapsed
 .message-content-collapsed {
-  position: relative;
-  // --- ВИДАЛИТИ блок &::after ---
-
-  // --- ДОДАТИ властивості маски ---
-  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-  // Потрібен префікс для кращої сумісності
-  -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  // position: relative; // No longer needed for ::after
+  // Remove ::after styles entirely
 }
+// Remove .user-message .message-content-collapsed::after styles
 
-// --- Видалити селектор .user-message .message-content-collapsed::after ---
-
-
-// Кнопка "Показати більше/менше" (стилі залишаються, як у Варіанті 1)
+// Show more button (consolidated styles)
 .show-more-button {
   display: block;
-  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto; // Маленький відступ зверху
+  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto; // Small top margin, centered below collapsed content
   padding: 2px 10px;
   font-size: 0.8em;
   color: var(--text-muted);
@@ -266,8 +251,7 @@
   transition: all 0.2s ease;
   text-align: center;
   width: fit-content;
-  position: relative; // На випадок потреби в z-index
-  z-index: 2;       // Вище замаскованого контенту
+  z-index: 2; // Above masked content
 
   &:hover {
       background-color: var(--background-modifier-hover);
@@ -275,49 +259,19 @@
       border-color: var(--background-modifier-border-hover);
   }
 }
-
-// Стиль кнопки для повідомлень користувача (простий варіант)
-.user-message .show-more-button {
+.user-message .show-more-button { // Style button when inside user message
     background-color: transparent;
     border-color: transparent;
-    color: rgba(255, 255, 255, 0.7); // Напівпрозорий білий на акцентному фоні
+    color: rgba(255, 255, 255, 0.7);
     &:hover {
         background-color: rgba(255, 255, 255, 0.2);
         color: white;
     }
 }
-
-// Button to expand/collapse
-.show-more-button {
-  display: block; // Ensure it's visible
-  margin: 8px auto 0 auto; // Center below the collapsed content
-  padding: 4px 12px;
-  font-size: 0.85em;
-  color: var(--text-accent);
-  background-color: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 15px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
-  text-align: center;
-  width: fit-content; // Take minimum width needed
-
-  &:hover {
-    background-color: var(--background-modifier-hover);
-    border-color: var(--interactive-accent-translucent);
-    color: var(--text-accent-hover);
-  }
-}
-
-// Ensure button is visible inside user messages too
-.user-message .show-more-button {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: var(--text-on-accent);
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-  }
-}
-
 // --- End Message Collapsing Styles ---
+
+// --- Animation for arriving messages ---
+@keyframes message-appear {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

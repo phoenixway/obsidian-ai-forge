@@ -39,7 +39,7 @@
 
 // Кнопки дій у повідомленнях (завжди видимі)
 .message-actions-wrapper {
-  opacity: 0.65;
+  opacity: 0.7;
   visibility: visible;
   transition: none; // Без анімації
 
@@ -59,6 +59,12 @@
        transform: none; // Без зміни розміру
        opacity: 1;
      }
+  }
+
+  .message:hover + &,
+  .message-wrapper:hover & {
+       opacity: 0.7; // Залишати напівпрозорими
+       visibility: visible;
   }
 }
 

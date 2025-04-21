@@ -1621,7 +1621,6 @@ This action cannot be undone.`, async () => {
       }
     }
     const messageEl = messageWrapper.createDiv({ cls: messageClass });
-    messageEl.style.position = "relative";
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
     switch (message.role) {
@@ -1647,12 +1646,12 @@ This action cannot be undone.`, async () => {
         contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
         break;
     }
-    const buttonsWrapper = messageEl.createDiv({ cls: "message-actions-wrapper" });
+    this.checkMessageForCollapsing(messageEl);
+    const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
     if (message.role === "user") {
-      const regenerateBtn = buttonsWrapper.createEl("button", {
-        cls: CSS_CLASS_REGENERATE_BUTTON,
-        attr: { title: "Regenerate response", "aria-label": "Regenerate AI response based on this message" }
-      });
+      const regenerateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_REGENERATE_BUTTON, attr: {
+        /*...*/
+      } });
       (0, import_obsidian3.setIcon)(regenerateBtn, "refresh-cw");
       this.registerDomEvent(regenerateBtn, "click", (e) => {
         e.stopPropagation();
@@ -1660,15 +1659,18 @@ This action cannot be undone.`, async () => {
       });
     }
     if (message.role === "user" || message.role === "assistant") {
-      const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", "aria-label": "Copy message content" } });
+      const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: {
+        /*...*/
+      } });
       (0, import_obsidian3.setIcon)(copyBtn, "copy");
       this.registerDomEvent(copyBtn, "click", (e) => {
         e.stopPropagation();
         this.handleCopyClick(message.content, copyBtn);
       });
-      if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage) {
-        const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
-        const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, "aria-label": "Translate message" } });
+      if (this.plugin.settings.enableTranslation) {
+        const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: {
+          /*...*/
+        } });
         (0, import_obsidian3.setIcon)(translateBtn, "languages");
         this.registerDomEvent(translateBtn, "click", (e) => {
           e.stopPropagation();
@@ -1677,6 +1679,7 @@ This action cannot be undone.`, async () => {
       }
     }
     messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+    messageEl.addClass(CSS_CLASS_MESSAGE_ARRIVING);
     setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
     return messageEl;
   }
