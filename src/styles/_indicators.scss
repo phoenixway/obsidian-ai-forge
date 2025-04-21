@@ -129,8 +129,15 @@
     // align-items: center;
     // justify-content: center;
 
+    flex-grow: 1; // !!! ДОДАНО: Дозволяє цьому блоку зайняти весь вільний вертикальний простір
+    display: flex;
+    flex-direction: column; // Вміст (текст) розташовується вертикально
+    justify-content: center; // Центрування ВЕРТИКАЛЬНО всередині .ollama-empty-state
+    align-items: center;    // Центрування ГОРИЗОНТАЛЬНО всередині .ollama-empty-state
+  
 
-    width: auto; // Let it size based on content
+    // width: auto; // Let it size based on content
+    width: 100%; // Займає всю ширину батька (для align-items)
     max-width: 90%; // Limit width relative to container
 
     height: 100%; // Takes full height of chat container
@@ -139,12 +146,16 @@
     top: 0;
     left: 0;
     text-align: center;
-    color: var(--text-muted);
+    color: var(--text-faint);
     padding: 20px;
     box-sizing: border-box;
     z-index: 1; // Below input/menu
     background-color: var(--background-secondary-alt); // Match container background
   
+    > div { // Стилізуємо безпосередні дочірні div (.empty-state-message, .empty-state-tip)
+      max-width: 90%; // Обмежуємо ширину текстових блоків
+  }
+
     .empty-state-message {
       font-size: var(--font-ui-large);
       font-weight: 600; // Slightly less bold?
