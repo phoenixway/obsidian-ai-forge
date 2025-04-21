@@ -2833,13 +2833,13 @@ var DEFAULT_SETTINGS = {
   temperature: 0.7,
   contextWindow: 4096,
   // Roles
-  userRolesFolderPath: "System/Prompts/Roles",
+  userRolesFolderPath: "/etc/ai-forge/roles",
   selectedRolePath: "",
   followRole: true,
   // Storage & History
   saveMessageHistory: true,
-  chatHistoryFolderPath: "AI Forge/Chats",
-  chatExportFolderPath: "AI Forge/Exports",
+  chatHistoryFolderPath: "/etc/ai-forge/chats",
+  chatExportFolderPath: "/etc/ai-forge/xports",
   // View Behavior
   openChatInTab: false,
   // За замовчуванням - бічна панель
@@ -2851,7 +2851,7 @@ var DEFAULT_SETTINGS = {
   aiAvatarContent: "bot",
   // RAG
   ragEnabled: false,
-  ragFolderPath: "Knowledge",
+  ragFolderPath: "etc/ai-forge/rag",
   ragEnableSemanticSearch: true,
   ragEmbeddingModel: "nomic-embed-text",
   ragChunkSize: 512,

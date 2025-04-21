@@ -88,14 +88,14 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   contextWindow: 4096,
 
   // Roles
-  userRolesFolderPath: "System/Prompts/Roles",
+  userRolesFolderPath: "/etc/ai-forge/roles",
   selectedRolePath: "",
   followRole: true,
 
   // Storage & History
   saveMessageHistory: true,
-  chatHistoryFolderPath: "AI Forge/Chats",
-  chatExportFolderPath: "AI Forge/Exports",
+  chatHistoryFolderPath: "/etc/ai-forge/chats",
+  chatExportFolderPath: "/etc/ai-forge/xports",
 
   // View Behavior
   openChatInTab: false, // За замовчуванням - бічна панель
@@ -109,7 +109,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
 
   // RAG
   ragEnabled: false,
-  ragFolderPath: "Knowledge",
+  ragFolderPath: "etc/ai-forge/rag",
   ragEnableSemanticSearch: true,
   ragEmbeddingModel: "nomic-embed-text",
   ragChunkSize: 512,
