@@ -10,8 +10,15 @@
   }
   
   .ollama-chat-container {
-    flex: 1 1 auto;
-    overflow-y: auto;
+
+    display: flex;
+    flex-direction: column; // Still need column layout overall
+    justify-content: center; // Center empty state vertically
+    align-items: center;    // Center empty state horizontally
+    height: 100%;          // Crucial for vertical centering
+
+    overflow-y: auto;      // Keep scroll for actual messages later
+    // flex: 1 1 auto;
     padding: calc(var(--chat-spacing-unit) * 4); 
     padding-bottom: calc(var(--chat-spacing-unit) * 2);
     box-sizing: border-box;

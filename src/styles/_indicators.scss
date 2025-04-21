@@ -120,14 +120,21 @@
     }
   }
   
+
+  
   // Empty state styling
   .ollama-empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    // display: flex;
+    // flex-direction: column;
+    // align-items: center;
+    // justify-content: center;
+
+
+    width: auto; // Let it size based on content
+    max-width: 90%; // Limit width relative to container
+
     height: 100%; // Takes full height of chat container
-    width: 100%;
+    // width: 100%;
     position: absolute; // Overlay on chat container
     top: 0;
     left: 0;
@@ -139,13 +146,27 @@
     background-color: var(--background-secondary-alt); // Match container background
   
     .empty-state-message {
-      font-size: 18px;
-      margin-bottom: 10px;
-      opacity: 0.7;
+      font-size: var(--font-ui-large);
+      font-weight: 600; // Slightly less bold?
+      margin-bottom: var(--size-4-3);
+      color: var(--text-normal); // Make main message less faint
     }
     .empty-state-tip {
-      font-size: 14px;
-      opacity: 0.5;
-      max-width: 80%;
+      font-size: var(--font-ui-small);
+      // max-width: 80%; // No longer needed if parent is centered & max-width applied
+      line-height: 1.5;
+      color: var(--text-muted); // Make tip more muted
     }
+
+  
+    // .empty-state-message {
+    //   font-size: 18px;
+    //   margin-bottom: 10px;
+    //   opacity: 0.7;
+    // }
+    // .empty-state-tip {
+    //   font-size: 14px;
+    //   opacity: 0.5;
+    //   max-width: 80%;
+    // }
   }
