@@ -1002,9 +1002,9 @@ This action cannot be undone.`, async () => {
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
     (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { "aria-label": "Toggle View Location" } });
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian3.setIcon)(this.menuButton, "more-vertical");
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { "aria-label": "Toggle View Location" } });
     this.updateToggleLocationButton();
     this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
