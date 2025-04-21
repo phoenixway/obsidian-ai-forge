@@ -1,7 +1,7 @@
 {
     "id": "obsidian-ai-forge",  
     "name": "AI Forge",         
-    "version": "0.2.0",              
+    "version": "0.3.0",              
     "minAppVersion": "0.15.0",       
     "description": "AI Forge",
     "author": "Roman Kozak",         
