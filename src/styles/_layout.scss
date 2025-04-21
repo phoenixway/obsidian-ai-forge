@@ -6,6 +6,8 @@
     height: 100%;
     position: relative;
     background-color: var(--background-secondary-alt); /* Background for the whole container */
+    margin-bottom: calc(var(--chat-spacing-unit) * 2); // Example space
+B
   }
   
   .ollama-chat-container {
@@ -22,7 +24,6 @@
     width: 100%; 
     margin-left: auto; 
     margin-right: auto; 
-    margin-bottom: calc(var(--chat-spacing-unit) * 2); // Example space
 
     &::-webkit-scrollbar { width: 8px; }
     &::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 4px; margin: 4px 0; }
