@@ -114,6 +114,10 @@ const CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
 const CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
 const CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
 
+// const CSS_CLASS_TOGGLE_VIEW_LOCATION_OPTION = "toggle-view-location-option";
+// const CSS_CLASS_TOGGLE_VIEW_LOCATION_CURRENT = "is-current-location";
+const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
+
 const CHAT_LIST_MAX_HEIGHT = '250px';
 
 // --- Message Types ---
@@ -177,6 +181,7 @@ export class OllamaView extends ItemView {
   private deleteChatOption!: HTMLElement;
   private settingsOption!: HTMLElement;
   private temperatureIndicatorEl!: HTMLElement;
+  private toggleViewLocationOption!: HTMLElement;
 
   // --- State ---
   private isProcessing: boolean = false;
@@ -342,6 +347,10 @@ export class OllamaView extends ItemView {
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
     this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" }); // Змінено текст
+
+    this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
+    this.updateToggleViewLocationOption();
+
     // --- КІНЕЦЬ ЗМІНИ ---
 
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
@@ -349,7 +358,7 @@ export class OllamaView extends ItemView {
     this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); setIcon(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2"); this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
     this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` }); setIcon(this.settingsOption.createSpan({ cls: "menu-option-icon" }), "settings"); this.settingsOption.createSpan({ cls: "menu-option-text", text: "Settings" });
-    // --- Кінець Кастомного Меню ---
+
   }
 
   // --- Event Listeners (with Custom Div Menu) ---
@@ -409,6 +418,15 @@ export class OllamaView extends ItemView {
     if (this.renameChatOption) this.renameChatOption.addEventListener("click", this.handleRenameChatClick); else console.error("renameChatOption missing!");
     if (this.cloneChatOption) this.cloneChatOption.addEventListener("click", this.handleCloneChatClick); else console.error("cloneChatOption missing!");
     if (this.deleteChatOption) this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick); else console.error("deleteChatOption missing!");
+
+    // --- Додано слухач для перемикання View ---
+    if (this.toggleViewLocationOption) {
+      // Використовуємо addEventListener або registerDomEvent
+      this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick);
+      // АБО: this.toggleViewLocationOption.addEventListener("click", this.handleToggleViewLocationClick);
+    } else {
+      this.plugin.logger.error("toggleViewLocationOption missing!");
+    }
     // --- End Custom Menu Listeners ---
 
     // Window/Workspace/Document listeners
@@ -439,17 +457,21 @@ export class OllamaView extends ItemView {
 
   }
 
-  public handleSettingsUpdated = async (): Promise<void> => {
-    
+  // --- Зробіть метод публічним і додайте виклик ---
+  public async handleSettingsUpdated(): Promise<void> {
+    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called"); // Лог
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
     const currentRoleName = await this.getCurrentRoleDisplayName();
     const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+
     this.updateModelDisplay(currentModelName);
     this.updateRoleDisplay(currentRoleName);
-    this.updateTemperatureIndicator(currentTemperature);
     this.updateInputPlaceholder(currentRoleName);
-  }
+    this.updateTemperatureIndicator(currentTemperature);
+    this.updateToggleViewLocationOption(); // <-- Оновлюємо текст/іконку кнопки перемикання
+}
+// ------------------------------------------
 
   private handleModelDisplayClick = async (event: MouseEvent) => {
     const menu = new Menu();
@@ -874,36 +896,36 @@ export class OllamaView extends ItemView {
 
   private adjustTextareaHeight = (): void => {
     requestAnimationFrame(() => {
-        if (!this.inputEl) return;
-        const textarea = this.inputEl;
-        const computedStyle = window.getComputedStyle(textarea);
-        // Читаємо базовий min-height та max-height з CSS
-        const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
-        const maxHeight = parseFloat(computedStyle.maxHeight);
+      if (!this.inputEl) return;
+      const textarea = this.inputEl;
+      const computedStyle = window.getComputedStyle(textarea);
+      // Читаємо базовий min-height та max-height з CSS
+      const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
+      const maxHeight = parseFloat(computedStyle.maxHeight);
 
-        // Тимчасово скидаємо height, щоб виміряти реальну висоту контенту
-        const currentScrollTop = textarea.scrollTop; // Зберігаємо позицію скролу
-        textarea.style.height = 'auto';
+      // Тимчасово скидаємо height, щоб виміряти реальну висоту контенту
+      const currentScrollTop = textarea.scrollTop; // Зберігаємо позицію скролу
+      textarea.style.height = 'auto';
 
-        const scrollHeight = textarea.scrollHeight;
+      const scrollHeight = textarea.scrollHeight;
 
-        // Обчислюємо цільову висоту, обмежену min/max
-        let targetHeight = Math.max(baseMinHeight, scrollHeight);
-        let applyOverflow = false;
+      // Обчислюємо цільову висоту, обмежену min/max
+      let targetHeight = Math.max(baseMinHeight, scrollHeight);
+      let applyOverflow = false;
 
-        if (!isNaN(maxHeight) && targetHeight > maxHeight) {
-            targetHeight = maxHeight;
-            applyOverflow = true; // Потрібен скролбар
-        }
+      if (!isNaN(maxHeight) && targetHeight > maxHeight) {
+        targetHeight = maxHeight;
+        applyOverflow = true; // Потрібен скролбар
+      }
 
-        // Застосовуємо обчислену висоту та стиль overflow
-        textarea.style.height = `${targetHeight}px`;
-        textarea.style.overflowY = applyOverflow ? 'auto' : 'hidden';
-        textarea.scrollTop = currentScrollTop; // Відновлюємо позицію скролу
+      // Застосовуємо обчислену висоту та стиль overflow
+      textarea.style.height = `${targetHeight}px`;
+      textarea.style.overflowY = applyOverflow ? 'auto' : 'hidden';
+      textarea.scrollTop = currentScrollTop; // Відновлюємо позицію скролу
 
-        this.plugin.logger.debug(`[AdjustHeight] scrollH: ${scrollHeight}, baseMin: ${baseMinHeight}, targetH: ${targetHeight}, overflow: ${applyOverflow}`);
+      this.plugin.logger.debug(`[AdjustHeight] scrollH: ${scrollHeight}, baseMin: ${baseMinHeight}, targetH: ${targetHeight}, overflow: ${applyOverflow}`);
     });
-}
+  }
 
   private updateRoleDisplay(roleName: string | null | undefined): void {
     if (this.roleDisplayEl) {
@@ -921,91 +943,91 @@ export class OllamaView extends ItemView {
     // console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
   }
 
-// Load and Display Chat (Тепер оновлює і температуру)
-async loadAndDisplayActiveChat(): Promise<void> {
-  this.clearChatContainerInternal();
-  this.currentMessages = [];
-  this.lastRenderedMessageDate = null;
+  // Load and Display Chat (Тепер оновлює і температуру)
+  async loadAndDisplayActiveChat(): Promise<void> {
+    this.clearChatContainerInternal();
+    this.currentMessages = [];
+    this.lastRenderedMessageDate = null;
 
-  let activeChat: Chat | null = null;
-  let availableModels: string[] = [];
-  let finalModelName: string | null = null;
-  let finalTemperature: number | null | undefined = undefined; // Для температури
-  let errorOccurred = false;
+    let activeChat: Chat | null = null;
+    let availableModels: string[] = [];
+    let finalModelName: string | null = null;
+    let finalTemperature: number | null | undefined = undefined; // Для температури
+    let errorOccurred = false;
 
-  // Крок 1: Отримати чат та моделі
-  try {
+    // Крок 1: Отримати чат та моделі
+    try {
       activeChat = await this.plugin.chatManager?.getActiveChat() || null;
       availableModels = await this.plugin.ollamaService.getModels();
-  } catch (error) {
-       console.error("[OllamaView] Error fetching active chat or available models:", error);
-       new Notice("Error connecting to Ollama or loading chat data.", 5000);
-       this.showEmptyState();
-       errorOccurred = true;
-       finalModelName = null;
-       finalTemperature = this.plugin.settings.temperature; // Використовуємо глобальну при помилці
-  }
+    } catch (error) {
+      console.error("[OllamaView] Error fetching active chat or available models:", error);
+      new Notice("Error connecting to Ollama or loading chat data.", 5000);
+      this.showEmptyState();
+      errorOccurred = true;
+      finalModelName = null;
+      finalTemperature = this.plugin.settings.temperature; // Використовуємо глобальну при помилці
+    }
 
-  // Крок 2, 3, 4: Визначення моделі та оновлення метаданих (якщо не було помилки)
-  if (!errorOccurred) {
-       let preferredModel = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-       // ... (логіка вибору finalModelName як раніше) ...
-       if (availableModels.length > 0) {
-           if (preferredModel && availableModels.includes(preferredModel)) {
-               finalModelName = preferredModel;
-           } else {
-               finalModelName = availableModels[0];
-               if (preferredModel) {
-               } else {
-               }
-           }
-       } else {
-           finalModelName = null;
-       }
-       // Оновлення метаданих чату для моделі
-       if (activeChat && activeChat.metadata.modelName !== finalModelName) {
-          // ... (логіка оновлення метаданих моделі, як раніше) ...
-           try {
-               if (finalModelName !== null) {
-                   await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
-                   if(activeChat.metadata) activeChat.metadata.modelName = finalModelName;
-               } else {
-               }
-           } catch (updateError) { /* ... */ }
-       }
-        // Визначаємо температуру: з чату або глобальну
-        finalTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+    // Крок 2, 3, 4: Визначення моделі та оновлення метаданих (якщо не було помилки)
+    if (!errorOccurred) {
+      let preferredModel = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+      // ... (логіка вибору finalModelName як раніше) ...
+      if (availableModels.length > 0) {
+        if (preferredModel && availableModels.includes(preferredModel)) {
+          finalModelName = preferredModel;
+        } else {
+          finalModelName = availableModels[0];
+          if (preferredModel) {
+          } else {
+          }
+        }
+      } else {
+        finalModelName = null;
+      }
+      // Оновлення метаданих чату для моделі
+      if (activeChat && activeChat.metadata.modelName !== finalModelName) {
+        // ... (логіка оновлення метаданих моделі, як раніше) ...
+        try {
+          if (finalModelName !== null) {
+            await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
+            if (activeChat.metadata) activeChat.metadata.modelName = finalModelName;
+          } else {
+          }
+        } catch (updateError) { /* ... */ }
+      }
+      // Визначаємо температуру: з чату або глобальну
+      finalTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
 
-  } // кінець if (!errorOccurred)
+    } // кінець if (!errorOccurred)
 
-  // Крок 5: Завантаження повідомлень та ролі
-  const currentRoleName = await this.getCurrentRoleDisplayName();
+    // Крок 5: Завантаження повідомлень та ролі
+    const currentRoleName = await this.getCurrentRoleDisplayName();
 
-  if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
+    if (!errorOccurred && activeChat && activeChat.messages.length > 0) {
       this.hideEmptyState();
       this.renderMessages(activeChat.messages);
       this.checkAllMessagesForCollapsing();
       setTimeout(() => { this.guaranteedScrollToBottom(100, true); }, 150);
-  } else if (!errorOccurred) {
+    } else if (!errorOccurred) {
       this.showEmptyState();
-  }
+    }
 
-  // Крок 6: Оновлення UI
-  this.updateInputPlaceholder(currentRoleName);
-  this.updateRoleDisplay(currentRoleName);
-  this.updateModelDisplay(finalModelName);
-  this.updateTemperatureIndicator(finalTemperature); // Оновлюємо індикатор температури
+    // Крок 6: Оновлення UI
+    this.updateInputPlaceholder(currentRoleName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateModelDisplay(finalModelName);
+    this.updateTemperatureIndicator(finalTemperature); // Оновлюємо індикатор температури
 
-  // Крок 7: Налаштування поля вводу
-  if (finalModelName === null) {
+    // Крок 7: Налаштування поля вводу
+    if (finalModelName === null) {
       if (this.inputEl) { this.inputEl.disabled = true; this.inputEl.placeholder = "No models available..."; }
       if (this.sendButton) this.sendButton.disabled = true;
       this.setLoadingState(false);
-  } else {
+    } else {
       if (this.inputEl) { this.inputEl.disabled = this.isProcessing; }
       this.updateSendButtonState();
+    }
   }
-}
 
 
   /** Renders a list of messages to the chat container */
@@ -2123,11 +2145,58 @@ async loadAndDisplayActiveChat(): Promise<void> {
   private getTemperatureEmoji(temperature: number): string {
     if (temperature <= 0.4) {
       return '🧊'; // Strict/Focused (Monocle face)
-    } else if ( temperature > 0.4 && temperature <= 0.6) {
+    } else if (temperature > 0.4 && temperature <= 0.6) {
       return '🙂'; // Neutral (Slightly smiling face)
     } else {
       return '🤪'; // Creative/Wild (Fire)
     }
   }
+
+  private updateToggleViewLocationOption(): void {
+    if (!this.toggleViewLocationOption) return;
+    this.toggleViewLocationOption.empty(); // Очищуємо перед оновленням
+    const iconSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-icon" });
+    const textSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-text" });
+
+    if (this.plugin.settings.openChatInTab) {
+      // Якщо зараз налаштовано відкриття у Вкладці, дія - "Перемістити в Бічну Панель"
+      setIcon(iconSpan, "sidebar-right"); // Іконка бічної панелі
+      textSpan.setText("Move to Sidebar");
+      this.toggleViewLocationOption.title = "Close tab and reopen in sidebar";
+    } else {
+      // Якщо зараз налаштовано відкриття у Бічній Панелі, дія - "Перемістити у Вкладку"
+      setIcon(iconSpan, "layout-list"); // Іконка вкладки/списку
+      textSpan.setText("Move to Tab");
+      this.toggleViewLocationOption.title = "Close sidebar panel and reopen in tab";
+    }
+    // Прибираємо сірий колір - кнопка завжди активна для перемикання
+    // this.toggleViewLocationOption.removeClass(CSS_CLASS_INACTIVE_OPTION);
+  }
+
+  // --- Новий обробник кліку для перемикання ---
+  private handleToggleViewLocationClick = async (): Promise<void> => {
+    this.closeMenu(); // Закриваємо меню
+
+    const currentSetting = this.plugin.settings.openChatInTab;
+    const newSetting = !currentSetting; // Інвертуємо налаштування
+
+    this.plugin.logger.info(`Toggling view location setting from ${currentSetting} to ${newSetting}`);
+
+    // Зберігаємо нове налаштування
+    this.plugin.settings.openChatInTab = newSetting;
+    await this.plugin.saveSettings(); // Зберігаємо (це також викличе подію 'settings-updated')
+
+    // Закриваємо поточний(і) екземпляр(и) View
+    this.plugin.logger.debug("Detaching current view leaf/leaves...");
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
+
+    // Активуємо View знову (використовує оновлені налаштування)
+    // Невелика затримка, щоб гарантувати завершення detach
+    setTimeout(() => {
+      this.plugin.logger.debug("Re-activating view with new setting...");
+      this.plugin.activateView();
+    }, 50); // 50 мс зазвичай достатньо
+  }
+
 
 } // END OF OllamaView CLASS

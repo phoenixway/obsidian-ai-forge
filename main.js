@@ -200,6 +200,7 @@ var CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 var CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
 var CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
 var CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
+var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var LANGUAGES = {
   "af": "Afrikaans",
@@ -328,17 +329,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    this.handleSettingsUpdated = async () => {
-      var _a, _b, _c, _d;
-      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-      const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
-      const currentRoleName = await this.getCurrentRoleDisplayName();
-      const currentTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
-      this.updateModelDisplay(currentModelName);
-      this.updateRoleDisplay(currentRoleName);
-      this.updateTemperatureIndicator(currentTemperature);
-      this.updateInputPlaceholder(currentRoleName);
-    };
+    // ------------------------------------------
     this.handleModelDisplayClick = async (event) => {
       var _a, _b;
       const menu = new import_obsidian3.Menu();
@@ -904,6 +895,21 @@ This action cannot be undone.`, async () => {
         }
       ).open();
     };
+    // --- Новий обробник кліку для перемикання ---
+    this.handleToggleViewLocationClick = async () => {
+      this.closeMenu();
+      const currentSetting = this.plugin.settings.openChatInTab;
+      const newSetting = !currentSetting;
+      this.plugin.logger.info(`Toggling view location setting from ${currentSetting} to ${newSetting}`);
+      this.plugin.settings.openChatInTab = newSetting;
+      await this.plugin.saveSettings();
+      this.plugin.logger.debug("Detaching current view leaf/leaves...");
+      this.app.workspace.detachLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
+      setTimeout(() => {
+        this.plugin.logger.debug("Re-activating view with new setting...");
+        this.plugin.activateView();
+      }, 50);
+    };
     this.plugin = plugin;
     this.initSpeechWorker();
     this.scrollListenerDebounced = (0, import_obsidian3.debounce)(this.handleScroll, 150, true);
@@ -1041,6 +1047,8 @@ This action cannot be undone.`, async () => {
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     (0, import_obsidian3.setIcon)(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
     this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" });
+    this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
+    this.updateToggleViewLocationOption();
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
     (0, import_obsidian3.setIcon)(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash");
@@ -1157,6 +1165,11 @@ This action cannot be undone.`, async () => {
       this.deleteChatOption.addEventListener("click", this.handleDeleteChatClick);
     else
       console.error("deleteChatOption missing!");
+    if (this.toggleViewLocationOption) {
+      this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick);
+    } else {
+      this.plugin.logger.error("toggleViewLocationOption missing!");
+    }
     this.registerDomEvent(window, "resize", this.handleWindowResize);
     this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
     this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
@@ -1178,6 +1191,20 @@ This action cannot be undone.`, async () => {
     this.register(this.plugin.on("messages-cleared", this.handleMessagesCleared));
     this.register(this.plugin.on("chat-list-updated", this.handleChatListUpdated));
     this.register(this.plugin.on("settings-updated", this.handleSettingsUpdated));
+  }
+  // --- Зробіть метод публічним і додайте виклик ---
+  async handleSettingsUpdated() {
+    var _a, _b, _c, _d;
+    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+    const currentRoleName = await this.getCurrentRoleDisplayName();
+    const currentTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
+    this.updateModelDisplay(currentModelName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateInputPlaceholder(currentRoleName);
+    this.updateTemperatureIndicator(currentTemperature);
+    this.updateToggleViewLocationOption();
   }
   updateModelDisplay(modelName) {
     if (this.modelDisplayEl) {
@@ -2499,6 +2526,22 @@ This action cannot be undone.`, async () => {
       return "\u{1F642}";
     } else {
       return "\u{1F92A}";
+    }
+  }
+  updateToggleViewLocationOption() {
+    if (!this.toggleViewLocationOption)
+      return;
+    this.toggleViewLocationOption.empty();
+    const iconSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-icon" });
+    const textSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-text" });
+    if (this.plugin.settings.openChatInTab) {
+      (0, import_obsidian3.setIcon)(iconSpan, "sidebar-right");
+      textSpan.setText("Move to Sidebar");
+      this.toggleViewLocationOption.title = "Close tab and reopen in sidebar";
+    } else {
+      (0, import_obsidian3.setIcon)(iconSpan, "layout-list");
+      textSpan.setText("Move to Tab");
+      this.toggleViewLocationOption.title = "Close sidebar panel and reopen in tab";
     }
   }
 };
