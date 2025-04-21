@@ -155,31 +155,54 @@
 
   // Base button style inside actions
   button {
-    background: rgba(var(--background-secondary-rgb), 0.7);
-    backdrop-filter: blur(3px);
-    border: 1px solid rgba(var(--background-modifier-border-rgb), 0.5);
+    background: transparent !important; // Force transparent background
+    border: none; // Remove border
+    box-shadow: none; // Remove shadow
+    backdrop-filter: none; // Remove blur
+    padding: 1px; // Minimal padding around icon
+    color: var(--text-muted); // Icon color
+
+ 
+
+
+
+    // background: rgba(var(--background-secondary-rgb), 0.7);
+    // backdrop-filter: blur(3px);
+    // border: 1px solid rgba(var(--background-modifier-border-rgb), 0.5);
     border-radius: var(--radius-s);
-    padding: 2px;
-    color: var(--text-muted);
+    // padding: 2px;
+    // color: var(--text-muted);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.15s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    // box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 
     .svg-icon { width: 14px; height: 14px; }
 
     &:hover {
-      background-color: var(--background-modifier-hover);
-      color: var(--text-normal);
-      border-color: var(--background-modifier-border-hover);
-      transform: scale(1.05);
+        background: transparent !important; // Still transparent on hover
+        color: var(--text-normal); // Change only icon color on hover
+        transform: scale(1.05); // Keep scale effect if desired
     }
+
+}
+
+&.user-message-group & button { // Or .user-message + & button
+  color: rgba(255, 255, 255, 0.8); // Lighter icon color for user messages
+  background: transparent !important;
+  border: none;
+  box-shadow: none;
+   &:hover {
+      background: transparent !important;
+      color: white;
+   }
+}
   }
   // Style for Regenerate button (optional)
   .regenerate-button {
      // color: var(--text-warning); // Example accent
   }
-}
+
 
 // Show buttons on hover of the MESSAGE BUBBLE (as buttons are now siblings)
 // Or hover of the wrapper containing both? Let's try wrapper for larger target.
@@ -206,6 +229,7 @@
      }
   }
 }
+
 
 // Specific button styles for user messages (actions appear below user bubble)
 .user-message-group .message-actions-wrapper button {
