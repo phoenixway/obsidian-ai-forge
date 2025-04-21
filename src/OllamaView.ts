@@ -348,6 +348,7 @@ export class OllamaView extends ItemView {
     setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
     this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" }); // Змінено текст
 
+    this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
     this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
     this.updateToggleViewLocationOption();
 
@@ -2161,12 +2162,12 @@ export class OllamaView extends ItemView {
     if (this.plugin.settings.openChatInTab) {
       // Якщо зараз налаштовано відкриття у Вкладці, дія - "Перемістити в Бічну Панель"
       setIcon(iconSpan, "sidebar-right"); // Іконка бічної панелі
-      textSpan.setText("Move to Sidebar");
+      textSpan.setText("Show in Sidebar");
       this.toggleViewLocationOption.title = "Close tab and reopen in sidebar";
     } else {
       // Якщо зараз налаштовано відкриття у Бічній Панелі, дія - "Перемістити у Вкладку"
       setIcon(iconSpan, "layout-list"); // Іконка вкладки/списку
-      textSpan.setText("Move to Tab");
+      textSpan.setText("Show in Tab");
       this.toggleViewLocationOption.title = "Close sidebar panel and reopen in tab";
     }
     // Прибираємо сірий колір - кнопка завжди активна для перемикання

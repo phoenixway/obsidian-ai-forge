@@ -1047,6 +1047,7 @@ This action cannot be undone.`, async () => {
     this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
     (0, import_obsidian3.setIcon)(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
     this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" });
+    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
     this.updateToggleViewLocationOption();
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
@@ -2536,11 +2537,11 @@ This action cannot be undone.`, async () => {
     const textSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-text" });
     if (this.plugin.settings.openChatInTab) {
       (0, import_obsidian3.setIcon)(iconSpan, "sidebar-right");
-      textSpan.setText("Move to Sidebar");
+      textSpan.setText("Show in Sidebar");
       this.toggleViewLocationOption.title = "Close tab and reopen in sidebar";
     } else {
       (0, import_obsidian3.setIcon)(iconSpan, "layout-list");
-      textSpan.setText("Move to Tab");
+      textSpan.setText("Show in Tab");
       this.toggleViewLocationOption.title = "Close sidebar panel and reopen in tab";
     }
   }
