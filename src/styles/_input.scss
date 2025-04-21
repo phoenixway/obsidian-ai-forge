@@ -14,6 +14,7 @@
   // Adjust existing margin if needed (remove horizontal auto from here if set previously)
   margin-top: 0; // Keep vertical margins as needed
   // margin-bottom: calc(var(--chat-spacing-unit) * 2);
+  margin-bottom: 1000px !important; // Example space
 
   width: 98%; // Трохи менше, щоб уникнути горизонтального скролу в деяких випадках
 
