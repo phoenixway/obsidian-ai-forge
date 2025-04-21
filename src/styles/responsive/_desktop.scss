@@ -8,6 +8,9 @@
 
  // Панель керування: Відновлюємо видимість прихованих елементів
  .chat-input-container {
+  margin-bottom: calc(var(--chat-spacing-unit) * 2);
+
+
     .input-controls-container {
         flex-wrap: nowrap;
         justify-content: space-between;
