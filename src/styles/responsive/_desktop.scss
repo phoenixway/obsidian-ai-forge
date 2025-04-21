@@ -89,7 +89,9 @@
         max-height: 300px; // Більше місця на десктопі
     }
 
-    .toggle-view-location-option {
+    .toggle-view-location-option+hr.menu-separator {
         display: none;
     }
+
+
 }
