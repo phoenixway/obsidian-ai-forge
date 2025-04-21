@@ -119,6 +119,7 @@ const CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button"; // Для к�
 const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 
 const CHAT_LIST_MAX_HEIGHT = '250px';
+const CSS_CLASS_REGENERATE_BUTTON = "regenerate-button";
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -728,10 +729,49 @@ export class OllamaView extends ItemView {
     this.closeMenu();
     try { const newChat = await this.plugin.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); this.focusInput(); } else { new Notice("Failed to create new chat."); } } catch (error) { new Notice("Error creating new chat."); }
   }
-  private handleRenameChatClick = async (): Promise<void> => {
-    this.closeMenu();
-    const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to rename."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { let noticeMessage = "Rename cancelled or name unchanged."; if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { noticeMessage = `Chat renamed to "${newName.trim()}"`; } else { noticeMessage = "Failed to rename chat."; } } else if (newName?.trim() === currentName) { noticeMessage = "Name unchanged."; } else { noticeMessage = "Rename cancelled or invalid name entered."; } new Notice(noticeMessage); this.focusInput(); }).open();
+// У файлі src/OllamaView.ts
+
+private handleRenameChatClick = async (): Promise<void> => {
+  this.closeMenu();
+  const activeChat = await this.plugin.chatManager?.getActiveChat();
+  if (!activeChat) {
+    new Notice("No active chat to rename.");
+    return;
   }
+  const currentName = activeChat.metadata.name;
+  const chatId = activeChat.metadata.id; // Для логування
+
+  new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName,
+    async (newName) => {
+      let noticeMessage = "Rename cancelled or name unchanged."; // Повідомлення за замовчуванням
+      const trimmedName = newName?.trim(); // Обрізаємо та обробляємо null
+
+      if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
+        this.plugin.logger.debug(`[OllamaView] Attempting rename for chat ${chatId} to "${trimmedName}" via updateActiveChatMetadata`);
+
+        // --- ВИПРАВЛЕННЯ: Використовуємо updateActiveChatMetadata ---
+        const success = await this.plugin.chatManager.updateActiveChatMetadata({ name: trimmedName });
+        // ----------------------------------------------------------
+
+        if (success) {
+          // Подія active-chat-changed, викликана в updateActiveChatMetadata,
+          // оновить UI. Notice тут може бути необов'язковим.
+          noticeMessage = `Chat renamed to "${trimmedName}"`;
+          this.plugin.logger.info(`Chat ${chatId} rename initiated to "${trimmedName}".`);
+        } else {
+          noticeMessage = "Failed to rename chat.";
+          this.plugin.logger.error(`[OllamaView] Failed to rename chat ${chatId} using updateActiveChatMetadata.`);
+        }
+      } else if (trimmedName && trimmedName === currentName) {
+         noticeMessage = "Name unchanged.";
+      } else if (newName === null || trimmedName === "") { // Явна перевірка скасування/порожнього імені
+         noticeMessage = "Rename cancelled or invalid name entered.";
+      }
+      // Показуємо фінальне повідомлення
+      new Notice(noticeMessage);
+      this.focusInput(); // Повертаємо фокус
+    }).open();
+}
   private handleCloneChatClick = async (): Promise<void> => {
     this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat to clone."); return; } const originalName = activeChat.metadata.name; const cloningNotice = new Notice("Cloning chat...", 0); try { const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id); if (clonedChat) { new Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`); } else { new Notice("Failed to clone chat."); } } catch (error) { new Notice("An error occurred while cloning the chat."); } finally { cloningNotice.hide(); }
@@ -1219,6 +1259,7 @@ export class OllamaView extends ItemView {
       }
     }
     const messageEl = messageWrapper.createDiv({ cls: messageClass }); // Append message to wrapper
+    messageEl.style.position = 'relative';
 
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
@@ -1248,18 +1289,49 @@ export class OllamaView extends ItemView {
     }
 
     // --- Action Buttons ---
-    const buttonsWrapper = contentContainer.createDiv({ cls: 'message-actions-wrapper' });
-    if (message.role !== "system" && message.role !== "error") {
-      const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
-      setIcon(copyBtn, "copy");
-      this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
+    const buttonsWrapper = messageEl.createDiv({ cls: 'message-actions-wrapper' }); // Створюємо обгортку
+
+    // --- Кнопка Регенерації (ТІЛЬКИ для user messages) ---
+    if (message.role === "user") {
+      const regenerateBtn = buttonsWrapper.createEl("button", {
+        cls: CSS_CLASS_REGENERATE_BUTTON,
+        attr: { title: "Regenerate response", 'aria-label': "Regenerate AI response based on this message" }
+      });
+      setIcon(regenerateBtn, "refresh-cw"); // Або "redo"
+      // Передаємо сам об'єкт повідомлення в обробник
+      this.registerDomEvent(regenerateBtn, "click", (e) => {
+        e.stopPropagation();
+        this.handleRegenerateClick(message); // Викликаємо новий обробник
+      });
     }
-    if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
+
+// Кнопки Копіювання та Перекладу (для user та assistant)
+if (message.role === "user" || message.role === "assistant") {
+  // Кнопка копіювання
+  const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
+  setIcon(copyBtn, "copy");
+  this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
+
+  // Кнопка перекладу (якщо увімкнено)
+  if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage) {
       const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
       const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, 'aria-label': "Translate message" } });
       setIcon(translateBtn, "languages");
       this.registerDomEvent(translateBtn, "click", (e) => { e.stopPropagation(); this.handleTranslateClick(message.content, contentEl, translateBtn); });
-    }
+  }
+}
+
+    // if (message.role !== "system" && message.role !== "error") {
+    //   const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", 'aria-label': "Copy message content" } });
+    //   setIcon(copyBtn, "copy");
+    //   this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(message.content, copyBtn); });
+    // }
+    // if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
+    //   const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
+    //   const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, 'aria-label': "Translate message" } });
+    //   setIcon(translateBtn, "languages");
+    //   this.registerDomEvent(translateBtn, "click", (e) => { e.stopPropagation(); this.handleTranslateClick(message.content, contentEl, translateBtn); });
+    // }
 
     // --- Timestamp ---
     messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
@@ -1270,6 +1342,96 @@ export class OllamaView extends ItemView {
     return messageEl;
   }
 
+  // --- Новий обробник для кнопки Регенерації ---
+  private async handleRegenerateClick(userMessage: Message): Promise<void> {
+    this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
+
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat) {
+        new Notice("Cannot regenerate: No active chat found.");
+        return;
+    }
+    const chatId = activeChat.metadata.id;
+
+    // Знаходимо індекс повідомлення користувача в поточній історії
+    // Важливо: Використовуємо історію з activeChat, а не this.currentMessages,
+    // оскільки this.currentMessages може бути неповним або застарілим.
+    const messageIndex = activeChat.messages.findIndex(msg =>
+        msg.role === 'user' && msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.content === userMessage.content
+    );
+
+    if (messageIndex === -1) {
+        this.plugin.logger.error("Could not find the user message in the active chat history for regeneration.", userMessage);
+        new Notice("Error: Could not find the message to regenerate from.");
+        return;
+    }
+
+    // Перевіряємо, чи це не останнє повідомлення (немає чого регенерувати)
+    if (messageIndex === activeChat.messages.length - 1) {
+        new Notice("This is the last message, nothing to regenerate after it.");
+        return;
+    }
+
+    // Підтвердження (опціонально, але бажано)
+    new ConfirmModal(this.app, 'Confirm Regeneration',
+        'This will delete all messages after this prompt and generate a new response. Continue?',
+        async () => {
+            this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
+            let loadingIndicator: HTMLElement | null = null;
+            try {
+                this.setLoadingState(true);
+
+                // 1. Видаляємо повідомлення ПІСЛЯ вибраного індексу
+                const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
+
+                if (!deleteSuccess) {
+                    throw new Error("Failed to delete subsequent messages.");
+                }
+
+                // 2. Оновлюємо UI (видаляємо старі повідомлення з екрану)
+                // Перезавантажуємо чат, щоб отримати оновлений стан
+                await this.loadAndDisplayActiveChat();
+                // Або можна спробувати видалити елементи з DOM вручну, але перезавантаження надійніше
+                this.scrollToBottom(); // Прокрутити вниз
+
+                // 3. Показуємо індикатор завантаження
+                loadingIndicator = this.addLoadingIndicator();
+                this.guaranteedScrollToBottom(50, true);
+
+                // 4. Отримуємо оновлений чат (після видалення)
+                const updatedChat = await this.plugin.chatManager.getActiveChat(); // Отримати актуальну версію
+                if (!updatedChat) throw new Error("Failed to get updated chat after deletion.");
+
+                // 5. Генеруємо нову відповідь
+                this.plugin.logger.info(`Generating new response for chat ${chatId} based on history up to index ${messageIndex}`);
+                const assistantMessage = await this.plugin.ollamaService.generateChatResponse(updatedChat);
+
+                // 6. Прибираємо індикатор завантаження
+                if (loadingIndicator) this.removeLoadingIndicator(loadingIndicator);
+                loadingIndicator = null;
+
+                // 7. Додаємо нову відповідь
+                if (assistantMessage) {
+                    await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
+                    // Повідомлення додасться через подію 'message-added'
+                } else {
+                     this.plugin.logger.warn("Regeneration: Assistant did not provide a response.");
+                     this.addMessageToDisplay("error", "Assistant did not provide a response for regeneration.", new Date());
+                }
+
+            } catch (error: any) {
+                 this.plugin.logger.error("Error during regeneration process:", error);
+                 new Notice(`Regeneration failed: ${error.message}`);
+                 if (loadingIndicator) this.removeLoadingIndicator(loadingIndicator);
+            } finally {
+                 this.setLoadingState(false);
+                 this.focusInput();
+            }
+        } // Кінець колбеку ConfirmModal
+    ).open(); // Відкриваємо модалку підтвердження
+  }
+
+  
   // --- Action Button Handlers ---
   private handleCopyClick(content: string, buttonEl: HTMLElement): void {
     let textToCopy = content;

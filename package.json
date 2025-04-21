@@ -5,16 +5,18 @@
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && npm run build:sass", 
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production && npm run build:sass",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"watch:sass": "sass --watch src/styles/main.scss:styles.css --quiet",
-		"build:sass": "sass src/styles/main.scss:styles.css --style=compressed --quiet"	},
+		"build:sass": "sass src/styles/main.scss:styles.css --style=compressed --quiet"
+	},
 	"keywords": [],
 	"author": "",
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^16.11.6",
 		"@types/pdf-parse": "^1.1.4",
+		"@types/uuid": "^10.0.0",
 		"@typescript-eslint/eslint-plugin": "^8.26.1",
 		"@typescript-eslint/parser": "^8.26.1",
 		"builtin-modules": "3.3.0",
@@ -30,6 +32,7 @@
 		"gpt-tokenizer": "^2.9.0",
 		"marked": "^15.0.7",
 		"node-fetch": "^3.3.2",
-		"pdf-parse": "^1.1.1"
+		"pdf-parse": "^1.1.1",
+		"uuid": "^11.1.0"
 	}
 }

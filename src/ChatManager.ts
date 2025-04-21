@@ -1,635 +1,544 @@
 // ChatManager.ts
-import { App, Notice, DataAdapter, normalizePath, TFolder } from "obsidian";
-import OllamaPlugin, { ACTIVE_CHAT_ID_KEY } from "./main";
+import { App, Notice, DataAdapter, normalizePath, TFolder, debounce } from "obsidian";
+// --- ВИПРАВЛЕННЯ: Імпортуємо правильні константи ---
+import OllamaPlugin, { ACTIVE_CHAT_ID_KEY, CHAT_INDEX_KEY } from "./main"; // Переконайтесь, що CHAT_INDEX_KEY експортується в main.ts
+// -------------------------------------------------
 import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat";
 import { MessageRole, Message } from './OllamaView';
-import * as path from 'path'; // Додаємо імпорт path
-
-// Ключі для зберігання даних плагіна
-const SESSIONS_INDEX_KEY = 'chatSessionsIndex_v1'; // Key for storing index in plugin data
-const ACTIVE_SESSION_ID_KEY = 'activeChatSessionId_v1'; // Key for storing active ID
+import { v4 as uuidv4 } from 'uuid'; // <-- Імпорт uuid
 
 // Інтерфейси
+interface ChatSessionStored { // Метадані, що зберігаються в індексі
+    name: string;
+    lastModified: string; // Зберігаємо як ISO рядок
+    modelName?: string;
+    selectedRolePath?: string;
+    temperature?: number;
+    contextWindow?: number; // <-- Додано поле
+    // НЕ ЗБЕРІГАЄМО: id (ключ), createdAt (не змінюється)
+    createdAt: string; 
+}
 interface ChatSessionIndex {
-    [id: string]: Omit<ChatMetadata, 'id'>; // Store metadata without repeating ID as key
+    [id: string]: ChatSessionStored;
 }
 export interface RoleInfo {
     name: string;
     path: string;
     isCustom: boolean;
 }
+interface TaskState { urgent: string[]; regular: string[]; hasContent: boolean; }
 
 export class ChatManager {
     private plugin: OllamaPlugin;
     private app: App;
-    private adapter: DataAdapter; // Obsidian Vault Adapter
-    private chatsFolderPath: string = "/"; // Шлях до папки чатів В СХОВИЩІ
-    private sessionIndex: ChatSessionIndex = {}; // In-memory index of available chats {id: metadata}
+    private adapter: DataAdapter;
+    private chatsFolderPath: string = "/";
+    private chatIndex: ChatSessionIndex = {};
     private activeChatId: string | null = null;
-    private loadedChats: Record<string, Chat> = {}; // Cache for loaded Chat objects
-    public filePlanExists: boolean = false; // Стан файлу плану
-    public fileUrgentTasks: string[] = [];  // Термінові завдання з файлу
-    public fileRegularTasks: string[] = []; // Звичайні завдання з файлу
+    private activeChat: Chat | null = null; // Кеш ТІЛЬКИ для активного об'єкта Chat
+    private loadedChats: Record<string, Chat> = {}; // Загальний кеш завантажених чатів (для швидкодії)
+    // savingDebounced тепер не потрібен, бо debounce є в Chat
+    public currentTaskState: TaskState | null = null;
 
     constructor(plugin: OllamaPlugin) {
         this.plugin = plugin;
         this.app = plugin.app;
         this.adapter = plugin.app.vault.adapter;
-        this.updateChatsFolderPath();
-        console.log(`[ChatManager] Initialized. Base path set to: ${this.chatsFolderPath}`);
     }
 
-    /**
-     * Оновлює внутрішній шлях `chatsFolderPath` на основі поточних налаштувань плагіна.
-     */
+    async initialize(): Promise<void> {
+        this.plugin.logger.info("Initializing ChatManager...");
+        this.updateChatsFolderPath();
+        await this.ensureFoldersExist();
+        await this.loadChatIndex(true); // Примусове сканування при старті
+        // Активний ID завантажується та встановлюється в main.ts -> onLayoutReady
+        this.plugin.logger.info(`ChatManager initialized. Index has ${Object.keys(this.chatIndex).length} chats.`);
+    }
+
     updateChatsFolderPath(): void {
         const settingsPath = this.plugin.settings.chatHistoryFolderPath?.trim();
-        this.chatsFolderPath = (settingsPath) ? normalizePath(settingsPath) : "/";
-        console.log(`[ChatManager] Updated chatsFolderPath to: ${this.chatsFolderPath}`);
+        this.chatsFolderPath = (settingsPath && settingsPath !== '/') ? normalizePath(settingsPath) : "/";
+        this.plugin.logger.debug(`Chat history folder path set to: ${this.chatsFolderPath}`);
     }
 
-    /** Оновлює стан завдань на основі даних, отриманих з плагіна. */
-    updateTaskState(tasks: { urgent: string[], regular: string[], hasContent: boolean } | null) {
-        if (tasks) {
-            this.filePlanExists = tasks.hasContent;
-            this.fileUrgentTasks = [...tasks.urgent];
-            this.fileRegularTasks = [...tasks.regular];
-            // console.log(`[ChatManager] Updated task state. Plan exists: ${this.filePlanExists}, Urgent: ${this.fileUrgentTasks.length}, Regular: ${this.fileRegularTasks.length}`);
-        } else {
-            this.filePlanExists = false;
-            this.fileUrgentTasks = [];
-            this.fileRegularTasks = [];
-            // console.log(`[ChatManager] Cleared task state.`);
-        }
+    updateTaskState(tasks: TaskState | null) {
+        this.plugin.logger.debug("Updating task state in ChatManager", tasks);
+        this.currentTaskState = tasks;
     }
 
-    /**
-     * Ініціалізує ChatManager: оновлює шлях, перевіряє папку, завантажує індекс та активний ID.
-     */
-    async initialize(): Promise<void> {
-        console.log("[ChatManager] Initializing...");
-        this.updateChatsFolderPath();
-        await this.ensureChatsFolderExists();
-        await this.loadChatIndex(true); // Примусове сканування файлів при старті
-
-        this.activeChatId = await this.plugin.loadDataKey(ACTIVE_SESSION_ID_KEY) || null;
-        // console.log(`[ChatManager] Loaded activeChatId from store: ${this.activeChatId}`);
-
-        if (this.activeChatId && !this.sessionIndex[this.activeChatId]) {
-            // console.warn(`[ChatManager] Active chat ID ${this.activeChatId} not found in the refreshed index. Resetting.`);
-            this.activeChatId = null;
-            await this.plugin.saveDataKey(ACTIVE_SESSION_ID_KEY, null);
-        } else if (this.activeChatId) {
-            // console.log(`[ChatManager] Active chat ID ${this.activeChatId} confirmed in the refreshed index.`);
-        }
-        // console.log(`[ChatManager] Initialized. Index has ${Object.keys(this.sessionIndex).length} entries. Final Active ID: ${this.activeChatId}`);
+    getCurrentTaskState(): TaskState | null {
+        return this.currentTaskState;
     }
 
-    /**
-     * Гарантує існування папки для історії чатів.
-     */
-    private async ensureChatsFolderExists(): Promise<void> {
-        if (this.chatsFolderPath === "/" || !this.chatsFolderPath) {
-            return;
-        }
-        try {
-            if (!(await this.adapter.exists(this.chatsFolderPath))) {
-                // console.log(`[ChatManager] Creating chat history directory: ${this.chatsFolderPath}`);
-                await this.adapter.mkdir(this.chatsFolderPath);
-            } else {
-                const stat = await this.adapter.stat(this.chatsFolderPath);
-                if (stat?.type !== 'folder') {
-                    const errorMsg = `Error: Configured chat history path '${this.chatsFolderPath}' exists but is not a folder.`;
-                    console.error(`[ChatManager] ${errorMsg}`);
-                    new Notice(errorMsg);
-                }
-            }
-        } catch (error) {
-            const errorMsg = `Error creating/checking chat history directory '${this.chatsFolderPath}'.`;
-            console.error(`[ChatManager] ${errorMsg}`, error);
-            new Notice(errorMsg);
-        }
-    }
+    public async ensureFoldersExist(): Promise<void> { /* ... як у попередній версії ... */
+        const historyPath = this.plugin.settings.chatHistoryFolderPath;
+        const exportPath = this.plugin.settings.chatExportFolderPath;
+        this.plugin.logger.debug(`Ensuring folders exist: History='${historyPath}', Export='${exportPath}'`);
+        const checkAndCreate = async (folderPath: string, folderDesc: string) => {
+            if (!folderPath || folderPath === "/") return;
+            try { if (!(await this.adapter.exists(folderPath))) { this.plugin.logger.info(`${folderDesc} folder doesn't exist. Creating: ${folderPath}`); await this.adapter.mkdir(folderPath); } else { const stat = await this.adapter.stat(folderPath); if (stat?.type !== 'folder') { this.plugin.logger.error(`Path for ${folderDesc} exists but is not a folder: ${folderPath}`); new Notice(`Error: Path for ${folderDesc} is not a folder.`); } } }
+            catch (error) { this.plugin.logger.error(`Error creating/checking ${folderDesc} directory '${folderPath}':`, error); new Notice(`Error creating folder for ${folderDesc}. Check settings and permissions.`); } };
+        await checkAndCreate(historyPath, "Chat History"); await checkAndCreate(exportPath, "Chat Export");
+     }
 
-    /**
-     * Завантажує або оновлює індекс чатів, скануючи файли у папці історії.
-     * @param forceScanFromFile Завжди true для пересканування.
-     */
-    private async loadChatIndex(forceScanFromFile: boolean = true): Promise<void> { // Зроблено forceScan=true за замовчуванням для initialize
-        if (!forceScanFromFile) { // Ця гілка тепер рідко використовується
-            const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
-            this.sessionIndex = loadedIndex || {};
-            // console.log(`[ChatManager] Loaded chat index from plugin data with ${Object.keys(this.sessionIndex).length} entries.`);
+    private async loadChatIndex(forceScan: boolean = false): Promise<void> {
+        this.plugin.logger.debug(`Loading chat index... (forceScan: ${forceScan})`);
+        const storedIndex = await this.plugin.loadDataKey(CHAT_INDEX_KEY); // Використовуємо новий ключ
+
+        if (!forceScan && storedIndex && Object.keys(storedIndex).length > 0) {
+            this.chatIndex = storedIndex;
+            this.plugin.logger.debug(`Loaded ${Object.keys(this.chatIndex).length} chat(s) from stored index.`);
             return;
         }
 
-        // console.log(`[ChatManager] Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
+        this.plugin.logger.info(`Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
         const newIndex: ChatSessionIndex = {};
         let filesScanned = 0;
         let chatsLoaded = 0;
 
         try {
-            if (!(await this.adapter.exists(this.chatsFolderPath)) && this.chatsFolderPath !== "/") {
-                console.warn(`[ChatManager] Chat history folder '${this.chatsFolderPath}' not found. Index is empty.`);
-                this.sessionIndex = {};
+            if (this.chatsFolderPath !== "/" && !(await this.adapter.exists(this.chatsFolderPath))) {
+                this.plugin.logger.warn(`Chat history folder '${this.chatsFolderPath}' not found during scan. Index will be empty.`);
+                this.chatIndex = {};
                 await this.saveChatIndex();
                 return;
             }
 
             const listResult = await this.adapter.list(this.chatsFolderPath);
-            const chatFiles = listResult.files.filter(filePath =>
-                filePath.toLowerCase().endsWith('.json') // Тільки .json
-            );
+            const chatFiles = listResult.files.filter(filePath => {
+                 const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+                 return fileName.endsWith('.json') && !fileName.startsWith('.');
+            });
 
             filesScanned = chatFiles.length;
-            this.plugin.logger.info(`[ChatManager] Found ${filesScanned} potential chat files.`);
+            this.plugin.logger.debug(`Found ${filesScanned} potential chat files to scan.`);
 
-            for (const filePath of chatFiles) {
-                const fullPath = normalizePath(filePath); // list() повертає повні шляхи
-                // const fileName = path.basename(fullPath); 
-                const fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
-                const chatId = fileName.endsWith('.json') ? fileName.slice(0, -5) : null;
+            for (const fullPath of chatFiles) {
+                 // --- ВИПРАВЛЕННЯ: Заміна path.basename ---
+                 const fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
+                 // ------------------------------------
+                 const chatId = fileName.endsWith('.json') ? fileName.slice(0, -5) : null;
 
-                if (!chatId) {
-                    console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
-                    continue;
-                }
+                 if (!chatId) continue;
 
-                try {
-                    const jsonContent = await this.adapter.read(fullPath);
-                    const data = JSON.parse(jsonContent) as Partial<ChatData>;
+                 try {
+                     const jsonContent = await this.adapter.read(fullPath);
+                     const data = JSON.parse(jsonContent) as Partial<ChatData>;
 
-                    if (data?.metadata?.id && data.metadata.id === chatId) {
+                     // Валідація базових метаданих
+                     if (data?.metadata?.id && data.metadata.id === chatId && data.metadata.name && data.metadata.lastModified && data.metadata.createdAt) { // Додано перевірку createdAt
                         const metadata = data.metadata;
+                        // --- ВИПРАВЛЕННЯ: Явно створюємо об'єкт потрібного типу ---
                         newIndex[chatId] = {
                             name: metadata.name,
-                            modelName: metadata.modelName,
-                            selectedRolePath: metadata.selectedRolePath,
-                            temperature: metadata.temperature,
-                            createdAt: metadata.createdAt,
-                            lastModified: metadata.lastModified
+                            lastModified: typeof metadata.lastModified === 'string' ? metadata.lastModified : new Date(metadata.lastModified || Date.now()).toISOString(),
+                            createdAt: typeof metadata.createdAt === 'string' ? metadata.createdAt : new Date(metadata.createdAt || Date.now()).toISOString(), // Додаємо createdAt
+                            // Додаємо опціональні поля, якщо вони є
+                            ...(metadata.modelName && { modelName: metadata.modelName }),
+                            ...(metadata.selectedRolePath && { selectedRolePath: metadata.selectedRolePath }),
+                            ...(metadata.temperature !== undefined && { temperature: metadata.temperature }),
+                            ...(metadata.contextWindow !== undefined && { contextWindow: metadata.contextWindow }),
                         };
+                        // ------------------------------------------------------
                         chatsLoaded++;
-                    } else {
-                        console.warn(`[ChatManager] Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data?.metadata);
-                    }
-                } catch (e) {
-                    console.error(`[ChatManager] Error reading or parsing chat file ${fullPath}:`, e);
-                }
+                    } else { this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing required fields.`); }
+                 } catch (e) { this.plugin.logger.error(`Error reading or parsing chat file ${fullPath} during index scan:`, e); }
             }
 
-            this.sessionIndex = newIndex;
+            this.chatIndex = newIndex;
             await this.saveChatIndex();
+            this.plugin.logger.info(`Index rebuilt: ${chatsLoaded} chats loaded from ${filesScanned} scanned files.`);
 
         } catch (error) {
-            this.plugin.logger.error(`[ChatManager] Critical error during index rebuild:`, error);
-            this.sessionIndex = {};
-            await this.saveChatIndex();
-            // new Notice("Error rebuilding chat index.");
+             this.plugin.logger.error(`Critical error during index rebuild scan:`, error);
+             this.chatIndex = {};
+             await this.saveChatIndex();
         }
     }
 
-    /** Зберігає поточний індекс чатів у сховище плагіна. */
     private async saveChatIndex(): Promise<void> {
-        // console.log(`[ChatManager] Saving chat index with ${Object.keys(this.sessionIndex).length} entries.`);
-        await this.plugin.saveDataKey(SESSIONS_INDEX_KEY, this.sessionIndex);
+        this.plugin.logger.debug(`Saving chat index with ${Object.keys(this.chatIndex).length} entries.`);
+        await this.plugin.saveDataKey(CHAT_INDEX_KEY, this.chatIndex); // ВИПРАВЛЕНО: Новий ключ
     }
 
-    /** Генерує повний шлях до файлу чату. */
     private getChatFilePath(id: string): string {
         const fileName = `${id}.json`;
-        return (this.chatsFolderPath === "/" || !this.chatsFolderPath)
+        return (this.chatsFolderPath === "/")
             ? normalizePath(fileName)
             : normalizePath(`${this.chatsFolderPath}/${fileName}`);
     }
 
-    /** Зберігає дані вказаного чату у файл. */
-    async saveChat(chat: Chat): Promise<boolean> {
-        try {
-            const filePath = this.getChatFilePath(chat.metadata.id);
-            // Оновлюємо дату модифікації перед збереженням
-            chat.metadata.lastModified = new Date().toISOString();
-            const dataToSave: ChatData = {
-                metadata: chat.metadata,
-                messages: chat.getMessages()
-            };
-            await this.adapter.write(filePath, JSON.stringify(dataToSave, null, 2));
-            // console.log(`[ChatManager] Saved chat ${chat.metadata.id} to ${filePath}`);
-            // Оновлюємо індекс після збереження файлу
-            this.sessionIndex[chat.metadata.id] = { ...chat.metadata };
-            delete (this.sessionIndex[chat.metadata.id] as any).id;
+    /**
+     * Зберігає дані вказаного чату у файл (делегує класу Chat) та оновлює індекс.
+     * Цей метод тепер використовується лише для початкового збереження нового чату.
+     * Подальше збереження ініціюється з класу Chat через debounce.
+     */
+    async saveChatAndUpdateIndex(chat: Chat): Promise<boolean> {
+        const saved = await chat.saveImmediately(); // Викликаємо негайне збереження з Chat
+        if (saved) {
+            // Оновлюємо індекс після успішного збереження
+            const { id, createdAt, ...metaToStore } = chat.metadata;
+            this.chatIndex[id] = metaToStore as ChatSessionStored;
             await this.saveChatIndex();
-            // Повідомляємо про оновлення списку (змінилася дата модифікації)
-            this.plugin.emit('chat-list-updated');
+            this.plugin.emit('chat-list-updated'); // Повідомляємо про зміну
             return true;
-        } catch (error) {
-            console.error(`[ChatManager] Error saving chat ${chat.metadata.id} to ${chat.filePath}:`, error);
-            new Notice(`Error saving chat: ${chat.metadata.name}`);
-            return false;
         }
+        return false;
     }
-
 
     /** Створює новий чат. */
     async createNewChat(name?: string): Promise<Chat | null> {
-        console.log("[ChatManager] Creating new chat...");
+        this.plugin.logger.info(`Creating new chat...`);
         try {
             const now = new Date();
-            const newId = `chat_${now.getTime()}_${Math.random().toString(36).substring(2, 8)}`;
+            const newId = uuidv4();
             const filePath = this.getChatFilePath(newId);
 
             const initialMetadata: ChatMetadata = {
                 id: newId,
-                name: name || `Chat ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, // Use locale time format
+                name: name || `Chat ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
                 modelName: this.plugin.settings.modelName,
                 selectedRolePath: this.plugin.settings.selectedRolePath,
                 temperature: this.plugin.settings.temperature,
+                contextWindow: this.plugin.settings.contextWindow, // <-- Додано
                 createdAt: now.toISOString(),
                 lastModified: now.toISOString(),
             };
 
             const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
-            const newChat = new Chat(this.adapter, constructorSettings, { metadata: initialMetadata, messages: [] }, filePath);
+            const chatData: ChatData = { metadata: initialMetadata, messages: [] };
 
-            // Використовуємо saveChat для збереження та оновлення індексу
-            const saved = await this.saveChat(newChat);
-            if (!saved) {
-                throw new Error("Failed to save initial chat file via saveChat.");
-            }
+            // --- ВИПРАВЛЕННЯ: Викликаємо конструктор з 4 аргументами ---
+            const newChat = new Chat(this.adapter, constructorSettings, chatData, filePath, this.plugin.logger);
+            // -----------------------------------------------------
+
+            // Викликаємо saveChatAndUpdateIndex для першого збереження та оновлення індексу
+            const saved = await this.saveChatAndUpdateIndex(newChat);
+            if (!saved) throw new Error("Failed to save initial chat file.");
 
             this.loadedChats[newChat.metadata.id] = newChat; // Додаємо в кеш
-            await this.setActiveChat(newChat.metadata.id); // Встановлюємо активним
+            await this.setActiveChat(newChat.metadata.id); // Активуємо
 
-            // console.log(`[ChatManager] Created and activated new chat: ${newChat.metadata.name} (ID: ${newChat.metadata.id})`);
-            // Подію 'chat-list-updated' тепер генерує saveChat
+            this.plugin.logger.info(`Created and activated new chat: ${newChat.metadata.name} (ID: ${newChat.metadata.id})`);
             return newChat;
         } catch (error) {
-            console.error("[ChatManager] Error creating new chat:", error);
+            this.plugin.logger.error("Error creating new chat:", error);
             new Notice("Error creating new chat session.");
             return null;
         }
     }
 
-    /** Повертає масив метаданих всіх доступних чатів, відсортований за датою зміни. */
+    /** Повертає масив метаданих всіх доступних чатів. */
     listAvailableChats(): ChatMetadata[] {
-        return Object.entries(this.sessionIndex).map(([id, meta]) => ({
-            id,
-            ...meta,
-        })).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
-    }
+        return Object.entries(this.chatIndex)
+            // Крок 1: Перетворюємо запис індексу на повний об'єкт або null, якщо дані невалідні
+            .map(([id, storedMeta]): ChatMetadata | null => {
+               // Перевіряємо наявність обов'язкових полів у збережених метаданих
+               if (!storedMeta || typeof storedMeta.name !== 'string' || typeof storedMeta.lastModified !== 'string' || typeof storedMeta.createdAt !== 'string') {
+                   this.plugin.logger.warn(`Invalid or incomplete metadata found in index for chat ID: ${id}. Skipping in list.`, storedMeta);
+                   return null; // Повертаємо null для невалідних записів
+               }
+               // Створюємо повний об'єкт ChatMetadata
+               return {
+                   id,
+                   createdAt: storedMeta.createdAt, // Тепер ми впевнені, що воно існує
+                   lastModified: storedMeta.lastModified,
+                   name: storedMeta.name,
+                   modelName: storedMeta.modelName,
+                   selectedRolePath: storedMeta.selectedRolePath,
+                   temperature: storedMeta.temperature,
+                   contextWindow: storedMeta.contextWindow
+               };
+            })
+            // Крок 2: Відфільтровуємо всі null значення
+            .filter((chatMeta): chatMeta is ChatMetadata => chatMeta !== null)
+            // Крок 3: Сортуємо валідні об'єкти
+            .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+   }
+   
+    getActiveChatId(): string | null { return this.activeChatId; }
 
-    /** Повертає ID поточного активного чату. */
-    getActiveChatId(): string | null {
-        return this.activeChatId;
-    }
+    /** Завантажує та повертає екземпляр Chat за його ID. */
+    async getChat(id: string): Promise<Chat | null> {
+         this.plugin.logger.debug(`getChat called for ID: ${id}`);
+         if (this.loadedChats[id]) {
+              this.plugin.logger.debug(`Returning chat ${id} from memory cache.`);
+              return this.loadedChats[id];
+         }
+         this.plugin.logger.debug(`Chat ${id} not in memory cache, loading from file...`);
 
-    /** Встановлює активний чат за його ID. */
-    async setActiveChat(id: string | null): Promise<void> {
-        // console.log(`[ChatManager] Setting active chat to ID: ${id}`);
-        if (id && !this.sessionIndex[id]) {
-            console.error(`[ChatManager] Attempted to set active chat to non-existent ID: ${id}. Setting to null.`);
-            id = null;
+         if (!this.chatIndex[id]) {
+             this.plugin.logger.warn(`Chat ID ${id} not found in index during getChat.`);
+             return null;
+         }
+
+         const filePath = this.getChatFilePath(id);
+         try {
+             // Використовуємо статичний метод Chat для завантаження
+             const chat = await Chat.loadFromFile(filePath, this.adapter, this.plugin.settings, this.plugin.logger);
+
+             if (chat) {
+                 this.plugin.logger.debug(`Successfully loaded chat ${id}. Caching.`);
+                 this.loadedChats[id] = chat; // Кешуємо завантажений чат
+                 return chat;
+             } else {
+                 // loadFromFile вже мав вивести помилку і, можливо, видалити з індексу
+                 this.plugin.logger.error(`Chat.loadFromFile returned null for ${id}. Removing from index if still present.`);
+                 if (this.chatIndex[id]) { // Перевіряємо ще раз, бо loadFromFile міг видалити
+                    delete this.chatIndex[id];
+                    await this.saveChatIndex();
+                    this.plugin.emit('chat-list-updated');
+                 }
+                 if (this.activeChatId === id) await this.setActiveChat(null); // Скидаємо активний, якщо це був він
+                 return null;
+             }
+         } catch (error) { // Додатковий захист
+             this.plugin.logger.error(`Unexpected error during getChat for ${id} from ${filePath}:`, error);
+             return null;
+         }
+     }
+
+    async getActiveChat(): Promise<Chat | null> {
+        this.plugin.logger.debug(`getActiveChat called. Current activeChatId: ${this.activeChatId}`);
+        if (!this.activeChatId) {
+             this.plugin.logger.debug("No active chat ID set.");
+             return null; // Немає активного чату
         }
 
-        if (id === this.activeChatId) {
-            // console.log(`[ChatManager] Chat ${id} is already active.`);
-            if (id) await this.getChat(id); // Переконуємось, що завантажено
+        // Перевіряємо активний кеш
+        if (this.activeChat && this.activeChat.metadata.id === this.activeChatId) {
+            this.plugin.logger.debug(`Returning cached active chat object: ${this.activeChatId}`);
+            return this.activeChat;
+        }
+
+        // Завантажуємо/отримуємо з загального кешу через getChat
+        this.plugin.logger.debug(`Active chat ${this.activeChatId} not in active cache, calling getChat...`);
+        const chat = await this.getChat(this.activeChatId);
+        if (chat) {
+            this.activeChat = chat; // Оновлюємо активний кеш
+            return chat;
+        } else {
+            // getChat вже обробив помилку і скинув індекс/активний ID
+            this.plugin.logger.warn(`Failed to load active chat ${this.activeChatId} via getChat.`);
+            // this.activeChatId вже має бути null після невдалого getChat/setActiveChat(null)
+            return null;
+        }
+    }
+
+    public async setActiveChat(id: string | null): Promise<void> {
+        this.plugin.logger.debug(`setActiveChat called with ID: ${id}`);
+        const previousActiveId = this.activeChatId;
+
+        if (id && !this.chatIndex[id]) {
+            this.plugin.logger.error(`Attempted to set active chat to non-existent ID: ${id}. Aborting.`);
+            // Не встановлюємо null автоматично, щоб зберегти попередній стан, якщо id невалідний
+            new Notice(`Error: Chat with ID ${id} not found.`);
+            return; // Просто виходимо
+        }
+
+        if (id === previousActiveId) {
+            this.plugin.logger.debug(`Chat ${id} is already active.`);
+            // Переконаємось, що він завантажений (особливо при першому запуску)
+             if (id && !this.activeChat) {
+                this.activeChat = await this.getChat(id);
+                // Якщо щойно завантажили, можливо, варто повідомити View
+                 this.plugin.emit('active-chat-changed', { chatId: id, chat: this.activeChat });
+             }
             return;
         }
 
+        // Збереження попереднього чату тепер не потрібне тут, бо Chat робить це сам
+        // if (previousActiveId && this.loadedChats[previousActiveId]) { ... }
+
         this.activeChatId = id;
-        await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, id); // Використовуємо новий ключ v2        // console.log(`[ChatManager] Persisted active chat ID: ${id}`);
+        this.activeChat = null; // Скидаємо кеш активного об'єкта Chat
+        // Збереження ID відбувається в main.ts через подію
 
         let loadedChat: Chat | null = null;
         if (id) {
             loadedChat = await this.getChat(id);
             if (!loadedChat) {
-                console.error(`[ChatManager] Failed to load chat data for newly activated ID ${id}. Resetting active chat to null.`);
-                await this.setActiveChat(null); // Рекурсивний виклик для коректного скидання
-                return;
+                this.plugin.logger.error(`Failed to load chat data AFTER validating ID ${id}. Resetting active chat to null.`);
+                this.activeChatId = null; // Скидаємо ID
+                id = null; // Для події
+            } else {
+                this.activeChat = loadedChat; // Кешуємо активний чат
             }
         }
 
-        // console.log(`[ChatManager] Emitting 'active-chat-changed' event for ID: ${id}`);
+        this.plugin.logger.info(`Active chat changed from ${previousActiveId} to ${id}`);
         this.plugin.emit('active-chat-changed', { chatId: id, chat: loadedChat });
     }
 
-    /** Отримує конкретний чат за ID (з кешу або файлу). */
-    async getChat(id: string): Promise<Chat | null> {
-        // console.log(`[ChatManager] getChat called for ID: ${id}`);
-        if (this.loadedChats[id]) {
-            // console.log(`[ChatManager] Returning chat ${id} from cache.`);
-            return this.loadedChats[id];
-        }
-        // console.log(`[ChatManager] Chat ${id} not in cache.`);
-
-        if (this.sessionIndex[id]) {
-            const filePath = this.getChatFilePath(id);
-            // console.log(`[ChatManager] Attempting to load chat ${id} from path: ${filePath}`);
-            const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
-            const chat = await Chat.loadFromFile(filePath, this.adapter, constructorSettings);
-
-            if (chat) {
-                // console.log(`[ChatManager] Successfully loaded chat ${id}. Caching.`);
-                this.loadedChats[id] = chat;
-                return chat;
-            } else {
-                console.error(`[ChatManager] Failed to load chat ${id} from ${filePath}. Removing from index.`);
-                delete this.sessionIndex[id];
-                await this.saveChatIndex();
-                if (this.activeChatId === id) {
-                    await this.setActiveChat(null);
-                }
-                this.plugin.emit('chat-list-updated');
-                return null;
-            }
-        }
-
-        console.warn(`[ChatManager] Chat with ID ${id} not found in session index.`);
-        return null;
-    }
-
-    /** Отримує поточний активний чат (або останній, або створює новий). */
-    async getActiveChat(): Promise<Chat | null> {
-        // console.log(`[ChatManager] getActiveChat called. Current activeChatId: ${this.activeChatId}`);
-        if (this.activeChatId) {
-            // Якщо є активний ID, спробуємо його отримати (з кешу або завантажити)
-            const chat = await this.getChat(this.activeChatId);
-            if (chat) return chat; // Повертаємо, якщо вдалося завантажити/знайти в кеші
-            // Якщо getChat повернув null (помилка завантаження), активний ID вже скинуто,
-            // тому переходимо до логіки нижче (вибір останнього або створення нового)
-            console.warn(`[ChatManager] Active chat ${this.activeChatId} failed to load. Finding alternative.`);
-        }
-
-        // Якщо активного ID немає або він не завантажився
-        const availableChats = this.listAvailableChats();
-        if (availableChats.length > 0) {
-            const mostRecentId = availableChats[0].id;
-            // console.log(`[ChatManager] No active chat set or load failed. Setting most recent as active: ID ${mostRecentId}`);
-            await this.setActiveChat(mostRecentId);
-            // Потрібно повернути результат setActiveChat (який може бути null, якщо і цей чат не завантажиться)
-            return this.activeChatId ? this.loadedChats[this.activeChatId] : null;
-        } else {
-            // console.log("[ChatManager] No available chats exist. Creating a new one.");
-            return await this.createNewChat();
-        }
-    }
-
-    /** Додає повідомлення до активного чату. */
     async addMessageToActiveChat(role: MessageRole, content: string): Promise<Message | null> {
-        const activeChat = await this.getActiveChat();
-        if (activeChat) {
-            const newMessage = activeChat.addMessage(role, content);
-            // console.log(`[ChatManager] Added ${role} message to active chat ${activeChat.metadata.id}.`);
-            // saveChat викликається через debouncedSave в Chat.addMessage,
-            // але нам потрібно оновити індекс (дату модифікації) та викликати подію одразу.
-            this.sessionIndex[activeChat.metadata.id].lastModified = new Date().toISOString();
-            await this.saveChatIndex(); // Зберігаємо індекс
-            this.plugin.emit('message-added', { chatId: activeChat.metadata.id, message: newMessage });
-            this.plugin.emit('chat-list-updated'); // Оновлюємо список чатів через зміну дати
-            return newMessage;
-        } else {
-            console.error("[ChatManager] Cannot add message, no active chat.");
-            new Notice("Error: No active chat session to add message to.");
-            return null;
-        }
-    }
+         const activeChat = await this.getActiveChat();
+         if (!activeChat) { this.plugin.logger.error("Cannot add message: No active chat."); new Notice("Error: No active chat session."); return null; }
 
-    /** Очищує історію повідомлень активного чату. */
+         const newMessage = activeChat.addMessage(role, content); // Цей метод оновить lastModified і викличе save() (з debounce)
+         this.plugin.logger.debug(`Added ${role} message to active chat ${activeChat.metadata.id}.`);
+
+         // Оновлюємо lastModified в індексі ОДРАЗУ, щоб сортування працювало коректно
+         if (this.chatIndex[activeChat.metadata.id]) {
+             this.chatIndex[activeChat.metadata.id].lastModified = activeChat.metadata.lastModified;
+             await this.saveChatIndex(); // Зберігаємо індекс
+         }
+
+         this.plugin.emit('message-added', { chatId: activeChat.metadata.id, message: newMessage });
+         this.plugin.emit('chat-list-updated'); // Оновлюємо список чатів
+         return newMessage;
+     }
+
     async clearActiveChatMessages(): Promise<void> {
-        const activeChat = await this.getActiveChat();
-        if (activeChat) {
-            activeChat.clearMessages(); // Цей метод має викликати saveChat
-            // console.log(`[ChatManager] Messages cleared for active chat: ${activeChat.metadata.id}`);
-            this.plugin.emit('messages-cleared', activeChat.metadata.id);
-        } else {
-            console.warn("[ChatManager] Cannot clear messages, no active chat.");
-            new Notice("No active chat to clear.");
-        }
-    }
+         const activeChat = await this.getActiveChat();
+         if (!activeChat) { this.plugin.logger.warn("Cannot clear messages: No active chat."); return; }
 
-    /** Оновлює метадані активного чату та генерує відповідні події. */
-    // ChatManager.ts
+         this.plugin.logger.info(`Clearing messages for chat: ${activeChat.metadata.id}`);
+         activeChat.clearMessages(); // Цей метод оновить lastModified і викличе save() (з debounce)
 
-    /** Оновлює метадані активного чату та генерує відповідні події. */
+         // Оновлюємо lastModified в індексі ОДРАЗУ
+         if (this.chatIndex[activeChat.metadata.id]) {
+              this.chatIndex[activeChat.metadata.id].lastModified = activeChat.metadata.lastModified;
+              await this.saveChatIndex();
+         }
+
+         this.plugin.emit('messages-cleared', activeChat.metadata.id);
+         this.plugin.emit('chat-list-updated');
+     }
+
     async updateActiveChatMetadata(metadataUpdate: Partial<Omit<ChatMetadata, 'id' | 'createdAt'>>): Promise<boolean> {
-        const activeChat = await this.getActiveChat();
-        if (!activeChat) {
-            console.warn("[ChatManager] Cannot update metadata, no active chat.");
-            new Notice("No active chat to update metadata for.");
-            return false;
-        }
+         const activeChat = await this.getActiveChat();
+         if (!activeChat) { this.plugin.logger.warn("Cannot update metadata, no active chat."); new Notice("No active chat to update metadata for."); return false; }
+         this.plugin.logger.debug(`Updating metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
 
-        // console.log(`[ChatManager] Updating metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
+         const oldRolePath = activeChat.metadata.selectedRolePath;
+         const oldModelName = activeChat.metadata.modelName;
 
-        // Зберігаємо старі значення ДО оновлення для порівняння
-        const oldRolePath = activeChat.metadata.selectedRolePath;
-        const oldModelName = activeChat.metadata.modelName;
+         const changed = activeChat.updateMetadata(metadataUpdate); // Цей метод оновить lastModified і викличе save() (з debounce)
 
-        // Застосовуємо оновлення до об'єкта Chat в пам'яті
-        activeChat.updateMetadata(metadataUpdate); // Оновлює і lastModified
+         if (changed) {
+             this.plugin.logger.debug(`Metadata changed. Chat ${activeChat.metadata.id} save scheduled by Chat class.`);
+              // Оновлюємо індекс ОДРАЗУ (особливо name та lastModified)
+              if (this.chatIndex[activeChat.metadata.id]) {
+                  const { id, createdAt, ...metaToStore } = activeChat.metadata;
+                  this.chatIndex[activeChat.metadata.id] = metaToStore as ChatSessionStored;
+                  await this.saveChatIndex();
+              }
 
-        // Зберігаємо оновлений чат у файл (saveChat оновить індекс та викличе chat-list-updated)
-        const saved = await this.saveChat(activeChat);
+             // Генеруємо події, якщо відповідні поля дійсно змінилися
+             const newRolePath = activeChat.metadata.selectedRolePath;
+             const newModelName = activeChat.metadata.modelName;
+             let roleChanged = false; let modelChanged = false;
 
-        if (saved) {
-            // Подію 'chat-list-updated' вже згенерував saveChat
+             if (metadataUpdate.selectedRolePath !== undefined && oldRolePath !== newRolePath) { roleChanged = true; }
+             if (metadataUpdate.modelName !== undefined && oldModelName !== newModelName) { modelChanged = true; }
 
-            const newRolePath = activeChat.metadata.selectedRolePath;
-            const newModelName = activeChat.metadata.modelName;
+             // Генеруємо події ПІСЛЯ оновлення індексу
+             if (roleChanged) {
+                 try { const newRoleName = this.plugin.findRoleNameByPath(newRolePath); this.plugin.logger.debug(`Emitting 'role-changed': ${newRoleName}`); this.plugin.emit('role-changed', newRoleName); this.plugin.promptService?.clearRoleCache?.(); } catch (e) { this.plugin.logger.error("Error finding role name/emitting role-changed:", e); }
+             }
+             if (modelChanged) {
+                 this.plugin.logger.debug(`Emitting 'model-changed': ${newModelName}`); this.plugin.emit('model-changed', newModelName); this.plugin.promptService?.clearModelDetailsCache?.();
+             }
+              this.plugin.emit('active-chat-changed', { chatId: this.activeChatId, chat: activeChat });
+              this.plugin.emit('chat-list-updated'); // Через зміну метаданих/lastModified
 
-            // --- ГЕНЕРАЦІЯ ПОДІЇ ROLE-CHANGED ---
-            // Перевіряємо, чи поле selectedRolePath БУЛО в об'єкті -> metadataUpdate <-
-            // І чи нове значення відрізняється від старого
-            // --- ВИПРАВЛЕНО: Використовуємо metadataUpdate ---
-            if (metadataUpdate.selectedRolePath !== undefined && oldRolePath !== newRolePath) {
-                try {
-                    const newRoleName = this.plugin.findRoleNameByPath(newRolePath);
-                    // console.log(`[ChatManager] Emitting 'role-changed' event with name: ${newRoleName}`);
-                    this.plugin.emit('role-changed', newRoleName);
-                    this.plugin.promptService?.clearRoleCache?.();
-                } catch (e) {
-                    console.error("[ChatManager] Error finding role name or emitting role-changed event:", e);
-                }
-            }
-            // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+             return true;
+         } else { this.plugin.logger.debug("Metadata update called, but no actual changes detected."); return false; }
+     }
 
-            // --- ГЕНЕРАЦІЯ ПОДІЇ MODEL-CHANGED ---
-            // Перевіряємо, чи поле modelName БУЛО в -> metadataUpdate <-
-            // І чи нове значення відрізняється від старого
-            // --- ВИПРАВЛЕНО: Використовуємо metadataUpdate ---
-            if (metadataUpdate.modelName !== undefined && oldModelName !== newModelName) {
-                // console.log(`[ChatManager] Emitting 'model-changed' event with name: ${newModelName}`);
-                this.plugin.emit('model-changed', newModelName);
-                this.plugin.promptService?.clearModelDetailsCache?.();
-            }
-            // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-
-
-            // Генеруємо 'active-chat-changed', щоб View оновив усі аспекти
-            this.plugin.emit('active-chat-changed', { chatId: this.activeChatId, chat: activeChat });
-
-            return true;
-        } else {
-            console.error(`[ChatManager] Failed to save chat file after metadata update for ${activeChat.metadata.id}.`);
-            new Notice("Error saving chat after metadata update.");
-            return false;
-        }
+    async deleteChat(id: string): Promise<boolean> { /* ... як раніше ... */
+         this.plugin.logger.info(`Deleting chat ID: ${id}`); 
+         const chatExistedInIndex = !!this.chatIndex[id]; 
+         const filePath = this.getChatFilePath(id); 
+         let success = true;
+         try { 
+            if (this.loadedChats[id]) {
+                delete this.loadedChats[id]; 
+                this.plugin.logger.debug(`Removed chat ${id} from memory cache.`); } 
+                if (chatExistedInIndex) { 
+                    delete this.chatIndex[id]; 
+                    await this.saveChatIndex(); 
+                    this.plugin.logger.debug(`Removed chat ${id} from index.`); } 
+                    if (await this.adapter.exists(filePath)) { 
+                        await this.adapter.remove(filePath); 
+                        this.plugin.logger.debug(`Removed chat file: ${filePath}`); 
+                    } 
+                    else { 
+                        if (chatExistedInIndex) { 
+                            this.plugin.logger.warn(`Chat file not found during deletion (but was in index): ${filePath}`); } } }
+         catch (error) { this.plugin.logger.error(`Error during deletion process for chat ${id} or its file ${filePath}:`, error); new Notice(`Error deleting chat ${id}.`); success = false; await this.loadChatIndex(true); }
+         finally { if (id === this.activeChatId) { this.plugin.logger.info(`Deleted active chat ${id}. Selecting new active chat...`); const availableChats = this.listAvailableChats(); const nextActiveId = availableChats.length > 0 ? availableChats[0].id : null; await this.setActiveChat(nextActiveId); } this.plugin.emit('chat-list-updated'); }
+         return success && chatExistedInIndex;
     }
 
-    // ... (решта коду ChatManager) ...
-
-    /** Видаляє чат за ID. */
-    async deleteChat(id: string): Promise<boolean> {
-        // console.log(`[ChatManager] Attempting to delete chat ID: ${id}`);
-        const filePath = this.getChatFilePath(id);
-        let deletedFile = false;
-
-        try {
-            if (await this.adapter.exists(filePath)) {
-                await this.adapter.remove(filePath);
-                // console.log(`[ChatManager] Deleted chat file: ${filePath}`);
-            } else {
-                console.warn(`[ChatManager] Chat file not found, assuming already deleted: ${filePath}`);
-            }
-            deletedFile = true; // Вважаємо успішним, якщо файлу немає або його видалено
-        } catch (error) {
-            console.error(`[ChatManager] Error deleting chat file ${filePath}:`, error);
-            new Notice(`Error deleting chat file for ID ${id}.`);
-            // Незважаючи на помилку видалення файлу, спробуємо видалити з індексу
-            deletedFile = false; // Позначаємо як помилку видалення файлу
-        }
-
-        // Видаляємо з індексу та кешу незалежно від успіху видалення файлу,
-        // якщо чат був в індексі
-        if (this.sessionIndex[id]) {
-            delete this.sessionIndex[id];
-            delete this.loadedChats[id];
-            await this.saveChatIndex();
-            // console.log(`[ChatManager] Removed chat ${id} from index and cache.`);
-
-            if (this.activeChatId === id) {
-                // console.log(`[ChatManager] Deleted chat was active. Selecting new active chat...`);
-                const available = this.listAvailableChats();
-                const nextActiveId = available.length > 0 ? available[0].id : null;
-                await this.setActiveChat(nextActiveId);
-            }
-            this.plugin.emit('chat-list-updated');
-            return true; // Повертаємо true, бо запис з індексу видалено
-        } else {
-            console.warn(`[ChatManager] Chat ${id} not found in index while trying to delete.`);
-            return deletedFile; // Повертаємо результат видалення файлу, якщо запису в індексі і не було
-        }
-    }
-
-    /** Перейменовує чат за ID. */
-    async renameChat(id: string, newName: string): Promise<boolean> {
-        const trimmedName = newName.trim();
-        if (!trimmedName) { new Notice("Chat name cannot be empty."); return false; }
-
-        if (!this.sessionIndex[id]) {
-            console.warn(`[ChatManager] Cannot rename chat ${id}: Not found in index.`);
-            new Notice(`Chat with ID ${id} not found.`);
-            return false;
-        }
-
-        console.log(`[ChatManager] Renaming chat ${id} to "${trimmedName}"`);
-        // Завантажуємо чат перед зміною (з кешу або файлу)
-        const chatToRename = await this.getChat(id);
-        if (!chatToRename) {
-            console.error(`[ChatManager] Failed to load chat ${id} for renaming.`);
-            new Notice(`Error loading chat data for rename.`);
-            return false;
-        }
-
-        // Оновлюємо метадані в об'єкті Chat (це оновить і lastModified)
-        chatToRename.updateMetadata({ name: trimmedName });
-
-        // Зберігаємо оновлений чат у файл (saveChat оновить і індекс)
-        const saved = await this.saveChat(chatToRename);
-
-        if (saved) {
-            // console.log(`[ChatManager] Finished renaming chat ${id}`);
-            // Подію 'chat-list-updated' вже згенерує saveChat
-            new Notice(`Chat renamed to "${trimmedName}"`); // Додамо сповіщення про успіх
-            return true;
-        } else {
-            console.error(`[ChatManager] Failed to save renamed chat file for ${id}.`);
-            new Notice(`Error saving renamed chat ${trimmedName}.`);
-            return false;
-        }
-    }
-
-    /** Створює копію існуючого чату. */
     async cloneChat(chatIdToClone: string): Promise<Chat | null> {
-        // console.log(`[ChatManager] Cloning chat ID: ${chatIdToClone}`);
-        const originalChat = await this.getChat(chatIdToClone);
-        if (!originalChat) {
-            console.error(`[ChatManager] Cannot clone: Original chat ${chatIdToClone} not found.`);
-            new Notice("Original chat not found for cloning.");
-            return null;
-        }
-
+        this.plugin.logger.info(`Cloning chat ID: ${chatIdToClone}`);
+        const originalChat = await this.getChat(chatIdToClone); // Використовуємо getChat
+        if (!originalChat) { this.plugin.logger.error(`Cannot clone: Original chat ${chatIdToClone} not found.`); new Notice("Original chat not found."); return null; }
         try {
+            // --- ВИПРАВЛЕННЯ: Використовуємо toJSON ---
+            const clonedData = originalChat.toJSON();
+            // -----------------------------------
             const now = new Date();
-            const newId = `chat_${now.getTime()}_${Math.random().toString(36).substring(2, 8)}`;
+            const newId = uuidv4();
             const newFilePath = this.getChatFilePath(newId);
 
-            const originalMetadata = originalChat.metadata;
-            const clonedMetadata: ChatMetadata = {
-                ...originalMetadata,
-                id: newId,
-                name: `Copy of ${originalMetadata.name}`,
-                createdAt: now.toISOString(),
-                lastModified: now.toISOString(),
-            };
-
-            const clonedChatData: ChatData = {
-                metadata: clonedMetadata,
-                messages: originalChat.getMessages().map(msg => ({ ...msg }))
-            };
+            // Оновлюємо метадані для клону
+            clonedData.metadata.id = newId;
+            clonedData.metadata.name = `Copy of ${originalChat.metadata.name}`;
+            clonedData.metadata.createdAt = now.toISOString();
+            clonedData.metadata.lastModified = now.toISOString();
 
             const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
-            const clonedChat = new Chat(this.adapter, constructorSettings, clonedChatData, newFilePath);
+            // --- ВИПРАВЛЕННЯ: Викликаємо конструктор з 4 аргументами ---
+            const clonedChat = new Chat(this.adapter, constructorSettings, clonedData, newFilePath,this.plugin.logger);
+            // -----------------------------------------------------
 
-            // Зберігаємо клон (saveChat оновить індекс та викличе подію)
-            const saved = await this.saveChat(clonedChat);
-            if (!saved) {
-                throw new Error("Failed to save the cloned chat file.");
-            }
+            // Зберігаємо клон через saveChatAndUpdateIndex, щоб оновити індекс
+            const saved = await this.saveChatAndUpdateIndex(clonedChat);
+            if (!saved) throw new Error("Failed to save the cloned chat file.");
 
             this.loadedChats[clonedChat.metadata.id] = clonedChat; // Додаємо в кеш
             await this.setActiveChat(clonedChat.metadata.id); // Активуємо клон
 
-            // console.log(`[ChatManager] Cloned chat "${clonedChat.metadata.name}" created and activated.`);
+            this.plugin.logger.info(`Cloned chat "${clonedChat.metadata.name}" created and activated.`);
             return clonedChat;
-
-        } catch (error) {
-            console.error("[ChatManager] Error cloning chat:", error);
-            new Notice("An error occurred while cloning the chat.");
-            return null;
-        }
+        } catch (error) { this.plugin.logger.error("Error cloning chat:", error); new Notice("An error occurred while cloning the chat."); return null; }
     }
 
-    // У класі ChatManager
-    public async ensureFoldersExist(): Promise<void> {
-        const historyPath = this.plugin.settings.chatHistoryFolderPath;
-        const exportPath = this.plugin.settings.chatExportFolderPath;
-        this.plugin.logger.debug(`Ensuring folders exist: History='<span class="math-inline">\{historyPath\}', Export\='</span>{exportPath}'`);
+    // --- Метод видалення повідомлень ---
+    public async deleteMessagesAfter(chatId: string, userMessageIndex: number): Promise<boolean> {
+        this.plugin.logger.info(`Deleting messages after index ${userMessageIndex} for chat ${chatId}`);
+        const chat = await this.getChat(chatId); // Використовуємо getChat
+        if (!chat) { this.plugin.logger.error(`Cannot delete messages: Chat ${chatId} not found.`); return false; }
 
-        try {
-            if (historyPath && !(await this.adapter.exists(historyPath))) {
-                this.plugin.logger.info(`History folder doesn't exist. Creating: ${historyPath}`);
-                await this.adapter.mkdir(historyPath);
-            }
-            if (exportPath && !(await this.adapter.exists(exportPath))) {
-                this.plugin.logger.info(`Export folder doesn't exist. Creating: ${exportPath}`);
-                await this.adapter.mkdir(exportPath);
-            }
-        } catch (error) {
-            this.plugin.logger.error("Error ensuring chat folders exist:", error);
-            new Notice("Error creating necessary chat folders. Check plugin settings and vault permissions.");
+        if (userMessageIndex < 0 || userMessageIndex >= chat.messages.length - 1) {
+            this.plugin.logger.warn(`Invalid index (${userMessageIndex}) or last message, nothing to delete after in chat ${chatId}.`);
+            return true;
         }
+
+        const originalLength = chat.messages.length;
+        // --- ВИПРАВЛЕННЯ: Обрізаємо масив напряму ---
+        chat.messages = chat.messages.slice(0, userMessageIndex + 1);
+        // Викликаємо updateMetadata, щоб оновити lastModified та ініціювати збереження
+        chat.updateMetadata({}); // Передаємо пустий об'єкт, щоб лише оновити час
+        // ---------------------------------------
+        this.plugin.logger.debug(`Messages for chat ${chatId} truncated from ${originalLength} to ${chat.messages.length}. Save scheduled.`);
+
+        // Оновлюємо індекс одразу (saveChat в Chat оновить файл з затримкою)
+        if (this.chatIndex[chatId]) {
+             this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
+             await this.saveChatIndex();
+        }
+
+        // Оновлюємо кеш активного чату, якщо це він
+        if (this.activeChatId === chatId) {
+            this.activeChat = chat;
+            this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
+        }
+        // Подію 'chat-list-updated' згенерує оновлення індексу/збереження чату
+        return true;
     }
+    // --- Кінець методу видалення ---
 
 } // End of ChatManager class

@@ -90,8 +90,13 @@
   margin-bottom: calc(var(--chat-spacing-unit) * 1);
   /* Small gap between messages in group */
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+  position: relative; // Для абсолютного позиціонування кнопок
+  padding-bottom: calc(var(--chat-spacing-unit) * 5); // Додатковий відступ знизу для кнопок та мітки часу
+  width: fit-content;
+  max-width: 100%; // Обмеження ширини тепер на .message-wrapper
+
   border-radius: 18px;
-  max-width: var(--chat-message-max-width);
+  // max-width: var(--chat-message-max-width);
   word-wrap: break-word;
   position: relative;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
@@ -128,6 +133,8 @@
   .message:first-child {
     border-top-right-radius: 18px;
   }
+
+  .message { border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
 }
 
 .ollama-message-group .message-wrapper {
@@ -146,6 +153,8 @@
   .message:first-child {
     border-top-left-radius: 18px;
   }
+
+  .message { border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
 }
 
 

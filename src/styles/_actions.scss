@@ -7,15 +7,15 @@ $translation-text-line-height: 1.5; // Нормальний line-height для �
 
 
 .message-actions-wrapper {
-    display: flex;
-    gap: calc(var(--chat-spacing-unit) * 1.5); /* Space between buttons */
-    position: absolute;
-    top: calc(var(--chat-spacing-unit) * 1);
-    right: calc(var(--chat-spacing-unit) * 1.5);
-    opacity: 0; // Hidden by default on desktop
-    visibility: hidden;
-    transition: opacity 0.2s ease-in-out, visibility 0s 0.2s;
-    z-index: 2;
+  position: absolute;
+  bottom: 4px; // Відступ від нижнього краю бульбашки
+  display: flex;
+  gap: calc(var(--chat-spacing-unit) * 1.5); // Відстань між кнопками
+  // Стилі видимості/невидимості (з _desktop.scss) - керуються батьківським :hover
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
+  z-index: 6; // Вище аватара та контенту
   
     // Show buttons on hover over the message bubble
     .message:hover & { // Use parent selector '&'
@@ -24,31 +24,30 @@ $translation-text-line-height: 1.5; // Нормальний line-height для �
       transition-delay: 0s; /* Show immediately on hover */
     }
   
-    button { // Base style for action buttons (copy, translate)
-      padding: calc(var(--chat-spacing-unit) * 0.5) calc(var(--chat-spacing-unit) * 1);
-      background-color: var(--background-modifier-hover);
-      border: 1px solid var(--background-modifier-border);
+    button {
+      background: rgba(var(--background-secondary-rgb), 0.7); // Напівпрозорий фон
+      backdrop-filter: blur(3px);
+      border: 1px solid rgba(var(--background-modifier-border-rgb), 0.5);
       border-radius: var(--radius-s);
+      padding: 2px; // Компактні
+      color: var(--text-muted);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--text-muted);
-      transition: all 0.15s ease-out;
-      outline: none;
-      line-height: 1; // Better icon alignment
+      transition: all 0.15s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  
+      .svg-icon { width: 14px; height: 14px; } // Стандартний розмір іконки
   
       &:hover {
-        background-color: var(--background-modifier-border);
+        background-color: var(--background-modifier-hover);
         color: var(--text-normal);
+        border-color: var(--background-modifier-border-hover);
         transform: scale(1.05);
       }
-  
-      .svg-icon { // Icon size within buttons
-        width: 14px;
-        height: 14px;
-      }
     }
+  
   
     // Specific styles for buttons inside user messages
     .user-message & button {
@@ -172,3 +171,30 @@ $translation-text-line-height: 1.5; // Нормальний line-height для �
       }
     }
   }
+
+  // Показуємо кнопки при наведенні на повідомлення
+.message:hover .message-actions-wrapper {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+// Позиціонування для AI повідомлень (знизу зліва)
+.ollama-message .message-actions-wrapper {
+  left: 8px; // Відступ зліва
+}
+
+// Позиціонування для User повідомлень (знизу справа)
+.user-message .message-actions-wrapper {
+  right: 8px; // Відступ справа
+  // Специфічні стилі для кнопок на повідомленнях користувача
+  button {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: rgba(255, 255, 255, 0.8); // Світліша іконка
+       &:hover {
+          background-color: rgba(255, 255, 255, 0.25);
+          color: white;
+       }
+  }
+}

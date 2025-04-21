@@ -24,8 +24,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  ACTIVE_CHAT_ID_KEY: () => ACTIVE_CHAT_ID_KEY,
-  SESSIONS_INDEX_KEY: () => SESSIONS_INDEX_KEY2,
+  ACTIVE_CHAT_ID_KEY: () => ACTIVE_CHAT_ID_KEY2,
+  CHAT_INDEX_KEY: () => CHAT_INDEX_KEY,
+  SESSIONS_INDEX_KEY: () => SESSIONS_INDEX_KEY,
   default: () => OllamaPlugin2
 });
 module.exports = __toCommonJS(main_exports);
@@ -203,6 +204,7 @@ var CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
 var CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button";
 var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CHAT_LIST_MAX_HEIGHT = "250px";
+var CSS_CLASS_REGENERATE_BUTTON = "regenerate-button";
 var LANGUAGES = {
   "af": "Afrikaans",
   "sq": "Albanian",
@@ -476,6 +478,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
         new import_obsidian3.Notice("Error creating new chat.");
       }
     };
+    // У файлі src/OllamaView.ts
     this.handleRenameChatClick = async () => {
       var _a;
       this.closeMenu();
@@ -485,23 +488,34 @@ var OllamaView = class extends import_obsidian3.ItemView {
         return;
       }
       const currentName = activeChat.metadata.name;
-      new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async (newName) => {
-        let noticeMessage = "Rename cancelled or name unchanged.";
-        if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-          const success = await this.plugin.chatManager.renameChat(activeChat.metadata.id, newName.trim());
-          if (success) {
-            noticeMessage = `Chat renamed to "${newName.trim()}"`;
-          } else {
-            noticeMessage = "Failed to rename chat.";
+      const chatId = activeChat.metadata.id;
+      new PromptModal(
+        this.app,
+        "Rename Chat",
+        `Enter new name for "${currentName}":`,
+        currentName,
+        async (newName) => {
+          let noticeMessage = "Rename cancelled or name unchanged.";
+          const trimmedName = newName == null ? void 0 : newName.trim();
+          if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
+            this.plugin.logger.debug(`[OllamaView] Attempting rename for chat ${chatId} to "${trimmedName}" via updateActiveChatMetadata`);
+            const success = await this.plugin.chatManager.updateActiveChatMetadata({ name: trimmedName });
+            if (success) {
+              noticeMessage = `Chat renamed to "${trimmedName}"`;
+              this.plugin.logger.info(`Chat ${chatId} rename initiated to "${trimmedName}".`);
+            } else {
+              noticeMessage = "Failed to rename chat.";
+              this.plugin.logger.error(`[OllamaView] Failed to rename chat ${chatId} using updateActiveChatMetadata.`);
+            }
+          } else if (trimmedName && trimmedName === currentName) {
+            noticeMessage = "Name unchanged.";
+          } else if (newName === null || trimmedName === "") {
+            noticeMessage = "Rename cancelled or invalid name entered.";
           }
-        } else if ((newName == null ? void 0 : newName.trim()) === currentName) {
-          noticeMessage = "Name unchanged.";
-        } else {
-          noticeMessage = "Rename cancelled or invalid name entered.";
+          new import_obsidian3.Notice(noticeMessage);
+          this.focusInput();
         }
-        new import_obsidian3.Notice(noticeMessage);
-        this.focusInput();
-      }).open();
+      ).open();
     };
     this.handleCloneChatClick = async () => {
       var _a;
@@ -1607,6 +1621,7 @@ This action cannot be undone.`, async () => {
       }
     }
     const messageEl = messageWrapper.createDiv({ cls: messageClass });
+    messageEl.style.position = "relative";
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
     switch (message.role) {
@@ -1632,27 +1647,104 @@ This action cannot be undone.`, async () => {
         contentEl.createSpan({ cls: CSS_CLASS_ERROR_TEXT, text: message.content });
         break;
     }
-    const buttonsWrapper = contentContainer.createDiv({ cls: "message-actions-wrapper" });
-    if (message.role !== "system" && message.role !== "error") {
+    const buttonsWrapper = messageEl.createDiv({ cls: "message-actions-wrapper" });
+    if (message.role === "user") {
+      const regenerateBtn = buttonsWrapper.createEl("button", {
+        cls: CSS_CLASS_REGENERATE_BUTTON,
+        attr: { title: "Regenerate response", "aria-label": "Regenerate AI response based on this message" }
+      });
+      (0, import_obsidian3.setIcon)(regenerateBtn, "refresh-cw");
+      this.registerDomEvent(regenerateBtn, "click", (e) => {
+        e.stopPropagation();
+        this.handleRegenerateClick(message);
+      });
+    }
+    if (message.role === "user" || message.role === "assistant") {
       const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { title: "Copy", "aria-label": "Copy message content" } });
       (0, import_obsidian3.setIcon)(copyBtn, "copy");
       this.registerDomEvent(copyBtn, "click", (e) => {
         e.stopPropagation();
         this.handleCopyClick(message.content, copyBtn);
       });
-    }
-    if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage && (message.role === "user" || message.role === "assistant")) {
-      const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
-      const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, "aria-label": "Translate message" } });
-      (0, import_obsidian3.setIcon)(translateBtn, "languages");
-      this.registerDomEvent(translateBtn, "click", (e) => {
-        e.stopPropagation();
-        this.handleTranslateClick(message.content, contentEl, translateBtn);
-      });
+      if (this.plugin.settings.enableTranslation && this.plugin.settings.translationTargetLanguage) {
+        const targetLangName = LANGUAGES[this.plugin.settings.translationTargetLanguage] || this.plugin.settings.translationTargetLanguage;
+        const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { title: `Translate to ${targetLangName}`, "aria-label": "Translate message" } });
+        (0, import_obsidian3.setIcon)(translateBtn, "languages");
+        this.registerDomEvent(translateBtn, "click", (e) => {
+          e.stopPropagation();
+          this.handleTranslateClick(message.content, contentEl, translateBtn);
+        });
+      }
     }
     messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
     setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
     return messageEl;
+  }
+  // --- Новий обробник для кнопки Регенерації ---
+  async handleRegenerateClick(userMessage) {
+    var _a;
+    this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
+    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    if (!activeChat) {
+      new import_obsidian3.Notice("Cannot regenerate: No active chat found.");
+      return;
+    }
+    const chatId = activeChat.metadata.id;
+    const messageIndex = activeChat.messages.findIndex(
+      (msg) => msg.role === "user" && msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.content === userMessage.content
+    );
+    if (messageIndex === -1) {
+      this.plugin.logger.error("Could not find the user message in the active chat history for regeneration.", userMessage);
+      new import_obsidian3.Notice("Error: Could not find the message to regenerate from.");
+      return;
+    }
+    if (messageIndex === activeChat.messages.length - 1) {
+      new import_obsidian3.Notice("This is the last message, nothing to regenerate after it.");
+      return;
+    }
+    new ConfirmModal(
+      this.app,
+      "Confirm Regeneration",
+      "This will delete all messages after this prompt and generate a new response. Continue?",
+      async () => {
+        this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
+        let loadingIndicator = null;
+        try {
+          this.setLoadingState(true);
+          const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
+          if (!deleteSuccess) {
+            throw new Error("Failed to delete subsequent messages.");
+          }
+          await this.loadAndDisplayActiveChat();
+          this.scrollToBottom();
+          loadingIndicator = this.addLoadingIndicator();
+          this.guaranteedScrollToBottom(50, true);
+          const updatedChat = await this.plugin.chatManager.getActiveChat();
+          if (!updatedChat)
+            throw new Error("Failed to get updated chat after deletion.");
+          this.plugin.logger.info(`Generating new response for chat ${chatId} based on history up to index ${messageIndex}`);
+          const assistantMessage = await this.plugin.ollamaService.generateChatResponse(updatedChat);
+          if (loadingIndicator)
+            this.removeLoadingIndicator(loadingIndicator);
+          loadingIndicator = null;
+          if (assistantMessage) {
+            await this.plugin.chatManager.addMessageToActiveChat(assistantMessage.role, assistantMessage.content);
+          } else {
+            this.plugin.logger.warn("Regeneration: Assistant did not provide a response.");
+            this.addMessageToDisplay("error", "Assistant did not provide a response for regeneration.", new Date());
+          }
+        } catch (error) {
+          this.plugin.logger.error("Error during regeneration process:", error);
+          new import_obsidian3.Notice(`Regeneration failed: ${error.message}`);
+          if (loadingIndicator)
+            this.removeLoadingIndicator(loadingIndicator);
+        } finally {
+          this.setLoadingState(false);
+          this.focusInput();
+        }
+      }
+      // Кінець колбеку ConfirmModal
+    ).open();
   }
   // --- Action Button Handlers ---
   handleCopyClick(content, buttonEl) {
@@ -4014,10 +4106,10 @@ var PromptService = class {
     return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
   }
   /**
-   * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
-   */
+      * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
+      */
   async preparePromptBody(history, chatMetadata) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b;
     this.plugin.logger.debug("[PromptService] Preparing prompt body...");
     const settings = this.plugin.settings;
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
@@ -4025,17 +4117,18 @@ var PromptService = class {
     this.plugin.logger.debug(`[PromptService] Productivity features potentially active for body: ${isProductivityActive}`);
     let taskContext = "";
     if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
-      if ((_a = this.plugin.chatManager) == null ? void 0 : _a.filePlanExists) {
-        const needsUpdateBefore = (_c = (_b = this.plugin).isTaskFileUpdated) == null ? void 0 : _c.call(_b);
-        await ((_e = (_d = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _e.call(_d));
-        const tasksWereUpdated = needsUpdateBefore && !((_g = (_f = this.plugin).isTaskFileUpdated) == null ? void 0 : _g.call(_f));
-        taskContext = tasksWereUpdated ? "\n--- Updated Tasks Context ---\n" : "\n--- Today's Tasks Context ---\n";
-        taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.join(", ") || "None"}
+      await ((_b = (_a = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _b.call(_a));
+      const taskState = this.plugin.chatManager.getCurrentTaskState();
+      if (taskState && taskState.hasContent) {
+        taskContext = "\n--- Today's Tasks Context ---\n";
+        taskContext += `Urgent: ${taskState.urgent.join(", ") || "None"}
 `;
-        taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.join(", ") || "None"}
+        taskContext += `Other: ${taskState.regular.join(", ") || "None"}
 `;
         taskContext += "--- End Tasks Context ---";
-        this.plugin.logger.debug(`[PromptService] Injecting task context.`);
+        this.plugin.logger.debug(`[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`);
+      } else {
+        this.plugin.logger.debug("[PromptService] No relevant task state found or no tasks to inject.");
       }
     }
     const approxTaskTokens = this._countTokens(taskContext);
@@ -4049,22 +4142,38 @@ var PromptService = class {
       processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
     }
     let ragContext = "";
-    if (settings.ragEnabled && this.plugin.ragService) {
+    if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
       const lastUserMessage = history.findLast((m) => m.role === "user");
       if (lastUserMessage == null ? void 0 : lastUserMessage.content) {
         ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
         if (!ragContext)
           this.plugin.logger.info("[PromptService] RAG prepareContext returned empty.");
+        else
+          this.plugin.logger.debug(`[PromptService] RAG context length: ${ragContext.length} chars`);
       } else {
         this.plugin.logger.warn("[PromptService] RAG enabled, but no last user message found.");
       }
+    } else {
+      this.plugin.logger.debug("[PromptService] RAG context NOT prepared.");
     }
-    const finalPromptBody = `${ragContext}${taskContext}
-
-### Conversation History:
-${processedHistoryString}`.trim();
+    let finalPromptBodyParts = [];
+    if (ragContext) {
+      finalPromptBodyParts.push(ragContext);
+    }
+    if (taskContext) {
+      finalPromptBodyParts.push(taskContext);
+    }
+    if (processedHistoryString) {
+      finalPromptBodyParts.push(`### Conversation History:
+${processedHistoryString}`);
+    }
+    const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
+    if (!finalPromptBody) {
+      this.plugin.logger.warn("[PromptService] No RAG, no tasks, and no history processed. Returning null prompt body.");
+      return null;
+    }
     this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
-    return finalPromptBody.length > 0 ? finalPromptBody : null;
+    return finalPromptBody;
   }
   // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages залишаються
   // але мають використовувати this.plugin.logger замість console.log/warn
@@ -4155,7 +4264,7 @@ var import_obsidian10 = require("obsidian");
 // src/Chat.ts
 var import_obsidian9 = require("obsidian");
 var Chat = class {
-  // Debounced function for saving
+  // Додати властивість
   /**
    * Creates an instance of Chat. Should be called by ChatManager.
    * @param adapter - Obsidian's DataAdapter.
@@ -4163,25 +4272,14 @@ var Chat = class {
    * @param data - The initial chat data (metadata and messages).
    * @param filePath - The full, normalized path where this chat should be saved/loaded from within the vault. **Required**.
    */
-  constructor(adapter, settings, data, filePath) {
-    var _a, _b, _c;
+  constructor(adapter, settings, data, filePath, logger) {
     this.adapter = adapter;
     this.pluginSettings = settings;
-    if (!filePath || typeof filePath !== "string" || filePath.trim() === "") {
-      const errorMsg = "[Chat] Critical Error: Chat constructor called without a valid filePath.";
-      console.error(errorMsg, { settings, data });
-      this.filePath = `INVALID_PATH_${((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) || Date.now()}.json`;
-      new import_obsidian9.Notice("Critical Error: Chat created without a valid save path!");
-    } else {
-      this.filePath = (0, import_obsidian9.normalizePath)(filePath);
-    }
-    console.log(`[Chat ${(_c = (_b = data == null ? void 0 : data.metadata) == null ? void 0 : _b.id) != null ? _c : "initializing"}] Initialized. File path set to: ${this.filePath}`);
+    this.filePath = (0, import_obsidian9.normalizePath)(filePath);
     this.metadata = data.metadata;
-    this.messages = data.messages.map((m) => ({
-      ...m,
-      timestamp: new Date(m.timestamp)
-      // Ensure timestamp is a Date object
-    }));
+    this.messages = data.messages.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
+    this.logger = logger;
+    this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
     this.debouncedSave = (0, import_obsidian9.debounce)(this._saveToFile.bind(this), 1500, true);
   }
   // --- Message Management ---
@@ -4211,27 +4309,84 @@ var Chat = class {
     this.metadata.lastModified = new Date().toISOString();
     this.save();
   }
+  // У файлі Chat.ts
   /**
    * Updates specified metadata fields for the chat.
-   * Automatically updates the lastModified timestamp and triggers a save.
+   * Automatically updates the lastModified timestamp and triggers a save if changes occurred.
    * @param updates - An object containing metadata fields to update (cannot update 'id' or 'createdAt').
+   * @returns {boolean} - True if any metadata field was actually changed, false otherwise.
    */
   updateMetadata(updates) {
-    const originalId = this.metadata.id;
-    const originalCreatedAt = this.metadata.createdAt;
-    this.metadata = {
-      ...this.metadata,
-      ...updates,
-      id: originalId,
-      // Preserve original ID
-      createdAt: originalCreatedAt,
-      // Preserve original creation date
-      lastModified: new Date().toISOString()
-      // Always update last modified
-    };
-    console.log(`[Chat ${this.metadata.id}] Metadata updated:`, updates);
-    this.save();
+    let changed = false;
+    const currentMeta = this.metadata;
+    if (updates.name !== void 0 && updates.name !== currentMeta.name) {
+      currentMeta.name = updates.name;
+      changed = true;
+    }
+    if (updates.modelName !== void 0 && updates.modelName !== currentMeta.modelName) {
+      currentMeta.modelName = updates.modelName;
+      changed = true;
+    }
+    if (updates.selectedRolePath !== void 0 && updates.selectedRolePath !== currentMeta.selectedRolePath) {
+      currentMeta.selectedRolePath = updates.selectedRolePath;
+      changed = true;
+    }
+    if (updates.temperature !== void 0 && updates.temperature !== currentMeta.temperature) {
+      currentMeta.temperature = updates.temperature;
+      changed = true;
+    }
+    if (updates.contextWindow !== void 0 && updates.contextWindow !== currentMeta.contextWindow) {
+      currentMeta.contextWindow = updates.contextWindow;
+      changed = true;
+    }
+    if (changed) {
+      this.metadata.lastModified = new Date().toISOString();
+      if (this.pluginSettings.logger) {
+        this.pluginSettings.logger.debug(`[Chat ${this.metadata.id}] Metadata updated, scheduling save:`, updates);
+      } else {
+        console.log(`[Chat ${this.metadata.id}] Metadata updated, scheduling save:`, updates);
+      }
+      this.save();
+    } else {
+      if (this.pluginSettings.logger) {
+        this.pluginSettings.logger.debug(`[Chat ${this.metadata.id}] updateMetadata called, but no changes detected.`);
+      } else {
+        console.log(`[Chat ${this.metadata.id}] updateMetadata called, but no changes detected.`);
+      }
+    }
+    return changed;
   }
+  // Також переконайтесь, що конструктор Chat приймає і зберігає logger (або plugin)
+  // і що він передається при викликах new Chat та Chat.loadFromFile в ChatManager.ts
+  // Приклад оновленого конструктора Chat:
+  /*
+      private logger: Logger; // Додати властивість
+  
+      constructor(
+          adapter: DataAdapter,
+          settings: ChatConstructorSettings,
+          data: ChatData,
+          filePath: string,
+          logger: Logger // Додати параметр
+      ) {
+          this.adapter = adapter;
+          this.pluginSettings = settings;
+          this.filePath = normalizePath(filePath);
+          this.metadata = data.metadata;
+          this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+          this.logger = logger; // Зберегти логер
+  
+          this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
+          this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
+      }
+  
+      // І оновіть статичний метод loadFromFile, щоб він теж приймав та передавав logger
+       static async loadFromFile(filePath: string, adapter: DataAdapter, settings: ChatConstructorSettings, logger: Logger): Promise<Chat | null> {
+          // ...
+          return new Chat(adapter, settings, data, normPath, logger); // Передати logger
+          // ...
+       }
+       */
   // --- Persistence ---
   /** Triggers a debounced save if message history saving is enabled. */
   save() {
@@ -4246,7 +4401,6 @@ var Chat = class {
    */
   async saveImmediately() {
     if (!this.pluginSettings.saveMessageHistory) {
-      console.log(`[Chat ${this.metadata.id}] Save disabled, immediate save skipped for ${this.filePath}.`);
       return true;
     }
     return await this._saveToFile();
@@ -4288,27 +4442,27 @@ var Chat = class {
    * @param settings - Plugin settings.
    * @returns A new Chat instance or null if loading fails.
    */
-  static async loadFromFile(filePath, adapter, settings) {
+  static async loadFromFile(filePath, adapter, settings, logger) {
     var _a;
     const normPath = (0, import_obsidian9.normalizePath)(filePath);
-    console.log(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
+    logger.debug(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
     try {
       if (!await adapter.exists(normPath)) {
-        console.warn(`[Chat] File not found for loading: ${normPath}`);
+        logger.warn(`[Chat] File not found for loading: ${normPath}`);
         return null;
       }
       const json = await adapter.read(normPath);
       const data = JSON.parse(json);
       if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && Array.isArray(data.messages)) {
-        console.log(`[Chat] Successfully parsed data for static load, creating Chat instance for ID: ${data.metadata.id}`);
-        return new Chat(adapter, settings, data, normPath);
+        logger.debug(`[Chat] Successfully parsed data, creating Chat instance for ID: ${data.metadata.id}`);
+        return new Chat(adapter, settings, data, normPath, logger);
       } else {
-        console.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
+        logger.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
         new import_obsidian9.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
         return null;
       }
     } catch (e) {
-      console.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
+      logger.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
       new import_obsidian9.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
       return null;
     }
@@ -4333,485 +4487,544 @@ var Chat = class {
       return false;
     }
   }
+  toJSON() {
+    return {
+      metadata: this.metadata,
+      messages: this.messages
+    };
+  }
 };
 
+// node_modules/uuid/dist/esm-browser/stringify.js
+var byteToHex = [];
+for (let i = 0; i < 256; ++i) {
+  byteToHex.push((i + 256).toString(16).slice(1));
+}
+function unsafeStringify(arr, offset = 0) {
+  return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
+}
+
+// node_modules/uuid/dist/esm-browser/rng.js
+var getRandomValues;
+var rnds8 = new Uint8Array(16);
+function rng() {
+  if (!getRandomValues) {
+    if (typeof crypto === "undefined" || !crypto.getRandomValues) {
+      throw new Error("crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported");
+    }
+    getRandomValues = crypto.getRandomValues.bind(crypto);
+  }
+  return getRandomValues(rnds8);
+}
+
+// node_modules/uuid/dist/esm-browser/native.js
+var randomUUID = typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID.bind(crypto);
+var native_default = { randomUUID };
+
+// node_modules/uuid/dist/esm-browser/v4.js
+function v4(options, buf, offset) {
+  var _a, _b, _c;
+  if (native_default.randomUUID && !buf && !options) {
+    return native_default.randomUUID();
+  }
+  options = options || {};
+  const rnds = (_c = (_b = options.random) != null ? _b : (_a = options.rng) == null ? void 0 : _a.call(options)) != null ? _c : rng();
+  if (rnds.length < 16) {
+    throw new Error("Random bytes length must be >= 16");
+  }
+  rnds[6] = rnds[6] & 15 | 64;
+  rnds[8] = rnds[8] & 63 | 128;
+  if (buf) {
+    offset = offset || 0;
+    if (offset < 0 || offset + 16 > buf.length) {
+      throw new RangeError(`UUID byte range ${offset}:${offset + 15} is out of buffer bounds`);
+    }
+    for (let i = 0; i < 16; ++i) {
+      buf[offset + i] = rnds[i];
+    }
+    return buf;
+  }
+  return unsafeStringify(rnds);
+}
+var v4_default = v4;
+
 // src/ChatManager.ts
-var SESSIONS_INDEX_KEY = "chatSessionsIndex_v1";
-var ACTIVE_SESSION_ID_KEY = "activeChatSessionId_v1";
 var ChatManager = class {
-  // Звичайні завдання з файлу
   constructor(plugin) {
-    // Obsidian Vault Adapter
     this.chatsFolderPath = "/";
-    // Шлях до папки чатів В СХОВИЩІ
-    this.sessionIndex = {};
-    // In-memory index of available chats {id: metadata}
+    this.chatIndex = {};
     this.activeChatId = null;
+    this.activeChat = null;
+    // Кеш ТІЛЬКИ для активного об'єкта Chat
     this.loadedChats = {};
-    // Cache for loaded Chat objects
-    this.filePlanExists = false;
-    // Стан файлу плану
-    this.fileUrgentTasks = [];
-    // Термінові завдання з файлу
-    this.fileRegularTasks = [];
+    // Загальний кеш завантажених чатів (для швидкодії)
+    // savingDebounced тепер не потрібен, бо debounce є в Chat
+    this.currentTaskState = null;
     this.plugin = plugin;
     this.app = plugin.app;
     this.adapter = plugin.app.vault.adapter;
-    this.updateChatsFolderPath();
-    console.log(`[ChatManager] Initialized. Base path set to: ${this.chatsFolderPath}`);
   }
-  /**
-   * Оновлює внутрішній шлях `chatsFolderPath` на основі поточних налаштувань плагіна.
-   */
+  async initialize() {
+    this.plugin.logger.info("Initializing ChatManager...");
+    this.updateChatsFolderPath();
+    await this.ensureFoldersExist();
+    await this.loadChatIndex(true);
+    this.plugin.logger.info(`ChatManager initialized. Index has ${Object.keys(this.chatIndex).length} chats.`);
+  }
   updateChatsFolderPath() {
     var _a;
     const settingsPath = (_a = this.plugin.settings.chatHistoryFolderPath) == null ? void 0 : _a.trim();
-    this.chatsFolderPath = settingsPath ? (0, import_obsidian10.normalizePath)(settingsPath) : "/";
-    console.log(`[ChatManager] Updated chatsFolderPath to: ${this.chatsFolderPath}`);
+    this.chatsFolderPath = settingsPath && settingsPath !== "/" ? (0, import_obsidian10.normalizePath)(settingsPath) : "/";
+    this.plugin.logger.debug(`Chat history folder path set to: ${this.chatsFolderPath}`);
   }
-  /** Оновлює стан завдань на основі даних, отриманих з плагіна. */
   updateTaskState(tasks) {
-    if (tasks) {
-      this.filePlanExists = tasks.hasContent;
-      this.fileUrgentTasks = [...tasks.urgent];
-      this.fileRegularTasks = [...tasks.regular];
-    } else {
-      this.filePlanExists = false;
-      this.fileUrgentTasks = [];
-      this.fileRegularTasks = [];
-    }
+    this.plugin.logger.debug("Updating task state in ChatManager", tasks);
+    this.currentTaskState = tasks;
   }
-  /**
-   * Ініціалізує ChatManager: оновлює шлях, перевіряє папку, завантажує індекс та активний ID.
-   */
-  async initialize() {
-    console.log("[ChatManager] Initializing...");
-    this.updateChatsFolderPath();
-    await this.ensureChatsFolderExists();
-    await this.loadChatIndex(true);
-    this.activeChatId = await this.plugin.loadDataKey(ACTIVE_SESSION_ID_KEY) || null;
-    if (this.activeChatId && !this.sessionIndex[this.activeChatId]) {
-      this.activeChatId = null;
-      await this.plugin.saveDataKey(ACTIVE_SESSION_ID_KEY, null);
-    } else if (this.activeChatId) {
-    }
+  getCurrentTaskState() {
+    return this.currentTaskState;
   }
-  /**
-   * Гарантує існування папки для історії чатів.
-   */
-  async ensureChatsFolderExists() {
-    if (this.chatsFolderPath === "/" || !this.chatsFolderPath) {
-      return;
-    }
-    try {
-      if (!await this.adapter.exists(this.chatsFolderPath)) {
-        await this.adapter.mkdir(this.chatsFolderPath);
-      } else {
-        const stat = await this.adapter.stat(this.chatsFolderPath);
-        if ((stat == null ? void 0 : stat.type) !== "folder") {
-          const errorMsg = `Error: Configured chat history path '${this.chatsFolderPath}' exists but is not a folder.`;
-          console.error(`[ChatManager] ${errorMsg}`);
-          new import_obsidian10.Notice(errorMsg);
+  async ensureFoldersExist() {
+    const historyPath = this.plugin.settings.chatHistoryFolderPath;
+    const exportPath = this.plugin.settings.chatExportFolderPath;
+    this.plugin.logger.debug(`Ensuring folders exist: History='${historyPath}', Export='${exportPath}'`);
+    const checkAndCreate = async (folderPath, folderDesc) => {
+      if (!folderPath || folderPath === "/")
+        return;
+      try {
+        if (!await this.adapter.exists(folderPath)) {
+          this.plugin.logger.info(`${folderDesc} folder doesn't exist. Creating: ${folderPath}`);
+          await this.adapter.mkdir(folderPath);
+        } else {
+          const stat = await this.adapter.stat(folderPath);
+          if ((stat == null ? void 0 : stat.type) !== "folder") {
+            this.plugin.logger.error(`Path for ${folderDesc} exists but is not a folder: ${folderPath}`);
+            new import_obsidian10.Notice(`Error: Path for ${folderDesc} is not a folder.`);
+          }
         }
+      } catch (error) {
+        this.plugin.logger.error(`Error creating/checking ${folderDesc} directory '${folderPath}':`, error);
+        new import_obsidian10.Notice(`Error creating folder for ${folderDesc}. Check settings and permissions.`);
       }
-    } catch (error) {
-      const errorMsg = `Error creating/checking chat history directory '${this.chatsFolderPath}'.`;
-      console.error(`[ChatManager] ${errorMsg}`, error);
-      new import_obsidian10.Notice(errorMsg);
-    }
+    };
+    await checkAndCreate(historyPath, "Chat History");
+    await checkAndCreate(exportPath, "Chat Export");
   }
-  /**
-   * Завантажує або оновлює індекс чатів, скануючи файли у папці історії.
-   * @param forceScanFromFile Завжди true для пересканування.
-   */
-  async loadChatIndex(forceScanFromFile = true) {
+  async loadChatIndex(forceScan = false) {
     var _a;
-    if (!forceScanFromFile) {
-      const loadedIndex = await this.plugin.loadDataKey(SESSIONS_INDEX_KEY);
-      this.sessionIndex = loadedIndex || {};
+    this.plugin.logger.debug(`Loading chat index... (forceScan: ${forceScan})`);
+    const storedIndex = await this.plugin.loadDataKey(CHAT_INDEX_KEY);
+    if (!forceScan && storedIndex && Object.keys(storedIndex).length > 0) {
+      this.chatIndex = storedIndex;
+      this.plugin.logger.debug(`Loaded ${Object.keys(this.chatIndex).length} chat(s) from stored index.`);
       return;
     }
+    this.plugin.logger.info(`Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
     const newIndex = {};
     let filesScanned = 0;
     let chatsLoaded = 0;
     try {
-      if (!await this.adapter.exists(this.chatsFolderPath) && this.chatsFolderPath !== "/") {
-        console.warn(`[ChatManager] Chat history folder '${this.chatsFolderPath}' not found. Index is empty.`);
-        this.sessionIndex = {};
+      if (this.chatsFolderPath !== "/" && !await this.adapter.exists(this.chatsFolderPath)) {
+        this.plugin.logger.warn(`Chat history folder '${this.chatsFolderPath}' not found during scan. Index will be empty.`);
+        this.chatIndex = {};
         await this.saveChatIndex();
         return;
       }
       const listResult = await this.adapter.list(this.chatsFolderPath);
-      const chatFiles = listResult.files.filter(
-        (filePath) => filePath.toLowerCase().endsWith(".json")
-        // Тільки .json
-      );
+      const chatFiles = listResult.files.filter((filePath) => {
+        const fileName = filePath.substring(filePath.lastIndexOf("/") + 1);
+        return fileName.endsWith(".json") && !fileName.startsWith(".");
+      });
       filesScanned = chatFiles.length;
-      this.plugin.logger.info(`[ChatManager] Found ${filesScanned} potential chat files.`);
-      for (const filePath of chatFiles) {
-        const fullPath = (0, import_obsidian10.normalizePath)(filePath);
+      this.plugin.logger.debug(`Found ${filesScanned} potential chat files to scan.`);
+      for (const fullPath of chatFiles) {
         const fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
         const chatId = fileName.endsWith(".json") ? fileName.slice(0, -5) : null;
-        if (!chatId) {
-          console.warn(`[ChatManager] Could not extract chat ID from file path: ${fullPath}`);
+        if (!chatId)
           continue;
-        }
         try {
           const jsonContent = await this.adapter.read(fullPath);
           const data = JSON.parse(jsonContent);
-          if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && data.metadata.id === chatId) {
+          if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && data.metadata.id === chatId && data.metadata.name && data.metadata.lastModified && data.metadata.createdAt) {
             const metadata = data.metadata;
             newIndex[chatId] = {
               name: metadata.name,
-              modelName: metadata.modelName,
-              selectedRolePath: metadata.selectedRolePath,
-              temperature: metadata.temperature,
-              createdAt: metadata.createdAt,
-              lastModified: metadata.lastModified
+              lastModified: typeof metadata.lastModified === "string" ? metadata.lastModified : new Date(metadata.lastModified || Date.now()).toISOString(),
+              createdAt: typeof metadata.createdAt === "string" ? metadata.createdAt : new Date(metadata.createdAt || Date.now()).toISOString(),
+              // Додаємо createdAt
+              // Додаємо опціональні поля, якщо вони є
+              ...metadata.modelName && { modelName: metadata.modelName },
+              ...metadata.selectedRolePath && { selectedRolePath: metadata.selectedRolePath },
+              ...metadata.temperature !== void 0 && { temperature: metadata.temperature },
+              ...metadata.contextWindow !== void 0 && { contextWindow: metadata.contextWindow }
             };
             chatsLoaded++;
           } else {
-            console.warn(`[ChatManager] Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing metadata. ChatID from filename: ${chatId}`, data == null ? void 0 : data.metadata);
+            this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing required fields.`);
           }
         } catch (e) {
-          console.error(`[ChatManager] Error reading or parsing chat file ${fullPath}:`, e);
+          this.plugin.logger.error(`Error reading or parsing chat file ${fullPath} during index scan:`, e);
         }
       }
-      this.sessionIndex = newIndex;
+      this.chatIndex = newIndex;
       await this.saveChatIndex();
+      this.plugin.logger.info(`Index rebuilt: ${chatsLoaded} chats loaded from ${filesScanned} scanned files.`);
     } catch (error) {
-      this.plugin.logger.error(`[ChatManager] Critical error during index rebuild:`, error);
-      this.sessionIndex = {};
+      this.plugin.logger.error(`Critical error during index rebuild scan:`, error);
+      this.chatIndex = {};
       await this.saveChatIndex();
     }
   }
-  /** Зберігає поточний індекс чатів у сховище плагіна. */
   async saveChatIndex() {
-    await this.plugin.saveDataKey(SESSIONS_INDEX_KEY, this.sessionIndex);
+    this.plugin.logger.debug(`Saving chat index with ${Object.keys(this.chatIndex).length} entries.`);
+    await this.plugin.saveDataKey(CHAT_INDEX_KEY, this.chatIndex);
   }
-  /** Генерує повний шлях до файлу чату. */
   getChatFilePath(id) {
     const fileName = `${id}.json`;
-    return this.chatsFolderPath === "/" || !this.chatsFolderPath ? (0, import_obsidian10.normalizePath)(fileName) : (0, import_obsidian10.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
+    return this.chatsFolderPath === "/" ? (0, import_obsidian10.normalizePath)(fileName) : (0, import_obsidian10.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
   }
-  /** Зберігає дані вказаного чату у файл. */
-  async saveChat(chat) {
-    try {
-      const filePath = this.getChatFilePath(chat.metadata.id);
-      chat.metadata.lastModified = new Date().toISOString();
-      const dataToSave = {
-        metadata: chat.metadata,
-        messages: chat.getMessages()
-      };
-      await this.adapter.write(filePath, JSON.stringify(dataToSave, null, 2));
-      this.sessionIndex[chat.metadata.id] = { ...chat.metadata };
-      delete this.sessionIndex[chat.metadata.id].id;
+  /**
+   * Зберігає дані вказаного чату у файл (делегує класу Chat) та оновлює індекс.
+   * Цей метод тепер використовується лише для початкового збереження нового чату.
+   * Подальше збереження ініціюється з класу Chat через debounce.
+   */
+  async saveChatAndUpdateIndex(chat) {
+    const saved = await chat.saveImmediately();
+    if (saved) {
+      const { id, createdAt, ...metaToStore } = chat.metadata;
+      this.chatIndex[id] = metaToStore;
       await this.saveChatIndex();
       this.plugin.emit("chat-list-updated");
       return true;
-    } catch (error) {
-      console.error(`[ChatManager] Error saving chat ${chat.metadata.id} to ${chat.filePath}:`, error);
-      new import_obsidian10.Notice(`Error saving chat: ${chat.metadata.name}`);
-      return false;
     }
+    return false;
   }
   /** Створює новий чат. */
   async createNewChat(name) {
-    console.log("[ChatManager] Creating new chat...");
+    this.plugin.logger.info(`Creating new chat...`);
     try {
       const now = new Date();
-      const newId = `chat_${now.getTime()}_${Math.random().toString(36).substring(2, 8)}`;
+      const newId = v4_default();
       const filePath = this.getChatFilePath(newId);
       const initialMetadata = {
         id: newId,
         name: name || `Chat ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-        // Use locale time format
         modelName: this.plugin.settings.modelName,
         selectedRolePath: this.plugin.settings.selectedRolePath,
         temperature: this.plugin.settings.temperature,
+        contextWindow: this.plugin.settings.contextWindow,
+        // <-- Додано
         createdAt: now.toISOString(),
         lastModified: now.toISOString()
       };
       const constructorSettings = { ...this.plugin.settings };
-      const newChat = new Chat(this.adapter, constructorSettings, { metadata: initialMetadata, messages: [] }, filePath);
-      const saved = await this.saveChat(newChat);
-      if (!saved) {
-        throw new Error("Failed to save initial chat file via saveChat.");
-      }
+      const chatData = { metadata: initialMetadata, messages: [] };
+      const newChat = new Chat(this.adapter, constructorSettings, chatData, filePath, this.plugin.logger);
+      const saved = await this.saveChatAndUpdateIndex(newChat);
+      if (!saved)
+        throw new Error("Failed to save initial chat file.");
       this.loadedChats[newChat.metadata.id] = newChat;
       await this.setActiveChat(newChat.metadata.id);
+      this.plugin.logger.info(`Created and activated new chat: ${newChat.metadata.name} (ID: ${newChat.metadata.id})`);
       return newChat;
     } catch (error) {
-      console.error("[ChatManager] Error creating new chat:", error);
+      this.plugin.logger.error("Error creating new chat:", error);
       new import_obsidian10.Notice("Error creating new chat session.");
       return null;
     }
   }
-  /** Повертає масив метаданих всіх доступних чатів, відсортований за датою зміни. */
+  /** Повертає масив метаданих всіх доступних чатів. */
   listAvailableChats() {
-    return Object.entries(this.sessionIndex).map(([id, meta]) => ({
-      id,
-      ...meta
-    })).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+    return Object.entries(this.chatIndex).map(([id, storedMeta]) => {
+      if (!storedMeta || typeof storedMeta.name !== "string" || typeof storedMeta.lastModified !== "string" || typeof storedMeta.createdAt !== "string") {
+        this.plugin.logger.warn(`Invalid or incomplete metadata found in index for chat ID: ${id}. Skipping in list.`, storedMeta);
+        return null;
+      }
+      return {
+        id,
+        createdAt: storedMeta.createdAt,
+        // Тепер ми впевнені, що воно існує
+        lastModified: storedMeta.lastModified,
+        name: storedMeta.name,
+        modelName: storedMeta.modelName,
+        selectedRolePath: storedMeta.selectedRolePath,
+        temperature: storedMeta.temperature,
+        contextWindow: storedMeta.contextWindow
+      };
+    }).filter((chatMeta) => chatMeta !== null).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
   }
-  /** Повертає ID поточного активного чату. */
   getActiveChatId() {
     return this.activeChatId;
   }
-  /** Встановлює активний чат за його ID. */
-  async setActiveChat(id) {
-    if (id && !this.sessionIndex[id]) {
-      console.error(`[ChatManager] Attempted to set active chat to non-existent ID: ${id}. Setting to null.`);
-      id = null;
+  /** Завантажує та повертає екземпляр Chat за його ID. */
+  async getChat(id) {
+    this.plugin.logger.debug(`getChat called for ID: ${id}`);
+    if (this.loadedChats[id]) {
+      this.plugin.logger.debug(`Returning chat ${id} from memory cache.`);
+      return this.loadedChats[id];
     }
-    if (id === this.activeChatId) {
-      if (id)
-        await this.getChat(id);
+    this.plugin.logger.debug(`Chat ${id} not in memory cache, loading from file...`);
+    if (!this.chatIndex[id]) {
+      this.plugin.logger.warn(`Chat ID ${id} not found in index during getChat.`);
+      return null;
+    }
+    const filePath = this.getChatFilePath(id);
+    try {
+      const chat = await Chat.loadFromFile(filePath, this.adapter, this.plugin.settings, this.plugin.logger);
+      if (chat) {
+        this.plugin.logger.debug(`Successfully loaded chat ${id}. Caching.`);
+        this.loadedChats[id] = chat;
+        return chat;
+      } else {
+        this.plugin.logger.error(`Chat.loadFromFile returned null for ${id}. Removing from index if still present.`);
+        if (this.chatIndex[id]) {
+          delete this.chatIndex[id];
+          await this.saveChatIndex();
+          this.plugin.emit("chat-list-updated");
+        }
+        if (this.activeChatId === id)
+          await this.setActiveChat(null);
+        return null;
+      }
+    } catch (error) {
+      this.plugin.logger.error(`Unexpected error during getChat for ${id} from ${filePath}:`, error);
+      return null;
+    }
+  }
+  async getActiveChat() {
+    this.plugin.logger.debug(`getActiveChat called. Current activeChatId: ${this.activeChatId}`);
+    if (!this.activeChatId) {
+      this.plugin.logger.debug("No active chat ID set.");
+      return null;
+    }
+    if (this.activeChat && this.activeChat.metadata.id === this.activeChatId) {
+      this.plugin.logger.debug(`Returning cached active chat object: ${this.activeChatId}`);
+      return this.activeChat;
+    }
+    this.plugin.logger.debug(`Active chat ${this.activeChatId} not in active cache, calling getChat...`);
+    const chat = await this.getChat(this.activeChatId);
+    if (chat) {
+      this.activeChat = chat;
+      return chat;
+    } else {
+      this.plugin.logger.warn(`Failed to load active chat ${this.activeChatId} via getChat.`);
+      return null;
+    }
+  }
+  async setActiveChat(id) {
+    this.plugin.logger.debug(`setActiveChat called with ID: ${id}`);
+    const previousActiveId = this.activeChatId;
+    if (id && !this.chatIndex[id]) {
+      this.plugin.logger.error(`Attempted to set active chat to non-existent ID: ${id}. Aborting.`);
+      new import_obsidian10.Notice(`Error: Chat with ID ${id} not found.`);
+      return;
+    }
+    if (id === previousActiveId) {
+      this.plugin.logger.debug(`Chat ${id} is already active.`);
+      if (id && !this.activeChat) {
+        this.activeChat = await this.getChat(id);
+        this.plugin.emit("active-chat-changed", { chatId: id, chat: this.activeChat });
+      }
       return;
     }
     this.activeChatId = id;
-    await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, id);
+    this.activeChat = null;
     let loadedChat = null;
     if (id) {
       loadedChat = await this.getChat(id);
       if (!loadedChat) {
-        console.error(`[ChatManager] Failed to load chat data for newly activated ID ${id}. Resetting active chat to null.`);
-        await this.setActiveChat(null);
-        return;
+        this.plugin.logger.error(`Failed to load chat data AFTER validating ID ${id}. Resetting active chat to null.`);
+        this.activeChatId = null;
+        id = null;
+      } else {
+        this.activeChat = loadedChat;
       }
     }
+    this.plugin.logger.info(`Active chat changed from ${previousActiveId} to ${id}`);
     this.plugin.emit("active-chat-changed", { chatId: id, chat: loadedChat });
   }
-  /** Отримує конкретний чат за ID (з кешу або файлу). */
-  async getChat(id) {
-    if (this.loadedChats[id]) {
-      return this.loadedChats[id];
-    }
-    if (this.sessionIndex[id]) {
-      const filePath = this.getChatFilePath(id);
-      const constructorSettings = { ...this.plugin.settings };
-      const chat = await Chat.loadFromFile(filePath, this.adapter, constructorSettings);
-      if (chat) {
-        this.loadedChats[id] = chat;
-        return chat;
-      } else {
-        console.error(`[ChatManager] Failed to load chat ${id} from ${filePath}. Removing from index.`);
-        delete this.sessionIndex[id];
-        await this.saveChatIndex();
-        if (this.activeChatId === id) {
-          await this.setActiveChat(null);
-        }
-        this.plugin.emit("chat-list-updated");
-        return null;
-      }
-    }
-    console.warn(`[ChatManager] Chat with ID ${id} not found in session index.`);
-    return null;
-  }
-  /** Отримує поточний активний чат (або останній, або створює новий). */
-  async getActiveChat() {
-    if (this.activeChatId) {
-      const chat = await this.getChat(this.activeChatId);
-      if (chat)
-        return chat;
-      console.warn(`[ChatManager] Active chat ${this.activeChatId} failed to load. Finding alternative.`);
-    }
-    const availableChats = this.listAvailableChats();
-    if (availableChats.length > 0) {
-      const mostRecentId = availableChats[0].id;
-      await this.setActiveChat(mostRecentId);
-      return this.activeChatId ? this.loadedChats[this.activeChatId] : null;
-    } else {
-      return await this.createNewChat();
-    }
-  }
-  /** Додає повідомлення до активного чату. */
   async addMessageToActiveChat(role, content) {
     const activeChat = await this.getActiveChat();
-    if (activeChat) {
-      const newMessage = activeChat.addMessage(role, content);
-      this.sessionIndex[activeChat.metadata.id].lastModified = new Date().toISOString();
-      await this.saveChatIndex();
-      this.plugin.emit("message-added", { chatId: activeChat.metadata.id, message: newMessage });
-      this.plugin.emit("chat-list-updated");
-      return newMessage;
-    } else {
-      console.error("[ChatManager] Cannot add message, no active chat.");
-      new import_obsidian10.Notice("Error: No active chat session to add message to.");
+    if (!activeChat) {
+      this.plugin.logger.error("Cannot add message: No active chat.");
+      new import_obsidian10.Notice("Error: No active chat session.");
       return null;
     }
+    const newMessage = activeChat.addMessage(role, content);
+    this.plugin.logger.debug(`Added ${role} message to active chat ${activeChat.metadata.id}.`);
+    if (this.chatIndex[activeChat.metadata.id]) {
+      this.chatIndex[activeChat.metadata.id].lastModified = activeChat.metadata.lastModified;
+      await this.saveChatIndex();
+    }
+    this.plugin.emit("message-added", { chatId: activeChat.metadata.id, message: newMessage });
+    this.plugin.emit("chat-list-updated");
+    return newMessage;
   }
-  /** Очищує історію повідомлень активного чату. */
   async clearActiveChatMessages() {
     const activeChat = await this.getActiveChat();
-    if (activeChat) {
-      activeChat.clearMessages();
-      this.plugin.emit("messages-cleared", activeChat.metadata.id);
-    } else {
-      console.warn("[ChatManager] Cannot clear messages, no active chat.");
-      new import_obsidian10.Notice("No active chat to clear.");
+    if (!activeChat) {
+      this.plugin.logger.warn("Cannot clear messages: No active chat.");
+      return;
     }
+    this.plugin.logger.info(`Clearing messages for chat: ${activeChat.metadata.id}`);
+    activeChat.clearMessages();
+    if (this.chatIndex[activeChat.metadata.id]) {
+      this.chatIndex[activeChat.metadata.id].lastModified = activeChat.metadata.lastModified;
+      await this.saveChatIndex();
+    }
+    this.plugin.emit("messages-cleared", activeChat.metadata.id);
+    this.plugin.emit("chat-list-updated");
   }
-  /** Оновлює метадані активного чату та генерує відповідні події. */
-  // ChatManager.ts
-  /** Оновлює метадані активного чату та генерує відповідні події. */
   async updateActiveChatMetadata(metadataUpdate) {
     var _a, _b, _c, _d;
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
-      console.warn("[ChatManager] Cannot update metadata, no active chat.");
+      this.plugin.logger.warn("Cannot update metadata, no active chat.");
       new import_obsidian10.Notice("No active chat to update metadata for.");
       return false;
     }
+    this.plugin.logger.debug(`Updating metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
     const oldRolePath = activeChat.metadata.selectedRolePath;
     const oldModelName = activeChat.metadata.modelName;
-    activeChat.updateMetadata(metadataUpdate);
-    const saved = await this.saveChat(activeChat);
-    if (saved) {
+    const changed = activeChat.updateMetadata(metadataUpdate);
+    if (changed) {
+      this.plugin.logger.debug(`Metadata changed. Chat ${activeChat.metadata.id} save scheduled by Chat class.`);
+      if (this.chatIndex[activeChat.metadata.id]) {
+        const { id, createdAt, ...metaToStore } = activeChat.metadata;
+        this.chatIndex[activeChat.metadata.id] = metaToStore;
+        await this.saveChatIndex();
+      }
       const newRolePath = activeChat.metadata.selectedRolePath;
       const newModelName = activeChat.metadata.modelName;
+      let roleChanged = false;
+      let modelChanged = false;
       if (metadataUpdate.selectedRolePath !== void 0 && oldRolePath !== newRolePath) {
+        roleChanged = true;
+      }
+      if (metadataUpdate.modelName !== void 0 && oldModelName !== newModelName) {
+        modelChanged = true;
+      }
+      if (roleChanged) {
         try {
           const newRoleName = this.plugin.findRoleNameByPath(newRolePath);
+          this.plugin.logger.debug(`Emitting 'role-changed': ${newRoleName}`);
           this.plugin.emit("role-changed", newRoleName);
           (_b = (_a = this.plugin.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
         } catch (e) {
-          console.error("[ChatManager] Error finding role name or emitting role-changed event:", e);
+          this.plugin.logger.error("Error finding role name/emitting role-changed:", e);
         }
       }
-      if (metadataUpdate.modelName !== void 0 && oldModelName !== newModelName) {
+      if (modelChanged) {
+        this.plugin.logger.debug(`Emitting 'model-changed': ${newModelName}`);
         this.plugin.emit("model-changed", newModelName);
         (_d = (_c = this.plugin.promptService) == null ? void 0 : _c.clearModelDetailsCache) == null ? void 0 : _d.call(_c);
       }
       this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
-      return true;
-    } else {
-      console.error(`[ChatManager] Failed to save chat file after metadata update for ${activeChat.metadata.id}.`);
-      new import_obsidian10.Notice("Error saving chat after metadata update.");
-      return false;
-    }
-  }
-  // ... (решта коду ChatManager) ...
-  /** Видаляє чат за ID. */
-  async deleteChat(id) {
-    const filePath = this.getChatFilePath(id);
-    let deletedFile = false;
-    try {
-      if (await this.adapter.exists(filePath)) {
-        await this.adapter.remove(filePath);
-      } else {
-        console.warn(`[ChatManager] Chat file not found, assuming already deleted: ${filePath}`);
-      }
-      deletedFile = true;
-    } catch (error) {
-      console.error(`[ChatManager] Error deleting chat file ${filePath}:`, error);
-      new import_obsidian10.Notice(`Error deleting chat file for ID ${id}.`);
-      deletedFile = false;
-    }
-    if (this.sessionIndex[id]) {
-      delete this.sessionIndex[id];
-      delete this.loadedChats[id];
-      await this.saveChatIndex();
-      if (this.activeChatId === id) {
-        const available = this.listAvailableChats();
-        const nextActiveId = available.length > 0 ? available[0].id : null;
-        await this.setActiveChat(nextActiveId);
-      }
       this.plugin.emit("chat-list-updated");
       return true;
     } else {
-      console.warn(`[ChatManager] Chat ${id} not found in index while trying to delete.`);
-      return deletedFile;
-    }
-  }
-  /** Перейменовує чат за ID. */
-  async renameChat(id, newName) {
-    const trimmedName = newName.trim();
-    if (!trimmedName) {
-      new import_obsidian10.Notice("Chat name cannot be empty.");
-      return false;
-    }
-    if (!this.sessionIndex[id]) {
-      console.warn(`[ChatManager] Cannot rename chat ${id}: Not found in index.`);
-      new import_obsidian10.Notice(`Chat with ID ${id} not found.`);
-      return false;
-    }
-    console.log(`[ChatManager] Renaming chat ${id} to "${trimmedName}"`);
-    const chatToRename = await this.getChat(id);
-    if (!chatToRename) {
-      console.error(`[ChatManager] Failed to load chat ${id} for renaming.`);
-      new import_obsidian10.Notice(`Error loading chat data for rename.`);
-      return false;
-    }
-    chatToRename.updateMetadata({ name: trimmedName });
-    const saved = await this.saveChat(chatToRename);
-    if (saved) {
-      new import_obsidian10.Notice(`Chat renamed to "${trimmedName}"`);
-      return true;
-    } else {
-      console.error(`[ChatManager] Failed to save renamed chat file for ${id}.`);
-      new import_obsidian10.Notice(`Error saving renamed chat ${trimmedName}.`);
+      this.plugin.logger.debug("Metadata update called, but no actual changes detected.");
       return false;
     }
   }
-  /** Створює копію існуючого чату. */
+  async deleteChat(id) {
+    this.plugin.logger.info(`Deleting chat ID: ${id}`);
+    const chatExistedInIndex = !!this.chatIndex[id];
+    const filePath = this.getChatFilePath(id);
+    let success = true;
+    try {
+      if (this.loadedChats[id]) {
+        delete this.loadedChats[id];
+        this.plugin.logger.debug(`Removed chat ${id} from memory cache.`);
+      }
+      if (chatExistedInIndex) {
+        delete this.chatIndex[id];
+        await this.saveChatIndex();
+        this.plugin.logger.debug(`Removed chat ${id} from index.`);
+      }
+      if (await this.adapter.exists(filePath)) {
+        await this.adapter.remove(filePath);
+        this.plugin.logger.debug(`Removed chat file: ${filePath}`);
+      } else {
+        if (chatExistedInIndex) {
+          this.plugin.logger.warn(`Chat file not found during deletion (but was in index): ${filePath}`);
+        }
+      }
+    } catch (error) {
+      this.plugin.logger.error(`Error during deletion process for chat ${id} or its file ${filePath}:`, error);
+      new import_obsidian10.Notice(`Error deleting chat ${id}.`);
+      success = false;
+      await this.loadChatIndex(true);
+    } finally {
+      if (id === this.activeChatId) {
+        this.plugin.logger.info(`Deleted active chat ${id}. Selecting new active chat...`);
+        const availableChats = this.listAvailableChats();
+        const nextActiveId = availableChats.length > 0 ? availableChats[0].id : null;
+        await this.setActiveChat(nextActiveId);
+      }
+      this.plugin.emit("chat-list-updated");
+    }
+    return success && chatExistedInIndex;
+  }
   async cloneChat(chatIdToClone) {
+    this.plugin.logger.info(`Cloning chat ID: ${chatIdToClone}`);
     const originalChat = await this.getChat(chatIdToClone);
     if (!originalChat) {
-      console.error(`[ChatManager] Cannot clone: Original chat ${chatIdToClone} not found.`);
-      new import_obsidian10.Notice("Original chat not found for cloning.");
+      this.plugin.logger.error(`Cannot clone: Original chat ${chatIdToClone} not found.`);
+      new import_obsidian10.Notice("Original chat not found.");
       return null;
     }
     try {
+      const clonedData = originalChat.toJSON();
       const now = new Date();
-      const newId = `chat_${now.getTime()}_${Math.random().toString(36).substring(2, 8)}`;
+      const newId = v4_default();
       const newFilePath = this.getChatFilePath(newId);
-      const originalMetadata = originalChat.metadata;
-      const clonedMetadata = {
-        ...originalMetadata,
-        id: newId,
-        name: `Copy of ${originalMetadata.name}`,
-        createdAt: now.toISOString(),
-        lastModified: now.toISOString()
-      };
-      const clonedChatData = {
-        metadata: clonedMetadata,
-        messages: originalChat.getMessages().map((msg) => ({ ...msg }))
-      };
+      clonedData.metadata.id = newId;
+      clonedData.metadata.name = `Copy of ${originalChat.metadata.name}`;
+      clonedData.metadata.createdAt = now.toISOString();
+      clonedData.metadata.lastModified = now.toISOString();
       const constructorSettings = { ...this.plugin.settings };
-      const clonedChat = new Chat(this.adapter, constructorSettings, clonedChatData, newFilePath);
-      const saved = await this.saveChat(clonedChat);
-      if (!saved) {
+      const clonedChat = new Chat(this.adapter, constructorSettings, clonedData, newFilePath, this.plugin.logger);
+      const saved = await this.saveChatAndUpdateIndex(clonedChat);
+      if (!saved)
         throw new Error("Failed to save the cloned chat file.");
-      }
       this.loadedChats[clonedChat.metadata.id] = clonedChat;
       await this.setActiveChat(clonedChat.metadata.id);
+      this.plugin.logger.info(`Cloned chat "${clonedChat.metadata.name}" created and activated.`);
       return clonedChat;
     } catch (error) {
-      console.error("[ChatManager] Error cloning chat:", error);
+      this.plugin.logger.error("Error cloning chat:", error);
       new import_obsidian10.Notice("An error occurred while cloning the chat.");
       return null;
     }
   }
-  // У класі ChatManager
-  async ensureFoldersExist() {
-    const historyPath = this.plugin.settings.chatHistoryFolderPath;
-    const exportPath = this.plugin.settings.chatExportFolderPath;
-    this.plugin.logger.debug(`Ensuring folders exist: History='<span class="math-inline">{historyPath}', Export='</span>{exportPath}'`);
-    try {
-      if (historyPath && !await this.adapter.exists(historyPath)) {
-        this.plugin.logger.info(`History folder doesn't exist. Creating: ${historyPath}`);
-        await this.adapter.mkdir(historyPath);
-      }
-      if (exportPath && !await this.adapter.exists(exportPath)) {
-        this.plugin.logger.info(`Export folder doesn't exist. Creating: ${exportPath}`);
-        await this.adapter.mkdir(exportPath);
-      }
-    } catch (error) {
-      this.plugin.logger.error("Error ensuring chat folders exist:", error);
-      new import_obsidian10.Notice("Error creating necessary chat folders. Check plugin settings and vault permissions.");
+  // --- Метод видалення повідомлень ---
+  async deleteMessagesAfter(chatId, userMessageIndex) {
+    this.plugin.logger.info(`Deleting messages after index ${userMessageIndex} for chat ${chatId}`);
+    const chat = await this.getChat(chatId);
+    if (!chat) {
+      this.plugin.logger.error(`Cannot delete messages: Chat ${chatId} not found.`);
+      return false;
     }
+    if (userMessageIndex < 0 || userMessageIndex >= chat.messages.length - 1) {
+      this.plugin.logger.warn(`Invalid index (${userMessageIndex}) or last message, nothing to delete after in chat ${chatId}.`);
+      return true;
+    }
+    const originalLength = chat.messages.length;
+    chat.messages = chat.messages.slice(0, userMessageIndex + 1);
+    chat.updateMetadata({});
+    this.plugin.logger.debug(`Messages for chat ${chatId} truncated from ${originalLength} to ${chat.messages.length}. Save scheduled.`);
+    if (this.chatIndex[chatId]) {
+      this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
+      await this.saveChatIndex();
+    }
+    if (this.activeChatId === chatId) {
+      this.activeChat = chat;
+      this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
+    }
+    return true;
   }
+  // --- Кінець методу видалення ---
 };
 
 // src/main.ts
@@ -4902,8 +5115,9 @@ var TranslationService = class {
 // src/main.ts
 var SESSIONS_INDEX_KEY_V1 = "chatSessionsIndex_v1";
 var ACTIVE_SESSION_ID_KEY_V1 = "activeChatSessionId_v1";
-var SESSIONS_INDEX_KEY2 = "chatIndex_v2";
-var ACTIVE_CHAT_ID_KEY = "activeChatId_v2";
+var SESSIONS_INDEX_KEY = "chatIndex_v2";
+var ACTIVE_CHAT_ID_KEY2 = "activeChatId_v2";
+var CHAT_INDEX_KEY = "chatIndex_v2";
 var OllamaPlugin2 = class extends import_obsidian12.Plugin {
   constructor() {
     super(...arguments);
@@ -5063,7 +5277,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
           (_a = this.ragService) == null ? void 0 : _a.indexDocuments();
         }, 5e3);
       }
-      const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
+      const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY2);
       if (savedActiveId && this.settings.saveMessageHistory) {
         this.logger.info(`Layout ready, restoring active chat ID: ${savedActiveId}`);
         await this.chatManager.setActiveChat(savedActiveId);
@@ -5276,14 +5490,14 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
         const lastActiveId = this.chatManager.getActiveChatId();
         if (lastActiveId !== void 0 && lastActiveId !== null) {
           this.logger.info(`Saving activeChatId (${lastActiveId}) on unload.`);
-          await this.saveDataKey(ACTIVE_CHAT_ID_KEY, lastActiveId);
+          await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, lastActiveId);
         } else {
           this.logger.info(`No active chat ID found to save on unload.`);
-          await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
+          await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, null);
         }
       } else {
         this.logger.info(`History saving disabled or chatManager missing, not saving active chat ID.`);
-        await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
+        await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, null);
       }
     } catch (error) {
       this.logger.error("Error saving active chat ID on unload:", error);
@@ -5367,15 +5581,15 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     const loadedData = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
     let migrated = false;
-    if (loadedData && loadedData[SESSIONS_INDEX_KEY_V1] !== void 0 && this.settings[SESSIONS_INDEX_KEY2] === void 0) {
+    if (loadedData && loadedData[SESSIONS_INDEX_KEY_V1] !== void 0 && this.settings[SESSIONS_INDEX_KEY] === void 0) {
       this.logger.info("Migrating chat index key v1 -> v2");
-      this.settings[SESSIONS_INDEX_KEY2] = loadedData[SESSIONS_INDEX_KEY_V1];
+      this.settings[SESSIONS_INDEX_KEY] = loadedData[SESSIONS_INDEX_KEY_V1];
       delete this.settings[SESSIONS_INDEX_KEY_V1];
       migrated = true;
     }
-    if (loadedData && loadedData[ACTIVE_SESSION_ID_KEY_V1] !== void 0 && this.settings[ACTIVE_CHAT_ID_KEY] === void 0) {
+    if (loadedData && loadedData[ACTIVE_SESSION_ID_KEY_V1] !== void 0 && this.settings[ACTIVE_CHAT_ID_KEY2] === void 0) {
       this.logger.info("Migrating active chat id key v1 -> v2");
-      this.settings[ACTIVE_CHAT_ID_KEY] = loadedData[ACTIVE_SESSION_ID_KEY_V1];
+      this.settings[ACTIVE_CHAT_ID_KEY2] = loadedData[ACTIVE_SESSION_ID_KEY_V1];
       delete this.settings[ACTIVE_SESSION_ID_KEY_V1];
       migrated = true;
     }
@@ -5530,26 +5744,36 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
   async showChatSwitcher() {
     new import_obsidian12.Notice("Switch Chat UI not implemented yet.");
   }
+  // У файлі src/main.ts
   async renameActiveChat() {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian12.Notice("No active chat.");
+      new import_obsidian12.Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
-    new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async (newName) => {
-      if (newName && newName.trim() !== "" && newName.trim() !== currentName) {
-        const success = await this.chatManager.renameChat(activeChat.metadata.id, newName.trim());
-        if (success) {
-          new import_obsidian12.Notice(`Chat renamed to "${newName.trim()}".`);
-        } else {
-          new import_obsidian12.Notice("Failed to rename chat.");
+    const chatId = activeChat.metadata.id;
+    new PromptModal(
+      this.app,
+      "Rename Chat",
+      `Enter new name for "${currentName}":`,
+      currentName,
+      async (newName) => {
+        const trimmedName = newName == null ? void 0 : newName.trim();
+        if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
+          this.logger.debug(`Attempting to rename chat ${chatId} to "${trimmedName}" via updateActiveChatMetadata`);
+          const success = await this.chatManager.updateActiveChatMetadata({ name: trimmedName });
+          if (success) {
+            this.logger.info(`Chat ${chatId} rename initiated to "${trimmedName}".`);
+          } else {
+            this.logger.error(`Failed to rename chat ${chatId} using updateActiveChatMetadata.`);
+          }
+        } else if (newName !== null) {
+          new import_obsidian12.Notice("Rename cancelled or name unchanged.");
         }
-      } else if (newName !== null) {
-        new import_obsidian12.Notice("Rename cancelled or name unchanged.");
       }
-    }).open();
+    ).open();
   }
   async deleteActiveChatWithConfirmation() {
     var _a;
@@ -5572,7 +5796,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
   async handleActiveChatChangedLocally(data) {
     this.logger.info(`Handling 'active-chat-changed' locally. New active ID: ${data.chatId}`);
     if (this.settings.saveMessageHistory) {
-      await this.saveDataKey(ACTIVE_CHAT_ID_KEY, data.chatId);
+      await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, data.chatId);
       this.logger.debug(`Saved active chat ID: ${data.chatId}`);
     }
   }

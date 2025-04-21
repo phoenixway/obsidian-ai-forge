@@ -189,67 +189,79 @@ export class PromptService {
     }
 
 
-    /**
+ /**
      * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
      */
-    async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
-        this.plugin.logger.debug("[PromptService] Preparing prompt body...");
-        const settings = this.plugin.settings;
-        // Шлях ролі потрібен для визначення, чи активна персона продуктивності
-        const selectedRolePath = chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
-                               ? chatMetadata.selectedRolePath : settings.selectedRolePath;
-        const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
-        this.plugin.logger.debug(`[PromptService] Productivity features potentially active for body: ${isProductivityActive}`);
+ async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
+    this.plugin.logger.debug("[PromptService] Preparing prompt body...");
+    const settings = this.plugin.settings;
+    const selectedRolePath = chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
+                           ? chatMetadata.selectedRolePath : settings.selectedRolePath;
+    const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
+    this.plugin.logger.debug(`[PromptService] Productivity features potentially active for body: ${isProductivityActive}`);
 
-        // --- Контекст завдань ---
-        let taskContext = "";
-        if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
-            if (this.plugin.chatManager?.filePlanExists) {
-                // ... (логіка оновлення та форматування taskContext) ...
-                 const needsUpdateBefore = this.plugin.isTaskFileUpdated?.();
-                 await this.plugin.checkAndProcessTaskUpdate?.();
-                 const tasksWereUpdated = needsUpdateBefore && !this.plugin.isTaskFileUpdated?.();
-                 taskContext = tasksWereUpdated ? "\n--- Updated Tasks Context ---\n" : "\n--- Today's Tasks Context ---\n";
-                 taskContext += `Urgent: ${this.plugin.chatManager.fileUrgentTasks.join(', ') || "None"}\n`;
-                 taskContext += `Other: ${this.plugin.chatManager.fileRegularTasks.join(', ') || "None"}\n`;
-                 taskContext += "--- End Tasks Context ---";
-                 this.plugin.logger.debug(`[PromptService] Injecting task context.`);
-            }
-        }
+    // --- Контекст завдань ---
+    let taskContext = "";
+    if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
+        // --- ВИПРАВЛЕННЯ: Отримуємо стан завдань через метод ---
+        await this.plugin.checkAndProcessTaskUpdate?.(); // Переконуємось, що стан оновлено
+        const taskState = this.plugin.chatManager.getCurrentTaskState();
+        // ------------------------------------------------------
 
-        // --- Розрахунок токенів для історії ---
-        const approxTaskTokens = this._countTokens(taskContext);
-        // Розраховуємо місце для RAG та Історії. Запас для RAG залежить від topK та chunk size.
-        const maxRagTokens = settings.ragEnabled ? (settings.ragTopK * settings.ragChunkSize / 4) * 1.5 : 0; // Дуже грубий запас для RAG
-        const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 200; // Запас для промпту/відповіді
-        this.plugin.logger.debug(`[PromptService] Max tokens available for history processing: ${maxHistoryTokens}`);
-
-        // --- Обробка історії ---
-        let processedHistoryString = "";
-        if (isProductivityActive && settings.useAdvancedContextStrategy) {
-            processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
+        // --- ВИПРАВЛЕННЯ: Перевіряємо об'єкт стану та його властивості ---
+        if (taskState && taskState.hasContent) {
+            // Проста логіка заголовку (можна вдосконалити, якщо потрібно відстежувати саме оновлення)
+            taskContext = "\n--- Today's Tasks Context ---\n";
+            taskContext += `Urgent: ${taskState.urgent.join(', ') || "None"}\n`; // Доступ через taskState.urgent
+            taskContext += `Other: ${taskState.regular.join(', ') || "None"}\n`; // Доступ через taskState.regular
+            taskContext += "--- End Tasks Context ---";
+            this.plugin.logger.debug(`[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`);
         } else {
-            processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
+             this.plugin.logger.debug("[PromptService] No relevant task state found or no tasks to inject.");
         }
-
-        // --- Отримання RAG контексту ---
-        let ragContext = "";
-        if (settings.ragEnabled && this.plugin.ragService) {
-            const lastUserMessage = history.findLast(m => m.role === 'user');
-            if (lastUserMessage?.content) {
-                ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
-                 if(!ragContext) this.plugin.logger.info("[PromptService] RAG prepareContext returned empty.");
-            } else {
-                this.plugin.logger.warn("[PromptService] RAG enabled, but no last user message found.");
-            }
-        }
-
-        // --- Формування фінального тіла промпту ---
-        const finalPromptBody = `${ragContext}${taskContext}\n\n### Conversation History:\n${processedHistoryString}`.trim();
-        this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
-        return finalPromptBody.length > 0 ? finalPromptBody : null; // Повертаємо null, якщо порожньо? Або пустий рядок?
+        // ---------------------------------------------------------
     }
 
+    // --- Розрахунок токенів та решта логіки... ---
+    const approxTaskTokens = this._countTokens(taskContext);
+    const maxRagTokens = settings.ragEnabled ? (settings.ragTopK * settings.ragChunkSize / 4) * 1.5 : 0; // Дуже грубий запас для RAG
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 200; // Резерв
+    this.plugin.logger.debug(`[PromptService] Max tokens available for history processing: ${maxHistoryTokens}`);
+
+    let processedHistoryString = "";
+    if (isProductivityActive && settings.useAdvancedContextStrategy) {
+        processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
+    } else {
+        processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
+    }
+
+    let ragContext = "";
+    if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
+        const lastUserMessage = history.findLast(m => m.role === 'user');
+        if (lastUserMessage?.content) {
+            ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
+             if(!ragContext) this.plugin.logger.info("[PromptService] RAG prepareContext returned empty.");
+             else this.plugin.logger.debug(`[PromptService] RAG context length: ${ragContext.length} chars`);
+        } else { this.plugin.logger.warn("[PromptService] RAG enabled, but no last user message found."); }
+    } else { this.plugin.logger.debug("[PromptService] RAG context NOT prepared."); }
+
+    // --- Формування фінального тіла промпту ---
+    // (Важливо перевіряти, чи секції не порожні перед додаванням заголовків)
+    let finalPromptBodyParts: string[] = [];
+    if (ragContext) { finalPromptBodyParts.push(ragContext); }
+    if (taskContext) { finalPromptBodyParts.push(taskContext); }
+    if (processedHistoryString) { finalPromptBodyParts.push(`### Conversation History:\n${processedHistoryString}`); }
+
+    const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
+
+    if (!finalPromptBody) {
+        this.plugin.logger.warn("[PromptService] No RAG, no tasks, and no history processed. Returning null prompt body.");
+         return null; // Повертаємо null, якщо нічого не вдалося зібрати
+    }
+
+    this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
+    return finalPromptBody;
+}
 
     // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages залишаються
     // але мають використовувати this.plugin.logger замість console.log/warn

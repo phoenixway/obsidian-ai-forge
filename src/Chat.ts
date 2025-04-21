@@ -2,6 +2,7 @@
 import { normalizePath, DataAdapter, Notice, debounce } from "obsidian";
 import { Message, MessageRole } from "./OllamaView"; // Assuming OllamaView exports these
 import { OllamaPluginSettings } from "./settings"; // Assuming settings exports this
+import { Logger } from "./Logger";
 
 /**
  * Type definition for settings relevant to the Chat constructor.
@@ -13,13 +14,14 @@ export type ChatConstructorSettings = OllamaPluginSettings;
  * Metadata associated with a chat session.
  */
 export interface ChatMetadata {
-    id: string;                 // Unique identifier for the chat
-    name: string;               // User-friendly name for the chat
-    modelName: string;          // Model used for this chat
-    selectedRolePath: string;   // Path to the role file used
-    temperature: number;        // Temperature setting for this chat
-    createdAt: string;          // ISO string timestamp of creation
-    lastModified: string;       // ISO string timestamp of last modification
+    id: string;
+    name: string;
+    modelName?: string;          // <-- Зробити опціональним
+    selectedRolePath?: string;   // <-- Зробити опціональним
+    temperature?: number;        // <-- Зробити опціональним
+    createdAt: string;          // Залишити обов'язковим
+    lastModified: string;       // Залишити обов'язковим
+    contextWindow?: number;      // <-- Вже опціональне (з попереднього кроку)
 }
 
 /**
@@ -42,7 +44,8 @@ export class Chat {
     private adapter: DataAdapter;          // Obsidian's DataAdapter for file operations
     private pluginSettings: ChatConstructorSettings; // Relevant plugin settings
     private debouncedSave: () => void;     // Debounced function for saving
-
+    private logger: Logger; // Додати властивість
+    
     /**
      * Creates an instance of Chat. Should be called by ChatManager.
      * @param adapter - Obsidian's DataAdapter.
@@ -50,35 +53,22 @@ export class Chat {
      * @param data - The initial chat data (metadata and messages).
      * @param filePath - The full, normalized path where this chat should be saved/loaded from within the vault. **Required**.
      */
-    constructor(adapter: DataAdapter, settings: ChatConstructorSettings, data: ChatData, filePath: string) {
+    constructor(
+        adapter: DataAdapter,
+        settings: ChatConstructorSettings,
+        data: ChatData,
+        filePath: string,
+        logger: Logger // Додати параметр
+    ) {
         this.adapter = adapter;
         this.pluginSettings = settings;
-
-        // FilePath is now mandatory and determined by ChatManager
-        if (!filePath || typeof filePath !== 'string' || filePath.trim() === '') {
-            const errorMsg = "[Chat] Critical Error: Chat constructor called without a valid filePath.";
-            console.error(errorMsg, { settings, data });
-            // Depending on desired strictness, either throw or try a fallback (though fallback is risky)
-            // For now, log an error and proceed, but saving will likely fail.
-            // throw new Error(errorMsg);
-            this.filePath = `INVALID_PATH_${data?.metadata?.id || Date.now()}.json`; // Assign a clearly invalid path
-            new Notice("Critical Error: Chat created without a valid save path!");
-        } else {
-            this.filePath = normalizePath(filePath); // Normalize the provided path
-        }
-
-        console.log(`[Chat ${data?.metadata?.id ?? 'initializing'}] Initialized. File path set to: ${this.filePath}`);
-
-        // Initialize metadata and messages from provided data
+        this.filePath = normalizePath(filePath);
         this.metadata = data.metadata;
-        // Convert ISO timestamp strings back to Date objects when loading
-        this.messages = data.messages.map(m => ({
-            ...m,
-            timestamp: new Date(m.timestamp) // Ensure timestamp is a Date object
-        }));
+        this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+        this.logger = logger; // Зберегти логер
 
-        // Initialize debounced save function
-        this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true); // Save after 1.5s of inactivity
+        this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
+        this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
     }
 
     // --- Message Management ---
@@ -113,25 +103,92 @@ export class Chat {
         this.save(); // Trigger save after clearing
     }
 
+// У файлі Chat.ts
+
     /**
      * Updates specified metadata fields for the chat.
-     * Automatically updates the lastModified timestamp and triggers a save.
+     * Automatically updates the lastModified timestamp and triggers a save if changes occurred.
      * @param updates - An object containing metadata fields to update (cannot update 'id' or 'createdAt').
+     * @returns {boolean} - True if any metadata field was actually changed, false otherwise.
      */
-    updateMetadata(updates: Partial<Omit<ChatMetadata, 'id' | 'createdAt'>>) {
-        // Merge updates, ensuring id and createdAt are not overwritten
-        const originalId = this.metadata.id;
-        const originalCreatedAt = this.metadata.createdAt;
-        this.metadata = {
-            ...this.metadata,
-            ...updates,
-            id: originalId, // Preserve original ID
-            createdAt: originalCreatedAt, // Preserve original creation date
-            lastModified: new Date().toISOString() // Always update last modified
-        };
-        console.log(`[Chat ${this.metadata.id}] Metadata updated:`, updates);
-        this.save(); // Trigger save after metadata update
+    updateMetadata(updates: Partial<Omit<ChatMetadata, 'id' | 'createdAt' | 'lastModified'>>): boolean { // <-- Додано тип повернення boolean
+        let changed = false;
+        const currentMeta = this.metadata;
+
+        // Порівнюємо і оновлюємо кожне поле, що може бути передано
+        if (updates.name !== undefined && updates.name !== currentMeta.name) {
+            currentMeta.name = updates.name;
+            changed = true;
+        }
+        if (updates.modelName !== undefined && updates.modelName !== currentMeta.modelName) {
+            currentMeta.modelName = updates.modelName;
+            changed = true;
+        }
+        if (updates.selectedRolePath !== undefined && updates.selectedRolePath !== currentMeta.selectedRolePath) {
+            currentMeta.selectedRolePath = updates.selectedRolePath;
+            changed = true;
+        }
+        if (updates.temperature !== undefined && updates.temperature !== currentMeta.temperature) {
+            currentMeta.temperature = updates.temperature;
+            changed = true;
+        }
+        if (updates.contextWindow !== undefined && updates.contextWindow !== currentMeta.contextWindow) {
+            currentMeta.contextWindow = updates.contextWindow;
+            changed = true;
+        }
+        // Додайте сюди перевірки для інших полів метаданих, якщо вони є
+
+        if (changed) {
+            this.metadata.lastModified = new Date().toISOString(); // Оновлюємо час тільки якщо були зміни
+            // Використовуємо логер плагіна, якщо він доступний
+             if ((this.pluginSettings as any).logger) { // Потрібно передати логер або плагін в конструктор Chat
+                 (this.pluginSettings as any).logger.debug(`[Chat ${this.metadata.id}] Metadata updated, scheduling save:`, updates);
+             } else {
+                  console.log(`[Chat ${this.metadata.id}] Metadata updated, scheduling save:`, updates);
+             }
+            this.save(); // Викликаємо збереження (з debounce) тільки якщо були зміни
+        } else {
+             if ((this.pluginSettings as any).logger) {
+                 (this.pluginSettings as any).logger.debug(`[Chat ${this.metadata.id}] updateMetadata called, but no changes detected.`);
+             } else {
+                  console.log(`[Chat ${this.metadata.id}] updateMetadata called, but no changes detected.`);
+             }
+        }
+
+        return changed; // <-- Повертаємо результат (true або false)
     }
+
+    // Також переконайтесь, що конструктор Chat приймає і зберігає logger (або plugin)
+    // і що він передається при викликах new Chat та Chat.loadFromFile в ChatManager.ts
+    // Приклад оновленого конструктора Chat:
+    /*
+    private logger: Logger; // Додати властивість
+
+    constructor(
+        adapter: DataAdapter,
+        settings: ChatConstructorSettings,
+        data: ChatData,
+        filePath: string,
+        logger: Logger // Додати параметр
+    ) {
+        this.adapter = adapter;
+        this.pluginSettings = settings;
+        this.filePath = normalizePath(filePath);
+        this.metadata = data.metadata;
+        this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+        this.logger = logger; // Зберегти логер
+
+        this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
+        this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
+    }
+
+    // І оновіть статичний метод loadFromFile, щоб він теж приймав та передавав logger
+     static async loadFromFile(filePath: string, adapter: DataAdapter, settings: ChatConstructorSettings, logger: Logger): Promise<Chat | null> {
+        // ...
+        return new Chat(adapter, settings, data, normPath, logger); // Передати logger
+        // ...
+     }
+     */
 
     // --- Persistence ---
 
@@ -152,7 +209,7 @@ export class Chat {
      */
     public async saveImmediately(): Promise<boolean> {
         if (!this.pluginSettings.saveMessageHistory) {
-            console.log(`[Chat ${this.metadata.id}] Save disabled, immediate save skipped for ${this.filePath}.`);
+            // console.log(`[Chat ${this.metadata.id}] Save disabled, immediate save skipped for ${this.filePath}.`);
             return true; // Consider it "successful" as no save was intended
         }
         // console.log(`[Chat ${this.metadata.id}] Attempting immediate save to ${this.filePath}...`);
@@ -206,36 +263,36 @@ export class Chat {
      * @param settings - Plugin settings.
      * @returns A new Chat instance or null if loading fails.
      */
-    static async loadFromFile(filePath: string, adapter: DataAdapter, settings: ChatConstructorSettings): Promise<Chat | null> {
+    static async loadFromFile(
+        filePath: string,
+        adapter: DataAdapter,
+        settings: ChatConstructorSettings,
+        logger: Logger // <-- ДОДАНО ПАРАМЕТР
+    ): Promise<Chat | null> {
         const normPath = normalizePath(filePath);
-        console.log(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
+        // --- ВИПРАВЛЕННЯ: Використовуємо переданий logger ---
+        logger.debug(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
+        // --------------------------------------------------
         try {
-            // Check if file exists using the adapter
             if (!(await adapter.exists(normPath))) {
-                console.warn(`[Chat] File not found for loading: ${normPath}`);
-                return null; // File doesn't exist
+                logger.warn(`[Chat] File not found for loading: ${normPath}`); // Використовуємо logger
+                return null;
             }
-            // Read file content
             const json = await adapter.read(normPath);
-            // console.log(`[Chat] Read ${json.length} bytes from ${normPath} for static load`);
-
-            // Parse JSON content
             const data = JSON.parse(json) as ChatData;
 
-            // Basic validation of loaded data structure
             if (data?.metadata?.id && Array.isArray(data.messages)) {
-                console.log(`[Chat] Successfully parsed data for static load, creating Chat instance for ID: ${data.metadata.id}`);
-                // Create and return a new Chat instance using the loaded data and path
-                return new Chat(adapter, settings, data, normPath);
+                logger.debug(`[Chat] Successfully parsed data, creating Chat instance for ID: ${data.metadata.id}`); // Використовуємо logger
+                // --- ВИПРАВЛЕННЯ: Передаємо logger в конструктор ---
+                return new Chat(adapter, settings, data, normPath, logger);
+                // ----------------------------------------------
             } else {
-                // Data structure is invalid
-                console.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
+                logger.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data); // Використовуємо logger
                 new Notice(`Error loading chat: Invalid data structure in ${filePath}`);
                 return null;
             }
         } catch (e: any) {
-            // Handle file read or JSON parse errors
-            console.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
+            logger.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e); // Використовуємо logger
             new Notice(`Error loading chat file: ${filePath}. ${e.message}`);
             return null;
         }
@@ -264,5 +321,12 @@ export class Chat {
             return false; // Deletion failed
         }
     }
+
+    public toJSON(): ChatData {
+        return {
+          metadata: this.metadata,
+          messages: this.messages
+        };
+      }
 
 } // End of Chat class

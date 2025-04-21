@@ -31,7 +31,7 @@ const SESSIONS_INDEX_KEY_V1 = 'chatSessionsIndex_v1';
 const ACTIVE_SESSION_ID_KEY_V1 = 'activeChatSessionId_v1';
 export const SESSIONS_INDEX_KEY = 'chatIndex_v2';
 export const ACTIVE_CHAT_ID_KEY = 'activeChatId_v2';
-
+export const CHAT_INDEX_KEY = 'chatIndex_v2';
 // ----------------------------------
 
 interface RAGDocument { id: string; content: string; metadata: { source: string; path: string; }; }
@@ -593,9 +593,45 @@ export default class OllamaPlugin extends Plugin {
 
   // --- Session Management Command Helpers ---
   async showChatSwitcher() { new Notice("Switch Chat UI not implemented yet."); }
-  async renameActiveChat() { /* ... як раніше ... */
-    const activeChat = await this.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat."); return; } const currentName = activeChat.metadata.name; new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName, async (newName) => { if (newName && newName.trim() !== "" && newName.trim() !== currentName) { const success = await this.chatManager.renameChat(activeChat.metadata.id, newName.trim()); if (success) { new Notice(`Chat renamed to "${newName.trim()}".`); } else { new Notice("Failed to rename chat."); } } else if (newName !== null) { new Notice("Rename cancelled or name unchanged."); } }).open();
+
+// У файлі src/main.ts
+
+async renameActiveChat() {
+  const activeChat = await this.chatManager?.getActiveChat();
+  if (!activeChat) {
+    new Notice("No active chat to rename.");
+    return;
   }
+  const currentName = activeChat.metadata.name;
+  const chatId = activeChat.metadata.id; // Отримуємо ID для логування/перевірки
+
+  new PromptModal(this.app, 'Rename Chat', `Enter new name for "${currentName}":`, currentName,
+    async (newName) => {
+      const trimmedName = newName?.trim(); // Обрізаємо та перевіряємо на null
+      if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
+        this.logger.debug(`Attempting to rename chat ${chatId} to "${trimmedName}" via updateActiveChatMetadata`);
+
+        // --- ВИПРАВЛЕННЯ: Використовуємо updateActiveChatMetadata ---
+        const success = await this.chatManager.updateActiveChatMetadata({ name: trimmedName });
+        // -----------------------------------------------------
+
+        if (success) {
+          // Можливо, Notice тут зайвий, оскільки updateActiveChatMetadata може генерувати події,
+          // на які реагує View, АБО saveChat (який викликається з update...) генерує chat-list-updated
+          this.logger.info(`Chat ${chatId} rename initiated to "${trimmedName}".`);
+          // new Notice(`Chat renamed to "${trimmedName}".`); // Можна закоментувати/видалити
+        } else {
+          // updateActiveChatMetadata має сам обробити помилку або повернути false
+           this.logger.error(`Failed to rename chat ${chatId} using updateActiveChatMetadata.`);
+          // new Notice("Failed to rename chat."); // Зазвичай не потрібно дублювати
+        }
+      } else if (newName !== null) { // Показуємо сповіщення, тільки якщо користувач щось ввів (а не просто закрив вікно)
+        new Notice("Rename cancelled or name unchanged.");
+      }
+    }
+  ).open();
+}
+
   async deleteActiveChatWithConfirmation() { /* ... як раніше ... */
     const activeChat = await this.chatManager?.getActiveChat(); if (!activeChat) { new Notice("No active chat."); return; } const chatName = activeChat.metadata.name; new ConfirmModal(this.app, 'Delete Chat', `Delete chat "${chatName}"?`, async () => { const success = await this.chatManager.deleteChat(activeChat.metadata.id); if (success) { new Notice(`Chat "${chatName}" deleted.`); } else { new Notice(`Failed to delete chat "${chatName}".`); } }).open();
   }
