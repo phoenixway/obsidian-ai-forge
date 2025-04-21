@@ -189,6 +189,24 @@
   transition-delay: 0s;
 }
 
+.user-message-group .message-actions-wrapper {
+  // --- ДОДАНО ЦЕ ПРАВИЛО ---
+  align-self: flex-start; // Перевизначає align-items: flex-end батьківського .message-wrapper,
+                          // змушуючи САМЕ ЦЕЙ БЛОК КНОПОК вирівнятись по лівому краю.
+  // --------------------------
+
+  // Стилі самих кнопок (залишаються ті ж)
+  button {
+     background: rgba(255, 255, 255, 0.1);
+     border-color: rgba(255, 255, 255, 0.2);
+     color: rgba(255, 255, 255, 0.8);
+     &:hover {
+        background-color: rgba(255, 255, 255, 0.25);
+        color: white;
+     }
+  }
+}
+
 // Specific button styles for user messages (actions appear below user bubble)
 .user-message-group .message-actions-wrapper button {
    background: rgba(255, 255, 255, 0.1);
