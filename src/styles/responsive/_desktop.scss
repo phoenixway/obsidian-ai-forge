@@ -1,78 +1,95 @@
 // src/styles/responsive/_desktop.scss
 // Стилі для екранів >= 769px (скасовують/перевизначають мобільні/планшетні стилі)
 
- // Мінімальна висота чату на десктопі
- .workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
+// Мінімальна висота чату на десктопі
+.workspace-leaf-content[data-type='ollama-personas-chat-view'] .ollama-container {
     min-height: 300px; // Або інше значення, напр. 50vh
- }
+}
 
- // Панель керування: Відновлюємо видимість прихованих елементів
- .chat-input-container {
-  margin-bottom: calc(var(--chat-spacing-unit) * 2);
+// Панель керування: Відновлюємо видимість прихованих елементів
+.chat-input-container {
+    margin-bottom: calc(var(--chat-spacing-unit) * 2);
 
 
     .input-controls-container {
         flex-wrap: nowrap;
         justify-content: space-between;
     }
+
     .input-controls-right {
+
         .voice-button,
         .send-button {
             display: flex; // Явно показуємо кнопки
         }
+
+        .toggle-location-button {
+            display: flex; // Показуємо кнопку перемикання місця
+        }
     }
+
     .input-controls-left {
         .role-display {
-             display: inline-flex; // Явно показуємо роль
+            display: inline-flex; // Явно показуємо роль
         }
+
         .translate-input-button {
             display: flex; // Явно показуємо переклад
         }
     }
- }
+}
 
- // Кнопки дій у повідомленнях (повертаємо поведінку "з'являтись при наведенні")
- .message-actions-wrapper {
+// Кнопки дій у повідомленнях (повертаємо поведінку "з'являтись при наведенні")
+.message-actions-wrapper {
     opacity: 0; // Сховані за замовчуванням
     visibility: hidden;
     transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s; // Повертаємо анімацію
 
     button {
-       // Повертаємо стандартні стилі кнопки, якщо потрібно (розмір іконки тощо)
-       // .svg-icon { width: 14px; height: 14px; }
-       // Повертаємо стандартні background/border/padding, якщо вони змінювались у _tablet
-       background-color: transparent;
-       border: none;
-       padding: 2px; // Можливо, трохи більші
+        // Повертаємо стандартні стилі кнопки, якщо потрібно (розмір іконки тощо)
+        // .svg-icon { width: 14px; height: 14px; }
+        // Повертаємо стандартні background/border/padding, якщо вони змінювались у _tablet
+        background-color: transparent;
+        border: none;
+        padding: 2px; // Можливо, трохи більші
 
-        &:hover { // Стандартний hover-ефект для десктопу
+        &:hover {
+            // Стандартний hover-ефект для десктопу
             background-color: var(--background-modifier-hover);
             transform: scale(1.1); // Повертаємо scale
             opacity: 1;
         }
     }
- }
- // Показуємо кнопки при наведенні на повідомлення
- .message:hover .message-actions-wrapper {
+}
+
+// Показуємо кнопки при наведенні на повідомлення
+.message:hover .message-actions-wrapper {
     opacity: 0.8;
     visibility: visible;
     transition-delay: 0s; // Показываем сразу при наведении на сообщение
- }
+}
 
 
- // Меню: Приховуємо секції Моделі та Ролі на десктопі
- .menu-dropdown.ollama-chat-menu {
-   .model-submenu-section,
-   .role-submenu-section {
-       display: none !important; // Використовуємо !important, щоб перебити display: block з _tablet
-   }
-   // Приховуємо також роздільники ПІСЛЯ цих секцій
-   .model-submenu-section + hr.menu-separator,
-   .role-submenu-section + hr.menu-separator {
-       display: none !important;
-   }
+// Меню: Приховуємо секції Моделі та Ролі на десктопі
+.menu-dropdown.ollama-chat-menu {
+
+    .model-submenu-section,
+    .role-submenu-section {
+        display: none !important; // Використовуємо !important, щоб перебити display: block з _tablet
+    }
+
+    // Приховуємо також роздільники ПІСЛЯ цих секцій
+    .model-submenu-section+hr.menu-separator,
+    .role-submenu-section+hr.menu-separator {
+        display: none !important;
+    }
+
     // Повертаємо більшу висоту для списку чатів на десктопі
-   .submenu-content.chat-list-container {
+    .submenu-content.chat-list-container {
         max-height: 300px; // Більше місця на десктопі
-   }
- }
+    }
+
+    .toggle-view-location-option {
+        display: none;
+    }
+}

@@ -114,8 +114,8 @@ const CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
 const CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
 const CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
 
-// const CSS_CLASS_TOGGLE_VIEW_LOCATION_OPTION = "toggle-view-location-option";
-// const CSS_CLASS_TOGGLE_VIEW_LOCATION_CURRENT = "is-current-location";
+const CSS_CLASS_DESKTOP_TOGGLE_VIEW_BUTTON = "desktop-toggle-view-button"; // Новий клас для кнопки
+const CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button"; // Для кнопки в панелі
 const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 
 const CHAT_LIST_MAX_HEIGHT = '250px';
@@ -182,6 +182,7 @@ export class OllamaView extends ItemView {
   private settingsOption!: HTMLElement;
   private temperatureIndicatorEl!: HTMLElement;
   private toggleViewLocationOption!: HTMLElement;
+  private toggleLocationButton!: HTMLButtonElement; // Кнопка в панелі (для десктопу)
 
   // --- State ---
   private isProcessing: boolean = false;
@@ -301,6 +302,8 @@ export class OllamaView extends ItemView {
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } }); setIcon(this.voiceButton, "mic");
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } }); setIcon(this.menuButton, "more-vertical");
 
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { 'aria-label': 'Toggle View Location' } });
+    this.updateToggleLocationButton(); // Встановлюємо іконку/підказку
 
     // --- Кастомне Випадаюче Меню (для кнопки "...") ---
     // Позиціонується відносно inputContainer або menuButton
@@ -351,7 +354,7 @@ export class OllamaView extends ItemView {
     this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); setIcon(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash"); this.clearChatOption.createSpan({ cls: "menu-option-text", text: "Clear Messages" });
     this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` }); setIcon(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2"); this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
-    
+
     this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
     this.menuDropdown.createEl('hr', { cls: CSS_CLASS_MENU_SEPARATOR });
 
@@ -392,6 +395,12 @@ export class OllamaView extends ItemView {
       this.registerDomEvent(this.temperatureIndicatorEl, 'click', this.handleTemperatureClick);
     } else {
       this.plugin.logger.error("temperatureIndicatorEl missing!");
+    }
+
+    if (this.toggleLocationButton) {
+      this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick); // Використовуємо той самий обробник
+    } else {
+      this.plugin.logger.error("toggleLocationButton missing!");
     }
     // --- Кінець доданого слухача ---
 
@@ -457,9 +466,10 @@ export class OllamaView extends ItemView {
 
   }
 
-  // --- Зробіть метод публічним і додайте виклик ---
+  // --- Обробник зміни налаштувань (зроблено публічним) ---
   public async handleSettingsUpdated(): Promise<void> {
-    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called"); // Лог
+    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+    // ... (логіка оновлення моделі, ролі, плейсхолдера, температури) ...
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
     const currentRoleName = await this.getCurrentRoleDisplayName();
@@ -469,9 +479,33 @@ export class OllamaView extends ItemView {
     this.updateRoleDisplay(currentRoleName);
     this.updateInputPlaceholder(currentRoleName);
     this.updateTemperatureIndicator(currentTemperature);
-    this.updateToggleViewLocationOption(); // <-- Оновлюємо текст/іконку кнопки перемикання
-}
-// ------------------------------------------
+
+    // Оновлюємо ОБИДВА елементи керування перемиканням
+    this.updateToggleViewLocationOption(); // Для меню
+    this.updateToggleLocationButton();     // Для кнопки
+  }
+
+  // --- Додано: Метод для оновлення кнопки перемикання ---
+  private updateToggleLocationButton(): void {
+    if (!this.toggleLocationButton) return;
+    // Не очищуємо, просто міняємо іконку і title
+    let iconName: string;
+    let titleText: string;
+
+    if (this.plugin.settings.openChatInTab) {
+      // Зараз у вкладці -> дія "В панель"
+      iconName = "sidebar-right";
+      titleText = "Move to Sidebar";
+    } else {
+      // Зараз у панелі -> дія "У вкладку"
+      iconName = "layout-list"; // Або 'panel-top'
+      titleText = "Move to Tab";
+    }
+    setIcon(this.toggleLocationButton, iconName);
+    this.toggleLocationButton.setAttribute('aria-label', titleText);
+    this.toggleLocationButton.title = titleText; // Встановлюємо підказку
+  }
+
 
   private handleModelDisplayClick = async (event: MouseEvent) => {
     const menu = new Menu();
@@ -2180,14 +2214,14 @@ export class OllamaView extends ItemView {
     const currentSetting = this.plugin.settings.openChatInTab;
     const newSetting = !currentSetting; // Інвертуємо налаштування
 
-    this.plugin.logger.info(`Toggling view location setting from ${currentSetting} to ${newSetting}`);
+    // this.plugin.logger.info(`Toggling view location setting from ${currentSetting} to ${newSetting}`);
 
     // Зберігаємо нове налаштування
     this.plugin.settings.openChatInTab = newSetting;
     await this.plugin.saveSettings(); // Зберігаємо (це також викличе подію 'settings-updated')
 
     // Закриваємо поточний(і) екземпляр(и) View
-    this.plugin.logger.debug("Detaching current view leaf/leaves...");
+    // this.plugin.logger.debug("Detaching current view leaf/leaves...");
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
 
     // Активуємо View знову (використовує оновлені налаштування)

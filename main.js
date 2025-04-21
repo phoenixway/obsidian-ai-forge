@@ -200,6 +200,7 @@ var CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 var CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
 var CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
 var CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
+var CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button";
 var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var LANGUAGES = {
@@ -317,6 +318,7 @@ var LANGUAGES = {
 var OllamaView = class extends import_obsidian3.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
+    // Кнопка в панелі (для десктопу)
     // --- State ---
     this.isProcessing = false;
     this.scrollTimeout = null;
@@ -329,7 +331,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    // ------------------------------------------
     this.handleModelDisplayClick = async (event) => {
       var _a, _b;
       const menu = new import_obsidian3.Menu();
@@ -900,10 +901,8 @@ This action cannot be undone.`, async () => {
       this.closeMenu();
       const currentSetting = this.plugin.settings.openChatInTab;
       const newSetting = !currentSetting;
-      this.plugin.logger.info(`Toggling view location setting from ${currentSetting} to ${newSetting}`);
       this.plugin.settings.openChatInTab = newSetting;
       await this.plugin.saveSettings();
-      this.plugin.logger.debug("Detaching current view leaf/leaves...");
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
       setTimeout(() => {
         this.plugin.logger.debug("Re-activating view with new setting...");
@@ -1005,6 +1004,8 @@ This action cannot be undone.`, async () => {
     (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
     this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian3.setIcon)(this.menuButton, "more-vertical");
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { "aria-label": "Toggle View Location" } });
+    this.updateToggleLocationButton();
     this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
     const createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
@@ -1097,6 +1098,11 @@ This action cannot be undone.`, async () => {
       this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
     } else {
       this.plugin.logger.error("temperatureIndicatorEl missing!");
+    }
+    if (this.toggleLocationButton) {
+      this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
+    } else {
+      this.plugin.logger.error("toggleLocationButton missing!");
     }
     if (this.modelSubmenuHeader)
       this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"));
@@ -1193,7 +1199,7 @@ This action cannot be undone.`, async () => {
     this.register(this.plugin.on("chat-list-updated", this.handleChatListUpdated));
     this.register(this.plugin.on("settings-updated", this.handleSettingsUpdated));
   }
-  // --- Зробіть метод публічним і додайте виклик ---
+  // --- Обробник зміни налаштувань (зроблено публічним) ---
   async handleSettingsUpdated() {
     var _a, _b, _c, _d;
     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
@@ -1206,6 +1212,24 @@ This action cannot be undone.`, async () => {
     this.updateInputPlaceholder(currentRoleName);
     this.updateTemperatureIndicator(currentTemperature);
     this.updateToggleViewLocationOption();
+    this.updateToggleLocationButton();
+  }
+  // --- Додано: Метод для оновлення кнопки перемикання ---
+  updateToggleLocationButton() {
+    if (!this.toggleLocationButton)
+      return;
+    let iconName;
+    let titleText;
+    if (this.plugin.settings.openChatInTab) {
+      iconName = "sidebar-right";
+      titleText = "Move to Sidebar";
+    } else {
+      iconName = "layout-list";
+      titleText = "Move to Tab";
+    }
+    (0, import_obsidian3.setIcon)(this.toggleLocationButton, iconName);
+    this.toggleLocationButton.setAttribute("aria-label", titleText);
+    this.toggleLocationButton.title = titleText;
   }
   updateModelDisplay(modelName) {
     if (this.modelDisplayEl) {
