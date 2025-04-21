@@ -5312,80 +5312,54 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     }, 3e4);
   }
   // Оновлений метод активації View
-  // async activateView() {
-  //   const { workspace } = this.app;
-  //   let leaf: WorkspaceLeaf | null = null;
-  //   const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
-  //   this.logger.debug(`activateView called. Found ${existingLeaves.length} existing leaves. Open in tab setting: ${this.settings.openChatInTab}`);
-  //   if (existingLeaves.length > 0) {
-  //     leaf = existingLeaves[0];
-  //     this.logger.debug(`Found existing view leaf. Revealing it.`);
-  //   } else {
-  //     this.logger.debug(`No existing view leaf found. Creating new one.`);
-  //     if (this.settings.openChatInTab) {
-  //       this.logger.debug(`Opening view in a new tab.`);
-  //       leaf = workspace.getLeaf('tab');
-  //     } else {
-  //       this.logger.debug(`Opening view in the right sidebar.`);
-  //       leaf = workspace.getRightLeaf(false);
-  //       if (!leaf) {
-  //         this.logger.debug(`Right sidebar not found, creating a new leaf.`);
-  //         leaf = workspace.getLeaf(true);
-  //       }
-  //     }
-  //     if (leaf) {
-  //       this.logger.debug(`Setting view state for the new leaf.`);
-  //       await leaf.setViewState({ type: VIEW_TYPE_OLLAMA_PERSONAS, active: true });
-  //     } else {
-  //       this.logger.error("Failed to get or create leaf for AI Forge view.");
-  //       new Notice("Could not open AI Forge view.");
-  //       return; // Виходимо, якщо не вдалося створити leaf
-  //     }
-  //   }
-  //   // Активуємо leaf (або існуючий, або щойно створений)
-  //   workspace.revealLeaf(leaf);
-  //   if (leaf?.view instanceof OllamaView) {
-  //     this.view = leaf.view;
-  //     this.logger.debug("AI Forge View instance assigned/confirmed.");
-  //   } else if (leaf) {
-  //     this.logger.error("Leaf revealed, but view is not an instance of OllamaView:", leaf.view);
-  //   }
-  // }
   async activateView() {
     const { workspace } = this.app;
     let leaf = null;
-    const existingLeaves = workspace.getLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
-    this.logger.debug(`activateView: Found ${existingLeaves.length} existing leaves. Setting 'openChatInTab': ${this.settings.openChatInTab}`);
+    const viewType = VIEW_TYPE_OLLAMA_PERSONAS;
+    const existingLeaves = workspace.getLeavesOfType(viewType);
+    this.logger.debug(`activateView called. Found ${existingLeaves.length} existing leaves. Open in tab setting: ${this.settings.openChatInTab}`);
     if (existingLeaves.length > 0) {
       leaf = existingLeaves[0];
-      this.logger.debug("activateView: Revealing existing leaf.");
+      this.logger.debug(`Found existing view leaf. Revealing it.`);
     } else {
-      this.logger.debug("activateView: No existing leaf. Creating new one.");
+      this.logger.debug(`No existing view leaf found. Creating new one.`);
       if (this.settings.openChatInTab) {
-        this.logger.debug("activateView: Creating new leaf in 'tab'.");
+        this.logger.debug(`Setting requests view in tab.`);
         leaf = workspace.getLeaf("tab");
       } else {
-        this.logger.debug("activateView: Creating new leaf in 'right sidebar'.");
-        leaf = workspace.getRightLeaf(true);
+        this.logger.debug(`Setting requests view in sidebar. Checking right sidebar...`);
+        leaf = workspace.getRightLeaf(false);
+        if (!leaf) {
+          this.logger.warn(`Right sidebar leaf not found or not open. Per default settings, chat should open here.`);
+          this.logger.warn(`Falling back to opening in a new tab as sidebar is not available.`);
+          leaf = workspace.getLeaf("tab");
+        } else {
+          this.logger.debug(`Found existing right sidebar leaf.`);
+        }
       }
       if (leaf) {
-        this.logger.debug("activateView: Setting view state for new leaf.");
-        await leaf.setViewState({
-          type: VIEW_TYPE_OLLAMA_PERSONAS,
-          active: true
-        });
+        this.logger.debug(`Setting view state for the leaf.`);
+        try {
+          await leaf.setViewState({ type: viewType, active: true });
+        } catch (e) {
+          this.logger.error("Error setting view state:", e);
+          new import_obsidian12.Notice("Error opening AI Forge view.");
+          return;
+        }
       } else {
-        this.logger.error("activateView: Failed to get or create leaf.");
+        this.logger.error("Failed to get or create leaf for AI Forge view.");
         new import_obsidian12.Notice("Could not open AI Forge view.");
         return;
       }
     }
-    this.logger.debug(`activateView: Revealing leaf: ${leaf == null ? void 0 : leaf.getViewState().type}`);
-    workspace.revealLeaf(leaf);
-    if ((leaf == null ? void 0 : leaf.view) instanceof OllamaView) {
-      this.view = leaf.view;
-    } else if (leaf) {
-      this.logger.error("activateView: Leaf revealed, but view is not an instance of OllamaView:", leaf.view);
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+      if (leaf.view instanceof OllamaView) {
+        this.view = leaf.view;
+        this.logger.debug("AI Forge View instance assigned/confirmed.");
+      } else {
+        this.logger.error("Leaf revealed, but view is not an instance of OllamaView:", leaf.view);
+      }
     }
   }
   // Завантаження та Міграція Налаштувань
