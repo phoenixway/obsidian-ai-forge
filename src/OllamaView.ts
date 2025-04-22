@@ -822,31 +822,54 @@ export class OllamaView extends ItemView {
 		);
 	}
 
-  public handleSettingsUpdated = async (): Promise<void> => {
-    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
-    const activeChat = await this.plugin.chatManager?.getActiveChat();
-    const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-    // Отримуємо ім'я поточної ролі (з чату або глобальних налаштувань)
-    const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-    const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath); // Використовуємо хелпер
+//   public handleSettingsUpdated = async (): Promise<void> => {
+//     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+//     const activeChat = await this.plugin.chatManager?.getActiveChat();
+//     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+//     // Отримуємо ім'я поточної ролі (з чату або глобальних налаштувань)
+//     const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+//     const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath); // Використовуємо хелпер
 
-    const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+//     const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
 
-    this.updateModelDisplay(currentModelName);
-    this.updateRoleDisplay(currentRoleName); // Оновлення маленького індикатора ролі
-    this.updateInputPlaceholder(currentRoleName);
-    this.updateTemperatureIndicator(currentTemperature);
-    this.updateToggleViewLocationOption();
-    this.updateToggleLocationButton();
+//     this.updateModelDisplay(currentModelName);
+//     this.updateRoleDisplay(currentRoleName); // Оновлення маленького індикатора ролі
+//     this.updateInputPlaceholder(currentRoleName);
+//     this.updateTemperatureIndicator(currentTemperature);
+//     this.updateToggleViewLocationOption();
+//     this.updateToggleLocationButton();
 
-    // --- Оновлюємо список у бічній панелі ---
-    await this.updateRolePanelList();
-    // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
-    if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-         this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
-         await this.renderRoleList();
-    }
+//     // --- Оновлюємо список у бічній панелі ---
+//     await this.updateRolePanelList();
+//     // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
+//     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+//          this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
+//          await this.renderRoleList();
+//     }
+// }
+
+// Приклад для handleSettingsUpdated
+public handleSettingsUpdated = async (): Promise<void> => {
+  this.plugin.logger.debug("[handleSettingsUpdated] Updating relevant UI elements directly...");
+  const activeChat = await this.plugin.chatManager?.getActiveChat();
+  const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+  const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+  const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath);
+  const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+
+  // Оновлюємо тільки те, що могло змінитися через НАЛАШТУВАННЯ
+  this.updateModelDisplay(currentModelName); // Якщо modelName є в налаштуваннях
+  this.updateRoleDisplay(currentRoleName);    // Якщо selectedRolePath є в налаштуваннях
+  this.updateInputPlaceholder(currentRoleName);
+  this.updateTemperatureIndicator(currentTemperature); // Якщо temperature є в налаштуваннях
+  await this.updateRolePanelList(); // Панель ролей
+  // ... можливо, оновлення меню ...
+  this.updateToggleViewLocationOption(); // Це точно налаштування
+  this.updateToggleLocationButton();     // Це точно налаштування
+
+  // НЕ викликаємо loadAndDisplayActiveChat
 }
+
 
 // --- Новий метод для рендерингу списку в ПАНЕЛІ ---
 private updateRolePanelList = async (): Promise<void> => {

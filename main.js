@@ -362,9 +362,32 @@ var OllamaView = class extends import_obsidian3.ItemView {
       content.style.paddingBottom = "0";
       return { header, content, section };
     };
+    //   public handleSettingsUpdated = async (): Promise<void> => {
+    //     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+    //     const activeChat = await this.plugin.chatManager?.getActiveChat();
+    //     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+    //     // Отримуємо ім'я поточної ролі (з чату або глобальних налаштувань)
+    //     const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+    //     const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath); // Використовуємо хелпер
+    //     const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+    //     this.updateModelDisplay(currentModelName);
+    //     this.updateRoleDisplay(currentRoleName); // Оновлення маленького індикатора ролі
+    //     this.updateInputPlaceholder(currentRoleName);
+    //     this.updateTemperatureIndicator(currentTemperature);
+    //     this.updateToggleViewLocationOption();
+    //     this.updateToggleLocationButton();
+    //     // --- Оновлюємо список у бічній панелі ---
+    //     await this.updateRolePanelList();
+    //     // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
+    //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+    //          this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
+    //          await this.renderRoleList();
+    //     }
+    // }
+    // Приклад для handleSettingsUpdated
     this.handleSettingsUpdated = async () => {
       var _a, _b, _c, _d, _e, _f;
-      this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+      this.plugin.logger.debug("[handleSettingsUpdated] Updating relevant UI elements directly...");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRolePath = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) != null ? _d : this.plugin.settings.selectedRolePath;
@@ -374,13 +397,9 @@ var OllamaView = class extends import_obsidian3.ItemView {
       this.updateRoleDisplay(currentRoleName);
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
+      await this.updateRolePanelList();
       this.updateToggleViewLocationOption();
       this.updateToggleLocationButton();
-      await this.updateRolePanelList();
-      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-        this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
-        await this.renderRoleList();
-      }
     };
     // --- Новий метод для рендерингу списку в ПАНЕЛІ ---
     this.updateRolePanelList = async () => {
