@@ -130,42 +130,52 @@
 .ollama-main-chat-area {
   display: flex;
   flex-direction: column;
-  flex-grow: 1; // Займає весь простір, що залишився
-  height: 100%;
-  min-width: 0; // Дозволяє стискатись
-  overflow: hidden; // Важливо для правильного layout
+  flex-grow: 1;
+  height: 100%; // Або min-height: 0; щоб flex працював правильно з overflow
+  min-width: 0;
+  // overflow: hidden; // !!! ВИДАЛИТИ або змінити на visible (для тесту) !!!
 
-  // Контейнер для повідомлень (старий chatContainerEl)
-  > div:first-child {
-     flex-grow: 1;
-     display: flex; // Щоб chat-container розтягувався
-     flex-direction: column;
-     overflow: hidden; // Обрізати те, що не влазить
-     position: relative; // Для індикатора нових повідомлень
+  // Контейнер для повідомлень (chatContainerEl в TS)
+  // Змінимо селектор на більш надійний, якщо є клас, або залишимо :first-child
+  // Припустимо, це елемент з TS: this.chatContainerEl
+  // Можна додати клас в TS: this.chatContainerEl.addClass('ollama-chat-area-content');
+  // Або залишити селектор :first-child, якщо структура гарантована
+  > div:first-child { // Або .ollama-chat-area-content
+     flex-grow: 1; // Залишає доступний простір по вертикалі
+     // display: flex; // !!! СПРОБУВАТИ ВИДАЛИТИ !!! - Ймовірно, не потрібен
+     // flex-direction: column; // Якщо видалили display: flex, це теж не потрібно
+     overflow: hidden; // !!! ВИДАЛИТИ або змінити на visible !!!
+     position: relative;
+     display: flex; // ПОТРІБНО, щоб .ollama-chat-container розтягувався всередині
+     flex-direction: column; // Потрібно, щоб .ollama-chat-container розтягувався
   }
 
-  // Контейнер повідомлень (старий chatContainer)
+  // Контейнер повідомлень (chatContainer в TS)
   .ollama-chat-container {
     flex-grow: 1; // Розтягується всередині батька
-    // Скидаємо max-width і margin auto, бо вони тепер на ollama-main-chat-area
     max-width: none;
     margin-left: 0;
     margin-right: 0;
-    padding: calc(var(--chat-spacing-unit) * 4); // Можна налаштувати
+    padding: calc(var(--chat-spacing-unit) * 4);
+    overflow-y: auto; // !!! ДОДАНО - Дозволяє скролінг повідомлень !!!
+    // Додайте стилі для скролбару, якщо вони зникли
+    &::-webkit-scrollbar { width: 8px; }
+    &::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 4px; margin: 4px 0; }
+    &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 4px; border: 2px solid var(--background-secondary); }
+    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
   }
 
-  // Контейнер вводу (старий inputContainer)
+  // Контейнер вводу (inputContainer в TS)
   .chat-input-container {
      flex-shrink: 0; // Не стискати поле вводу
-     // Скидаємо max-width і margin auto
+     // ... решта стилів без змін ...
      max-width: none;
      margin-left: 0;
      margin-right: 0;
-     width: 100%; // Займає всю ширину .ollama-main-chat-area
-     border-radius: 0; // Можна прибрати радіус, якщо панель зліва
-     border-top: 1px solid var(--divider-color); // Зберігаємо верхню межу
-     border-left: none; // Прибираємо ліву межу, якщо панель ролей зліва
-     // padding налаштовується індивідуально
+     width: 100%;
+     border-radius: 0;
+     border-top: 1px solid var(--divider-color);
+     border-left: none;
   }
 }
   
