@@ -407,7 +407,7 @@ export class OllamaView extends ItemView {
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
 
     // Вміст основної області (старий контейнер)
-    this.chatContainerEl = this.mainChatAreaEl.createDiv(); // Тепер це не головний контейнер
+    this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: 'ollama-chat-area-content' });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
     setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");

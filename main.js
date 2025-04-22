@@ -1278,7 +1278,7 @@ This action cannot be undone.`,
     this.rolePanelEl.createEl("h4", { text: "Roles", cls: CSS_ROLE_PANEL_HEADER });
     this.rolePanelListEl = this.rolePanelEl.createDiv({ cls: CSS_ROLE_PANEL_LIST });
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-    this.chatContainerEl = this.mainChatAreaEl.createDiv();
+    this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
     (0, import_obsidian3.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
