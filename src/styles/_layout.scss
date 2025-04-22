@@ -193,6 +193,7 @@
 }
 // --- END RESPONSIVE ---
 
+// FIXME: bad code structure 
 .ollama-container .message .message-content {
     user-select: text !important; // Або auto. !important може знадобитись для перевизначення
     // Також переконайтесь для коду
