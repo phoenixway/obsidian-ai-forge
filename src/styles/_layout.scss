@@ -251,3 +251,32 @@
 // 	transform: translateX(-50%);
 // 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 // }
+
+// --- Адаптивність: Приховуємо панель ролей на менших екранах ---
+@media screen and (max-width: 768px) { // Планшети та менше
+  .ollama-container {
+    // Повертаємо звичайний блочний layout
+    display: block !important;
+  }
+
+  .ollama-role-panel {
+    // display: none; // Приховуємо панель ролей
+  }
+
+  .ollama-main-chat-area {
+     height: 100%; // Займає всю висоту
+     border-left: none; // Немає роздільника зліва
+
+     .ollama-chat-container {
+        padding: calc(var(--chat-spacing-unit) * 3); // Повертаємо планшетні падінги
+     }
+
+     .chat-input-container {
+        border-radius: 12px; // Повертаємо радіус для поля вводу
+        margin-top: 10px; // Менший відступ зверху
+        width: 98%; // Повертаємо відступи з боків
+        margin-left: auto;
+        margin-right: auto;
+     }
+  }
+}
