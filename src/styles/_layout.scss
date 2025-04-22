@@ -192,3 +192,16 @@
     }
 }
 // --- END RESPONSIVE ---
+
+.ollama-container .message .message-content {
+    user-select: text !important; // Або auto. !important може знадобитись для перевизначення
+    // Також переконайтесь для коду
+    pre, code {
+      user-select: text !important;
+    }
+  }
+  
+  // Якщо проблема стосується тільки повідомлень користувача:
+  .ollama-container .user-message .message-content {
+     user-select: text !important;
+  }
