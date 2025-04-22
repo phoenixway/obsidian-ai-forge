@@ -333,6 +333,21 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
+    // --- Обробник зміни налаштувань (зроблено публічним) ---
+    this.handleSettingsUpdated = async () => {
+      var _a, _b, _c, _d;
+      this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+      const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
+      const currentRoleName = await this.getCurrentRoleDisplayName();
+      const currentTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
+      this.updateModelDisplay(currentModelName);
+      this.updateRoleDisplay(currentRoleName);
+      this.updateInputPlaceholder(currentRoleName);
+      this.updateTemperatureIndicator(currentTemperature);
+      this.updateToggleViewLocationOption();
+      this.updateToggleLocationButton();
+    };
     this.handleModelDisplayClick = async (event) => {
       var _a, _b;
       const menu = new import_obsidian3.Menu();
@@ -1610,21 +1625,6 @@ This action cannot be undone.`,
     this.register(
       this.plugin.on("settings-updated", this.handleSettingsUpdated)
     );
-  }
-  // --- Обробник зміни налаштувань (зроблено публічним) ---
-  async handleSettingsUpdated() {
-    var _a, _b, _c, _d;
-    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
-    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-    const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
-    const currentRoleName = await this.getCurrentRoleDisplayName();
-    const currentTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
-    this.updateModelDisplay(currentModelName);
-    this.updateRoleDisplay(currentRoleName);
-    this.updateInputPlaceholder(currentRoleName);
-    this.updateTemperatureIndicator(currentTemperature);
-    this.updateToggleViewLocationOption();
-    this.updateToggleLocationButton();
   }
   // --- Додано: Метод для оновлення кнопки перемикання ---
   updateToggleLocationButton() {

@@ -883,26 +883,25 @@ export class OllamaView extends ItemView {
 	}
 
 	// --- Обробник зміни налаштувань (зроблено публічним) ---
-	public async handleSettingsUpdated(): Promise<void> {
-		this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
-		// ... (логіка оновлення моделі, ролі, плейсхолдера, температури) ...
-		const activeChat = await this.plugin.chatManager?.getActiveChat();
-		const currentModelName =
-			activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-		const currentRoleName = await this.getCurrentRoleDisplayName();
-		const currentTemperature =
-			activeChat?.metadata?.temperature ??
-			this.plugin.settings.temperature;
-
-		this.updateModelDisplay(currentModelName);
-		this.updateRoleDisplay(currentRoleName);
-		this.updateInputPlaceholder(currentRoleName);
-		this.updateTemperatureIndicator(currentTemperature);
-
-		// Оновлюємо ОБИДВА елементи керування перемиканням
-		this.updateToggleViewLocationOption(); // Для меню
-		this.updateToggleLocationButton(); // Для кнопки
-	}
+  public handleSettingsUpdated = async (): Promise<void> => {
+    // Тепер 'this' гарантовано посилається на екземпляр OllamaView
+    this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
+  
+    // --- Решта коду функції залишається без змін ---
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+    const currentRoleName = await this.getCurrentRoleDisplayName();
+    const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+  
+    this.updateModelDisplay(currentModelName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateInputPlaceholder(currentRoleName);
+    this.updateTemperatureIndicator(currentTemperature);
+  
+    // Оновлюємо ОБИДВА елементи керування перемиканням
+    this.updateToggleViewLocationOption(); // Для меню
+    this.updateToggleLocationButton();     // Для кнопки
+  }
 
 	// --- Додано: Метод для оновлення кнопки перемикання ---
 	private updateToggleLocationButton(): void {

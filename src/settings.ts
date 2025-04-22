@@ -1,3 +1,5 @@
+//settings.ts
+
 import {
   App,
   PluginSettingTab,
