@@ -524,12 +524,26 @@ var OllamaView = class extends import_obsidian3.ItemView {
             const success = await this.plugin.chatManager.updateActiveChatMetadata({
               name: trimmedName
             });
-            this.plugin.logger.debug(`[handleRenameChatClick] updateActiveChatMetadata returned: ${success}`);
+            this.plugin.logger.debug(
+              `[handleRenameChatClick] updateActiveChatMetadata returned: ${success}`
+            );
             if (success) {
               noticeMessage = `Chat renamed to "${trimmedName}"`;
               this.plugin.logger.info(
                 `Chat ${chatId} rename initiated to "${trimmedName}".`
               );
+              if (this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(
+                CSS_CLASS_SUBMENU_CONTENT_HIDDEN
+              )) {
+                this.plugin.logger.info(
+                  "[handleRenameChatClick] Forcing chat list menu refresh after rename completed."
+                );
+                await this.renderChatListMenu();
+              } else {
+                this.plugin.logger.debug(
+                  "[handleRenameChatClick] Chat list submenu is closed after rename, not forcing refresh."
+                );
+              }
             } else {
               noticeMessage = "Failed to rename chat.";
               this.plugin.logger.error(
@@ -2615,20 +2629,26 @@ This action cannot be undone.`,
     var _a, _b;
     const container = this.chatSubmenuContent;
     if (!container) {
-      this.plugin.logger.warn("[renderChatListMenu] Chat submenu container not found!");
+      this.plugin.logger.warn(
+        "[renderChatListMenu] Chat submenu container not found!"
+      );
       return;
     }
     container.empty();
     try {
       const chats = ((_a = this.plugin.chatManager) == null ? void 0 : _a.listAvailableChats()) || [];
       const currentActiveId = (_b = this.plugin.chatManager) == null ? void 0 : _b.getActiveChatId();
-      this.plugin.logger.debug(`[renderChatListMenu] Fetched ${chats.length} chats from ChatManager. Active ID: ${currentActiveId}`);
+      this.plugin.logger.debug(
+        `[renderChatListMenu] Fetched ${chats.length} chats from ChatManager. Active ID: ${currentActiveId}`
+      );
       if (chats.length === 0) {
         container.createEl("div", {
           cls: "menu-info-text",
           text: "No saved chats."
         });
-        this.plugin.logger.debug("[renderChatListMenu] Rendered 'No saved chats.' message.");
+        this.plugin.logger.debug(
+          "[renderChatListMenu] Rendered 'No saved chats.' message."
+        );
         return;
       }
       chats.forEach((chatMeta) => {
@@ -2660,7 +2680,9 @@ This action cannot be undone.`,
         });
         this.registerDomEvent(chatOptionEl, "click", async () => {
           var _a2;
-          this.plugin.logger.debug(`[renderChatListMenu] Clicked chat option: ${chatMeta.name} (ID: ${chatMeta.id})`);
+          this.plugin.logger.debug(
+            `[renderChatListMenu] Clicked chat option: ${chatMeta.name} (ID: ${chatMeta.id})`
+          );
           if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
             await this.plugin.chatManager.setActiveChat(
               chatMeta.id
@@ -2670,9 +2692,14 @@ This action cannot be undone.`,
         });
       });
       this.updateSubmenuHeight(container);
-      this.plugin.logger.debug("[renderChatListMenu] Finished rendering chat list successfully.");
+      this.plugin.logger.debug(
+        "[renderChatListMenu] Finished rendering chat list successfully."
+      );
     } catch (error) {
-      this.plugin.logger.error("[renderChatListMenu] Error rendering chat list:", error);
+      this.plugin.logger.error(
+        "[renderChatListMenu] Error rendering chat list:",
+        error
+      );
       container.empty();
       container.createEl("div", {
         cls: "menu-error-text",
@@ -5578,9 +5605,20 @@ var ChatManager = class {
     if (changed) {
       this.plugin.logger.debug(`Metadata changed. Chat ${activeChat.metadata.id} save scheduled by Chat class.`);
       if (this.chatIndex[activeChat.metadata.id]) {
-        const { id, createdAt, ...metaToStore } = activeChat.metadata;
+        const metaToStore = {
+          name: activeChat.metadata.name,
+          lastModified: activeChat.metadata.lastModified,
+          createdAt: activeChat.metadata.createdAt,
+          // Явно додаємо createdAt
+          // Додаємо опціональні поля, якщо вони є
+          ...activeChat.metadata.modelName && { modelName: activeChat.metadata.modelName },
+          ...activeChat.metadata.selectedRolePath && { selectedRolePath: activeChat.metadata.selectedRolePath },
+          ...activeChat.metadata.temperature !== void 0 && { temperature: activeChat.metadata.temperature },
+          ...activeChat.metadata.contextWindow !== void 0 && { contextWindow: activeChat.metadata.contextWindow }
+        };
         this.chatIndex[activeChat.metadata.id] = metaToStore;
         await this.saveChatIndex();
+        this.plugin.logger.debug(`[ChatManager.updateActiveChatMetadata] Updated chat index entry for ${activeChat.metadata.id} including createdAt.`);
       }
       const newRolePath = activeChat.metadata.selectedRolePath;
       const newModelName = activeChat.metadata.modelName;

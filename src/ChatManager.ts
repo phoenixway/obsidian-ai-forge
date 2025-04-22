@@ -419,9 +419,21 @@ export class ChatManager {
              this.plugin.logger.debug(`Metadata changed. Chat ${activeChat.metadata.id} save scheduled by Chat class.`);
               // Оновлюємо індекс ОДРАЗУ (особливо name та lastModified)
               if (this.chatIndex[activeChat.metadata.id]) {
-                  const { id, createdAt, ...metaToStore } = activeChat.metadata;
-                  this.chatIndex[activeChat.metadata.id] = metaToStore as ChatSessionStored;
-                  await this.saveChatIndex();
+                const metaToStore: ChatSessionStored = {
+                    name: activeChat.metadata.name,
+                    lastModified: activeChat.metadata.lastModified,
+                    createdAt: activeChat.metadata.createdAt, // Явно додаємо createdAt
+                    // Додаємо опціональні поля, якщо вони є
+                    ...(activeChat.metadata.modelName && { modelName: activeChat.metadata.modelName }),
+                    ...(activeChat.metadata.selectedRolePath && { selectedRolePath: activeChat.metadata.selectedRolePath }),
+                    ...(activeChat.metadata.temperature !== undefined && { temperature: activeChat.metadata.temperature }),
+                    ...(activeChat.metadata.contextWindow !== undefined && { contextWindow: activeChat.metadata.contextWindow }),
+                };
+                // --- КІНЕЦЬ НОВОГО ВАРІАНТУ ---
+            
+                this.chatIndex[activeChat.metadata.id] = metaToStore;
+                await this.saveChatIndex();
+                this.plugin.logger.debug(`[ChatManager.updateActiveChatMetadata] Updated chat index entry for ${activeChat.metadata.id} including createdAt.`); // Додайте лог для підтвердження
               }
 
              // Генеруємо події, якщо відповідні поля дійсно змінилися

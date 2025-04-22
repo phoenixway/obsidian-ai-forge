@@ -1310,7 +1310,9 @@ export class OllamaView extends ItemView {
 							name: trimmedName,
 						});
 					// ----------------------------------------------------------
-          this.plugin.logger.debug(`[handleRenameChatClick] updateActiveChatMetadata returned: ${success}`);
+					this.plugin.logger.debug(
+						`[handleRenameChatClick] updateActiveChatMetadata returned: ${success}`
+					);
 					if (success) {
 						// Подія active-chat-changed, викликана в updateActiveChatMetadata,
 						// оновить UI. Notice тут може бути необов'язковим.
@@ -1318,6 +1320,23 @@ export class OllamaView extends ItemView {
 						this.plugin.logger.info(
 							`Chat ${chatId} rename initiated to "${trimmedName}".`
 						);
+						// --- ДОДАНО: Примусове оновлення ПІСЛЯ await ---
+						// Перевіряємо, чи підменю чатів все ще розгорнуте
+						if (
+							this.chatSubmenuContent &&
+							!this.chatSubmenuContent.classList.contains(
+								CSS_CLASS_SUBMENU_CONTENT_HIDDEN
+							)
+						) {
+							this.plugin.logger.info(
+								"[handleRenameChatClick] Forcing chat list menu refresh after rename completed."
+							);
+							await this.renderChatListMenu(); // Використовуємо await
+						} else {
+							this.plugin.logger.debug(
+								"[handleRenameChatClick] Chat list submenu is closed after rename, not forcing refresh."
+							);
+						}
 					} else {
 						noticeMessage = "Failed to rename chat.";
 						this.plugin.logger.error(
@@ -2842,22 +2861,28 @@ export class OllamaView extends ItemView {
 	public async renderChatListMenu(): Promise<void> {
 		const container = this.chatSubmenuContent;
 		if (!container) {
-      this.plugin.logger.warn("[renderChatListMenu] Chat submenu container not found!"); // Log missing element
-      return;
-    }
+			this.plugin.logger.warn(
+				"[renderChatListMenu] Chat submenu container not found!"
+			); // Log missing element
+			return;
+		}
 		container.empty();
 		try {
 			const chats = this.plugin.chatManager?.listAvailableChats() || [];
 			const currentActiveId = this.plugin.chatManager?.getActiveChatId();
 
-      this.plugin.logger.debug(`[renderChatListMenu] Fetched ${chats.length} chats from ChatManager. Active ID: ${currentActiveId}`); // Log chat count
+			this.plugin.logger.debug(
+				`[renderChatListMenu] Fetched ${chats.length} chats from ChatManager. Active ID: ${currentActiveId}`
+			); // Log chat count
 
 			if (chats.length === 0) {
 				container.createEl("div", {
 					cls: "menu-info-text",
 					text: "No saved chats.",
 				});
-        this.plugin.logger.debug("[renderChatListMenu] Rendered 'No saved chats.' message.");
+				this.plugin.logger.debug(
+					"[renderChatListMenu] Rendered 'No saved chats.' message."
+				);
 				return;
 			}
 			chats.forEach((chatMeta) => {
@@ -2888,7 +2913,9 @@ export class OllamaView extends ItemView {
 					text: dateText,
 				});
 				this.registerDomEvent(chatOptionEl, "click", async () => {
-          this.plugin.logger.debug(`[renderChatListMenu] Clicked chat option: ${chatMeta.name} (ID: ${chatMeta.id})`);
+					this.plugin.logger.debug(
+						`[renderChatListMenu] Clicked chat option: ${chatMeta.name} (ID: ${chatMeta.id})`
+					);
 					if (
 						chatMeta.id !==
 						this.plugin.chatManager?.getActiveChatId()
@@ -2901,9 +2928,14 @@ export class OllamaView extends ItemView {
 				});
 			});
 			this.updateSubmenuHeight(container);
-      this.plugin.logger.debug("[renderChatListMenu] Finished rendering chat list successfully."); // Log success end
+			this.plugin.logger.debug(
+				"[renderChatListMenu] Finished rendering chat list successfully."
+			); // Log success end
 		} catch (error) {
-      this.plugin.logger.error("[renderChatListMenu] Error rendering chat list:", error); // Log error
+			this.plugin.logger.error(
+				"[renderChatListMenu] Error rendering chat list:",
+				error
+			); // Log error
 			container.empty();
 			container.createEl("div", {
 				cls: "menu-error-text",
