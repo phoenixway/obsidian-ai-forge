@@ -205,6 +205,16 @@ var CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button";
 var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var CSS_CLASS_REGENERATE_BUTTON = "regenerate-button";
+var CSS_ROLE_PANEL = "ollama-role-panel";
+var CSS_ROLE_PANEL_HEADER = "ollama-role-panel-header";
+var CSS_ROLE_PANEL_LIST = "ollama-role-panel-list";
+var CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item";
+var CSS_ROLE_PANEL_ITEM_ICON = "ollama-role-panel-item-icon";
+var CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
+var CSS_ROLE_PANEL_ITEM_ACTIVE = "is-active";
+var CSS_ROLE_PANEL_ITEM_CUSTOM = "is-custom";
+var CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
+var CSS_MAIN_CHAT_AREA = "ollama-main-chat-area";
 var LANGUAGES = {
   af: "Afrikaans",
   sq: "Albanian",
@@ -318,6 +328,7 @@ var LANGUAGES = {
   zu: "Zulu"
 };
 var OllamaView = class extends import_obsidian3.ItemView {
+  // Нова обгортка для чату та вводу
   constructor(leaf, plugin) {
     super(leaf);
     // Кнопка в панелі (для десктопу)
@@ -333,20 +344,118 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    // --- Обробник зміни налаштувань (зроблено публічним) ---
+    // Допоміжна функція для створення підменю (з попереднього коду)
+    this.createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
+      const section = this.menuDropdown.createDiv();
+      if (sectionClass)
+        section.addClass(sectionClass);
+      const header = section.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
+      (0, import_obsidian3.setIcon)(header.createSpan({ cls: "menu-option-icon" }), icon);
+      header.createSpan({ cls: "menu-option-text", text: title });
+      (0, import_obsidian3.setIcon)(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
+      const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
+      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}` });
+      content.style.maxHeight = "0";
+      content.style.overflow = "hidden";
+      content.style.transition = "max-height 0.3s ease-out, padding 0.3s ease-out";
+      content.style.paddingTop = "0";
+      content.style.paddingBottom = "0";
+      return { header, content, section };
+    };
     this.handleSettingsUpdated = async () => {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e, _f;
       this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
-      const currentRoleName = await this.getCurrentRoleDisplayName();
-      const currentTemperature = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.temperature) != null ? _d : this.plugin.settings.temperature;
+      const currentRolePath = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) != null ? _d : this.plugin.settings.selectedRolePath;
+      const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath);
+      const currentTemperature = (_f = (_e = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _e.temperature) != null ? _f : this.plugin.settings.temperature;
       this.updateModelDisplay(currentModelName);
       this.updateRoleDisplay(currentRoleName);
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
       this.updateToggleViewLocationOption();
       this.updateToggleLocationButton();
+      await this.updateRolePanelList();
+      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+        this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
+        await this.renderRoleList();
+      }
+    };
+    // --- Новий метод для рендерингу списку в ПАНЕЛІ ---
+    this.updateRolePanelList = async () => {
+      var _a, _b;
+      if (!this.rolePanelListEl || !this.plugin.chatManager) {
+        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Panel list element or chat manager not ready.");
+        return;
+      }
+      this.plugin.logger.debug("[updateRolePanelList] Updating role list in the side panel...");
+      this.rolePanelListEl.empty();
+      try {
+        const roles = await this.plugin.listRoleFiles(true);
+        const activeChat = await this.plugin.chatManager.getActiveChat();
+        const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
+        this.plugin.logger.debug(`[updateRolePanelList] Current active role path for panel: ${currentRolePath || "None"}`);
+        const noneOptionEl = this.rolePanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"] });
+        const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
+        noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None (Default)" });
+        if (!currentRolePath) {
+          noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+          (0, import_obsidian3.setIcon)(noneIconSpan, "check");
+        } else {
+          (0, import_obsidian3.setIcon)(noneIconSpan, "slash");
+        }
+        this.registerDomEvent(noneOptionEl, "click", () => this.handleRolePanelItemClick(null, currentRolePath));
+        if (roles.length > 0) {
+          this.rolePanelListEl.createEl("hr", { cls: "menu-separator" });
+        }
+        roles.forEach((roleInfo) => {
+          const roleOptionEl = this.rolePanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option"] });
+          const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
+          roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: roleInfo.name });
+          if (roleInfo.isCustom) {
+            roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM);
+          }
+          if (roleInfo.path === currentRolePath) {
+            roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+            (0, import_obsidian3.setIcon)(iconSpan, "check");
+          } else {
+            (0, import_obsidian3.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "file-text");
+          }
+          this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+        });
+        this.plugin.logger.debug(`[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`);
+      } catch (error) {
+        this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
+        this.rolePanelListEl.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
+      }
+    };
+    // --- Новий обробник кліку для ПАНЕЛІ ролей ---
+    this.handleRolePanelItemClick = async (roleInfo, currentRolePath) => {
+      var _a, _b, _c, _d, _e;
+      const newRolePath = (_a = roleInfo == null ? void 0 : roleInfo.path) != null ? _a : "";
+      const roleNameForEvent = (_b = roleInfo == null ? void 0 : roleInfo.name) != null ? _b : "None";
+      this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role: ${roleNameForEvent} (Path: ${newRolePath || "None"})`);
+      if (newRolePath !== currentRolePath) {
+        const activeChat = await ((_c = this.plugin.chatManager) == null ? void 0 : _c.getActiveChat());
+        try {
+          if (activeChat) {
+            this.plugin.logger.debug(`[handleRolePanelItemClick] Setting active role for chat ${activeChat.metadata.id} to: ${newRolePath || "None"}`);
+            await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+          } else {
+            this.plugin.logger.debug(`[handleRolePanelItemClick] No active chat. Setting global default role to: ${newRolePath || "None"}`);
+            this.plugin.settings.selectedRolePath = newRolePath;
+            await this.plugin.saveSettings();
+            this.plugin.emit("role-changed", roleNameForEvent);
+            (_e = (_d = this.plugin.promptService) == null ? void 0 : _d.clearRoleCache) == null ? void 0 : _e.call(_d);
+          }
+        } catch (error) {
+          this.plugin.logger.error(`[handleRolePanelItemClick] Error setting role to ${newRolePath}:`, error);
+          new import_obsidian3.Notice("Failed to set the role.");
+        }
+      } else {
+        this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role is already active.`);
+      }
     };
     this.handleModelDisplayClick = async (event) => {
       var _a, _b;
@@ -818,10 +927,12 @@ This action cannot be undone.`,
       }
     };
     this.handleActiveChatChanged = (data) => {
-      console.log(
-        `[OllamaView] Active chat changed event received. New ID: ${data.chatId}`
-      );
+      this.plugin.logger.debug(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
       this.loadAndDisplayActiveChat();
+      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+        this.plugin.logger.debug("[OllamaView] Active chat changed, role submenu open, refreshing role list menu.");
+        this.renderRoleList();
+      }
     };
     this.handleMessageAdded = (data) => {
       var _a;
@@ -1133,6 +1244,8 @@ This action cannot be undone.`,
       this.updateModelDisplay(this.plugin.settings.modelName);
       this.updateTemperatureIndicator(this.plugin.settings.temperature);
     }
+    this.renderRoleList();
+    this.updateRolePanelList();
     setTimeout(() => {
       var _a;
       return (_a = this.inputEl) == null ? void 0 : _a.focus();
@@ -1140,6 +1253,7 @@ This action cannot be undone.`,
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
     }
+    this.loadAndDisplayActiveChat();
   }
   async onClose() {
     if (this.speechWorker) {
@@ -1159,105 +1273,47 @@ This action cannot be undone.`,
   // --- UI Creation (with Custom Div Menu & Accordion) ---
   createUIElements() {
     this.contentEl.empty();
-    this.chatContainerEl = this.contentEl.createDiv({
-      cls: CSS_CLASS_CONTAINER
-    });
-    this.chatContainer = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_CHAT_CONTAINER
-    });
-    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_NEW_MESSAGE_INDICATOR
-    });
-    (0, import_obsidian3.setIcon)(
-      this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }),
-      "arrow-down"
-    );
+    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
+    this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
+    this.rolePanelEl.createEl("h4", { text: "Roles", cls: CSS_ROLE_PANEL_HEADER });
+    this.rolePanelListEl = this.rolePanelEl.createDiv({ cls: CSS_ROLE_PANEL_LIST });
+    this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
+    this.chatContainerEl = this.mainChatAreaEl.createDiv();
+    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+    (0, import_obsidian3.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
-    const inputContainer = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_INPUT_CONTAINER
-    });
-    this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Text...`, rows: 1 }
-    });
-    const controlsContainer = inputContainer.createDiv({
-      cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER
-    });
-    const leftControls = controlsContainer.createDiv({
-      cls: CSS_CLASS_INPUT_CONTROLS_LEFT
-    });
-    this.translateInputButton = leftControls.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { "aria-label": "Translate input to English" }
-    });
+    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
+    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+    this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { "aria-label": "Translate input to English" } });
     (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
-    this.modelDisplayEl = leftControls.createDiv({
-      cls: CSS_CLASS_MODEL_DISPLAY
-    });
+    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
-    this.roleDisplayEl = leftControls.createDiv({
-      cls: CSS_CLASS_ROLE_DISPLAY
-    });
+    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
     this.roleDisplayEl.setText("...");
     this.roleDisplayEl.title = "Click to select role";
-    this.temperatureIndicatorEl = leftControls.createDiv({
-      cls: CSS_CLASS_TEMPERATURE_INDICATOR
-    });
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
     this.temperatureIndicatorEl.setText("?");
     this.temperatureIndicatorEl.title = "Click to set temperature";
-    this.buttonsContainer = controlsContainer.createDiv({
-      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`
-    });
-    this.sendButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_SEND_BUTTON,
-      attr: { "aria-label": "Send" }
-    });
+    this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
-    this.voiceButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_VOICE_BUTTON,
-      attr: { "aria-label": "Voice Input" }
-    });
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
     (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      attr: { "aria-label": "Toggle View Location" }
-    });
-    this.menuButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_MENU_BUTTON,
-      attr: { "aria-label": "Menu" }
-    });
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { "aria-label": "Toggle View Location" } });
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian3.setIcon)(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
-    this.menuDropdown = inputContainer.createEl("div", {
-      cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"]
-    });
+    this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
+    const roleSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.roleSubmenuHeader = roleSection.header;
+    this.roleSubmenuContent = roleSection.content;
     this.menuDropdown.style.display = "none";
-    const createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
-      const section = this.menuDropdown.createDiv();
-      if (sectionClass)
-        section.addClass(sectionClass);
-      const header = section.createDiv({
-        cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}`
-      });
-      (0, import_obsidian3.setIcon)(header.createSpan({ cls: "menu-option-icon" }), icon);
-      header.createSpan({ cls: "menu-option-text", text: title });
-      (0, import_obsidian3.setIcon)(
-        header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }),
-        "chevron-right"
-      );
-      const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
-      const content = section.createDiv({
-        cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}`
-      });
-      content.style.maxHeight = "0";
-      content.style.overflow = "hidden";
-      content.style.transition = "max-height 0.3s ease-out, padding 0.3s ease-out";
-      content.style.paddingTop = "0";
-      content.style.paddingBottom = "0";
-      return { header, content, section };
-    };
-    const modelSection = createSubmenuSection(
+    const modelSection = this.createSubmenuSection(
       "Select Model",
       "list-collapse",
       CSS_CLASS_MODEL_LIST_CONTAINER,
@@ -1265,15 +1321,7 @@ This action cannot be undone.`,
     );
     this.modelSubmenuHeader = modelSection.header;
     this.modelSubmenuContent = modelSection.content;
-    const roleSection = createSubmenuSection(
-      "Select Role",
-      "users",
-      CSS_CLASS_ROLE_LIST_CONTAINER,
-      "role-submenu-section"
-    );
-    this.roleSubmenuHeader = roleSection.header;
-    this.roleSubmenuContent = roleSection.content;
-    const chatSection = createSubmenuSection(
+    const chatSection = this.createSubmenuSection(
       "Load Chat",
       "messages-square",
       CSS_CLASS_CHAT_LIST_CONTAINER
@@ -1612,9 +1660,8 @@ This action cannot be undone.`,
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));
     this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));
-    this.register(
-      this.plugin.on("active-chat-changed", this.handleActiveChatChanged)
-    );
+    this.register(this.plugin.on("roles-updated", this.updateRolePanelList));
+    this.plugin.on("active-chat-changed", this.handleActiveChatChanged);
     this.register(this.plugin.on("message-added", this.handleMessageAdded));
     this.register(
       this.plugin.on("messages-cleared", this.handleMessagesCleared)
@@ -1915,6 +1962,7 @@ This action cannot be undone.`,
     this.updateRoleDisplay(currentRoleName);
     this.updateModelDisplay(finalModelName);
     this.updateTemperatureIndicator(finalTemperature);
+    await this.updateRolePanelList();
     if (finalModelName === null) {
       if (this.inputEl) {
         this.inputEl.disabled = true;
@@ -3374,6 +3422,26 @@ This action cannot be undone.`,
       (0, import_obsidian3.setIcon)(iconSpan, "layout-list");
       textSpan.setText("Show in Tab");
       this.toggleViewLocationOption.title = "Close sidebar panel and reopen in tab";
+    }
+  }
+  async findRoleNameByPath(rolePath) {
+    var _a;
+    if (!rolePath) {
+      return "None";
+    }
+    try {
+      const allRoles = await this.plugin.listRoleFiles(true);
+      const foundRole = allRoles.find((role) => role.path === rolePath);
+      if (foundRole) {
+        return foundRole.name;
+      } else {
+        const fileName = (_a = rolePath.split("/").pop()) == null ? void 0 : _a.replace(".md", "");
+        this.plugin.logger.warn(`[findRoleNameByPath] Role not found in list for path "${rolePath}". Using derived name: "${fileName || "Unknown"}"`);
+        return fileName || "Unknown Role";
+      }
+    } catch (error) {
+      this.plugin.logger.error(`[findRoleNameByPath] Error fetching roles list while finding name for path "${rolePath}":`, error);
+      return "Error";
     }
   }
 };

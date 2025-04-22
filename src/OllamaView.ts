@@ -10,7 +10,7 @@ import {
 	TFolder,
 	TFile,
 	Menu,
-	Platform, // <-- Додано для перевірки платформи, якщо знадобиться
+	Platform, 
 } from "obsidian";
 // Імпортуємо модальні вікна
 import { ConfirmModal } from "./ConfirmModal";
@@ -119,6 +119,18 @@ const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 
 const CHAT_LIST_MAX_HEIGHT = "250px";
 const CSS_CLASS_REGENERATE_BUTTON = "regenerate-button";
+
+const CSS_ROLE_PANEL = "ollama-role-panel";
+const CSS_ROLE_PANEL_HEADER = "ollama-role-panel-header";
+const CSS_ROLE_PANEL_LIST = "ollama-role-panel-list";
+const CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item"; // Можна використовувати спільно з menu-option
+const CSS_ROLE_PANEL_ITEM_ICON = "ollama-role-panel-item-icon";
+const CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
+const CSS_ROLE_PANEL_ITEM_ACTIVE = "is-active";
+const CSS_ROLE_PANEL_ITEM_CUSTOM = "is-custom";
+const CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
+const CSS_MAIN_CHAT_AREA = "ollama-main-chat-area"; // Новий клас для обгортки чату+вводу
+
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -290,6 +302,11 @@ export class OllamaView extends ItemView {
 	private newMessagesIndicatorEl: HTMLElement | null = null;
 	private userScrolledUp: boolean = false;
 
+  private rolePanelEl!: HTMLElement; // Нова властивість для панелі ролей
+  private rolePanelListEl!: HTMLElement; // Нова властивість для списку в панелі
+  private mainChatAreaEl!: HTMLElement; // Нова обгортка для чату та вводу
+
+
 	constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
 		super(leaf);
 		this.plugin = plugin;
@@ -346,10 +363,18 @@ export class OllamaView extends ItemView {
 			this.updateModelDisplay(this.plugin.settings.modelName);
 			this.updateTemperatureIndicator(this.plugin.settings.temperature);
 		}
+
+    //......Ролі, панель ролей.......
+    this.renderRoleList(); // Оновлює список у випадаючому меню (якщо воно ще використовується)
+    this.updateRolePanelList(); // Оновлює список у бічній панелі
+
+
 		setTimeout(() => this.inputEl?.focus(), 150);
 		if (this.inputEl) {
 			this.inputEl.dispatchEvent(new Event("input"));
 		}
+    //FIXME: checkit
+    this.loadAndDisplayActiveChat();
 	}
 
 	async onClose(): Promise<void> {
@@ -369,144 +394,57 @@ export class OllamaView extends ItemView {
 	// --- UI Creation (with Custom Div Menu & Accordion) ---
 	private createUIElements(): void {
 		this.contentEl.empty();
-		this.chatContainerEl = this.contentEl.createDiv({
-			cls: CSS_CLASS_CONTAINER,
-		});
-		this.chatContainer = this.chatContainerEl.createDiv({
-			cls: CSS_CLASS_CHAT_CONTAINER,
-		});
-		this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({
-			cls: CSS_CLASS_NEW_MESSAGE_INDICATOR,
-		});
-		setIcon(
-			this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }),
-			"arrow-down"
-		);
-		this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
-		// --- Input Container (Тепер містить textarea + controlsContainer) ---
-		const inputContainer = this.chatContainerEl.createDiv({
-			cls: CSS_CLASS_INPUT_CONTAINER,
-		});
+    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
+    // flexContainer.style.display = 'flex'; // Стиль буде в SCSS
 
-		// 1. Textarea (зверху)
-		this.inputEl = inputContainer.createEl("textarea", {
-			attr: { placeholder: `Text...`, rows: 1 },
-		});
-		// Забираємо зайвий padding-right, який був для старих кнопок
-		// this.inputEl.style.paddingRight = '15px'; // Або залишити стандартний
+    // 1. Панель Ролей (зліва чи справа?) - Давайте зробимо зліва
+    this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
+    this.rolePanelEl.createEl("h4", { text: "Roles", cls: CSS_ROLE_PANEL_HEADER });
+    this.rolePanelListEl = this.rolePanelEl.createDiv({ cls: CSS_ROLE_PANEL_LIST });
 
-		// 2. Контейнер для контролів (знизу)
-		const controlsContainer = inputContainer.createDiv({
-			cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER,
-		});
+    // 2. Основна Область Чату (права частина)
+    this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
 
-		// 2a. Ліва група контролів
-		const leftControls = controlsContainer.createDiv({
-			cls: CSS_CLASS_INPUT_CONTROLS_LEFT,
-		});
-		this.translateInputButton = leftControls.createEl("button", {
-			cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-			attr: { "aria-label": "Translate input to English" },
-		});
-		setIcon(this.translateInputButton, "languages");
-		this.translateInputButton.title = "Translate input to English";
+    // Вміст основної області (старий контейнер)
+    this.chatContainerEl = this.mainChatAreaEl.createDiv(); // Тепер це не головний контейнер
+    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+    setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+    this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
-		this.modelDisplayEl = leftControls.createDiv({
-			cls: CSS_CLASS_MODEL_DISPLAY,
-		});
-		this.modelDisplayEl.setText("..."); // Початковий текст
-		this.modelDisplayEl.title = "Click to select model";
+    // Контейнер вводу (знизу основної області)
+    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
+    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+    // ... (кнопка перекладу, дисплей моделі, температури - ЯК БУЛО) ...
+    this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { 'aria-label': 'Translate input to English' } }); setIcon(this.translateInputButton, "languages"); this.translateInputButton.title = "Translate input to English";
+    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY }); this.modelDisplayEl.setText("..."); this.modelDisplayEl.title = "Click to select model";
+    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY }); this.roleDisplayEl.setText("..."); this.roleDisplayEl.title = "Click to select role"; // Цей елемент тепер може бути менш важливим на десктопі
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR }); this.temperatureIndicatorEl.setText("?"); this.temperatureIndicatorEl.title = "Click to set temperature";
 
-		this.roleDisplayEl = leftControls.createDiv({
-			cls: CSS_CLASS_ROLE_DISPLAY,
-		});
-		this.roleDisplayEl.setText("..."); // Початковий текст
-		this.roleDisplayEl.title = "Click to select role";
+    this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
+    // ... (кнопки Send, Voice, Menu, Toggle Location - ЯК БУЛО) ...
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send");
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } }); setIcon(this.voiceButton, "mic");
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { 'aria-label': 'Toggle View Location' } });
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } }); setIcon(this.menuButton, "more-vertical");
+    this.updateToggleLocationButton();
 
-		this.temperatureIndicatorEl = leftControls.createDiv({
-			cls: CSS_CLASS_TEMPERATURE_INDICATOR,
-		});
-		this.temperatureIndicatorEl.setText("?"); // Початковий стан
-		this.temperatureIndicatorEl.title = "Click to set temperature";
+    // Випадаюче меню (залишається для інших опцій)
+    this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
+    // ... (вміст меню ЯК БУЛО, АЛЕ секцію ролей можна прибрати або залишити для мобільних) ...
+    // Можна залишити секцію ролей, стилі її приховають на десктопі
+    const roleSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.roleSubmenuHeader = roleSection.header;
+    this.roleSubmenuContent = roleSection.content;
 
-		// 2b. Права група контролів (старий buttonsContainer)
-		this.buttonsContainer = controlsContainer.createDiv({
-			cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`,
-		});
-		this.sendButton = this.buttonsContainer.createEl("button", {
-			cls: CSS_CLASS_SEND_BUTTON,
-			attr: { "aria-label": "Send" },
-		});
-		setIcon(this.sendButton, "send");
-		this.voiceButton = this.buttonsContainer.createEl("button", {
-			cls: CSS_CLASS_VOICE_BUTTON,
-			attr: { "aria-label": "Voice Input" },
-		});
-		setIcon(this.voiceButton, "mic");
-		this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-			cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-			attr: { "aria-label": "Toggle View Location" },
-		});
-		this.menuButton = this.buttonsContainer.createEl("button", {
-			cls: CSS_CLASS_MENU_BUTTON,
-			attr: { "aria-label": "Menu" },
-		});
-		setIcon(this.menuButton, "more-vertical");
-		this.updateToggleLocationButton(); // Встановлюємо іконку/підказку
-
-		// --- Кастомне Випадаюче Меню (для кнопки "...") ---
-		// Позиціонується відносно inputContainer або menuButton
-		this.menuDropdown = inputContainer.createEl("div", {
-			cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"],
-		});
 		this.menuDropdown.style.display = "none"; // Приховано
-
-		// Helper для секцій акордеону
-		// Helper для секцій акордеону
-		const createSubmenuSection = (
-			title: string,
-			icon: string,
-			listContainerClass: string,
-			sectionClass?: string
-		): {
-			header: HTMLElement;
-			content: HTMLElement;
-			section: HTMLElement;
-		} => {
-			const section = this.menuDropdown.createDiv();
-			if (sectionClass) section.addClass(sectionClass);
-			const header = section.createDiv({
-				cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}`,
-			});
-			setIcon(header.createSpan({ cls: "menu-option-icon" }), icon);
-			header.createSpan({ cls: "menu-option-text", text: title });
-			setIcon(
-				header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }),
-				"chevron-right"
-			);
-			// Додаємо CSS_CLASS_CHAT_LIST_SCROLLABLE для списку чатів
-			const isChatList =
-				listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
-			const content = section.createDiv({
-				cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${
-					isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""
-				}`,
-			});
-			// Початкові стилі для анімації
-			content.style.maxHeight = "0";
-			content.style.overflow = "hidden"; // Початково приховано
-			content.style.transition =
-				"max-height 0.3s ease-out, padding 0.3s ease-out";
-			content.style.paddingTop = "0";
-			content.style.paddingBottom = "0";
-			// Встановлюємо overflow-y: auto для списку чатів у CSS
-			return { header, content, section };
-		};
-
+		
 		// Створюємо секції акордеону
 		// Секція Моделей буде прихована на десктопі через CSS
-		const modelSection = createSubmenuSection(
+		const modelSection = this.createSubmenuSection(
 			"Select Model",
 			"list-collapse",
 			CSS_CLASS_MODEL_LIST_CONTAINER,
@@ -514,17 +452,8 @@ export class OllamaView extends ItemView {
 		);
 		this.modelSubmenuHeader = modelSection.header;
 		this.modelSubmenuContent = modelSection.content;
-		// const roleSection = createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER); this.roleSubmenuHeader s= roleSection.header; this.roleSubmenuContent = roleSection.content;
-		const roleSection = createSubmenuSection(
-			"Select Role",
-			"users",
-			CSS_CLASS_ROLE_LIST_CONTAINER,
-			"role-submenu-section"
-		);
-		this.roleSubmenuHeader = roleSection.header;
-		this.roleSubmenuContent = roleSection.content;
-
-		const chatSection = createSubmenuSection(
+/////////
+		const chatSection = this.createSubmenuSection(
 			"Load Chat",
 			"messages-square",
 			CSS_CLASS_CHAT_LIST_CONTAINER
@@ -629,6 +558,16 @@ export class OllamaView extends ItemView {
 		});
 	}
 
+    // Допоміжна функція для створення підменю (з попереднього коду)
+    private createSubmenuSection = (title: string, icon: string, listContainerClass: string, sectionClass?: string): { header: HTMLElement, content: HTMLElement, section: HTMLElement } => {
+      const section = this.menuDropdown.createDiv(); if (sectionClass) section.addClass(sectionClass);
+      const header = section.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
+      setIcon(header.createSpan({ cls: "menu-option-icon" }), icon); header.createSpan({ cls: "menu-option-text", text: title }); setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
+      const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
+      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ''}` });
+      content.style.maxHeight = '0'; content.style.overflow = 'hidden'; content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out'; content.style.paddingTop = '0'; content.style.paddingBottom = '0';
+      return { header, content, section };
+  };
 	// --- Event Listeners (with Custom Div Menu) ---
 	private attachEventListeners(): void {
 		// Перевірки існування елементів
@@ -866,9 +805,10 @@ export class OllamaView extends ItemView {
 		this.register(this.plugin.on("model-changed", this.handleModelChange));
 		this.register(this.plugin.on("role-changed", this.handleRoleChange));
 		this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));
-		this.register(
-			this.plugin.on("active-chat-changed", this.handleActiveChatChanged)
-		);
+    //FIXME: checkit
+    this.register(this.plugin.on('roles-updated', this.updateRolePanelList));
+
+			this.plugin.on("active-chat-changed", this.handleActiveChatChanged);
 		this.register(this.plugin.on("message-added", this.handleMessageAdded));
 		this.register(
 			this.plugin.on("messages-cleared", this.handleMessagesCleared)
@@ -882,27 +822,125 @@ export class OllamaView extends ItemView {
 		);
 	}
 
-	// --- Обробник зміни налаштувань (зроблено публічним) ---
   public handleSettingsUpdated = async (): Promise<void> => {
-    // Тепер 'this' гарантовано посилається на екземпляр OllamaView
     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
-  
-    // --- Решта коду функції залишається без змін ---
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-    const currentRoleName = await this.getCurrentRoleDisplayName();
+    // Отримуємо ім'я поточної ролі (з чату або глобальних налаштувань)
+    const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+    const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath); // Використовуємо хелпер
+
     const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
-  
+
     this.updateModelDisplay(currentModelName);
-    this.updateRoleDisplay(currentRoleName);
+    this.updateRoleDisplay(currentRoleName); // Оновлення маленького індикатора ролі
     this.updateInputPlaceholder(currentRoleName);
     this.updateTemperatureIndicator(currentTemperature);
-  
-    // Оновлюємо ОБИДВА елементи керування перемиканням
-    this.updateToggleViewLocationOption(); // Для меню
-    this.updateToggleLocationButton();     // Для кнопки
-  }
+    this.updateToggleViewLocationOption();
+    this.updateToggleLocationButton();
 
+    // --- Оновлюємо список у бічній панелі ---
+    await this.updateRolePanelList();
+    // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
+    if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+         this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
+         await this.renderRoleList();
+    }
+}
+
+// --- Новий метод для рендерингу списку в ПАНЕЛІ ---
+private updateRolePanelList = async (): Promise<void> => {
+    if (!this.rolePanelListEl || !this.plugin.chatManager) {
+         this.plugin.logger.debug("[updateRolePanelList] Skipping update: Panel list element or chat manager not ready.");
+         return; // Перевірка, чи елемент існує і менеджер готовий
+    }
+
+    this.plugin.logger.debug("[updateRolePanelList] Updating role list in the side panel...");
+    this.rolePanelListEl.empty(); // Очищуємо поточний список
+
+    try {
+        const roles = await this.plugin.listRoleFiles(true);
+        const activeChat = await this.plugin.chatManager.getActiveChat(); // Не потрібно '?.' бо перевірили вище
+        const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+
+        this.plugin.logger.debug(`[updateRolePanelList] Current active role path for panel: ${currentRolePath || 'None'}`);
+
+        // --- Опція "None" ---
+        const noneOptionEl = this.rolePanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, 'menu-option'] }); // Додаємо menu-option для перевикористання стилів
+        const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
+        noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, 'menu-option-text'], text: "None (Default)" });
+
+        if (!currentRolePath) {
+            noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+            setIcon(noneIconSpan, "check");
+        } else {
+            setIcon(noneIconSpan, "slash");
+        }
+        this.registerDomEvent(noneOptionEl, 'click', () => this.handleRolePanelItemClick(null, currentRolePath)); // Передаємо null як RoleInfo
+
+        // Роздільник
+        if (roles.length > 0) {
+            this.rolePanelListEl.createEl('hr', { cls: 'menu-separator' });
+        }
+
+        // --- Список ролей ---
+        roles.forEach(roleInfo => {
+            const roleOptionEl = this.rolePanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, 'menu-option'] });
+            const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
+            roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, 'menu-option-text'], text: roleInfo.name });
+
+            if (roleInfo.isCustom) {
+                roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM);
+            }
+
+            if (roleInfo.path === currentRolePath) {
+                roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+                setIcon(iconSpan, "check");
+            } else {
+                setIcon(iconSpan, roleInfo.isCustom ? 'user' : 'file-text');
+            }
+            this.registerDomEvent(roleOptionEl, 'click', () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+        });
+        this.plugin.logger.debug(`[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`);
+
+    } catch (error) {
+        this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
+        this.rolePanelListEl.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
+    }
+}
+
+// --- Новий обробник кліку для ПАНЕЛІ ролей ---
+private handleRolePanelItemClick = async (roleInfo: RoleInfo | null, currentRolePath: string | null | undefined): Promise<void> => {
+    const newRolePath = roleInfo?.path ?? ""; // "" для "None"
+    const roleNameForEvent = roleInfo?.name ?? "None";
+
+    this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role: ${roleNameForEvent} (Path: ${newRolePath || 'None'})`);
+
+    if (newRolePath !== currentRolePath) {
+        const activeChat = await this.plugin.chatManager?.getActiveChat();
+        try {
+             if (activeChat) {
+                this.plugin.logger.debug(`[handleRolePanelItemClick] Setting active role for chat ${activeChat.metadata.id} to: ${newRolePath || 'None'}`);
+                await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+             } else {
+                this.plugin.logger.debug(`[handleRolePanelItemClick] No active chat. Setting global default role to: ${newRolePath || 'None'}`);
+                 this.plugin.settings.selectedRolePath = newRolePath;
+                 await this.plugin.saveSettings(); // Це викличе 'settings-updated', який оновить UI
+                 // Додатково генеруємо 'role-changed', бо ChatManager не викликався
+                 this.plugin.emit('role-changed', roleNameForEvent);
+                 this.plugin.promptService?.clearRoleCache?.();
+             }
+             // Оновлення UI (списку панелі) відбудеться через події 'active-chat-changed' або 'settings-updated'
+        } catch (error) {
+             this.plugin.logger.error(`[handleRolePanelItemClick] Error setting role to ${newRolePath}:`, error);
+             new Notice("Failed to set the role.");
+        }
+    } else {
+         this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role is already active.`);
+    }
+}
+
+  
 	// --- Додано: Метод для оновлення кнопки перемикання ---
 	private updateToggleLocationButton(): void {
 		if (!this.toggleLocationButton) return;
@@ -1625,15 +1663,15 @@ export class OllamaView extends ItemView {
 		}
 	};
 
-	private handleActiveChatChanged = (data: {
-		chatId: string | null;
-		chat: Chat | null;
-	}): void => {
-		console.log(
-			`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`
-		);
-		this.loadAndDisplayActiveChat();
-	};
+  private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => {
+    this.plugin.logger.debug(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
+    this.loadAndDisplayActiveChat(); // Цей метод тепер має оновити все, включаючи панель ролей
+    // Додатково оновити список ролей у випадаючому меню, якщо воно відкрите
+    if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+        this.plugin.logger.debug("[OllamaView] Active chat changed, role submenu open, refreshing role list menu.");
+        this.renderRoleList(); // Оновлення списку в меню
+    }
+}
 
 	private handleMessageAdded = (data: {
 		chatId: string;
@@ -1962,6 +2000,7 @@ export class OllamaView extends ItemView {
 		this.updateRoleDisplay(currentRoleName);
 		this.updateModelDisplay(finalModelName);
 		this.updateTemperatureIndicator(finalTemperature); // Оновлюємо індикатор температури
+    await this.updateRolePanelList();
 
 		// Крок 7: Налаштування поля вводу
 		if (finalModelName === null) {
@@ -3958,4 +3997,26 @@ export class OllamaView extends ItemView {
 			this.plugin.activateView();
 		}, 50); // 50 мс зазвичай достатньо
 	};
+
+  public async findRoleNameByPath(rolePath: string | null | undefined): Promise<string> {
+    if (!rolePath) {
+        return "None";
+    }
+    try {
+        const allRoles = await this.plugin.listRoleFiles(true);
+        const foundRole = allRoles.find(role => role.path === rolePath);
+        if (foundRole) {
+            return foundRole.name;
+        } else {
+            // Спробувати отримати ім'я з шляху як запасний варіант
+            const fileName = rolePath.split('/').pop()?.replace('.md', '');
+            this.plugin.logger.warn(`[findRoleNameByPath] Role not found in list for path "${rolePath}". Using derived name: "${fileName || 'Unknown'}"`);
+            return fileName || "Unknown Role";
+        }
+    } catch (error) {
+        this.plugin.logger.error(`[findRoleNameByPath] Error fetching roles list while finding name for path "${rolePath}":`, error);
+        return "Error"; // Повернути повідомлення про помилку
+    }
+}
+
 } // END OF OllamaView CLASS
