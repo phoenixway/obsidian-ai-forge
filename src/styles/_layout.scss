@@ -1,292 +1,194 @@
 // src/styles/_layout.scss
 
+// Main View Container
 .ollama-container {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row; // Горизонтальний макет: панель + чат
 	height: 100%;
-	// position: relative;
-	background-color: var(
-		--background-secondary-alt
-	); /* Background for the whole container */
-	align-items: stretch; // Розтягнути дочірні елементи по висоті
-	gap: 0; // Без відступу між панеллю та чатом за замовчуванням
+	background-color: var(--background-secondary-alt);
+	align-items: stretch; // Розтягнути по висоті
+	gap: 0;
+    overflow: hidden; // Головний контейнер обрізає все, що виходить за межі
+}
 
-	// Панель вибору ролей
-	.ollama-role-panel {
-		display: flex; // На десктопі показуємо
-		flex-direction: column;
-		width: 240px; // Фіксована ширина (або %, напр. 25%)
-		flex-shrink: 0; // Не стискати панель
-		background-color: var(--background-secondary); // Трохи інший фон
-		border-right: 1px solid var(--divider-color); // Роздільник справа
-		height: 100%; // Займає всю висоту батька
-		overflow: hidden; // Приховати те, що виходить за межі (напр. скролбар)
-		box-sizing: border-box;
-	}
+// --- Role Panel (Sidebar within the view) ---
+.ollama-role-panel {
+	display: flex; // Показати на десктопі
+	flex-direction: column;
+	width: 240px; // Налаштуйте ширину
+	flex-shrink: 0; // Не стискати
+	background-color: var(--background-secondary);
+	border-right: 1px solid var(--divider-color);
+	height: 100%;
+	overflow: hidden; // Сама панель не скролиться
+	box-sizing: border-box;
 
-	// Заголовок панелі
-	.ollama-role-panel-header {
-		padding: calc(var(--chat-spacing-unit) * 3)
-			calc(var(--chat-spacing-unit) * 3)
-			calc(var(--chat-spacing-unit) * 2);
-		font-size: var(--font-ui-small); // Трохи менший
-		font-weight: 600;
-		color: var(--text-muted);
-		border-bottom: 1px solid var(--divider-color);
-		flex-shrink: 0; // Не стискати заголовок
-	}
+    // Header
+    .ollama-role-panel-header {
+        padding: calc(var(--chat-spacing-unit) * 3)
+            calc(var(--chat-spacing-unit) * 3)
+            calc(var(--chat-spacing-unit) * 2);
+        font-size: var(--font-ui-small);
+        font-weight: 600;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--divider-color);
+        flex-shrink: 0;
+    }
 
-	// Контейнер списку ролей
-	.ollama-role-panel-list {
-		flex-grow: 1; // Займає весь доступний простір по висоті
-		overflow-y: auto; // Додати скрол при потребі
-		padding: calc(var(--chat-spacing-unit) * 2)
-			calc(var(--chat-spacing-unit) * 1.5);
+    // List container
+    .ollama-role-panel-list {
+        flex-grow: 1; // Займає вільний простір
+        overflow-y: auto; // Скролінг для списку
+        padding: calc(var(--chat-spacing-unit) * 2)
+            calc(var(--chat-spacing-unit) * 1.5);
+        min-height: 0; // Дозволяє списку стискатись у flex-контейнері
 
-		// Стилізація скролбару (як у chat-container)
-		&::-webkit-scrollbar {
-			width: 6px;
-		}
-		&::-webkit-scrollbar-track {
-			background: transparent;
-			margin: 4px 0;
-		}
-		&::-webkit-scrollbar-thumb {
-			background-color: var(--background-modifier-border);
-			border-radius: 3px;
-		}
-		&::-webkit-scrollbar-thumb:hover {
-			background-color: var(--interactive-accent-translucent);
-		}
+        // Scrollbar styles
+        &::-webkit-scrollbar { width: 6px; }
+        &::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+        &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+        &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
 
-		// Роздільник всередині списку
-		hr.menu-separator {
-			margin: calc(var(--chat-spacing-unit) * 1.5)
-				calc(var(--chat-spacing-unit) * 1.5);
-		}
-	}
+        // Separator
+        hr.menu-separator {
+            margin: calc(var(--chat-spacing-unit) * 1.5)
+                calc(var(--chat-spacing-unit) * 1.5);
+        }
+    }
 
-	// Елемент списку ролей в панелі
-	.ollama-role-panel-item {
-		// Можна перевикористати стилі .menu-option
-		&.menu-option {
-			padding: calc(var(--chat-spacing-unit) * 1.8)
-				calc(var(--chat-spacing-unit) * 2.5); // Трохи інші відступи
-			margin: 2px 0; // Невеликий вертикальний відступ
-			cursor: pointer;
+    // List item
+    .ollama-role-panel-item {
+        &.menu-option { // Використовуємо спільний клас для перевикористання
+            display: flex; // Додано для вирівнювання іконки/тексту
+            align-items: center; // Вирівняти по вертикалі
+            padding: calc(var(--chat-spacing-unit) * 1.8)
+                calc(var(--chat-spacing-unit) * 2.5);
+            margin: 2px 0;
+            cursor: pointer;
+            border-radius: var(--radius-s);
 
-			&:hover {
-				background-color: var(--background-modifier-hover);
-			}
+            &:hover {
+                background-color: var(--background-modifier-hover);
+            }
 
-			.menu-option-icon {
-				margin-right: 10px; // Трохи менший відступ
-				min-width: 16px;
-				.svg-icon {
-					width: 15px;
-					height: 15px;
-				}
-			}
+            .menu-option-icon {
+                margin-right: 10px;
+                min-width: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0; // Не стискати іконку
+                .svg-icon { width: 15px; height: 15px; }
+            }
 
-			.menu-option-text {
-				font-size: calc(
-					var(--font-ui-small) * 0.95
-				); // Ще трохи менший шрифт
-			}
+            .menu-option-text {
+                font-size: calc(var(--font-ui-small) * 0.95);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex-grow: 1; // Дозволяє тексту зайняти решту місця
+            }
 
-			// Стиль для активного елемента
-			&.is-active {
-				background-color: var(
-					--interactive-accent-translucent
-				); // Напівпрозорий фон
-				color: var(--text-accent-hover); // Колір тексту
+            // Active state
+            &.is-active {
+                background-color: var(--interactive-accent-translucent);
+                color: var(--text-accent-hover);
+                .menu-option-text { font-weight: 500; color: var(--text-accent-hover); }
+                .menu-option-icon { color: var(--interactive-accent); }
+                &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
+            }
 
-				.menu-option-text {
-					font-weight: 500; // Не дуже жирний
-					color: var(--text-accent-hover);
-				}
-				.menu-option-icon {
-					color: var(--interactive-accent); // Яскрава іконка
-				}
+            // Custom role icon state
+            &.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
+                color: var(--text-faint);
+            }
+        }
+    }
+} // --- End Role Panel ---
 
-				&:hover {
-					// Hover для активного елемента
-					background-color: var(
-						--interactive-accent-translucent
-					); // Залишаємо фон
-					filter: brightness(1.1);
-				}
-			}
 
-			// Додатковий стиль для кастомних ролей (напр. іконка)
-			&.is-custom
-				.menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
-				color: var(--text-faint);
-			}
-		}
-	}
-
-// Основна область чату (повідомлення + поле вводу)
+// --- Main Chat Area (Messages + Input) ---
 .ollama-main-chat-area {
-  display: flex;
-  flex-direction: column;
-  flex-grow: 1;
-  height: 100%; // Або min-height: 0; щоб flex працював правильно з overflow
-  min-width: 0;
-  // overflow: hidden; // !!! ВИДАЛИТИ або змінити на visible (для тесту) !!!
+	display: flex;
+	flex-direction: column; // Вертикальний макет: повідомлення зверху, ввід знизу
+	flex-grow: 1; // Займає решту горизонтального простору
+	height: 100%;
+	min-width: 0; // Дозволяє стискатись
+    overflow: hidden; // Обрізає вміст, що виходить за межі цієї області
+}
 
-  // Контейнер для повідомлень (chatContainerEl в TS)
-  // Змінимо селектор на більш надійний, якщо є клас, або залишимо :first-child
-  // Припустимо, це елемент з TS: this.chatContainerEl
-  // Можна додати клас в TS: this.chatContainerEl.addClass('ollama-chat-area-content');
-  // Або залишити селектор :first-child, якщо структура гарантована
-  > div:first-child { // Або .ollama-chat-area-content
-     flex-grow: 1; // Залишає доступний простір по вертикалі
-     // display: flex; // !!! СПРОБУВАТИ ВИДАЛИТИ !!! - Ймовірно, не потрібен
-     // flex-direction: column; // Якщо видалили display: flex, це теж не потрібно
-     overflow: hidden; // !!! ВИДАЛИТИ або змінити на visible !!!
-     position: relative;
-     display: flex; // ПОТРІБНО, щоб .ollama-chat-container розтягувався всередині
-     flex-direction: column; // Потрібно, щоб .ollama-chat-container розтягувався
-  }
+// Обгортка для списку повідомлень (має клас ollama-chat-area-content в TS)
+.ollama-chat-area-content {
+	flex-grow: 1; // Займає доступний вертикальний простір
+	position: relative;
+	display: flex; // Потрібен для розтягування .ollama-chat-container
+	flex-direction: column;
+    min-height: 0; // Дозволяє стискатись всередині flex-батька
+    overflow: hidden; // Обрізає сам контейнер повідомлень, якщо потрібно
+}
 
-  // Контейнер повідомлень (chatContainer в TS)
-  .ollama-chat-container {
-    flex-grow: 1; // Розтягується всередині батька
-    max-width: none;
-    margin-left: 0;
-    margin-right: 0;
-    padding: calc(var(--chat-spacing-unit) * 4);
-    overflow-y: auto; // !!! ДОДАНО - Дозволяє скролінг повідомлень !!!
-    // Додайте стилі для скролбару, якщо вони зникли
-    &::-webkit-scrollbar { width: 8px; }
+// Сам список повідомлень
+.ollama-chat-container {
+	flex-grow: 1; // Розтягується вертикально всередині .ollama-chat-area-content
+	max-width: none; // Займає всю ширину батька
+	margin-left: 0;
+	margin-right: 0;
+	padding: calc(var(--chat-spacing-unit) * 4);
+	overflow-y: auto; // Дозволяє скролінг повідомлень
+    min-height: 0; // Дозволяє стискатись
+
+	// Scrollbar styles
+	&::-webkit-scrollbar { width: 8px; }
     &::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 4px; margin: 4px 0; }
     &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 4px; border: 2px solid var(--background-secondary); }
     &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-  }
-
-  // Контейнер вводу (inputContainer в TS)
-  .chat-input-container {
-     flex-shrink: 0; // Не стискати поле вводу
-     // ... решта стилів без змін ...
-     max-width: none;
-     margin-left: 0;
-     margin-right: 0;
-     width: 100%;
-     border-radius: 0;
-     border-top: 1px solid var(--divider-color);
-     border-left: none;
-  }
-}
-  
 }
 
-// .ollama-chat-container {
-// 	display: flex;
-// 	flex-direction: column; // Still need column layout overall
-// 	// justify-content: center; // Center empty state vertically
-// 	align-items: center; // Center empty state horizontally
-// 	height: 100%; // Crucial for vertical centering
-
-// 	overflow-y: auto; // Keep scroll for actual messages later
-// 	// flex: 1 1 auto;
-// 	padding: var(--size-4-3);
-// 	// padding: calc(var(--chat-spacing-unit) * 4);
-// 	padding-bottom: calc(var(--chat-spacing-unit) * 2);
-// 	box-sizing: border-box;
-// 	scroll-behavior: smooth;
-// 	overscroll-behavior: contain;
-// 	position: relative; /* For positioning new message indicator */
-
-// 	max-width: 1300px;
-// 	width: 100%;
-// 	margin-left: auto;
-// 	margin-right: auto;
-
-// 	&::-webkit-scrollbar {
-// 		width: 8px;
-// 	}
-// 	&::-webkit-scrollbar-track {
-// 		background: var(--background-secondary);
-// 		border-radius: 4px;
-// 		margin: 4px 0;
-// 	}
-// 	&::-webkit-scrollbar-thumb {
-// 		background-color: var(--background-modifier-border);
-// 		border-radius: 4px;
-// 		border: 2px solid var(--background-secondary);
-// 	}
-// 	&::-webkit-scrollbar-thumb:hover {
-// 		background-color: var(--interactive-accent-translucent);
-// 	}
-// }
-
-// .ollama-chat-container.has-messages {
-// 	// Потрібно додати/видалити цей клас через JS
-// 	display: block; // Або інший потрібний display для списку повідомлень
-// 	height: auto; // Висота за контентом
-// }
-
-// // Ensure correct stretching within Obsidian
-// .workspace-leaf-content[data-type="ollama-personas-chat-view"] {
-// 	display: flex;
-// 	flex-direction: column;
-// 	overflow-y: visible;
-
-// 	.view-content {
-// 		height: 100%;
-// 		display: flex;
-// 		flex-direction: column;
-// 		overflow-y: visible;
-
-// 		.ollama-container {
-// 			flex-grow: 1;
-// 		}
-// 	}
-// }
-
-// // --- Date Separator ---
-// .chat-date-separator {
-// 	text-align: center;
-// 	margin: calc(var(--chat-spacing-unit) * 5) 0;
-// 	font-size: 0.8em;
-// 	color: var(--text-muted);
-// 	font-weight: 500;
-// 	background-color: var(--background-modifier-border);
-// 	padding: calc(var(--chat-spacing-unit) * 0.5)
-// 		calc(var(--chat-spacing-unit) * 2);
-// 	border-radius: 10px;
-// 	display: inline-block;
-// 	margin-left: 50%;
-// 	transform: translateX(-50%);
-// 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-// }
-
-// --- Адаптивність: Приховуємо панель ролей на менших екранах ---
-@media screen and (max-width: 768px) { // Планшети та менше
-  .ollama-container {
-    // Повертаємо звичайний блочний layout
-    display: block !important;
-  }
-
-  .ollama-role-panel {
-    // display: none; // Приховуємо панель ролей
-  }
-
-  .ollama-main-chat-area {
-     height: 100%; // Займає всю висоту
-     border-left: none; // Немає роздільника зліва
-
-     .ollama-chat-container {
-        padding: calc(var(--chat-spacing-unit) * 3); // Повертаємо планшетні падінги
-     }
-
-     .chat-input-container {
-        border-radius: 12px; // Повертаємо радіус для поля вводу
-        margin-top: 10px; // Менший відступ зверху
-        width: 98%; // Повертаємо відступи з боків
-        margin-left: auto;
-        margin-right: auto;
-     }
-  }
+// Контейнер поля вводу
+.chat-input-container {
+    // ТІЛЬКИ СТИЛІ МАКЕТУВАННЯ В ЦЬОМУ ФАЙЛІ:
+	flex-shrink: 0; // Не стискати по вертикалі
+    width: 100%;    // Займає всю ширину батька
+    // Стилі вигляду (padding, border, background і т.д.) мають бути в _input.scss
 }
+// --- End Main Chat Area ---
+
+
+// --- RESPONSIVE ---
+@media screen and (max-width: 768px) { // Tablet and smaller
+	.ollama-container {
+		// Повертаємо вертикальний макет, але все ще flex
+        // (можна і block, якщо панель точно не буде показуватись зверху/знизу)
+		flex-direction: column;
+        overflow: visible; // Дозволити скролінг сторінки при потребі
+	}
+
+	.ollama-role-panel {
+		display: none; // Приховуємо панель
+        // Скидаємо стилі, які були потрібні для бічного розташування
+        width: 100%;
+        height: auto;
+        border-right: none;
+        // Можна додати border-bottom, якщо панель колись буде зверху
+        // border-bottom: 1px solid var(--divider-color);
+	}
+
+    .ollama-main-chat-area {
+        // Займає всю висоту контейнера, бо панель прихована
+        height: 100%;
+        border-left: none;
+        overflow: visible; // Дозволяємо внутрішнім елементам керувати скролом
+    }
+
+    // Відновлюємо стилі контейнера вводу для мобільного вигляду
+    // Ці стилі візьмуться з _input.scss, якщо там немає медіа-запитів, що їх перебивають
+    // АЛЕ, якщо _input.scss не визначає border-radius, margin, width для мобільних,
+    // то їх треба відновити тут:
+    .chat-input-container {
+        // Припускаємо, що _input.scss визначає базові стилі,
+        // а responsive/_tablet.scss додає/змінює потрібне
+        // Якщо ні, додайте сюди відновлення margin, width, border-radius
+         margin-top: 10px; // Додати відступ зверху
+    }
+}
+// --- END RESPONSIVE ---
