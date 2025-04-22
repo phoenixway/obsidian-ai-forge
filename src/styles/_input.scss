@@ -24,6 +24,7 @@
   // border-radius визначається в _layout.scss або responsive
   position: relative; // Для випадаючого меню
   box-shadow: none;
+  border-radius: 8px;
 
   // --- Внутрішні елементи (textarea, controls) ---
   textarea {
