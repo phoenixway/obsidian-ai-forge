@@ -1,292 +1,213 @@
-// src/styles/_input.scss
+// src/styles/_layout.scss
 
-.chat-input-container {
-  display: flex;
-  flex-direction: column;
-  flex-grow: 0;
-  flex-shrink: 0;
+// Main View Container
+.ollama-container {
+	display: flex;
+	flex-direction: row; // <<< *** CORRECTED: Use 'row' for side-by-side ***
+	height: 100%;
+	background-color: var(--background-secondary-alt);
+	align-items: stretch;
+	gap: 0;
+    overflow: hidden; // Add overflow hidden to the main container to prevent layout issues
+}
 
-  max-width: 800px; // SAME value as .ollama-chat-container
-  // width: 100%; /     // Use 100% so it shrinks below max-width
-  margin-left: auto;
-  margin-right: auto;
-  // --- END ADD ---
-  // Adjust existing margin if needed (remove horizontal auto from here if set previously)
-  margin-top: 20px; // Keep vertical margins as needed
+// --- Role Panel (Sidebar within the view) ---
+.ollama-role-panel {
+	display: flex; // Show by default (on desktop)
+	flex-direction: column;
+	width: 240px; // Adjust width as needed
+	flex-shrink: 0;
+	background-color: var(--background-secondary);
+	border-right: 1px solid var(--divider-color);
+	height: 100%;
+	overflow: hidden; // Panel itself shouldn't scroll, list inside does
+	box-sizing: border-box;
 
-  width: 98%; // Трохи менше, щоб уникнути горизонтального скролу в деяких випадках
-
-  box-sizing: border-box;
-  padding:
-    calc(var(--chat-spacing-unit) * 2)    // Top
-    calc(var(--chat-spacing-unit) * 3)    // Right (зменшено порівняно з вашим варіантом)
-    calc(var(--chat-spacing-unit) * 2)    // Bottom
-    calc(var(--chat-spacing-unit) * 3);   // Left
-  border-top: 1px solid var(--divider-color);
-  background-color: var(--background-primary);
-  z-index: 20;
-  border-radius: 12px;
-  // margin:
-    // 0                                     // Top
-    // calc(var(--chat-spacing-unit) * 2)    // Right
-    // calc(var(--chat-spacing-unit) * 2)    // Bottom
-    // calc(var(--chat-spacing-unit) * 2);   // Left
-  position: relative; // Потрібно для позиціонування меню
-  box-shadow: none; // Прибираємо тінь за замовчуванням
-
-  &:focus-within {
-    // Стилі при фокусі на textarea (можна прибрати, якщо не потрібно)
-    // border-color: var(--interactive-accent);
-  }
-
-  textarea {
-    width: 100%;
-    box-sizing: border-box;
-    resize: none;
-    border: none; // Прибираємо рамку за замовчуванням
-    border-radius: 8px;
-    padding: 10px 15px;
-    line-height: 1.5;
-    field-sizing: content; // Нова властивість CSS
-    // Можливо, знадобляться префікси або стара назва:
-    // form-sizing: content;
-    // Переконайтеся, що min-height і max-height все ще працюють
-    min-height: 40px;
-    max-height: 60vh;
-    height: auto;     // Дозволяє автовисоту
-    overflow-y: auto; // Додаємо скрол при переповненні max-height
-    background-color: var(--background-secondary); // Трохи інший фон для поля
-    color: var(--text-normal);
-    font-size: var(--font-ui-small); // Використовуємо змінну Obsidian
-    transition: border-color 0.3s, background-color 0.3s;
-    margin-bottom: calc(var(--chat-spacing-unit) * 2); // Відступ знизу до контролів
-    box-shadow: none;
-    flex-shrink: 0; // Не стискати textarea
-
-    &:focus {
-      outline: none; // Прибираємо стандартний outline
-      background-color: var(--background-primary); // Можна змінювати фон при фокусі
-      box-shadow: none;
+    // Header inside the panel
+    .ollama-role-panel-header {
+        padding: calc(var(--chat-spacing-unit) * 3)
+            calc(var(--chat-spacing-unit) * 3)
+            calc(var(--chat-spacing-unit) * 2);
+        font-size: var(--font-ui-small);
+        font-weight: 600;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--divider-color);
+        flex-shrink: 0;
     }
 
-    &::placeholder { // Стилізація плейсхолдера
-      color: var(--text-faint);
-      opacity: 0.8;
-    }
-  }
+    // List container inside the panel
+    .ollama-role-panel-list {
+        flex-grow: 1; // Takes remaining vertical space
+        overflow-y: auto; // Allows list scrolling
+        padding: calc(var(--chat-spacing-unit) * 2)
+            calc(var(--chat-spacing-unit) * 1.5);
+        min-height: 0; // Allow shrinking within flex parent
 
-  .input-controls-container {
-    display: flex;
-    justify-content: space-between; // Розносимо ліву і праву групи
-    align-items: center;          // Вирівнюємо по центру вертикально
-    width: 100%;
-    box-sizing: border-box;
-    flex-shrink: 0;               // Не стискати контейнер контролів
-    gap: calc(var(--chat-spacing-unit) * 2); // Відступ між лівою та правою групами
-  }
+        // Scrollbar styles
+        &::-webkit-scrollbar { width: 6px; }
+        &::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+        &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+        &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
 
-  .input-controls-left {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--chat-spacing-unit) * 1.5); // Відступ між елементами ліворуч
-    flex-shrink: 1; // Дозволяємо стискатись, якщо потрібно
-    min-width: 0; // Дозволяє flex-shrink працювати коректно
-    overflow: hidden; // Приховувати контент, що не влазить
-
-    .model-display,
-    .role-display {
-      font-size: var(--font-ui-smaller);
-      color: var(--text-muted);
-      padding: 4px 8px;
-      border-radius: var(--radius-s);
-      cursor: pointer;
-      text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 140px; // Обмеження ширини
-      border: 1px solid transparent; // Рамка для hover-ефекту
-      background-color: transparent;
-      transition: all 0.2s ease;
-
-      &:hover {
-        background-color: var(--background-modifier-hover);
-        border-color: var(--background-modifier-border-hover); // Змінено для кращого контрасту
-        color: var(--text-normal);
-      }
-      // Стиль для стану "недоступно" (з updateModelDisplay)
-      &.model-not-available {
-         opacity: 0.6;
-         cursor: not-allowed;
-         &:hover {
-             background-color: transparent;
-             border-color: transparent;
-         }
-      }
-    }
-
-    .temperature-indicator {
-      font-size: 1.2em; // Емодзі трохи більший
-      color: var(--text-muted);
-      padding: 4px; // Менші падінги для компактності
-      border-radius: var(--radius-s);
-      cursor: pointer;
-      line-height: 1;
-      user-select: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 26px; // Мінімальна ширина
-      background-color: transparent;
-      border: 1px solid transparent;
-      transition: all 0.2s ease;
-
-      &:hover {
-        background-color: var(--background-modifier-hover);
-        border-color: var(--background-modifier-border-hover);
-        color: var(--text-normal);
-      }
-    }
-
-    // Кнопка Перекладу (ліворуч)
-    .translate-input-button {
-      width: 28px; height: 28px; // Розмір за замовчуванням
-      border: none;
-      border-radius: var(--radius-s);
-      background-color: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center; padding: 0;
-      transition: all 0.15s ease-in-out;
-      opacity: 0.7;
-      outline: none;
-      flex-shrink: 0; // Не стискати кнопку
-
-      .svg-icon { width: 16px; height: 16px; } // Розмір іконки
-
-      &:hover {
-        background-color: var(--background-modifier-hover);
-        color: var(--text-normal);
-        opacity: 1;
-      }
-
-      &.translating-input {
-        cursor: default;
-        opacity: 0.5;
-        .svg-icon {
-           animation: spin 1s linear infinite;
+        // Separator
+        hr.menu-separator {
+            margin: calc(var(--chat-spacing-unit) * 1.5)
+                calc(var(--chat-spacing-unit) * 1.5);
         }
-      }
-       &.disabled { // Стиль для вимкненої кнопки
-            opacity: 0.4 !important;
-            cursor: not-allowed;
-            background-color: transparent !important;
-       }
-    }
-  }
-
-  // Права група контролів
-  .input-controls-right {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--chat-spacing-unit) * 1.5); // Відступ між кнопками праворуч
-    flex-shrink: 0; // Не стискати цю групу
-
-    // Базові стилі для всіх кнопок праворуч
-    button {
-      width: 32px; // Розмір за замовчуванням
-      height: 32px;
-      border: none;
-      border-radius: 50%; // Круглі кнопки
-      background-color: transparent;
-      color: var(--text-muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      transition: all 0.15s ease-in-out;
-      opacity: 0.7;
-      outline: none;
-      flex-shrink: 0; // Не стискати кнопки
-
-      .svg-icon { width: 18px; height: 18px; } // Розмір іконок
-
-      &:hover {
-        background-color: var(--background-modifier-hover);
-        color: var(--text-normal);
-        opacity: 1;
-        transform: scale(1.05); // Невелике збільшення при наведенні
-      }
-
-      &.disabled {
-        opacity: 0.4 !important;
-        cursor: not-allowed;
-        background-color: transparent !important;
-        transform: none !important;
-      }
-
-       &:focus-visible { // Стиль фокусу для навігації клавіатурою
-         opacity: 1;
-         background-color: var(--background-modifier-hover);
-         box-shadow: 0 0 0 2px var(--interactive-accent-translucent);
-       }
     }
 
-    // Кнопка Відправки
-    .send-button {
-      background-color: var(--interactive-accent);
-      color: var(--text-on-accent);
-      opacity: 1;
+    // List item styles (using .menu-option base)
+    .ollama-role-panel-item {
+        &.menu-option {
+            padding: calc(var(--chat-spacing-unit) * 1.8)
+                calc(var(--chat-spacing-unit) * 2.5);
+            margin: 2px 0;
+            cursor: pointer;
+            border-radius: var(--radius-s); // Use theme radius
 
-      &:hover {
-        background-color: var(--interactive-accent-hover);
-        transform: scale(1.08);
-      }
+            &:hover {
+                background-color: var(--background-modifier-hover);
+            }
 
-      &:active {
-        transform: scale(1.02);
-        background-color: var(--interactive-accent); // Трохи темніший при натисканні
-      }
+            .menu-option-icon {
+                margin-right: 10px;
+                min-width: 16px;
+                display: flex; // Center icon properly
+                align-items: center;
+                justify-content: center;
+                .svg-icon { width: 15px; height: 15px; }
+            }
 
-      &.disabled {
-        background-color: var(--background-modifier-border) !important; // Сірий фон для вимкненої
-        color: var(--text-faint) !important; // Тьмяніший текст
-        opacity: 0.6 !important;
-      }
+            .menu-option-text {
+                font-size: calc(var(--font-ui-small) * 0.95);
+                white-space: nowrap; // Prevent wrapping
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            // Active state
+            &.is-active {
+                background-color: var(--interactive-accent-translucent);
+                color: var(--text-accent-hover);
+                .menu-option-text { font-weight: 500; color: var(--text-accent-hover); }
+                .menu-option-icon { color: var(--interactive-accent); }
+                &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
+            }
+
+            // Custom role icon state
+            &.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
+                color: var(--text-faint);
+            }
+        }
     }
+} // --- End Role Panel ---
 
-    // Кнопка Голосового Вводу
-    .voice-button {
-      // Стилі для стану запису
-      &.recording {
-        background-color: var(--text-error);
-        color: white;
-        opacity: 1;
-        animation: pulse-recording 1.5s infinite ease-in-out;
-        // boxShadow для анімації пульсації (опціонально)
-        box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5);
-      }
-    }
 
-    .toggle-location-button {
-      display: none;
-    }
-
-    // Кнопка Меню
-    .menu-button { } // Додаткові стилі, якщо потрібні
-  }
+// --- Main Chat Area (Messages + Input) ---
+.ollama-main-chat-area {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1; // Takes remaining horizontal space
+	height: 100%; // Takes full parent height
+	min-width: 0; // Allows shrinking
+    overflow: hidden; // Prevents children from overflowing the main area container
 }
 
-// Анімація пульсації для кнопки запису
-@keyframes pulse-recording {
-  0% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.6); }
-  70% { box-shadow: 0 0 0 8px rgba(var(--text-error-rgb), 0); }
-  100% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); }
+// Container for the message list (chatContainerEl)
+// Use a specific class if added in TS, otherwise rely on structure (less robust)
+// Assuming TS adds class 'ollama-chat-area-content' to this element:
+.ollama-chat-area-content { // Or use '> div:first-child' if you prefer
+	flex-grow: 1; // Takes available vertical space
+	position: relative;
+	display: flex; // Needed for child flex-grow
+	flex-direction: column;
+    min-height: 0; // <<< *** ADDED: Allow shrinking ***
+    overflow: hidden; // Hide anything overflowing *this* container (e.g. padding issues)
 }
 
-// Анімація обертання для іконки завантаження
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+// Message list container (chatContainer)
+.ollama-chat-container {
+	flex-grow: 1; // Stretches vertically within its parent
+	max-width: none; // Takes full width of parent
+	margin-left: 0;
+	margin-right: 0;
+	padding: calc(var(--chat-spacing-unit) * 4); // Inner padding for messages
+	overflow-y: auto; // <<< *** CRUCIAL: Allows message scrolling ***
+    min-height: 0; // <<< *** ADDED: Allow shrinking ***
+
+	// Scrollbar styles
+	&::-webkit-scrollbar { width: 8px; }
+	&::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 4px; margin: 4px 0; }
+	&::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 4px; border: 2px solid var(--background-secondary); }
+	&::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
 }
+
+// Input container (inputContainer)
+.chat-input-container {
+	flex-shrink: 0; // Doesn't shrink vertically
+	max-width: none;
+	margin-left: 0;
+	margin-right: 0;
+	width: 100%; // Takes full width of parent
+	box-sizing: border-box; // Ensure padding is included in width
+
+	// Reset styles specific to non-flex layout if needed (from responsive)
+	border-radius: 0;
+	border-top: 1px solid var(--divider-color);
+	border-left: none; // Assuming panel is on the left
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3); // Adjust padding as needed
+
+    // Ensure textarea inside behaves
+    textarea {
+        max-width: 100%; // Ensure it doesn't overflow horizontally
+    }
+}
+// --- End Main Chat Area ---
+
+
+// --- RESPONSIVE ---
+@media screen and (max-width: 768px) { // Tablet and smaller
+	.ollama-container {
+		// Revert to vertical layout for the main container
+		flex-direction: column; // Stack role panel (if shown) and chat area vertically
+        overflow: visible; // Allow content to scroll normally if needed
+	}
+
+	.ollama-role-panel {
+		display: none; // Hide the role panel
+        width: 100%; // Reset width
+        height: auto; // Reset height
+        border-right: none; // Remove border
+        border-bottom: 1px solid var(--divider-color); // Add bottom border if shown above chat
+	}
+
+    .ollama-main-chat-area {
+        border-left: none; // Ensure no border when panel hidden
+        // Height is now determined by flex-grow in column layout
+        overflow: visible; // Allow internal elements (chat container, input) to manage overflow
+    }
+
+    // Restore some original styles for chat-container and input-container
+    // if they were heavily modified for the desktop flex layout
+
+    .ollama-chat-container {
+         padding: calc(var(--chat-spacing-unit) * 3); // Tablet padding
+         // Ensure overflow-y is still auto
+         overflow-y: auto;
+    }
+
+    .chat-input-container {
+        border-radius: 12px; // Restore border radius
+        border-left: 1px solid var(--divider-color); // Restore border if needed
+        margin-top: 10px; // Add some top margin
+        width: 98%; // Restore side margins
+        margin-left: auto;
+        margin-right: auto;
+        padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3); // Restore padding
+    }
+}
+
+// --- END RESPONSIVE ---
+
+
+// --- (Keep other layout styles like .workspace-leaf-content, .chat-date-separator etc. if they were outside the main .ollama-container block) ---
