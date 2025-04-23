@@ -442,7 +442,7 @@ export class OllamaView extends ItemView {
         cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
         attr: { 'data-section-type': 'chats', 'data-collapsed': 'false' } // Стан зберігаємо в атрибуті
     });
-    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open"); // Початкова іконка
+    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "lucide-folder-open"); // Початкова іконка
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
 
     this.chatPanelListEl = this.rolePanelEl.createDiv({
@@ -456,7 +456,7 @@ export class OllamaView extends ItemView {
          cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
          attr: { 'data-section-type': 'roles', 'data-collapsed': 'true' }
     });
-    setIcon(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
+    setIcon(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "lucide-folder");
     this.rolePanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Roles" });
 
     this.rolePanelListEl = this.rolePanelEl.createDiv({
