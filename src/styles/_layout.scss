@@ -28,25 +28,39 @@
 
 // --- Sidebar Accordion Sections ---
 
+.ollama-role-panel {
+    display: flex;
+    flex-direction: column;
+    width: 240px;
+    flex-shrink: 0;
+    background-color: var(--background-secondary);
+    border-right: 1px solid var(--divider-color);
+    height: 100%;
+    overflow: hidden; // Keep this
+    box-sizing: border-box;
+}
+
+// --- Sidebar Accordion Sections ---
+
 // Header for collapsible sections (Chats, Roles)
 .ollama-sidebar-section-header {
-    // Inherits base styles from .menu-option (added via TS) for hover etc.
-    display: flex; // Ensure flex layout for icon + text
+    display: flex;
     padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
     user-select: none;
-    align-items: baseline; // Align icon baseline with text baseline
+    align-items: baseline;
     cursor: pointer;
-    flex-shrink: 0; // Prevent header from shrinking vertically
+    flex-shrink: 0; // Headers should not shrink
     position: relative;
-    border-radius: var(--radius-s); // Apply consistent radius
-    margin: 1px 0; // Small vertical margin like other items
+    border-radius: var(--radius-s);
+    margin: 1px 0;
 
-    &:hover { // Explicit hover style if not fully covered by .menu-option inheritance
+    // Apply hover effect (can inherit from .menu-option if added in TS)
+     &:hover {
       background-color: var(--background-modifier-hover);
     }
 
     .ollama-sidebar-section-icon {
-        margin-right: 14px; // Increased horizontal spacing
+        margin-right: 14px;
         min-width: 18px;
         display: inline-flex;
         align-items: center;
@@ -56,63 +70,61 @@
         .svg-icon {
             width: 16px;
             height: 16px;
-            color: var(--text-faint); // Base icon color
+            color: var(--text-faint);
         }
     }
 
     &:hover .ollama-sidebar-section-icon .svg-icon {
-        color: var(--text-muted); // Icon color on header hover
+        color: var(--text-muted);
     }
 
-    .menu-option-text { // Style for the "Chats" / "Roles" text
+    .menu-option-text {
         font-weight: 500;
         color: var(--text-normal);
-        line-height: 1.2; // Adjust for baseline alignment
+        line-height: 1.2;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        flex-grow: 1; // Allow text to take remaining space
+        flex-grow: 1;
     }
 }
 
-// Content area for collapsible sections (holds the list)
+// Content area for collapsible sections
 .ollama-sidebar-section-content {
-    overflow: hidden; // Crucial for max-height animation
+    overflow: hidden;
     max-height: 0; // Collapsed by default
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out; // Animate height and padding
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
     box-sizing: border-box;
-    padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Only horizontal padding when collapsed
-    min-height: 0; // Allow shrinking in flex context
-    flex-shrink: 0; // Don't shrink when collapsed
+    padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
+    // min-height: 0; // Not strictly needed if not a flex item that needs shrinking
+    // flex-shrink: 0; // Not needed if not using flex-grow
 
-    // Expanded state (toggled by adding/removing .is-expanded class via TS)
+    // Expanded state
     &.is-expanded {
-        flex-grow: 1; // Allow expanded section to fill available vertical space
-        flex-shrink: 1; // Allow shrinking if needed (less relevant for accordion)
-        max-height: 75vh; // Large value allowing content to determine height up to this limit
-        overflow-y: auto; // Enable scrolling ONLY when expanded and overflowing
+        // flex-grow: 1; // <-- REMOVE THIS LINE
+        // flex-shrink: 1; // <-- REMOVE THIS LINE
+        max-height: 75vh; // Keep max-height limit (adjust value as needed)
+        overflow-y: auto; // Enable scrolling
         padding-top: calc(var(--chat-spacing-unit) * 1);
         padding-bottom: calc(var(--chat-spacing-unit) * 1);
     }
 
-    // Scrollbar styling (only visible when expanded and overflowing)
+    // Scrollbar styling
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
     &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
     &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
 
     // --- Styles for elements INSIDE the content lists ---
-
-    // List items (Chats or Roles)
-    .ollama-role-panel-item,
+    // (List items, chat item layout, empty text, separator - keep as before)
+     .ollama-role-panel-item,
     .ollama-chat-panel-item {
-        // Applying .menu-option styles directly as done in TS
         &.menu-option {
             display: flex;
-            align-items: center; // Center icon/text vertically within the item row
+            align-items: center;
             padding: calc(var(--chat-spacing-unit) * 1.8)
-                     calc(var(--chat-spacing-unit) * 1.5); // Adjusted padding slightly for inside list
-            margin: 1px 0; // Reduced margin
+                     calc(var(--chat-spacing-unit) * 1.5);
+            margin: 1px 0;
             cursor: pointer;
             border-radius: var(--radius-s);
 
@@ -121,7 +133,7 @@
             }
 
             .menu-option-icon {
-                margin-right: 10px; // Spacing for item icons
+                margin-right: 10px;
                 min-width: 16px;
                 display: flex;
                 align-items: center;
@@ -138,65 +150,57 @@
                 flex-grow: 1;
             }
 
-            // Active state for items
             &.is-active {
                 background-color: var(--interactive-accent-translucent);
                 color: var(--text-accent-hover);
-                .menu-option-text, .chat-panel-item-name { // Target name specifically too
+                .menu-option-text, .chat-panel-item-name {
                   font-weight: 500;
                   color: var(--text-accent-hover);
                 }
-                .chat-panel-item-date { // Style date on active chat
+                .chat-panel-item-date {
                    color: var(--text-accent-hover);
                    opacity: 0.8;
                 }
                 .menu-option-icon { color: var(--interactive-accent); }
                 &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
             }
-
-            // Custom role icon state
             &.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
                 color: var(--text-faint);
             }
         }
     }
-
-    // Chat list item specific text layout
-    .ollama-chat-panel-item {
-       &.menu-option { // Target within menu-option context
-           .menu-option-text { // This element contains name and date
+     .ollama-chat-panel-item {
+       &.menu-option {
+           .menu-option-text {
                 display: flex;
                 flex-direction: column;
                 line-height: 1.3;
                 gap: 1px;
            }
            .chat-panel-item-name {
-                // Style already handled by .menu-option-text and .is-active above
            }
            .chat-panel-item-date {
                 font-size: 0.85em;
                 color: var(--text-faint);
-                // Active state handled above
+           }
+           &.is-active {
+              .chat-panel-item-date {
+                  color: var(--text-accent-hover);
+                  opacity: 0.8;
+              }
            }
        }
     }
-
-
-    // Empty list message
      .menu-info-text {
         padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 1);
         color: var(--text-faint);
         font-style: italic;
         font-size: calc(var(--font-ui-small) * 0.9);
     }
-
-    // Separator within lists (if used, e.g., between None and Roles)
-    hr.menu-separator {
-        margin: calc(var(--chat-spacing-unit) * 1.5)
-                calc(var(--chat-spacing-unit) * 0); // Only vertical margin inside padded list
-        border-top-color: var(--background-modifier-border); // Ensure visible
+     hr.menu-separator {
+        margin: calc(var(--chat-spacing-unit) * 1.5) 0;
+        border-top-color: var(--background-modifier-border);
     }
-
 }
 // --- End Sidebar Accordion Sections ---
 
