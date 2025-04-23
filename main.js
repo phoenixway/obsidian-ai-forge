@@ -216,7 +216,6 @@ var CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
 var CSS_MAIN_CHAT_AREA = "ollama-main-chat-area";
 var CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header";
 var CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
-var CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden";
 var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
 var LANGUAGES = {
   af: "Afrikaans",
@@ -397,10 +396,12 @@ var OllamaView = class extends import_obsidian3.ItemView {
     //     }
     // }
     this.updateRolePanelList = async () => {
-      var _a, _b;
+      var _a, _b, _c;
       const container = this.rolePanelListEl;
-      if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Roles panel list element or chat manager not ready.");
+      if (!container || !this.plugin.chatManager)
+        return;
+      if (((_a = this.rolePanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true") {
+        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Roles panel is collapsed.");
         return;
       }
       this.plugin.logger.debug("[updateRolePanelList] Updating role list in the side panel...");
@@ -408,8 +409,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
       try {
         const roles = await this.plugin.listRoleFiles(true);
         const activeChat = await this.plugin.chatManager.getActiveChat();
-        const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        this.plugin.logger.debug(`[updateRolePanelList] Current active role path for panel: ${currentRolePath || "None"}`);
+        const currentRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
         const noneOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"] });
         const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
         noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None" });
@@ -438,25 +438,10 @@ var OllamaView = class extends import_obsidian3.ItemView {
           }
           this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
         });
-        this.plugin.logger.debug(`[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`);
-        requestAnimationFrame(() => {
-          if (container && this.isSidebarSectionVisible("roles")) {
-            const currentScrollHeight = container.scrollHeight;
-            container.style.maxHeight = currentScrollHeight + "px";
-            container.style.overflowY = "auto";
-            this.plugin.logger.debug(`[updateRolePanelList] Set maxHeight to ${currentScrollHeight}px`);
-          } else if (container) {
-            this.plugin.logger.debug(`[updateRolePanelList] Section became hidden or container removed, height not set.`);
-          }
-        });
       } catch (error) {
         this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
         container.empty();
         container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
-        requestAnimationFrame(() => {
-          if (container)
-            container.style.maxHeight = "50px";
-        });
       }
     };
     // --- Новий обробник кліку для ПАНЕЛІ ролей ---
@@ -1307,9 +1292,12 @@ This action cannot be undone.`,
       }, 50);
     };
     this.updateChatPanelList = async () => {
+      var _a;
       const container = this.chatPanelListEl;
-      if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Chat panel list element or chat manager not ready.");
+      if (!container || !this.plugin.chatManager)
+        return;
+      if (((_a = this.chatPanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true") {
+        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Chat panel is collapsed.");
         return;
       }
       this.plugin.logger.debug("[updateChatPanelList] Updating chat list in the side panel...");
@@ -1320,7 +1308,6 @@ This action cannot be undone.`,
         this.plugin.logger.debug(`[updateChatPanelList] Fetched ${chats.length} chats. Active ID: ${currentActiveId}`);
         if (chats.length === 0) {
           container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
-          this.plugin.logger.debug("[updateChatPanelList] Rendered 'No saved chats yet.' message.");
         } else {
           chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
           chats.forEach((chatMeta) => {
@@ -1336,32 +1323,17 @@ This action cannot be undone.`,
               (0, import_obsidian3.setIcon)(iconSpan, "message-square");
             }
             this.registerDomEvent(chatOptionEl, "click", async () => {
-              var _a;
-              if (chatMeta.id !== ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
+              var _a2;
+              if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
                 await this.plugin.chatManager.setActiveChat(chatMeta.id);
               }
             });
           });
-          this.plugin.logger.debug(`[updateChatPanelList] Rendered ${chats.length} chat options in panel.`);
         }
-        requestAnimationFrame(() => {
-          if (container && this.isSidebarSectionVisible("chats")) {
-            const currentScrollHeight = container.scrollHeight;
-            container.style.maxHeight = currentScrollHeight + "px";
-            container.style.overflowY = "auto";
-            this.plugin.logger.debug(`[updateChatPanelList] Set maxHeight to ${currentScrollHeight}px`);
-          } else if (container) {
-            this.plugin.logger.debug(`[updateChatPanelList] Section became hidden during update, height not set.`);
-          }
-        });
       } catch (error) {
         this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
         container.empty();
         container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
-        requestAnimationFrame(() => {
-          if (container)
-            container.style.maxHeight = "50px";
-        });
       }
     };
     this.plugin = plugin;
@@ -1393,19 +1365,31 @@ This action cannot be undone.`,
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(this.plugin.settings.modelName);
       this.updateTemperatureIndicator(this.plugin.settings.temperature);
-      this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
+      this.plugin.logger.debug(
+        "[OllamaView] Initial UI elements updated based on settings."
+      );
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
+      this.plugin.logger.error(
+        "[OllamaView] Error during initial UI update in onOpen:",
+        error
+      );
     }
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
-      this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
+      this.plugin.logger.debug(
+        "[OllamaView] Calling loadAndDisplayActiveChat from onOpen..."
+      );
       await this.loadAndDisplayActiveChat();
-      this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
+      this.plugin.logger.debug(
+        "[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen."
+      );
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
+      this.plugin.logger.error(
+        "[OllamaView] Error during initial chat load in onOpen:",
+        error
+      );
       this.showEmptyState();
       const updatePromises = [];
       if (this.isSidebarSectionVisible("chats")) {
@@ -1416,14 +1400,6 @@ This action cannot be undone.`,
       }
       if (updatePromises.length > 0) {
         await Promise.all(updatePromises);
-        if (this.isSidebarSectionVisible("chats") && this.chatPanelListEl) {
-          this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
-          this.chatPanelListEl.style.overflowY = "auto";
-        }
-        if (this.isSidebarSectionVisible("roles") && this.rolePanelListEl) {
-          this.rolePanelListEl.style.maxHeight = this.rolePanelListEl.scrollHeight + "px";
-          this.rolePanelListEl.style.overflowY = "auto";
-        }
       }
     }
     setTimeout(() => {
@@ -1451,7 +1427,6 @@ This action cannot be undone.`,
     if (this.resizeTimeout)
       clearTimeout(this.resizeTimeout);
   }
-  // --- UI Creation (Прибрано початкову max-height для чатів) ---
   createUIElements() {
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
@@ -1459,14 +1434,14 @@ This action cannot be undone.`,
     this.chatPanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
+      // Стан зберігаємо в атрибуті
     });
     (0, import_obsidian3.setIcon)(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open");
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
     this.chatPanelListEl = this.rolePanelEl.createDiv({
-      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "ollama-chat-panel-list"]
+      // Додаємо is-expanded для початкового стану
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"]
     });
-    this.chatPanelListEl.style.overflow = "hidden";
-    this.chatPanelListEl.style.transition = "max-height 0.3s ease-out";
     this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
@@ -1474,11 +1449,9 @@ This action cannot be undone.`,
     (0, import_obsidian3.setIcon)(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
     this.rolePanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Roles" });
     this.rolePanelListEl = this.rolePanelEl.createDiv({
-      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_SIDEBAR_SECTION_CONTENT_HIDDEN]
+      // НЕМАЄ is-expanded, тому буде застосовано max-height: 0 з CSS
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT]
     });
-    this.rolePanelListEl.style.maxHeight = "0";
-    this.rolePanelListEl.style.overflow = "hidden";
-    this.rolePanelListEl.style.transition = "max-height 0.3s ease-out";
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
@@ -1981,7 +1954,7 @@ This action cannot be undone.`,
     this.updateRoleDisplay(finalRoleName);
     this.updateModelDisplay(finalModelName);
     this.updateTemperatureIndicator(finalTemperature);
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels (height will be set by update functions)...");
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
     const panelUpdatePromises = [];
     if (this.isSidebarSectionVisible("chats")) {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is visible, queueing update.");
@@ -3457,6 +3430,7 @@ This action cannot be undone.`,
     let otherSectionType = null;
     const collapseIcon = "folder";
     const expandIcon = "folder-open";
+    const expandedClass = "is-expanded";
     if (sectionType === "chats") {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
@@ -3480,37 +3454,24 @@ This action cannot be undone.`,
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
           (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
-        otherContentEl.style.maxHeight = "0";
-        otherContentEl.style.overflowY = "hidden";
-        otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+        otherContentEl.classList.remove(expandedClass);
       }
       clickedHeaderEl.setAttribute("data-collapsed", "false");
-      contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
       (0, import_obsidian3.setIcon)(iconEl, expandIcon);
       try {
         await updateFunction();
-        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType} (height will be set by update function)`);
+        contentEl.classList.add(expandedClass);
+        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch (error) {
         this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
-        requestAnimationFrame(() => {
-          if (contentEl) {
-            contentEl.setText(`Error loading ${sectionType}.`);
-            contentEl.style.maxHeight = "50px";
-            contentEl.style.overflowY = "auto";
-          }
-        });
+        contentEl.setText(`Error loading ${sectionType}.`);
+        contentEl.classList.add(expandedClass);
       }
     } else {
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
       (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
-      contentEl.style.maxHeight = "0";
-      contentEl.style.overflowY = "hidden";
-      setTimeout(() => {
-        if (clickedHeaderEl.getAttribute("data-collapsed") === "true") {
-          contentEl == null ? void 0 : contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-        }
-      }, 300);
+      contentEl.classList.remove(expandedClass);
     }
   }
 };
