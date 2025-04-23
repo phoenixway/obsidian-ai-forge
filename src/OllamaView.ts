@@ -442,7 +442,7 @@ export class OllamaView extends ItemView {
         cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
         attr: { 'data-section-type': 'chats', 'data-collapsed': 'false' } // Стан зберігаємо в атрибуті
     });
-    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folderИ"); // Початкова іконка
+    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder"); // Початкова іконка
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
 
     this.chatPanelListEl = this.rolePanelEl.createDiv({
