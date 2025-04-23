@@ -1433,7 +1433,7 @@ This action cannot be undone.`,
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
       // Стан зберігаємо в атрибуті
     });
-    (0, import_obsidian3.setIcon)(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
+    (0, import_obsidian3.setIcon)(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open");
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       // Додаємо is-expanded для початкового стану
@@ -3421,13 +3421,17 @@ This action cannot be undone.`,
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
     const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+    console.log(`Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`);
+    if (!iconEl) {
+      console.error("Could not find icon element for section:", sectionType);
+    }
     let contentEl = null;
     let updateFunction = null;
     let otherHeaderEl = null;
     let otherContentEl = null;
     let otherSectionType = null;
-    const collapseIcon = "folder";
-    const expandIcon = "folder-open";
+    const collapseIcon = "lucide-folder";
+    const expandIcon = "lucide-folder-open";
     const expandedClass = "is-expanded";
     if (sectionType === "chats") {
       contentEl = this.chatPanelListEl;
@@ -3442,20 +3446,26 @@ This action cannot be undone.`,
       otherContentEl = this.chatPanelListEl;
       otherSectionType = "chats";
     }
-    if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+    if (!contentEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
       this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
       return;
     }
     if (isCurrentlyCollapsed) {
       if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
+        this.plugin.logger.debug(`Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`);
         const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
-        if (otherIconEl)
+        if (otherIconEl) {
+          console.log("Setting other icon to:", collapseIcon);
           (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
+        }
         otherContentEl.classList.remove(expandedClass);
       }
       clickedHeaderEl.setAttribute("data-collapsed", "false");
-      (0, import_obsidian3.setIcon)(iconEl, expandIcon);
+      if (iconEl) {
+        console.log("Setting current icon to:", expandIcon);
+        (0, import_obsidian3.setIcon)(iconEl, expandIcon);
+      }
       try {
         await updateFunction();
         contentEl.classList.add(expandedClass);
@@ -3466,10 +3476,13 @@ This action cannot be undone.`,
         contentEl.classList.add(expandedClass);
       }
     } else {
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
-      (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
+      if (iconEl) {
+        console.log("Setting current icon to:", collapseIcon);
+        (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
+      }
       contentEl.classList.remove(expandedClass);
+      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
     }
   }
 };

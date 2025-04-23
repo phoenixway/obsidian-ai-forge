@@ -442,7 +442,7 @@ export class OllamaView extends ItemView {
         cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
         attr: { 'data-section-type': 'chats', 'data-collapsed': 'false' } // Стан зберігаємо в атрибуті
     });
-    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder"); // Початкова іконка
+    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open"); // Початкова іконка
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
 
     this.chatPanelListEl = this.rolePanelEl.createDiv({
@@ -3986,15 +3986,23 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
   const isCurrentlyCollapsed = clickedHeaderEl.getAttribute('data-collapsed') === 'true';
   const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
 
+  // --- DEBUGGING ---
+  console.log(`Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`);
+  if (!iconEl) {
+       console.error("Could not find icon element for section:", sectionType);
+  }
+  // --- END DEBUGGING ---
+
   let contentEl: HTMLElement | null = null;
   let updateFunction: (() => Promise<void>) | null = null;
   let otherHeaderEl: HTMLElement | null = null;
   let otherContentEl: HTMLElement | null = null;
   let otherSectionType: 'chats' | 'roles' | null = null;
 
-  const collapseIcon = "folder";
-  const expandIcon = "folder-open";
-  const expandedClass = "is-expanded"; // Клас для керування станом в CSS
+  // --- ЗМІНА: Використовуємо префікс lucide- ---
+  const collapseIcon = "lucide-folder";
+  const expandIcon = "lucide-folder-open";
+  const expandedClass = "is-expanded";
 
   if (sectionType === 'chats') {
       contentEl = this.chatPanelListEl;
@@ -4010,45 +4018,54 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
       otherSectionType = 'chats';
   }
 
-  if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+  if (!contentEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) { // iconEl перевірено в логуванні
       this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
       return;
   }
 
   // Логіка Акордеону
   if (isCurrentlyCollapsed) {
-      // --- Розгортаємо поточну, згортаємо іншу (якщо треба) ---
-
-      // 1. Згортаємо іншу секцію
+      // --- Розгортаємо поточну, згортаємо іншу ---
       if (otherHeaderEl.getAttribute('data-collapsed') === 'false') {
+          // ... (згортання іншої секції як було) ...
+           this.plugin.logger.debug(`Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`);
           const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
           otherHeaderEl.setAttribute('data-collapsed', 'true');
-          if (otherIconEl) setIcon(otherIconEl, collapseIcon);
-          otherContentEl.classList.remove(expandedClass); // Видаляємо клас = згортаємо
+          if (otherIconEl) {
+              console.log("Setting other icon to:", collapseIcon); // Debug
+              setIcon(otherIconEl, collapseIcon);
+          }
+          otherContentEl.classList.remove(expandedClass);
       }
 
-      // 2. Розгортаємо поточну секцію
       clickedHeaderEl.setAttribute('data-collapsed', 'false');
-      setIcon(iconEl, expandIcon);
-      // Викликаємо updateFunction ДО додавання класу, щоб контент був готовий
+       if (iconEl) {
+          console.log("Setting current icon to:", expandIcon); // Debug
+          setIcon(iconEl, expandIcon);
+      }
       try {
           await updateFunction();
-          contentEl.classList.add(expandedClass); // Додаємо клас = розгортаємо
+          contentEl.classList.add(expandedClass);
           this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch(error) {
-          this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+          // ... (обробка помилки як була) ...
+           this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
           contentEl.setText(`Error loading ${sectionType}.`);
-           contentEl.classList.add(expandedClass); // Все одно розгортаємо, щоб показати помилку
+           contentEl.classList.add(expandedClass);
       }
 
   } else {
       // --- Згортаємо поточну ---
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute('data-collapsed', 'true');
-      setIcon(iconEl, collapseIcon);
-      contentEl.classList.remove(expandedClass); // Видаляємо клас = згортаємо
+       if (iconEl) {
+          console.log("Setting current icon to:", collapseIcon); // Debug
+          setIcon(iconEl, collapseIcon);
+      }
+      contentEl.classList.remove(expandedClass);
+      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
   }
 }
+
 
 
 
