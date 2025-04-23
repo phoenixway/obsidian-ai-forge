@@ -328,7 +328,7 @@ var LANGUAGES = {
   zu: "Zulu"
 };
 var OllamaView = class extends import_obsidian3.ItemView {
-  // Ця властивість вже має бути
+  // <--- НОВА ВЛАСТИВІСТЬ для списку чатів у панелі
   constructor(leaf, plugin) {
     super(leaf);
     // Кнопка в панелі (для десктопу)
@@ -351,12 +351,19 @@ var OllamaView = class extends import_obsidian3.ItemView {
       const section = this.menuDropdown.createDiv();
       if (sectionClass)
         section.addClass(sectionClass);
-      const header = section.createDiv({ cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}` });
+      const header = section.createDiv({
+        cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}`
+      });
       (0, import_obsidian3.setIcon)(header.createSpan({ cls: "menu-option-icon" }), icon);
       header.createSpan({ cls: "menu-option-text", text: title });
-      (0, import_obsidian3.setIcon)(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
+      (0, import_obsidian3.setIcon)(
+        header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }),
+        "chevron-right"
+      );
       const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
-      const content = section.createDiv({ cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}` });
+      const content = section.createDiv({
+        cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}`
+      });
       content.style.maxHeight = "0";
       content.style.overflow = "hidden";
       content.style.transition = "max-height 0.3s ease-out, padding 0.3s ease-out";
@@ -389,11 +396,15 @@ var OllamaView = class extends import_obsidian3.ItemView {
     // Приклад для handleSettingsUpdated
     this.handleSettingsUpdated = async () => {
       var _a, _b, _c, _d, _e, _f;
-      this.plugin.logger.debug("[handleSettingsUpdated] Updating relevant UI elements directly...");
+      this.plugin.logger.debug(
+        "[handleSettingsUpdated] Updating relevant UI elements directly..."
+      );
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRolePath = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) != null ? _d : this.plugin.settings.selectedRolePath;
-      const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath);
+      const currentRoleName = await this.plugin.findRoleNameByPath(
+        currentRolePath
+      );
       const currentTemperature = (_f = (_e = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _e.temperature) != null ? _f : this.plugin.settings.temperature;
       this.updateModelDisplay(currentModelName);
       this.updateRoleDisplay(currentRoleName);
@@ -407,33 +418,57 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.updateRolePanelList = async () => {
       var _a, _b;
       if (!this.rolePanelListEl || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Panel list element or chat manager not ready.");
+        this.plugin.logger.debug(
+          "[updateRolePanelList] Skipping update: Panel list element or chat manager not ready."
+        );
         return;
       }
-      this.plugin.logger.debug("[updateRolePanelList] Updating role list in the side panel...");
+      this.plugin.logger.debug(
+        "[updateRolePanelList] Updating role list in the side panel..."
+      );
       this.rolePanelListEl.empty();
       try {
         const roles = await this.plugin.listRoleFiles(true);
         const activeChat = await this.plugin.chatManager.getActiveChat();
         const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        this.plugin.logger.debug(`[updateRolePanelList] Current active role path for panel: ${currentRolePath || "None"}`);
-        const noneOptionEl = this.rolePanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"] });
-        const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
-        noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None (Default)" });
+        this.plugin.logger.debug(
+          `[updateRolePanelList] Current active role path for panel: ${currentRolePath || "None"}`
+        );
+        const noneOptionEl = this.rolePanelListEl.createDiv({
+          cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"]
+        });
+        const noneIconSpan = noneOptionEl.createSpan({
+          cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"]
+        });
+        noneOptionEl.createSpan({
+          cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
+          text: "None (Default)"
+        });
         if (!currentRolePath) {
           noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
           (0, import_obsidian3.setIcon)(noneIconSpan, "check");
         } else {
           (0, import_obsidian3.setIcon)(noneIconSpan, "slash");
         }
-        this.registerDomEvent(noneOptionEl, "click", () => this.handleRolePanelItemClick(null, currentRolePath));
+        this.registerDomEvent(
+          noneOptionEl,
+          "click",
+          () => this.handleRolePanelItemClick(null, currentRolePath)
+        );
         if (roles.length > 0) {
           this.rolePanelListEl.createEl("hr", { cls: "menu-separator" });
         }
         roles.forEach((roleInfo) => {
-          const roleOptionEl = this.rolePanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option"] });
-          const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
-          roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: roleInfo.name });
+          const roleOptionEl = this.rolePanelListEl.createDiv({
+            cls: [CSS_ROLE_PANEL_ITEM, "menu-option"]
+          });
+          const iconSpan = roleOptionEl.createSpan({
+            cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"]
+          });
+          roleOptionEl.createSpan({
+            cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
+            text: roleInfo.name
+          });
           if (roleInfo.isCustom) {
             roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM);
           }
@@ -443,12 +478,24 @@ var OllamaView = class extends import_obsidian3.ItemView {
           } else {
             (0, import_obsidian3.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "file-text");
           }
-          this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+          this.registerDomEvent(
+            roleOptionEl,
+            "click",
+            () => this.handleRolePanelItemClick(roleInfo, currentRolePath)
+          );
         });
-        this.plugin.logger.debug(`[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`);
+        this.plugin.logger.debug(
+          `[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`
+        );
       } catch (error) {
-        this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
-        this.rolePanelListEl.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
+        this.plugin.logger.error(
+          "[updateRolePanelList] Error rendering role panel list:",
+          error
+        );
+        this.rolePanelListEl.createDiv({
+          text: "Error loading roles.",
+          cls: "menu-error-text"
+        });
       }
     };
     // --- Новий обробник кліку для ПАНЕЛІ ролей ---
@@ -456,26 +503,39 @@ var OllamaView = class extends import_obsidian3.ItemView {
       var _a, _b, _c, _d, _e;
       const newRolePath = (_a = roleInfo == null ? void 0 : roleInfo.path) != null ? _a : "";
       const roleNameForEvent = (_b = roleInfo == null ? void 0 : roleInfo.name) != null ? _b : "None";
-      this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role: ${roleNameForEvent} (Path: ${newRolePath || "None"})`);
+      this.plugin.logger.debug(
+        `[handleRolePanelItemClick] Clicked role: ${roleNameForEvent} (Path: ${newRolePath || "None"})`
+      );
       if (newRolePath !== currentRolePath) {
         const activeChat = await ((_c = this.plugin.chatManager) == null ? void 0 : _c.getActiveChat());
         try {
           if (activeChat) {
-            this.plugin.logger.debug(`[handleRolePanelItemClick] Setting active role for chat ${activeChat.metadata.id} to: ${newRolePath || "None"}`);
-            await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
+            this.plugin.logger.debug(
+              `[handleRolePanelItemClick] Setting active role for chat ${activeChat.metadata.id} to: ${newRolePath || "None"}`
+            );
+            await this.plugin.chatManager.updateActiveChatMetadata({
+              selectedRolePath: newRolePath
+            });
           } else {
-            this.plugin.logger.debug(`[handleRolePanelItemClick] No active chat. Setting global default role to: ${newRolePath || "None"}`);
+            this.plugin.logger.debug(
+              `[handleRolePanelItemClick] No active chat. Setting global default role to: ${newRolePath || "None"}`
+            );
             this.plugin.settings.selectedRolePath = newRolePath;
             await this.plugin.saveSettings();
             this.plugin.emit("role-changed", roleNameForEvent);
             (_e = (_d = this.plugin.promptService) == null ? void 0 : _d.clearRoleCache) == null ? void 0 : _e.call(_d);
           }
         } catch (error) {
-          this.plugin.logger.error(`[handleRolePanelItemClick] Error setting role to ${newRolePath}:`, error);
+          this.plugin.logger.error(
+            `[handleRolePanelItemClick] Error setting role to ${newRolePath}:`,
+            error
+          );
           new import_obsidian3.Notice("Failed to set the role.");
         }
       } else {
-        this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role is already active.`);
+        this.plugin.logger.debug(
+          `[handleRolePanelItemClick] Clicked role is already active.`
+        );
       }
     };
     this.handleModelDisplayClick = async (event) => {
@@ -504,13 +564,11 @@ var OllamaView = class extends import_obsidian3.ItemView {
                 const latestModelName = ((_b2 = chatToUpdate == null ? void 0 : chatToUpdate.metadata) == null ? void 0 : _b2.modelName) || this.plugin.settings.modelName;
                 if (modelName !== latestModelName) {
                   if (chatToUpdate) {
-                    await this.plugin.chatManager.updateActiveChatMetadata(
-                      { modelName }
-                    );
+                    await this.plugin.chatManager.updateActiveChatMetadata({
+                      modelName
+                    });
                   } else {
-                    new import_obsidian3.Notice(
-                      "Cannot set model: No active chat."
-                    );
+                    new import_obsidian3.Notice("Cannot set model: No active chat.");
                   }
                 }
               })
@@ -520,10 +578,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
         }
       } catch (error) {
         loadingNotice.hide();
-        console.error(
-          "Error loading models for model selection menu:",
-          error
-        );
+        console.error("Error loading models for model selection menu:", error);
         menu.addItem(
           (item) => item.setTitle("Error loading models").setDisabled(true)
         );
@@ -533,9 +588,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
         if (itemsAdded) {
           menu.showAtMouseEvent(event);
         } else {
-          console.warn(
-            "Model menu was not shown because no items were added."
-          );
+          console.warn("Model menu was not shown because no items were added.");
         }
       }
     };
@@ -607,9 +660,7 @@ var OllamaView = class extends import_obsidian3.ItemView {
       } finally {
         (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
         this.translateInputButton.disabled = this.isProcessing;
-        this.translateInputButton.classList.remove(
-          CSS_CLASS_TRANSLATING_INPUT
-        );
+        this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT);
         this.translateInputButton.title = "Translate input to English";
       }
     };
@@ -787,14 +838,9 @@ This action cannot be undone.`,
         return;
       }
       try {
-        const markdownContent = this.formatChatToMarkdown(
-          activeChat.messages
-        );
+        const markdownContent = this.formatChatToMarkdown(activeChat.messages);
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const safeName = activeChat.metadata.name.replace(
-          /[\\/?:*"<>|]/g,
-          "-"
-        );
+        const safeName = activeChat.metadata.name.replace(/[\\/?:*"<>|]/g, "-");
         const filename = `ollama-chat-${safeName}-${timestamp}.md`;
         let targetFolderPath = (_b = this.plugin.settings.chatExportFolderPath) == null ? void 0 : _b.trim();
         let targetFolder = null;
@@ -808,27 +854,18 @@ This action cannot be undone.`,
                 targetFolderPath
               );
               if (targetFolder) {
-                new import_obsidian3.Notice(
-                  `Created export folder: ${targetFolderPath}`
-                );
+                new import_obsidian3.Notice(`Created export folder: ${targetFolderPath}`);
               } else {
                 this.plugin.logger.error(
                   "Failed to get folder even after creation attempt:",
                   targetFolderPath
                 );
-                new import_obsidian3.Notice(
-                  `Error creating export folder. Saving to vault root.`
-                );
+                new import_obsidian3.Notice(`Error creating export folder. Saving to vault root.`);
                 targetFolder = this.app.vault.getRoot();
               }
             } catch (err) {
-              this.plugin.logger.error(
-                "Error creating export folder:",
-                err
-              );
-              new import_obsidian3.Notice(
-                `Error creating export folder. Saving to vault root.`
-              );
+              this.plugin.logger.error("Error creating export folder:", err);
+              new import_obsidian3.Notice(`Error creating export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
             }
           } else if (abstractFile instanceof import_obsidian3.TFolder) {
@@ -846,9 +883,7 @@ This action cannot be undone.`,
           this.plugin.logger.error(
             "Failed to determine a valid target folder for export."
           );
-          new import_obsidian3.Notice(
-            "Error determining export folder. Cannot save file."
-          );
+          new import_obsidian3.Notice("Error determining export folder. Cannot save file.");
           return;
         }
         const filePath = (0, import_obsidian3.normalizePath)(`${targetFolder.path}/${filename}`);
@@ -916,36 +951,39 @@ This action cannot be undone.`,
         this.renderRoleList();
       }
     };
+    // OllamaView.ts
     this.handleChatListUpdated = () => {
       this.plugin.logger.info(
         "[handleChatListUpdated] Received 'chat-list-updated' event."
       );
       const menuOpen = this.isMenuOpen();
-      this.plugin.logger.debug(
-        `[handleChatListUpdated] Is menu open? ${menuOpen}`
-      );
+      this.plugin.logger.debug(`[handleChatListUpdated] Is dropdown menu open? ${menuOpen}`);
       if (menuOpen) {
         const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(
           CSS_CLASS_SUBMENU_CONTENT_HIDDEN
         );
-        this.plugin.logger.debug(
-          `[handleChatListUpdated] Is chat submenu visible? ${isChatSubmenuVisible}`
-        );
+        this.plugin.logger.debug(`[handleChatListUpdated] Is chat submenu visible? ${isChatSubmenuVisible}`);
         if (isChatSubmenuVisible) {
           this.plugin.logger.info(
-            "[handleChatListUpdated] Menu and chat submenu are open, calling renderChatListMenu()."
+            "[handleChatListUpdated] Dropdown menu and chat submenu are open, calling renderChatListMenu()."
           );
-          this.renderChatListMenu();
+          this.renderChatListMenu().catch((error) => {
+            this.plugin.logger.error("[handleChatListUpdated] Error rendering chat list menu:", error);
+          });
         } else {
           this.plugin.logger.debug(
-            "[handleChatListUpdated] Menu is open, but chat submenu is collapsed. Not re-rendering list."
+            "[handleChatListUpdated] Dropdown menu is open, but chat submenu is collapsed. Not re-rendering dropdown list."
           );
         }
       } else {
         this.plugin.logger.debug(
-          "[handleChatListUpdated] Menu is closed. Not re-rendering list."
+          "[handleChatListUpdated] Dropdown menu is closed. Not re-rendering dropdown list."
         );
       }
+      this.plugin.logger.info("[handleChatListUpdated] Updating chat panel list.");
+      this.updateChatPanelList().catch((error) => {
+        this.plugin.logger.error("[handleChatListUpdated] Error updating chat panel list:", error);
+      });
     };
     //   private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => {
     //     this.plugin.logger.debug(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
@@ -957,39 +995,57 @@ This action cannot be undone.`,
     //     }
     // }
     // В src/OllamaView.ts
+    // OllamaView.ts
     this.handleActiveChatChanged = async (data) => {
       var _a, _b, _c, _d, _e;
-      this.plugin.logger.debug(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}, Previous ID: ${this.lastProcessedChatId}`);
+      this.plugin.logger.debug(`[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`);
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       const previousChatId = this.lastProcessedChatId;
       this.lastProcessedChatId = data.chatId;
       if (chatSwitched) {
-        this.plugin.logger.info(`[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view.`);
+        this.plugin.logger.info(`[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`);
         await this.loadAndDisplayActiveChat();
       } else if (data.chatId !== null && data.chat !== null) {
         this.plugin.logger.info(`[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements directly.`);
         const activeChat = data.chat;
         const currentModelName = ((_a = activeChat.metadata) == null ? void 0 : _a.modelName) || this.plugin.settings.modelName;
         const currentRolePath = (_c = (_b = activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
-        const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath);
+        const currentRoleName = await this.findRoleNameByPath(currentRolePath);
         const currentTemperature = (_e = (_d = activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
+        this.plugin.logger.debug(`[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`);
         this.updateModelDisplay(currentModelName);
         this.updateRoleDisplay(currentRoleName);
         this.updateInputPlaceholder(currentRoleName);
         this.updateTemperatureIndicator(currentTemperature);
-        await this.updateRolePanelList();
+        const panelUpdatePromises = [
+          this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)),
+          this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
+        ];
+        await Promise.all(panelUpdatePromises);
+        this.plugin.logger.debug("[handleActiveChatChanged] Side panel lists updated for metadata change.");
       } else {
-        if (data.chatId === null) {
+        if (data.chatId === null && previousChatId !== null) {
           this.plugin.logger.info(`[handleActiveChatChanged] Active chat explicitly set to null. Reloading view.`);
-        } else {
+          await this.loadAndDisplayActiveChat();
+        } else if (data.chatId !== null && data.chat === null) {
           this.plugin.logger.warn(`[handleActiveChatChanged] Received metadata change event for chat ${data.chatId}, but chat data was null. Reloading view as a fallback.`);
+          await this.loadAndDisplayActiveChat();
+        } else {
+          this.plugin.logger.debug(`[handleActiveChatChanged] Unhandled case or no actual change (e.g., null -> null). chatId: ${data.chatId}. Updating panels as a precaution.`);
+          const panelUpdatePromises = [
+            this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)),
+            this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
+          ];
+          await Promise.all(panelUpdatePromises);
         }
-        await this.loadAndDisplayActiveChat();
       }
       if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
         this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
-        this.renderRoleList();
+        this.renderRoleList().catch((error) => {
+          this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
+        });
       }
+      this.plugin.logger.debug(`[handleActiveChatChanged] Finished processing event for chat ID: ${data.chatId}`);
     };
     this.handleMessageAdded = (data) => {
       var _a;
@@ -1136,9 +1192,9 @@ This action cannot be undone.`,
             const newRolePath = "";
             if (currentRolePath !== newRolePath) {
               if (activeChat) {
-                await this.plugin.chatManager.updateActiveChatMetadata(
-                  { selectedRolePath: newRolePath }
-                );
+                await this.plugin.chatManager.updateActiveChatMetadata({
+                  selectedRolePath: newRolePath
+                });
               } else {
                 this.plugin.settings.selectedRolePath = newRolePath;
                 await this.plugin.saveSettings();
@@ -1162,16 +1218,13 @@ This action cannot be undone.`,
               const newRolePath = roleInfo.path;
               if (currentRolePath !== newRolePath) {
                 if (activeChat) {
-                  await this.plugin.chatManager.updateActiveChatMetadata(
-                    { selectedRolePath: newRolePath }
-                  );
+                  await this.plugin.chatManager.updateActiveChatMetadata({
+                    selectedRolePath: newRolePath
+                  });
                 } else {
                   this.plugin.settings.selectedRolePath = newRolePath;
                   await this.plugin.saveSettings();
-                  this.plugin.emit(
-                    "role-changed",
-                    roleInfo.name
-                  );
+                  this.plugin.emit("role-changed", roleInfo.name);
                   (_b2 = (_a2 = this.plugin.promptService) == null ? void 0 : _a2.clearRoleCache) == null ? void 0 : _b2.call(_a2);
                 }
               }
@@ -1180,10 +1233,7 @@ This action cannot be undone.`,
           });
         });
       } catch (error) {
-        console.error(
-          "Error loading roles for role selection menu:",
-          error
-        );
+        console.error("Error loading roles for role selection menu:", error);
         if (!itemsAdded) {
           menu.addItem(
             (item) => item.setTitle("Error loading roles").setDisabled(true)
@@ -1235,10 +1285,7 @@ This action cannot be undone.`,
               `Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`
             );
           } catch (error) {
-            this.plugin.logger.error(
-              "Failed to update chat temperature:",
-              error
-            );
+            this.plugin.logger.error("Failed to update chat temperature:", error);
             new import_obsidian3.Notice("Error setting temperature.");
           }
         }
@@ -1256,6 +1303,55 @@ This action cannot be undone.`,
         this.plugin.logger.debug("Re-activating view with new setting...");
         this.plugin.activateView();
       }, 50);
+    };
+    this.updateChatPanelList = async () => {
+      if (!this.chatPanelListEl || !this.plugin.chatManager) {
+        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Chat panel list element or chat manager not ready.");
+        return;
+      }
+      this.plugin.logger.debug("[updateChatPanelList] Updating chat list in the side panel...");
+      this.chatPanelListEl.empty();
+      try {
+        const chats = this.plugin.chatManager.listAvailableChats() || [];
+        const currentActiveId = this.plugin.chatManager.getActiveChatId();
+        this.plugin.logger.debug(`[updateChatPanelList] Fetched ${chats.length} chats. Active ID: ${currentActiveId}`);
+        if (chats.length === 0) {
+          this.chatPanelListEl.createDiv({
+            cls: "menu-info-text",
+            // Можна перевикористати стиль
+            text: "No saved chats yet."
+          });
+          this.plugin.logger.debug("[updateChatPanelList] Rendered 'No saved chats yet.' message.");
+          return;
+        }
+        chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
+        chats.forEach((chatMeta) => {
+          const chatOptionEl = this.chatPanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option", "ollama-chat-panel-item"] });
+          const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
+          const textSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"] });
+          textSpan.createDiv({ cls: "chat-panel-item-name", text: chatMeta.name });
+          textSpan.createDiv({ cls: "chat-panel-item-date", text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
+          if (chatMeta.id === currentActiveId) {
+            chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+            (0, import_obsidian3.setIcon)(iconSpan, "check");
+          } else {
+            (0, import_obsidian3.setIcon)(iconSpan, "message-square");
+          }
+          this.registerDomEvent(chatOptionEl, "click", async () => {
+            var _a;
+            if (chatMeta.id !== ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
+              this.plugin.logger.debug(`[updateChatPanelList] Activating chat ID: ${chatMeta.id} from panel click.`);
+              await this.plugin.chatManager.setActiveChat(chatMeta.id);
+            } else {
+              this.plugin.logger.debug(`[updateChatPanelList] Clicked already active chat ID: ${chatMeta.id}. No action.`);
+            }
+          });
+        });
+        this.plugin.logger.debug(`[updateChatPanelList] Rendered ${chats.length} chat options in panel.`);
+      } catch (error) {
+        this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
+        this.chatPanelListEl.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
+      }
     };
     this.plugin = plugin;
     this.initSpeechWorker();
@@ -1286,17 +1382,26 @@ This action cannot be undone.`,
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(this.plugin.settings.modelName);
       this.updateTemperatureIndicator(this.plugin.settings.temperature);
-      this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
+      this.plugin.logger.debug(
+        "[OllamaView] Initial UI elements updated based on settings."
+      );
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
+      this.plugin.logger.error(
+        "[OllamaView] Error during initial UI update in onOpen:",
+        error
+      );
     }
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
-      this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
+      this.plugin.logger.debug(
+        "[OllamaView] Calling loadAndDisplayActiveChat from onOpen..."
+      );
       await this.loadAndDisplayActiveChat();
-      this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
+      this.plugin.logger.debug(
+        "[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen."
+      );
     } catch (error) {
       this.plugin.logger.error(
         "[OllamaView] Error during initial chat load in onOpen:",
@@ -1304,11 +1409,18 @@ This action cannot be undone.`,
       );
       this.showEmptyState();
       try {
-        this.plugin.logger.debug("[OllamaView] Updating role panel list in onOpen catch block...");
+        this.plugin.logger.debug(
+          "[OllamaView] Updating role panel list in onOpen catch block..."
+        );
         await this.updateRolePanelList();
-        this.plugin.logger.debug("[OllamaView] Role panel list updated in onOpen catch block.");
+        this.plugin.logger.debug(
+          "[OllamaView] Role panel list updated in onOpen catch block."
+        );
       } catch (panelError) {
-        this.plugin.logger.error("[OllamaView] Error updating role panel list in onOpen catch block:", panelError);
+        this.plugin.logger.error(
+          "[OllamaView] Error updating role panel list in onOpen catch block:",
+          panelError
+        );
       }
     }
     setTimeout(() => {
@@ -1339,43 +1451,105 @@ This action cannot be undone.`,
   // --- UI Creation (with Custom Div Menu & Accordion) ---
   createUIElements() {
     this.contentEl.empty();
-    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
+    const flexContainer = this.contentEl.createDiv({
+      cls: CSS_CLASS_CONTAINER
+    });
     this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
-    this.rolePanelEl.createEl("h4", { text: "Roles", cls: CSS_ROLE_PANEL_HEADER });
-    this.rolePanelListEl = this.rolePanelEl.createDiv({ cls: CSS_ROLE_PANEL_LIST });
+    this.rolePanelEl.createEl("h4", {
+      text: "Chats",
+      cls: CSS_ROLE_PANEL_HEADER
+    });
+    this.chatPanelListEl = this.rolePanelEl.createDiv({
+      cls: [CSS_ROLE_PANEL_LIST, "ollama-chat-panel-list"]
+    });
+    this.rolePanelEl.createEl("hr", { cls: "menu-separator" });
+    this.rolePanelEl.createEl("h4", {
+      text: "Roles",
+      cls: CSS_ROLE_PANEL_HEADER
+    });
+    this.rolePanelListEl = this.rolePanelEl.createDiv({
+      cls: CSS_ROLE_PANEL_LIST
+    });
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-    this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
-    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
-    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
-    (0, import_obsidian3.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+    this.chatContainerEl = this.mainChatAreaEl.createDiv({
+      cls: "ollama-chat-area-content"
+    });
+    this.chatContainer = this.chatContainerEl.createDiv({
+      cls: CSS_CLASS_CHAT_CONTAINER
+    });
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({
+      cls: CSS_CLASS_NEW_MESSAGE_INDICATOR
+    });
+    (0, import_obsidian3.setIcon)(
+      this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }),
+      "arrow-down"
+    );
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
-    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
-    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
-    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-    this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { "aria-label": "Translate input to English" } });
+    const inputContainer = this.mainChatAreaEl.createDiv({
+      cls: CSS_CLASS_INPUT_CONTAINER
+    });
+    this.inputEl = inputContainer.createEl("textarea", {
+      attr: { placeholder: `Text...`, rows: 1 }
+    });
+    const controlsContainer = inputContainer.createDiv({
+      cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER
+    });
+    const leftControls = controlsContainer.createDiv({
+      cls: CSS_CLASS_INPUT_CONTROLS_LEFT
+    });
+    this.translateInputButton = leftControls.createEl("button", {
+      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
+      attr: { "aria-label": "Translate input to English" }
+    });
     (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
-    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+    this.modelDisplayEl = leftControls.createDiv({
+      cls: CSS_CLASS_MODEL_DISPLAY
+    });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
-    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
+    this.roleDisplayEl = leftControls.createDiv({
+      cls: CSS_CLASS_ROLE_DISPLAY
+    });
     this.roleDisplayEl.setText("...");
     this.roleDisplayEl.title = "Click to select role";
-    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
+    this.temperatureIndicatorEl = leftControls.createDiv({
+      cls: CSS_CLASS_TEMPERATURE_INDICATOR
+    });
     this.temperatureIndicatorEl.setText("?");
     this.temperatureIndicatorEl.title = "Click to set temperature";
-    this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
-    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
+    this.buttonsContainer = controlsContainer.createDiv({
+      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`
+    });
+    this.sendButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_SEND_BUTTON,
+      attr: { "aria-label": "Send" }
+    });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
-    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
+    this.voiceButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_VOICE_BUTTON,
+      attr: { "aria-label": "Voice Input" }
+    });
     (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { "aria-label": "Toggle View Location" } });
-    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
+      attr: { "aria-label": "Toggle View Location" }
+    });
+    this.menuButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_MENU_BUTTON,
+      attr: { "aria-label": "Menu" }
+    });
     (0, import_obsidian3.setIcon)(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
-    this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
-    const roleSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.menuDropdown = inputContainer.createEl("div", {
+      cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"]
+    });
+    const roleSection = this.createSubmenuSection(
+      "Select Role",
+      "users",
+      CSS_CLASS_ROLE_LIST_CONTAINER,
+      "role-submenu-section"
+    );
     this.roleSubmenuHeader = roleSection.header;
     this.roleSubmenuContent = roleSection.content;
     this.menuDropdown.style.display = "none";
@@ -1581,17 +1755,11 @@ This action cannot be undone.`,
     else
       console.error("chatSubmenuHeader missing!");
     if (this.settingsOption)
-      this.settingsOption.addEventListener(
-        "click",
-        this.handleSettingsClick
-      );
+      this.settingsOption.addEventListener("click", this.handleSettingsClick);
     else
       console.error("settingsOption missing!");
     if (this.clearChatOption)
-      this.clearChatOption.addEventListener(
-        "click",
-        this.handleClearChatClick
-      );
+      this.clearChatOption.addEventListener("click", this.handleClearChatClick);
     else
       console.error("clearChatOption missing!");
     if (this.exportChatOption)
@@ -1602,10 +1770,7 @@ This action cannot be undone.`,
     else
       console.error("exportChatOption missing!");
     if (this.newChatOption)
-      this.newChatOption.addEventListener(
-        "click",
-        this.handleNewChatClick
-      );
+      this.newChatOption.addEventListener("click", this.handleNewChatClick);
     else
       console.error("newChatOption missing!");
     if (this.renameChatOption)
@@ -1616,10 +1781,7 @@ This action cannot be undone.`,
     else
       console.error("renameChatOption missing!");
     if (this.cloneChatOption)
-      this.cloneChatOption.addEventListener(
-        "click",
-        this.handleCloneChatClick
-      );
+      this.cloneChatOption.addEventListener("click", this.handleCloneChatClick);
     else
       console.error("cloneChatOption missing!");
     if (this.deleteChatOption)
@@ -1630,17 +1792,11 @@ This action cannot be undone.`,
     else
       console.error("deleteChatOption missing!");
     if (this.settingsOption)
-      this.settingsOption.addEventListener(
-        "click",
-        this.handleSettingsClick
-      );
+      this.settingsOption.addEventListener("click", this.handleSettingsClick);
     else
       console.error("settingsOption missing!");
     if (this.clearChatOption)
-      this.clearChatOption.addEventListener(
-        "click",
-        this.handleClearChatClick
-      );
+      this.clearChatOption.addEventListener("click", this.handleClearChatClick);
     else
       console.error("clearChatOption missing!");
     if (this.exportChatOption)
@@ -1651,10 +1807,7 @@ This action cannot be undone.`,
     else
       console.error("exportChatOption missing!");
     if (this.newChatOption)
-      this.newChatOption.addEventListener(
-        "click",
-        this.handleNewChatClick
-      );
+      this.newChatOption.addEventListener("click", this.handleNewChatClick);
     else
       console.error("newChatOption missing!");
     if (this.renameChatOption)
@@ -1665,10 +1818,7 @@ This action cannot be undone.`,
     else
       console.error("renameChatOption missing!");
     if (this.cloneChatOption)
-      this.cloneChatOption.addEventListener(
-        "click",
-        this.handleCloneChatClick
-      );
+      this.cloneChatOption.addEventListener("click", this.handleCloneChatClick);
     else
       console.error("cloneChatOption missing!");
     if (this.deleteChatOption)
@@ -1691,21 +1841,14 @@ This action cannot be undone.`,
     this.registerEvent(
       this.app.workspace.on("resize", this.handleWindowResize)
     );
-    this.registerDomEvent(
-      document,
-      "click",
-      this.handleDocumentClickForMenu
-    );
+    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
     this.registerDomEvent(
       document,
       "visibilitychange",
       this.handleVisibilityChange
     );
     this.registerEvent(
-      this.app.workspace.on(
-        "active-leaf-change",
-        this.handleActiveLeafChange
-      )
+      this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange)
     );
     if (this.chatContainer) {
       this.registerDomEvent(
@@ -1809,9 +1952,7 @@ This action cannot be undone.`,
             break;
         }
         requestAnimationFrame(() => {
-          if (!contentEl.classList.contains(
-            CSS_CLASS_SUBMENU_CONTENT_HIDDEN
-          )) {
+          if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
             if (type === "chats") {
               contentEl.style.maxHeight = CHAT_LIST_MAX_HEIGHT;
               contentEl.style.overflowY = "auto";
@@ -1822,10 +1963,7 @@ This action cannot be undone.`,
           }
         });
       } catch (error) {
-        this.plugin.logger.error(
-          `Error rendering ${type} list:`,
-          error
-        );
+        this.plugin.logger.error(`Error rendering ${type} list:`, error);
         contentEl.empty();
         contentEl.createDiv({
           cls: "menu-error-text",
@@ -1862,12 +2000,8 @@ This action cannot be undone.`,
     ];
     submenus.forEach((submenu) => {
       if (submenu.content && submenu.header && submenu.content !== exceptContent) {
-        if (!submenu.content.classList.contains(
-          CSS_CLASS_SUBMENU_CONTENT_HIDDEN
-        )) {
-          submenu.content.classList.add(
-            CSS_CLASS_SUBMENU_CONTENT_HIDDEN
-          );
+        if (!submenu.content.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+          submenu.content.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
           submenu.content.style.maxHeight = "0";
           submenu.content.style.paddingTop = "0";
           submenu.content.style.paddingBottom = "0";
@@ -1946,10 +2080,7 @@ This action cannot be undone.`,
     }
     if (this.translateInputButton) {
       this.translateInputButton.disabled = isLoading;
-      this.translateInputButton.classList.toggle(
-        CSS_CLASS_DISABLED,
-        isLoading
-      );
+      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
     if (this.menuButton) {
       this.menuButton.disabled = isLoading;
@@ -1960,6 +2091,7 @@ This action cannot be undone.`,
   // В src/OllamaView.ts
   // --- ВАЖЛИВО: Переконайтесь, що цей метод також оновлений! ---
   // (Перевірив ваш код, він вже містить виклик updateRolePanelList, це добре)
+  // OllamaView.ts
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h;
     this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
@@ -2041,17 +2173,17 @@ This action cannot be undone.`,
       this.plugin.logger.debug("[loadAndDisplayActiveChat] No active chat or error occurred earlier. Showing empty state.");
       this.showEmptyState();
     }
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements including side panels...");
     this.updateInputPlaceholder(finalRoleName);
     this.updateRoleDisplay(finalRoleName);
     this.updateModelDisplay(finalModelName);
     this.updateTemperatureIndicator(finalTemperature);
-    try {
-      await this.updateRolePanelList();
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Role panel list updated.");
-    } catch (panelError) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] Error updating role panel list:", panelError);
-    }
+    const panelUpdatePromises = [
+      this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)),
+      this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
+    ];
+    await Promise.all(panelUpdatePromises);
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Side panel lists updated.");
     if (finalModelName === null) {
       this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
       if (this.inputEl) {
@@ -2128,9 +2260,7 @@ This action cannot be undone.`,
         throw new Error("Failed to add user message to history.");
       loadingEl = this.addLoadingIndicator();
       this.guaranteedScrollToBottom(50, true);
-      const assistantMessage = await this.plugin.ollamaService.generateChatResponse(
-        activeChat
-      );
+      const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
       if (loadingEl) {
         this.removeLoadingIndicator(loadingEl);
         loadingEl = null;
@@ -2247,10 +2377,7 @@ This action cannot be undone.`,
         }
         break;
       case "system":
-        (0, import_obsidian3.setIcon)(
-          contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }),
-          "info"
-        );
+        (0, import_obsidian3.setIcon)(contentEl.createSpan({ cls: CSS_CLASS_SYSTEM_ICON }), "info");
         contentEl.createSpan({
           cls: CSS_CLASS_SYSTEM_TEXT,
           text: message.content
@@ -2306,11 +2433,7 @@ This action cannot be undone.`,
         (0, import_obsidian3.setIcon)(translateBtn, "languages");
         this.registerDomEvent(translateBtn, "click", (e) => {
           e.stopPropagation();
-          this.handleTranslateClick(
-            message.content,
-            contentEl,
-            translateBtn
-          );
+          this.handleTranslateClick(message.content, contentEl, translateBtn);
         });
       }
     }
@@ -2349,9 +2472,7 @@ This action cannot be undone.`,
       return;
     }
     if (messageIndex === activeChat.messages.length - 1) {
-      new import_obsidian3.Notice(
-        "This is the last message, nothing to regenerate after it."
-      );
+      new import_obsidian3.Notice("This is the last message, nothing to regenerate after it.");
       return;
     }
     new ConfirmModal(
@@ -2370,9 +2491,7 @@ This action cannot be undone.`,
             messageIndex
           );
           if (!deleteSuccess) {
-            throw new Error(
-              "Failed to delete subsequent messages."
-            );
+            throw new Error("Failed to delete subsequent messages.");
           }
           await this.loadAndDisplayActiveChat();
           this.scrollToBottom();
@@ -2380,15 +2499,11 @@ This action cannot be undone.`,
           this.guaranteedScrollToBottom(50, true);
           const updatedChat = await this.plugin.chatManager.getActiveChat();
           if (!updatedChat)
-            throw new Error(
-              "Failed to get updated chat after deletion."
-            );
+            throw new Error("Failed to get updated chat after deletion.");
           this.plugin.logger.info(
             `Generating new response for chat ${chatId} based on history up to index ${messageIndex}`
           );
-          const assistantMessage = await this.plugin.ollamaService.generateChatResponse(
-            updatedChat
-          );
+          const assistantMessage = await this.plugin.ollamaService.generateChatResponse(updatedChat);
           if (loadingIndicator)
             this.removeLoadingIndicator(loadingIndicator);
           loadingIndicator = null;
@@ -2408,10 +2523,7 @@ This action cannot be undone.`,
             );
           }
         } catch (error) {
-          this.plugin.logger.error(
-            "Error during regeneration process:",
-            error
-          );
+          this.plugin.logger.error("Error during regeneration process:", error);
           new import_obsidian3.Notice(`Regeneration failed: ${error.message}`);
           if (loadingIndicator)
             this.removeLoadingIndicator(loadingIndicator);
@@ -2653,9 +2765,9 @@ This action cannot be undone.`,
           if (modelName !== currentModelName) {
             const chat = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
             if (chat)
-              await this.plugin.chatManager.updateActiveChatMetadata(
-                { modelName }
-              );
+              await this.plugin.chatManager.updateActiveChatMetadata({
+                modelName
+              });
             else
               new import_obsidian3.Notice("No active chat.");
           }
@@ -2746,9 +2858,9 @@ This action cannot be undone.`,
             await this.plugin.saveSettings();
             const chat = await ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChat());
             if (chat && chat.metadata.selectedRolePath !== nrp) {
-              await this.plugin.chatManager.updateActiveChatMetadata(
-                { selectedRolePath: nrp }
-              );
+              await this.plugin.chatManager.updateActiveChatMetadata({
+                selectedRolePath: nrp
+              });
               (_c2 = (_b2 = this.plugin.promptService) == null ? void 0 : _b2.clearRoleCache) == null ? void 0 : _c2.call(_b2);
             }
             this.plugin.emit("role-changed", roleInfo.name);
@@ -2825,9 +2937,7 @@ This action cannot be undone.`,
             `[renderChatListMenu] Clicked chat option: ${chatMeta.name} (ID: ${chatMeta.id})`
           );
           if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
-            await this.plugin.chatManager.setActiveChat(
-              chatMeta.id
-            );
+            await this.plugin.chatManager.setActiveChat(chatMeta.id);
           }
           this.closeMenu();
         });
@@ -3039,10 +3149,7 @@ This action cannot be undone.`,
       } else {
         recorderOptions = void 0;
       }
-      this.mediaRecorder = new MediaRecorder(
-        this.audioStream,
-        recorderOptions
-      );
+      this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
       const audioChunks = [];
       (_a = this.voiceButton) == null ? void 0 : _a.classList.add(CSS_CLASS_RECORDING);
       (0, import_obsidian3.setIcon)(this.voiceButton, "stop-circle");
@@ -3079,9 +3186,7 @@ This action cannot be undone.`,
       this.mediaRecorder.start();
     } catch (error) {
       if (error instanceof DOMException && error.name === "NotAllowedError") {
-        new import_obsidian3.Notice(
-          "Microphone access denied. Please grant permission."
-        );
+        new import_obsidian3.Notice("Microphone access denied. Please grant permission.");
       } else if (error instanceof DOMException && error.name === "NotFoundError") {
         new import_obsidian3.Notice(
           "Microphone not found. Please ensure it's connected and enabled."
@@ -3187,9 +3292,7 @@ This action cannot be undone.`,
     const h = this.plugin.settings.maxMessageHeight;
     if (!c || h <= 0) {
       if (c && h <= 0) {
-        const b = messageEl.querySelector(
-          `.${CSS_CLASS_SHOW_MORE_BUTTON}`
-        );
+        const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
         b == null ? void 0 : b.remove();
         c.style.maxHeight = "";
         c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
@@ -3310,9 +3413,7 @@ This action cannot be undone.`,
           if (isScrolledUp !== this.userScrolledUp) {
             this.userScrolledUp = isScrolledUp;
             if (!isScrolledUp)
-              (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(
-                CSS_CLASS_VISIBLE
-              );
+              (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
           }
           if (forceScroll || !this.userScrolledUp || this.isProcessing) {
             const behavior = this.isProcessing ? "auto" : "smooth";
@@ -3322,9 +3423,7 @@ This action cannot be undone.`,
             });
             if (forceScroll) {
               this.userScrolledUp = false;
-              (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(
-                CSS_CLASS_VISIBLE
-              );
+              (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
             }
           }
         } else {
@@ -3460,9 +3559,7 @@ This action cannot be undone.`,
       const rolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
       if (rolePath) {
         const allRoles = await this.plugin.listRoleFiles(true);
-        const foundRole = allRoles.find(
-          (role) => role.path === rolePath
-        );
+        const foundRole = allRoles.find((role) => role.path === rolePath);
         if (foundRole) {
           return foundRole.name;
         } else {
@@ -3529,11 +3626,16 @@ This action cannot be undone.`,
         return foundRole.name;
       } else {
         const fileName = (_a = rolePath.split("/").pop()) == null ? void 0 : _a.replace(".md", "");
-        this.plugin.logger.warn(`[findRoleNameByPath] Role not found in list for path "${rolePath}". Using derived name: "${fileName || "Unknown"}"`);
+        this.plugin.logger.warn(
+          `[findRoleNameByPath] Role not found in list for path "${rolePath}". Using derived name: "${fileName || "Unknown"}"`
+        );
         return fileName || "Unknown Role";
       }
     } catch (error) {
-      this.plugin.logger.error(`[findRoleNameByPath] Error fetching roles list while finding name for path "${rolePath}":`, error);
+      this.plugin.logger.error(
+        `[findRoleNameByPath] Error fetching roles list while finding name for path "${rolePath}":`,
+        error
+      );
       return "Error";
     }
   }
