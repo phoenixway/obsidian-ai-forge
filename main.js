@@ -1431,19 +1431,21 @@ This action cannot be undone.`,
         error
       );
       this.showEmptyState();
-      try {
-        this.plugin.logger.debug(
-          "[OllamaView] Updating role panel list in onOpen catch block..."
-        );
-        await this.updateRolePanelList();
-        this.plugin.logger.debug(
-          "[OllamaView] Role panel list updated in onOpen catch block."
-        );
-      } catch (panelError) {
-        this.plugin.logger.error(
-          "[OllamaView] Error updating role panel list in onOpen catch block:",
-          panelError
-        );
+      if (this.isSidebarSectionVisible("roles")) {
+        try {
+          this.plugin.logger.debug(
+            "[OllamaView] Updating role panel list in onOpen catch block (as it's visible)..."
+          );
+          await this.updateRolePanelList();
+          this.plugin.logger.debug(
+            "[OllamaView] Role panel list updated in onOpen catch block."
+          );
+        } catch (panelError) {
+          this.plugin.logger.error(
+            "[OllamaView] Error updating role panel list in onOpen catch block:",
+            panelError
+          );
+        }
       }
     }
     setTimeout(() => {
@@ -1472,31 +1474,33 @@ This action cannot be undone.`,
       clearTimeout(this.resizeTimeout);
   }
   // --- UI Creation (with Custom Div Menu & Accordion) ---
+  // --- UI Creation (змінено для іконок та стану за замовчуванням) ---
   createUIElements() {
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
     this.chatPanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-      // Використовуємо схожі класи для стилів
-      attr: { "data-section-type": "chats", "data-collapsed": "true" }
-      // Атрибути для логіки
+      attr: { "data-section-type": "chats", "data-collapsed": "false" }
+      // <-- Змінено на false
     });
-    (0, import_obsidian3.setIcon)(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "chevron-right");
+    (0, import_obsidian3.setIcon)(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open");
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
     this.chatPanelListEl = this.rolePanelEl.createDiv({
-      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_SIDEBAR_SECTION_CONTENT_HIDDEN, "ollama-chat-panel-list"]
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "ollama-chat-panel-list"]
+      // <-- Прибрано _HIDDEN клас
     });
-    this.chatPanelListEl.style.maxHeight = "0";
     this.chatPanelListEl.style.overflow = "hidden";
     this.chatPanelListEl.style.transition = "max-height 0.3s ease-out";
     this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
+      // <-- Залишається true
     });
-    (0, import_obsidian3.setIcon)(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "chevron-right");
+    (0, import_obsidian3.setIcon)(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
     this.rolePanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Roles" });
     this.rolePanelListEl = this.rolePanelEl.createDiv({
+      // Додаємо _HIDDEN клас, бо вона згорнута
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_SIDEBAR_SECTION_CONTENT_HIDDEN]
     });
     this.rolePanelListEl.style.maxHeight = "0";
@@ -3477,10 +3481,6 @@ This action cannot be undone.`,
       return "Error";
     }
   }
-  // OllamaView.ts
-  // --- Новий метод для перемикання секцій акордеону в бічній панелі ---
-  // OllamaView.ts
-  // --- ОНОВЛЕНИЙ метод для перемикання секцій АКОРДЕОНУ в бічній панелі ---
   async toggleSidebarSection(clickedHeaderEl) {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
@@ -3490,6 +3490,8 @@ This action cannot be undone.`,
     let otherHeaderEl = null;
     let otherContentEl = null;
     let otherSectionType = null;
+    const collapseIcon = "folder";
+    const expandIcon = "folder-open";
     if (sectionType === "chats") {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
@@ -3513,13 +3515,13 @@ This action cannot be undone.`,
         const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
-          (0, import_obsidian3.setIcon)(otherIconEl, "chevron-right");
+          (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
         otherContentEl.style.maxHeight = "0";
       }
       this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "false");
       contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-      (0, import_obsidian3.setIcon)(iconEl, "chevron-down");
+      (0, import_obsidian3.setIcon)(iconEl, expandIcon);
       try {
         await updateFunction();
       } catch (error) {
@@ -3534,7 +3536,7 @@ This action cannot be undone.`,
     } else {
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
-      (0, import_obsidian3.setIcon)(iconEl, "chevron-right");
+      (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
       contentEl.style.maxHeight = "0";
     }
   }

@@ -175,71 +175,62 @@
 
     .ollama-sidebar-section-header {
         // Inherits base styles from .menu-option (flex, align-items, cursor, radius, hover)
-        // Add specific adjustments if needed
-        padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5); // Consistent padding
-        user-select: none; // Prevent text selection on header click
+        padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
+        user-select: none;
     
         // Icon specific styles within the header
         .ollama-sidebar-section-icon {
             margin-right: 10px;
-            min-width: 16px; // Match other icons
+            min-width: 18px; // --- ЗБІЛЬШЕНО --- Трохи більше місця для іконки папки
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            transition: transform 0.2s ease-in-out; // Add transition for potential rotation (optional)
+            // transition: transform 0.2s ease-in-out; // Можна прибрати, якщо іконки міняються, а не обертаються
     
-            .svg-icon { width: 15px; height: 15px; }
+            .svg-icon {
+                width: 16px; // --- ЗБІЛЬШЕНО ---
+                height: 16px; // --- ЗБІЛЬШЕНО ---
+                color: var(--text-faint); // --- ДОДАНО --- Сіруватий колір для іконки
+            }
         }
     
-        // Optional: Slightly bolder text for headers
+         // Змінюємо колір іконки при наведенні на заголовок
+        &:hover .ollama-sidebar-section-icon .svg-icon {
+            color: var(--text-muted);
+        }
+    
+    
         .menu-option-text {
-            font-weight: 500; // Make header text slightly bolder
-            color: var(--text-normal); // Or keep default menu-option color
+            font-weight: 500;
+            color: var(--text-normal);
         }
-    
-        // Rotate icon when expanded (alternative to swapping icon in TS)
-        // &:not([data-collapsed="true"]) {
-        //    .ollama-sidebar-section-icon {
-        //        transform: rotate(90deg);
-        //    }
-        // }
     }
     
     // Content area for collapsible sections (holds the list)
     .ollama-sidebar-section-content {
-        // Transition is set inline via TS (max-height)
-        // overflow: hidden; // Set inline via TS
-        // max-height: 0; // Initial state set inline via TS
+        // Transition, overflow, max-height set inline via TS
         box-sizing: border-box;
-    
-        // Add padding when expanded (matches .ollama-role-panel-list)
-        // Apply padding directly, it will be hidden/shown by max-height animation
-        padding: calc(var(--chat-spacing-unit) * 1) // Reduced top/bottom padding slightly
+        padding: calc(var(--chat-spacing-unit) * 1)
                    calc(var(--chat-spacing-unit) * 1.5);
+        overflow-y: auto; // Завжди дозволяємо скрол, якщо вміст перевищує max-height
     
-        // Ensure scrollbar appears when needed and expanded
-        // The max-height transition handles the reveal, overflow makes it scrollable
-        // Adding overflow-y: auto only when expanded might cause jumpiness,
-        // better to have it always and rely on max-height.
-        overflow-y: auto; // Always allow vertical scroll if needed
-    
-        // Use the same scrollbar styling as .ollama-role-panel-list
+        // Scrollbar styling (як було)
         &::-webkit-scrollbar { width: 6px; }
-        &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; } // Reduced margin slightly
+        &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
         &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
         &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
     
-        // Ensure list items inside have no extra top/bottom margin conflicting with padding
-        .ollama-role-panel-item, // Target role items
-        .ollama-chat-panel-item { // Target chat items
+        // Margins for items inside (як було)
+        .ollama-role-panel-item,
+        .ollama-chat-panel-item {
             &.menu-option {
                 margin-top: 1px;
                 margin-bottom: 1px;
             }
         }
     
-         // Style for the "No chats/roles" message
+        // Style for the "No chats/roles" message (як було)
         .menu-info-text {
             padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 2.5);
             color: var(--text-faint);
@@ -250,7 +241,8 @@
     
     // Specific styles for Chat Panel List Items
     .ollama-chat-panel-item {
-        &.menu-option { // Inherit base styles
+        // ... (стилі для .chat-panel-item-name, .chat-panel-item-date як були) ...
+         &.menu-option { // Inherit base styles
            // Container for name and date
            .menu-option-text {
                 display: flex;
@@ -281,6 +273,7 @@
            }
         }
     }
+    
     
     
 
