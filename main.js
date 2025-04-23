@@ -396,61 +396,37 @@ var OllamaView = class extends import_obsidian3.ItemView {
     //          await this.renderRoleList();
     //     }
     // }
-    // --- Новий метод для рендерингу списку в ПАНЕЛІ ---
     this.updateRolePanelList = async () => {
       var _a, _b;
-      if (!this.rolePanelListEl || !this.plugin.chatManager) {
-        this.plugin.logger.debug(
-          "[updateRolePanelList] Skipping update: Panel list element or chat manager not ready."
-        );
+      const container = this.rolePanelListEl;
+      if (!container || !this.plugin.chatManager) {
+        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Roles panel list element or chat manager not ready.");
         return;
       }
-      this.plugin.logger.debug(
-        "[updateRolePanelList] Updating role list in the side panel..."
-      );
-      this.rolePanelListEl.empty();
+      this.plugin.logger.debug("[updateRolePanelList] Updating role list in the side panel...");
+      container.empty();
       try {
         const roles = await this.plugin.listRoleFiles(true);
         const activeChat = await this.plugin.chatManager.getActiveChat();
         const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        this.plugin.logger.debug(
-          `[updateRolePanelList] Current active role path for panel: ${currentRolePath || "None"}`
-        );
-        const noneOptionEl = this.rolePanelListEl.createDiv({
-          cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"]
-        });
-        const noneIconSpan = noneOptionEl.createSpan({
-          cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"]
-        });
-        noneOptionEl.createSpan({
-          cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
-          text: "None (Default)"
-        });
+        this.plugin.logger.debug(`[updateRolePanelList] Current active role path for panel: ${currentRolePath || "None"}`);
+        const noneOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"] });
+        const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
+        noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None" });
         if (!currentRolePath) {
           noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
           (0, import_obsidian3.setIcon)(noneIconSpan, "check");
         } else {
           (0, import_obsidian3.setIcon)(noneIconSpan, "slash");
         }
-        this.registerDomEvent(
-          noneOptionEl,
-          "click",
-          () => this.handleRolePanelItemClick(null, currentRolePath)
-        );
+        this.registerDomEvent(noneOptionEl, "click", () => this.handleRolePanelItemClick(null, currentRolePath));
         if (roles.length > 0) {
-          this.rolePanelListEl.createEl("hr", { cls: "menu-separator" });
+          container.createEl("hr", { cls: "menu-separator" });
         }
         roles.forEach((roleInfo) => {
-          const roleOptionEl = this.rolePanelListEl.createDiv({
-            cls: [CSS_ROLE_PANEL_ITEM, "menu-option"]
-          });
-          const iconSpan = roleOptionEl.createSpan({
-            cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"]
-          });
-          roleOptionEl.createSpan({
-            cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
-            text: roleInfo.name
-          });
+          const roleOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option"] });
+          const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
+          roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: roleInfo.name });
           if (roleInfo.isCustom) {
             roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM);
           }
@@ -460,23 +436,26 @@ var OllamaView = class extends import_obsidian3.ItemView {
           } else {
             (0, import_obsidian3.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "file-text");
           }
-          this.registerDomEvent(
-            roleOptionEl,
-            "click",
-            () => this.handleRolePanelItemClick(roleInfo, currentRolePath)
-          );
+          this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
         });
-        this.plugin.logger.debug(
-          `[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`
-        );
+        this.plugin.logger.debug(`[updateRolePanelList] Rendered ${roles.length + 1} role options in panel.`);
+        requestAnimationFrame(() => {
+          if (container && this.isSidebarSectionVisible("roles")) {
+            const currentScrollHeight = container.scrollHeight;
+            container.style.maxHeight = currentScrollHeight + "px";
+            container.style.overflowY = "auto";
+            this.plugin.logger.debug(`[updateRolePanelList] Set maxHeight to ${currentScrollHeight}px`);
+          } else if (container) {
+            this.plugin.logger.debug(`[updateRolePanelList] Section became hidden or container removed, height not set.`);
+          }
+        });
       } catch (error) {
-        this.plugin.logger.error(
-          "[updateRolePanelList] Error rendering role panel list:",
-          error
-        );
-        this.rolePanelListEl.createDiv({
-          text: "Error loading roles.",
-          cls: "menu-error-text"
+        this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
+        container.empty();
+        container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
+        requestAnimationFrame(() => {
+          if (container)
+            container.style.maxHeight = "50px";
         });
       }
     };
@@ -1328,52 +1307,61 @@ This action cannot be undone.`,
       }, 50);
     };
     this.updateChatPanelList = async () => {
-      if (!this.chatPanelListEl || !this.plugin.chatManager) {
+      const container = this.chatPanelListEl;
+      if (!container || !this.plugin.chatManager) {
         this.plugin.logger.debug("[updateChatPanelList] Skipping update: Chat panel list element or chat manager not ready.");
         return;
       }
       this.plugin.logger.debug("[updateChatPanelList] Updating chat list in the side panel...");
-      this.chatPanelListEl.empty();
+      container.empty();
       try {
         const chats = this.plugin.chatManager.listAvailableChats() || [];
         const currentActiveId = this.plugin.chatManager.getActiveChatId();
         this.plugin.logger.debug(`[updateChatPanelList] Fetched ${chats.length} chats. Active ID: ${currentActiveId}`);
         if (chats.length === 0) {
-          this.chatPanelListEl.createDiv({
-            cls: "menu-info-text",
-            // Можна перевикористати стиль
-            text: "No saved chats yet."
-          });
+          container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
           this.plugin.logger.debug("[updateChatPanelList] Rendered 'No saved chats yet.' message.");
-          return;
-        }
-        chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
-        chats.forEach((chatMeta) => {
-          const chatOptionEl = this.chatPanelListEl.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option", "ollama-chat-panel-item"] });
-          const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
-          const textSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"] });
-          textSpan.createDiv({ cls: "chat-panel-item-name", text: chatMeta.name });
-          textSpan.createDiv({ cls: "chat-panel-item-date", text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
-          if (chatMeta.id === currentActiveId) {
-            chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-            (0, import_obsidian3.setIcon)(iconSpan, "check");
-          } else {
-            (0, import_obsidian3.setIcon)(iconSpan, "message-square");
-          }
-          this.registerDomEvent(chatOptionEl, "click", async () => {
-            var _a;
-            if (chatMeta.id !== ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
-              this.plugin.logger.debug(`[updateChatPanelList] Activating chat ID: ${chatMeta.id} from panel click.`);
-              await this.plugin.chatManager.setActiveChat(chatMeta.id);
+        } else {
+          chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
+          chats.forEach((chatMeta) => {
+            const chatOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option", "ollama-chat-panel-item"] });
+            const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
+            const textSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"] });
+            textSpan.createDiv({ cls: "chat-panel-item-name", text: chatMeta.name });
+            textSpan.createDiv({ cls: "chat-panel-item-date", text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
+            if (chatMeta.id === currentActiveId) {
+              chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+              (0, import_obsidian3.setIcon)(iconSpan, "check");
             } else {
-              this.plugin.logger.debug(`[updateChatPanelList] Clicked already active chat ID: ${chatMeta.id}. No action.`);
+              (0, import_obsidian3.setIcon)(iconSpan, "message-square");
             }
+            this.registerDomEvent(chatOptionEl, "click", async () => {
+              var _a;
+              if (chatMeta.id !== ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
+                await this.plugin.chatManager.setActiveChat(chatMeta.id);
+              }
+            });
           });
+          this.plugin.logger.debug(`[updateChatPanelList] Rendered ${chats.length} chat options in panel.`);
+        }
+        requestAnimationFrame(() => {
+          if (container && this.isSidebarSectionVisible("chats")) {
+            const currentScrollHeight = container.scrollHeight;
+            container.style.maxHeight = currentScrollHeight + "px";
+            container.style.overflowY = "auto";
+            this.plugin.logger.debug(`[updateChatPanelList] Set maxHeight to ${currentScrollHeight}px`);
+          } else if (container) {
+            this.plugin.logger.debug(`[updateChatPanelList] Section became hidden during update, height not set.`);
+          }
         });
-        this.plugin.logger.debug(`[updateChatPanelList] Rendered ${chats.length} chat options in panel.`);
       } catch (error) {
         this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
-        this.chatPanelListEl.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
+        container.empty();
+        container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
+        requestAnimationFrame(() => {
+          if (container)
+            container.style.maxHeight = "50px";
+        });
       }
     };
     this.plugin = plugin;
@@ -1993,36 +1981,15 @@ This action cannot be undone.`,
     this.updateRoleDisplay(finalRoleName);
     this.updateModelDisplay(finalModelName);
     this.updateTemperatureIndicator(finalTemperature);
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels (height will be set by update functions)...");
     const panelUpdatePromises = [];
-    let chatPanelVisible = false;
     if (this.isSidebarSectionVisible("chats")) {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is visible, queueing update.");
-      chatPanelVisible = true;
       panelUpdatePromises.push(this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)));
-    } else {
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is collapsed, skipping update.");
     }
     if (this.isSidebarSectionVisible("roles")) {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is visible, queueing update.");
       panelUpdatePromises.push(this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e)));
-    } else {
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is collapsed, skipping update.");
-    }
-    if (panelUpdatePromises.length > 0) {
-      await Promise.all(panelUpdatePromises);
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Visible sidebar panels updated.");
-      requestAnimationFrame(() => {
-        if (chatPanelVisible && this.chatPanelListEl) {
-          this.plugin.logger.debug("[loadAndDisplayActiveChat] Setting chat panel height after update.");
-          this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
-          this.chatPanelListEl.style.overflowY = "auto";
-        }
-        if (this.isSidebarSectionVisible("roles") && this.rolePanelListEl) {
-          this.rolePanelListEl.style.maxHeight = this.rolePanelListEl.scrollHeight + "px";
-          this.rolePanelListEl.style.overflowY = "auto";
-        }
-      });
     }
     if (finalModelName === null) {
       this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
@@ -3509,30 +3476,30 @@ This action cannot be undone.`,
     }
     if (isCurrentlyCollapsed) {
       if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        this.plugin.logger.debug(`Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`);
         const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
           (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
         otherContentEl.style.maxHeight = "0";
+        otherContentEl.style.overflowY = "hidden";
         otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
       }
-      this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "false");
       contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
       (0, import_obsidian3.setIcon)(iconEl, expandIcon);
-      contentEl.style.overflowY = "auto";
       try {
         await updateFunction();
+        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType} (height will be set by update function)`);
       } catch (error) {
         this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
-        contentEl.setText(`Error loading ${sectionType}.`);
+        requestAnimationFrame(() => {
+          if (contentEl) {
+            contentEl.setText(`Error loading ${sectionType}.`);
+            contentEl.style.maxHeight = "50px";
+            contentEl.style.overflowY = "auto";
+          }
+        });
       }
-      requestAnimationFrame(() => {
-        if (contentEl && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
-          contentEl.style.maxHeight = contentEl.scrollHeight + "px";
-        }
-      });
     } else {
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
