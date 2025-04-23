@@ -450,7 +450,7 @@ export class OllamaView extends ItemView {
         cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"]
     });
     // Всі стилі висоти/анімації тепер в CSS
-
+    this.rolePanelEl.createEl('hr', { cls: 'menu-separator' });
     // --- Секція Ролей (Згорнута за замовчуванням) ---
     this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
          cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],

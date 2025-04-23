@@ -1442,6 +1442,7 @@ This action cannot be undone.`,
       // Додаємо is-expanded для початкового стану
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"]
     });
+    this.rolePanelEl.createEl("hr", { cls: "menu-separator" });
     this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
