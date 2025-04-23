@@ -553,4 +553,72 @@ export class ChatManager {
     }
     // --- Кінець методу видалення ---
 
+// --- НОВИЙ МЕТОД: Видалення конкретного повідомлення за міткою часу ---
+async deleteMessageByTimestamp(chatId: string, timestampToDelete: Date): Promise<boolean> {
+    this.plugin.logger.info(`Attempting to delete message with timestamp ${timestampToDelete.toISOString()} from chat ${chatId}`);
+
+    const chat = await this.getChat(chatId); // Отримуємо об'єкт чату (з кешу або файлу)
+    if (!chat) {
+        this.plugin.logger.error(`Cannot delete message: Chat ${chatId} not found.`);
+        new Notice(`Error: Chat ${chatId} not found.`);
+        return false;
+    }
+
+    const initialMessageCount = chat.messages.length;
+
+    // Знаходимо індекс повідомлення для видалення, порівнюючи час
+    const messageIndex = chat.messages.findIndex(
+        msg => msg.timestamp.getTime() === timestampToDelete.getTime()
+    );
+
+    if (messageIndex === -1) {
+        this.plugin.logger.warn(`Message with timestamp ${timestampToDelete.toISOString()} not found in chat ${chatId}. Cannot delete.`);
+        // Не показуємо Notice користувачу, можливо повідомлення вже було видалено
+        return false; // Повідомлення не знайдено
+    }
+
+    try {
+        // Видаляємо повідомлення з масиву
+        const deletedMessage = chat.messages.splice(messageIndex, 1)[0]; // splice повертає масив видалених елементів
+        this.plugin.logger.debug(`Removed message at index ${messageIndex} (Role: ${deletedMessage?.role}) from chat ${chatId}.`);
+
+        // Перевіряємо, чи щось змінилося (про всяк випадок)
+        if (chat.messages.length < initialMessageCount) {
+            // Оновлюємо метадані (lastModified) та ініціюємо збереження чату
+            chat.updateMetadata({}); // Передача пустого об'єкта оновить lastModified і викличе debounced save
+
+            // Оновлюємо індекс негайно
+            if (this.chatIndex[chatId]) {
+                this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
+                await this.saveChatIndex();
+                this.plugin.logger.debug(`Updated chat index for ${chatId} after message deletion.`);
+            }
+
+            // Оновлюємо кеш активного чату, якщо це він
+            if (this.activeChatId === chatId) {
+                this.activeChat = chat; // Оновлюємо посилання на змінений об'єкт
+                this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
+            }
+
+            // Повідомляємо View про зміну контенту активного чату
+            // Це призведе до перезавантаження чату у View (loadAndDisplayActiveChat)
+            this.plugin.emit('active-chat-changed', { chatId: chatId, chat: chat });
+            // Повідомляємо про зміну списку (через lastModified)
+            this.plugin.emit('chat-list-updated');
+
+            return true; // Успішно видалено
+        } else {
+             this.plugin.logger.warn(`Message deletion for chat ${chatId}, timestamp ${timestampToDelete.toISOString()} seemed to fail (length unchanged).`);
+             return false; // Щось пішло не так
+        }
+    } catch (error) {
+        this.plugin.logger.error(`Error during message deletion process for chat ${chatId}, timestamp ${timestampToDelete.toISOString()}:`, error);
+        new Notice("Error deleting message.");
+        // Відновлюємо стан масиву, якщо можливо? Або просто повертаємо false.
+        // Повернення false безпечніше.
+        return false;
+    }
+}
+// --- Кінець нового методу ---
+    
 } // End of ChatManager class

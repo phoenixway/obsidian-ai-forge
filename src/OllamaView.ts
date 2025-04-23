@@ -136,6 +136,7 @@ const CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content"; // Кон�
 const CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden"; // Для прихованого стану
 const CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon"; // Іконка ►/▼
 
+const CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button"; 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
 export interface Message {
@@ -2309,6 +2310,15 @@ private attachEventListeners(): void {
         });
       }
     }
+    const deleteBtn = buttonsWrapper.createEl("button", {
+      cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], // Додаємо клас небезпеки для стилізації
+      attr: { "aria-label": "Delete message", title: "Delete Message" }
+  });
+  setIcon(deleteBtn, "trash"); // Використовуємо іконку кошика
+  this.registerDomEvent(deleteBtn, "click", (e) => {
+      e.stopPropagation(); // Зупиняємо спливання події
+      this.handleDeleteMessageClick(message); // Викликаємо новий обробник
+  });
     // --- Кінець додавання кнопок ---
 
     // 3. Мітка часу (залишається всередині messageEl після contentContainer)
@@ -2329,6 +2339,52 @@ private attachEventListeners(): void {
     // Повернемо messageEl, бо checkMessageForCollapsing працює з ним
     return messageEl;
     // --- КІНЕЦЬ ЗМІН ---
+  }
+
+// OllamaView.ts
+
+    // --- НОВИЙ МЕТОД: Обробник кліку на кнопку видалення повідомлення ---
+    private async handleDeleteMessageClick(messageToDelete: Message): Promise<void> {
+      this.plugin.logger.debug(`Delete requested for message timestamp: ${messageToDelete.timestamp.toISOString()}`);
+
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      if (!activeChat) {
+          new Notice("Cannot delete message: No active chat.");
+          return;
+      }
+
+      // --- Підтвердження видалення ---
+      new ConfirmModal(
+          this.app,
+          "Confirm Message Deletion",
+          `Are you sure you want to delete this message?\n"${messageToDelete.content.substring(0, 100)}${messageToDelete.content.length > 100 ? '...' : ''}"\n\nThis action cannot be undone.`,
+          async () => { // Колбек при підтвердженні
+              this.plugin.logger.info(`User confirmed deletion for message timestamp: ${messageToDelete.timestamp.toISOString()} in chat ${activeChat.metadata.id}`);
+              try {
+                  // Викликаємо метод менеджера для видалення повідомлення
+                  // Важливо: Передаємо ID чату та унікальний ідентифікатор повідомлення (timestamp)
+                  const deleteSuccess = await this.plugin.chatManager.deleteMessageByTimestamp(
+                      activeChat.metadata.id,
+                      messageToDelete.timestamp
+                  );
+
+                  if (deleteSuccess) {
+                      new Notice("Message deleted.");
+                      // ChatManager має викликати подію 'active-chat-changed' після успішного видалення та збереження,
+                      // що призведе до автоматичного оновлення UI через handleActiveChatChanged -> loadAndDisplayActiveChat.
+                      // Якщо ChatManager не викликає подію, потрібно буде викликати оновлення вручну:
+                      // await this.loadAndDisplayActiveChat();
+                  } else {
+                      // Цей випадок не мав би статися, якщо deleteMessageByTimestamp кидає помилку при невдачі
+                      new Notice("Failed to delete message.");
+                       this.plugin.logger.warn(`deleteMessageByTimestamp returned false for chat ${activeChat.metadata.id}, timestamp ${messageToDelete.timestamp.toISOString()}`);
+                  }
+              } catch (error) {
+                  this.plugin.logger.error(`Error deleting message (chat ${activeChat.metadata.id}, timestamp ${messageToDelete.timestamp.toISOString()}):`, error);
+                  new Notice("An error occurred while deleting the message.");
+              }
+          }
+      ).open();
   }
 
   // --- Новий обробник для кнопки Регенерації ---

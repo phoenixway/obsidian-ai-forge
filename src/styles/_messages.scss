@@ -188,6 +188,33 @@
 
 }
 
+.delete-message-button {
+  // Можна успадкувати базові стилі кнопки
+
+  &.danger-option { // Використовуємо клас небезпеки
+       color: var(--text-error); // Червонуватий колір іконки
+
+       &:hover {
+           color: var(--text-on-accent); // Білий або інший контрастний при наведенні
+           background-color: var(--background-modifier-error-hover); // Червонуватий фон при наведенні
+           border-color: transparent; // Можна прибрати рамку при наведенні
+       }
+  }
+}
+
+// --- Специфічні стилі для кнопки видалення НА ПОВІДОМЛЕННЯХ КОРИСТУВАЧА ---
+// (щоб краще виглядало на синьому фоні)
+.user-message .delete-message-button {
+  &.danger-option {
+      color: rgba(255, 150, 150, 0.8); // Світло-червоний для кращої видимості
+
+      &:hover {
+          background-color: rgba(200, 50, 50, 0.5); // Темніший червоний фон при наведенні
+          color: white;
+      }
+  }
+}
+
 &.user-message-group & button { // Or .user-message + & button
   color: rgba(255, 255, 255, 0.8); // Lighter icon color for user messages
   background: transparent !important;

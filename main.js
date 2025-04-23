@@ -217,6 +217,7 @@ var CSS_MAIN_CHAT_AREA = "ollama-main-chat-area";
 var CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header";
 var CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
 var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
+var CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button";
 var LANGUAGES = {
   af: "Afrikaans",
   sq: "Albanian",
@@ -2215,6 +2216,16 @@ This action cannot be undone.`,
         });
       }
     }
+    const deleteBtn = buttonsWrapper.createEl("button", {
+      cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION],
+      // Додаємо клас небезпеки для стилізації
+      attr: { "aria-label": "Delete message", title: "Delete Message" }
+    });
+    (0, import_obsidian3.setIcon)(deleteBtn, "trash");
+    this.registerDomEvent(deleteBtn, "click", (e) => {
+      e.stopPropagation();
+      this.handleDeleteMessageClick(message);
+    });
     messageEl.createDiv({
       cls: CSS_CLASS_TIMESTAMP,
       text: this.formatTime(message.timestamp)
@@ -2225,6 +2236,43 @@ This action cannot be undone.`,
       500
     );
     return messageEl;
+  }
+  // OllamaView.ts
+  // --- НОВИЙ МЕТОД: Обробник кліку на кнопку видалення повідомлення ---
+  async handleDeleteMessageClick(messageToDelete) {
+    var _a;
+    this.plugin.logger.debug(`Delete requested for message timestamp: ${messageToDelete.timestamp.toISOString()}`);
+    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    if (!activeChat) {
+      new import_obsidian3.Notice("Cannot delete message: No active chat.");
+      return;
+    }
+    new ConfirmModal(
+      this.app,
+      "Confirm Message Deletion",
+      `Are you sure you want to delete this message?
+"${messageToDelete.content.substring(0, 100)}${messageToDelete.content.length > 100 ? "..." : ""}"
+
+This action cannot be undone.`,
+      async () => {
+        this.plugin.logger.info(`User confirmed deletion for message timestamp: ${messageToDelete.timestamp.toISOString()} in chat ${activeChat.metadata.id}`);
+        try {
+          const deleteSuccess = await this.plugin.chatManager.deleteMessageByTimestamp(
+            activeChat.metadata.id,
+            messageToDelete.timestamp
+          );
+          if (deleteSuccess) {
+            new import_obsidian3.Notice("Message deleted.");
+          } else {
+            new import_obsidian3.Notice("Failed to delete message.");
+            this.plugin.logger.warn(`deleteMessageByTimestamp returned false for chat ${activeChat.metadata.id}, timestamp ${messageToDelete.timestamp.toISOString()}`);
+          }
+        } catch (error) {
+          this.plugin.logger.error(`Error deleting message (chat ${activeChat.metadata.id}, timestamp ${messageToDelete.timestamp.toISOString()}):`, error);
+          new import_obsidian3.Notice("An error occurred while deleting the message.");
+        }
+      }
+    ).open();
   }
   // --- Новий обробник для кнопки Регенерації ---
   async handleRegenerateClick(userMessage) {
@@ -5860,6 +5908,51 @@ var ChatManager = class {
     return true;
   }
   // --- Кінець методу видалення ---
+  // --- НОВИЙ МЕТОД: Видалення конкретного повідомлення за міткою часу ---
+  async deleteMessageByTimestamp(chatId, timestampToDelete) {
+    this.plugin.logger.info(`Attempting to delete message with timestamp ${timestampToDelete.toISOString()} from chat ${chatId}`);
+    const chat = await this.getChat(chatId);
+    if (!chat) {
+      this.plugin.logger.error(`Cannot delete message: Chat ${chatId} not found.`);
+      new import_obsidian10.Notice(`Error: Chat ${chatId} not found.`);
+      return false;
+    }
+    const initialMessageCount = chat.messages.length;
+    const messageIndex = chat.messages.findIndex(
+      (msg) => msg.timestamp.getTime() === timestampToDelete.getTime()
+    );
+    if (messageIndex === -1) {
+      this.plugin.logger.warn(`Message with timestamp ${timestampToDelete.toISOString()} not found in chat ${chatId}. Cannot delete.`);
+      return false;
+    }
+    try {
+      const deletedMessage = chat.messages.splice(messageIndex, 1)[0];
+      this.plugin.logger.debug(`Removed message at index ${messageIndex} (Role: ${deletedMessage == null ? void 0 : deletedMessage.role}) from chat ${chatId}.`);
+      if (chat.messages.length < initialMessageCount) {
+        chat.updateMetadata({});
+        if (this.chatIndex[chatId]) {
+          this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
+          await this.saveChatIndex();
+          this.plugin.logger.debug(`Updated chat index for ${chatId} after message deletion.`);
+        }
+        if (this.activeChatId === chatId) {
+          this.activeChat = chat;
+          this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
+        }
+        this.plugin.emit("active-chat-changed", { chatId, chat });
+        this.plugin.emit("chat-list-updated");
+        return true;
+      } else {
+        this.plugin.logger.warn(`Message deletion for chat ${chatId}, timestamp ${timestampToDelete.toISOString()} seemed to fail (length unchanged).`);
+        return false;
+      }
+    } catch (error) {
+      this.plugin.logger.error(`Error during message deletion process for chat ${chatId}, timestamp ${timestampToDelete.toISOString()}:`, error);
+      new import_obsidian10.Notice("Error deleting message.");
+      return false;
+    }
+  }
+  // --- Кінець нового методу ---
 };
 
 // src/main.ts
