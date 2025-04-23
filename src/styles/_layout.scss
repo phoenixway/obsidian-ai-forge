@@ -22,6 +22,7 @@
 	height: 100%;
 	overflow: hidden; // Сама панель не скролиться
 	box-sizing: border-box;
+    min-height: 150px;
 
     // Header
     .ollama-role-panel-header {
@@ -174,67 +175,74 @@
 	}
 
     .ollama-sidebar-section-header {
-        // Base styles from .menu-option
-        display: flex; // Явно задаємо flex
-        align-items: center; // <<< Явно центруємо елементи по вертикалі в заголовку
+        // Base styles from .menu-option (cursor, radius, hover) are assumed included via TS class add
+        display: flex; // Ensure flex is explicitly set here
+        align-items: center; // <-- PRIMARY VERTICAL ALIGNMENT
         padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
         user-select: none;
-        cursor: pointer; // Переконуємось, що курсор вказує на клікабельність
+        cursor: pointer; // Ensure pointer cursor
     
         // Icon specific styles within the header
         .ollama-sidebar-section-icon {
-            margin-right: 14px; // <<< ЗБІЛЬШЕНО відстань від тексту
+            margin-right: 13px; // --- ЗБІЛЬШЕНО ВІДСТАНЬ ---
             min-width: 18px;
-            display: flex;
+            display: flex; // Use flex for centering inside the span too
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-    
-            /* --- Вертикальне коригування (якщо align-items недостатньо) --- */
-            // Спробуйте спочатку без цього. Якщо іконка все ще зависока, розкоментуйте.
-            // position: relative;
-            // top: 1px; // Опустити на 1 піксель (або 2px)
-            /* --------------------------------------------------------------- */
+            // position: relative; // Try removing relative positioning first
+            // top: 1px; // Remove explicit pixel shift if align-items works
     
             .svg-icon {
                 width: 16px;
                 height: 16px;
                 color: var(--text-faint);
-                // vertical-align: middle; // Зазвичай не потрібно з flex
+                vertical-align: middle; // Additional hint for vertical alignment
             }
         }
     
-        // Hover state for icon
         &:hover .ollama-sidebar-section-icon .svg-icon {
             color: var(--text-muted);
         }
     
-        // Text styles within the header
         .menu-option-text {
             font-weight: 500;
             color: var(--text-normal);
-            line-height: 1.3; // <<< Явно задаємо висоту рядка тексту для кращого центрування
+            line-height: 1.2; // Explicit line-height might help alignment consistency
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            flex-grow: 1; // Дозволити тексту зайняти місце
         }
     }
     
+    // Content area for collapsible sections (holds the list)
+
     .ollama-sidebar-section-content {
-        // Transition, overflow, max-height set inline via TS
         box-sizing: border-box;
         padding: calc(var(--chat-spacing-unit) * 1)
                    calc(var(--chat-spacing-unit) * 1.5);
-        overflow-y: auto; // Завжди дозволяємо скрол, якщо вміст перевищує max-height
+        overflow-y: auto;
+        overflow-x: hidden; // Prevent horizontal scrollbar
+        // Transition and initial max-height are set inline via TS
+        transition: max-height 0.3s ease-out; // Ensure transition is defined
     
-        // Scrollbar styling (як було)
+        // --- FIX для стрибка заголовка Roles ---
+        // Give it a minimum height when expanded to prevent collapsing entirely during load
+        min-height: 0; // Allow shrinking generally
+        flex-shrink: 0; // Prevent shrinking by flex parent if space is tight initially
+    
+        // When expanded (not having max-height: 0 style set inline)
+        // We can't easily select this state purely in CSS without adding a class in TS.
+        // Let's apply a general min-height for now. A small one might be enough.
+        // Alternatively, apply it only to the chat list which is open initially.
+    
+        // Scrollbar styling
         &::-webkit-scrollbar { width: 6px; }
         &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
         &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
         &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
     
-        // Margins for items inside (як було)
+        // Margins for items inside
         .ollama-role-panel-item,
         .ollama-chat-panel-item {
             &.menu-option {
@@ -243,49 +251,63 @@
             }
         }
     
-        // Style for the "No chats/roles" message (як було)
+        // Style for the "No chats/roles" message
         .menu-info-text {
             padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 2.5);
             color: var(--text-faint);
             font-style: italic;
             font-size: calc(var(--font-ui-small) * 0.9);
+            min-height: 30px; // Ensure empty message takes some space
         }
     }
+
     
+
+
     // Specific styles for Chat Panel List Items
     .ollama-chat-panel-item {
-        &.menu-option { // Inherit base styles
-           // Container for name and date
-           .menu-option-text {
-                display: flex;
-                flex-direction: column;
-                line-height: 1.3; // Adjust line height for two lines
-                gap: 1px; // Small gap between name and date
-           }
-           .chat-panel-item-name {
-                // font-weight: 500; // Optional: make name slightly bolder
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-           }
-           .chat-panel-item-date {
-                font-size: 0.85em; // Smaller font for date
-                color: var(--text-faint);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-           }
-    
-           // Highlight date on active item slightly
-           &.is-active {
-              .chat-panel-item-date {
-                  color: var(--text-accent-hover); // Use accent color
-                  opacity: 0.8; // Slightly less prominent than name
-              }
-           }
-        }
-    }
-    
+        // ... (no changes needed here for the reported issues) ...
+          &.menu-option { // Inherit base styles
+            // Container for name and date
+            .menu-option-text {
+                 display: flex;
+                 flex-direction: column;
+                 line-height: 1.3; // Adjust line height for two lines
+                 gap: 1px; // Small gap between name and date
+            }
+            .chat-panel-item-name {
+                 // font-weight: 500; // Optional: make name slightly bolder
+                 white-space: nowrap;
+                 overflow: hidden;
+                 text-overflow: ellipsis;
+            }
+            .chat-panel-item-date {
+                 font-size: 0.85em; // Smaller font for date
+                 color: var(--text-faint);
+                 white-space: nowrap;
+                 overflow: hidden;
+                 text-overflow: ellipsis;
+            }
+     
+            // Highlight date on active item slightly
+            &.is-active {
+               .chat-panel-item-date {
+                   color: var(--text-accent-hover); // Use accent color
+                   opacity: 0.8; // Slightly less prominent than name
+               }
+            }
+         }
+     }
+     
+     
+
+.ollama-chat-panel-list {
+    // Only apply min-height if it's NOT collapsed (controlled by inline style)
+    // This CSS rule might not work reliably due to inline style precedence.
+    // It's better to handle this by ensuring the initial render has *some* content
+    // or by adding a class via TS when expanded.
+    // Let's try setting a reasonable overall min-height on the parent panel first.
+}
     
 
     .ollama-main-chat-area {
