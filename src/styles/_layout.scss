@@ -174,40 +174,53 @@
 	}
 
     .ollama-sidebar-section-header {
-        // Inherits base styles from .menu-option (flex, align-items, cursor, radius, hover)
+        // Base styles from .menu-option
+        display: flex; // Явно задаємо flex
+        align-items: center; // <<< Явно центруємо елементи по вертикалі в заголовку
         padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
         user-select: none;
+        cursor: pointer; // Переконуємось, що курсор вказує на клікабельність
     
         // Icon specific styles within the header
         .ollama-sidebar-section-icon {
-            margin-right: 10px;
-            min-width: 18px; // --- ЗБІЛЬШЕНО --- Трохи більше місця для іконки папки
+            margin-right: 14px; // <<< ЗБІЛЬШЕНО відстань від тексту
+            min-width: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            // transition: transform 0.2s ease-in-out; // Можна прибрати, якщо іконки міняються, а не обертаються
+    
+            /* --- Вертикальне коригування (якщо align-items недостатньо) --- */
+            // Спробуйте спочатку без цього. Якщо іконка все ще зависока, розкоментуйте.
+            // position: relative;
+            // top: 1px; // Опустити на 1 піксель (або 2px)
+            /* --------------------------------------------------------------- */
     
             .svg-icon {
-                width: 16px; // --- ЗБІЛЬШЕНО ---
-                height: 16px; // --- ЗБІЛЬШЕНО ---
-                color: var(--text-faint); // --- ДОДАНО --- Сіруватий колір для іконки
+                width: 16px;
+                height: 16px;
+                color: var(--text-faint);
+                // vertical-align: middle; // Зазвичай не потрібно з flex
             }
         }
     
-         // Змінюємо колір іконки при наведенні на заголовок
+        // Hover state for icon
         &:hover .ollama-sidebar-section-icon .svg-icon {
             color: var(--text-muted);
         }
     
-    
+        // Text styles within the header
         .menu-option-text {
             font-weight: 500;
             color: var(--text-normal);
+            line-height: 1.3; // <<< Явно задаємо висоту рядка тексту для кращого центрування
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-grow: 1; // Дозволити тексту зайняти місце
         }
     }
     
-    // Content area for collapsible sections (holds the list)
     .ollama-sidebar-section-content {
         // Transition, overflow, max-height set inline via TS
         box-sizing: border-box;
@@ -241,8 +254,7 @@
     
     // Specific styles for Chat Panel List Items
     .ollama-chat-panel-item {
-        // ... (стилі для .chat-panel-item-name, .chat-panel-item-date як були) ...
-         &.menu-option { // Inherit base styles
+        &.menu-option { // Inherit base styles
            // Container for name and date
            .menu-option-text {
                 display: flex;
@@ -273,7 +285,6 @@
            }
         }
     }
-    
     
     
 
