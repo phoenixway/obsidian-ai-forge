@@ -1428,15 +1428,19 @@ This action cannot be undone.`,
       }
       if (updatePromises.length > 0) {
         await Promise.all(updatePromises);
+        if (this.isSidebarSectionVisible("chats") && this.chatPanelListEl) {
+          this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
+          this.chatPanelListEl.style.overflowY = "auto";
+        }
+        if (this.isSidebarSectionVisible("roles") && this.rolePanelListEl) {
+          this.rolePanelListEl.style.maxHeight = this.rolePanelListEl.scrollHeight + "px";
+          this.rolePanelListEl.style.overflowY = "auto";
+        }
       }
     }
     setTimeout(() => {
       var _a;
       (_a = this.inputEl) == null ? void 0 : _a.focus();
-      if (this.chatPanelListEl && !this.chatPanelHeaderEl.hasAttribute("data-collapsed")) {
-        this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
-        this.chatPanelListEl.style.overflowY = "auto";
-      }
       this.plugin.logger.debug("[OllamaView] Input focused in onOpen.");
     }, 150);
     if (this.inputEl) {
@@ -1459,8 +1463,7 @@ This action cannot be undone.`,
     if (this.resizeTimeout)
       clearTimeout(this.resizeTimeout);
   }
-  // --- UI Creation (with Custom Div Menu & Accordion) ---
-  // --- UI Creation (змінено для іконок та стану за замовчуванням) ---
+  // --- UI Creation (Прибрано початкову max-height для чатів) ---
   createUIElements() {
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
@@ -1474,22 +1477,15 @@ This action cannot be undone.`,
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "ollama-chat-panel-list"]
     });
-    this.chatPanelListEl.style.maxHeight = "300px";
     this.chatPanelListEl.style.overflow = "hidden";
     this.chatPanelListEl.style.transition = "max-height 0.3s ease-out";
-    this.rolesSectionContainerEl = this.rolePanelEl.createDiv({
-      cls: "roles-section-container"
-      // Клас для потенційного керування видимістю
-    });
-    this.rolePanelHeaderEl = this.rolesSectionContainerEl.createDiv({
-      // <-- Додано до обгортки
+    this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
     });
     (0, import_obsidian3.setIcon)(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
     this.rolePanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Roles" });
-    this.rolePanelListEl = this.rolesSectionContainerEl.createDiv({
-      // <-- Додано до обгортки
+    this.rolePanelListEl = this.rolePanelEl.createDiv({
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_SIDEBAR_SECTION_CONTENT_HIDDEN]
     });
     this.rolePanelListEl.style.maxHeight = "0";
@@ -1998,22 +1994,35 @@ This action cannot be undone.`,
     this.updateModelDisplay(finalModelName);
     this.updateTemperatureIndicator(finalTemperature);
     this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
-    const updatePromises = [];
+    const panelUpdatePromises = [];
+    let chatPanelVisible = false;
     if (this.isSidebarSectionVisible("chats")) {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is visible, queueing update.");
-      updatePromises.push(this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)));
+      chatPanelVisible = true;
+      panelUpdatePromises.push(this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)));
     } else {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is collapsed, skipping update.");
     }
     if (this.isSidebarSectionVisible("roles")) {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is visible, queueing update.");
-      updatePromises.push(this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e)));
+      panelUpdatePromises.push(this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e)));
     } else {
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is collapsed, skipping update.");
     }
-    if (updatePromises.length > 0) {
-      await Promise.all(updatePromises);
+    if (panelUpdatePromises.length > 0) {
+      await Promise.all(panelUpdatePromises);
       this.plugin.logger.debug("[loadAndDisplayActiveChat] Visible sidebar panels updated.");
+      requestAnimationFrame(() => {
+        if (chatPanelVisible && this.chatPanelListEl) {
+          this.plugin.logger.debug("[loadAndDisplayActiveChat] Setting chat panel height after update.");
+          this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
+          this.chatPanelListEl.style.overflowY = "auto";
+        }
+        if (this.isSidebarSectionVisible("roles") && this.rolePanelListEl) {
+          this.rolePanelListEl.style.maxHeight = this.rolePanelListEl.scrollHeight + "px";
+          this.rolePanelListEl.style.overflowY = "auto";
+        }
+      });
     }
     if (finalModelName === null) {
       this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");

@@ -317,7 +317,7 @@ export class OllamaView extends ItemView {
   private chatPanelHeaderEl!: HTMLElement; // Нова властивість для заголовка чатів
   private rolePanelHeaderEl!: HTMLElement; // Нова властивість для заголовка ролей
   private rolesSectionContainerEl!: HTMLElement; // <-- Нова властивість
-  
+
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -360,6 +360,7 @@ export class OllamaView extends ItemView {
      this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
     }
 
+
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
@@ -367,22 +368,11 @@ export class OllamaView extends ItemView {
     // Завантажуємо чат і оновлюємо видимі панелі
     try {
         this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
-        await this.loadAndDisplayActiveChat(); // Цей виклик оновить видиму панель чатів
+        await this.loadAndDisplayActiveChat(); // Цей виклик оновить видиму панель чатів і встановить її висоту
         this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
-
-        // --- FIX Мерехтіння: Робимо секцію Roles видимою ПІСЛЯ завантаження ---
-        // Додаємо невелику затримку, щоб chatPanelListEl встиг отримати висоту
-        // setTimeout(() => {
-        //     if (this.rolesSectionContainerEl) {
-        //         this.rolesSectionContainerEl.style.opacity = '1'; // Або show() / removeClass('is-hidden')
-        //         this.rolesSectionContainerEl.show(); // Використовуємо Obsidian API
-        //         this.plugin.logger.debug("[OllamaView] Roles section container made visible.");
-        //     }
-        // }, 50); // Коротка затримка
-        // Прибираємо цей підхід, бо початкова max-height для чатів має бути достатньо
-
     } catch (error) {
-        this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
+        // ... (обробка помилки як була, оновлення видимих панелей) ...
+         this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
         this.showEmptyState();
         // Оновлюємо видимі панелі навіть при помилці
          const updatePromises = [];
@@ -394,25 +384,27 @@ export class OllamaView extends ItemView {
          }
           if (updatePromises.length > 0) {
              await Promise.all(updatePromises);
+             // --- ДОДАНО ВСТАНОВЛЕННЯ ВИСОТИ ПІСЛЯ ОНОВЛЕННЯ ПАНЕЛЕЙ ПРИ ПОМИЛЦІ ---
+             // Негайно встановлюємо висоту для розгорнутих секцій після оновлення даних
+             if (this.isSidebarSectionVisible('chats') && this.chatPanelListEl) {
+                this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
+                this.chatPanelListEl.style.overflowY = 'auto';
+             }
+             if (this.isSidebarSectionVisible('roles') && this.rolePanelListEl) {
+                 this.rolePanelListEl.style.maxHeight = this.rolePanelListEl.scrollHeight + "px";
+                 this.rolePanelListEl.style.overflowY = 'auto';
+             }
+             // --- КІНЕЦЬ ДОДАНОГО КОДУ ---
          }
-        // --- FIX Мерехтіння: Робимо секцію Roles видимою навіть якщо була помилка ---
-        // if (this.rolesSectionContainerEl) {
-        //     this.rolesSectionContainerEl.style.opacity = '1';
-        //     this.rolesSectionContainerEl.show();
-        //     this.plugin.logger.debug("[OllamaView] Roles section container made visible after error.");
-        // }
+
     }
 
-    // Встановлюємо фокус і т.д.
+    // --- ЗМІНЕНО: Встановлення фокусу, прибрано логіку висоти ---
     setTimeout(() => {
-        // Перевіряємо чи існує елемент перед фокусуванням
         this.inputEl?.focus();
-        // Встановлюємо початкову висоту для розгорнутої секції чатів
-        if (this.chatPanelListEl && !this.chatPanelHeaderEl.hasAttribute('data-collapsed')) {
-            this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
-            this.chatPanelListEl.style.overflowY = 'auto'; // Увімкнути скрол, якщо треба
-        }
         this.plugin.logger.debug("[OllamaView] Input focused in onOpen.");
+        // --- ВИДАЛЕНО БЛОК ВСТАНОВЛЕННЯ ВИСОТИ ЗВІДСИ ---
+        // if (this.chatPanelListEl && this.chatPanelHeaderEl.getAttribute('data-collapsed') === 'false') { ... }
     }, 150);
 
     if (this.inputEl) {
@@ -420,7 +412,6 @@ export class OllamaView extends ItemView {
     }
     this.plugin.logger.debug("[OllamaView] onOpen finished.");
 }
-
 
   async onClose(): Promise<void> {
     if (this.speechWorker) {
@@ -436,8 +427,7 @@ export class OllamaView extends ItemView {
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
   }
 
-  // --- UI Creation (with Custom Div Menu & Accordion) ---
-   // --- UI Creation (змінено для іконок та стану за замовчуванням) ---
+   // --- UI Creation (Прибрано початкову max-height для чатів) ---
    private createUIElements(): void {
     this.contentEl.empty();
 
@@ -455,37 +445,28 @@ export class OllamaView extends ItemView {
     this.chatPanelListEl = this.rolePanelEl.createDiv({
         cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "ollama-chat-panel-list"]
     });
-    // --- ДОДАНО початкову max-height, щоб уникнути стрибка ---
-    this.chatPanelListEl.style.maxHeight = '300px'; // Приблизна початкова висота, можна налаштувати
-    this.chatPanelListEl.style.overflow = 'hidden'; // Спочатку ховаємо скрол, поки висота неточна
+    // --- ПРИБРАНО ПОЧАТКОВУ max-height ---
+    // this.chatPanelListEl.style.maxHeight = '300px'; // <--- ВИДАЛЕНО
+    this.chatPanelListEl.style.overflow = 'hidden'; // overflow: hidden потрібен для анімації max-height
     this.chatPanelListEl.style.transition = 'max-height 0.3s ease-out';
 
-    // --- Обгортка для секції Ролей (для виправлення мерехтіння) ---
-    this.rolesSectionContainerEl = this.rolePanelEl.createDiv({
-        cls: 'roles-section-container' // Клас для потенційного керування видимістю
-    });
-    // --- Початково можна приховати обгортку (опціонально, через CSS або тут) ---
-    // this.rolesSectionContainerEl.style.opacity = '0'; // Приклад приховування через opacity
-    // this.rolesSectionContainerEl.hide(); // Приклад приховування через display:none
-
-
-    // --- Секція Ролей (Згорнута) - тепер всередині обгортки ---
-    this.rolePanelHeaderEl = this.rolesSectionContainerEl.createDiv({ // <-- Додано до обгортки
+    // --- Секція Ролей (Згорнута) ---
+    this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
          cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
          attr: { 'data-section-type': 'roles', 'data-collapsed': 'true' }
     });
     setIcon(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
     this.rolePanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Roles" });
 
-    this.rolePanelListEl = this.rolesSectionContainerEl.createDiv({ // <-- Додано до обгортки
+    this.rolePanelListEl = this.rolePanelEl.createDiv({
         cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_SIDEBAR_SECTION_CONTENT_HIDDEN]
     });
     this.rolePanelListEl.style.maxHeight = '0';
     this.rolePanelListEl.style.overflow = 'hidden';
     this.rolePanelListEl.style.transition = 'max-height 0.3s ease-out';
 
-    // ... (решта createUIElements: mainChatAreaEl, inputContainer, menuDropdown і т.д.) ...
-      // Основна Область Чату (права частина - без змін)
+    // ... (решта createUIElements як була) ...
+     // Основна Область Чату (права частина - без змін)
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
     // Вміст основної області (без змін)
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: 'ollama-chat-area-content' });
@@ -1756,146 +1737,164 @@ private attachEventListeners(): void {
   }
 
   async loadAndDisplayActiveChat(): Promise<void> {
-      // ... (Крок 1-5: отримання даних, рендеринг повідомлень) ...
-       this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
+    // ... (Крок 1-5: отримання даних, рендеринг повідомлень, як у попередній відповіді) ...
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
 
-      this.clearChatContainerInternal(); // Очищуємо перед рендерингом
-      this.currentMessages = [];
-      this.lastRenderedMessageDate = null;
+    this.clearChatContainerInternal(); // Очищуємо перед рендерингом
+    this.currentMessages = [];
+    this.lastRenderedMessageDate = null;
 
-      let activeChat: Chat | null = null;
-      let availableModels: string[] = [];
-      let finalModelName: string | null = null;
-      let finalRolePath: string | null | undefined = undefined; // Зберігаємо шлях
-      let finalRoleName: string = "None"; // Значення за замовчуванням
-      let finalTemperature: number | null | undefined = undefined;
-      let errorOccurred = false;
-
-
-      // Крок 1: Отримати чат, моделі, роль
-      try {
-           activeChat = await this.plugin.chatManager?.getActiveChat() || null;
-           this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? 'null'}`);
-           availableModels = await this.plugin.ollamaService.getModels();
-           this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(', ')}`);
-
-           // Визначаємо шлях ролі (з чату або глобальний)
-           finalRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-           finalRoleName = await this.findRoleNameByPath(finalRolePath); // Отримуємо ім'я за шляхом
-           this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || 'None'}', Name='${finalRoleName}'`);
-
-      } catch (error) {
-           this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching active chat, models, or role:", error);
-           new Notice("Error connecting to Ollama or loading chat data.", 5000);
-           errorOccurred = true;
-           finalModelName = null; // Моделей немає
-           finalTemperature = this.plugin.settings.temperature; // Глобальна температура
-           finalRolePath = this.plugin.settings.selectedRolePath; // Глобальна роль
-           finalRoleName = await this.findRoleNameByPath(finalRolePath); // Ім'я для глобальної ролі
-           activeChat = null; // Переконуємось, що чат null при помилці
-      }
-
-      // Крок 2, 3, 4: Визначення моделі та оновлення метаданих (якщо не було помилки ЗАВАНТАЖЕННЯ)
-      if (!errorOccurred && activeChat) { // Перевіряємо і на помилку, і на наявність activeChat
-          let preferredModel = activeChat.metadata?.modelName || this.plugin.settings.modelName;
-          if (availableModels.length > 0) {
-               if (preferredModel && availableModels.includes(preferredModel)) {
-                   finalModelName = preferredModel;
-               } else {
-                   finalModelName = availableModels[0];
-                   this.plugin.logger.warn(`[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`);
-               }
-          } else {
-               finalModelName = null;
-               this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
-          }
-          this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined final model for chat: ${finalModelName ?? 'None'}`);
-
-          if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-               try {
-                   this.plugin.logger.debug(`[loadAndDisplayActiveChat] Updating chat model metadata from '${activeChat.metadata.modelName}' to '${finalModelName}'`);
-                   this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName })
-                      .catch(updateError => {
-                           this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
-                       });
-               } catch (updateError) {
-                   this.plugin.logger.error("[loadAndDisplayActiveChat] Sync error during model metadata update call:", updateError);
-               }
-          }
-          finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-          this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined final temperature for chat: ${finalTemperature}`);
-
-      } else if (!errorOccurred && !activeChat) {
-           this.plugin.logger.debug("[loadAndDisplayActiveChat] No active chat found. Using global settings.");
-           finalModelName = availableModels.includes(this.plugin.settings.modelName)
-                              ? this.plugin.settings.modelName
-                              : (availableModels.length > 0 ? availableModels[0] : null);
-           finalTemperature = this.plugin.settings.temperature;
-           this.plugin.logger.debug(`[loadAndDisplayActiveChat] Using global model: ${finalModelName ?? 'None'}, Temp: ${finalTemperature}, Role: ${finalRoleName}`);
-      }
+    let activeChat: Chat | null = null;
+    let availableModels: string[] = [];
+    let finalModelName: string | null = null;
+    let finalRolePath: string | null | undefined = undefined; // Зберігаємо шлях
+    let finalRoleName: string = "None"; // Значення за замовчуванням
+    let finalTemperature: number | null | undefined = undefined;
+    let errorOccurred = false;
 
 
-      // --- Крок 5: Завантаження ПОВІДОМЛЕНЬ ---
-      if (activeChat !== null && !errorOccurred) {
-          if (activeChat.messages && activeChat.messages.length > 0) {
-               this.plugin.logger.debug(`[loadAndDisplayActiveChat] Rendering ${activeChat.messages.length} messages.`);
-               this.hideEmptyState();
-               this.renderMessages(activeChat.messages);
-               this.checkAllMessagesForCollapsing();
-               this.plugin.logger.debug("[loadAndDisplayActiveChat] Scrolling to bottom after rendering messages.");
-               setTimeout(() => { this.guaranteedScrollToBottom(100, false); }, 150);
-          } else {
-               this.plugin.logger.debug("[loadAndDisplayActiveChat] Active chat exists but has no messages. Showing empty state.");
-               this.showEmptyState();
-          }
-      } else {
-          this.plugin.logger.debug("[loadAndDisplayActiveChat] No active chat or error occurred earlier. Showing empty state.");
-          this.showEmptyState();
-      }
+    // Крок 1: Отримати чат, моделі, роль
+    try {
+     activeChat = await this.plugin.chatManager?.getActiveChat() || null;
+     this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? 'null'}`);
+     availableModels = await this.plugin.ollamaService.getModels();
+     this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(', ')}`);
 
-      // --- Крок 6: Оновлення решти UI ---
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
-      this.updateInputPlaceholder(finalRoleName);
-      this.updateRoleDisplay(finalRoleName);
-      this.updateModelDisplay(finalModelName);
-      this.updateTemperatureIndicator(finalTemperature);
+     // Визначаємо шлях ролі (з чату або глобальний)
+     finalRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+     finalRoleName = await this.findRoleNameByPath(finalRolePath); // Отримуємо ім'я за шляхом
+     this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || 'None'}', Name='${finalRoleName}'`);
 
-      // --- ЗМІНЕНО: Оновлюємо панелі, ТІЛЬКИ ЯКЩО вони видимі ---
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
-      const updatePromises = [];
-      if (this.isSidebarSectionVisible('chats')) {
-          this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is visible, queueing update.");
-          updatePromises.push(this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e)));
-      } else {
-           this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is collapsed, skipping update.");
-      }
-      if (this.isSidebarSectionVisible('roles')) {
-           this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is visible, queueing update.");
-          updatePromises.push(this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e)));
-      } else {
-           this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is collapsed, skipping update.");
-      }
-      if (updatePromises.length > 0) {
-          await Promise.all(updatePromises);
-           this.plugin.logger.debug("[loadAndDisplayActiveChat] Visible sidebar panels updated.");
-      }
-      // --- КІНЕЦЬ ЗМІН ---
+    } catch (error) {
+     this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching active chat, models, or role:", error);
+     new Notice("Error connecting to Ollama or loading chat data.", 5000);
+     errorOccurred = true;
+     finalModelName = null; // Моделей немає
+     finalTemperature = this.plugin.settings.temperature; // Глобальна температура
+     finalRolePath = this.plugin.settings.selectedRolePath; // Глобальна роль
+     finalRoleName = await this.findRoleNameByPath(finalRolePath); // Ім'я для глобальної ролі
+     activeChat = null; // Переконуємось, що чат null при помилці
+    }
+
+    // Крок 2, 3, 4: Визначення моделі та оновлення метаданих (якщо не було помилки ЗАВАНТАЖЕННЯ)
+    if (!errorOccurred && activeChat) { // Перевіряємо і на помилку, і на наявність activeChat
+        let preferredModel = activeChat.metadata?.modelName || this.plugin.settings.modelName;
+        if (availableModels.length > 0) {
+             if (preferredModel && availableModels.includes(preferredModel)) {
+                 finalModelName = preferredModel;
+             } else {
+                 finalModelName = availableModels[0];
+                 this.plugin.logger.warn(`[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`);
+             }
+        } else {
+             finalModelName = null;
+             this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
+        }
+        this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined final model for chat: ${finalModelName ?? 'None'}`);
+
+        if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
+             try {
+                 this.plugin.logger.debug(`[loadAndDisplayActiveChat] Updating chat model metadata from '${activeChat.metadata.modelName}' to '${finalModelName}'`);
+                 this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName })
+                    .catch(updateError => {
+                         this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
+                     });
+             } catch (updateError) {
+                 this.plugin.logger.error("[loadAndDisplayActiveChat] Sync error during model metadata update call:", updateError);
+             }
+        }
+        finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
+        this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined final temperature for chat: ${finalTemperature}`);
+
+    } else if (!errorOccurred && !activeChat) {
+     this.plugin.logger.debug("[loadAndDisplayActiveChat] No active chat found. Using global settings.");
+     finalModelName = availableModels.includes(this.plugin.settings.modelName)
+                        ? this.plugin.settings.modelName
+                        : (availableModels.length > 0 ? availableModels[0] : null);
+     finalTemperature = this.plugin.settings.temperature;
+     this.plugin.logger.debug(`[loadAndDisplayActiveChat] Using global model: ${finalModelName ?? 'None'}, Temp: ${finalTemperature}, Role: ${finalRoleName}`);
+    }
 
 
-      // --- Крок 7: Налаштування поля вводу ---
-      if (finalModelName === null) {
-          // ... (як було)
-           this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
-          if (this.inputEl) { this.inputEl.disabled = true; this.inputEl.placeholder = "No models available..."; }
-          if (this.sendButton) {this.sendButton.disabled = true; this.sendButton.classList.add(CSS_CLASS_DISABLED);}
-           this.setLoadingState(false);
-      } else {
-           // ... (як було)
-           if (this.inputEl) { this.inputEl.disabled = this.isProcessing; }
-          this.updateSendButtonState();
-      }
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
-  }
+    // --- Крок 5: Завантаження ПОВІДОМЛЕНЬ ---
+    if (activeChat !== null && !errorOccurred) {
+        if (activeChat.messages && activeChat.messages.length > 0) {
+             this.plugin.logger.debug(`[loadAndDisplayActiveChat] Rendering ${activeChat.messages.length} messages.`);
+             this.hideEmptyState();
+             this.renderMessages(activeChat.messages);
+             this.checkAllMessagesForCollapsing();
+             this.plugin.logger.debug("[loadAndDisplayActiveChat] Scrolling to bottom after rendering messages.");
+             setTimeout(() => { this.guaranteedScrollToBottom(100, false); }, 150);
+        } else {
+             this.plugin.logger.debug("[loadAndDisplayActiveChat] Active chat exists but has no messages. Showing empty state.");
+             this.showEmptyState();
+        }
+    } else {
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] No active chat or error occurred earlier. Showing empty state.");
+        this.showEmptyState();
+    }
+
+    // --- Крок 6: Оновлення решти UI ---
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
+    this.updateInputPlaceholder(finalRoleName);
+    this.updateRoleDisplay(finalRoleName);
+    this.updateModelDisplay(finalModelName);
+    this.updateTemperatureIndicator(finalTemperature);
+
+    // Оновлюємо панелі, ТІЛЬКИ ЯКЩО вони видимі
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
+    const panelUpdatePromises = [];
+    let chatPanelVisible = false; // Прапорець, чи оновлювали панель чатів
+    if (this.isSidebarSectionVisible('chats')) {
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is visible, queueing update.");
+        chatPanelVisible = true;
+        panelUpdatePromises.push(this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e)));
+    } else {
+         this.plugin.logger.debug("[loadAndDisplayActiveChat] Chats panel is collapsed, skipping update.");
+    }
+    if (this.isSidebarSectionVisible('roles')) {
+         this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is visible, queueing update.");
+        panelUpdatePromises.push(this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e)));
+    } else {
+         this.plugin.logger.debug("[loadAndDisplayActiveChat] Roles panel is collapsed, skipping update.");
+    }
+
+    if (panelUpdatePromises.length > 0) {
+        await Promise.all(panelUpdatePromises);
+         this.plugin.logger.debug("[loadAndDisplayActiveChat] Visible sidebar panels updated.");
+
+         // --- ЗМІНА: Встановлюємо висоту ТУТ, після оновлення панелей ---
+         // Використовуємо requestAnimationFrame для очікування рендерінгу DOM
+         requestAnimationFrame(() => {
+             if (chatPanelVisible && this.chatPanelListEl) {
+                  this.plugin.logger.debug("[loadAndDisplayActiveChat] Setting chat panel height after update.");
+                 this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
+                 this.chatPanelListEl.style.overflowY = 'auto'; // Дозволяємо скрол
+             }
+             // Можна зробити те саме для ролей, якщо вони видимі і були оновлені
+             if (this.isSidebarSectionVisible('roles') && this.rolePanelListEl) {
+                 this.rolePanelListEl.style.maxHeight = this.rolePanelListEl.scrollHeight + "px";
+                 this.rolePanelListEl.style.overflowY = 'auto';
+             }
+         });
+         // --- КІНЕЦЬ ЗМІНИ ---
+    }
+
+
+    // --- Крок 7: Налаштування поля вводу ---
+    // ... (як було) ...
+     if (finalModelName === null) {
+        this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
+        if (this.inputEl) { this.inputEl.disabled = true; this.inputEl.placeholder = "No models available..."; }
+        if (this.sendButton) {this.sendButton.disabled = true; this.sendButton.classList.add(CSS_CLASS_DISABLED);}
+         this.setLoadingState(false);
+    } else {
+         if (this.inputEl) { this.inputEl.disabled = this.isProcessing; }
+        this.updateSendButtonState();
+    }
+
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
+}
 
   private handleActiveChatChanged = async (data: { chatId: string | null, chat: Chat | null }): Promise<void> => {
       // ... (логіка визначення chatSwitched, previousChatId) ...
