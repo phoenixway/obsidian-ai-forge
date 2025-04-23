@@ -316,7 +316,8 @@ export class OllamaView extends ItemView {
 
   private chatPanelHeaderEl!: HTMLElement; // Нова властивість для заголовка чатів
   private rolePanelHeaderEl!: HTMLElement; // Нова властивість для заголовка ролей
-
+  private rolesSectionContainerEl!: HTMLElement; // <-- Нова властивість
+  
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -343,82 +344,82 @@ export class OllamaView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    // ... (код onOpen як був)
     this.plugin.logger.debug("[OllamaView] onOpen started.");
-     this.createUIElements();
+    this.createUIElements();
 
-     // Оновлюємо плейсхолдер та інші елементи НА ОСНОВІ ПОТОЧНИХ ГЛОБАЛЬНИХ НАЛАШТУВАНЬ СПОЧАТКУ
-     // Це забезпечує швидше початкове відображення, не чекаючи завантаження чату.
-     try {
-      const initialRolePath = this.plugin.settings.selectedRolePath;
-      // Використовуємо findRoleNameByPath, бо він обробляє null/undefined
-      const initialRoleName = await this.findRoleNameByPath(initialRolePath);
-      this.updateInputPlaceholder(initialRoleName);
-      this.updateRoleDisplay(initialRoleName); // Оновлюємо індикатор ролі теж
-      this.updateModelDisplay(this.plugin.settings.modelName);
-      this.updateTemperatureIndicator(this.plugin.settings.temperature);
-      this.plugin.logger.debug(
-       "[OllamaView] Initial UI elements updated based on settings."
-      );
-     } catch (error) {
-      this.plugin.logger.error(
-       "[OllamaView] Error during initial UI update in onOpen:",
-       error
-      );
-      // Продовжуємо роботу, навіть якщо тут виникла помилка
-     }
+    // ... (код для початкового оновлення input placeholder, model/role/temp display) ...
+    try {
+     const initialRolePath = this.plugin.settings.selectedRolePath;
+     const initialRoleName = await this.findRoleNameByPath(initialRolePath);
+     this.updateInputPlaceholder(initialRoleName);
+     this.updateRoleDisplay(initialRoleName);
+     this.updateModelDisplay(this.plugin.settings.modelName);
+     this.updateTemperatureIndicator(this.plugin.settings.temperature);
+     this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
+    } catch (error) {
+     this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
+    }
 
-     this.attachEventListeners();
-     this.autoResizeTextarea();
-     this.updateSendButtonState(); // Важливо оновити стан кнопки після встановлення початкових значень
+    this.attachEventListeners();
+    this.autoResizeTextarea();
+    this.updateSendButtonState();
 
-     // ВАЖЛИВО: loadAndDisplayActiveChat тепер завантажить чат (якщо є)
-     // і сам викличе updateRolePanelList та оновить інші елементи UI відповідно до чату.
-     try {
-      this.plugin.logger.debug(
-       "[OllamaView] Calling loadAndDisplayActiveChat from onOpen..."
-      );
-      await this.loadAndDisplayActiveChat(); // Цей виклик оновить все, включаючи видиму панель чатів
-      this.plugin.logger.debug(
-       "[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen."
-      );
-     } catch (error) {
-      this.plugin.logger.error(
-       "[OllamaView] Error during initial chat load in onOpen:",
-       error
-      );
-      this.showEmptyState();
-      // Навіть якщо помилка завантаження чату, панель ролей має бути оновлена
-      // з активною глобальною роллю (або "None"), ЯКЩО вона видима.
-      // Але за замовчуванням вона не видима, тому оновлювати не треба.
-      if (this.isSidebarSectionVisible('roles')) {
-          try {
-              this.plugin.logger.debug(
-               "[OllamaView] Updating role panel list in onOpen catch block (as it's visible)..."
-              );
-              await this.updateRolePanelList();
-              this.plugin.logger.debug(
-               "[OllamaView] Role panel list updated in onOpen catch block."
-              );
-          } catch (panelError) {
-              this.plugin.logger.error(
-               "[OllamaView] Error updating role panel list in onOpen catch block:",
-               panelError
-              );
-          }
-      }
-     }
+    // Завантажуємо чат і оновлюємо видимі панелі
+    try {
+        this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
+        await this.loadAndDisplayActiveChat(); // Цей виклик оновить видиму панель чатів
+        this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
 
-     // Встановлюємо фокус та ініціюємо перевірку розміру textarea
-     setTimeout(() => {
-      this.inputEl?.focus();
-      this.plugin.logger.debug("[OllamaView] Input focused in onOpen.");
-     }, 150); // Невелика затримка
-     if (this.inputEl) {
-      this.inputEl.dispatchEvent(new Event("input")); // Для початкового авто-розміру
-     }
-     this.plugin.logger.debug("[OllamaView] onOpen finished.");
- }
+        // --- FIX Мерехтіння: Робимо секцію Roles видимою ПІСЛЯ завантаження ---
+        // Додаємо невелику затримку, щоб chatPanelListEl встиг отримати висоту
+        // setTimeout(() => {
+        //     if (this.rolesSectionContainerEl) {
+        //         this.rolesSectionContainerEl.style.opacity = '1'; // Або show() / removeClass('is-hidden')
+        //         this.rolesSectionContainerEl.show(); // Використовуємо Obsidian API
+        //         this.plugin.logger.debug("[OllamaView] Roles section container made visible.");
+        //     }
+        // }, 50); // Коротка затримка
+        // Прибираємо цей підхід, бо початкова max-height для чатів має бути достатньо
+
+    } catch (error) {
+        this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
+        this.showEmptyState();
+        // Оновлюємо видимі панелі навіть при помилці
+         const updatePromises = [];
+         if (this.isSidebarSectionVisible('chats')) {
+             updatePromises.push(this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list in catch:", e)));
+         }
+          if (this.isSidebarSectionVisible('roles')) {
+             updatePromises.push(this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list in catch:", e)));
+         }
+          if (updatePromises.length > 0) {
+             await Promise.all(updatePromises);
+         }
+        // --- FIX Мерехтіння: Робимо секцію Roles видимою навіть якщо була помилка ---
+        // if (this.rolesSectionContainerEl) {
+        //     this.rolesSectionContainerEl.style.opacity = '1';
+        //     this.rolesSectionContainerEl.show();
+        //     this.plugin.logger.debug("[OllamaView] Roles section container made visible after error.");
+        // }
+    }
+
+    // Встановлюємо фокус і т.д.
+    setTimeout(() => {
+        // Перевіряємо чи існує елемент перед фокусуванням
+        this.inputEl?.focus();
+        // Встановлюємо початкову висоту для розгорнутої секції чатів
+        if (this.chatPanelListEl && !this.chatPanelHeaderEl.hasAttribute('data-collapsed')) {
+            this.chatPanelListEl.style.maxHeight = this.chatPanelListEl.scrollHeight + "px";
+            this.chatPanelListEl.style.overflowY = 'auto'; // Увімкнути скрол, якщо треба
+        }
+        this.plugin.logger.debug("[OllamaView] Input focused in onOpen.");
+    }, 150);
+
+    if (this.inputEl) {
+        this.inputEl.dispatchEvent(new Event("input"));
+    }
+    this.plugin.logger.debug("[OllamaView] onOpen finished.");
+}
 
 
   async onClose(): Promise<void> {
@@ -443,45 +444,50 @@ export class OllamaView extends ItemView {
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
 
-    // --- Секція Чатів (Акордеон - РОЗГОРНУТА ЗА ЗАМОВЧУВАННЯМ) ---
+    // --- Секція Чатів (Розгорнута) ---
     this.chatPanelHeaderEl = this.rolePanelEl.createDiv({
         cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-        attr: { 'data-section-type': 'chats', 'data-collapsed': 'false' } // <-- Змінено на false
+        attr: { 'data-section-type': 'chats', 'data-collapsed': 'false' }
     });
-    // --- ЗМІНЕНО ІКОНКУ ---
-    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open"); // <-- Іконка відкритої папки
+    setIcon(this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder-open");
     this.chatPanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Chats" });
 
     this.chatPanelListEl = this.rolePanelEl.createDiv({
-        cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "ollama-chat-panel-list"] // <-- Прибрано _HIDDEN клас
+        cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "ollama-chat-panel-list"]
     });
-    // --- ПРИБРАНО max-height: 0 ---
-    // this.chatPanelListEl.style.maxHeight = '0'; // <-- Закоментовано або видалено
-    this.chatPanelListEl.style.overflow = 'hidden'; // Залишаємо для анімації
-    this.chatPanelListEl.style.transition = 'max-height 0.3s ease-out'; // Залишаємо анімацію
+    // --- ДОДАНО початкову max-height, щоб уникнути стрибка ---
+    this.chatPanelListEl.style.maxHeight = '300px'; // Приблизна початкова висота, можна налаштувати
+    this.chatPanelListEl.style.overflow = 'hidden'; // Спочатку ховаємо скрол, поки висота неточна
+    this.chatPanelListEl.style.transition = 'max-height 0.3s ease-out';
 
-    // --- Секція Ролей (Акордеон - ЗГОРНУТА ЗА ЗАМОВЧУВАННЯМ) ---
-    this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
-         cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-         attr: { 'data-section-type': 'roles', 'data-collapsed': 'true' } // <-- Залишається true
+    // --- Обгортка для секції Ролей (для виправлення мерехтіння) ---
+    this.rolesSectionContainerEl = this.rolePanelEl.createDiv({
+        cls: 'roles-section-container' // Клас для потенційного керування видимістю
     });
-     // --- ЗМІНЕНО ІКОНКУ ---
-    setIcon(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder"); // <-- Іконка закритої папки
+    // --- Початково можна приховати обгортку (опціонально, через CSS або тут) ---
+    // this.rolesSectionContainerEl.style.opacity = '0'; // Приклад приховування через opacity
+    // this.rolesSectionContainerEl.hide(); // Приклад приховування через display:none
+
+
+    // --- Секція Ролей (Згорнута) - тепер всередині обгортки ---
+    this.rolePanelHeaderEl = this.rolesSectionContainerEl.createDiv({ // <-- Додано до обгортки
+         cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+         attr: { 'data-section-type': 'roles', 'data-collapsed': 'true' }
+    });
+    setIcon(this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "folder");
     this.rolePanelHeaderEl.createSpan({ cls: "menu-option-text", text: "Roles" });
 
-    this.rolePanelListEl = this.rolePanelEl.createDiv({
-        // Додаємо _HIDDEN клас, бо вона згорнута
+    this.rolePanelListEl = this.rolesSectionContainerEl.createDiv({ // <-- Додано до обгортки
         cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_SIDEBAR_SECTION_CONTENT_HIDDEN]
     });
-    this.rolePanelListEl.style.maxHeight = '0'; // Залишаємо 0 для згорнутого стану
+    this.rolePanelListEl.style.maxHeight = '0';
     this.rolePanelListEl.style.overflow = 'hidden';
     this.rolePanelListEl.style.transition = 'max-height 0.3s ease-out';
 
-
-    // Основна Область Чату (права частина - без змін)
+    // ... (решта createUIElements: mainChatAreaEl, inputContainer, menuDropdown і т.д.) ...
+      // Основна Область Чату (права частина - без змін)
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-    // ... (решта коду createUIElements без змін) ...
-     // Вміст основної області (без змін)
+    // Вміст основної області (без змін)
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: 'ollama-chat-area-content' });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
@@ -4049,6 +4055,7 @@ private attachEventListeners(): void {
 	}
 }
 
+
 private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> {
   const sectionType = clickedHeaderEl.getAttribute('data-section-type'); // 'chats' or 'roles'
   const isCurrentlyCollapsed = clickedHeaderEl.getAttribute('data-collapsed') === 'true';
@@ -4094,14 +4101,17 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
           otherHeaderEl.setAttribute('data-collapsed', 'true');
           if (otherIconEl) setIcon(otherIconEl, collapseIcon); // <-- Нова іконка
           otherContentEl.style.maxHeight = '0';
-          // otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Можна додати клас після анімації
+          otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Додаємо клас при згортанні
       }
 
       // 2. Розгортаємо поточну секцію
       this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute('data-collapsed', 'false');
-      contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+      contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Прибираємо клас
       setIcon(iconEl, expandIcon); // <-- Нова іконка
+
+      // Дозволяємо скролінг для розгорнутої секції
+      contentEl.style.overflowY = 'auto';
 
       try {
           await updateFunction(); // Оновлюємо/завантажуємо контент
@@ -4123,8 +4133,16 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
       clickedHeaderEl.setAttribute('data-collapsed', 'true');
       setIcon(iconEl, collapseIcon); // <-- Нова іконка
       contentEl.style.maxHeight = '0';
-      // contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Можна додати клас після анімації
+      contentEl.style.overflowY = 'hidden'; // Ховаємо скрол при згортанні
+      // Додаємо клас hidden після завершення анімації
+      setTimeout(() => {
+           if (clickedHeaderEl.getAttribute('data-collapsed') === 'true') { // Перевірка стану
+              contentEl?.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+           }
+      }, 300); // Час = transition duration
   }
 }
+
+
 
 } // END OF OllamaView CLASS
