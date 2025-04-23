@@ -420,9 +420,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
           (0, import_obsidian3.setIcon)(noneIconSpan, "slash");
         }
         this.registerDomEvent(noneOptionEl, "click", () => this.handleRolePanelItemClick(null, currentRolePath));
-        if (roles.length > 0) {
-          container.createEl("hr", { cls: "menu-separator" });
-        }
         roles.forEach((roleInfo) => {
           const roleOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, "menu-option"] });
           const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });

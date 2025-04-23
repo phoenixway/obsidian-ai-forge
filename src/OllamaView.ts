@@ -724,9 +724,9 @@ private attachEventListeners(): void {
          }
          this.registerDomEvent(noneOptionEl, 'click', () => this.handleRolePanelItemClick(null, currentRolePath));
 
-        if (roles.length > 0) {
-            container.createEl('hr', { cls: 'menu-separator' });
-        }
+        // if (roles.length > 0) {
+        //     container.createEl('hr', { cls: 'menu-separator' });
+        // }
 
         roles.forEach(roleInfo => {
              const roleOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, 'menu-option'] });
