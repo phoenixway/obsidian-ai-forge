@@ -4053,32 +4053,60 @@ private attachEventListeners(): void {
 // OllamaView.ts
 
     // --- Новий метод для перемикання секцій акордеону в бічній панелі ---
-    private async toggleSidebarSection(headerEl: HTMLElement): Promise<void> {
-      const sectionType = headerEl.getAttribute('data-section-type'); // 'chats' or 'roles'
-      const isCollapsed = headerEl.getAttribute('data-collapsed') === 'true';
-      const iconEl = headerEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
+// OllamaView.ts
+
+    // --- ОНОВЛЕНИЙ метод для перемикання секцій АКОРДЕОНУ в бічній панелі ---
+    private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> {
+      const sectionType = clickedHeaderEl.getAttribute('data-section-type'); // 'chats' or 'roles'
+      const isCurrentlyCollapsed = clickedHeaderEl.getAttribute('data-collapsed') === 'true';
+      const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
 
       let contentEl: HTMLElement | null = null;
       let updateFunction: (() => Promise<void>) | null = null;
+      let otherHeaderEl: HTMLElement | null = null;
+      let otherContentEl: HTMLElement | null = null;
+      let otherSectionType: 'chats' | 'roles' | null = null;
 
+      // Визначаємо елементи для поточної та іншої секції
       if (sectionType === 'chats') {
           contentEl = this.chatPanelListEl;
           updateFunction = this.updateChatPanelList;
+          otherHeaderEl = this.rolePanelHeaderEl;
+          otherContentEl = this.rolePanelListEl;
+          otherSectionType = 'roles';
       } else if (sectionType === 'roles') {
           contentEl = this.rolePanelListEl;
           updateFunction = this.updateRolePanelList;
+          otherHeaderEl = this.chatPanelHeaderEl;
+          otherContentEl = this.chatPanelListEl;
+          otherSectionType = 'chats';
       }
 
-      if (!contentEl || !iconEl || !updateFunction) {
-          this.plugin.logger.error("Could not find elements for sidebar section toggle:", sectionType);
+      // Перевірка, чи всі необхідні елементи існують
+      if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+          this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
           return;
       }
 
-      if (isCollapsed) {
-          // --- Розгортання ---
+      // --- Логіка Акордеону ---
+      if (isCurrentlyCollapsed) {
+          // Користувач клікнув на ЗГОРНУТУ секцію, щоб РОЗГОРНУТИ її
+
+          // 1. Спочатку ЗГОРТАЄМО ІНШУ секцію, якщо вона зараз розгорнута
+          if (otherHeaderEl.getAttribute('data-collapsed') === 'false') {
+              this.plugin.logger.debug(`Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`);
+              const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
+              otherHeaderEl.setAttribute('data-collapsed', 'true');
+              if (otherIconEl) setIcon(otherIconEl, "chevron-right"); // Іконка ►
+              otherContentEl.style.maxHeight = '0';
+              // Додатково, можна додати клас hidden після анімації для іншої секції
+              // setTimeout(() => { otherContentEl?.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); }, 300);
+          }
+
+          // 2. Тепер РОЗГОРТАЄМО секцію, на яку клікнули
           this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
-          headerEl.setAttribute('data-collapsed', 'false');
-          contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+          clickedHeaderEl.setAttribute('data-collapsed', 'false');
+          contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Прибираємо клас, якщо він був
           setIcon(iconEl, "chevron-down"); // Іконка ▼
 
           // Завантажуємо/оновлюємо контент ПЕРЕД встановленням maxHeight
@@ -4086,31 +4114,30 @@ private attachEventListeners(): void {
               await updateFunction(); // Викликаємо відповідну функцію оновлення
           } catch(error) {
               this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
-              // Можна показати помилку в самому contentEl
               contentEl.setText(`Error loading ${sectionType}.`);
           }
 
-          // Встановлюємо висоту для анімації
-          // requestAnimationFrame потрібен, щоб браузер встиг обробити зміни DOM після updateFunction
+          // Встановлюємо висоту для плавної анімації
+          // Використовуємо requestAnimationFrame, щоб браузер встиг обробити зміни DOM/стилів
            requestAnimationFrame(() => {
-               if (contentEl) { // Перевіряємо ще раз, раптом елемент зник
+               // Перевіряємо ще раз на випадок швидких кліків або зникнення елемента
+               if (contentEl && clickedHeaderEl.getAttribute('data-collapsed') === 'false') {
                   contentEl.style.maxHeight = contentEl.scrollHeight + "px";
                }
            });
 
       } else {
-          // --- Згортання ---
+          // Користувач клікнув на ВЖЕ РОЗГОРНУТУ секцію, щоб ЗГОРНУТИ її
           this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
-          headerEl.setAttribute('data-collapsed', 'true');
+          clickedHeaderEl.setAttribute('data-collapsed', 'true');
           setIcon(iconEl, "chevron-right"); // Іконка ►
           contentEl.style.maxHeight = '0';
-          // Додаємо клас hidden після завершення анімації (необов'язково, але може бути корисно)
+          // Додаємо клас hidden після завершення анімації (необов'язково)
           // setTimeout(() => {
-          //     if (headerEl.getAttribute('data-collapsed') === 'true') { // Перевірка, якщо користувач швидко клікнув знову
+          //     if (clickedHeaderEl.getAttribute('data-collapsed') === 'true') {
           //        contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
           //     }
-          // }, 300); // Час має відповідати transition duration
+          // }, 300);
       }
   }
-
 } // END OF OllamaView CLASS

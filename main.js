@@ -3479,26 +3479,45 @@ This action cannot be undone.`,
   }
   // OllamaView.ts
   // --- Новий метод для перемикання секцій акордеону в бічній панелі ---
-  async toggleSidebarSection(headerEl) {
-    const sectionType = headerEl.getAttribute("data-section-type");
-    const isCollapsed = headerEl.getAttribute("data-collapsed") === "true";
-    const iconEl = headerEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+  // OllamaView.ts
+  // --- ОНОВЛЕНИЙ метод для перемикання секцій АКОРДЕОНУ в бічній панелі ---
+  async toggleSidebarSection(clickedHeaderEl) {
+    const sectionType = clickedHeaderEl.getAttribute("data-section-type");
+    const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
+    const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
     let contentEl = null;
     let updateFunction = null;
+    let otherHeaderEl = null;
+    let otherContentEl = null;
+    let otherSectionType = null;
     if (sectionType === "chats") {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
+      otherHeaderEl = this.rolePanelHeaderEl;
+      otherContentEl = this.rolePanelListEl;
+      otherSectionType = "roles";
     } else if (sectionType === "roles") {
       contentEl = this.rolePanelListEl;
       updateFunction = this.updateRolePanelList;
+      otherHeaderEl = this.chatPanelHeaderEl;
+      otherContentEl = this.chatPanelListEl;
+      otherSectionType = "chats";
     }
-    if (!contentEl || !iconEl || !updateFunction) {
-      this.plugin.logger.error("Could not find elements for sidebar section toggle:", sectionType);
+    if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
       return;
     }
-    if (isCollapsed) {
+    if (isCurrentlyCollapsed) {
+      if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
+        this.plugin.logger.debug(`Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`);
+        const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+        otherHeaderEl.setAttribute("data-collapsed", "true");
+        if (otherIconEl)
+          (0, import_obsidian3.setIcon)(otherIconEl, "chevron-right");
+        otherContentEl.style.maxHeight = "0";
+      }
       this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
-      headerEl.setAttribute("data-collapsed", "false");
+      clickedHeaderEl.setAttribute("data-collapsed", "false");
       contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
       (0, import_obsidian3.setIcon)(iconEl, "chevron-down");
       try {
@@ -3508,13 +3527,13 @@ This action cannot be undone.`,
         contentEl.setText(`Error loading ${sectionType}.`);
       }
       requestAnimationFrame(() => {
-        if (contentEl) {
+        if (contentEl && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
           contentEl.style.maxHeight = contentEl.scrollHeight + "px";
         }
       });
     } else {
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
-      headerEl.setAttribute("data-collapsed", "true");
+      clickedHeaderEl.setAttribute("data-collapsed", "true");
       (0, import_obsidian3.setIcon)(iconEl, "chevron-right");
       contentEl.style.maxHeight = "0";
     }
