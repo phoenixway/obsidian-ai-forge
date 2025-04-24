@@ -1038,17 +1038,25 @@ This action cannot be undone.`,
         );
       });
     };
+    // OllamaView.ts
     this.handleActiveChatChanged = async (data) => {
       var _a, _b, _c, _d, _e;
       this.plugin.logger.debug(`[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`);
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       const previousChatId = this.lastProcessedChatId;
-      this.lastProcessedChatId = data.chatId;
-      if (chatSwitched) {
-        this.plugin.logger.info(`[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`);
+      if (chatSwitched || data.chatId === null) {
+        this.lastProcessedChatId = data.chatId;
+      }
+      if (chatSwitched || data.chat === null) {
+        if (chatSwitched) {
+          this.plugin.logger.info(`[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`);
+        } else {
+          this.plugin.logger.warn(`[handleActiveChatChanged] Received event for current chat ID ${data.chatId} but chat data is null. Reloading view.`);
+          this.lastProcessedChatId = null;
+        }
         await this.loadAndDisplayActiveChat();
-      } else if (data.chatId !== null && data.chat !== null) {
-        this.plugin.logger.info(`[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements directly.`);
+      } else if (data.chatId !== null) {
+        this.plugin.logger.info(`[handleActiveChatChanged] Active chat content/metadata changed (ID: ${data.chatId}). Updating UI elements and messages directly.`);
         const activeChat = data.chat;
         const currentModelName = ((_a = activeChat.metadata) == null ? void 0 : _a.modelName) || this.plugin.settings.modelName;
         const currentRolePath = (_c = (_b = activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
@@ -1059,7 +1067,7 @@ This action cannot be undone.`,
         this.updateRoleDisplay(currentRoleName);
         this.updateInputPlaceholder(currentRoleName);
         this.updateTemperatureIndicator(currentTemperature);
-        this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
+        this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for content/metadata change...");
         const updatePromises = [];
         if (this.isSidebarSectionVisible("chats")) {
           updatePromises.push(this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)));
@@ -1069,28 +1077,24 @@ This action cannot be undone.`,
         }
         if (updatePromises.length > 0) {
           await Promise.all(updatePromises);
-          this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
+          this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for content/metadata change.");
+        }
+        this.plugin.logger.debug("[handleActiveChatChanged] Re-rendering message list...");
+        if (activeChat.messages && activeChat.messages.length > 0) {
+          this.hideEmptyState();
+          this.renderMessages(activeChat.messages);
+          this.checkAllMessagesForCollapsing();
+          if (!this.userScrolledUp) {
+            this.guaranteedScrollToBottom(100, false);
+          }
+        } else {
+          this.plugin.logger.debug("[handleActiveChatChanged] Chat has no messages after update. Showing empty state.");
+          this.clearChatContainerInternal();
+          this.showEmptyState();
         }
       } else {
-        if (data.chatId === null && previousChatId !== null) {
-          this.plugin.logger.info(`[handleActiveChatChanged] Active chat explicitly set to null. Reloading view.`);
-          await this.loadAndDisplayActiveChat();
-        } else if (data.chatId !== null && data.chat === null) {
-          this.plugin.logger.warn(`[handleActiveChatChanged] Received metadata change event for chat ${data.chatId}, but chat data was null. Reloading view as a fallback.`);
-          await this.loadAndDisplayActiveChat();
-        } else {
-          this.plugin.logger.debug(`[handleActiveChatChanged] Unhandled case or no actual change (e.g., null -> null). chatId: ${data.chatId}. Updating visible panels as precaution.`);
-          const updatePromises = [];
-          if (this.isSidebarSectionVisible("chats")) {
-            updatePromises.push(this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)));
-          }
-          if (this.isSidebarSectionVisible("roles")) {
-            updatePromises.push(this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e)));
-          }
-          if (updatePromises.length > 0) {
-            await Promise.all(updatePromises);
-          }
-        }
+        this.plugin.logger.warn(`[handleActiveChatChanged] Unhandled state: chatId=${data.chatId}, chatSwitched=${chatSwitched}. Reloading view as fallback.`);
+        await this.loadAndDisplayActiveChat();
       }
       if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
         this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");

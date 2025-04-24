@@ -1841,83 +1841,99 @@ private attachEventListeners(): void {
     this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
 }
 
-  private handleActiveChatChanged = async (data: { chatId: string | null, chat: Chat | null }): Promise<void> => {
-      // ... (логіка визначення chatSwitched, previousChatId) ...
-       this.plugin.logger.debug(`[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`);
+// OllamaView.ts
 
-      const chatSwitched = data.chatId !== this.lastProcessedChatId;
-      const previousChatId = this.lastProcessedChatId;
-      this.lastProcessedChatId = data.chatId;
+private handleActiveChatChanged = async (data: { chatId: string | null, chat: Chat | null }): Promise<void> => {
+  this.plugin.logger.debug(`[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`);
 
+  const chatSwitched = data.chatId !== this.lastProcessedChatId;
+  const previousChatId = this.lastProcessedChatId;
+
+  // Важливо: Оновлюємо lastProcessedChatId ТІЛЬКИ ЯКЩО ID дійсно змінився АБО став null.
+  // Якщо це просто оновлення метаданих поточного чату, ID не міняємо, щоб наступна подія
+  // (наприклад, ще одне оновлення метаданих) не вважалася "перемиканням".
+  // Однак, якщо ID стає null, це завжди "перемикання".
+  if (chatSwitched || data.chatId === null) {
+       this.lastProcessedChatId = data.chatId;
+  }
+  // Якщо !chatSwitched, lastProcessedChatId залишається старим.
+
+  if (chatSwitched || data.chat === null) { // Включаємо випадок, коли чат став null
+      // --- ЗМІНИВСЯ ЧАТ (новий ID або став null, або дані чату null) ---
       if (chatSwitched) {
-          // --- ЗМІНИВСЯ ЧАТ ---
            this.plugin.logger.info(`[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`);
-          // loadAndDisplayActiveChat оновить видимі панелі
-          await this.loadAndDisplayActiveChat();
-      } else if (data.chatId !== null && data.chat !== null) {
-          // --- МЕТАДАНІ ЗМІНИЛИСЯ ---
-           this.plugin.logger.info(`[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements directly.`);
-          // ... (оновлення model/role/temp display) ...
-           const activeChat = data.chat;
-          const currentModelName = activeChat.metadata?.modelName || this.plugin.settings.modelName;
-          const currentRolePath = activeChat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-          const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-          const currentTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
+      } else { // data.chat === null, але ID той самий - дивно, але перезавантажимо
+           this.plugin.logger.warn(`[handleActiveChatChanged] Received event for current chat ID ${data.chatId} but chat data is null. Reloading view.`);
+           // Потрібно також оновити lastProcessedChatId якщо ми переходимо до null стану
+           this.lastProcessedChatId = null;
+      }
+      await this.loadAndDisplayActiveChat(); // Повне перезавантаження
 
-          this.plugin.logger.debug(`[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`);
-          this.updateModelDisplay(currentModelName);
-          this.updateRoleDisplay(currentRoleName);
-          this.updateInputPlaceholder(currentRoleName);
-          this.updateTemperatureIndicator(currentTemperature);
+  } else if (data.chatId !== null /* && data.chat !== null - вже перевірено вище */) {
+      // --- ЧАТ НЕ ЗМІНИВСЯ (лише контент/метадані) ---
+      this.plugin.logger.info(`[handleActiveChatChanged] Active chat content/metadata changed (ID: ${data.chatId}). Updating UI elements and messages directly.`);
 
-          // --- ЗМІНЕНО: Оновлюємо видимі панелі ---
-           this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
-          const updatePromises = [];
-          if (this.isSidebarSectionVisible('chats')) {
-              updatePromises.push(this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e)));
-          }
-           if (this.isSidebarSectionVisible('roles')) {
-              updatePromises.push(this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e)));
-          }
-           if (updatePromises.length > 0) {
-              await Promise.all(updatePromises);
-               this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
-          }
-           // --- КІНЕЦЬ ЗМІН ---
+      const activeChat = data.chat; // Ми знаємо, що він не null тут
 
-      } else {
-           // --- ІНШІ ВИПАДКИ (chatId став null, тощо) ---
-           if (data.chatId === null && previousChatId !== null) {
-               this.plugin.logger.info(`[handleActiveChatChanged] Active chat explicitly set to null. Reloading view.`);
-               await this.loadAndDisplayActiveChat(); // Перезавантаження оновить видимі панелі
-           } else if (data.chatId !== null && data.chat === null) {
-                this.plugin.logger.warn(`[handleActiveChatChanged] Received metadata change event for chat ${data.chatId}, but chat data was null. Reloading view as a fallback.`);
-                await this.loadAndDisplayActiveChat(); // Перезавантаження оновить видимі панелі
-           } else {
-              this.plugin.logger.debug(`[handleActiveChatChanged] Unhandled case or no actual change (e.g., null -> null). chatId: ${data.chatId}. Updating visible panels as precaution.`);
-               const updatePromises = [];
-               if (this.isSidebarSectionVisible('chats')) {
-                   updatePromises.push(this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e)));
-               }
-                if (this.isSidebarSectionVisible('roles')) {
-                   updatePromises.push(this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e)));
-               }
-                if (updatePromises.length > 0) {
-                   await Promise.all(updatePromises);
-               }
+      // 1. Оновлюємо метадані UI (як було)
+      const currentModelName = activeChat.metadata?.modelName || this.plugin.settings.modelName;
+      const currentRolePath = activeChat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+      const currentRoleName = await this.findRoleNameByPath(currentRolePath);
+      const currentTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
+
+      this.plugin.logger.debug(`[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`);
+      this.updateModelDisplay(currentModelName);
+      this.updateRoleDisplay(currentRoleName);
+      this.updateInputPlaceholder(currentRoleName);
+      this.updateTemperatureIndicator(currentTemperature);
+
+      // 2. Оновлюємо видимі панелі (як було)
+      this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for content/metadata change...");
+      const updatePromises = [];
+      if (this.isSidebarSectionVisible('chats')) {
+          updatePromises.push(this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e)));
+      }
+       if (this.isSidebarSectionVisible('roles')) {
+          updatePromises.push(this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e)));
+      }
+       if (updatePromises.length > 0) {
+          await Promise.all(updatePromises);
+           this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for content/metadata change.");
+      }
+
+      // --- 3. ДОДАНО: Перемальовуємо список повідомлень ---
+      this.plugin.logger.debug("[handleActiveChatChanged] Re-rendering message list...");
+      if (activeChat.messages && activeChat.messages.length > 0) {
+          this.hideEmptyState();
+          this.renderMessages(activeChat.messages); // Використовуємо існуючий метод рендерингу
+          this.checkAllMessagesForCollapsing();
+          // Плавно прокручуємо вниз, якщо користувач був унизу
+           if (!this.userScrolledUp) {
+              this.guaranteedScrollToBottom(100, false);
            }
+      } else {
+           this.plugin.logger.debug("[handleActiveChatChanged] Chat has no messages after update. Showing empty state.");
+           this.clearChatContainerInternal(); // Переконатись, що контейнер чистий
+           this.showEmptyState(); // Показати заглушку
       }
+      // --- КІНЕЦЬ ДОДАНОГО КОДУ ---
 
-      // Оновлення випадаючого меню ролей (як було)
-      // ...
-       if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-           this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
-           this.renderRoleList().catch(error => {
-              this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
-           });
-      }
-       this.plugin.logger.debug(`[handleActiveChatChanged] Finished processing event for chat ID: ${data.chatId}`);
-  };
+  } else {
+       // Логіка для випадку, коли data.chatId є null, але chatSwitched чомусь false
+       // (малоймовірно після виправлення вище, але про всяк випадок)
+       this.plugin.logger.warn(`[handleActiveChatChanged] Unhandled state: chatId=${data.chatId}, chatSwitched=${chatSwitched}. Reloading view as fallback.`);
+       await this.loadAndDisplayActiveChat();
+  }
+
+  // Оновлення випадаючого меню ролей (як було)
+  if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+       this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
+       this.renderRoleList().catch(error => {
+          this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
+       });
+  }
+   this.plugin.logger.debug(`[handleActiveChatChanged] Finished processing event for chat ID: ${data.chatId}`);
+};
 
   private handleChatListUpdated = (): void => {
       this.plugin.logger.info(
