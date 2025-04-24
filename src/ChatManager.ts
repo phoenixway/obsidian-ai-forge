@@ -535,8 +535,9 @@ export class ChatManager {
                 }
 
                 // Повідомляємо View про зміну контенту активного чату
-                this.plugin.emit('active-chat-changed', { chatId: chatId, chat: chat });
-                // Повідомляємо про зміну списку (через lastModified)
+                this.plugin.emit('message-deleted', { chatId: chatId, timestamp: timestampToDelete });
+                // Подію chat-list-updated залишаємо, бо змінився lastModified
+                // this.plugin.emit('chat-list-updated');                // Повідомляємо про зміну списку (через lastModified)
                 this.plugin.emit('chat-list-updated');
 
                 return true; // Успішно видалено
