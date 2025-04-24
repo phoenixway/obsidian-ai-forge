@@ -1095,93 +1095,58 @@ export class OllamaView extends ItemView {
   };
   // --- Кінець нового методу ---
 
-  private updateRolePanelList = async (): Promise<void> => {
-    const container = this.rolePanelListEl;
-    if (!container || !this.plugin.chatManager) return;
 
-    // Перевірка видимості
-    if (this.rolePanelHeaderEl?.getAttribute("data-collapsed") === "true") {
-      this.plugin.logger.debug(
-        "[updateRolePanelList] Skipping update: Roles panel is collapsed."
-      );
-      return;
-    }
-
-    this.plugin.logger.debug(
-      "[updateRolePanelList] Updating role list in the side panel..."
-    );
-    container.empty();
-
-    try {
-      // ... (решта логіки отримання, сортування та рендерингу ролей ЯК БУЛА) ...
-      const roles = await this.plugin.listRoleFiles(true);
-      const activeChat = await this.plugin.chatManager.getActiveChat();
-      const currentRolePath =
-        activeChat?.metadata?.selectedRolePath ??
-        this.plugin.settings.selectedRolePath;
-
-      const noneOptionEl = container.createDiv({
-        cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, "menu-option"],
-      });
-      const noneIconSpan = noneOptionEl.createSpan({
-        cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"],
-      });
-      noneOptionEl.createSpan({
-        cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
-        text: "None",
-      });
-      if (!currentRolePath) {
-        noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-        setIcon(noneIconSpan, "check");
-      } else {
-        setIcon(noneIconSpan, "slash");
+    // --- Оновлений updateRolePanelList (БЕЗ ВСТАНОВЛЕННЯ max-height/overflow) ---
+    private updateRolePanelList = async (): Promise<void> => {
+      const container = this.rolePanelListEl;
+      if (!container || !this.plugin.chatManager) {
+           this.plugin.logger.debug("[updateRolePanelList] Skipping update: Container or ChatManager missing.");
+          return;
+      };
+      // Перевірка видимості
+       if (this.rolePanelHeaderEl?.getAttribute('data-collapsed') === 'true') {
+           this.plugin.logger.debug("[updateRolePanelList] Skipping update: Roles panel is collapsed.");
+           return;
       }
-      this.registerDomEvent(noneOptionEl, "click", () =>
-        this.handleRolePanelItemClick(null, currentRolePath)
-      );
 
-      // if (roles.length > 0) {
-      //     container.createEl('hr', { cls: 'menu-separator' });
-      // }
-
-      roles.forEach((roleInfo) => {
-        const roleOptionEl = container.createDiv({
-          cls: [CSS_ROLE_PANEL_ITEM, "menu-option"],
-        });
-        const iconSpan = roleOptionEl.createSpan({
-          cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"],
-        });
-        roleOptionEl.createSpan({
-          cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
-          text: roleInfo.name,
-        });
-        if (roleInfo.isCustom) {
-          roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM);
-        }
-        if (roleInfo.path === currentRolePath) {
-          roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-          setIcon(iconSpan, "check");
-        } else {
-          setIcon(iconSpan, roleInfo.isCustom ? "user" : "file-text");
-        }
-        this.registerDomEvent(roleOptionEl, "click", () =>
-          this.handleRolePanelItemClick(roleInfo, currentRolePath)
-        );
-      });
-
-      // --- ВИДАЛЕНО ВСТАНОВЛЕННЯ ВИСОТИ ---
-    } catch (error) {
-      this.plugin.logger.error(
-        "[updateRolePanelList] Error rendering role panel list:",
-        error
-      );
+      this.plugin.logger.debug("[updateRolePanelList] Updating role list content...");
+      const currentScrollTop = container.scrollTop;
       container.empty();
-      container.createDiv({
-        text: "Error loading roles.",
-        cls: "menu-error-text",
-      });
-    }
-  };
+
+      try {
+          // ... (логіка рендерингу елементів списку як була) ...
+          const roles = await this.plugin.listRoleFiles(true);
+          const activeChat = await this.plugin.chatManager.getActiveChat();
+          const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+
+          const noneOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, 'menu-option'] });
+          const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
+          noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, 'menu-option-text'], text: "None" });
+          if (!currentRolePath) { noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); setIcon(noneIconSpan, "check"); } else { setIcon(noneIconSpan, "slash"); }
+          this.registerDomEvent(noneOptionEl, 'click', () => this.handleRolePanelItemClick(null, currentRolePath));
+
+          roles.forEach(roleInfo => {
+               const roleOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, 'menu-option'] });
+               const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
+               roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, 'menu-option-text'], text: roleInfo.name });
+               if (roleInfo.isCustom) { roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM); }
+               if (roleInfo.path === currentRolePath) { roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); setIcon(iconSpan, "check"); } else { setIcon(iconSpan, roleInfo.isCustom ? 'user' : 'file-text'); }
+               this.registerDomEvent(roleOptionEl, 'click', () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+          });
+           this.plugin.logger.debug(`[updateRolePanelList] Finished rendering ${roles.length + 1} role items.`);
+
+          // --- ВИДАЛЕНО ВСТАНОВЛЕННЯ max-height/overflow ЗВІДСИ ---
+          // requestAnimationFrame(() => { ... }); // ВИДАЛЕНО
+
+      } catch (error) {
+          this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
+          container.empty();
+          container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
+      } finally {
+           requestAnimationFrame(() => { container.scrollTop = currentScrollTop; });
+      }
+  }
+
 
   // --- Новий обробник кліку для ПАНЕЛІ ролей ---
   private handleRolePanelItemClick = async (
@@ -4618,108 +4583,70 @@ export class OllamaView extends ItemView {
 
 // OllamaView.ts
 
-    // --- Оновлений метод для рендерингу списку ЧАТІВ у ПАНЕЛІ (зміна структури DOM) ---
-    private updateChatPanelList = async (): Promise<void> => {
-      const container = this.chatPanelListEl;
-      if (!container || !this.plugin.chatManager) return;
-      if (this.chatPanelHeaderEl?.getAttribute('data-collapsed') === 'true') return;
+  // --- Оновлений updateChatPanelList (БЕЗ ВСТАНОВЛЕННЯ max-height/overflow) ---
+  private updateChatPanelList = async (): Promise<void> => {
+    const container = this.chatPanelListEl;
+    if (!container || !this.plugin.chatManager) {
+        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Container or ChatManager missing.");
+        return;
+    };
+    // Перевірка видимості
+    if (this.chatPanelHeaderEl?.getAttribute('data-collapsed') === 'true') {
+        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Chat panel is collapsed.");
+        return;
+    }
 
-      this.plugin.logger.debug("[updateChatPanelList] Updating chat list in the side panel...");
-      const currentScrollTop = container.scrollTop;
-      container.empty();
+    this.plugin.logger.debug("[updateChatPanelList] Updating chat list content...");
+    const currentScrollTop = container.scrollTop;
+    container.empty();
 
-      try {
-          const chats: ChatMetadata[] = this.plugin.chatManager.listAvailableChats() || [];
-          const currentActiveId = this.plugin.chatManager.getActiveChatId();
+    try {
+        const chats: ChatMetadata[] = this.plugin.chatManager.listAvailableChats() || [];
+        const currentActiveId = this.plugin.chatManager.getActiveChatId();
+        // ... (логіка рендерингу елементів списку як була) ...
+         if (chats.length === 0) {
+            container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
+        } else {
+            chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
+            chats.forEach(chatMeta => {
+                // Створення chatOptionEl
+                const chatOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, 'menu-option', 'ollama-chat-panel-item'] });
+                // 1. Іконка
+                const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
+                if (chatMeta.id === currentActiveId) { setIcon(iconSpan, "check"); chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); } else { setIcon(iconSpan, "message-square"); }
+                // 2. Обгортка тексту
+                const textWrapper = chatOptionEl.createDiv({ cls: 'ollama-chat-item-text-wrapper' });
+                textWrapper.createDiv({ cls: 'chat-panel-item-name', text: chatMeta.name });
+                textWrapper.createDiv({ cls: 'chat-panel-item-date', text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
+                // 3. Кнопка опцій
+                const optionsBtn = chatOptionEl.createEl('button', { cls: [CSS_CHAT_ITEM_OPTIONS, 'clickable-icon'], attr: { 'aria-label': 'Chat options', title: 'More options'} });
+                setIcon(optionsBtn, "lucide-more-horizontal");
+                // Обробники подій
+                this.registerDomEvent(chatOptionEl, 'click', async (e) => { if (!(e.target instanceof Element && e.target.closest(`.${CSS_CHAT_ITEM_OPTIONS}`))) { if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) { await this.plugin.chatManager.setActiveChat(chatMeta.id); } } });
+                this.registerDomEvent(optionsBtn, 'click', (e) => { e.stopPropagation(); this.showChatContextMenu(e, chatMeta); });
+                this.registerDomEvent(chatOptionEl, 'contextmenu', (e) => { this.showChatContextMenu(e, chatMeta); });
+            });
+        }
+         this.plugin.logger.debug(`[updateChatPanelList] Finished rendering ${chats.length} chat items.`);
+        // --- ВИДАЛЕНО ВСТАНОВЛЕННЯ max-height/overflow ЗВІДСИ ---
+        // requestAnimationFrame(() => { ... }); // ВИДАЛЕНО
 
-          if (chats.length === 0) {
-              container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
-          } else {
-              chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
+    } catch (error) {
+        this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
+        container.empty();
+        container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
+         // Не встановлюємо висоту для помилки, CSS має впоратись
+    } finally {
+        // Відновлення скролу
+        requestAnimationFrame(() => { container.scrollTop = currentScrollTop; });
+    }
+}
 
-              chats.forEach(chatMeta => {
-                  // Головний контейнер елемента списку
-                  const chatOptionEl = container.createDiv({
-                      cls: [CSS_ROLE_PANEL_ITEM, 'menu-option', 'ollama-chat-panel-item']
-                  });
-
-                  // --- НОВА СТРУКТУРА ---
-                  // 1. Іконка чату
-                  const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
-                  if (chatMeta.id === currentActiveId) {
-                      setIcon(iconSpan, "check"); // Використовуємо check для активного
-                      chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-                  } else {
-                      setIcon(iconSpan, "message-square");
-                  }
-
-                  // 2. Обгортка для тексту (Назва + Дата)
-                  const textWrapper = chatOptionEl.createDiv({ cls: 'ollama-chat-item-text-wrapper' });
-                  textWrapper.createDiv({ cls: 'chat-panel-item-name', text: chatMeta.name });
-                  textWrapper.createDiv({ cls: 'chat-panel-item-date', text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
-
-                  // 3. Кнопка "..." (Опції)
-                  const optionsBtn = chatOptionEl.createEl('button', {
-                      cls: [CSS_CHAT_ITEM_OPTIONS, 'clickable-icon'],
-                      attr: { 'aria-label': 'Chat options', title: 'More options'}
-                  });
-                  setIcon(optionsBtn, "lucide-more-horizontal");
-                  // --- КІНЕЦЬ НОВОЇ СТРУКТУРИ ---
-
-                  // --- ОБРОБНИКИ ---
-                  // Клік на ВЕСЬ елемент (крім кнопки опцій) - активація
-                  this.registerDomEvent(chatOptionEl, 'click', async (e) => {
-                      // Перевіряємо, чи клік був НЕ по кнопці опцій
-                      if (!(e.target instanceof Element && e.target.closest(`.${CSS_CHAT_ITEM_OPTIONS}`))) {
-                           if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
-                               await this.plugin.chatManager.setActiveChat(chatMeta.id);
-                           }
-                      }
-                  });
-
-                  // Клік на кнопку "..." - меню
-                  this.registerDomEvent(optionsBtn, 'click', (e) => {
-                      e.stopPropagation();
-                      this.showChatContextMenu(e, chatMeta);
-                  });
-
-                  // Правий клік на весь елемент - меню
-                  this.registerDomEvent(chatOptionEl, 'contextmenu', (e) => {
-                      this.showChatContextMenu(e, chatMeta);
-                  });
-              });
-          }
-          // Встановлення висоти в кінці (як було)
-          requestAnimationFrame(() => {
-              if (container && this.isSidebarSectionVisible('chats')) {
-                  const currentScrollHeight = container.scrollHeight;
-                  container.style.maxHeight = currentScrollHeight + "px";
-                  container.style.overflowY = 'auto';
-              }
-          });
-
-      } catch (error) {
-           // ... (обробка помилки як була) ...
-            this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
-          container.empty();
-          container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
-      } finally {
-           requestAnimationFrame(() => {
-               container.scrollTop = currentScrollTop;
-           });
-      }
-  }
-
-// OllamaView.ts
-
-// OllamaView.ts
 
 private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> {
   const sectionType = clickedHeaderEl.getAttribute('data-section-type') as 'chats' | 'roles';
   const isCurrentlyCollapsed = clickedHeaderEl.getAttribute('data-collapsed') === 'true';
   const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
-
-  this.plugin.logger.debug(`Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`); // Use plugin logger
 
   let contentEl: HTMLElement | null = null;
   let updateFunction: (() => Promise<void>) | null = null;
@@ -4731,8 +4658,7 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
   const expandIcon = "lucide-folder-open";
   const expandedClass = "is-expanded";
 
-  if (sectionType === 'chats') { /* ... */ } else if (sectionType === 'roles') { /* ... */ }
-  // (Assign variables as before)
+  // ... (визначення змінних як раніше) ...
    if (sectionType === 'chats') {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
@@ -4752,54 +4678,55 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
        return;
   }
 
-
   if (isCurrentlyCollapsed) {
-      // --- EXPANDING current section ---
-      // 1. Collapse other section
+      // --- Розгортаємо поточну, згортаємо іншу ---
+      // 1. Згортаємо іншу секцію
       if (otherHeaderEl.getAttribute('data-collapsed') === 'false') {
           const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
           otherHeaderEl.setAttribute('data-collapsed', 'true');
           if (otherIconEl) setIcon(otherIconEl, collapseIcon);
-          this.plugin.logger.debug(`Collapsing other section (${otherSectionType}) by removing class:`, otherContentEl); // Log element
-          otherContentEl.classList.remove(expandedClass);
+          otherContentEl.classList.remove(expandedClass); // Видаляємо клас
+           // --- ЗМІНА: Не чіпаємо inline стилі ---
+          // otherContentEl.style.maxHeight = '0px';
+          // otherContentEl.style.paddingTop = '0';
+          // otherContentEl.style.paddingBottom = '0';
+          // otherContentEl.style.overflowY = 'hidden';
           if (otherSectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.hide();
       }
 
-      // 2. Expand current section
+      // 2. Розгортаємо поточну секцію
       clickedHeaderEl.setAttribute('data-collapsed', 'false');
       setIcon(iconEl, expandIcon);
       if (sectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.show();
       try {
-          // Важливо: Викликаємо updateFunction *перед* додаванням класу,
-          // щоб контент був готовий, коли почнеться анімація розгортання
+           // Спочатку викликаємо оновлення, щоб контент був готовий
           await updateFunction();
-          this.plugin.logger.debug(`Adding ${expandedClass} to content of section ${sectionType}:`, contentEl); // Log element
+          // Потім додаємо клас, CSS подбає про анімацію та висоту
           contentEl.classList.add(expandedClass);
+           this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch(error) {
           this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
           contentEl.setText(`Error loading ${sectionType}.`);
-           contentEl.classList.add(expandedClass); // Розгортаємо, щоб показати помилку
+          contentEl.classList.add(expandedClass); // Показуємо помилку
       }
 
   } else {
-      // --- COLLAPSING current section ---
+      // --- Згортаємо поточну ---
+      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute('data-collapsed', 'true');
       setIcon(iconEl, collapseIcon);
-      // --- DEBUGGING: Log before and after class removal ---
-      this.plugin.logger.debug(`Attempting to remove ${expandedClass} from:`, contentEl);
-      console.log("Classes BEFORE removal:", contentEl.classList.toString()); // Use console.log for direct class list string
-      contentEl.classList.remove(expandedClass);
-      console.log("Classes AFTER removal:", contentEl.classList.toString()); // Use console.log for direct class list string
-      this.plugin.logger.debug(`Removed ${expandedClass} for section ${sectionType}. Element should now collapse via CSS.`);
-      // --- END DEBUGGING ---
+       // --- ЗМІНА: Не чіпаємо inline стилі ---
+      contentEl.classList.remove(expandedClass); // Видаляємо клас
+      // contentEl.style.maxHeight = '0px';
+      // contentEl.style.paddingTop = '0';
+      // contentEl.style.paddingBottom = '0';
+      // contentEl.style.overflowY = 'hidden';
 
       if (sectionType === 'chats' && this.newChatSidebarButton) {
            this.newChatSidebarButton.hide();
       }
   }
 }
-
-// OllamaView.ts
 
     // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - через 'dom' з 'as any') ---
     private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
