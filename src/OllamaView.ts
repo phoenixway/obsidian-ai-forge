@@ -2720,78 +2720,83 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
           }
 
       } finally {
-           // 7. Завжди виконується після try/catch (очищення стану та фіналізація UI)
-          this.plugin.logger.debug("[OllamaView] sendMessage finally block executing. Cleaning up UI state.");
+        this.plugin.logger.debug("[OllamaView] sendMessage finally block executing. Cleaning up UI state.");
 
-           // Фіналізуємо вигляд повідомлення асистента (додаємо кнопки, мітку часу),
-           // тільки якщо воно не було видалено через помилку або скасування без відповіді.
-           if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl && assistantMessageElInternal) {
-               const finalTimestamp = this.currentAssistantMessage.timestamp ?? responseStartTime;
-               // Використовуємо accumulatedResponse, бо currentAssistantMessage.fullContent не оновлювався
-               const finalContent = accumulatedResponse;
+        // Фіналізуємо вигляд повідомлення асистента
+        // Перевіряємо, чи існує посилання на елементи (на випадок помилок/скасування)
+        if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl && assistantMessageElInternal) {
+            const finalTimestamp = this.currentAssistantMessage.timestamp ?? responseStartTime;
+            const finalContent = accumulatedResponse; // Остаточний текст
+            // --- ВИПРАВЛЕННЯ: Захоплюємо посилання на contentEl ---
+            const targetContentElement = this.currentAssistantMessage.contentEl; // Зберігаємо посилання!
+            // ----------------------------------------------------
 
-               // Додаємо кнопки та мітку часу до assistantMessageElInternal
-               const messageWrapper = assistantMessageElInternal.parentElement;
-               if (messageWrapper) {
-                   const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
-                   existingActions?.remove(); // Видаляємо старі кнопки, якщо вони були
-                   const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+             const messageWrapper = assistantMessageElInternal.parentElement;
+             if (messageWrapper) {
+                 const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
+                 existingActions?.remove();
+                 const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
 
-                   // Кнопка Копіювання
-                   const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
-                   setIcon(copyBtn, "copy");
-                   this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
+                 // Кнопка Копіювання
+                 const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
+                 setIcon(copyBtn, "copy");
+                 this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
 
-                   // Кнопка Перекладу (якщо налаштовано)
-                   if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
-                       const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
-                       setIcon(translateBtn, "languages");
-                       this.registerDomEvent(translateBtn, "click", (e) => {
-                           e.stopPropagation();
-                           if (this.currentAssistantMessage?.contentEl) { // Перевірка існування contentEl
-                              this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
-                           }
-                       });
-                   }
+                 // Кнопка Перекладу
+                 if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
+                     const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
+                     setIcon(translateBtn, "languages");
+                     // --- ВИПРАВЛЕННЯ: Використовуємо захоплене посилання targetContentElement ---
+                     this.registerDomEvent(translateBtn, "click", (e) => {
+                         e.stopPropagation();
+                         // Тепер використовуємо змінну, яка зберігає посилання з моменту реєстрації
+                         if (targetContentElement && targetContentElement.isConnected) {
+                             this.handleTranslateClick(finalContent, targetContentElement, translateBtn);
+                         } else {
+                              this.plugin.logger.error("Translate click handler (finally): targetContentElement is null or not connected!");
+                              new Notice("Cannot translate: message content element not found.");
+                         }
+                     });
+                     // ---------------------------------------------------------------------------
+                 }
 
-                   // Кнопка Видалення
-                   const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
-                   setIcon(deleteBtn, "trash");
-                   this.registerDomEvent(deleteBtn, "click", (e) => {
-                       e.stopPropagation();
-                       // Створюємо тимчасовий об'єкт Message для передачі в обробник
-                       // (припускаючи, що handleDeleteMessageClick може знайти повідомлення за timestamp)
-                       const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
-                       this.handleDeleteMessageClick(tempMsgForDelete);
-                   });
-               } else {
-                    this.plugin.logger.warn("[OllamaView] finally: Could not find message-wrapper to add action buttons.");
-               }
+                 // Кнопка Видалення
+                 const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+                 setIcon(deleteBtn, "trash");
+                 this.registerDomEvent(deleteBtn, "click", (e) => {
+                     e.stopPropagation();
+                     const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
+                     this.handleDeleteMessageClick(tempMsgForDelete);
+                 });
+             } else {
+                  this.plugin.logger.warn("[OllamaView] finally: Could not find message-wrapper to add action buttons.");
+             }
 
-               // Додаємо мітку часу
-               const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
-               existingTimestamp?.remove();
-               assistantMessageElInternal.createDiv({
-                   cls: CSS_CLASS_TIMESTAMP,
-                   text: this.formatTime(finalTimestamp),
-               });
+             // Додаємо мітку часу
+             const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+             existingTimestamp?.remove();
+             assistantMessageElInternal.createDiv({
+                 cls: CSS_CLASS_TIMESTAMP,
+                 text: this.formatTime(finalTimestamp),
+             });
 
-               // Перевірка згортання ще раз після додавання всіх елементів
-               this.checkMessageForCollapsing(assistantMessageElInternal);
+             // Перевірка згортання
+             this.checkMessageForCollapsing(assistantMessageElInternal);
 
-           } else {
-                this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed).");
-           }
+        } else {
+             this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed or null).");
+        }
 
-          // Скидаємо стан завантаження та контролер
-          this.setLoadingState(false);
-          this.stopGeneratingButton?.hide();
-          this.currentAbortController = null;
-          this.currentAssistantMessage = null; // Очищуємо посилання на поточне повідомлення
-          this.updateSendButtonState(); // Оновлюємо стан кнопок Send/Stop
-          this.focusInput(); // Повертаємо фокус у поле вводу
-          this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
-      }
+       // Скидаємо стан завантаження, контролер та кнопку
+       this.setLoadingState(false);
+       this.stopGeneratingButton?.hide();
+       this.currentAbortController = null;
+       this.currentAssistantMessage = null; // <-- Ось тут він стає null, ПІСЛЯ реєстрації обробників
+       this.updateSendButtonState();
+       this.focusInput();
+       this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
+    }
+
   }
 
   // ... (решта коду OllamaView.ts після sendMessage) ...
@@ -3274,74 +3279,80 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
                       }
                       this.currentAssistantMessage = null; // Важливо для finally
                   }
-              } finally {
-                  // 9. Завжди виконується: Очищення стану та фіналізація UI
-                  this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block executing. Cleaning up UI state.");
-
-                  // Фіналізуємо вигляд повідомлення асистента (кнопки, мітка часу)
-                  if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl && assistantMessageElInternal) {
-                       const finalTimestamp = this.currentAssistantMessage.timestamp ?? responseStartTime;
-                       const finalContent = accumulatedResponse; // Остаточний текст
-
-                       // Додаємо кнопки та мітку часу до assistantMessageElInternal
-                       const messageWrapper = assistantMessageElInternal.parentElement;
-                       if (messageWrapper) {
-                           const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
-                           existingActions?.remove();
-                           const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-
-                           // Кнопка Копіювання
-                           const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
-                           setIcon(copyBtn, "copy");
-                           this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
-
-                           // Кнопка Перекладу
-                           if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
-                               const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
-                               setIcon(translateBtn, "languages");
-                               this.registerDomEvent(translateBtn, "click", (e) => {
-                                   e.stopPropagation();
-                                   if (this.currentAssistantMessage?.contentEl) {
-                                      this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
-                                   }
-                               });
-                           }
-
-                           // Кнопка Видалення
-                           const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
-                           setIcon(deleteBtn, "trash");
-                           this.registerDomEvent(deleteBtn, "click", (e) => {
-                               e.stopPropagation();
-                               const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
-                               this.handleDeleteMessageClick(tempMsgForDelete);
-                           });
-                       } else {
+              }  finally {
+                this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block executing. Cleaning up UI state.");
+        
+                // Фіналізуємо вигляд повідомлення асистента
+                if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl && assistantMessageElInternal) {
+                     const finalTimestamp = this.currentAssistantMessage.timestamp ?? responseStartTime;
+                     const finalContent = accumulatedResponse;
+                     // --- ВИПРАВЛЕННЯ: Захоплюємо посилання на contentEl ---
+                     const targetContentElement = this.currentAssistantMessage.contentEl; // Зберігаємо посилання!
+                     // ----------------------------------------------------
+        
+                      const messageWrapper = assistantMessageElInternal.parentElement;
+                      if (messageWrapper) {
+                          const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
+                          existingActions?.remove();
+                          const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+        
+                          // Кнопка Копіювання
+                          const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
+                          setIcon(copyBtn, "copy");
+                          this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
+        
+                          // Кнопка Перекладу
+                          if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
+                              const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
+                              setIcon(translateBtn, "languages");
+                              // --- ВИПРАВЛЕННЯ: Використовуємо захоплене посилання targetContentElement ---
+                              this.registerDomEvent(translateBtn, "click", (e) => {
+                                  e.stopPropagation();
+                                  if (targetContentElement && targetContentElement.isConnected) {
+                                      this.handleTranslateClick(finalContent, targetContentElement, translateBtn);
+                                  } else {
+                                       this.plugin.logger.error("Translate click handler (finally/regenerate): targetContentElement is null or not connected!");
+                                       new Notice("Cannot translate: message content element not found.");
+                                  }
+                              });
+                              // ---------------------------------------------------------------------------
+                          }
+        
+                          // Кнопка Видалення
+                          const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+                          setIcon(deleteBtn, "trash");
+                          this.registerDomEvent(deleteBtn, "click", (e) => {
+                              e.stopPropagation();
+                              const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
+                              this.handleDeleteMessageClick(tempMsgForDelete);
+                          });
+                      } else {
                            this.plugin.logger.warn("[OllamaView] finally (regenerate): Could not find message-wrapper to add action buttons.");
-                       }
-
-                       // Додаємо мітку часу
-                       const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
-                       existingTimestamp?.remove();
-                       assistantMessageElInternal.createDiv({
-                           cls: CSS_CLASS_TIMESTAMP,
-                           text: this.formatTime(finalTimestamp),
-                       });
-
-                       // Перевірка згортання
-                       this.checkMessageForCollapsing(assistantMessageElInternal);
-                  } else {
-                       this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed).");
-                  }
-
-                  // Скидаємо стан завантаження, контролер та кнопку
-                  this.setLoadingState(false);
-                  this.stopGeneratingButton?.hide();
-                  this.currentAbortController = null;
-                  this.currentAssistantMessage = null; // Очищуємо посилання
-                  this.updateSendButtonState(); // Оновлюємо стан кнопок
-                  this.focusInput(); // Повертаємо фокус
-                  this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
-              }
+                      }
+        
+                      // Додаємо мітку часу
+                      const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+                      existingTimestamp?.remove();
+                      assistantMessageElInternal.createDiv({
+                          cls: CSS_CLASS_TIMESTAMP,
+                          text: this.formatTime(finalTimestamp),
+                      });
+        
+                      // Перевірка згортання
+                      this.checkMessageForCollapsing(assistantMessageElInternal);
+                 } else {
+                      this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed or null).");
+                 }
+        
+                // Скидаємо стан завантаження, контролер та кнопку
+                this.setLoadingState(false);
+                this.stopGeneratingButton?.hide();
+                this.currentAbortController = null;
+                this.currentAssistantMessage = null; // <-- Скидання тут
+                this.updateSendButtonState();
+                this.focusInput();
+                this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
+            }
           } // Кінець колбеку ConfirmModal
       ).open(); // Відкриваємо модалку підтвердження
    }

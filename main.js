@@ -2514,6 +2514,7 @@ This action cannot be undone.`,
       if (((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) && ((_h = this.currentAssistantMessage) == null ? void 0 : _h.contentEl) && assistantMessageElInternal) {
         const finalTimestamp = (_i = this.currentAssistantMessage.timestamp) != null ? _i : responseStartTime;
         const finalContent = accumulatedResponse;
+        const targetContentElement = this.currentAssistantMessage.contentEl;
         const messageWrapper = assistantMessageElInternal.parentElement;
         if (messageWrapper) {
           const existingActions = messageWrapper.querySelector(".message-actions-wrapper");
@@ -2529,10 +2530,12 @@ This action cannot be undone.`,
             const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
             (0, import_obsidian3.setIcon)(translateBtn, "languages");
             this.registerDomEvent(translateBtn, "click", (e) => {
-              var _a2;
               e.stopPropagation();
-              if ((_a2 = this.currentAssistantMessage) == null ? void 0 : _a2.contentEl) {
-                this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
+              if (targetContentElement && targetContentElement.isConnected) {
+                this.handleTranslateClick(finalContent, targetContentElement, translateBtn);
+              } else {
+                this.plugin.logger.error("Translate click handler (finally): targetContentElement is null or not connected!");
+                new import_obsidian3.Notice("Cannot translate: message content element not found.");
               }
             });
           }
@@ -2554,7 +2557,7 @@ This action cannot be undone.`,
         });
         this.checkMessageForCollapsing(assistantMessageElInternal);
       } else {
-        this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed).");
+        this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed or null).");
       }
       this.setLoadingState(false);
       (_j = this.stopGeneratingButton) == null ? void 0 : _j.hide();
@@ -2944,6 +2947,7 @@ This action cannot be undone.`,
           if (((_f = this.currentAssistantMessage) == null ? void 0 : _f.groupEl) && ((_g = this.currentAssistantMessage) == null ? void 0 : _g.contentEl) && assistantMessageElInternal) {
             const finalTimestamp = (_h = this.currentAssistantMessage.timestamp) != null ? _h : responseStartTime;
             const finalContent = accumulatedResponse;
+            const targetContentElement = this.currentAssistantMessage.contentEl;
             const messageWrapper = assistantMessageElInternal.parentElement;
             if (messageWrapper) {
               const existingActions = messageWrapper.querySelector(".message-actions-wrapper");
@@ -2959,10 +2963,12 @@ This action cannot be undone.`,
                 const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
                 (0, import_obsidian3.setIcon)(translateBtn, "languages");
                 this.registerDomEvent(translateBtn, "click", (e) => {
-                  var _a3;
                   e.stopPropagation();
-                  if ((_a3 = this.currentAssistantMessage) == null ? void 0 : _a3.contentEl) {
-                    this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
+                  if (targetContentElement && targetContentElement.isConnected) {
+                    this.handleTranslateClick(finalContent, targetContentElement, translateBtn);
+                  } else {
+                    this.plugin.logger.error("Translate click handler (finally/regenerate): targetContentElement is null or not connected!");
+                    new import_obsidian3.Notice("Cannot translate: message content element not found.");
                   }
                 });
               }
@@ -2984,7 +2990,7 @@ This action cannot be undone.`,
             });
             this.checkMessageForCollapsing(assistantMessageElInternal);
           } else {
-            this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed).");
+            this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed or null).");
           }
           this.setLoadingState(false);
           (_i = this.stopGeneratingButton) == null ? void 0 : _i.hide();
