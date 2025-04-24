@@ -1591,244 +1591,122 @@ This action cannot be undone.`,
     if (this.resizeTimeout)
       clearTimeout(this.resizeTimeout);
   }
+  // OllamaView.ts
+  // --- UI Creation (Повна версія з усіма виправленнями) ---
   createUIElements() {
+    this.plugin.logger.debug("createUIElements: Starting UI creation.");
     this.contentEl.empty();
-    const flexContainer = this.contentEl.createDiv({
-      cls: CSS_CLASS_CONTAINER
-    });
+    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
     this.chatPanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
-      // Стан зберігаємо в атрибуті
+      // State: collapsed = false
     });
-    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({
-      cls: "ollama-sidebar-header-left"
-    });
-    (0, import_obsidian3.setIcon)(
-      chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-      "lucide-folder-open"
-    );
+    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    (0, import_obsidian3.setIcon)(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "lucide-folder-open");
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
     this.newChatSidebarButton = this.chatPanelHeaderEl.createEl("button", {
-      // <-- Призначаємо властивості
       cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
       attr: { "aria-label": "New Chat", "title": "New Chat" }
     });
     (0, import_obsidian3.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
-    this.chatPanelListEl = this.rolePanelEl.createDiv({
-      // Додаємо is-expanded для початкового стану
-      cls: [
-        CSS_ROLE_PANEL_LIST,
-        CSS_SIDEBAR_SECTION_CONTENT,
-        "is-expanded",
-        "ollama-chat-panel-list"
-      ]
+    this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
+      e.stopPropagation();
+      this.handleNewChatClick();
     });
+    this.chatPanelListEl = this.rolePanelEl.createDiv({
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"]
+      // Class: is-expanded
+    });
+    this.chatPanelListEl.style.overflow = "hidden";
+    this.chatPanelListEl.style.transition = "max-height 0.3s ease-out";
     this.rolePanelEl.createEl("hr", { cls: "menu-separator" });
     this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
+      // State: collapsed = true
     });
-    (0, import_obsidian3.setIcon)(
-      this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-      "lucide-folder"
-    );
-    this.rolePanelHeaderEl.createSpan({
-      cls: "menu-option-text",
-      text: "Roles"
-    });
+    const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    (0, import_obsidian3.setIcon)(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "lucide-folder");
+    roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
     this.rolePanelListEl = this.rolePanelEl.createDiv({
-      // НЕМАЄ is-expanded, тому буде застосовано max-height: 0 з CSS
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT]
+      // Class: NO is-expanded
     });
+    this.rolePanelListEl.style.overflow = "hidden";
+    this.rolePanelListEl.style.transition = "max-height 0.3s ease-out";
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-    this.chatContainerEl = this.mainChatAreaEl.createDiv({
-      cls: "ollama-chat-area-content"
-    });
-    this.chatContainer = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_CHAT_CONTAINER
-    });
-    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_NEW_MESSAGE_INDICATOR
-    });
-    (0, import_obsidian3.setIcon)(
-      this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }),
-      "arrow-down"
-    );
+    this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
+    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+    (0, import_obsidian3.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
-    const inputContainer = this.mainChatAreaEl.createDiv({
-      cls: CSS_CLASS_INPUT_CONTAINER
-    });
-    this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Text...`, rows: 1 }
-    });
-    const controlsContainer = inputContainer.createDiv({
-      cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER
-    });
-    const leftControls = controlsContainer.createDiv({
-      cls: CSS_CLASS_INPUT_CONTROLS_LEFT
-    });
-    this.translateInputButton = leftControls.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { "aria-label": "Translate input to English" }
-    });
+    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
+    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+    this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { "aria-label": "Translate input to English" } });
     (0, import_obsidian3.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
-    this.modelDisplayEl = leftControls.createDiv({
-      cls: CSS_CLASS_MODEL_DISPLAY
-    });
+    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
-    this.roleDisplayEl = leftControls.createDiv({
-      cls: CSS_CLASS_ROLE_DISPLAY
-    });
+    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
     this.roleDisplayEl.setText("...");
     this.roleDisplayEl.title = "Click to select role";
-    this.temperatureIndicatorEl = leftControls.createDiv({
-      cls: CSS_CLASS_TEMPERATURE_INDICATOR
-    });
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
     this.temperatureIndicatorEl.setText("?");
     this.temperatureIndicatorEl.title = "Click to set temperature";
-    this.buttonsContainer = controlsContainer.createDiv({
-      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`
-    });
-    this.sendButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_SEND_BUTTON,
-      attr: { "aria-label": "Send" }
-    });
+    this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
-    this.voiceButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_VOICE_BUTTON,
-      attr: { "aria-label": "Voice Input" }
-    });
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
     (0, import_obsidian3.setIcon)(this.voiceButton, "mic");
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      attr: { "aria-label": "Toggle View Location" }
-    });
-    this.menuButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_MENU_BUTTON,
-      attr: { "aria-label": "Menu" }
-    });
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { "aria-label": "Toggle View Location" } });
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { "aria-label": "Menu" } });
     (0, import_obsidian3.setIcon)(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
-    this.menuDropdown = inputContainer.createEl("div", {
-      cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"]
-    });
-    const roleSection = this.createSubmenuSection(
-      "Select Role",
-      "users",
-      CSS_CLASS_ROLE_LIST_CONTAINER,
-      "role-submenu-section"
-    );
-    this.roleSubmenuHeader = roleSection.header;
-    this.roleSubmenuContent = roleSection.content;
+    this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
-    const modelSection = this.createSubmenuSection(
-      "Select Model",
-      "list-collapse",
-      CSS_CLASS_MODEL_LIST_CONTAINER,
-      "model-submenu-section"
-    );
+    const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
     this.modelSubmenuHeader = modelSection.header;
     this.modelSubmenuContent = modelSection.content;
-    const chatSection = this.createSubmenuSection(
-      "Load Chat",
-      "messages-square",
-      CSS_CLASS_CHAT_LIST_CONTAINER
-    );
-    this.chatSubmenuHeader = chatSection.header;
-    this.chatSubmenuContent = chatSection.content;
+    const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.roleSubmenuHeader = roleDropdownSection.header;
+    this.roleSubmenuContent = roleDropdownSection.content;
+    const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER);
+    this.chatSubmenuHeader = chatDropdownSection.header;
+    this.chatSubmenuContent = chatDropdownSection.content;
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.menuDropdown.createEl("div", {
-      text: "Actions",
-      cls: CSS_CLASS_MENU_HEADER
-    });
-    this.newChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.newChatOption.createSpan({ cls: "menu-option-icon" }),
-      "plus-circle"
-    );
-    this.newChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "New Chat"
-    });
-    this.renameChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.renameChatOption.createSpan({ cls: "menu-option-icon" }),
-      "pencil"
-    );
-    this.renameChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Rename Chat"
-    });
-    this.cloneChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.cloneChatOption.createSpan({ cls: "menu-option-icon" }),
-      "copy-plus"
-    );
-    this.cloneChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Clone Chat"
-    });
-    this.exportChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.exportChatOption.createSpan({ cls: "menu-option-icon" }),
-      "download"
-    );
-    this.exportChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Export Chat to Note"
-    });
+    this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
+    this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.newChatOption.createSpan({ cls: "menu-option-icon" }), "plus-circle");
+    this.newChatOption.createSpan({ cls: "menu-option-text", text: "New Chat" });
+    this.renameChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.renameChatOption.createSpan({ cls: "menu-option-icon" }), "pencil");
+    this.renameChatOption.createSpan({ cls: "menu-option-text", text: "Rename Chat" });
+    this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.cloneChatOption.createSpan({ cls: "menu-option-icon" }), "copy-plus");
+    this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
+    this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
+    this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.clearChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.clearChatOption.createSpan({ cls: "menu-option-icon" }),
-      "trash"
-    );
-    this.clearChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Clear Messages"
-    });
-    this.deleteChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.deleteChatOption.createSpan({ cls: "menu-option-icon" }),
-      "trash-2"
-    );
-    this.deleteChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Delete Chat"
-    });
+    this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash");
+    this.clearChatOption.createSpan({ cls: "menu-option-text", text: "Clear Messages" });
+    this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2");
+    this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.toggleViewLocationOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}`
-    });
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
     this.updateToggleViewLocationOption();
-    this.settingsOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}`
-    });
-    (0, import_obsidian3.setIcon)(
-      this.settingsOption.createSpan({ cls: "menu-option-icon" }),
-      "settings"
-    );
-    this.settingsOption.createSpan({
-      cls: "menu-option-text",
-      text: "Settings"
-    });
+    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
+    (0, import_obsidian3.setIcon)(this.settingsOption.createSpan({ cls: "menu-option-icon" }), "settings");
+    this.settingsOption.createSpan({ cls: "menu-option-text", text: "Settings" });
+    this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
   // --- Event Listeners (with Custom Div Menu) ---
   // OllamaView.ts

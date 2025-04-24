@@ -449,265 +449,150 @@ export class OllamaView extends ItemView {
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
   }
 
-  private createUIElements(): void {
-    this.contentEl.empty();
-    const flexContainer = this.contentEl.createDiv({
-      cls: CSS_CLASS_CONTAINER,
-    });
-    this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
+  // OllamaView.ts
 
-    // --- Секція Чатів (Розгорнута за замовчуванням через клас) ---
-    this.chatPanelHeaderEl = this.rolePanelEl.createDiv({
-      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-      attr: { "data-section-type": "chats", "data-collapsed": "false" }, // Стан зберігаємо в атрибуті
-    });
+    // --- UI Creation (Повна версія з усіма виправленнями) ---
+    private createUIElements(): void {
+      this.plugin.logger.debug("createUIElements: Starting UI creation.");
+      this.contentEl.empty();
+      const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
+      this.rolePanelEl = flexContainer.createDiv({ cls: CSS_ROLE_PANEL });
 
-    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({
-      cls: "ollama-sidebar-header-left",
-    }); // Контейнер для іконки і тексту
-    setIcon(
-      chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-      "lucide-folder-open"
-    );
-    chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
+      // --- Секція Чатів (Розгорнута за замовчуванням, з кнопкою +) ---
+      this.chatPanelHeaderEl = this.rolePanelEl.createDiv({
+          cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+          attr: { 'data-section-type': 'chats', 'data-collapsed': 'false' } // State: collapsed = false
+      });
+      // Внутрішня обгортка для іконки та тексту (ліва частина)
+      const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: 'ollama-sidebar-header-left' });
+      setIcon(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "lucide-folder-open"); // Icon: expanded
+      chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
+      // Кнопка "+" (права частина)
+      this.newChatSidebarButton = this.chatPanelHeaderEl.createEl('button', {
+          cls: [CSS_SIDEBAR_HEADER_BUTTON, 'clickable-icon'],
+          attr: { 'aria-label': 'New Chat', 'title': 'New Chat' }
+      });
+      setIcon(this.newChatSidebarButton, "lucide-plus-circle");
+      // Реєструємо обробник для кнопки "+"
+      this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
+          e.stopPropagation(); // Зупиняємо спливання, щоб не згорнути/розгорнути секцію
+          this.handleNewChatClick(); // Викликаємо існуючий обробник
+      });
+
+      // Контейнер списку чатів
+      this.chatPanelListEl = this.rolePanelEl.createDiv({
+          cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"] // Class: is-expanded
+      });
+      this.chatPanelListEl.style.overflow = 'hidden'; // Потрібно для анімації max-height
+      this.chatPanelListEl.style.transition = 'max-height 0.3s ease-out'; // Анімація
+
+      // Роздільник між секціями Chats та Roles
+      this.rolePanelEl.createEl('hr', { cls: 'menu-separator' });
+
+      // --- Секція Ролей (Згорнута за замовчуванням) ---
+      this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
+           cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+           attr: { 'data-section-type': 'roles', 'data-collapsed': 'true' } // State: collapsed = true
+      });
+      // Додаємо таку ж внутрішню обгортку, як у Chats, для консистентності стилів
+      const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: 'ollama-sidebar-header-left' });
+      setIcon(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), "lucide-folder"); // Icon: collapsed
+      roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
+      // Кнопки "+" тут немає
+
+      // Контейнер списку ролей
+      this.rolePanelListEl = this.rolePanelEl.createDiv({
+          cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT] // Class: NO is-expanded
+      });
+      // Стилі max-height: 0; overflow: hidden; transition: ... застосовуються через CSS
+      this.rolePanelListEl.style.overflow = 'hidden'; // Встановлюємо тут про всяк випадок
+      this.rolePanelListEl.style.transition = 'max-height 0.3s ease-out';
 
 
-        // --- ЗБЕРІГАЄМО ПОСИЛАННЯ НА КНОПКУ ---
-        this.newChatSidebarButton = this.chatPanelHeaderEl.createEl('button', { // <-- Призначаємо властивості
-            cls: [CSS_SIDEBAR_HEADER_BUTTON, 'clickable-icon'],
-            attr: { 'aria-label': 'New Chat', 'title': 'New Chat' }
-        });
-        setIcon(this.newChatSidebarButton, "lucide-plus-circle");
-        
-        // --- КІНЕЦЬ ЗБЕРЕЖЕННЯ ---
+      // --- Основна Область Чату (права частина) ---
+      this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
 
-    this.chatPanelListEl = this.rolePanelEl.createDiv({
-      // Додаємо is-expanded для початкового стану
-      cls: [
-        CSS_ROLE_PANEL_LIST,
-        CSS_SIDEBAR_SECTION_CONTENT,
-        "is-expanded",
-        "ollama-chat-panel-list",
-      ],
-    });
-    // Всі стилі висоти/анімації тепер в CSS
-    this.rolePanelEl.createEl("hr", { cls: "menu-separator" });
-    // --- Секція Ролей (Згорнута за замовчуванням) ---
-    this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
-      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-      attr: { "data-section-type": "roles", "data-collapsed": "true" },
-    });
-    setIcon(
-      this.rolePanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-      "lucide-folder"
-    );
-    this.rolePanelHeaderEl.createSpan({
-      cls: "menu-option-text",
-      text: "Roles",
-    });
+      // Вміст основної області
+      this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: 'ollama-chat-area-content' });
+      this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+      this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+      setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+      this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
-    this.rolePanelListEl = this.rolePanelEl.createDiv({
-      // НЕМАЄ is-expanded, тому буде застосовано max-height: 0 з CSS
-      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT],
-    });
-    // Всі стилі висоти/анімації тепер в CSS
+      // Контейнер вводу
+      const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
+      this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+      const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
+      const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+      this.translateInputButton = leftControls.createEl("button", { cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON, attr: { 'aria-label': 'Translate input to English' } }); setIcon(this.translateInputButton, "languages"); this.translateInputButton.title = "Translate input to English";
+      this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY }); this.modelDisplayEl.setText("..."); this.modelDisplayEl.title = "Click to select model";
+      this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY }); this.roleDisplayEl.setText("..."); this.roleDisplayEl.title = "Click to select role";
+      this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR }); this.temperatureIndicatorEl.setText("?"); this.temperatureIndicatorEl.title = "Click to set temperature";
 
-    // ... (решта createUIElements як була) ...
-    // Основна Область Чату (права частина - без змін)
-    this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-    // Вміст основної області (без змін)
-    this.chatContainerEl = this.mainChatAreaEl.createDiv({
-      cls: "ollama-chat-area-content",
-    });
-    this.chatContainer = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_CHAT_CONTAINER,
-    });
-    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({
-      cls: CSS_CLASS_NEW_MESSAGE_INDICATOR,
-    });
-    setIcon(
-      this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }),
-      "arrow-down"
-    );
-    this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+      this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
+      this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { 'aria-label': 'Send' } }); setIcon(this.sendButton, "send");
+      this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { 'aria-label': 'Voice Input' } }); setIcon(this.voiceButton, "mic");
+      this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, attr: { 'aria-label': 'Toggle View Location' } });
+      this.menuButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_MENU_BUTTON, attr: { 'aria-label': 'Menu' } }); setIcon(this.menuButton, "more-vertical");
+      this.updateToggleLocationButton();
 
-    // Контейнер вводу (без змін)
-    const inputContainer = this.mainChatAreaEl.createDiv({
-      cls: CSS_CLASS_INPUT_CONTAINER,
-    });
-    this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Text...`, rows: 1 },
-    });
-    const controlsContainer = inputContainer.createDiv({
-      cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER,
-    });
-    const leftControls = controlsContainer.createDiv({
-      cls: CSS_CLASS_INPUT_CONTROLS_LEFT,
-    });
-    this.translateInputButton = leftControls.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { "aria-label": "Translate input to English" },
-    });
-    setIcon(this.translateInputButton, "languages");
-    this.translateInputButton.title = "Translate input to English";
-    this.modelDisplayEl = leftControls.createDiv({
-      cls: CSS_CLASS_MODEL_DISPLAY,
-    });
-    this.modelDisplayEl.setText("...");
-    this.modelDisplayEl.title = "Click to select model";
-    this.roleDisplayEl = leftControls.createDiv({
-      cls: CSS_CLASS_ROLE_DISPLAY,
-    });
-    this.roleDisplayEl.setText("...");
-    this.roleDisplayEl.title = "Click to select role";
-    this.temperatureIndicatorEl = leftControls.createDiv({
-      cls: CSS_CLASS_TEMPERATURE_INDICATOR,
-    });
-    this.temperatureIndicatorEl.setText("?");
-    this.temperatureIndicatorEl.title = "Click to set temperature";
+      // Випадаюче меню
+      this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
+      this.menuDropdown.style.display = "none"; // Приховано
 
-    this.buttonsContainer = controlsContainer.createDiv({
-      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`,
-    });
-    this.sendButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_SEND_BUTTON,
-      attr: { "aria-label": "Send" },
-    });
-    setIcon(this.sendButton, "send");
-    this.voiceButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_VOICE_BUTTON,
-      attr: { "aria-label": "Voice Input" },
-    });
-    setIcon(this.voiceButton, "mic");
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      attr: { "aria-label": "Toggle View Location" },
-    });
-    this.menuButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_MENU_BUTTON,
-      attr: { "aria-label": "Menu" },
-    });
-    setIcon(this.menuButton, "more-vertical");
-    this.updateToggleLocationButton();
+      // Секції випадаючого меню (моделі, ролі, чати)
+      const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
+      this.modelSubmenuHeader = modelSection.header;
+      this.modelSubmenuContent = modelSection.content;
+      const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+      this.roleSubmenuHeader = roleDropdownSection.header;
+      this.roleSubmenuContent = roleDropdownSection.content;
+      const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER);
+      this.chatSubmenuHeader = chatDropdownSection.header;
+      this.chatSubmenuContent = chatDropdownSection.content;
 
-    // Випадаюче меню (без змін)
-    this.menuDropdown = inputContainer.createEl("div", {
-      cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"],
-    });
-    // ... (вміст випадаючого меню як був) ...
-    const roleSection = this.createSubmenuSection(
-      "Select Role",
-      "users",
-      CSS_CLASS_ROLE_LIST_CONTAINER,
-      "role-submenu-section"
-    );
-    this.roleSubmenuHeader = roleSection.header;
-    this.roleSubmenuContent = roleSection.content;
-    this.menuDropdown.style.display = "none";
-    const modelSection = this.createSubmenuSection(
-      "Select Model",
-      "list-collapse",
-      CSS_CLASS_MODEL_LIST_CONTAINER,
-      "model-submenu-section"
-    );
-    this.modelSubmenuHeader = modelSection.header;
-    this.modelSubmenuContent = modelSection.content;
-    const chatSection = this.createSubmenuSection(
-      "Load Chat",
-      "messages-square",
-      CSS_CLASS_CHAT_LIST_CONTAINER
-    );
-    this.chatSubmenuHeader = chatSection.header;
-    this.chatSubmenuContent = chatSection.content;
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.menuDropdown.createEl("div", {
-      text: "Actions",
-      cls: CSS_CLASS_MENU_HEADER,
-    });
-    this.newChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}`,
-    });
-    setIcon(
-      this.newChatOption.createSpan({ cls: "menu-option-icon" }),
-      "plus-circle"
-    );
-    this.newChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "New Chat",
-    });
-    this.renameChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}`,
-    });
-    setIcon(
-      this.renameChatOption.createSpan({ cls: "menu-option-icon" }),
-      "pencil"
-    );
-    this.renameChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Rename Chat",
-    });
-    this.cloneChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}`,
-    });
-    setIcon(
-      this.cloneChatOption.createSpan({ cls: "menu-option-icon" }),
-      "copy-plus"
-    );
-    this.cloneChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Clone Chat",
-    });
-    this.exportChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}`,
-    });
-    setIcon(
-      this.exportChatOption.createSpan({ cls: "menu-option-icon" }),
-      "download"
-    );
-    this.exportChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Export Chat to Note",
-    });
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.clearChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}`,
-    });
-    setIcon(
-      this.clearChatOption.createSpan({ cls: "menu-option-icon" }),
-      "trash"
-    );
-    this.clearChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Clear Messages",
-    });
-    this.deleteChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}`,
-    });
-    setIcon(
-      this.deleteChatOption.createSpan({ cls: "menu-option-icon" }),
-      "trash-2"
-    );
-    this.deleteChatOption.createSpan({
-      cls: "menu-option-text",
-      text: "Delete Chat",
-    });
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.toggleViewLocationOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}`,
-    });
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.updateToggleViewLocationOption();
-    this.settingsOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}`,
-    });
-    setIcon(
-      this.settingsOption.createSpan({ cls: "menu-option-icon" }),
-      "settings"
-    );
-    this.settingsOption.createSpan({
-      cls: "menu-option-text",
-      text: "Settings",
-    });
+      // Дії випадаючого меню
+      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
+      // New Chat
+      this.newChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}` });
+      setIcon(this.newChatOption.createSpan({ cls: "menu-option-icon" }), "plus-circle");
+      this.newChatOption.createSpan({ cls: "menu-option-text", text: "New Chat" });
+      // Rename Chat
+      this.renameChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}` });
+      setIcon(this.renameChatOption.createSpan({ cls: "menu-option-icon" }), "pencil");
+      this.renameChatOption.createSpan({ cls: "menu-option-text", text: "Rename Chat" });
+      // Clone Chat
+      this.cloneChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}` });
+      setIcon(this.cloneChatOption.createSpan({ cls: "menu-option-icon" }), "copy-plus");
+      this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
+      // Export Chat
+      this.exportChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}` });
+      setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
+      this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" });
+      // Separator
+      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      // Clear Messages
+      this.clearChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
+      setIcon(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash");
+      this.clearChatOption.createSpan({ cls: "menu-option-text", text: "Clear Messages" });
+      // Delete Chat
+      this.deleteChatOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASS_DANGER_OPTION}` });
+      setIcon(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2");
+      this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
+      // Separator
+      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      // Toggle View Location
+      this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
+      this.updateToggleViewLocationOption(); // Оновлюємо текст/іконку
+      // Separator
+      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      // Settings
+      this.settingsOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}` });
+      setIcon(this.settingsOption.createSpan({ cls: "menu-option-icon" }), "settings");
+      this.settingsOption.createSpan({ cls: "menu-option-text", text: "Settings" });
+
+      this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
 
   // Допоміжна функція для створення підменю (з попереднього коду)
