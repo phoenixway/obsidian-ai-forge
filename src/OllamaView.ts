@@ -474,11 +474,7 @@ export class OllamaView extends ItemView {
       });
       setIcon(this.newChatSidebarButton, "lucide-plus-circle");
       // Реєструємо обробник для кнопки "+"
-      this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
-          e.stopPropagation(); // Зупиняємо спливання, щоб не згорнути/розгорнути секцію
-          this.handleNewChatClick(); // Викликаємо існуючий обробник
-      });
-
+      
       // Контейнер списку чатів
       this.chatPanelListEl = this.rolePanelEl.createDiv({
           cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"] // Class: is-expanded
@@ -733,6 +729,11 @@ export class OllamaView extends ItemView {
       );
     else console.error("chatSubmenuHeader missing!");
 
+    this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
+      e.stopPropagation(); // Зупиняємо спливання, щоб не згорнути/розгорнути секцію
+      this.handleNewChatClick(); // Викликаємо існуючий обробник
+  });
+
     // Слухачі для прямих опцій меню (як були)
     // ... (newChatOption, renameChatOption, etc.) ...
     if (this.newChatOption)
@@ -820,10 +821,10 @@ export class OllamaView extends ItemView {
         this.handleNewMessageIndicatorClick
       );
 
-      this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
-        e.stopPropagation();
-        this.handleNewChatClick();
-    });
+    //   this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
+    //     e.stopPropagation();
+    //     this.handleNewChatClick();
+    // });
     // Plugin/ChatManager Event Listeners
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));

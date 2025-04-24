@@ -1602,10 +1602,6 @@ This action cannot be undone.`,
       attr: { "aria-label": "New Chat", "title": "New Chat" }
     });
     (0, import_obsidian3.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
-    this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
-      e.stopPropagation();
-      this.handleNewChatClick();
-    });
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"]
       // Class: is-expanded
@@ -1812,6 +1808,10 @@ This action cannot be undone.`,
       );
     else
       console.error("chatSubmenuHeader missing!");
+    this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
+      e.stopPropagation();
+      this.handleNewChatClick();
+    });
     if (this.newChatOption)
       this.registerDomEvent(
         this.newChatOption,
@@ -1900,10 +1900,6 @@ This action cannot be undone.`,
         "click",
         this.handleNewMessageIndicatorClick
       );
-    this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
-      e.stopPropagation();
-      this.handleNewChatClick();
-    });
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));
     this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));
