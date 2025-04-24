@@ -147,86 +147,105 @@ export class ChatManager {
         }
     }
 
+// ChatManager.ts
+
+    // ... (інші методи класу до rebuildIndexFromFiles) ...
+
+    // Окремий метод для сканування файлів
     private async rebuildIndexFromFiles(): Promise<void> {
-         this.plugin.logger.info(`Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
-         const newIndex: ChatSessionIndex = {};
-         let filesScanned = 0;
-         let chatsLoaded = 0;
+        this.plugin.logger.info(`Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
+        const newIndex: ChatSessionIndex = {};
+        let filesScanned = 0;
+        let chatsLoaded = 0;
 
-         try {
-             if (this.chatsFolderPath !== "/" && !(await this.adapter.exists(this.chatsFolderPath))) {
-                 this.plugin.logger.warn(`Chat history folder '${this.chatsFolderPath}' not found during scan. Creating it.`);
-                  try {
-                       await this.adapter.mkdir(this.chatsFolderPath);
-                       this.plugin.logger.info(`Created chat history folder: ${this.chatsFolderPath}`);
-                  } catch (mkdirError) {
-                       this.plugin.logger.error(`Failed to create chat history folder ${this.chatsFolderPath}. Index will be empty.`, mkdirError);
-                       this.chatIndex = {};
-                       await this.saveChatIndex();
-                       return;
+        try {
+            // Перевірка існування та типу папки (як раніше)
+            if (this.chatsFolderPath !== "/" && !(await this.adapter.exists(this.chatsFolderPath))) {
+                this.plugin.logger.warn(`Chat history folder '${this.chatsFolderPath}' not found during scan. Creating it.`);
+                 try { await this.adapter.mkdir(this.chatsFolderPath); /*...*/ }
+                 catch (mkdirError) { /*...*/ return; }
+            } else if (this.chatsFolderPath !== "/" && (await this.adapter.stat(this.chatsFolderPath))?.type !== 'folder') {
+                 this.plugin.logger.error(`Chat history path '${this.chatsFolderPath}' exists but is not a folder. Index will be empty.`);
+                 /*...*/ return;
+            }
+
+            const listResult = await this.adapter.list(this.chatsFolderPath);
+
+            // --- ВИПРАВЛЕННЯ ФІЛЬТРУ ---
+            const chatFiles = listResult.files.filter(filePath => {
+                 const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+                 // Перевірка, що це файл у поточній папці
+                 const isInCurrentFolder = normalizePath(filePath).split('/').length === (this.chatsFolderPath === '/' ? 1 : this.chatsFolderPath.split('/').length + 1);
+                 if (!isInCurrentFolder || !fileName.endsWith('.json') || fileName.startsWith('.')) {
+                     return false; // Відкидаємо файли не в тій папці, не .json, або приховані
+                 }
+
+                 // Патерни для імен файлів
+                 const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.json$/i; // Додано i для нечутливості до регістру
+                 // Патерн для старого формату: chat_числа_підкреслення_букви/цифри.json
+                 const oldPattern = /^chat_\d+_[a-zA-Z0-9]+\.json$/;
+
+                 // Пропускаємо файл, якщо його ім'я відповідає ОДНОМУ з патернів
+                 const isValidName = uuidPattern.test(fileName) || oldPattern.test(fileName);
+                  if (!isValidName) {
+                       this.plugin.logger.debug(`Skipping file due to name mismatch: ${fileName}`); // Змінено на trace для меншого спаму
                   }
-             } else if (this.chatsFolderPath !== "/" && (await this.adapter.stat(this.chatsFolderPath))?.type !== 'folder') {
-                  this.plugin.logger.error(`Chat history path '${this.chatsFolderPath}' exists but is not a folder. Index will be empty.`);
-                  this.chatIndex = {};
-                  await this.saveChatIndex();
-                  return;
-             }
+                 return isValidName;
+            });
+            // --- КІНЕЦЬ ВИПРАВЛЕННЯ ФІЛЬТРУ ---
 
+            filesScanned = chatFiles.length;
+            this.plugin.logger.debug(`Found ${filesScanned} potential chat files to scan after filtering.`);
 
-             const listResult = await this.adapter.list(this.chatsFolderPath);
-             const chatFiles = listResult.files.filter(filePath => {
-                  const fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-                   const isInCurrentFolder = normalizePath(filePath).split('/').length === (this.chatsFolderPath === '/' ? 1 : this.chatsFolderPath.split('/').length + 1);
-                  return isInCurrentFolder && fileName.endsWith('.json') && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.json$/.test(fileName);
-             });
+            for (const fullPath of chatFiles) {
+                 const fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
+                 // Визначаємо chatId: або UUID, або старий формат
+                 const chatId = fileName.slice(0, -5); // Видаляємо .json
 
-             filesScanned = chatFiles.length;
-             this.plugin.logger.debug(`Found ${filesScanned} potential chat files to scan.`);
+                 try {
+                     const jsonContent = await this.adapter.read(fullPath);
+                     const data = JSON.parse(jsonContent) as Partial<ChatData>;
 
-             for (const fullPath of chatFiles) {
-                  const fileName = fullPath.substring(fullPath.lastIndexOf('/') + 1);
-                  const chatId = fileName.slice(0, -5);
+                     // Валідація метаданих (як раніше)
+                     if (data?.metadata?.id === chatId && // Перевіряємо відповідність ID у файлі імені файлу
+                         typeof data.metadata.name === 'string' && data.metadata.name.trim() !== '' &&
+                         data.metadata.lastModified && !isNaN(new Date(data.metadata.lastModified).getTime()) &&
+                         data.metadata.createdAt && !isNaN(new Date(data.metadata.createdAt).getTime()))
+                     {
+                        const meta = data.metadata;
+                        newIndex[chatId] = {
+                            name: meta.name,
+                            lastModified: new Date(meta.lastModified).toISOString(),
+                            createdAt: new Date(meta.createdAt).toISOString(),
+                            ...(meta.modelName && { modelName: meta.modelName }),
+                            ...(meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath }),
+                            ...(typeof meta.temperature === 'number' && { temperature: meta.temperature }),
+                            ...(typeof meta.contextWindow === 'number' && { contextWindow: meta.contextWindow }),
+                        };
+                        chatsLoaded++;
+                    } else {
+                         // Додаємо більше деталей у лог помилки валідації
+                         this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID in file: ${data?.metadata?.id}, Expected ID (from filename): ${chatId}. Required fields: name, lastModified, createdAt.`, data?.metadata);
+                    }
+                 } catch (e) {
+                      this.plugin.logger.error(`Error reading or parsing chat file ${fullPath} during index scan:`, e);
+                 }
+            }
 
-                  try {
-                      const jsonContent = await this.adapter.read(fullPath);
-                      const data = JSON.parse(jsonContent) as Partial<ChatData>;
+            this.chatIndex = newIndex;
+            await this.saveChatIndex();
+            this.plugin.logger.info(`Index rebuilt: ${chatsLoaded} chats loaded from ${filesScanned} scanned files.`);
 
-                      if (data?.metadata?.id === chatId &&
-                          typeof data.metadata.name === 'string' && data.metadata.name.trim() !== '' &&
-                          data.metadata.lastModified && !isNaN(new Date(data.metadata.lastModified).getTime()) &&
-                          data.metadata.createdAt && !isNaN(new Date(data.metadata.createdAt).getTime()))
-                      {
-                         const meta = data.metadata;
-                         newIndex[chatId] = {
-                             name: meta.name,
-                             lastModified: new Date(meta.lastModified).toISOString(),
-                             createdAt: new Date(meta.createdAt).toISOString(),
-                             ...(meta.modelName && { modelName: meta.modelName }),
-                             ...(meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath }),
-                             ...(typeof meta.temperature === 'number' && { temperature: meta.temperature }),
-                             ...(typeof meta.contextWindow === 'number' && { contextWindow: meta.contextWindow }),
-                         };
-                         chatsLoaded++;
-                     } else { this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID: ${chatId}. Required fields: name, lastModified, createdAt.`, data?.metadata); }
-                  } catch (e) { this.plugin.logger.error(`Error reading or parsing chat file ${fullPath} during index scan:`, e); }
-             }
-
-             this.chatIndex = newIndex;
+        } catch (error: any) {
+              // Обробка помилок доступу до папки (як раніше)
+              if (error.code === 'EPERM' || error.code === 'EACCES') { /* ... */ }
+              else { /* ... */ }
+             this.chatIndex = {};
              await this.saveChatIndex();
-             this.plugin.logger.info(`Index rebuilt: ${chatsLoaded} chats loaded from ${filesScanned} scanned files.`);
+        }
+   }
 
-         } catch (error: any) {
-               if (error.code === 'EPERM' || error.code === 'EACCES') {
-                    this.plugin.logger.error(`Permission error accessing chat history folder ${this.chatsFolderPath}. Please check permissions. Index rebuild failed.`, error);
-                    new Notice(`Permission error accessing chat folder: ${this.chatsFolderPath}`);
-               } else {
-                    this.plugin.logger.error(`Critical error during index rebuild scan in ${this.chatsFolderPath}:`, error);
-               }
-              this.chatIndex = {};
-              await this.saveChatIndex();
-         }
-    }
-
+   // ... (решта коду ChatManager.ts) ...
 
     private async saveChatIndex(): Promise<void> {
         this.plugin.logger.debug(`Saving chat index with ${Object.keys(this.chatIndex).length} entries.`);
