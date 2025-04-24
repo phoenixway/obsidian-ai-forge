@@ -3020,17 +3020,18 @@ This action cannot be undone.`,
     const targetLang = this.plugin.settings.translationTargetLanguage;
     const apiKey = this.plugin.settings.googleTranslationApiKey;
     if (!targetLang || !apiKey) {
-      new import_obsidian3.Notice(
-        "Translation not configured. Please check language and API key in settings."
-      );
+      new import_obsidian3.Notice("Translation not configured...");
       return;
     }
     let textToTranslate = originalContent;
     if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
       textToTranslate = this.decodeHtmlEntities(originalContent).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     }
-    if (!textToTranslate)
+    if (!textToTranslate) {
+      this.plugin.logger.warn("[handleTranslateClick] textToTranslate is empty after preprocessing. Original content (start):", originalContent.substring(0, 100));
+      new import_obsidian3.Notice("Nothing to translate (content might be empty after removing internal tags).");
       return;
+    }
     (_a = contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)) == null ? void 0 : _a.remove();
     (0, import_obsidian3.setIcon)(buttonEl, "loader");
     buttonEl.disabled = true;
@@ -3039,8 +3040,14 @@ This action cannot be undone.`,
     try {
       const translatedText = await this.plugin.translationService.translate(
         textToTranslate,
+        // Використовується текст ПІСЛЯ видалення тегів
         targetLang
       );
+      if (!contentEl || !contentEl.isConnected) {
+        this.plugin.logger.error("[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived.");
+        new import_obsidian3.Notice("Translation failed: message element not found.");
+        return;
+      }
       if (translatedText !== null) {
         const translationContainer = contentEl.createDiv({
           cls: CSS_CLASS_TRANSLATION_CONTAINER
@@ -3052,9 +3059,7 @@ This action cannot be undone.`,
           translatedText,
           translationContentEl,
           (_c = (_b = this.plugin.app.vault.getRoot()) == null ? void 0 : _b.path) != null ? _c : "",
-          // Шлях контексту (корінь сховища)
           this
-          // Компонент (View)
         );
         const targetLangName = LANGUAGES[targetLang] || targetLang;
         translationContainer.createEl("div", {
@@ -3064,6 +3069,7 @@ This action cannot be undone.`,
         this.guaranteedScrollToBottom(50, false);
       }
     } catch (error) {
+      this.plugin.logger.error("Error during translation click handling:", error);
       new import_obsidian3.Notice("An unexpected error occurred during translation.");
     } finally {
       (0, import_obsidian3.setIcon)(buttonEl, "languages");

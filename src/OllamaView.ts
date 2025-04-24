@@ -3374,83 +3374,105 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
       });
   }
   private async handleTranslateClick(
-    originalContent: string,
-    contentEl: HTMLElement,
-    buttonEl: HTMLButtonElement
-  ): Promise<void> {
+    originalContent: string,    // Оригінальний текст повідомлення
+    contentEl: HTMLElement,     // DOM-елемент, куди додавати переклад
+    buttonEl: HTMLButtonElement // Сама кнопка (для зміни іконки)
+): Promise<void> {
     const targetLang = this.plugin.settings.translationTargetLanguage;
     const apiKey = this.plugin.settings.googleTranslationApiKey;
     if (!targetLang || !apiKey) {
-      new Notice(
-        "Translation not configured. Please check language and API key in settings."
-      );
-      return;
+        new Notice("Translation not configured..."); // Працює для обох типів?
+        return;
     }
 
     let textToTranslate = originalContent;
+    // ---> ПОТЕНЦІЙНА ПРОБЛЕМА №1: Видалення тегів <think> <---
     if (
-      this.detectThinkingTags(this.decodeHtmlEntities(originalContent))
-        .hasThinkingTags
+        this.detectThinkingTags(this.decodeHtmlEntities(originalContent))
+            .hasThinkingTags
     ) {
-      textToTranslate = this.decodeHtmlEntities(originalContent)
-        .replace(/<think>[\s\S]*?<\/think>/g, "")
-        .trim();
+        // Якщо повідомлення асистента складається ТІЛЬКИ з <think>...</think> та пробілів,
+        // то після видалення тегів textToTranslate може стати порожнім рядком.
+        textToTranslate = this.decodeHtmlEntities(originalContent)
+            .replace(/<think>[\s\S]*?<\/think>/g, "")
+            .trim();
     }
-    if (!textToTranslate) return; // Nothing to translate
+    // ---> ПОТЕНЦІЙНА ПРОБЛЕМА №2: Ранній вихід <---
+    if (!textToTranslate) {
+        // Якщо textToTranslate порожній (див. Проблема №1), функція тихо завершиться тут.
+        this.plugin.logger.warn("[handleTranslateClick] textToTranslate is empty after preprocessing. Original content (start):", originalContent.substring(0, 100));
+        // *** ДОДАМО NOTICE ДЛЯ ДІАГНОСТИКИ ***
+        new Notice("Nothing to translate (content might be empty after removing internal tags).");
+        return;
+    }
 
-    // Remove previous translation if exists
+    // Видалення попереднього перекладу
     contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
 
-    // Set loading state
+    // Встановлення стану завантаження кнопки
     setIcon(buttonEl, "loader");
     buttonEl.disabled = true;
     buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING);
     buttonEl.setAttribute("title", "Translating...");
 
     try {
-      const translatedText = await this.plugin.translationService.translate(
-        textToTranslate,
-        targetLang
-      );
-      if (translatedText !== null) {
-        const translationContainer = contentEl.createDiv({
-          cls: CSS_CLASS_TRANSLATION_CONTAINER,
-        });
-
-        // --- ЗМІНЕНО: Рендеринг Markdown ---
-        // Створюємо div для відрендереного контенту
-        const translationContentEl = translationContainer.createDiv({
-          cls: CSS_CLASS_TRANSLATION_CONTENT,
-        });
-        // Рендеримо Markdown в цей div
-        await MarkdownRenderer.renderMarkdown(
-          translatedText,
-          translationContentEl,
-          this.plugin.app.vault.getRoot()?.path ?? "", // Шлях контексту (корінь сховища)
-          this // Компонент (View)
+        // Виклик сервісу перекладу
+        const translatedText = await this.plugin.translationService.translate(
+            textToTranslate, // Використовується текст ПІСЛЯ видалення тегів
+            targetLang
         );
-        // --- КІНЕЦЬ ЗМІНИ ---
 
-        // Додаємо індикатор мови
-        const targetLangName = LANGUAGES[targetLang] || targetLang;
-        translationContainer.createEl("div", {
-          cls: "translation-indicator",
-          text: `[Translated to ${targetLangName}]`,
-        });
-        this.guaranteedScrollToBottom(50, false); // Scroll if needed
-      } // Error notice shown by service if null
+        // ---> ПОТЕНЦІЙНА ПРОБЛЕМА №3: Невалідний contentEl? <---
+        // Чи впевнені ми, що contentEl все ще існує і прикріплений до DOM, коли відповідь повертається?
+        // У випадку з потоковим повідомленням, цей елемент створюється в try/finally блоці sendMessage.
+        // Якщо користувач дуже швидко клікне "перекласти" до завершення фіналізації,
+        // можливо, contentEl ще не повністю готовий? Малоймовірно, але можливо.
+        if (!contentEl || !contentEl.isConnected) {
+             this.plugin.logger.error("[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived.");
+             new Notice("Translation failed: message element not found.");
+             return; // Виходимо, якщо елемента немає
+        }
+
+
+        if (translatedText !== null) {
+            // Створення контейнера для перекладу
+            const translationContainer = contentEl.createDiv({
+                cls: CSS_CLASS_TRANSLATION_CONTAINER,
+            });
+
+            // Рендеринг Markdown перекладу
+            const translationContentEl = translationContainer.createDiv({
+                cls: CSS_CLASS_TRANSLATION_CONTENT,
+            });
+            await MarkdownRenderer.renderMarkdown(
+                translatedText,
+                translationContentEl,
+                this.plugin.app.vault.getRoot()?.path ?? "",
+                this
+            );
+
+            // Додавання індикатора мови
+            const targetLangName = LANGUAGES[targetLang] || targetLang;
+            translationContainer.createEl("div", {
+                cls: "translation-indicator",
+                text: `[Translated to ${targetLangName}]`,
+            });
+
+            this.guaranteedScrollToBottom(50, false); // Прокрутка, якщо потрібно
+        } // Помилка (translatedText === null) обробляється сервісом
+
     } catch (error) {
-      //console.error("Error during translation click handling:", error);
-      new Notice("An unexpected error occurred during translation.");
+        this.plugin.logger.error("Error during translation click handling:", error);
+        new Notice("An unexpected error occurred during translation.");
     } finally {
-      // Restore button state
-      setIcon(buttonEl, "languages");
-      buttonEl.disabled = false;
-      buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
-      const targetLangName = LANGUAGES[targetLang] || targetLang;
-      buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
+        // Відновлення стану кнопки
+        setIcon(buttonEl, "languages");
+        buttonEl.disabled = false;
+        buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+        const targetLangName = LANGUAGES[targetLang] || targetLang;
+        buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
     }
-  }
+}
 
   // --- Rendering Helpers ---
   private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
