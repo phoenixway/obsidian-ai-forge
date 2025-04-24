@@ -110,7 +110,7 @@
     transition: max-height 0.3s ease-out, padding 0.3s ease-out; // Animate height and padding
     box-sizing: border-box;
     padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
-    flex-shrink: 0; // Prevent shrinking in parent flex container
+    // flex-shrink: 0; // Prevent shrinking in parent flex container
     min-height: 0; // Allow shrinking to 0
 
     // Expanded state (when .is-expanded class is added via TS)
