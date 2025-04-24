@@ -3989,10 +3989,12 @@ This action cannot be undone.`,
     }
   }
   // OllamaView.ts
+  // OllamaView.ts
   async toggleSidebarSection(clickedHeaderEl) {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
     const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+    this.plugin.logger.debug(`Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`);
     let contentEl = null;
     let updateFunction = null;
     let otherHeaderEl = null;
@@ -4001,6 +4003,9 @@ This action cannot be undone.`,
     const collapseIcon = "lucide-folder";
     const expandIcon = "lucide-folder-open";
     const expandedClass = "is-expanded";
+    if (sectionType === "chats") {
+    } else if (sectionType === "roles") {
+    }
     if (sectionType === "chats") {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
@@ -4024,22 +4029,19 @@ This action cannot be undone.`,
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
           (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
+        this.plugin.logger.debug(`Collapsing other section (${otherSectionType}) by removing class:`, otherContentEl);
         otherContentEl.classList.remove(expandedClass);
-        if (otherSectionType === "chats" && this.newChatSidebarButton) {
+        if (otherSectionType === "chats" && this.newChatSidebarButton)
           this.newChatSidebarButton.hide();
-          this.plugin.logger.debug("Hiding New Chat button because Roles section expanded.");
-        }
       }
       clickedHeaderEl.setAttribute("data-collapsed", "false");
       (0, import_obsidian3.setIcon)(iconEl, expandIcon);
-      if (sectionType === "chats" && this.newChatSidebarButton) {
+      if (sectionType === "chats" && this.newChatSidebarButton)
         this.newChatSidebarButton.show();
-        this.plugin.logger.debug("Showing New Chat button because Chats section expanded.");
-      }
       try {
         await updateFunction();
+        this.plugin.logger.debug(`Adding ${expandedClass} to content of section ${sectionType}:`, contentEl);
         contentEl.classList.add(expandedClass);
-        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch (error) {
         this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
         contentEl.setText(`Error loading ${sectionType}.`);
@@ -4048,12 +4050,14 @@ This action cannot be undone.`,
     } else {
       clickedHeaderEl.setAttribute("data-collapsed", "true");
       (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
+      this.plugin.logger.debug(`Attempting to remove ${expandedClass} from:`, contentEl);
+      console.log("Classes BEFORE removal:", contentEl.classList.toString());
       contentEl.classList.remove(expandedClass);
+      console.log("Classes AFTER removal:", contentEl.classList.toString());
+      this.plugin.logger.debug(`Removed ${expandedClass} for section ${sectionType}. Element should now collapse via CSS.`);
       if (sectionType === "chats" && this.newChatSidebarButton) {
         this.newChatSidebarButton.hide();
-        this.plugin.logger.debug("Hiding New Chat button because Chats section collapsed.");
       }
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
     }
   }
   // OllamaView.ts

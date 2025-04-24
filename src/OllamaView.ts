@@ -4712,13 +4712,16 @@ export class OllamaView extends ItemView {
 
 // OllamaView.ts
 
+// OllamaView.ts
+
 private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> {
   const sectionType = clickedHeaderEl.getAttribute('data-section-type') as 'chats' | 'roles';
   const isCurrentlyCollapsed = clickedHeaderEl.getAttribute('data-collapsed') === 'true';
   const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
 
-  // ... (визначення contentEl, updateFunction, otherHeaderEl, otherContentEl, іконок, класу як було) ...
-   let contentEl: HTMLElement | null = null;
+  this.plugin.logger.debug(`Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`); // Use plugin logger
+
+  let contentEl: HTMLElement | null = null;
   let updateFunction: (() => Promise<void>) | null = null;
   let otherHeaderEl: HTMLElement | null = null;
   let otherContentEl: HTMLElement | null = null;
@@ -4728,7 +4731,9 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
   const expandIcon = "lucide-folder-open";
   const expandedClass = "is-expanded";
 
-  if (sectionType === 'chats') {
+  if (sectionType === 'chats') { /* ... */ } else if (sectionType === 'roles') { /* ... */ }
+  // (Assign variables as before)
+   if (sectionType === 'chats') {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
       otherHeaderEl = this.rolePanelHeaderEl;
@@ -4743,61 +4748,54 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
   }
 
   if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
-      return;
+       this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
+       return;
   }
 
 
   if (isCurrentlyCollapsed) {
-      // --- Розгортаємо поточну, згортаємо іншу ---
-
-      // 1. Згортаємо іншу секцію
+      // --- EXPANDING current section ---
+      // 1. Collapse other section
       if (otherHeaderEl.getAttribute('data-collapsed') === 'false') {
-          // ... (логіка згортання іншої секції) ...
-           const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
+          const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
           otherHeaderEl.setAttribute('data-collapsed', 'true');
           if (otherIconEl) setIcon(otherIconEl, collapseIcon);
+          this.plugin.logger.debug(`Collapsing other section (${otherSectionType}) by removing class:`, otherContentEl); // Log element
           otherContentEl.classList.remove(expandedClass);
-          // --- ДОДАНО: Ховаємо кнопку "+", якщо згортаємо Chats через іншу секцію ---
-          if (otherSectionType === 'chats' && this.newChatSidebarButton) {
-              this.newChatSidebarButton.hide(); // Або .style.display = 'none';
-              this.plugin.logger.debug("Hiding New Chat button because Roles section expanded.");
-          }
-          // --- КІНЕЦЬ ДОДАНОГО ---
+          if (otherSectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.hide();
       }
 
-      // 2. Розгортаємо поточну секцію
+      // 2. Expand current section
       clickedHeaderEl.setAttribute('data-collapsed', 'false');
       setIcon(iconEl, expandIcon);
-       // --- ДОДАНО: Показуємо кнопку "+", якщо розгортаємо Chats ---
-       if (sectionType === 'chats' && this.newChatSidebarButton) {
-           this.newChatSidebarButton.show(); // Або .style.display = 'flex'; (якщо кнопка flex)
-           this.plugin.logger.debug("Showing New Chat button because Chats section expanded.");
-       }
-       // --- КІНЕЦЬ ДОДАНОГО ---
+      if (sectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.show();
       try {
-          await updateFunction(); // Оновлюємо контент (функція сама встановить висоту, якщо треба)
-          contentEl.classList.add(expandedClass); // Додаємо клас для CSS анімації
-          this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
+          // Важливо: Викликаємо updateFunction *перед* додаванням класу,
+          // щоб контент був готовий, коли почнеться анімація розгортання
+          await updateFunction();
+          this.plugin.logger.debug(`Adding ${expandedClass} to content of section ${sectionType}:`, contentEl); // Log element
+          contentEl.classList.add(expandedClass);
       } catch(error) {
-          // ... (обробка помилки) ...
-           this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+          this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
           contentEl.setText(`Error loading ${sectionType}.`);
-           contentEl.classList.add(expandedClass);
+           contentEl.classList.add(expandedClass); // Розгортаємо, щоб показати помилку
       }
 
   } else {
-      // --- Згортаємо поточну ---
+      // --- COLLAPSING current section ---
       clickedHeaderEl.setAttribute('data-collapsed', 'true');
       setIcon(iconEl, collapseIcon);
+      // --- DEBUGGING: Log before and after class removal ---
+      this.plugin.logger.debug(`Attempting to remove ${expandedClass} from:`, contentEl);
+      console.log("Classes BEFORE removal:", contentEl.classList.toString()); // Use console.log for direct class list string
       contentEl.classList.remove(expandedClass);
-       // --- ДОДАНО: Ховаємо кнопку "+", якщо згортаємо Chats ---
-       if (sectionType === 'chats' && this.newChatSidebarButton) {
+      console.log("Classes AFTER removal:", contentEl.classList.toString()); // Use console.log for direct class list string
+      this.plugin.logger.debug(`Removed ${expandedClass} for section ${sectionType}. Element should now collapse via CSS.`);
+      // --- END DEBUGGING ---
+
+      if (sectionType === 'chats' && this.newChatSidebarButton) {
            this.newChatSidebarButton.hide();
-           this.plugin.logger.debug("Hiding New Chat button because Chats section collapsed.");
-       }
-       // --- КІНЕЦЬ ДОДАНОГО ---
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
+      }
   }
 }
 
