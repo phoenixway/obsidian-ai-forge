@@ -7089,7 +7089,6 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       }
     };
     const handleCreateEvent = (file) => {
-      this.logger.debug(`Create event: ${file.path}`);
       this.fileChangeHandlerDebounced(file);
       if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
         this.logger.info(

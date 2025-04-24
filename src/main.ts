@@ -398,7 +398,7 @@ export default class OllamaPlugin extends Plugin {
 		};
 
 		const handleCreateEvent = (file: TAbstractFile) => {
-			this.logger.debug(`Create event: ${file.path}`);
+			// this.logger.debug(`Create event: ${file.path}`);
 			// Debounced Roles/RAG check
 			this.fileChangeHandlerDebounced(file);
 			// Миттєва обробка для файлу завдань
