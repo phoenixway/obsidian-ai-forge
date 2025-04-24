@@ -5427,10 +5427,7 @@ var ChatManager = class {
     this.chatIndex = {};
     this.activeChatId = null;
     this.activeChat = null;
-    // Кеш ТІЛЬКИ для активного об'єкта Chat
     this.loadedChats = {};
-    // Загальний кеш завантажених чатів (для швидкодії)
-    // savingDebounced тепер не потрібен, бо debounce є в Chat
     this.currentTaskState = null;
     this.plugin = plugin;
     this.app = plugin.app;
@@ -5523,8 +5520,6 @@ var ChatManager = class {
               name: metadata.name,
               lastModified: typeof metadata.lastModified === "string" ? metadata.lastModified : new Date(metadata.lastModified || Date.now()).toISOString(),
               createdAt: typeof metadata.createdAt === "string" ? metadata.createdAt : new Date(metadata.createdAt || Date.now()).toISOString(),
-              // Додаємо createdAt
-              // Додаємо опціональні поля, якщо вони є
               ...metadata.modelName && { modelName: metadata.modelName },
               ...metadata.selectedRolePath && { selectedRolePath: metadata.selectedRolePath },
               ...metadata.temperature !== void 0 && { temperature: metadata.temperature },
@@ -5532,7 +5527,7 @@ var ChatManager = class {
             };
             chatsLoaded++;
           } else {
-            this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing required fields.`);
+            this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing required fields (name, lastModified, createdAt).`);
           }
         } catch (e) {
           this.plugin.logger.error(`Error reading or parsing chat file ${fullPath} during index scan:`, e);
@@ -5555,23 +5550,26 @@ var ChatManager = class {
     const fileName = `${id}.json`;
     return this.chatsFolderPath === "/" ? (0, import_obsidian10.normalizePath)(fileName) : (0, import_obsidian10.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
   }
-  /**
-   * Зберігає дані вказаного чату у файл (делегує класу Chat) та оновлює індекс.
-   * Цей метод тепер використовується лише для початкового збереження нового чату.
-   * Подальше збереження ініціюється з класу Chat через debounce.
-   */
   async saveChatAndUpdateIndex(chat) {
     const saved = await chat.saveImmediately();
     if (saved) {
-      const { id, createdAt, ...metaToStore } = chat.metadata;
-      this.chatIndex[id] = metaToStore;
+      const meta = chat.metadata;
+      const storedMeta = {
+        name: meta.name,
+        lastModified: meta.lastModified,
+        createdAt: meta.createdAt,
+        ...meta.modelName && { modelName: meta.modelName },
+        ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
+        ...meta.temperature !== void 0 && { temperature: meta.temperature },
+        ...meta.contextWindow !== void 0 && { contextWindow: meta.contextWindow }
+      };
+      this.chatIndex[meta.id] = storedMeta;
       await this.saveChatIndex();
       this.plugin.emit("chat-list-updated");
       return true;
     }
     return false;
   }
-  /** Створює новий чат. */
   async createNewChat(name) {
     this.plugin.logger.info(`Creating new chat...`);
     try {
@@ -5585,7 +5583,6 @@ var ChatManager = class {
         selectedRolePath: this.plugin.settings.selectedRolePath,
         temperature: this.plugin.settings.temperature,
         contextWindow: this.plugin.settings.contextWindow,
-        // <-- Додано
         createdAt: now.toISOString(),
         lastModified: now.toISOString()
       };
@@ -5595,9 +5592,9 @@ var ChatManager = class {
       const saved = await this.saveChatAndUpdateIndex(newChat);
       if (!saved)
         throw new Error("Failed to save initial chat file.");
-      this.loadedChats[newChat.metadata.id] = newChat;
-      await this.setActiveChat(newChat.metadata.id);
-      this.plugin.logger.info(`Created and activated new chat: ${newChat.metadata.name} (ID: ${newChat.metadata.id})`);
+      this.loadedChats[newId] = newChat;
+      await this.setActiveChat(newId);
+      this.plugin.logger.info(`Created and activated new chat: ${newChat.metadata.name} (ID: ${newId})`);
       return newChat;
     } catch (error) {
       this.plugin.logger.error("Error creating new chat:", error);
@@ -5605,7 +5602,6 @@ var ChatManager = class {
       return null;
     }
   }
-  /** Повертає масив метаданих всіх доступних чатів. */
   listAvailableChats() {
     return Object.entries(this.chatIndex).map(([id, storedMeta]) => {
       if (!storedMeta || typeof storedMeta.name !== "string" || typeof storedMeta.lastModified !== "string" || typeof storedMeta.createdAt !== "string") {
@@ -5615,7 +5611,6 @@ var ChatManager = class {
       return {
         id,
         createdAt: storedMeta.createdAt,
-        // Тепер ми впевнені, що воно існує
         lastModified: storedMeta.lastModified,
         name: storedMeta.name,
         modelName: storedMeta.modelName,
@@ -5628,7 +5623,6 @@ var ChatManager = class {
   getActiveChatId() {
     return this.activeChatId;
   }
-  /** Завантажує та повертає екземпляр Chat за його ID. */
   async getChat(id) {
     this.plugin.logger.debug(`getChat called for ID: ${id}`);
     if (this.loadedChats[id]) {
@@ -5695,7 +5689,6 @@ var ChatManager = class {
       this.plugin.logger.debug(`Chat ${id} is already active.`);
       if (id && !this.activeChat) {
         this.activeChat = await this.getChat(id);
-        this.plugin.emit("active-chat-changed", { chatId: id, chat: this.activeChat });
       }
       return;
     }
@@ -5762,20 +5755,18 @@ var ChatManager = class {
     if (changed) {
       this.plugin.logger.debug(`Metadata changed. Chat ${activeChat.metadata.id} save scheduled by Chat class.`);
       if (this.chatIndex[activeChat.metadata.id]) {
-        const metaToStore = {
-          name: activeChat.metadata.name,
-          lastModified: activeChat.metadata.lastModified,
-          createdAt: activeChat.metadata.createdAt,
-          // Явно додаємо createdAt
-          // Додаємо опціональні поля, якщо вони є
-          ...activeChat.metadata.modelName && { modelName: activeChat.metadata.modelName },
-          ...activeChat.metadata.selectedRolePath && { selectedRolePath: activeChat.metadata.selectedRolePath },
-          ...activeChat.metadata.temperature !== void 0 && { temperature: activeChat.metadata.temperature },
-          ...activeChat.metadata.contextWindow !== void 0 && { contextWindow: activeChat.metadata.contextWindow }
+        const meta = activeChat.metadata;
+        const storedMeta = {
+          name: meta.name,
+          lastModified: meta.lastModified,
+          createdAt: meta.createdAt,
+          ...meta.modelName && { modelName: meta.modelName },
+          ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
+          ...meta.temperature !== void 0 && { temperature: meta.temperature },
+          ...meta.contextWindow !== void 0 && { contextWindow: meta.contextWindow }
         };
-        this.chatIndex[activeChat.metadata.id] = metaToStore;
+        this.chatIndex[meta.id] = storedMeta;
         await this.saveChatIndex();
-        this.plugin.logger.debug(`[ChatManager.updateActiveChatMetadata] Updated chat index entry for ${activeChat.metadata.id} including createdAt.`);
       }
       const newRolePath = activeChat.metadata.selectedRolePath;
       const newModelName = activeChat.metadata.modelName;
@@ -5789,7 +5780,7 @@ var ChatManager = class {
       }
       if (roleChanged) {
         try {
-          const newRoleName = this.plugin.findRoleNameByPath(newRolePath);
+          const newRoleName = await this.plugin.findRoleNameByPath(newRolePath);
           this.plugin.logger.debug(`Emitting 'role-changed': ${newRoleName}`);
           this.plugin.emit("role-changed", newRoleName);
           (_b = (_a = this.plugin.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
@@ -5799,7 +5790,7 @@ var ChatManager = class {
       }
       if (modelChanged) {
         this.plugin.logger.debug(`Emitting 'model-changed': ${newModelName}`);
-        this.plugin.emit("model-changed", newModelName);
+        this.plugin.emit("model-changed", newModelName || "");
         (_d = (_c = this.plugin.promptService) == null ? void 0 : _c.clearModelDetailsCache) == null ? void 0 : _d.call(_c);
       }
       this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
@@ -5871,8 +5862,8 @@ var ChatManager = class {
       const saved = await this.saveChatAndUpdateIndex(clonedChat);
       if (!saved)
         throw new Error("Failed to save the cloned chat file.");
-      this.loadedChats[clonedChat.metadata.id] = clonedChat;
-      await this.setActiveChat(clonedChat.metadata.id);
+      this.loadedChats[newId] = clonedChat;
+      await this.setActiveChat(newId);
       this.plugin.logger.info(`Cloned chat "${clonedChat.metadata.name}" created and activated.`);
       return clonedChat;
     } catch (error) {
@@ -5881,7 +5872,6 @@ var ChatManager = class {
       return null;
     }
   }
-  // --- Метод видалення повідомлень ---
   async deleteMessagesAfter(chatId, userMessageIndex) {
     this.plugin.logger.info(`Deleting messages after index ${userMessageIndex} for chat ${chatId}`);
     const chat = await this.getChat(chatId);
@@ -5905,9 +5895,9 @@ var ChatManager = class {
       this.activeChat = chat;
       this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
     }
+    this.plugin.emit("active-chat-changed", { chatId, chat });
     return true;
   }
-  // --- Кінець методу видалення ---
   // --- НОВИЙ МЕТОД: Видалення конкретного повідомлення за міткою часу ---
   async deleteMessageByTimestamp(chatId, timestampToDelete) {
     this.plugin.logger.info(`Attempting to delete message with timestamp ${timestampToDelete.toISOString()} from chat ${chatId}`);
