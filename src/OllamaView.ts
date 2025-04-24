@@ -2540,192 +2540,262 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
     this.hideEmptyState(); // Ensure empty state is hidden
   }
 
-  async sendMessage(): Promise<void> {
-    const content = this.inputEl.value.trim();
-    if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) return;
+// OllamaView.ts
 
-    const activeChat = await this.plugin.chatManager?.getActiveChat();
-    if (!activeChat) {
-        new Notice("Error: No active chat session found.");
-        return;
-    }
+    // ... (інші методи класу до sendMessage) ...
 
-    const userMessageContent = this.inputEl.value;
-    this.clearInputField();
-    this.setLoadingState(true);
-    this.hideEmptyState();
+    // --- ПОВНА ВЕРСІЯ МЕТОДУ: sendMessage ---
+    async sendMessage(): Promise<void> {
+      const content = this.inputEl.value.trim();
+      // Перевірка: додаємо this.currentAbortController !== null, щоб не відправляти нове повідомлення, поки старе генерується
+      if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
+           if(this.currentAbortController !== null) {
+                this.plugin.logger.debug("sendMessage prevented: generation already in progress.");
+           }
+           return;
+      }
 
-    this.currentAbortController = new AbortController();
-    let assistantMessageGroupEl: HTMLElement | null = null;
-    let assistantContentEl: HTMLElement | null = null;
-    let accumulatedResponse = "";
-    const responseStartTime = new Date();
 
-    this.stopGeneratingButton?.show();
-    this.updateSendButtonState();
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      if (!activeChat) {
+          new Notice("Error: No active chat session found.");
+          return;
+      }
 
-    try {
-        const userMessage = await this.plugin.chatManager.addMessageToActiveChat(
-            "user",
-            userMessageContent
-            // Не передаємо час для повідомлення користувача, ChatManager використає поточний
-        );
-        if (!userMessage) {
-            throw new Error("Failed to add user message to history.");
-        }
+      // Зберігаємо оригінальний контент (з пробілами/переносами)
+      const userMessageContent = this.inputEl.value;
 
-        assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
-        this.renderAvatar(assistantMessageGroupEl, false);
+      this.clearInputField(); // Очищуємо поле вводу ПІСЛЯ отримання userMessageContent
+      this.setLoadingState(true); // Блокуємо UI, встановлюємо isProcessing
+      this.hideEmptyState(); // Ховаємо повідомлення "No messages yet"
 
-        // --- ВИПРАВЛЕННЯ TS2353: Встановлюємо стиль окремо ---
-        const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper"});
-        messageWrapper.style.order = "2"; // Стиль застосовано після створення
-        // --- Кінець виправлення ---
+      // Створюємо AbortController та готуємо змінні для стрімінгу
+      this.currentAbortController = new AbortController();
+      let assistantMessageGroupEl: HTMLElement | null = null;
+      let assistantMessageElInternal: HTMLElement | null = null; // Для доступу в finally
+      let assistantContentEl: HTMLElement | null = null;
+      let accumulatedResponse = "";
+      const responseStartTime = new Date(); // Час початку відповіді асистента
 
-        const assistantMessageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
-        const contentContainer = assistantMessageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-        assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
+      // Показуємо кнопку Stop, оновлюємо стан кнопки Send
+      this.stopGeneratingButton?.show();
+      this.updateSendButtonState(); // Це вимкне Send через isProcessing та AbortController
 
-        this.currentAssistantMessage = {
-             groupEl: assistantMessageGroupEl,
-             contentEl: assistantContentEl,
-             fullContent: "", // Поки що порожньо
-             timestamp: responseStartTime
-        };
+      try {
+          // 1. Додаємо повідомлення користувача (emitEvent: true за замовчуванням)
+          const userMessage = await this.plugin.chatManager.addMessageToActiveChat(
+              "user",
+              userMessageContent,
+              undefined, // Timestamp для користувача не передаємо
+              true       // Генеруємо подію message-added
+          );
+          if (!userMessage) {
+              // Скидаємо стан, якщо не вдалося додати повідомлення користувача
+               throw new Error("Failed to add user message to history.");
+          }
 
-        this.guaranteedScrollToBottom(50, true);
+          // 2. Створюємо ПЛЕЙСХОЛДЕР для повідомлення асистента ВІДРАЗУ
+           assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+           this.renderAvatar(assistantMessageGroupEl, false); // Аватар AI
+           const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper"});
+           messageWrapper.style.order = "2"; // Встановлюємо порядок
+           const assistantMessageElement = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+           assistantMessageElInternal = assistantMessageElement; // Зберігаємо для finally
+           const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+           assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` }); // Зберігаємо посилання на contentEl
 
-        this.plugin.logger.info("[OllamaView] Starting stream request...");
-        const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
+           // Зберігаємо посилання на основні елементи для оновлення та фіналізації
+           this.currentAssistantMessage = {
+                groupEl: assistantMessageGroupEl,
+                contentEl: assistantContentEl,
+                fullContent: "", // Поки що порожньо
+                timestamp: responseStartTime
+           };
 
-        for await (const chunk of stream) {
-            // --- ВИПРАВЛЕННЯ TS2339: Використовуємо type guard ---
-             if ('error' in chunk && chunk.error) {
-                  throw new Error(chunk.error);
-              }
+           this.guaranteedScrollToBottom(50, true); // Прокручуємо, щоб показати плейсхолдер
 
-             // Перевіряємо, чи це OllamaGenerateChunk перед доступом до 'response' і 'done'
-              if ('response' in chunk && chunk.response && assistantContentEl) {
-                  accumulatedResponse += chunk.response;
-                  assistantContentEl.empty();
-                  this.renderAssistantContent(assistantContentEl, accumulatedResponse);
-                  this.guaranteedScrollToBottom(50, false);
-                  this.checkMessageForCollapsing(assistantMessageEl); // Перевіряємо згортання
-              }
+          // 3. Запускаємо стрімінг запит
+          this.plugin.logger.info("[OllamaView] Starting stream request...");
+          const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
 
-              if ('done' in chunk && chunk.done) {
-            // --- Кінець виправлення ---
-                this.plugin.logger.info("[OllamaView] Stream finished (done=true received).");
-                break;
-            }
-        } // Кінець for await...of
-
-        this.plugin.logger.debug(`[OllamaView] Stream completed. Final response length: ${accumulatedResponse.length}`);
-
-        if (accumulatedResponse.trim()) {
-             // --- ВИПРАВЛЕННЯ TS2554: Передаємо timestamp як третій аргумент (припускаючи, що метод ChatManager оновлено) ---
-             await this.plugin.chatManager.addMessageToActiveChat(
-                 "assistant",
-                 accumulatedResponse,
-                 responseStartTime // Передаємо час початку відповіді
-             );
-             // --- Кінець виправлення ---
-        } else {
-             this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
-             this.addMessageToDisplay("system", "Assistant provided an empty response.", new Date());
-        }
-
-    } catch (error: any) {
-        this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
-
-        if (error.name === 'AbortError' || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
-            this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
-             this.addMessageToDisplay("system", "Generation stopped.", new Date());
-             if (this.currentAssistantMessage && accumulatedResponse.trim()) {
-                  this.plugin.logger.info(`[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`);
-                   // --- ВИПРАВЛЕННЯ TS2554: Передаємо timestamp ---
-                   await this.plugin.chatManager.addMessageToActiveChat(
-                       "assistant",
-                       accumulatedResponse,
-                       this.currentAssistantMessage.timestamp ?? new Date()
-                   ).catch(e => this.plugin.logger.error("Failed to save partial message after abort:", e));
-                   // --- Кінець виправлення ---
-                  if(this.currentAssistantMessage.contentEl) {
-                      this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + " [...]");
-                  }
-             } else if(this.currentAssistantMessage?.groupEl) {
-                  this.currentAssistantMessage.groupEl.remove();
-             }
-
-        } else {
-            this.addMessageToDisplay(
-                "error",
-                `Error: ${error.message || "Unknown streaming error."}`,
-                new Date()
-            );
-             assistantMessageGroupEl?.remove();
-        }
-
-    } finally {
-        this.plugin.logger.debug("[OllamaView] Stream finished or aborted. Cleaning up UI state.");
-
-         if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl) {
-             const finalTimestamp = this.currentAssistantMessage.timestamp ?? new Date();
-             const finalContent = accumulatedResponse; // Використовуємо накопичений текст
-
-              const assistantMessageEl = this.currentAssistantMessage.groupEl.querySelector(`.${CSS_CLASS_OLLAMA_MESSAGE}`) as HTMLElement;
-               if(assistantMessageEl) {
-                    const messageWrapper = assistantMessageEl.parentElement;
-                    if(messageWrapper) {
-                         const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
-                         existingActions?.remove();
-                         const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-
-                          const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
-                          setIcon(copyBtn, "copy");
-                          this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
-
-                          if (this.plugin.settings.enableTranslation /* && translation conditions */) {
-                              const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
-                              setIcon(translateBtn, "languages");
-                              this.registerDomEvent(translateBtn, "click", (e) => {
-                                  e.stopPropagation();
-                                  // Переконуємось, що contentEl існує
-                                  if (this.currentAssistantMessage?.contentEl) {
-                                     this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
-                                  }
-                              });
-                          }
-
-                         const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
-                         setIcon(deleteBtn, "trash");
-                         this.registerDomEvent(deleteBtn, "click", (e) => {
-                              e.stopPropagation();
-                              // Створюємо тимчасовий об'єкт Message для передачі в обробник
-                              const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
-                              this.handleDeleteMessageClick(tempMsgForDelete);
-                         });
+          // 4. Обробляємо кожен chunk
+          for await (const chunk of stream) {
+               // Перевірка помилки в chunk
+               if ('error' in chunk && chunk.error) {
+                   // Перевіряємо, чи це помилка скасування, яку ми вже обробимо в catch/finally
+                    if (chunk.error.includes("aborted by user")) {
+                         this.plugin.logger.debug("[OllamaView] Stream iterator yielded abort error chunk.");
+                         // Нічого не робимо тут, обробка буде в catch(AbortError)
+                    } else {
+                         // Це інша помилка від сервісу
+                         throw new Error(chunk.error);
                     }
+                }
 
-                    const existingTimestamp = assistantMessageEl.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
-                    existingTimestamp?.remove();
-                     assistantMessageEl.createDiv({
-                         cls: CSS_CLASS_TIMESTAMP,
-                         text: this.formatTime(finalTimestamp),
-                     });
-
-                     this.checkMessageForCollapsing(assistantMessageEl);
+               // Оновлення контенту, якщо є відповідь
+               if ('response' in chunk && chunk.response && assistantContentEl) {
+                   accumulatedResponse += chunk.response;
+                   // Оновлюємо DOM: Очищуємо та рендеримо Markdown
+                   assistantContentEl.empty();
+                   this.renderAssistantContent(assistantContentEl, accumulatedResponse);
+                   // Прокручуємо вниз плавно
+                   this.guaranteedScrollToBottom(50, false);
+                   // Перевіряємо необхідність кнопки "Show More"
+                   this.checkMessageForCollapsing(assistantMessageElement);
                }
-         }
 
-        this.setLoadingState(false);
-        this.stopGeneratingButton?.hide();
-        this.currentAbortController = null;
-        this.currentAssistantMessage = null;
-        this.updateSendButtonState();
-        this.focusInput();
-    }
-}
+               // Перевірка завершення стріму
+               if ('done' in chunk && chunk.done) {
+                   this.plugin.logger.info("[OllamaView] Stream finished (done=true received).");
+                   break; // Виходимо з циклу for await...of
+               }
+          } // Кінець for await...of
+
+          // 5. Стрім завершився успішно (не було помилок чи переривання)
+          this.plugin.logger.debug(`[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`);
+
+          // Зберігаємо повне повідомлення в ChatManager без генерації події message-added
+          if (accumulatedResponse.trim()) {
+               await this.plugin.chatManager.addMessageToActiveChat(
+                   "assistant",
+                   accumulatedResponse,
+                   responseStartTime, // Використовуємо час початку відповіді
+                   false // <-- НЕ генерувати подію message-added
+               );
+               this.plugin.logger.debug(`Saved final assistant message (length: ${accumulatedResponse.length}) to chat history.`);
+          } else {
+               this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
+                // Якщо відповідь порожня, можна або видалити плейсхолдер, або додати системне повідомлення
+                this.addMessageToDisplay("system", "Assistant provided an empty response.", new Date());
+                // Видалимо плейсхолдер, щоб не залишати порожню бульбашку
+                assistantMessageGroupEl?.remove();
+                this.currentAssistantMessage = null; // Очищаємо, щоб finally не намагався його фіналізувати
+          }
+
+      } catch (error: any) {
+          // 6. Обробка помилок (включаючи скасування)
+          this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
+
+          // Перевірка на помилку скасування (AbortError)
+          if (error.name === 'AbortError' || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
+              this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
+               // Додаємо системне повідомлення про зупинку
+               this.addMessageToDisplay("system", "Generation stopped.", new Date());
+
+               // Зберігаємо часткову відповідь, якщо вона є (без генерації події)
+               if (this.currentAssistantMessage && accumulatedResponse.trim()) {
+                    this.plugin.logger.info(`[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`);
+                    await this.plugin.chatManager.addMessageToActiveChat(
+                        "assistant",
+                        accumulatedResponse,
+                        this.currentAssistantMessage.timestamp ?? responseStartTime, // Використовуємо збережений час
+                        false // <-- НЕ генерувати подію message-added
+                    ).catch(e => this.plugin.logger.error("Failed to save partial message after abort:", e));
+
+                    // Оновлюємо вигляд часткового повідомлення, щоб позначити його як незавершене
+                    if(this.currentAssistantMessage.contentEl) {
+                        // Перерендеримо з індикатором [...]
+                        this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + "\n\n[...] _(Stopped)_");
+                    }
+               } else if(this.currentAssistantMessage?.groupEl) {
+                    // Якщо скасовано до отримання будь-якої відповіді, прибираємо плейсхолдер
+                    this.plugin.logger.debug("Removing assistant message placeholder after cancellation with no response.");
+                    this.currentAssistantMessage.groupEl.remove();
+                    this.currentAssistantMessage = null; // Важливо для finally
+               }
+
+          } else {
+              // Інші помилки (з'єднання, API, парсинг JSON тощо)
+              this.addMessageToDisplay(
+                  "error",
+                  `Error: ${error.message || "Unknown streaming error."}`,
+                  new Date()
+              );
+               // Видаляємо плейсхолдер асистента, якщо він був створений
+               if (assistantMessageGroupEl) {
+                    this.plugin.logger.debug("Removing assistant message placeholder due to error.");
+                    assistantMessageGroupEl.remove();
+               }
+               this.currentAssistantMessage = null; // Важливо для finally
+          }
+
+      } finally {
+           // 7. Завжди виконується після try/catch (очищення стану та фіналізація UI)
+          this.plugin.logger.debug("[OllamaView] sendMessage finally block executing. Cleaning up UI state.");
+
+           // Фіналізуємо вигляд повідомлення асистента (додаємо кнопки, мітку часу),
+           // тільки якщо воно не було видалено через помилку або скасування без відповіді.
+           if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl && assistantMessageElInternal) {
+               const finalTimestamp = this.currentAssistantMessage.timestamp ?? responseStartTime;
+               // Використовуємо accumulatedResponse, бо currentAssistantMessage.fullContent не оновлювався
+               const finalContent = accumulatedResponse;
+
+               // Додаємо кнопки та мітку часу до assistantMessageElInternal
+               const messageWrapper = assistantMessageElInternal.parentElement;
+               if (messageWrapper) {
+                   const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
+                   existingActions?.remove(); // Видаляємо старі кнопки, якщо вони були
+                   const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+
+                   // Кнопка Копіювання
+                   const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
+                   setIcon(copyBtn, "copy");
+                   this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
+
+                   // Кнопка Перекладу (якщо налаштовано)
+                   if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
+                       const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
+                       setIcon(translateBtn, "languages");
+                       this.registerDomEvent(translateBtn, "click", (e) => {
+                           e.stopPropagation();
+                           if (this.currentAssistantMessage?.contentEl) { // Перевірка існування contentEl
+                              this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
+                           }
+                       });
+                   }
+
+                   // Кнопка Видалення
+                   const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+                   setIcon(deleteBtn, "trash");
+                   this.registerDomEvent(deleteBtn, "click", (e) => {
+                       e.stopPropagation();
+                       // Створюємо тимчасовий об'єкт Message для передачі в обробник
+                       // (припускаючи, що handleDeleteMessageClick може знайти повідомлення за timestamp)
+                       const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
+                       this.handleDeleteMessageClick(tempMsgForDelete);
+                   });
+               } else {
+                    this.plugin.logger.warn("[OllamaView] finally: Could not find message-wrapper to add action buttons.");
+               }
+
+               // Додаємо мітку часу
+               const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+               existingTimestamp?.remove();
+               assistantMessageElInternal.createDiv({
+                   cls: CSS_CLASS_TIMESTAMP,
+                   text: this.formatTime(finalTimestamp),
+               });
+
+               // Перевірка згортання ще раз після додавання всіх елементів
+               this.checkMessageForCollapsing(assistantMessageElInternal);
+
+           } else {
+                this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed).");
+           }
+
+          // Скидаємо стан завантаження та контролер
+          this.setLoadingState(false);
+          this.stopGeneratingButton?.hide();
+          this.currentAbortController = null;
+          this.currentAssistantMessage = null; // Очищуємо посилання на поточне повідомлення
+          this.updateSendButtonState(); // Оновлюємо стан кнопок Send/Stop
+          this.focusInput(); // Повертаємо фокус у поле вводу
+          this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
+      }
+  }
+
+  // ... (решта коду OllamaView.ts після sendMessage) ...
+
   // --- Core Rendering Logic ---
 
   /** Renders a single message bubble based on the message object and context */
@@ -3011,188 +3081,272 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
     ).open();
   }
 
-   // --- ОНОВЛЕНИЙ МЕТОД: handleRegenerateClick ---
-   private async handleRegenerateClick(userMessage: Message): Promise<void> {
-    this.plugin.logger.info(
-        `Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`
-    );
+// OllamaView.ts
 
-    if (this.currentAbortController) {
-        this.plugin.logger.warn("Cannot regenerate while another generation is in progress. Cancelling current one first.");
-        this.cancelGeneration();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        if(this.currentAbortController) {
-             new Notice("Please wait for the current generation to stop completely.");
-             return;
-        }
-    }
+    // ... (інші методи класу до handleRegenerateClick) ...
 
-    const activeChat = await this.plugin.chatManager?.getActiveChat();
-    if (!activeChat) {
-        new Notice("Cannot regenerate: No active chat found.");
-        return;
-    }
-    const chatId = activeChat.metadata.id;
+    // --- ПОВНА ВЕРСІЯ МЕТОДУ: handleRegenerateClick ---
+    private async handleRegenerateClick(userMessage: Message): Promise<void> {
+      this.plugin.logger.info(
+          `Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`
+      );
 
-    const messageIndex = activeChat.messages.findIndex(
-        (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime()
-    );
+      // Зупиняємо поточну генерацію, якщо вона є
+      if (this.currentAbortController) {
+          this.plugin.logger.warn("Cannot regenerate while another generation is in progress. Cancelling current one first.");
+          this.cancelGeneration(); // Викликаємо скасування
+          // Даємо трохи часу на завершення скасування
+          await new Promise(resolve => setTimeout(resolve, 150));
+          // Перевіряємо ще раз, чи скасування завершилось
+          if(this.currentAbortController) {
+               this.plugin.logger.warn("Previous generation cancellation still processing. Please try again shortly.");
+               new Notice("Please wait for the current generation to stop completely.");
+               return;
+          }
+      }
 
-    if (messageIndex === -1) {
-        this.plugin.logger.error("Could not find the user message for regeneration.", userMessage);
-        new Notice("Error: Could not find the message to regenerate from.");
-        return;
-    }
-    if (messageIndex === activeChat.messages.length - 1) {
-        new Notice("This is the last message, nothing to regenerate after it.");
-        return;
-    }
+      // Отримуємо активний чат та перевіряємо індекс повідомлення
+      const activeChat = await this.plugin.chatManager?.getActiveChat();
+      if (!activeChat) {
+          new Notice("Cannot regenerate: No active chat found.");
+          return;
+      }
+      const chatId = activeChat.metadata.id;
 
-    new ConfirmModal(
-        this.app,
-        "Confirm Regeneration",
-        "This will delete all messages after this prompt and generate a new response. Continue?",
-        async () => {
-            this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
+      const messageIndex = activeChat.messages.findIndex(
+          (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime()
+      );
 
-             this.currentAbortController = new AbortController();
-             let assistantMessageGroupEl: HTMLElement | null = null;
-             let assistantContentEl: HTMLElement | null = null;
-             let accumulatedResponse = "";
-             const responseStartTime = new Date();
+      if (messageIndex === -1) {
+          this.plugin.logger.error("Could not find the user message in the active chat history for regeneration.", userMessage);
+          new Notice("Error: Could not find the message to regenerate from.");
+          return;
+      }
 
-            this.setLoadingState(true);
-            this.stopGeneratingButton?.show();
-            this.updateSendButtonState();
+      // Перевіряємо, чи це не останнє повідомлення
+      if (messageIndex === activeChat.messages.length - 1) {
+          new Notice("This is the last message, nothing to regenerate after it.");
+          return;
+      }
 
-            try {
-                const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
-                if (!deleteSuccess) throw new Error("Failed to delete subsequent messages.");
+      // Запитуємо підтвердження користувача
+      new ConfirmModal(
+          this.app,
+          "Confirm Regeneration",
+          "This will delete all messages after this prompt and generate a new response. Continue?",
+          async () => {
+              // --- Початок логіки регенерації після підтвердження ---
+              this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
 
-                const updatedChat = await this.plugin.chatManager.getActiveChat();
-                if (!updatedChat) throw new Error("Failed to get updated chat after deletion.");
+              // Створюємо новий AbortController для цього запиту регенерації
+              this.currentAbortController = new AbortController();
+              let assistantMessageGroupEl: HTMLElement | null = null;
+              let assistantMessageElInternal: HTMLElement | null = null; // Для доступу в finally
+              let assistantContentEl: HTMLElement | null = null;
+              let accumulatedResponse = "";
+              const responseStartTime = new Date(); // Час початку відповіді
 
-                 await this.loadAndDisplayActiveChat();
-                 this.scrollToBottom();
+              // Встановлюємо стан завантаження та показуємо кнопку Stop
+              this.setLoadingState(true);
+              this.stopGeneratingButton?.show();
+              this.updateSendButtonState(); // Оновлюємо стан кнопок
 
-                 assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
-                 this.renderAvatar(assistantMessageGroupEl, false);
+              try {
+                  // 1. Видаляємо повідомлення ПІСЛЯ вибраного індексу
+                  this.plugin.logger.debug(`Deleting messages after index ${messageIndex} in chat ${chatId}...`);
+                  const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
+                  if (!deleteSuccess) {
+                      throw new Error("Failed to delete subsequent messages.");
+                  }
+                  this.plugin.logger.debug("Subsequent messages deleted successfully.");
 
-                 // --- ВИПРАВЛЕННЯ TS2353: Встановлюємо стиль окремо ---
-                 const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper"});
-                 messageWrapper.style.order = "2";
-                 // --- Кінець виправлення ---
+                  // 2. Отримуємо оновлений об'єкт чату (після видалення)
+                  const updatedChat = await this.plugin.chatManager.getActiveChat(); // Отримуємо актуальну версію
+                  if (!updatedChat) {
+                      // Це критична помилка, якщо чат зник після видалення повідомлень
+                      throw new Error("Failed to get updated chat state after deleting messages.");
+                  }
 
-                 const assistantMessageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
-                 const contentContainer = assistantMessageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-                 assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
+                  // 3. Оновлюємо UI (перезавантажуємо весь чат, щоб видалити старі повідомлення з екрану)
+                  this.plugin.logger.debug("Reloading chat display after message deletion...");
+                  await this.loadAndDisplayActiveChat(); // Перемальовуємо весь чат
+                  this.scrollToBottom(); // Прокручуємо вниз
 
-                 this.currentAssistantMessage = { groupEl: assistantMessageGroupEl, contentEl: assistantContentEl, fullContent: "", timestamp: responseStartTime };
-                 this.guaranteedScrollToBottom(50, true);
+                  // 4. Створюємо ПЛЕЙСХОЛДЕР для нового повідомлення асистента
+                  this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
+                  assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+                  this.renderAvatar(assistantMessageGroupEl, false); // Аватар AI
+                  const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper"});
+                  messageWrapper.style.order = "2"; // Стиль
+                  const assistantMessageElement = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+                  assistantMessageElInternal = assistantMessageElement; // Зберігаємо для finally
+                  const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+                  assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` }); // Зберігаємо посилання
 
-                this.plugin.logger.info(`Generating new response for chat ${chatId} based on history up to index ${messageIndex}`);
-                 const stream = this.plugin.ollamaService.generateChatResponseStream(updatedChat, this.currentAbortController.signal);
+                  // Зберігаємо посилання на основні елементи
+                  this.currentAssistantMessage = {
+                       groupEl: assistantMessageGroupEl,
+                       contentEl: assistantContentEl,
+                       fullContent: "", // Поки що порожньо
+                       timestamp: responseStartTime
+                  };
+                  this.guaranteedScrollToBottom(50, true); // Прокручуємо до плейсхолдера
 
-                 for await (const chunk of stream) {
-                      // --- ВИПРАВЛЕННЯ TS2339: Використовуємо type guard ---
+                  // 5. Генеруємо нову відповідь (потоково)
+                  this.plugin.logger.info(`Starting regeneration stream request for chat ${chatId} based on history up to index ${messageIndex}`);
+                  const stream = this.plugin.ollamaService.generateChatResponseStream(updatedChat, this.currentAbortController.signal);
+
+                  // 6. Обробляємо потік (аналогічно sendMessage)
+                  for await (const chunk of stream) {
+                      // Перевірка помилки в chunk
                       if ('error' in chunk && chunk.error) {
-                          throw new Error(chunk.error);
-                      }
+                           if (chunk.error.includes("aborted by user")) {
+                               this.plugin.logger.debug("[OllamaView] Regeneration stream iterator yielded abort error chunk.");
+                           } else { throw new Error(chunk.error); }
+                       }
+
+                      // Оновлення контенту
                       if ('response' in chunk && chunk.response && assistantContentEl) {
                           accumulatedResponse += chunk.response;
                           assistantContentEl.empty();
                           this.renderAssistantContent(assistantContentEl, accumulatedResponse);
                           this.guaranteedScrollToBottom(50, false);
-                          this.checkMessageForCollapsing(assistantMessageEl);
+                          this.checkMessageForCollapsing(assistantMessageElement);
                       }
-                      if ('done' in chunk && chunk.done) {
-                      // --- Кінець виправлення ---
-                         this.plugin.logger.info("[OllamaView] Regeneration stream finished.");
-                         break;
-                     }
-                 }
 
-                 if (accumulatedResponse.trim()) {
-                      // --- ВИПРАВЛЕННЯ TS2554: Передаємо timestamp ---
-                      await this.plugin.chatManager.addMessageToActiveChat(
-                          "assistant",
-                          accumulatedResponse,
-                          responseStartTime
-                      );
-                      // --- Кінець виправлення ---
-                 } else {
+                      // Перевірка завершення
+                      if ('done' in chunk && chunk.done) {
+                          this.plugin.logger.info("[OllamaView] Regeneration stream finished (done=true received).");
+                          break;
+                      }
+                  } // Кінець for await...of
+
+                  // 7. Стрім завершився успішно
+                  this.plugin.logger.debug(`Regeneration stream completed successfully. Final response length: ${accumulatedResponse.length}`);
+                  if (accumulatedResponse.trim()) {
+                       // Зберігаємо повну відповідь (без події message-added)
+                       await this.plugin.chatManager.addMessageToActiveChat(
+                           "assistant",
+                           accumulatedResponse,
+                           responseStartTime,
+                           false // НЕ генерувати подію
+                       );
+                       this.plugin.logger.debug(`Saved final regenerated message (length: ${accumulatedResponse.length}) to chat history.`);
+                  } else {
                        this.plugin.logger.warn("[OllamaView] Regeneration stream finished but accumulated response is empty.");
                        this.addMessageToDisplay("system", "Assistant provided an empty response during regeneration.", new Date());
-                 }
+                       assistantMessageGroupEl?.remove(); // Видаляємо плейсхолдер
+                       this.currentAssistantMessage = null; // Очищуємо для finally
+                  }
 
-            } catch (error: any) {
-                 this.plugin.logger.error("Error during regeneration process:", error);
-                 if (error.name === 'AbortError' || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
-                     this.plugin.logger.info("[OllamaView] Regeneration was cancelled.");
+              } catch (error: any) {
+                  // 8. Обробка помилок (включаючи скасування регенерації)
+                  this.plugin.logger.error("Error during regeneration process:", error);
+                  if (error.name === 'AbortError' || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
+                      this.plugin.logger.info("[OllamaView] Regeneration was cancelled by user.");
                       this.addMessageToDisplay("system", "Regeneration stopped.", new Date());
+                      // Зберігаємо часткову відповідь, якщо вона є (без події)
                       if (this.currentAssistantMessage && accumulatedResponse.trim()) {
-                           this.plugin.logger.info(`[OllamaView] Saving partial response after regeneration cancellation (length: ${accumulatedResponse.length})`);
-                           // --- ВИПРАВЛЕННЯ TS2554: Передаємо timestamp ---
-                           await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, this.currentAssistantMessage.timestamp ?? new Date())
-                            .catch(e => this.plugin.logger.error("Failed to save partial message after regeneration abort:", e));
-                           // --- Кінець виправлення ---
-                         if(this.currentAssistantMessage.contentEl) {
-                             this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + " [...]");
-                         }
-                     } else if(this.currentAssistantMessage?.groupEl) {
-                         this.currentAssistantMessage.groupEl.remove();
-                     }
-                 } else {
-                     new Notice(`Regeneration failed: ${error.message}`);
-                      assistantMessageGroupEl?.remove();
-                 }
-            } finally {
-                this.plugin.logger.debug("[OllamaView] Regeneration finished or aborted. Cleaning up UI state.");
-                 if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl) {
-                     const finalTimestamp = this.currentAssistantMessage.timestamp ?? new Date();
-                     const finalContent = accumulatedResponse;
-                      const assistantMessageEl = this.currentAssistantMessage.groupEl.querySelector(`.${CSS_CLASS_OLLAMA_MESSAGE}`) as HTMLElement;
-                     if(assistantMessageEl) {
-                         const messageWrapper = assistantMessageEl.parentElement;
-                         if(messageWrapper) {
-                              const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
-                                 existingActions?.remove();
-                                 const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-                                  const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
-                                  setIcon(copyBtn, "copy");
-                                  this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
-                                  if (this.plugin.settings.enableTranslation /* && conditions */) {
-                                       const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
-                                       setIcon(translateBtn, "languages");
-                                       this.registerDomEvent(translateBtn, "click", (e) => {
-                                            e.stopPropagation();
-                                            if(this.currentAssistantMessage?.contentEl) {
-                                                this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
-                                            }
-                                       });
+                          this.plugin.logger.info(`[OllamaView] Saving partial response after regeneration cancellation (length: ${accumulatedResponse.length})`);
+                          await this.plugin.chatManager.addMessageToActiveChat(
+                              "assistant",
+                              accumulatedResponse,
+                              this.currentAssistantMessage.timestamp ?? responseStartTime,
+                              false // НЕ генерувати подію
+                          ).catch(e => this.plugin.logger.error("Failed to save partial message after regeneration abort:", e));
+                          // Оновлюємо вигляд часткової відповіді
+                          if(this.currentAssistantMessage.contentEl) {
+                              this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + "\n\n[...] _(Stopped)_");
+                          }
+                      } else if(this.currentAssistantMessage?.groupEl) {
+                          // Скасовано до отримання відповіді - видаляємо плейсхолдер
+                          this.plugin.logger.debug("Removing assistant message placeholder after regeneration cancellation with no response.");
+                          this.currentAssistantMessage.groupEl.remove();
+                          this.currentAssistantMessage = null; // Важливо для finally
+                      }
+                  } else {
+                      // Інші помилки
+                      new Notice(`Regeneration failed: ${error.message || "Unknown error"}`);
+                      // Видаляємо плейсхолдер асистента, якщо він був створений
+                      if (assistantMessageGroupEl) {
+                           this.plugin.logger.debug("Removing assistant message placeholder due to regeneration error.");
+                           assistantMessageGroupEl.remove();
+                      }
+                      this.currentAssistantMessage = null; // Важливо для finally
+                  }
+              } finally {
+                  // 9. Завжди виконується: Очищення стану та фіналізація UI
+                  this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block executing. Cleaning up UI state.");
+
+                  // Фіналізуємо вигляд повідомлення асистента (кнопки, мітка часу)
+                  if (this.currentAssistantMessage?.groupEl && this.currentAssistantMessage?.contentEl && assistantMessageElInternal) {
+                       const finalTimestamp = this.currentAssistantMessage.timestamp ?? responseStartTime;
+                       const finalContent = accumulatedResponse; // Остаточний текст
+
+                       // Додаємо кнопки та мітку часу до assistantMessageElInternal
+                       const messageWrapper = assistantMessageElInternal.parentElement;
+                       if (messageWrapper) {
+                           const existingActions = messageWrapper.querySelector('.message-actions-wrapper');
+                           existingActions?.remove();
+                           const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+
+                           // Кнопка Копіювання
+                           const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { 'aria-label': 'Copy', title: 'Copy'} });
+                           setIcon(copyBtn, "copy");
+                           this.registerDomEvent(copyBtn, "click", (e) => { e.stopPropagation(); this.handleCopyClick(finalContent, copyBtn); });
+
+                           // Кнопка Перекладу
+                           if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
+                               const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { 'aria-label': 'Translate', title: 'Translate' } });
+                               setIcon(translateBtn, "languages");
+                               this.registerDomEvent(translateBtn, "click", (e) => {
+                                   e.stopPropagation();
+                                   if (this.currentAssistantMessage?.contentEl) {
+                                      this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
                                    }
-                                 const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
-                                 setIcon(deleteBtn, "trash");
-                                  this.registerDomEvent(deleteBtn, "click", (e) => { e.stopPropagation(); const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp }; this.handleDeleteMessageClick(tempMsgForDelete); });
+                               });
+                           }
 
-                              const existingTimestamp = assistantMessageEl.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
-                              existingTimestamp?.remove();
-                              assistantMessageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
-                               this.checkMessageForCollapsing(assistantMessageEl);
-                         }
-                     }
-                 }
+                           // Кнопка Видалення
+                           const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+                           setIcon(deleteBtn, "trash");
+                           this.registerDomEvent(deleteBtn, "click", (e) => {
+                               e.stopPropagation();
+                               const tempMsgForDelete: Message = { role: 'assistant', content: finalContent, timestamp: finalTimestamp };
+                               this.handleDeleteMessageClick(tempMsgForDelete);
+                           });
+                       } else {
+                           this.plugin.logger.warn("[OllamaView] finally (regenerate): Could not find message-wrapper to add action buttons.");
+                       }
 
-                this.setLoadingState(false);
-                this.stopGeneratingButton?.hide();
-                this.currentAbortController = null;
-                this.currentAssistantMessage = null;
-                this.updateSendButtonState();
-                this.focusInput();
-            }
-        }
-    ).open();
-}
+                       // Додаємо мітку часу
+                       const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+                       existingTimestamp?.remove();
+                       assistantMessageElInternal.createDiv({
+                           cls: CSS_CLASS_TIMESTAMP,
+                           text: this.formatTime(finalTimestamp),
+                       });
+
+                       // Перевірка згортання
+                       this.checkMessageForCollapsing(assistantMessageElInternal);
+                  } else {
+                       this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed).");
+                  }
+
+                  // Скидаємо стан завантаження, контролер та кнопку
+                  this.setLoadingState(false);
+                  this.stopGeneratingButton?.hide();
+                  this.currentAbortController = null;
+                  this.currentAssistantMessage = null; // Очищуємо посилання
+                  this.updateSendButtonState(); // Оновлюємо стан кнопок
+                  this.focusInput(); // Повертаємо фокус
+                  this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
+              }
+          } // Кінець колбеку ConfirmModal
+      ).open(); // Відкриваємо модалку підтвердження
+   }
+
+  // ... (решта коду OllamaView.ts після handleRegenerateClick) ...
 
   // --- Action Button Handlers ---
   private handleCopyClick(content: string, buttonEl: HTMLElement): void {

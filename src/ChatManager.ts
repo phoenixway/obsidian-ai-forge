@@ -541,28 +541,39 @@ export class ChatManager {
         this.plugin.emit('active-chat-changed', { chatId: id, chat: loadedChat });
     }
 
-    async addMessageToActiveChat(role: MessageRole, content: string, timestamp?: Date): Promise<Message | null> {
+    async addMessageToActiveChat(
+        role: MessageRole,
+        content: string,
+        timestamp?: Date,
+        emitEvent: boolean = true // <-- Новий параметр зі значенням за замовчуванням true
+    ): Promise<Message | null> {
         const activeChat = await this.getActiveChat();
         if (!activeChat) {
             this.plugin.logger.error("Cannot add message: No active chat.");
-            new Notice("Error: No active chat session.");
+            // Не показуємо Notice тут, бо це може викликатися у фоні
             return null;
         }
 
         const messageTimestamp = timestamp || new Date();
+
         // Припускаємо, що Chat.addMessage оновлено для прийняття timestamp
-        // Якщо ні, потрібно змінити Chat.ts або логіку тут
-        const newMessage = activeChat.addMessage(role, content, messageTimestamp); // Передаємо timestamp
+        // Якщо ні, створюємо Message тут і додаємо в масив:
+         const newMessage: Message = { role, content, timestamp: messageTimestamp };
+         activeChat.messages.push(newMessage);
+         activeChat.updateMetadata({}); // Оновлення lastModified + планування збереження
 
-        this.plugin.logger.debug(`Added ${role} message with timestamp ${messageTimestamp.toISOString()} to active chat ${activeChat.metadata.id}.`);
+        this.plugin.logger.debug(`Added ${role} message with timestamp ${messageTimestamp.toISOString()} to active chat ${activeChat.metadata.id}. Emit event: ${emitEvent}`);
 
-        // Оновлюємо індекс та сповіщаємо UI
-        // Використовуємо saveChatAndUpdateIndex, який вже містить потрібну логіку
-        await this.saveChatAndUpdateIndex(activeChat);
+        // Оновлюємо індекс та сповіщаємо UI (якщо потрібно)
+        const indexUpdated = await this.saveChatAndUpdateIndex(activeChat); // Це викличе chat-list-updated
 
-        this.plugin.emit('message-added', { chatId: activeChat.metadata.id, message: newMessage });
+        // --- ВИПРАВЛЕНО: Генеруємо подію тільки якщо emitEvent = true ---
+        if (emitEvent && indexUpdated) { // Генеруємо тільки якщо збереження індексу вдалося
+            this.plugin.emit('message-added', { chatId: activeChat.metadata.id, message: newMessage });
+        }
+        // --- Кінець виправлення ---
+
         // chat-list-updated вже викликається в saveChatAndUpdateIndex
-        // this.plugin.emit('chat-list-updated');
         return newMessage;
     }
 
