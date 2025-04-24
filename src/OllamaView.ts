@@ -4950,99 +4950,61 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
   let otherHeaderEl: HTMLElement | null = null;
   let otherContentEl: HTMLElement | null = null;
   let otherSectionType: 'chats' | 'roles' | null = null;
-  let maxHeightConst = "none"; // Default: no max height
 
   const collapseIcon = "lucide-folder";
   const expandIcon = "lucide-folder-open";
   const expandedClass = "is-expanded";
 
-  if (sectionType === 'chats') {
+  // ... (визначення змінних як раніше) ...
+   if (sectionType === 'chats') {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
       otherHeaderEl = this.rolePanelHeaderEl;
       otherContentEl = this.rolePanelListEl;
       otherSectionType = 'roles';
-      maxHeightConst = "250px"; // Use sidebar constant
   } else if (sectionType === 'roles') {
       contentEl = this.rolePanelListEl;
       updateFunction = this.updateRolePanelList;
       otherHeaderEl = this.chatPanelHeaderEl;
       otherContentEl = this.chatPanelListEl;
       otherSectionType = 'chats';
-      // maxHeightConst remains "none" for roles (or set a specific large value if desired)
   }
 
   if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
-      return;
+       this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
+       return;
   }
 
   if (isCurrentlyCollapsed) {
       // --- Розгортаємо поточну, згортаємо іншу ---
-      // 1. Згортаємо іншу секцію (якщо вона розгорнута)
+      // 1. Згортаємо іншу секцію
       if (otherHeaderEl.getAttribute('data-collapsed') === 'false') {
-          this.plugin.logger.debug(`Collapsing other section: ${otherSectionType}`);
           const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
           otherHeaderEl.setAttribute('data-collapsed', 'true');
           if (otherIconEl) setIcon(otherIconEl, collapseIcon);
-          otherContentEl.classList.remove(expandedClass);
-          otherContentEl.style.maxHeight = '0px'; // Примусово згортаємо
-          otherContentEl.style.paddingTop = '0px';
-          otherContentEl.style.paddingBottom = '0px';
-          otherContentEl.style.overflow = 'hidden'; // Додано для чистоти
-           if (otherSectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.hide();
+          otherContentEl.classList.remove(expandedClass); // Видаляємо клас
+           // --- ЗМІНА: Не чіпаємо inline стилі ---
+          // otherContentEl.style.maxHeight = '0px';
+          // otherContentEl.style.paddingTop = '0';
+          // otherContentEl.style.paddingBottom = '0';
+          // otherContentEl.style.overflowY = 'hidden';
+          if (otherSectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.hide();
       }
 
       // 2. Розгортаємо поточну секцію
-      this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute('data-collapsed', 'false');
       setIcon(iconEl, expandIcon);
-       if (sectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.show();
-
-      // Спочатку оновлюємо вміст
+      if (sectionType === 'chats' && this.newChatSidebarButton) this.newChatSidebarButton.show();
       try {
-          await updateFunction(); // Заповнюємо контейнер
-           this.plugin.logger.debug(`Content updated for section: ${sectionType}`);
-
-          // Встановлюємо стилі для анімації розгортання всередині rAF
-          requestAnimationFrame(() => {
-              // Перевіряємо, чи секція все ще має бути розгорнута
-              if (clickedHeaderEl.getAttribute('data-collapsed') === 'false') {
-                   // Спочатку встановлюємо падінги (якщо вони визначені в CSS)
-                   contentEl!.style.paddingTop = '';
-                   contentEl!.style.paddingBottom = '';
-                   // Потім вимірюємо висоту
-                  const scrollHeight = contentEl!.scrollHeight;
-                  let targetMaxHeight = `${scrollHeight}px`;
-                  let applyOverflow = 'hidden';
-
-                  // Застосовуємо обмеження max-height, якщо воно визначено і вміст перевищує його
-                  if (maxHeightConst !== "none") {
-                       const maxHeightValue = parseFloat(maxHeightConst);
-                       if (scrollHeight > maxHeightValue) {
-                            targetMaxHeight = maxHeightConst;
-                            applyOverflow = 'auto';
-                       }
-                  }
-
-                  this.plugin.logger.debug(`[rAF toggleSidebarSection ${sectionType}] scrollHeight: ${scrollHeight}, maxHeightConst: ${maxHeightConst}, targetMaxHeight: ${targetMaxHeight}`);
-
-                  // Застосовуємо обчислену висоту та клас/стилі
-                  contentEl!.style.maxHeight = targetMaxHeight;
-                  contentEl!.style.overflow = applyOverflow;
-                  contentEl!.classList.add(expandedClass); // Додаємо клас для CSS transition
-              } else {
-                  this.plugin.logger.debug(`[rAF toggleSidebarSection ${sectionType}] Section was collapsed before animation frame.`);
-              }
-          });
+           // Спочатку викликаємо оновлення, щоб контент був готовий
+          await updateFunction();
+          // Потім додаємо клас, CSS подбає про анімацію та висоту
+          contentEl.classList.add(expandedClass);
+           this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch(error) {
           this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
           contentEl.setText(`Error loading ${sectionType}.`);
-           // Встановлюємо якусь мінімальну висоту для показу помилки
-           requestAnimationFrame(() => {
-                contentEl!.style.maxHeight = '50px';
-                contentEl!.classList.add(expandedClass);
-           });
+          contentEl.classList.add(expandedClass); // Показуємо помилку
       }
 
   } else {
@@ -5050,18 +5012,18 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute('data-collapsed', 'true');
       setIcon(iconEl, collapseIcon);
-      contentEl.classList.remove(expandedClass); // Видаляємо клас (CSS має подбати про анімацію до max-height: 0)
-      contentEl.style.maxHeight = '0px'; // Явно встановлюємо для анімації
-      contentEl.style.overflow = 'hidden';
-      contentEl.style.paddingTop = '0px'; // Прибираємо падінг при згортанні
-      contentEl.style.paddingBottom = '0px';
+       // --- ЗМІНА: Не чіпаємо inline стилі ---
+      contentEl.classList.remove(expandedClass); // Видаляємо клас
+      // contentEl.style.maxHeight = '0px';
+      // contentEl.style.paddingTop = '0';
+      // contentEl.style.paddingBottom = '0';
+      // contentEl.style.overflowY = 'hidden';
 
-       if (sectionType === 'chats' && this.newChatSidebarButton) {
+      if (sectionType === 'chats' && this.newChatSidebarButton) {
            this.newChatSidebarButton.hide();
-       }
+      }
   }
 }
-
 
 // --- Оновлений метод показу контекстного меню ---
 private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {

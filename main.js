@@ -4131,7 +4131,6 @@ This action cannot be undone.`,
     let otherHeaderEl = null;
     let otherContentEl = null;
     let otherSectionType = null;
-    let maxHeightConst = "none";
     const collapseIcon = "lucide-folder";
     const expandIcon = "lucide-folder-open";
     const expandedClass = "is-expanded";
@@ -4141,7 +4140,6 @@ This action cannot be undone.`,
       otherHeaderEl = this.rolePanelHeaderEl;
       otherContentEl = this.rolePanelListEl;
       otherSectionType = "roles";
-      maxHeightConst = "250px";
     } else if (sectionType === "roles") {
       contentEl = this.rolePanelListEl;
       updateFunction = this.updateRolePanelList;
@@ -4155,66 +4153,32 @@ This action cannot be undone.`,
     }
     if (isCurrentlyCollapsed) {
       if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        this.plugin.logger.debug(`Collapsing other section: ${otherSectionType}`);
         const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
           (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
         otherContentEl.classList.remove(expandedClass);
-        otherContentEl.style.maxHeight = "0px";
-        otherContentEl.style.paddingTop = "0px";
-        otherContentEl.style.paddingBottom = "0px";
-        otherContentEl.style.overflow = "hidden";
         if (otherSectionType === "chats" && this.newChatSidebarButton)
           this.newChatSidebarButton.hide();
       }
-      this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "false");
       (0, import_obsidian3.setIcon)(iconEl, expandIcon);
       if (sectionType === "chats" && this.newChatSidebarButton)
         this.newChatSidebarButton.show();
       try {
         await updateFunction();
-        this.plugin.logger.debug(`Content updated for section: ${sectionType}`);
-        requestAnimationFrame(() => {
-          if (clickedHeaderEl.getAttribute("data-collapsed") === "false") {
-            contentEl.style.paddingTop = "";
-            contentEl.style.paddingBottom = "";
-            const scrollHeight = contentEl.scrollHeight;
-            let targetMaxHeight = `${scrollHeight}px`;
-            let applyOverflow = "hidden";
-            if (maxHeightConst !== "none") {
-              const maxHeightValue = parseFloat(maxHeightConst);
-              if (scrollHeight > maxHeightValue) {
-                targetMaxHeight = maxHeightConst;
-                applyOverflow = "auto";
-              }
-            }
-            this.plugin.logger.debug(`[rAF toggleSidebarSection ${sectionType}] scrollHeight: ${scrollHeight}, maxHeightConst: ${maxHeightConst}, targetMaxHeight: ${targetMaxHeight}`);
-            contentEl.style.maxHeight = targetMaxHeight;
-            contentEl.style.overflow = applyOverflow;
-            contentEl.classList.add(expandedClass);
-          } else {
-            this.plugin.logger.debug(`[rAF toggleSidebarSection ${sectionType}] Section was collapsed before animation frame.`);
-          }
-        });
+        contentEl.classList.add(expandedClass);
+        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch (error) {
         this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
         contentEl.setText(`Error loading ${sectionType}.`);
-        requestAnimationFrame(() => {
-          contentEl.style.maxHeight = "50px";
-          contentEl.classList.add(expandedClass);
-        });
+        contentEl.classList.add(expandedClass);
       }
     } else {
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
       (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
       contentEl.classList.remove(expandedClass);
-      contentEl.style.maxHeight = "0px";
-      contentEl.style.overflow = "hidden";
-      contentEl.style.paddingTop = "0px";
-      contentEl.style.paddingBottom = "0px";
       if (sectionType === "chats" && this.newChatSidebarButton) {
         this.newChatSidebarButton.hide();
       }
