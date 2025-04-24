@@ -4851,7 +4851,7 @@ export class OllamaView extends ItemView {
 
 // OllamaView.ts
 
-    // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - спроба 2) ---
+    // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - через 'dom' з 'as any') ---
     private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
       event.preventDefault();
       const menu = new Menu();
@@ -4880,8 +4880,13 @@ export class OllamaView extends ItemView {
               .setTitle("Clear Messages")
               .setIcon("lucide-trash")
               .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-          // --- ЗМІНА: Використовуємо 'el' замість 'dom' ---
-          console.log("Inspecting 'Clear Messages' MenuItem:", item);      });
+          // --- ЗМІНА: Використовуємо 'dom' з твердженням типу 'as any' ---
+          try { // Додаємо try-catch про всяк випадок
+              (item as any).dom.addClass("danger-option");
+          } catch (e) {
+               this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
+          }
+      });
 
       // 4. Видалити чат
       menu.addItem((item) => {
@@ -4889,12 +4894,18 @@ export class OllamaView extends ItemView {
               .setTitle("Delete Chat")
               .setIcon("lucide-trash-2")
               .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-           // --- ЗМІНА: Використовуємо 'el' замість 'dom' ---
-           console.log("Inspecting 'Delete Chat' MenuItem:", item);      });
+           // --- ЗМІНА: Використовуємо 'dom' з твердженням типу 'as any' ---
+           try {
+              (item as any).dom.addClass("danger-option");
+           } catch (e) {
+               this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
+           }
+      });
 
-      menu.showAtMouseEvent(event);
+      menu.showAtMouseEvent(event); // Показуємо меню в місці кліку
   }
 
+  // ... (решта методів класу) ...
   // ... (решта методів без змін) ...
   
   private async handleContextMenuClone(chatId: string): Promise<void> {

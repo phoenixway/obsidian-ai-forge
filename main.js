@@ -4106,7 +4106,7 @@ This action cannot be undone.`,
     }
   }
   // OllamaView.ts
-  // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - спроба 2) ---
+  // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - через 'dom' з 'as any') ---
   showChatContextMenu(event, chatMeta) {
     event.preventDefault();
     const menu = new import_obsidian3.Menu();
@@ -4119,14 +4119,23 @@ This action cannot be undone.`,
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-      console.log("Inspecting 'Clear Messages' MenuItem:", item);
+      try {
+        item.dom.addClass("danger-option");
+      } catch (e) {
+        this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
+      }
     });
     menu.addItem((item) => {
       item.setTitle("Delete Chat").setIcon("lucide-trash-2").onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-      console.log("Inspecting 'Delete Chat' MenuItem:", item);
+      try {
+        item.dom.addClass("danger-option");
+      } catch (e) {
+        this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
+      }
     });
     menu.showAtMouseEvent(event);
   }
+  // ... (решта методів класу) ...
   // ... (решта методів без змін) ...
   async handleContextMenuClone(chatId) {
     this.plugin.logger.info(`Context menu: Clone requested for chat ${chatId}`);
