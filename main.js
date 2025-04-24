@@ -219,7 +219,6 @@ var CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
 var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
 var CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button";
 var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
-var CSS_CHAT_ITEM_MAIN = "ollama-chat-item-main";
 var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 var LANGUAGES = {
   af: "Afrikaans",
@@ -337,7 +336,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
   // <-- Нова властивість
   constructor(leaf, plugin) {
     super(leaf);
-    // --- State ---
     this.isProcessing = false;
     this.scrollTimeout = null;
     this.speechWorker = null;
@@ -1444,78 +1442,52 @@ This action cannot be undone.`,
       }, 50);
     };
     // OllamaView.ts
-    // --- Оновлений метод для рендерингу списку ЧАТІВ у ПАНЕЛІ ---
+    // OllamaView.ts
+    // --- Оновлений метод для рендерингу списку ЧАТІВ у ПАНЕЛІ (зміна структури DOM) ---
     this.updateChatPanelList = async () => {
       var _a;
       const container = this.chatPanelListEl;
-      if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug(
-          "[updateChatPanelList] Skipping update: Chat panel list element or chat manager not ready."
-        );
+      if (!container || !this.plugin.chatManager)
         return;
-      }
-      if (((_a = this.chatPanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true") {
-        this.plugin.logger.debug(
-          "[updateChatPanelList] Skipping update: Chat panel is collapsed."
-        );
+      if (((_a = this.chatPanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true")
         return;
-      }
-      this.plugin.logger.debug(
-        "[updateChatPanelList] Updating chat list in the side panel..."
-      );
+      this.plugin.logger.debug("[updateChatPanelList] Updating chat list in the side panel...");
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
         const chats = this.plugin.chatManager.listAvailableChats() || [];
         const currentActiveId = this.plugin.chatManager.getActiveChatId();
         if (chats.length === 0) {
-          container.createDiv({
-            cls: "menu-info-text",
-            text: "No saved chats yet."
-          });
+          container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
         } else {
           chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
           chats.forEach((chatMeta) => {
             const chatOptionEl = container.createDiv({
               cls: [CSS_ROLE_PANEL_ITEM, "menu-option", "ollama-chat-panel-item"]
             });
-            const mainContent = chatOptionEl.createDiv({
-              cls: CSS_CHAT_ITEM_MAIN
-            });
-            const iconSpan = mainContent.createSpan({
-              cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"]
-            });
-            const textSpan = mainContent.createSpan({
-              cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"]
-            });
-            textSpan.createDiv({
-              cls: "chat-panel-item-name",
-              text: chatMeta.name
-            });
-            textSpan.createDiv({
-              cls: "chat-panel-item-date",
-              text: this.formatRelativeDate(
-                new Date(Number(chatMeta.lastModified))
-              )
-            });
+            const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
             if (chatMeta.id === currentActiveId) {
-              chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
               (0, import_obsidian3.setIcon)(iconSpan, "check");
+              chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
             } else {
               (0, import_obsidian3.setIcon)(iconSpan, "message-square");
             }
-            this.registerDomEvent(mainContent, "click", async () => {
-              var _a2;
-              if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
-                await this.plugin.chatManager.setActiveChat(chatMeta.id);
-              }
-            });
+            const textWrapper = chatOptionEl.createDiv({ cls: "ollama-chat-item-text-wrapper" });
+            textWrapper.createDiv({ cls: "chat-panel-item-name", text: chatMeta.name });
+            textWrapper.createDiv({ cls: "chat-panel-item-date", text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
             const optionsBtn = chatOptionEl.createEl("button", {
               cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"],
-              // Додаємо клас для стилізації
               attr: { "aria-label": "Chat options", title: "More options" }
             });
             (0, import_obsidian3.setIcon)(optionsBtn, "lucide-more-horizontal");
+            this.registerDomEvent(chatOptionEl, "click", async (e) => {
+              var _a2;
+              if (!(e.target instanceof Element && e.target.closest(`.${CSS_CHAT_ITEM_OPTIONS}`))) {
+                if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
+                  await this.plugin.chatManager.setActiveChat(chatMeta.id);
+                }
+              }
+            });
             this.registerDomEvent(optionsBtn, "click", (e) => {
               e.stopPropagation();
               this.showChatContextMenu(e, chatMeta);
@@ -1525,16 +1497,17 @@ This action cannot be undone.`,
             });
           });
         }
-      } catch (error) {
-        this.plugin.logger.error(
-          "[updateChatPanelList] Error rendering chat panel list:",
-          error
-        );
-        container.empty();
-        container.createDiv({
-          text: "Error loading chats.",
-          cls: "menu-error-text"
+        requestAnimationFrame(() => {
+          if (container && this.isSidebarSectionVisible("chats")) {
+            const currentScrollHeight = container.scrollHeight;
+            container.style.maxHeight = currentScrollHeight + "px";
+            container.style.overflowY = "auto";
+          }
         });
+      } catch (error) {
+        this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
+        container.empty();
+        container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
       } finally {
         requestAnimationFrame(() => {
           container.scrollTop = currentScrollTop;
@@ -1665,12 +1638,12 @@ This action cannot be undone.`,
       "lucide-folder-open"
     );
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
-    this.newChatBtn = this.chatPanelHeaderEl.createEl("button", {
+    this.newChatSidebarButton = this.chatPanelHeaderEl.createEl("button", {
+      // <-- Призначаємо властивості
       cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
-      // Використовуємо стандартний клас Obsidian для іконок-кнопок
-      attr: { "aria-label": "New Chat", title: "New Chat" }
+      attr: { "aria-label": "New Chat", "title": "New Chat" }
     });
-    (0, import_obsidian3.setIcon)(this.newChatBtn, "lucide-plus-circle");
+    (0, import_obsidian3.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       // Додаємо is-expanded для початкового стану
       cls: [
@@ -2089,7 +2062,7 @@ This action cannot be undone.`,
         "click",
         this.handleNewMessageIndicatorClick
       );
-    this.registerDomEvent(this.newChatBtn, "click", (e) => {
+    this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
       e.stopPropagation();
       this.handleNewChatClick();
     });
@@ -4015,18 +3988,11 @@ This action cannot be undone.`,
       return "Error";
     }
   }
+  // OllamaView.ts
   async toggleSidebarSection(clickedHeaderEl) {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
-    const iconEl = clickedHeaderEl.querySelector(
-      `.${CSS_SIDEBAR_SECTION_ICON}`
-    );
-    console.log(
-      `Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`
-    );
-    if (!iconEl) {
-      console.error("Could not find icon element for section:", sectionType);
-    }
+    const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
     let contentEl = null;
     let updateFunction = null;
     let otherHeaderEl = null;
@@ -4048,52 +4014,45 @@ This action cannot be undone.`,
       otherContentEl = this.chatPanelListEl;
       otherSectionType = "chats";
     }
-    if (!contentEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-      this.plugin.logger.error(
-        "Could not find all required elements for sidebar accordion toggle:",
-        sectionType
-      );
+    if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
       return;
     }
     if (isCurrentlyCollapsed) {
       if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        this.plugin.logger.debug(
-          `Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`
-        );
-        const otherIconEl = otherHeaderEl.querySelector(
-          `.${CSS_SIDEBAR_SECTION_ICON}`
-        );
+        const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
-        if (otherIconEl) {
-          console.log("Setting other icon to:", collapseIcon);
+        if (otherIconEl)
           (0, import_obsidian3.setIcon)(otherIconEl, collapseIcon);
-        }
         otherContentEl.classList.remove(expandedClass);
+        if (otherSectionType === "chats" && this.newChatSidebarButton) {
+          this.newChatSidebarButton.hide();
+          this.plugin.logger.debug("Hiding New Chat button because Roles section expanded.");
+        }
       }
       clickedHeaderEl.setAttribute("data-collapsed", "false");
-      if (iconEl) {
-        console.log("Setting current icon to:", expandIcon);
-        (0, import_obsidian3.setIcon)(iconEl, expandIcon);
+      (0, import_obsidian3.setIcon)(iconEl, expandIcon);
+      if (sectionType === "chats" && this.newChatSidebarButton) {
+        this.newChatSidebarButton.show();
+        this.plugin.logger.debug("Showing New Chat button because Chats section expanded.");
       }
       try {
         await updateFunction();
         contentEl.classList.add(expandedClass);
         this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch (error) {
-        this.plugin.logger.error(
-          `Error updating sidebar section ${sectionType}:`,
-          error
-        );
+        this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
         contentEl.setText(`Error loading ${sectionType}.`);
         contentEl.classList.add(expandedClass);
       }
     } else {
       clickedHeaderEl.setAttribute("data-collapsed", "true");
-      if (iconEl) {
-        console.log("Setting current icon to:", collapseIcon);
-        (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
-      }
+      (0, import_obsidian3.setIcon)(iconEl, collapseIcon);
       contentEl.classList.remove(expandedClass);
+      if (sectionType === "chats" && this.newChatSidebarButton) {
+        this.newChatSidebarButton.hide();
+        this.plugin.logger.debug("Hiding New Chat button because Chats section collapsed.");
+      }
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
     }
   }

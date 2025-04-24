@@ -45,47 +45,186 @@
 // Header for collapsible sections (Chats, Roles)
 .ollama-sidebar-section-header {
     display: flex;
-    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
+    justify-content: space-between;
+    align-items: baseline; // Зберігаємо baseline
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 1.5)
+               calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
+    // ... решта стилів заголовка як були ...
     user-select: none;
-    align-items: baseline;
     cursor: pointer;
-    flex-shrink: 0; // Headers should not shrink
+    flex-shrink: 0;
     position: relative;
     border-radius: var(--radius-s);
     margin: 1px 0;
 
-    // Apply hover effect (can inherit from .menu-option if added in TS)
-     &:hover {
-      background-color: var(--background-modifier-hover);
+    &:hover { background-color: var(--background-modifier-hover); }
+
+    // Ліва частина заголовка (іконка + текст)
+    .ollama-sidebar-header-left {
+        display: flex;
+        align-items: baseline;
+        overflow: hidden;
+        // Займає простір, але дозволяє кнопці справа бути видимою
+        flex-grow: 1; // Можливо, не потрібно, якщо кнопка не росте
+        margin-right: var(--chat-spacing-unit); // Відступ від кнопки "+"
     }
 
-    .ollama-sidebar-section-icon {
+    .ollama-sidebar-section-icon { /* як було */
         margin-right: 14px;
         min-width: 18px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-
-        .svg-icon {
-            width: 16px;
-            height: 16px;
-            color: var(--text-faint);
-        }
+        .svg-icon { width: 16px; height: 16px; color: var(--text-faint); }
     }
+    &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
 
-    &:hover .ollama-sidebar-section-icon .svg-icon {
-        color: var(--text-muted);
-    }
-
-    .menu-option-text {
+    .menu-option-text { /* як було */
         font-weight: 500;
         color: var(--text-normal);
         line-height: 1.2;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        flex-grow: 1;
+    }
+
+    // Кнопка "+"
+    .ollama-sidebar-header-button {
+        padding: 2px;
+        margin-left: auto; // Притискає до правого краю, якщо місця достатньо
+        flex-shrink: 0;
+        color: var(--text-muted);
+        opacity: 0.7;
+        // Прибираємо фон і рамку, щоб була лише іконка
+        background: none;
+        border: none;
+        box-shadow: none;
+
+        &:hover {
+            color: var(--text-normal);
+            opacity: 1;
+            background-color: var(--background-modifier-hover);
+        }
+        .svg-icon { width: 18px; height: 18px; }
+    }
+}
+
+// Контент акордеону
+.ollama-sidebar-section-content { /* як було */
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+    box-sizing: border-box;
+    padding: 0 calc(var(--chat-spacing-unit) * 1.5);
+    min-height: 0;
+    flex-shrink: 0;
+
+    &.is-expanded {
+        max-height: 75vh;
+        overflow-y: auto;
+        padding-top: calc(var(--chat-spacing-unit) * 1);
+        padding-bottom: calc(var(--chat-spacing-unit) * 1);
+    }
+    // ... scrollbar, etc. ...
+     &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
+    &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+     .menu-info-text {
+        padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 1);
+        color: var(--text-faint);
+        font-style: italic;
+        font-size: calc(var(--font-ui-small) * 0.9);
+    }
+     hr.menu-separator {
+        margin: calc(var(--chat-spacing-unit) * 1.5) 0;
+        border: none;
+        border-top: 1px solid var(--background-modifier-border);
+        flex-shrink: 0;
+    }
+}
+
+// --- ЗМІНА: Стилі для елемента списку чатів ---
+.ollama-chat-panel-item {
+    &.menu-option {
+        display: flex;
+        align-items: center; // Вирівнюємо іконку, текст і кнопку по вертикалі
+        padding: calc(var(--chat-spacing-unit) * 1.5) // Зменшено вертикальний паддінг
+                 calc(var(--chat-spacing-unit) * 1.5); // Зменшено горизонтальний паддінг
+        margin: 1px 0;
+
+        // Іконка зліва (як була)
+        .menu-option-icon {
+            margin-right: 10px;
+            min-width: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            .svg-icon { width: 15px; height: 15px; }
+        }
+
+        // Обгортка для тексту (Назва + Дата) - займає простір
+        .ollama-chat-item-text-wrapper {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1; // Займає доступний простір
+            overflow: hidden; // Обрізати довгий текст
+            margin-right: 8px; // Відступ перед кнопкою "..."
+            line-height: 1.3;
+            gap: 1px;
+
+             .chat-panel-item-name {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                font-size: calc(var(--font-ui-small) * 0.95);
+            }
+            .chat-panel-item-date {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                font-size: 0.85em;
+                color: var(--text-faint);
+            }
+        }
+
+        // Кнопка "..." (Опції) - справа
+        .ollama-chat-item-options {
+            padding: 3px;
+            margin: -3px; // Компенсація паддінгу для зони кліку
+            flex-shrink: 0; // Не стискати
+            opacity: 0; // --- Прихована за замовчуванням ---
+            transition: opacity 0.15s ease-in-out; // Плавна поява
+            border-radius: var(--radius-s);
+            background: none;
+            border: none;
+            color: var(--text-muted); // Колір іконки
+
+            &:hover {
+                background-color: var(--background-modifier-hover);
+                color: var(--text-normal); // Колір іконки при наведенні
+            }
+            .svg-icon { width: 18px; height: 18px; }
+        }
+
+        // Показуємо кнопку "..." при наведенні на весь елемент списку
+        &:hover .ollama-chat-item-options {
+             opacity: 0.7; // Робимо видимою при наведенні
+             &:hover { opacity: 1; } // Повна непрозорість при наведенні на саму кнопку
+        }
+
+         // Активний стан
+         &.is-active {
+            background-color: var(--interactive-accent-translucent);
+            .menu-option-icon { color: var(--interactive-accent); }
+            .chat-panel-item-name { color: var(--text-accent-hover); font-weight: 500;}
+            .chat-panel-item-date { color: var(--text-accent-hover); opacity: 0.8;}
+             // Можна зробити кнопку опцій видимою постійно для активного елемента
+            // .ollama-chat-item-options { opacity: 0.7; }
+            &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
+         }
     }
 }
 

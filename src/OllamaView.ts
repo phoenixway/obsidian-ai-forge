@@ -297,8 +297,8 @@ export class OllamaView extends ItemView {
   private temperatureIndicatorEl!: HTMLElement;
   private toggleViewLocationOption!: HTMLElement;
   private toggleLocationButton!: HTMLButtonElement; // Кнопка в панелі (для десктопу)
-  private newChatBtn: HTMLButtonElement;
-  // --- State ---
+  private newChatSidebarButton!: HTMLButtonElement;
+
   private isProcessing: boolean = false;
   private scrollTimeout: NodeJS.Timeout | null = null;
   private speechWorker: Worker | null = null;
@@ -471,20 +471,15 @@ export class OllamaView extends ItemView {
     );
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
 
-    this.newChatBtn = this.chatPanelHeaderEl.createEl("button", {
-      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"], // Використовуємо стандартний клас Obsidian для іконок-кнопок
-      attr: { "aria-label": "New Chat", title: "New Chat" },
-    });
-    setIcon(this.newChatBtn, "lucide-plus-circle");
 
-    // setIcon(
-    //   this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-    //   "lucide-folder-open"
-    // ); // Початкова іконка
-    // this.chatPanelHeaderEl.createSpan({
-    //   cls: "menu-option-text",
-    //   text: "Chats",
-    // });
+        // --- ЗБЕРІГАЄМО ПОСИЛАННЯ НА КНОПКУ ---
+        this.newChatSidebarButton = this.chatPanelHeaderEl.createEl('button', { // <-- Призначаємо властивості
+            cls: [CSS_SIDEBAR_HEADER_BUTTON, 'clickable-icon'],
+            attr: { 'aria-label': 'New Chat', 'title': 'New Chat' }
+        });
+        setIcon(this.newChatSidebarButton, "lucide-plus-circle");
+        
+        // --- КІНЕЦЬ ЗБЕРЕЖЕННЯ ---
 
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       // Додаємо is-expanded для початкового стану
@@ -939,9 +934,9 @@ export class OllamaView extends ItemView {
         this.handleNewMessageIndicatorClick
       );
 
-    this.registerDomEvent(this.newChatBtn, "click", (e) => {
-      e.stopPropagation(); // Зупиняємо спливання, щоб не згорнути/розгорнути секцію
-      this.handleNewChatClick(); // Викликаємо існуючий обробник
+      this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
+        e.stopPropagation();
+        this.handleNewChatClick();
     });
     // Plugin/ChatManager Event Listeners
     this.register(this.plugin.on("model-changed", this.handleModelChange));
@@ -4621,233 +4616,190 @@ export class OllamaView extends ItemView {
 
   // OllamaView.ts
 
-  // --- Оновлений метод для рендерингу списку ЧАТІВ у ПАНЕЛІ ---
-  private updateChatPanelList = async (): Promise<void> => {
-    const container = this.chatPanelListEl;
-    if (!container || !this.plugin.chatManager) {
-      this.plugin.logger.debug(
-        "[updateChatPanelList] Skipping update: Chat panel list element or chat manager not ready."
-      );
-      return;
-    }
-    if (this.chatPanelHeaderEl?.getAttribute("data-collapsed") === "true") {
-      this.plugin.logger.debug(
-        "[updateChatPanelList] Skipping update: Chat panel is collapsed."
-      );
-      return;
-    }
+// OllamaView.ts
 
-    this.plugin.logger.debug(
-      "[updateChatPanelList] Updating chat list in the side panel..."
-    );
-    const currentScrollTop = container.scrollTop; // Зберігаємо позицію скролу
-    container.empty();
+    // --- Оновлений метод для рендерингу списку ЧАТІВ у ПАНЕЛІ (зміна структури DOM) ---
+    private updateChatPanelList = async (): Promise<void> => {
+      const container = this.chatPanelListEl;
+      if (!container || !this.plugin.chatManager) return;
+      if (this.chatPanelHeaderEl?.getAttribute('data-collapsed') === 'true') return;
 
-    try {
-      const chats: ChatMetadata[] =
-        this.plugin.chatManager.listAvailableChats() || [];
-      const currentActiveId = this.plugin.chatManager.getActiveChatId();
-
-      if (chats.length === 0) {
-        container.createDiv({
-          cls: "menu-info-text",
-          text: "No saved chats yet.",
-        });
-      } else {
-        // Сортування залишається
-        chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
-
-        chats.forEach((chatMeta) => {
-          // Головний контейнер елемента списку
-          const chatOptionEl = container.createDiv({
-            cls: [CSS_ROLE_PANEL_ITEM, "menu-option", "ollama-chat-panel-item"],
-          });
-
-          // --- ЗМІНА: Розділяємо на основний контент і кнопку опцій ---
-          // 1. Основний контент (іконка, назва, дата) - для кліку активації
-          const mainContent = chatOptionEl.createDiv({
-            cls: CSS_CHAT_ITEM_MAIN,
-          });
-          const iconSpan = mainContent.createSpan({
-            cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"],
-          });
-          const textSpan = mainContent.createSpan({
-            cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"],
-          });
-          textSpan.createDiv({
-            cls: "chat-panel-item-name",
-            text: chatMeta.name,
-          });
-          textSpan.createDiv({
-            cls: "chat-panel-item-date",
-            text: this.formatRelativeDate(
-              new Date(Number(chatMeta.lastModified))
-            ),
-          });
-
-          if (chatMeta.id === currentActiveId) {
-            chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-            setIcon(iconSpan, "check");
-          } else {
-            setIcon(iconSpan, "message-square");
-          }
-
-          // Обробник кліку для активації (на основному контенті)
-          this.registerDomEvent(mainContent, "click", async () => {
-            if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
-              await this.plugin.chatManager.setActiveChat(chatMeta.id);
-            }
-          });
-
-          // 2. Кнопка "..." (Опції)
-          const optionsBtn = chatOptionEl.createEl("button", {
-            cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"], // Додаємо клас для стилізації
-            attr: { "aria-label": "Chat options", title: "More options" },
-          });
-          setIcon(optionsBtn, "lucide-more-horizontal"); // Іконка "три крапки"
-
-          // Обробник кліку на кнопку "..."
-          this.registerDomEvent(optionsBtn, "click", (e) => {
-            e.stopPropagation(); // Зупиняємо спливання до chatOptionEl
-            this.showChatContextMenu(e, chatMeta); // Показуємо меню
-          });
-          // --- КІНЕЦЬ ЗМІНИ ---
-
-          // Обробник правого кліку (на всьому елементі списку)
-          this.registerDomEvent(chatOptionEl, "contextmenu", (e) => {
-            this.showChatContextMenu(e, chatMeta); // Показуємо те саме меню
-          });
-        });
-      }
-      // Не встановлюємо висоту тут, CSS керує цим через is-expanded
-    } catch (error) {
-      this.plugin.logger.error(
-        "[updateChatPanelList] Error rendering chat panel list:",
-        error
-      );
+      this.plugin.logger.debug("[updateChatPanelList] Updating chat list in the side panel...");
+      const currentScrollTop = container.scrollTop;
       container.empty();
-      container.createDiv({
-        text: "Error loading chats.",
-        cls: "menu-error-text",
-      });
-    } finally {
-      // Відновлюємо позицію скролу після оновлення
-      // Даємо браузеру час на рендеринг перед відновленням
-      requestAnimationFrame(() => {
-        container.scrollTop = currentScrollTop;
-      });
-    }
-  };
 
-  private async toggleSidebarSection(
-    clickedHeaderEl: HTMLElement
-  ): Promise<void> {
-    const sectionType = clickedHeaderEl.getAttribute("data-section-type") as
-      | "chats"
-      | "roles";
-    const isCurrentlyCollapsed =
-      clickedHeaderEl.getAttribute("data-collapsed") === "true";
-    const iconEl = clickedHeaderEl.querySelector<HTMLElement>(
-      `.${CSS_SIDEBAR_SECTION_ICON}`
-    );
+      try {
+          const chats: ChatMetadata[] = this.plugin.chatManager.listAvailableChats() || [];
+          const currentActiveId = this.plugin.chatManager.getActiveChatId();
 
-    // --- DEBUGGING ---
-    console.log(
-      `Toggling section: ${sectionType}. Currently collapsed: ${isCurrentlyCollapsed}`
-    );
-    if (!iconEl) {
-      console.error("Could not find icon element for section:", sectionType);
-    }
-    // --- END DEBUGGING ---
+          if (chats.length === 0) {
+              container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
+          } else {
+              chats.sort((a, b) => Number(b.lastModified) - Number(a.lastModified));
 
-    let contentEl: HTMLElement | null = null;
-    let updateFunction: (() => Promise<void>) | null = null;
-    let otherHeaderEl: HTMLElement | null = null;
-    let otherContentEl: HTMLElement | null = null;
-    let otherSectionType: "chats" | "roles" | null = null;
+              chats.forEach(chatMeta => {
+                  // Головний контейнер елемента списку
+                  const chatOptionEl = container.createDiv({
+                      cls: [CSS_ROLE_PANEL_ITEM, 'menu-option', 'ollama-chat-panel-item']
+                  });
 
-    // --- ЗМІНА: Використовуємо префікс lucide- ---
-    const collapseIcon = "lucide-folder";
-    const expandIcon = "lucide-folder-open";
-    const expandedClass = "is-expanded";
+                  // --- НОВА СТРУКТУРА ---
+                  // 1. Іконка чату
+                  const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, 'menu-option-icon'] });
+                  if (chatMeta.id === currentActiveId) {
+                      setIcon(iconSpan, "check"); // Використовуємо check для активного
+                      chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+                  } else {
+                      setIcon(iconSpan, "message-square");
+                  }
 
-    if (sectionType === "chats") {
+                  // 2. Обгортка для тексту (Назва + Дата)
+                  const textWrapper = chatOptionEl.createDiv({ cls: 'ollama-chat-item-text-wrapper' });
+                  textWrapper.createDiv({ cls: 'chat-panel-item-name', text: chatMeta.name });
+                  textWrapper.createDiv({ cls: 'chat-panel-item-date', text: this.formatRelativeDate(new Date(Number(chatMeta.lastModified))) });
+
+                  // 3. Кнопка "..." (Опції)
+                  const optionsBtn = chatOptionEl.createEl('button', {
+                      cls: [CSS_CHAT_ITEM_OPTIONS, 'clickable-icon'],
+                      attr: { 'aria-label': 'Chat options', title: 'More options'}
+                  });
+                  setIcon(optionsBtn, "lucide-more-horizontal");
+                  // --- КІНЕЦЬ НОВОЇ СТРУКТУРИ ---
+
+                  // --- ОБРОБНИКИ ---
+                  // Клік на ВЕСЬ елемент (крім кнопки опцій) - активація
+                  this.registerDomEvent(chatOptionEl, 'click', async (e) => {
+                      // Перевіряємо, чи клік був НЕ по кнопці опцій
+                      if (!(e.target instanceof Element && e.target.closest(`.${CSS_CHAT_ITEM_OPTIONS}`))) {
+                           if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
+                               await this.plugin.chatManager.setActiveChat(chatMeta.id);
+                           }
+                      }
+                  });
+
+                  // Клік на кнопку "..." - меню
+                  this.registerDomEvent(optionsBtn, 'click', (e) => {
+                      e.stopPropagation();
+                      this.showChatContextMenu(e, chatMeta);
+                  });
+
+                  // Правий клік на весь елемент - меню
+                  this.registerDomEvent(chatOptionEl, 'contextmenu', (e) => {
+                      this.showChatContextMenu(e, chatMeta);
+                  });
+              });
+          }
+          // Встановлення висоти в кінці (як було)
+          requestAnimationFrame(() => {
+              if (container && this.isSidebarSectionVisible('chats')) {
+                  const currentScrollHeight = container.scrollHeight;
+                  container.style.maxHeight = currentScrollHeight + "px";
+                  container.style.overflowY = 'auto';
+              }
+          });
+
+      } catch (error) {
+           // ... (обробка помилки як була) ...
+            this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
+          container.empty();
+          container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
+      } finally {
+           requestAnimationFrame(() => {
+               container.scrollTop = currentScrollTop;
+           });
+      }
+  }
+
+// OllamaView.ts
+
+private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> {
+  const sectionType = clickedHeaderEl.getAttribute('data-section-type') as 'chats' | 'roles';
+  const isCurrentlyCollapsed = clickedHeaderEl.getAttribute('data-collapsed') === 'true';
+  const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
+
+  // ... (визначення contentEl, updateFunction, otherHeaderEl, otherContentEl, іконок, класу як було) ...
+   let contentEl: HTMLElement | null = null;
+  let updateFunction: (() => Promise<void>) | null = null;
+  let otherHeaderEl: HTMLElement | null = null;
+  let otherContentEl: HTMLElement | null = null;
+  let otherSectionType: 'chats' | 'roles' | null = null;
+
+  const collapseIcon = "lucide-folder";
+  const expandIcon = "lucide-folder-open";
+  const expandedClass = "is-expanded";
+
+  if (sectionType === 'chats') {
       contentEl = this.chatPanelListEl;
       updateFunction = this.updateChatPanelList;
       otherHeaderEl = this.rolePanelHeaderEl;
       otherContentEl = this.rolePanelListEl;
-      otherSectionType = "roles";
-    } else if (sectionType === "roles") {
+      otherSectionType = 'roles';
+  } else if (sectionType === 'roles') {
       contentEl = this.rolePanelListEl;
       updateFunction = this.updateRolePanelList;
       otherHeaderEl = this.chatPanelHeaderEl;
       otherContentEl = this.chatPanelListEl;
-      otherSectionType = "chats";
-    }
-
-    if (
-      !contentEl ||
-      !updateFunction ||
-      !otherHeaderEl ||
-      !otherContentEl ||
-      !otherSectionType
-    ) {
-      // iconEl перевірено в логуванні
-      this.plugin.logger.error(
-        "Could not find all required elements for sidebar accordion toggle:",
-        sectionType
-      );
-      return;
-    }
-
-    // Логіка Акордеону
-    if (isCurrentlyCollapsed) {
-      // --- Розгортаємо поточну, згортаємо іншу ---
-      if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        // ... (згортання іншої секції як було) ...
-        this.plugin.logger.debug(
-          `Collapsing other section ('${otherSectionType}') before expanding '${sectionType}'`
-        );
-        const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(
-          `.${CSS_SIDEBAR_SECTION_ICON}`
-        );
-        otherHeaderEl.setAttribute("data-collapsed", "true");
-        if (otherIconEl) {
-          console.log("Setting other icon to:", collapseIcon); // Debug
-          setIcon(otherIconEl, collapseIcon);
-        }
-        otherContentEl.classList.remove(expandedClass);
-      }
-
-      clickedHeaderEl.setAttribute("data-collapsed", "false");
-      if (iconEl) {
-        console.log("Setting current icon to:", expandIcon); // Debug
-        setIcon(iconEl, expandIcon);
-      }
-      try {
-        await updateFunction();
-        contentEl.classList.add(expandedClass);
-        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
-      } catch (error) {
-        // ... (обробка помилки як була) ...
-        this.plugin.logger.error(
-          `Error updating sidebar section ${sectionType}:`,
-          error
-        );
-        contentEl.setText(`Error loading ${sectionType}.`);
-        contentEl.classList.add(expandedClass);
-      }
-    } else {
-      // --- Згортаємо поточну ---
-      clickedHeaderEl.setAttribute("data-collapsed", "true");
-      if (iconEl) {
-        console.log("Setting current icon to:", collapseIcon); // Debug
-        setIcon(iconEl, collapseIcon);
-      }
-      contentEl.classList.remove(expandedClass);
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
-    }
+      otherSectionType = 'chats';
   }
+
+  if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
+      return;
+  }
+
+
+  if (isCurrentlyCollapsed) {
+      // --- Розгортаємо поточну, згортаємо іншу ---
+
+      // 1. Згортаємо іншу секцію
+      if (otherHeaderEl.getAttribute('data-collapsed') === 'false') {
+          // ... (логіка згортання іншої секції) ...
+           const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
+          otherHeaderEl.setAttribute('data-collapsed', 'true');
+          if (otherIconEl) setIcon(otherIconEl, collapseIcon);
+          otherContentEl.classList.remove(expandedClass);
+          // --- ДОДАНО: Ховаємо кнопку "+", якщо згортаємо Chats через іншу секцію ---
+          if (otherSectionType === 'chats' && this.newChatSidebarButton) {
+              this.newChatSidebarButton.hide(); // Або .style.display = 'none';
+              this.plugin.logger.debug("Hiding New Chat button because Roles section expanded.");
+          }
+          // --- КІНЕЦЬ ДОДАНОГО ---
+      }
+
+      // 2. Розгортаємо поточну секцію
+      clickedHeaderEl.setAttribute('data-collapsed', 'false');
+      setIcon(iconEl, expandIcon);
+       // --- ДОДАНО: Показуємо кнопку "+", якщо розгортаємо Chats ---
+       if (sectionType === 'chats' && this.newChatSidebarButton) {
+           this.newChatSidebarButton.show(); // Або .style.display = 'flex'; (якщо кнопка flex)
+           this.plugin.logger.debug("Showing New Chat button because Chats section expanded.");
+       }
+       // --- КІНЕЦЬ ДОДАНОГО ---
+      try {
+          await updateFunction(); // Оновлюємо контент (функція сама встановить висоту, якщо треба)
+          contentEl.classList.add(expandedClass); // Додаємо клас для CSS анімації
+          this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
+      } catch(error) {
+          // ... (обробка помилки) ...
+           this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+          contentEl.setText(`Error loading ${sectionType}.`);
+           contentEl.classList.add(expandedClass);
+      }
+
+  } else {
+      // --- Згортаємо поточну ---
+      clickedHeaderEl.setAttribute('data-collapsed', 'true');
+      setIcon(iconEl, collapseIcon);
+      contentEl.classList.remove(expandedClass);
+       // --- ДОДАНО: Ховаємо кнопку "+", якщо згортаємо Chats ---
+       if (sectionType === 'chats' && this.newChatSidebarButton) {
+           this.newChatSidebarButton.hide();
+           this.plugin.logger.debug("Hiding New Chat button because Chats section collapsed.");
+       }
+       // --- КІНЕЦЬ ДОДАНОГО ---
+      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
+  }
+}
 
 // OllamaView.ts
 
