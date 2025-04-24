@@ -1610,8 +1610,6 @@ This action cannot be undone.`,
       cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"]
       // Class: is-expanded
     });
-    this.chatPanelListEl.style.overflow = "hidden";
-    this.chatPanelListEl.style.transition = "max-height 0.3s ease-out";
     this.rolePanelEl.createEl("hr", { cls: "menu-separator" });
     this.rolePanelHeaderEl = this.rolePanelEl.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],

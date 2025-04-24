@@ -483,8 +483,8 @@ export class OllamaView extends ItemView {
       this.chatPanelListEl = this.rolePanelEl.createDiv({
           cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, "is-expanded", "ollama-chat-panel-list"] // Class: is-expanded
       });
-      this.chatPanelListEl.style.overflow = 'hidden'; // Потрібно для анімації max-height
-      this.chatPanelListEl.style.transition = 'max-height 0.3s ease-out'; // Анімація
+      // this.chatPanelListEl.style.overflow = 'hidden'; // Потрібно для анімації max-height
+      // this.chatPanelListEl.style.transition = 'max-height 0.3s ease-out'; // Анімація
 
       // Роздільник між секціями Chats та Roles
       this.rolePanelEl.createEl('hr', { cls: 'menu-separator' });
