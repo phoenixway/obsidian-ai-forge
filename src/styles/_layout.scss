@@ -1,393 +1,88 @@
 // src/styles/_layout.scss
-// Wednesday, April 23, 2025
+// Main layout structure for the Ollama View
+
+// --- ДОДАНО: Імпорт стилів сайдбару ---
+@import 'sidebar';
+// --- КІНЕЦЬ ІМПОРТУ ---
 
 // Main View Container
 .ollama-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: row; // Horizontal layout: panel + chat
     height: 100%;
     background-color: var(--background-secondary-alt);
-    align-items: stretch;
+    align-items: stretch; // Stretch children vertically
     gap: 0;
-    overflow: hidden; // ЗАЛИШАЄМО hidden тут - це нормально
+    overflow: hidden; // Main container clips anything overflowing it
 }
 
-// --- Sidebar Panel (Hosts Accordion) ---
-.ollama-role-panel {
-    display: flex;
-    flex-direction: column; // Вертикальна організація заголовків та контенту
-    width: 240px;
-    flex-shrink: 0;
-    background-color: var(--background-secondary);
-    border-right: 1px solid var(--divider-color);
-    height: 100%;
-    overflow: hidden; // --- ПОВЕРНУЛИ hidden: панель НЕ скролиться ---
-    box-sizing: border-box;
-
-    // Роздільник МІЖ секціями (Chats / Roles)
-     > hr.menu-separator {
-         margin: calc(var(--chat-spacing-unit) * 2)
-                 calc(var(--chat-spacing-unit) * 1.5);
-         border: none;
-         border-top: 1px solid var(--divider-color);
-         height: 0;
-         flex-shrink: 0; // Не стискати роздільник
-    }
-}
-
-// --- Sidebar Accordion Sections ---
-// --- Sidebar Accordion Sections ---
-
-.ollama-sidebar-section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 1.5)
-               calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
-    user-select: none;
-    cursor: pointer;
-    flex-shrink: 0; // Заголовки не стискаються
-    position: relative;
-    border-radius: var(--radius-s);
-    margin: 1px 0;
-    &:hover { background-color: var(--background-modifier-hover); }
-
-    // Ліва частина (іконка + текст)
-    .ollama-sidebar-header-left {
-        display: flex;
-        align-items: baseline;
-        overflow: hidden;
-        margin-right: var(--chat-spacing-unit);
-    }
-
-    .ollama-sidebar-section-icon {
-        margin-right: 14px;
-        min-width: 18px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        .svg-icon { width: 16px; height: 16px; color: var(--text-faint); }
-    }
-    &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
-
-    .menu-option-text {
-        font-weight: 500;
-        color: var(--text-normal);
-        line-height: 1.2;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    // Кнопка "+"
-    .ollama-sidebar-header-button {
-        padding: 2px;
-        margin-left: auto;
-        flex-shrink: 0;
-        color: var(--text-muted);
-        opacity: 0.7;
-        background: none; border: none; box-shadow: none;
-        &:hover {
-            color: var(--text-normal); opacity: 1; background-color: var(--background-modifier-hover);
-        }
-        .svg-icon { width: 18px; height: 18px; }
-    }
-}
-
-// Content area for collapsible sections
-.ollama-sidebar-section-content {
-    overflow: hidden; // Завжди ховати те, що виходить за межі max-height
-    max-height: 0; // Згорнуто за замовчуванням
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    box-sizing: border-box;
-    padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Горизонтальний паддінг
-     // Не є flex-елементом, що росте
-     min-height: 0;
-     flex-shrink: 0; // Явно забороняємо стискатись у батьківському flex-контейнері
-
-    // Expanded state
-    &.is-expanded {
-        // flex-grow: 1; // ВИДАЛЕНО
-        // Встановлюємо ОБМЕЖЕННЯ висоти та внутрішній скрол
-        max-height: 100px; // <-- ПОВЕРНУЛИ обмежувач висоти (можна налаштувати)
-        overflow-y: auto; // <-- ПОВЕРНУЛИ внутрішній скрол
-        // Вертикальні паддінги
-        padding-top: calc(var(--chat-spacing-unit) * 1);
-        padding-bottom: calc(var(--chat-spacing-unit) * 1);
-    }
-
-    // Scrollbar styles (ДЛЯ ВНУТРІШНЬОГО скролу секції)
-    &::-webkit-scrollbar { width: 6px; }
-    &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
-    &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-
-    // --- Styles for elements INSIDE the content lists ---
-    // (List items, chat item layout, empty text, separator - без змін)
-     .ollama-role-panel-item,
-    .ollama-chat-panel-item { /* ... як було ... */ }
-     .ollama-chat-panel-item { /* ... як було ... */ }
-     .menu-info-text { /* ... як було ... */ }
-     hr.menu-separator { /* ... як було ... */ }
-}
-// --- End Sidebar Accordion Sections ---
-
-
-
-// --- ЗМІНА: Стилі для елемента списку чатів ---
-.ollama-chat-panel-item {
-    &.menu-option {
-        display: flex;
-        align-items: center; // Вирівнюємо іконку, текст і кнопку по вертикалі
-        padding: calc(var(--chat-spacing-unit) * 1.5) // Зменшено вертикальний паддінг
-                 calc(var(--chat-spacing-unit) * 1.5); // Зменшено горизонтальний паддінг
-        margin: 1px 0;
-
-        // Іконка зліва (як була)
-        .menu-option-icon {
-            margin-right: 10px;
-            min-width: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            .svg-icon { width: 15px; height: 15px; }
-        }
-
-        // Обгортка для тексту (Назва + Дата) - займає простір
-        .ollama-chat-item-text-wrapper {
-            display: flex;
-            flex-direction: column;
-            flex-grow: 1; // Займає доступний простір
-            overflow: hidden; // Обрізати довгий текст
-            margin-right: 8px; // Відступ перед кнопкою "..."
-            line-height: 1.3;
-            gap: 1px;
-
-             .chat-panel-item-name {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                font-size: calc(var(--font-ui-small) * 0.95);
-            }
-            .chat-panel-item-date {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                font-size: 0.85em;
-                color: var(--text-faint);
-            }
-        }
-
-        // Кнопка "..." (Опції) - справа
-        .ollama-chat-item-options {
-            padding: 3px;
-            margin: -3px; // Компенсація паддінгу для зони кліку
-            flex-shrink: 0; // Не стискати
-            opacity: 0; // --- Прихована за замовчуванням ---
-            transition: opacity 0.15s ease-in-out; // Плавна поява
-            border-radius: var(--radius-s);
-            background: none;
-            border: none;
-            color: var(--text-muted); // Колір іконки
-
-            &:hover {
-                background-color: var(--background-modifier-hover);
-                color: var(--text-normal); // Колір іконки при наведенні
-            }
-            .svg-icon { width: 18px; height: 18px; }
-        }
-
-        // Показуємо кнопку "..." при наведенні на весь елемент списку
-        &:hover .ollama-chat-item-options {
-             opacity: 0.7; // Робимо видимою при наведенні
-             &:hover { opacity: 1; } // Повна непрозорість при наведенні на саму кнопку
-        }
-
-         // Активний стан
-         &.is-active {
-            background-color: var(--interactive-accent-translucent);
-            .menu-option-icon { color: var(--interactive-accent); }
-            .chat-panel-item-name { color: var(--text-accent-hover); font-weight: 500;}
-            .chat-panel-item-date { color: var(--text-accent-hover); opacity: 0.8;}
-             // Можна зробити кнопку опцій видимою постійно для активного елемента
-            // .ollama-chat-item-options { opacity: 0.7; }
-            &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
-         }
-    }
-}
-
-// Content area for collapsible sections
-.ollama-sidebar-section-content {
-    overflow: hidden;
-    max-height: 0; // Collapsed by default
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    box-sizing: border-box;
-    padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
-    // min-height: 0; // Not strictly needed if not a flex item that needs shrinking
-    // flex-shrink: 0; // Not needed if not using flex-grow
-
-    // Expanded state
-    &.is-expanded {
-        // flex-grow: 1; // <-- REMOVE THIS LINE
-        // flex-shrink: 1; // <-- REMOVE THIS LINE
-        max-height: 75vh; // Keep max-height limit (adjust value as needed)
-        overflow-y: auto; // Enable scrolling
-        padding-top: calc(var(--chat-spacing-unit) * 1);
-        padding-bottom: calc(var(--chat-spacing-unit) * 1);
-    }
-
-    // Scrollbar styling
-    &::-webkit-scrollbar { width: 6px; }
-    &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
-    &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-
-    // --- Styles for elements INSIDE the content lists ---
-    // (List items, chat item layout, empty text, separator - keep as before)
-     .ollama-role-panel-item,
-    .ollama-chat-panel-item {
-        &.menu-option {
-            display: flex;
-            align-items: center;
-            padding: calc(var(--chat-spacing-unit) * 1.8)
-                     calc(var(--chat-spacing-unit) * 1.5);
-            margin: 1px 0;
-            cursor: pointer;
-            border-radius: var(--radius-s);
-
-            &:hover {
-                background-color: var(--background-modifier-hover);
-            }
-
-            .menu-option-icon {
-                margin-right: 10px;
-                min-width: 16px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                .svg-icon { width: 15px; height: 15px; }
-            }
-
-            .menu-option-text {
-                font-size: calc(var(--font-ui-small) * 0.95);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                flex-grow: 1;
-            }
-
-            &.is-active {
-                background-color: var(--interactive-accent-translucent);
-                color: var(--text-accent-hover);
-                .menu-option-text, .chat-panel-item-name {
-                  font-weight: 500;
-                  color: var(--text-accent-hover);
-                }
-                .chat-panel-item-date {
-                   color: var(--text-accent-hover);
-                   opacity: 0.8;
-                }
-                .menu-option-icon { color: var(--interactive-accent); }
-                &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
-            }
-            &.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
-                color: var(--text-faint);
-            }
-        }
-    }
-     .ollama-chat-panel-item {
-       &.menu-option {
-           .menu-option-text {
-                display: flex;
-                flex-direction: column;
-                line-height: 1.3;
-                gap: 1px;
-           }
-           .chat-panel-item-name {
-           }
-           .chat-panel-item-date {
-                font-size: 0.85em;
-                color: var(--text-faint);
-           }
-           &.is-active {
-              .chat-panel-item-date {
-                  color: var(--text-accent-hover);
-                  opacity: 0.8;
-              }
-           }
-       }
-    }
-     .menu-info-text {
-        padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 1);
-        color: var(--text-faint);
-        font-style: italic;
-        font-size: calc(var(--font-ui-small) * 0.9);
-    }
-     hr.menu-separator {
-        margin: calc(var(--chat-spacing-unit) * 1.5) 0;
-        border-top-color: var(--background-modifier-border);
-    }
-}
-// --- End Sidebar Accordion Sections ---
-
-// --- Main Chat Area (Messages + Input) --- (No changes needed here)
+// --- Main Chat Area (Messages + Input) --- (Залишається тут)
 .ollama-main-chat-area {
     display: flex;
-    flex-direction: column;
-    flex-grow: 1;
+    flex-direction: column; // Vertical layout: messages above, input below
+    flex-grow: 1; // Takes remaining horizontal space
     height: 100%;
-    min-width: 0;
-    overflow: hidden;
+    min-width: 0; // Allows shrinking
+    overflow: hidden; // Clips content overflowing this area
 }
+
+// Wrapper for message list (has .ollama-chat-area-content in TS)
 .ollama-chat-area-content {
-    flex-grow: 1;
-    position: relative;
+    flex-grow: 1; // Takes available vertical space
+    position: relative; // For potential absolute positioning inside (like new message indicator)
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    overflow: hidden;
+    min-height: 0; // Allows shrinking within flex parent
+    overflow: hidden; // Clips the message container itself if needed
 }
+
+// The actual message list container
 .ollama-chat-container {
-    flex-grow: 1;
-    max-width: none;
+    flex-grow: 1; // Stretches vertically inside .ollama-chat-area-content
+    max-width: none; // Takes full width of parent
     margin-left: 0;
     margin-right: 0;
     padding: calc(var(--chat-spacing-unit) * 4);
-    overflow-y: auto;
-    min-height: 0;
+    overflow-y: auto; // Allows scrolling messages
+    min-height: 0; // Allows shrinking
 
+    // Scrollbar styles for messages
     &::-webkit-scrollbar { width: 8px; }
     &::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 4px; margin: 4px 0; }
     &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 4px; border: 2px solid var(--background-secondary); }
     &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
 }
+
+// Input area container
 .chat-input-container {
-    flex-shrink: 0;
-    width: 100%;
+    flex-shrink: 0; // Prevent vertical shrinking
+    width: 100%; // Takes full width of parent
+    // Visual styles (padding, border, background etc.) should be in _input.scss
 }
 // --- End Main Chat Area ---
 
 
-// --- RESPONSIVE --- (No changes needed here)
-@media screen and (max-width: 768px) {
+// --- RESPONSIVE --- (Залишається тут)
+@media screen and (max-width: 768px) { // Tablet and smaller
     .ollama-container {
-        flex-direction: column;
-        overflow: visible;
+        flex-direction: column; // Stack vertically
+        overflow: visible; // Allow page scrolling if needed
     }
+    // Sidebar panel is hidden on mobile by default via display:none in its base rule
+    // This media query just confirms hiding and resets properties related to side-by-side layout
     .ollama-role-panel {
-        display: none; // Hides the entire sidebar including accordion
+        display: none !important; // Force hide if base style didn't work
         width: 100%;
         height: auto;
         border-right: none;
+        border-bottom: 1px solid var(--divider-color); // Optional border if shown above content
     }
     .ollama-main-chat-area {
-        height: 100%;
+        height: 100%; // Takes full height as sidebar is hidden
         border-left: none;
-        overflow: visible;
+        overflow: visible; // Allow internal elements to control scroll
     }
+    // Adjust input container margin for mobile
     .chat-input-container {
          margin-top: 10px;
     }
@@ -395,13 +90,13 @@
 // --- END RESPONSIVE ---
 
 
-// --- User Select Fix --- (No changes needed here)
+// --- User Select Fix --- (Залишається тут або переноситься в _messages.scss)
 .ollama-container .message .message-content {
     user-select: text !important;
     pre, code {
       user-select: text !important;
     }
-  }
+}
 .ollama-container .user-message .message-content {
      user-select: text !important;
 }
