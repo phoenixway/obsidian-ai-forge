@@ -477,10 +477,10 @@ export class OllamaView extends ItemView {
     });
     setIcon(this.newChatBtn, "lucide-plus-circle");
 
-    setIcon(
-      this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-      "lucide-folder-open"
-    ); // Початкова іконка
+    // setIcon(
+    //   this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
+    //   "lucide-folder-open"
+    // ); // Початкова іконка
     // this.chatPanelHeaderEl.createSpan({
     //   cls: "menu-option-text",
     //   text: "Chats",

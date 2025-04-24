@@ -1671,10 +1671,6 @@ This action cannot be undone.`,
       attr: { "aria-label": "New Chat", title: "New Chat" }
     });
     (0, import_obsidian3.setIcon)(this.newChatBtn, "lucide-plus-circle");
-    (0, import_obsidian3.setIcon)(
-      this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
-      "lucide-folder-open"
-    );
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       // Додаємо is-expanded для початкового стану
       cls: [
