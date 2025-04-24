@@ -21,9 +21,17 @@
     background-color: var(--background-secondary);
     border-right: 1px solid var(--divider-color);
     height: 100%;
-    overflow: hidden; // Prevent scrollbars on the panel itself
+    // overflow: hidden; // <-- ЗМІНЕНО: Прибираємо hidden
+    overflow-y: auto; // <-- ДОДАНО: Дозволяємо вертикальний скрол для ВСІЄЇ панелі
+    overflow-x: hidden; // Забороняємо горизонтальний скрол
     box-sizing: border-box;
-    // min-height: 150px; // Removed - Caused layout issues
+
+    // --- ДОДАНО: Стилі скролбару для самої панелі ---
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; } // Тонший трек
+    &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+    // --- КІНЕЦЬ СТИЛІВ СКРОЛБАРУ ---
 }
 
 // --- Sidebar Accordion Sections ---
@@ -46,17 +54,15 @@
 .ollama-sidebar-section-header {
     display: flex;
     justify-content: space-between;
-    align-items: baseline; // Зберігаємо baseline
+    align-items: baseline;
     padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 1.5)
                calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
-    // ... решта стилів заголовка як були ...
     user-select: none;
     cursor: pointer;
-    flex-shrink: 0;
+    flex-shrink: 0; // Важливо, щоб заголовки не стискались
     position: relative;
     border-radius: var(--radius-s);
     margin: 1px 0;
-
     &:hover { background-color: var(--background-modifier-hover); }
 
     // Ліва частина заголовка (іконка + текст)
@@ -121,10 +127,12 @@
     flex-shrink: 0;
 
     &.is-expanded {
-        max-height: 75vh;
-        overflow-y: auto;
+        // max-height: 75vh;
+        // overflow-y: auto;
         padding-top: calc(var(--chat-spacing-unit) * 1);
         padding-bottom: calc(var(--chat-spacing-unit) * 1);
+        max-height: 10000px;
+        overflow-y: hidden
     }
     // ... scrollbar, etc. ...
      &::-webkit-scrollbar { width: 6px; }
