@@ -551,6 +551,57 @@ export class ChatManager {
             return false;
         }
     }
+// ChatManager.ts
+
+    // --- НОВИЙ МЕТОД: Очищення повідомлень для конкретного чату за ID ---
+    async clearChatMessagesById(chatId: string): Promise<boolean> {
+        this.plugin.logger.info(`Attempting to clear messages for chat ${chatId}`);
+
+        const chat = await this.getChat(chatId); // Отримуємо об'єкт чату
+        if (!chat) {
+            this.plugin.logger.error(`Cannot clear messages: Chat ${chatId} not found.`);
+            new Notice(`Error: Chat ${chatId} not found.`);
+            return false;
+        }
+
+        // Перевіряємо, чи є що очищати
+        if (chat.messages.length === 0) {
+             this.plugin.logger.debug(`Chat ${chatId} already has no messages. Nothing to clear.`);
+             return true; // Вважаємо операцію успішною
+        }
+
+        try {
+            // Використовуємо існуючий метод об'єкта Chat
+            chat.clearMessages(); // Цей метод оновить lastModified і викличе save() (з debounce)
+            this.plugin.logger.debug(`Messages cleared for chat ${chatId}. Save scheduled by Chat class.`);
+
+            // Оновлюємо індекс негайно
+            if (this.chatIndex[chatId]) {
+                this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
+                await this.saveChatIndex();
+                this.plugin.logger.debug(`Updated chat index for ${chatId} after clearing messages.`);
+            }
+
+            // Оновлюємо кеш активного чату, якщо це був він
+            const isActive = chatId === this.activeChatId;
+            if (isActive) {
+                this.activeChat = chat; // Оновлюємо посилання на змінений об'єкт
+                this.plugin.logger.debug(`Updated active chat cache for ${chatId} after clearing messages.`);
+                // Генеруємо подію, яку OllamaView вже обробляє для очищення активного чату
+                this.plugin.emit('messages-cleared', chatId);
+            }
+
+            // Завжди генеруємо подію оновлення списку, бо змінився lastModified
+            this.plugin.emit('chat-list-updated');
+
+            return true; // Успішно очищено (або збереження заплановано)
+
+        } catch (error) {
+             this.plugin.logger.error(`Error during message clearing process for chat ${chatId}:`, error);
+             new Notice("Error clearing messages.");
+             return false;
+        }
+    }
     // --- Кінець нового методу ---
 
 } // End of ChatManager class

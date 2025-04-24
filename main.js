@@ -218,6 +218,9 @@ var CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header";
 var CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
 var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
 var CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button";
+var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
+var CSS_CHAT_ITEM_MAIN = "ollama-chat-item-main";
+var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 var LANGUAGES = {
   af: "Afrikaans",
   sq: "Albanian",
@@ -334,7 +337,6 @@ var OllamaView = class extends import_obsidian3.ItemView {
   // <-- Нова властивість
   constructor(leaf, plugin) {
     super(leaf);
-    // Кнопка в панелі (для десктопу)
     // --- State ---
     this.isProcessing = false;
     this.scrollTimeout = null;
@@ -401,10 +403,14 @@ var OllamaView = class extends import_obsidian3.ItemView {
     // --- НОВИЙ МЕТОД: Обробник події видалення повідомлення (з виправленням типів) ---
     this.handleMessageDeleted = (data) => {
       var _a;
-      this.plugin.logger.debug(`handleMessageDeleted: Received event for chat ${data.chatId}, timestamp ${data.timestamp.toISOString()}`);
+      this.plugin.logger.debug(
+        `handleMessageDeleted: Received event for chat ${data.chatId}, timestamp ${data.timestamp.toISOString()}`
+      );
       const currentActiveChatId = (_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId();
       if (data.chatId !== currentActiveChatId || !this.chatContainer) {
-        this.plugin.logger.debug(`handleMessageDeleted: Event ignored (Event chat ${data.chatId} !== active chat ${currentActiveChatId} or container missing).`);
+        this.plugin.logger.debug(
+          `handleMessageDeleted: Event ignored (Event chat ${data.chatId} !== active chat ${currentActiveChatId} or container missing).`
+        );
         return;
       }
       const timestampMs = data.timestamp.getTime();
@@ -412,7 +418,9 @@ var OllamaView = class extends import_obsidian3.ItemView {
       try {
         const messageGroupEl = this.chatContainer.querySelector(selector);
         if (messageGroupEl instanceof HTMLElement) {
-          this.plugin.logger.debug(`handleMessageDeleted: Found message group HTMLElement to remove with selector: ${selector}`);
+          this.plugin.logger.debug(
+            `handleMessageDeleted: Found message group HTMLElement to remove with selector: ${selector}`
+          );
           const currentScrollTop = this.chatContainer.scrollTop;
           const removedHeight = messageGroupEl.offsetHeight;
           const wasAboveViewport = messageGroupEl.offsetTop < currentScrollTop;
@@ -421,26 +429,40 @@ var OllamaView = class extends import_obsidian3.ItemView {
           this.currentMessages = this.currentMessages.filter(
             (msg) => msg.timestamp.getTime() !== timestampMs
           );
-          this.plugin.logger.debug(`handleMessageDeleted: Updated local message cache from ${initialLength} to ${this.currentMessages.length} messages.`);
+          this.plugin.logger.debug(
+            `handleMessageDeleted: Updated local message cache from ${initialLength} to ${this.currentMessages.length} messages.`
+          );
           if (wasAboveViewport) {
             const newScrollTop = currentScrollTop - removedHeight;
             this.chatContainer.scrollTop = newScrollTop >= 0 ? newScrollTop : 0;
-            this.plugin.logger.debug(`handleMessageDeleted: Adjusted scroll top from ${currentScrollTop} to ${this.chatContainer.scrollTop} (removed height: ${removedHeight})`);
+            this.plugin.logger.debug(
+              `handleMessageDeleted: Adjusted scroll top from ${currentScrollTop} to ${this.chatContainer.scrollTop} (removed height: ${removedHeight})`
+            );
           } else {
             this.chatContainer.scrollTop = currentScrollTop;
-            this.plugin.logger.debug(`handleMessageDeleted: Message was not above viewport, scroll top remains at ${currentScrollTop}`);
+            this.plugin.logger.debug(
+              `handleMessageDeleted: Message was not above viewport, scroll top remains at ${currentScrollTop}`
+            );
           }
           if (this.currentMessages.length === 0) {
             this.showEmptyState();
           }
         } else if (messageGroupEl) {
-          this.plugin.logger.error(`handleMessageDeleted: Found element with selector ${selector}, but it is not an HTMLElement. Forcing reload.`, messageGroupEl);
+          this.plugin.logger.error(
+            `handleMessageDeleted: Found element with selector ${selector}, but it is not an HTMLElement. Forcing reload.`,
+            messageGroupEl
+          );
           this.loadAndDisplayActiveChat();
         } else {
-          this.plugin.logger.warn(`handleMessageDeleted: Could not find message group element with selector: ${selector}. Maybe already removed or timestamp attribute missing?`);
+          this.plugin.logger.warn(
+            `handleMessageDeleted: Could not find message group element with selector: ${selector}. Maybe already removed or timestamp attribute missing?`
+          );
         }
       } catch (error) {
-        this.plugin.logger.error(`handleMessageDeleted: Error removing message element for timestamp ${timestampMs}:`, error);
+        this.plugin.logger.error(
+          `handleMessageDeleted: Error removing message element for timestamp ${timestampMs}:`,
+          error
+        );
         this.loadAndDisplayActiveChat();
       }
     };
@@ -1123,7 +1145,9 @@ This action cannot be undone.`,
     // OllamaView.ts
     this.handleActiveChatChanged = async (data) => {
       var _a, _b, _c, _d, _e, _f;
-      this.plugin.logger.debug(`[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`);
+      this.plugin.logger.debug(
+        `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`
+      );
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       const previousChatId = this.lastProcessedChatId;
       if (chatSwitched || data.chatId === null) {
@@ -1131,45 +1155,76 @@ This action cannot be undone.`,
       }
       if (chatSwitched || data.chatId !== null && data.chat === null) {
         if (chatSwitched) {
-          this.plugin.logger.info(`[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`);
+          this.plugin.logger.info(
+            `[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`
+          );
         } else {
-          this.plugin.logger.warn(`[handleActiveChatChanged] Received event for current chat ID ${data.chatId} but chat data is null. Reloading view.`);
+          this.plugin.logger.warn(
+            `[handleActiveChatChanged] Received event for current chat ID ${data.chatId} but chat data is null. Reloading view.`
+          );
         }
         await this.loadAndDisplayActiveChat();
       } else if (data.chatId !== null && data.chat !== null) {
-        this.plugin.logger.info(`[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements (excluding messages).`);
+        this.plugin.logger.info(
+          `[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements (excluding messages).`
+        );
         const activeChat = data.chat;
         const currentModelName = ((_a = activeChat.metadata) == null ? void 0 : _a.modelName) || this.plugin.settings.modelName;
         const currentRolePath = (_c = (_b = activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
         const currentRoleName = await this.findRoleNameByPath(currentRolePath);
         const currentTemperature = (_e = (_d = activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
-        this.plugin.logger.debug(`[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`);
+        this.plugin.logger.debug(
+          `[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`
+        );
         this.updateModelDisplay(currentModelName);
         this.updateRoleDisplay(currentRoleName);
         this.updateInputPlaceholder(currentRoleName);
         this.updateTemperatureIndicator(currentTemperature);
-        this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
+        this.plugin.logger.debug(
+          "[handleActiveChatChanged] Updating visible sidebar panels for metadata change..."
+        );
         const updatePromises = [];
         if (this.isSidebarSectionVisible("chats")) {
-          updatePromises.push(this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e)));
+          updatePromises.push(
+            this.updateChatPanelList().catch(
+              (e) => this.plugin.logger.error("Error updating chat panel list:", e)
+            )
+          );
         }
         if (this.isSidebarSectionVisible("roles")) {
-          updatePromises.push(this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e)));
+          updatePromises.push(
+            this.updateRolePanelList().catch(
+              (e) => this.plugin.logger.error("Error updating role panel list:", e)
+            )
+          );
         }
         if (updatePromises.length > 0) {
           await Promise.all(updatePromises);
-          this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
+          this.plugin.logger.debug(
+            "[handleActiveChatChanged] Visible sidebar panels updated for metadata change."
+          );
         }
       } else {
-        this.plugin.logger.warn(`[handleActiveChatChanged] Unhandled state or no change detected: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`);
+        this.plugin.logger.warn(
+          `[handleActiveChatChanged] Unhandled state or no change detected: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
+        );
       }
-      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-        this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
+      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(
+        CSS_CLASS_SUBMENU_CONTENT_HIDDEN
+      )) {
+        this.plugin.logger.debug(
+          "[handleActiveChatChanged] Role submenu open, refreshing role list menu."
+        );
         this.renderRoleList().catch((error) => {
-          this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
+          this.plugin.logger.error(
+            "[handleActiveChatChanged] Error rendering role list menu:",
+            error
+          );
         });
       }
-      this.plugin.logger.debug(`[handleActiveChatChanged] Finished processing event for chat ID: ${(_f = data.chatId) != null ? _f : "null"}`);
+      this.plugin.logger.debug(
+        `[handleActiveChatChanged] Finished processing event for chat ID: ${(_f = data.chatId) != null ? _f : "null"}`
+      );
     };
     this.handleChatListUpdated = () => {
       this.plugin.logger.info(
@@ -1388,11 +1443,17 @@ This action cannot be undone.`,
         this.plugin.activateView();
       }, 50);
     };
+    // OllamaView.ts
+    // --- Оновлений метод для рендерингу списку ЧАТІВ у ПАНЕЛІ ---
     this.updateChatPanelList = async () => {
       var _a;
       const container = this.chatPanelListEl;
-      if (!container || !this.plugin.chatManager)
+      if (!container || !this.plugin.chatManager) {
+        this.plugin.logger.debug(
+          "[updateChatPanelList] Skipping update: Chat panel list element or chat manager not ready."
+        );
         return;
+      }
       if (((_a = this.chatPanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true") {
         this.plugin.logger.debug(
           "[updateChatPanelList] Skipping update: Chat panel is collapsed."
@@ -1402,13 +1463,11 @@ This action cannot be undone.`,
       this.plugin.logger.debug(
         "[updateChatPanelList] Updating chat list in the side panel..."
       );
+      const currentScrollTop = container.scrollTop;
       container.empty();
       try {
         const chats = this.plugin.chatManager.listAvailableChats() || [];
         const currentActiveId = this.plugin.chatManager.getActiveChatId();
-        this.plugin.logger.debug(
-          `[updateChatPanelList] Fetched ${chats.length} chats. Active ID: ${currentActiveId}`
-        );
         if (chats.length === 0) {
           container.createDiv({
             cls: "menu-info-text",
@@ -1420,10 +1479,13 @@ This action cannot be undone.`,
             const chatOptionEl = container.createDiv({
               cls: [CSS_ROLE_PANEL_ITEM, "menu-option", "ollama-chat-panel-item"]
             });
-            const iconSpan = chatOptionEl.createSpan({
+            const mainContent = chatOptionEl.createDiv({
+              cls: CSS_CHAT_ITEM_MAIN
+            });
+            const iconSpan = mainContent.createSpan({
               cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"]
             });
-            const textSpan = chatOptionEl.createSpan({
+            const textSpan = mainContent.createSpan({
               cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"]
             });
             textSpan.createDiv({
@@ -1442,11 +1504,24 @@ This action cannot be undone.`,
             } else {
               (0, import_obsidian3.setIcon)(iconSpan, "message-square");
             }
-            this.registerDomEvent(chatOptionEl, "click", async () => {
+            this.registerDomEvent(mainContent, "click", async () => {
               var _a2;
               if (chatMeta.id !== ((_a2 = this.plugin.chatManager) == null ? void 0 : _a2.getActiveChatId())) {
                 await this.plugin.chatManager.setActiveChat(chatMeta.id);
               }
+            });
+            const optionsBtn = chatOptionEl.createEl("button", {
+              cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"],
+              // Додаємо клас для стилізації
+              attr: { "aria-label": "Chat options", title: "More options" }
+            });
+            (0, import_obsidian3.setIcon)(optionsBtn, "lucide-more-horizontal");
+            this.registerDomEvent(optionsBtn, "click", (e) => {
+              e.stopPropagation();
+              this.showChatContextMenu(e, chatMeta);
+            });
+            this.registerDomEvent(chatOptionEl, "contextmenu", (e) => {
+              this.showChatContextMenu(e, chatMeta);
             });
           });
         }
@@ -1459,6 +1534,10 @@ This action cannot be undone.`,
         container.createDiv({
           text: "Error loading chats.",
           cls: "menu-error-text"
+        });
+      } finally {
+        requestAnimationFrame(() => {
+          container.scrollTop = currentScrollTop;
         });
       }
     };
@@ -1578,6 +1657,20 @@ This action cannot be undone.`,
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
       // Стан зберігаємо в атрибуті
     });
+    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({
+      cls: "ollama-sidebar-header-left"
+    });
+    (0, import_obsidian3.setIcon)(
+      chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
+      "lucide-folder-open"
+    );
+    chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
+    this.newChatBtn = this.chatPanelHeaderEl.createEl("button", {
+      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
+      // Використовуємо стандартний клас Obsidian для іконок-кнопок
+      attr: { "aria-label": "New Chat", title: "New Chat" }
+    });
+    (0, import_obsidian3.setIcon)(this.newChatBtn, "lucide-plus-circle");
     (0, import_obsidian3.setIcon)(
       this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
       "lucide-folder-open"
@@ -2004,6 +2097,10 @@ This action cannot be undone.`,
         "click",
         this.handleNewMessageIndicatorClick
       );
+    this.registerDomEvent(this.newChatBtn, "click", (e) => {
+      e.stopPropagation();
+      this.handleNewChatClick();
+    });
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));
     this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));
@@ -3914,13 +4011,13 @@ This action cannot be undone.`,
       } else {
         const fileName = (_a = rolePath.split("/").pop()) == null ? void 0 : _a.replace(".md", "");
         this.plugin.logger.warn(
-          `[findRoleNameByPath] Role not found in list for path "${rolePath}". Using derived name: "${fileName || "Unknown"}"`
+          `[findRoleNameByPath] Role not found for path "${rolePath}". Using derived name: "${fileName || "Unknown"}"`
         );
         return fileName || "Unknown Role";
       }
     } catch (error) {
       this.plugin.logger.error(
-        `[findRoleNameByPath] Error fetching roles list while finding name for path "${rolePath}":`,
+        `[findRoleNameByPath] Error fetching roles for path "${rolePath}":`,
         error
       );
       return "Error";
@@ -4008,6 +4105,187 @@ This action cannot be undone.`,
       this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
     }
   }
+  // OllamaView.ts
+  // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - спроба 2) ---
+  showChatContextMenu(event, chatMeta) {
+    event.preventDefault();
+    const menu = new import_obsidian3.Menu();
+    menu.addItem(
+      (item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id))
+    );
+    menu.addSeparator();
+    menu.addItem((item) => {
+      item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
+      console.log("Inspecting 'Clear Messages' MenuItem:", item);
+    });
+    menu.addItem((item) => {
+      item.setTitle("Delete Chat").setIcon("lucide-trash-2").onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
+      console.log("Inspecting 'Delete Chat' MenuItem:", item);
+    });
+    menu.showAtMouseEvent(event);
+  }
+  // ... (решта методів без змін) ...
+  async handleContextMenuClone(chatId) {
+    this.plugin.logger.info(`Context menu: Clone requested for chat ${chatId}`);
+    const cloningNotice = new import_obsidian3.Notice("Cloning chat...", 0);
+    try {
+      const clonedChat = await this.plugin.chatManager.cloneChat(chatId);
+      if (clonedChat) {
+        new import_obsidian3.Notice(
+          `Chat cloned as "${clonedChat.metadata.name}" and activated.`
+        );
+      } else {
+      }
+    } catch (error) {
+      this.plugin.logger.error(
+        `Context menu: Error cloning chat ${chatId}:`,
+        error
+      );
+      new import_obsidian3.Notice("Error cloning chat.");
+    } finally {
+      cloningNotice.hide();
+    }
+  }
+  // Новий метод для експорту КОНКРЕТНОГО чату
+  async exportSpecificChat(chatId) {
+    var _a;
+    this.plugin.logger.info(
+      `Context menu: Export requested for chat ${chatId}`
+    );
+    const exportingNotice = new import_obsidian3.Notice(`Exporting chat...`, 0);
+    try {
+      const chat = await this.plugin.chatManager.getChat(chatId);
+      if (!chat || chat.messages.length === 0) {
+        new import_obsidian3.Notice("Chat is empty or not found, nothing to export.");
+        exportingNotice.hide();
+        return;
+      }
+      const markdownContent = this.formatChatToMarkdown(chat.messages);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const safeName = chat.metadata.name.replace(/[\\/?:*"<>|]/g, "-");
+      const filename = `ollama-chat-${safeName}-${timestamp}.md`;
+      let targetFolderPath = (_a = this.plugin.settings.chatExportFolderPath) == null ? void 0 : _a.trim();
+      let targetFolder = null;
+      if (targetFolderPath) {
+        targetFolderPath = (0, import_obsidian3.normalizePath)(targetFolderPath);
+        const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
+        if (!abstractFile) {
+          try {
+            await this.app.vault.createFolder(targetFolderPath);
+            targetFolder = this.app.vault.getAbstractFileByPath(
+              targetFolderPath
+            );
+            if (targetFolder)
+              new import_obsidian3.Notice(`Created export folder: ${targetFolderPath}`);
+          } catch (err) {
+            this.plugin.logger.error("Error creating export folder:", err);
+            new import_obsidian3.Notice(`Error creating export folder. Saving to vault root.`);
+            targetFolder = this.app.vault.getRoot();
+          }
+        } else if (abstractFile instanceof import_obsidian3.TFolder) {
+          targetFolder = abstractFile;
+        } else {
+          new import_obsidian3.Notice(
+            `Error: Export path is not a folder. Saving to vault root.`
+          );
+          targetFolder = this.app.vault.getRoot();
+        }
+      } else {
+        targetFolder = this.app.vault.getRoot();
+      }
+      if (!targetFolder) {
+        new import_obsidian3.Notice("Error determining export folder.");
+        exportingNotice.hide();
+        return;
+      }
+      const filePath = (0, import_obsidian3.normalizePath)(`${targetFolder.path}/${filename}`);
+      const existingFile = this.app.vault.getAbstractFileByPath(filePath);
+      if (existingFile) {
+      }
+      const file = await this.app.vault.create(filePath, markdownContent);
+      new import_obsidian3.Notice(`Chat exported to ${file.path}`);
+    } catch (error) {
+      this.plugin.logger.error(
+        `Context menu: Error exporting chat ${chatId}:`,
+        error
+      );
+      new import_obsidian3.Notice("An error occurred during chat export.");
+    } finally {
+      exportingNotice.hide();
+    }
+  }
+  async handleContextMenuClear(chatId, chatName) {
+    this.plugin.logger.debug(
+      `Context menu: Clear requested for chat ${chatId} (${chatName})`
+    );
+    new ConfirmModal(
+      this.app,
+      "Confirm Clear Messages",
+      `Are you sure you want to clear all messages in chat "${chatName}"?
+This action cannot be undone.`,
+      async () => {
+        this.plugin.logger.info(
+          `User confirmed clearing messages for chat ${chatId}`
+        );
+        const clearingNotice = new import_obsidian3.Notice("Clearing messages...", 0);
+        try {
+          const success = await this.plugin.chatManager.clearChatMessagesById(
+            chatId
+          );
+          if (success) {
+            new import_obsidian3.Notice(`Messages cleared for chat "${chatName}".`);
+          } else {
+            new import_obsidian3.Notice(`Failed to clear messages for chat "${chatName}".`);
+          }
+        } catch (error) {
+          this.plugin.logger.error(
+            `Context menu: Error clearing messages for chat ${chatId}:`,
+            error
+          );
+          new import_obsidian3.Notice("Error clearing messages.");
+        } finally {
+          clearingNotice.hide();
+        }
+      }
+    ).open();
+  }
+  async handleContextMenuDelete(chatId, chatName) {
+    this.plugin.logger.debug(
+      `Context menu: Delete requested for chat ${chatId} (${chatName})`
+    );
+    new ConfirmModal(
+      this.app,
+      "Confirm Delete Chat",
+      `Are you sure you want to delete chat "${chatName}"?
+This action cannot be undone.`,
+      async () => {
+        this.plugin.logger.info(`User confirmed deletion for chat ${chatId}`);
+        const deletingNotice = new import_obsidian3.Notice("Deleting chat...", 0);
+        try {
+          const success = await this.plugin.chatManager.deleteChat(chatId);
+          if (success) {
+            new import_obsidian3.Notice(`Chat "${chatName}" deleted.`);
+          } else {
+          }
+        } catch (error) {
+          this.plugin.logger.error(
+            `Context menu: Error deleting chat ${chatId}:`,
+            error
+          );
+          new import_obsidian3.Notice("Error deleting chat.");
+        } finally {
+          deletingNotice.hide();
+        }
+      }
+    ).open();
+  }
+  // Метод handleNewChatClick вже існує і використовується кнопкою в заголовку
+  // Метод handleExportChatClick використовується пунктом меню у випадаючому меню
+  // Переконайтесь, що метод findRoleNameByPath також існує
+  // ... (решта методів класу OllamaView)
 };
 
 // src/settings.ts
@@ -6414,6 +6692,42 @@ var ChatManager = class {
     } catch (error) {
       this.plugin.logger.error(`Error during message deletion process for chat ${chatId}, timestamp ${timestampToDelete.toISOString()}:`, error);
       new import_obsidian10.Notice("Error deleting message.");
+      return false;
+    }
+  }
+  // ChatManager.ts
+  // --- НОВИЙ МЕТОД: Очищення повідомлень для конкретного чату за ID ---
+  async clearChatMessagesById(chatId) {
+    this.plugin.logger.info(`Attempting to clear messages for chat ${chatId}`);
+    const chat = await this.getChat(chatId);
+    if (!chat) {
+      this.plugin.logger.error(`Cannot clear messages: Chat ${chatId} not found.`);
+      new import_obsidian10.Notice(`Error: Chat ${chatId} not found.`);
+      return false;
+    }
+    if (chat.messages.length === 0) {
+      this.plugin.logger.debug(`Chat ${chatId} already has no messages. Nothing to clear.`);
+      return true;
+    }
+    try {
+      chat.clearMessages();
+      this.plugin.logger.debug(`Messages cleared for chat ${chatId}. Save scheduled by Chat class.`);
+      if (this.chatIndex[chatId]) {
+        this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
+        await this.saveChatIndex();
+        this.plugin.logger.debug(`Updated chat index for ${chatId} after clearing messages.`);
+      }
+      const isActive = chatId === this.activeChatId;
+      if (isActive) {
+        this.activeChat = chat;
+        this.plugin.logger.debug(`Updated active chat cache for ${chatId} after clearing messages.`);
+        this.plugin.emit("messages-cleared", chatId);
+      }
+      this.plugin.emit("chat-list-updated");
+      return true;
+    } catch (error) {
+      this.plugin.logger.error(`Error during message clearing process for chat ${chatId}:`, error);
+      new import_obsidian10.Notice("Error clearing messages.");
       return false;
     }
   }
