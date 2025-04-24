@@ -94,3 +94,30 @@ export interface OllamaShowResponse {
 export interface OllamaEmbeddingsResponse { // Інтерфейс для відповіді /api/embeddings
     embedding: number[];
 }
+
+// У файл з типами (наприклад, types.ts або подібний) або на початок OllamaService.ts
+
+/** Структура відповіді Ollama при /api/generate з stream: true */
+export interface OllamaGenerateChunk {
+    model: string;
+    created_at: string;
+    response?: string; // Текстова частина відповіді (може бути відсутня в першому/останньому чанку)
+    done: boolean;    // Чи це останній чанк?
+
+    // Додаткові поля, що можуть повертатися
+    context?: number[]; // Опціонально: контекст для наступного запиту
+    total_duration?: number;
+    load_duration?: number;
+    prompt_eval_count?: number;
+    prompt_eval_duration?: number;
+    eval_count?: number;
+    eval_duration?: number;
+}
+
+/** Структура відповіді Ollama при помилці потоку */
+export interface OllamaErrorChunk {
+    error: string;
+}
+
+/** Тип, що об'єднує успішний чанк та помилку */
+export type OllamaStreamChunk = OllamaGenerateChunk | OllamaErrorChunk;

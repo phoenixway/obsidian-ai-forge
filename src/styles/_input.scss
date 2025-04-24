@@ -79,8 +79,7 @@
     overflow: hidden;
 
     // Стилі для .model-display, .role-display, .temperature-indicator, .translate-input-button...
-    // (Залишаються без змін з вашої версії)
-     .model-display,
+    .model-display,
     .role-display {
       font-size: var(--font-ui-smaller);
       color: var(--text-muted);
@@ -178,8 +177,7 @@
     gap: calc(var(--chat-spacing-unit) * 1.5);
     flex-shrink: 0;
 
-    // Стилі для кнопок праворуч (send, voice, menu...)
-    // (Залишаються без змін з вашої версії)
+    // --- Базові стилі для всіх кнопок праворуч ---
      button {
       width: 32px; // Розмір за замовчуванням
       height: 32px;
@@ -220,6 +218,8 @@
        }
     }
 
+    // --- Стилі для КОНКРЕТНИХ кнопок ---
+
     // Кнопка Відправки
     .send-button {
       background-color: var(--interactive-accent);
@@ -251,10 +251,33 @@
         color: white;
         opacity: 1;
         animation: pulse-recording 1.5s infinite ease-in-out;
-        // boxShadow для анімації пульсації (опціонально)
         box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5);
       }
     }
+
+    // *** НОВІ СТИЛІ для Кнопки Stop ***
+    .stop-generating-button {
+      // Успадковує базові стилі кнопки звідси
+      // Додаткові стилі для небезпеки
+      &.danger-option {
+         color: var(--text-error); // Червонуватий колір іконки
+      }
+
+      // Стилі при наведенні на кнопку стоп
+      &:hover {
+         color: var(--text-on-accent);
+         background-color: var(--background-modifier-error-hover); // Червонуватий фон при наведенні
+         opacity: 1; // Повна видимість при наведенні
+         transform: scale(1.08); // Збільшення як у send
+      }
+
+       // Можна додати стилі для натискання, якщо потрібно
+       // &:active {
+       //    transform: scale(1.02);
+       //    background-color: var(--color-red); // Або темніший червоний
+       // }
+    }
+    // **********************************
 
     .toggle-location-button {
       display: none; // Приховано тут, керується в responsive
@@ -266,5 +289,12 @@
 }
 
 // Анімації (залишаються без змін)
-@keyframes pulse-recording { /* ... */ }
-@keyframes spin { /* ... */ }
+@keyframes pulse-recording {
+  0% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0.5); }
+  70% { box-shadow: 0 0 0 10px rgba(var(--text-error-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--text-error-rgb), 0); }
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

@@ -51,7 +51,7 @@
   }
 }
 
-// Wrapper for one or more message bubbles + their action buttons
+// Wrapper for one or more message bubbles + their action buttons below it
 .message-wrapper {
    display: flex;
    flex-direction: column;
@@ -163,10 +163,6 @@
     padding: 1px; // Minimal padding around icon
     color: var(--text-muted); // Icon color
 
- 
-
-
-
     // background: rgba(var(--background-secondary-rgb), 0.7);
     // backdrop-filter: blur(3px);
     // border: 1px solid rgba(var(--background-modifier-border-rgb), 0.5);
@@ -185,7 +181,6 @@
         color: var(--text-normal); // Change only icon color on hover
         transform: scale(1.05); // Keep scale effect if desired
     }
-
 }
 
 .delete-message-button {
@@ -346,6 +341,7 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+// --- Media Query for Large Screens ---
 @media screen and (min-width: 1600px) { // Порог ширини екрану (можна змінити: 1400px, 1800px, тощо)
 
   .ollama-chat-container {
@@ -374,4 +370,3 @@
   */
 
 } // --- Кінець медіа-запиту ---
-

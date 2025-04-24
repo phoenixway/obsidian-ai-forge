@@ -24,13 +24,13 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
-  ACTIVE_CHAT_ID_KEY: () => ACTIVE_CHAT_ID_KEY2,
+  ACTIVE_CHAT_ID_KEY: () => ACTIVE_CHAT_ID_KEY,
   CHAT_INDEX_KEY: () => CHAT_INDEX_KEY,
   SESSIONS_INDEX_KEY: () => SESSIONS_INDEX_KEY,
   default: () => OllamaPlugin2
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian12 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 
 // src/OllamaView.ts
 var import_obsidian3 = require("obsidian");
@@ -152,8 +152,6 @@ var CSS_CLASS_SYSTEM_TEXT = "system-message-text";
 var CSS_CLASS_ERROR_TEXT = "error-message-text";
 var CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
 var CSS_CLASS_CONTENT = "message-content";
-var CSS_CLASS_THINKING_DOTS = "thinking-dots";
-var CSS_CLASS_THINKING_DOT = "thinking-dot";
 var CSS_CLASS_THINKING_BLOCK = "thinking-block";
 var CSS_CLASS_THINKING_HEADER = "thinking-header";
 var CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
@@ -220,6 +218,7 @@ var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
 var CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button";
 var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
 var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
+var CSS_CLASS_STOP_BUTTON = "stop-generating-button";
 var LANGUAGES = {
   af: "Afrikaans",
   sq: "Albanian",
@@ -333,7 +332,6 @@ var LANGUAGES = {
   zu: "Zulu"
 };
 var OllamaView = class extends import_obsidian3.ItemView {
-  // <-- Нова властивість
   constructor(leaf, plugin) {
     super(leaf);
     this.isProcessing = false;
@@ -349,6 +347,10 @@ var OllamaView = class extends import_obsidian3.ItemView {
     this.userScrolledUp = false;
     // Нова обгортка для чату та вводу
     this.lastProcessedChatId = null;
+    // Нова кнопка
+    this.currentAbortController = null;
+    // Для переривання запиту
+    this.currentAssistantMessage = null;
     // Допоміжна функція для створення підменю (з попереднього коду)
     this.createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
       const section = this.menuDropdown.createDiv();
@@ -373,6 +375,14 @@ var OllamaView = class extends import_obsidian3.ItemView {
       content.style.paddingTop = "0";
       content.style.paddingBottom = "0";
       return { header, content, section };
+    };
+    this.cancelGeneration = () => {
+      if (this.currentAbortController) {
+        this.plugin.logger.info("[OllamaView] User requested generation cancellation.");
+        this.currentAbortController.abort();
+      } else {
+        this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
+      }
     };
     //   public handleSettingsUpdated = async (): Promise<void> => {
     //     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
@@ -1644,6 +1654,13 @@ This action cannot be undone.`,
     this.temperatureIndicatorEl.setText("?");
     this.temperatureIndicatorEl.title = "Click to set temperature";
     this.buttonsContainer = controlsContainer.createDiv({ cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}` });
+    this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
+      cls: [CSS_CLASS_STOP_BUTTON, CSS_CLASS_DANGER_OPTION],
+      // Додаємо клас небезпеки
+      attr: { "aria-label": "Stop Generation", title: "Stop Generation" }
+    });
+    (0, import_obsidian3.setIcon)(this.stopGeneratingButton, "square");
+    this.stopGeneratingButton.hide();
     this.sendButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_SEND_BUTTON, attr: { "aria-label": "Send" } });
     (0, import_obsidian3.setIcon)(this.sendButton, "send");
     this.voiceButton = this.buttonsContainer.createEl("button", { cls: CSS_CLASS_VOICE_BUTTON, attr: { "aria-label": "Voice Input" } });
@@ -1925,6 +1942,11 @@ This action cannot be undone.`,
       this.plugin.on("settings-updated", this.handleSettingsUpdated)
     );
     this.register(this.plugin.on("message-deleted", this.handleMessageDeleted));
+    if (this.stopGeneratingButton) {
+      this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
+    } else {
+      console.error("stopGeneratingButton missing!");
+    }
     this.plugin.logger.debug("[OllamaView] Event listeners attached.");
   }
   // --- Додано: Метод для оновлення кнопки перемикання ---
@@ -2089,11 +2111,13 @@ This action cannot be undone.`,
     }
   }
   updateSendButtonState() {
+    var _a;
     if (!this.inputEl || !this.sendButton)
       return;
-    const isDisabled = this.inputEl.value.trim() === "" || this.isProcessing;
+    const isDisabled = this.inputEl.value.trim() === "" || this.isProcessing || this.currentAbortController !== null;
     this.sendButton.disabled = isDisabled;
     this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled);
+    (_a = this.stopGeneratingButton) == null ? void 0 : _a.toggle(this.currentAbortController !== null);
   }
   showEmptyState() {
     var _a, _b;
@@ -2354,11 +2378,10 @@ This action cannot be undone.`,
     }
     this.hideEmptyState();
   }
-  /** Sends the user's input as a message and gets a response */
   async sendMessage() {
-    var _a;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const content = this.inputEl.value.trim();
-    if (!content || this.isProcessing || this.sendButton.disabled)
+    if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null)
       return;
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
@@ -2369,48 +2392,144 @@ This action cannot be undone.`,
     this.clearInputField();
     this.setLoadingState(true);
     this.hideEmptyState();
-    let loadingEl = null;
+    this.currentAbortController = new AbortController();
+    let assistantMessageGroupEl = null;
+    let assistantContentEl = null;
+    let accumulatedResponse = "";
+    const responseStartTime = new Date();
+    (_b = this.stopGeneratingButton) == null ? void 0 : _b.show();
+    this.updateSendButtonState();
     try {
       const userMessage = await this.plugin.chatManager.addMessageToActiveChat(
         "user",
         userMessageContent
+        // Не передаємо час для повідомлення користувача, ChatManager використає поточний
       );
-      if (!userMessage)
+      if (!userMessage) {
         throw new Error("Failed to add user message to history.");
-      loadingEl = this.addLoadingIndicator();
-      this.guaranteedScrollToBottom(50, true);
-      const assistantMessage = await this.plugin.ollamaService.generateChatResponse(activeChat);
-      if (loadingEl) {
-        this.removeLoadingIndicator(loadingEl);
-        loadingEl = null;
       }
-      if (assistantMessage) {
+      assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+      this.renderAvatar(assistantMessageGroupEl, false);
+      const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
+      messageWrapper.style.order = "2";
+      const assistantMessageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+      const contentContainer = assistantMessageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+      assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
+      this.currentAssistantMessage = {
+        groupEl: assistantMessageGroupEl,
+        contentEl: assistantContentEl,
+        fullContent: "",
+        // Поки що порожньо
+        timestamp: responseStartTime
+      };
+      this.guaranteedScrollToBottom(50, true);
+      this.plugin.logger.info("[OllamaView] Starting stream request...");
+      const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
+      for await (const chunk of stream) {
+        if ("error" in chunk && chunk.error) {
+          throw new Error(chunk.error);
+        }
+        if ("response" in chunk && chunk.response && assistantContentEl) {
+          accumulatedResponse += chunk.response;
+          assistantContentEl.empty();
+          this.renderAssistantContent(assistantContentEl, accumulatedResponse);
+          this.guaranteedScrollToBottom(50, false);
+          this.checkMessageForCollapsing(assistantMessageEl);
+        }
+        if ("done" in chunk && chunk.done) {
+          this.plugin.logger.info("[OllamaView] Stream finished (done=true received).");
+          break;
+        }
+      }
+      this.plugin.logger.debug(`[OllamaView] Stream completed. Final response length: ${accumulatedResponse.length}`);
+      if (accumulatedResponse.trim()) {
         await this.plugin.chatManager.addMessageToActiveChat(
-          assistantMessage.role,
-          assistantMessage.content
+          "assistant",
+          accumulatedResponse,
+          responseStartTime
+          // Передаємо час початку відповіді
         );
+      } else {
+        this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
+        this.addMessageToDisplay("system", "Assistant provided an empty response.", new Date());
+      }
+    } catch (error) {
+      this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
+      if (error.name === "AbortError" || ((_c = error.message) == null ? void 0 : _c.includes("aborted")) || ((_d = error.message) == null ? void 0 : _d.includes("aborted by user"))) {
+        this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
+        this.addMessageToDisplay("system", "Generation stopped.", new Date());
+        if (this.currentAssistantMessage && accumulatedResponse.trim()) {
+          this.plugin.logger.info(`[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`);
+          await this.plugin.chatManager.addMessageToActiveChat(
+            "assistant",
+            accumulatedResponse,
+            (_e = this.currentAssistantMessage.timestamp) != null ? _e : new Date()
+          ).catch((e) => this.plugin.logger.error("Failed to save partial message after abort:", e));
+          if (this.currentAssistantMessage.contentEl) {
+            this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + " [...]");
+          }
+        } else if ((_f = this.currentAssistantMessage) == null ? void 0 : _f.groupEl) {
+          this.currentAssistantMessage.groupEl.remove();
+        }
       } else {
         this.addMessageToDisplay(
           "error",
-          "Assistant did not provide a response.",
+          `Error: ${error.message || "Unknown streaming error."}`,
           new Date()
         );
+        assistantMessageGroupEl == null ? void 0 : assistantMessageGroupEl.remove();
       }
-    } catch (error) {
-      if (loadingEl) {
-        this.removeLoadingIndicator(loadingEl);
-        loadingEl = null;
-      }
-      this.addMessageToDisplay(
-        "error",
-        `Error: ${error.message || "Unknown error."}`,
-        new Date()
-      );
     } finally {
-      if (loadingEl) {
-        this.removeLoadingIndicator(loadingEl);
+      this.plugin.logger.debug("[OllamaView] Stream finished or aborted. Cleaning up UI state.");
+      if (((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) && ((_h = this.currentAssistantMessage) == null ? void 0 : _h.contentEl)) {
+        const finalTimestamp = (_i = this.currentAssistantMessage.timestamp) != null ? _i : new Date();
+        const finalContent = accumulatedResponse;
+        const assistantMessageEl = this.currentAssistantMessage.groupEl.querySelector(`.${CSS_CLASS_OLLAMA_MESSAGE}`);
+        if (assistantMessageEl) {
+          const messageWrapper = assistantMessageEl.parentElement;
+          if (messageWrapper) {
+            const existingActions = messageWrapper.querySelector(".message-actions-wrapper");
+            existingActions == null ? void 0 : existingActions.remove();
+            const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+            const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+            (0, import_obsidian3.setIcon)(copyBtn, "copy");
+            this.registerDomEvent(copyBtn, "click", (e) => {
+              e.stopPropagation();
+              this.handleCopyClick(finalContent, copyBtn);
+            });
+            if (this.plugin.settings.enableTranslation) {
+              const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
+              (0, import_obsidian3.setIcon)(translateBtn, "languages");
+              this.registerDomEvent(translateBtn, "click", (e) => {
+                var _a2;
+                e.stopPropagation();
+                if ((_a2 = this.currentAssistantMessage) == null ? void 0 : _a2.contentEl) {
+                  this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
+                }
+              });
+            }
+            const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+            (0, import_obsidian3.setIcon)(deleteBtn, "trash");
+            this.registerDomEvent(deleteBtn, "click", (e) => {
+              e.stopPropagation();
+              const tempMsgForDelete = { role: "assistant", content: finalContent, timestamp: finalTimestamp };
+              this.handleDeleteMessageClick(tempMsgForDelete);
+            });
+          }
+          const existingTimestamp = assistantMessageEl.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+          existingTimestamp == null ? void 0 : existingTimestamp.remove();
+          assistantMessageEl.createDiv({
+            cls: CSS_CLASS_TIMESTAMP,
+            text: this.formatTime(finalTimestamp)
+          });
+          this.checkMessageForCollapsing(assistantMessageEl);
+        }
       }
       this.setLoadingState(false);
+      (_j = this.stopGeneratingButton) == null ? void 0 : _j.hide();
+      this.currentAbortController = null;
+      this.currentAssistantMessage = null;
+      this.updateSendButtonState();
       this.focusInput();
     }
   }
@@ -2636,12 +2755,21 @@ This action cannot be undone.`,
       }
     ).open();
   }
-  // --- Новий обробник для кнопки Регенерації ---
+  // --- ОНОВЛЕНИЙ МЕТОД: handleRegenerateClick ---
   async handleRegenerateClick(userMessage) {
     var _a;
     this.plugin.logger.info(
       `Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`
     );
+    if (this.currentAbortController) {
+      this.plugin.logger.warn("Cannot regenerate while another generation is in progress. Cancelling current one first.");
+      this.cancelGeneration();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (this.currentAbortController) {
+        new import_obsidian3.Notice("Please wait for the current generation to stop completely.");
+        return;
+      }
+    }
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
       new import_obsidian3.Notice("Cannot regenerate: No active chat found.");
@@ -2649,13 +2777,10 @@ This action cannot be undone.`,
     }
     const chatId = activeChat.metadata.id;
     const messageIndex = activeChat.messages.findIndex(
-      (msg) => msg.role === "user" && msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.content === userMessage.content
+      (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime()
     );
     if (messageIndex === -1) {
-      this.plugin.logger.error(
-        "Could not find the user message in the active chat history for regeneration.",
-        userMessage
-      );
+      this.plugin.logger.error("Could not find the user message for regeneration.", userMessage);
       new import_obsidian3.Notice("Error: Could not find the message to regenerate from.");
       return;
     }
@@ -2668,59 +2793,131 @@ This action cannot be undone.`,
       "Confirm Regeneration",
       "This will delete all messages after this prompt and generate a new response. Continue?",
       async () => {
-        this.plugin.logger.debug(
-          `User confirmed regeneration for chat ${chatId} after index ${messageIndex}`
-        );
-        let loadingIndicator = null;
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+        this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
+        this.currentAbortController = new AbortController();
+        let assistantMessageGroupEl = null;
+        let assistantContentEl = null;
+        let accumulatedResponse = "";
+        const responseStartTime = new Date();
+        this.setLoadingState(true);
+        (_a2 = this.stopGeneratingButton) == null ? void 0 : _a2.show();
+        this.updateSendButtonState();
         try {
-          this.setLoadingState(true);
-          const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(
-            chatId,
-            messageIndex
-          );
-          if (!deleteSuccess) {
+          const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
+          if (!deleteSuccess)
             throw new Error("Failed to delete subsequent messages.");
-          }
-          await this.loadAndDisplayActiveChat();
-          this.scrollToBottom();
-          loadingIndicator = this.addLoadingIndicator();
-          this.guaranteedScrollToBottom(50, true);
           const updatedChat = await this.plugin.chatManager.getActiveChat();
           if (!updatedChat)
             throw new Error("Failed to get updated chat after deletion.");
-          this.plugin.logger.info(
-            `Generating new response for chat ${chatId} based on history up to index ${messageIndex}`
-          );
-          const assistantMessage = await this.plugin.ollamaService.generateChatResponse(updatedChat);
-          if (loadingIndicator)
-            this.removeLoadingIndicator(loadingIndicator);
-          loadingIndicator = null;
-          if (assistantMessage) {
+          await this.loadAndDisplayActiveChat();
+          this.scrollToBottom();
+          assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+          this.renderAvatar(assistantMessageGroupEl, false);
+          const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
+          messageWrapper.style.order = "2";
+          const assistantMessageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+          const contentContainer = assistantMessageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+          assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
+          this.currentAssistantMessage = { groupEl: assistantMessageGroupEl, contentEl: assistantContentEl, fullContent: "", timestamp: responseStartTime };
+          this.guaranteedScrollToBottom(50, true);
+          this.plugin.logger.info(`Generating new response for chat ${chatId} based on history up to index ${messageIndex}`);
+          const stream = this.plugin.ollamaService.generateChatResponseStream(updatedChat, this.currentAbortController.signal);
+          for await (const chunk of stream) {
+            if ("error" in chunk && chunk.error) {
+              throw new Error(chunk.error);
+            }
+            if ("response" in chunk && chunk.response && assistantContentEl) {
+              accumulatedResponse += chunk.response;
+              assistantContentEl.empty();
+              this.renderAssistantContent(assistantContentEl, accumulatedResponse);
+              this.guaranteedScrollToBottom(50, false);
+              this.checkMessageForCollapsing(assistantMessageEl);
+            }
+            if ("done" in chunk && chunk.done) {
+              this.plugin.logger.info("[OllamaView] Regeneration stream finished.");
+              break;
+            }
+          }
+          if (accumulatedResponse.trim()) {
             await this.plugin.chatManager.addMessageToActiveChat(
-              assistantMessage.role,
-              assistantMessage.content
+              "assistant",
+              accumulatedResponse,
+              responseStartTime
             );
           } else {
-            this.plugin.logger.warn(
-              "Regeneration: Assistant did not provide a response."
-            );
-            this.addMessageToDisplay(
-              "error",
-              "Assistant did not provide a response for regeneration.",
-              new Date()
-            );
+            this.plugin.logger.warn("[OllamaView] Regeneration stream finished but accumulated response is empty.");
+            this.addMessageToDisplay("system", "Assistant provided an empty response during regeneration.", new Date());
           }
         } catch (error) {
           this.plugin.logger.error("Error during regeneration process:", error);
-          new import_obsidian3.Notice(`Regeneration failed: ${error.message}`);
-          if (loadingIndicator)
-            this.removeLoadingIndicator(loadingIndicator);
+          if (error.name === "AbortError" || ((_b = error.message) == null ? void 0 : _b.includes("aborted")) || ((_c = error.message) == null ? void 0 : _c.includes("aborted by user"))) {
+            this.plugin.logger.info("[OllamaView] Regeneration was cancelled.");
+            this.addMessageToDisplay("system", "Regeneration stopped.", new Date());
+            if (this.currentAssistantMessage && accumulatedResponse.trim()) {
+              this.plugin.logger.info(`[OllamaView] Saving partial response after regeneration cancellation (length: ${accumulatedResponse.length})`);
+              await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, (_d = this.currentAssistantMessage.timestamp) != null ? _d : new Date()).catch((e) => this.plugin.logger.error("Failed to save partial message after regeneration abort:", e));
+              if (this.currentAssistantMessage.contentEl) {
+                this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + " [...]");
+              }
+            } else if ((_e = this.currentAssistantMessage) == null ? void 0 : _e.groupEl) {
+              this.currentAssistantMessage.groupEl.remove();
+            }
+          } else {
+            new import_obsidian3.Notice(`Regeneration failed: ${error.message}`);
+            assistantMessageGroupEl == null ? void 0 : assistantMessageGroupEl.remove();
+          }
         } finally {
+          this.plugin.logger.debug("[OllamaView] Regeneration finished or aborted. Cleaning up UI state.");
+          if (((_f = this.currentAssistantMessage) == null ? void 0 : _f.groupEl) && ((_g = this.currentAssistantMessage) == null ? void 0 : _g.contentEl)) {
+            const finalTimestamp = (_h = this.currentAssistantMessage.timestamp) != null ? _h : new Date();
+            const finalContent = accumulatedResponse;
+            const assistantMessageEl = this.currentAssistantMessage.groupEl.querySelector(`.${CSS_CLASS_OLLAMA_MESSAGE}`);
+            if (assistantMessageEl) {
+              const messageWrapper = assistantMessageEl.parentElement;
+              if (messageWrapper) {
+                const existingActions = messageWrapper.querySelector(".message-actions-wrapper");
+                existingActions == null ? void 0 : existingActions.remove();
+                const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+                const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+                (0, import_obsidian3.setIcon)(copyBtn, "copy");
+                this.registerDomEvent(copyBtn, "click", (e) => {
+                  e.stopPropagation();
+                  this.handleCopyClick(finalContent, copyBtn);
+                });
+                if (this.plugin.settings.enableTranslation) {
+                  const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
+                  (0, import_obsidian3.setIcon)(translateBtn, "languages");
+                  this.registerDomEvent(translateBtn, "click", (e) => {
+                    var _a3;
+                    e.stopPropagation();
+                    if ((_a3 = this.currentAssistantMessage) == null ? void 0 : _a3.contentEl) {
+                      this.handleTranslateClick(finalContent, this.currentAssistantMessage.contentEl, translateBtn);
+                    }
+                  });
+                }
+                const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+                (0, import_obsidian3.setIcon)(deleteBtn, "trash");
+                this.registerDomEvent(deleteBtn, "click", (e) => {
+                  e.stopPropagation();
+                  const tempMsgForDelete = { role: "assistant", content: finalContent, timestamp: finalTimestamp };
+                  this.handleDeleteMessageClick(tempMsgForDelete);
+                });
+                const existingTimestamp = assistantMessageEl.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+                existingTimestamp == null ? void 0 : existingTimestamp.remove();
+                assistantMessageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
+                this.checkMessageForCollapsing(assistantMessageEl);
+              }
+            }
+          }
           this.setLoadingState(false);
+          (_i = this.stopGeneratingButton) == null ? void 0 : _i.hide();
+          this.currentAbortController = null;
+          this.currentAssistantMessage = null;
+          this.updateSendButtonState();
           this.focusInput();
         }
       }
-      // Кінець колбеку ConfirmModal
     ).open();
   }
   // --- Action Button Handlers ---
@@ -2826,6 +3023,10 @@ This action cannot be undone.`,
       text: this.formatDateSeparator(date)
     });
   }
+  // --- Модифікація renderAssistantContent ---
+  // Потрібно переконатися, що цей метод може обробляти частковий Markdown
+  // і не кидає помилок, якщо, наприклад, блок коду ще не закритий.
+  // Поточна реалізація з MarkdownRenderer.renderMarkdown може бути достатньо стійкою.
   renderAssistantContent(containerEl, content) {
     var _a, _b;
     const decodedContent = this.decodeHtmlEntities(content);
@@ -2837,16 +3038,18 @@ This action cannot be undone.`,
       this.addThinkingToggleListeners(containerEl);
       this.addCodeBlockEnhancements(containerEl);
     } else {
-      import_obsidian3.MarkdownRenderer.renderMarkdown(
-        decodedContent,
-        // Use decoded content for rendering
-        containerEl,
-        (_b = (_a = this.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
-        // Source path context
-        this
-        // Component context for links etc.
-      );
-      this.addCodeBlockEnhancements(containerEl);
+      try {
+        import_obsidian3.MarkdownRenderer.renderMarkdown(
+          decodedContent,
+          containerEl,
+          (_b = (_a = this.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
+          this
+        );
+        this.addCodeBlockEnhancements(containerEl);
+      } catch (error) {
+        this.plugin.logger.error("[OllamaView] Error rendering partial Markdown:", error, "Content:", decodedContent.substring(0, 500));
+        containerEl.setText(decodedContent);
+      }
     }
   }
   addCodeBlockEnhancements(contentEl) {
@@ -3549,26 +3752,27 @@ This action cannot be undone.`,
     this.updateSendButtonState();
     setTimeout(() => this.focusInput(), 50);
   }
-  addLoadingIndicator() {
-    this.hideEmptyState();
-    const group = this.chatContainer.createDiv({
-      cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
-    });
-    this.renderAvatar(group, false);
-    const message = group.createDiv({
-      cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`
-    });
-    const dots = message.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
-    for (let i = 0; i < 3; i++)
-      dots.createDiv({ cls: CSS_CLASS_THINKING_DOT });
-    this.guaranteedScrollToBottom(50, true);
-    return group;
-  }
-  removeLoadingIndicator(loadingEl) {
-    if (loadingEl == null ? void 0 : loadingEl.parentNode) {
-      loadingEl.remove();
-    }
-  }
+  // public addLoadingIndicator(): HTMLElement {
+  //   // Adds the visual "thinking" dots indicator
+  //   this.hideEmptyState();
+  //   const group = this.chatContainer.createDiv({
+  //     cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`,
+  //   });
+  //   this.renderAvatar(group, false); // Render AI avatar
+  //   const message = group.createDiv({
+  //     cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`,
+  //   });
+  //   const dots = message.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
+  //   for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASS_THINKING_DOT });
+  //   this.guaranteedScrollToBottom(50, true); // Scroll to show it
+  //   return group; // Return the group element containing the indicator
+  // }
+  // public removeLoadingIndicator(loadingEl: HTMLElement | null): void {
+  //   // Removes the loading indicator element
+  //   if (loadingEl?.parentNode) {
+  //     loadingEl.remove();
+  //   }
+  // }
   scrollToBottom() {
     this.guaranteedScrollToBottom(50, true);
   }
@@ -5111,9 +5315,7 @@ var RagService = class {
 };
 
 // src/OllamaService.ts
-var import_obsidian7 = require("obsidian");
 var OllamaService = class {
-  // Keep event emitter for connection errors
   constructor(plugin) {
     this.eventHandlers = {};
     this.plugin = plugin;
@@ -5124,6 +5326,7 @@ var OllamaService = class {
     }
     this.promptService = plugin.promptService;
   }
+  // --- Event Emitter (залишаємо без змін) ---
   on(event, callback) {
     if (!this.eventHandlers[event])
       this.eventHandlers[event] = [];
@@ -5146,35 +5349,201 @@ var OllamaService = class {
         }
       });
   }
+  // ------------------------------------------
   setBaseUrl(url) {
   }
   /**
-   * Sends a raw request body to the Ollama /api/generate endpoint.
+   * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
+   * @param chat Поточний об'єкт чату.
+   * @param signal AbortSignal для можливості переривання запиту.
+   * @returns Асинхронний ітератор, що видає OllamaStreamChunk.
+   */
+  async *generateChatResponseStream(chat, signal) {
+    var _a;
+    if (!chat) {
+      this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat.");
+      yield { error: "Chat object is null." };
+      return;
+    }
+    if (!this.promptService) {
+      this.plugin.logger.error("[OllamaService] PromptService is not initialized!");
+      yield { error: "Prompt service is unavailable." };
+      return;
+    }
+    const currentSettings = this.plugin.settings;
+    const modelName = chat.metadata.modelName || currentSettings.modelName;
+    const temperature = (_a = chat.metadata.temperature) != null ? _a : currentSettings.temperature;
+    if (!modelName) {
+      this.plugin.logger.error("[OllamaService] No model specified in chat metadata or settings.");
+      yield { error: "No Ollama model selected." };
+      return;
+    }
+    const url = `${this.plugin.settings.ollamaServerUrl}/api/generate`;
+    const headers = { "Content-Type": "application/json" };
+    try {
+      const history = chat.getMessages();
+      this.plugin.logger.debug("[OllamaService] Getting system prompt from PromptService...");
+      const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
+      this.plugin.logger.debug("[OllamaService] Preparing prompt body from PromptService...");
+      const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
+      if (promptBody === null || promptBody === void 0) {
+        this.plugin.logger.error("[OllamaService] Prompt body generation failed (returned null/undefined).");
+        yield { error: "Could not generate prompt body." };
+        return;
+      }
+      const requestBody = {
+        model: modelName,
+        prompt: promptBody,
+        stream: true,
+        // <--- ВАЖЛИВО: Вмикаємо стрімінг
+        temperature,
+        options: { num_ctx: currentSettings.contextWindow },
+        ...systemPrompt && { system: systemPrompt }
+      };
+      this.plugin.logger.debug(`[OllamaService] Starting STREAMING request to ${url}: Model:"${modelName}", Temp:${temperature}, System Provided: ${!!systemPrompt}`);
+      this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", { ...requestBody, prompt: promptBody.substring(0, 200) + "..." });
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+        signal
+        // <--- Передаємо AbortSignal
+      });
+      if (!response.ok) {
+        let errorText = `Ollama API error! Status: ${response.status}`;
+        try {
+          const errorJson = await response.json();
+          errorText += `: ${(errorJson == null ? void 0 : errorJson.error) || response.statusText || "No details"}`;
+        } catch (e) {
+          errorText += `: ${response.statusText || "Could not parse error details"}`;
+        }
+        this.plugin.logger.error(`[OllamaService] ${errorText}`);
+        this.emit("connection-error", new Error(errorText));
+        yield { error: errorText };
+        return;
+      }
+      if (!response.body) {
+        throw new Error("Response body is null");
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (signal == null ? void 0 : signal.aborted) {
+          this.plugin.logger.info("[OllamaService] Stream reading aborted by signal.");
+          reader.cancel("Aborted by user");
+          yield { error: "Generation aborted by user.", done: true };
+          return;
+        }
+        if (done) {
+          this.plugin.logger.debug("[OllamaService] Stream finished.");
+          if (buffer.trim()) {
+            try {
+              const jsonChunk = JSON.parse(buffer.trim());
+              yield jsonChunk;
+            } catch (e) {
+              this.plugin.logger.warn(`[OllamaService] Could not parse final buffer content: ${buffer.trim()}`, e);
+            }
+          }
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.trim() === "")
+            continue;
+          try {
+            const jsonChunk = JSON.parse(line.trim());
+            yield jsonChunk;
+            if (jsonChunk.done) {
+              this.plugin.logger.debug("[OllamaService] Received 'done: true' chunk, finalizing stream.");
+              reader.cancel("Stream finished by Ollama");
+              return;
+            }
+          } catch (e) {
+            this.plugin.logger.error(`[OllamaService] Failed to parse JSON chunk: ${line.trim()}`, e);
+          }
+        }
+      }
+    } catch (error) {
+      if (error.name === "AbortError") {
+        this.plugin.logger.info("[OllamaService] Fetch request aborted.");
+        yield { error: "Generation aborted by user.", done: true };
+      } else {
+        this.plugin.logger.error("[OllamaService] Error during chat response stream generation:", error);
+        let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
+        if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("Failed to fetch")) {
+          errorMessage = `Connection Error: Failed to reach Ollama at ${this.plugin.settings.ollamaServerUrl}. Is it running?`;
+          this.emit("connection-error", new Error(errorMessage));
+        }
+        yield { error: errorMessage };
+      }
+    }
+  }
+  // --- Інші методи (getModels, getModelDetails, generateEmbeddings, generateRaw, _ollamaFetch) ---
+  // Важливо: _ollamaFetch ТЕПЕР НЕ ПОТРІБЕН для generateChatResponseStream,
+  // але може бути корисним для інших запитів (embeddings, tags, show), якщо вони не потребують стрімінгу.
+  // Якщо ви їх не використовуєте або можете адаптувати generateChatResponseStream для них, то _ollamaFetch можна видалити.
+  // Залишимо його поки що, але переконайтесь, що generateRaw та інші використовують його коректно (як було в запиті).
+  /**
+   * Sends a non-streaming request body to the Ollama /api/generate endpoint.
+   * (Залишаємо для можливої сумісності або інших потреб)
    */
   async generateRaw(requestBody) {
-    var _a;
-    this.plugin.logger.debug("[OllamaService] Sending RAW request to /api/generate:", { model: requestBody.model, temp: requestBody.temperature, system: !!requestBody.system, prompt_len: (_a = requestBody.prompt) == null ? void 0 : _a.length });
+    var _a, _b;
+    this.plugin.logger.debug("[OllamaService] Sending RAW (non-streaming) request to /api/generate:", { model: requestBody.model, temp: requestBody.temperature, system: !!requestBody.system, prompt_len: (_a = requestBody.prompt) == null ? void 0 : _a.length });
     if (!requestBody.model || !requestBody.prompt) {
       throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
     }
+    requestBody.stream = false;
     if (!requestBody.system) {
       delete requestBody.system;
     }
-    return await this._ollamaFetch(
-      "/api/generate",
-      "POST",
-      // Explicitly pass method
-      JSON.stringify(requestBody)
-      // Pass the stringified body
-    );
+    const url = `${this.plugin.settings.ollamaServerUrl}/api/generate`;
+    const headers = { "Content-Type": "application/json" };
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody)
+        // Не передаємо signal тут, бо запит не потоковий і не має сенсу його переривати
+      });
+      if (!response.ok) {
+        let errorText = `Ollama API error! Status: ${response.status}`;
+        try {
+          const errorJson = await response.json();
+          errorText += `: ${(errorJson == null ? void 0 : errorJson.error) || response.statusText || "No details"}`;
+        } catch (e) {
+          errorText += `: ${response.statusText || "Could not parse error details"}`;
+        }
+        this.plugin.logger.error(`[OllamaService] ${errorText}`);
+        this.emit("connection-error", new Error(errorText));
+        throw new Error(errorText);
+      }
+      if (!response.body)
+        throw new Error("Response body is null");
+      return await response.json();
+    } catch (error) {
+      this.plugin.logger.error(`[OllamaService] Error in generateRaw (${url}):`, error);
+      const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: /api/generate)`;
+      if (!((_b = error.message) == null ? void 0 : _b.includes("Ollama API error"))) {
+        this.emit("connection-error", new Error(connectionErrorMsg));
+      }
+      throw new Error(error.message || connectionErrorMsg);
+    }
   }
   /**
    * Generates embeddings for a list of text prompts.
+   * (Залишаємо без змін, використовує fetch)
    */
   async generateEmbeddings(prompts, model) {
     if (!prompts || prompts.length === 0)
       return [];
     const endpoint = "/api/embeddings";
+    const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
+    const headers = { "Content-Type": "application/json" };
     this.plugin.logger.debug(`[OllamaService] Generating ${prompts.length} embeddings using model ${model}...`);
     const embeddingsList = [];
     try {
@@ -5186,13 +5555,17 @@ var OllamaService = class {
         }
         const requestBody = JSON.stringify({ model, prompt: trimmedPrompt });
         try {
-          const embeddingResponse = await this._ollamaFetch(
-            endpoint,
-            "POST",
-            // Explicitly pass method
-            requestBody
-            // Pass the stringified body
-          );
+          const response = await fetch(url, { method: "POST", headers, body: requestBody });
+          if (!response.ok) {
+            let errorText = `Ollama Embeddings API error! Status: ${response.status}`;
+            try {
+              const errJson = await response.json();
+              errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
+            } catch (e) {
+            }
+            throw new Error(errorText);
+          }
+          const embeddingResponse = await response.json();
           if (embeddingResponse && embeddingResponse.embedding) {
             embeddingsList.push(embeddingResponse.embedding);
           } else {
@@ -5200,6 +5573,7 @@ var OllamaService = class {
           }
         } catch (singleError) {
           this.plugin.logger.error(`[OllamaService] Failed to generate embedding for one prompt using model ${model}. Prompt (start): "${trimmedPrompt.substring(0, 50)}..."`, singleError);
+          this.emit("connection-error", new Error(singleError.message || "Embedding generation failed"));
         }
       }
       this.plugin.logger.debug(`[OllamaService] Successfully generated ${embeddingsList.length} embeddings (out of ${prompts.length} prompts).`);
@@ -5209,172 +5583,86 @@ var OllamaService = class {
       return null;
     }
   }
+  /**
+  * Gets list of available models.
+  * (Залишаємо без змін, використовує fetch)
+  */
   async getModels(forceRefresh = false) {
+    var _a;
     const endpoint = "/api/tags";
-    const fullUrlForLogging = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
-    this.plugin.logger.debug(`[OllamaService] Fetching models from ${fullUrlForLogging}`);
+    const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
+    this.plugin.logger.debug(`[OllamaService] Fetching models from ${url}`);
     let modelListResult = [];
     try {
-      const data = await this._ollamaFetch(
-        endpoint,
-        // Передаємо '/api/tags'
-        "GET"
-        // Передаємо метод
-      );
-      if (data && Array.isArray(data.models)) {
-        const modelNames = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
-        this.plugin.logger.debug(`[OllamaService] Found ${modelNames.length} models.`);
-        modelListResult = modelNames;
-      } else {
-        this.plugin.logger.warn("[OllamaService] Invalid response structure received from /api/tags (expected { models: [...] }):", data);
-      }
-    } catch (e) {
-      this.plugin.logger.error(`[OllamaService] Failed to fetch models:`, e);
-    }
-    return modelListResult;
-  }
-  // End getModels
-  async getModelDetails(modelName) {
-    this.plugin.logger.debug(`[OllamaService] Fetching details for model: ${modelName}`);
-    const endpoint = "/api/show";
-    try {
-      const data = await this._ollamaFetch(
-        endpoint,
-        "POST",
-        // Explicitly pass method
-        JSON.stringify({ name: modelName })
-        // Pass the stringified body
-      );
-      return data;
-    } catch (e) {
-      this.plugin.logger.warn(`[OllamaService] Failed to get details for model ${modelName}:`, e);
-      return null;
-    }
-  }
-  /**
-       * Private helper for fetch requests to Ollama API.
-       * Now accepts method and optional string body.
-       */
-  // --- FIX: Changed method signature and implementation ---
-  async _ollamaFetch(endpoint, method, body) {
-    var _a, _b;
-    const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
-    const headers = { "Content-Type": "application/json" };
-    try {
-      const requestParams = { url, method, headers, body, throw: false };
-      this.plugin.logger.debug(`[OllamaService] Calling requestUrl with params:`, JSON.stringify(requestParams));
-      const response = await (0, import_obsidian7.requestUrl)(requestParams);
-      if (response.status >= 400) {
-        let errorText = `Ollama API error! Status: ${response.status} at ${endpoint}`;
+      const response = await fetch(url, { method: "GET" });
+      if (!response.ok) {
+        let errorText = `Ollama Tags API error! Status: ${response.status}`;
         try {
-          errorText += `: ${response.text || ((_a = response.json) == null ? void 0 : _a.error) || "No details"}`;
+          const errJson = await response.json();
+          errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
         } catch (e) {
         }
         this.plugin.logger.error(`[OllamaService] ${errorText}`);
         this.emit("connection-error", new Error(errorText));
         throw new Error(errorText);
       }
-      if (response.status === 204 || !response.text) {
-        const errorMsg = `Ollama API success status (${response.status}) but empty response body at ${endpoint}`;
-        this.plugin.logger.warn(`[OllamaService] ${errorMsg}`);
-        throw new Error(errorMsg);
+      const data = await response.json();
+      if (data && Array.isArray(data.models)) {
+        const modelNames = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
+        this.plugin.logger.debug(`[OllamaService] Found ${modelNames.length} models.`);
+        modelListResult = modelNames;
+      } else {
+        this.plugin.logger.warn("[OllamaService] Invalid response structure received from /api/tags:", data);
       }
-      try {
-        const jsonData = response.json;
-        if (jsonData === null || jsonData === void 0) {
-          throw new Error(`Ollama API returned null/undefined JSON at ${endpoint}`);
-        }
-        return jsonData;
-      } catch (jsonError) {
-        this.plugin.logger.error(`[OllamaService] Failed to parse JSON response from ${url}. Status: ${response.status}`, jsonError, "Response Text:", response.text);
-        throw new Error(`Failed to parse Ollama JSON response from ${endpoint}`);
+    } catch (e) {
+      this.plugin.logger.error(`[OllamaService] Failed to fetch models:`, e);
+      if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
+        this.emit("connection-error", new Error(e.message || "Failed to fetch models"));
       }
-    } catch (error) {
-      this.plugin.logger.error(`[OllamaService] Error in _ollamaFetch (${url}):`, error);
-      const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: ${endpoint})`;
-      if (!((_b = error.message) == null ? void 0 : _b.includes("Ollama API error"))) {
-        this.emit("connection-error", new Error(connectionErrorMsg));
-      }
-      throw new Error(error.message || connectionErrorMsg);
     }
+    return modelListResult;
   }
   /**
-       * Генерує відповідь чату, готуючи промпт та викликаючи generateRaw.
-       */
-  async generateChatResponse(chat) {
-    var _a, _b;
-    if (!chat) {
-      this.plugin.logger.error("[OllamaService] generateChatResponse called with null chat.");
-      return null;
-    }
-    if (!this.promptService) {
-      this.plugin.logger.error("[OllamaService] PromptService is not initialized!");
-      new import_obsidian7.Notice("Error: Prompt service is unavailable.");
-      return null;
-    }
-    const currentSettings = this.plugin.settings;
-    const modelName = chat.metadata.modelName || currentSettings.modelName;
-    const temperature = (_a = chat.metadata.temperature) != null ? _a : currentSettings.temperature;
-    if (!modelName) {
-      this.plugin.logger.error("[OllamaService] No model specified in chat metadata or settings.");
-      new import_obsidian7.Notice("Error: No Ollama model selected.");
-      return null;
-    }
+   * Gets details for a specific model.
+   * (Залишаємо без змін, використовує fetch)
+   */
+  async getModelDetails(modelName) {
+    var _a;
+    this.plugin.logger.debug(`[OllamaService] Fetching details for model: ${modelName}`);
+    const endpoint = "/api/show";
+    const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
+    const headers = { "Content-Type": "application/json" };
     try {
-      const history = chat.getMessages();
-      this.plugin.logger.debug("[OllamaService] Getting system prompt from PromptService...");
-      const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
-      this.plugin.logger.debug("[OllamaService] Preparing prompt body from PromptService...");
-      const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
-      if (promptBody === null || promptBody === void 0) {
-        this.plugin.logger.error("[OllamaService] Prompt body generation failed (returned null/undefined).");
-        new import_obsidian7.Notice("Error: Could not generate prompt body.");
-        return null;
+      const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ name: modelName }) });
+      if (!response.ok) {
+        let errorText = `Ollama Show API error! Status: ${response.status}`;
+        try {
+          const errJson = await response.json();
+          errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
+        } catch (e) {
+        }
+        this.plugin.logger.error(`[OllamaService] ${errorText}`);
+        this.emit("connection-error", new Error(errorText));
+        throw new Error(errorText);
       }
-      const requestBody = {
-        model: modelName,
-        prompt: promptBody,
-        // Тут вже є історія + RAG + завдання
-        stream: false,
-        temperature,
-        options: { num_ctx: currentSettings.contextWindow },
-        // Додаємо system, тільки якщо він існує і не порожній
-        ...systemPrompt && { system: systemPrompt }
-      };
-      this.plugin.logger.debug(`[OllamaService] Calling generateRaw for chat response: Model:"${modelName}", Temp:${temperature}, System Prompt Provided: ${!!systemPrompt}`);
-      this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", { ...requestBody, prompt: promptBody.substring(0, 200) + "..." });
-      const responseData = await this.generateRaw(requestBody);
-      if (responseData && typeof responseData.response === "string") {
-        this.plugin.logger.debug(`[OllamaService] Received response. Length: ${responseData.response.length} chars`);
-        const assistantMessage = {
-          role: "assistant",
-          content: responseData.response.trim(),
-          timestamp: new Date(responseData.created_at || Date.now())
-          // Використовуємо час відповіді або поточний
-        };
-        return assistantMessage;
-      } else {
-        this.plugin.logger.warn("[OllamaService] generateRaw returned unexpected structure or no response.", responseData);
-        throw new Error("Received unexpected or empty response from the model.");
+      const data = await response.json();
+      return data;
+    } catch (e) {
+      this.plugin.logger.warn(`[OllamaService] Failed to get details for model ${modelName}:`, e);
+      if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
+        this.emit("connection-error", new Error(e.message || `Failed to get details for ${modelName}`));
       }
-    } catch (error) {
-      this.plugin.logger.error("[OllamaService] Error during chat response generation cycle:", error);
-      let errorMessage = error instanceof Error ? error.message : "Unknown error generating response.";
-      if (errorMessage.includes("model not found")) {
-        errorMessage = `Model '${modelName}' not found. Check Ollama server or model name.`;
-      } else if (errorMessage.includes("context window")) {
-        errorMessage = `Context window error (${currentSettings.contextWindow} tokens): ${error.message}. Adjust context settings.`;
-      } else if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError") || ((_b = error.message) == null ? void 0 : _b.includes("Failed to connect"))) {
-        errorMessage = `Connection Error: Failed to reach Ollama at ${currentSettings.ollamaServerUrl}. Is it running?`;
-      }
-      new import_obsidian7.Notice(errorMessage);
       return null;
     }
   }
+  // _ollamaFetch більше не потрібен, оскільки всі запити тепер використовують fetch напряму.
+  // Можна його видалити.
+  // ВИДАЛЕНО МЕТОД generateChatResponse (старий, не потоковий)
+  // Всі виклики мають тепер використовувати generateChatResponseStream
 };
 
 // src/PromptService.ts
-var import_obsidian8 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 var PromptService = class {
   constructor(plugin) {
     this.currentSystemPrompt = null;
@@ -5407,7 +5695,7 @@ var PromptService = class {
    */
   async getRoleDefinition(rolePath) {
     var _a, _b, _c;
-    const normalizedPath = rolePath ? (0, import_obsidian8.normalizePath)(rolePath) : null;
+    const normalizedPath = rolePath ? (0, import_obsidian7.normalizePath)(rolePath) : null;
     if (normalizedPath === this.currentRolePath && normalizedPath && this.roleCache[normalizedPath]) {
       return this.roleCache[normalizedPath];
     }
@@ -5430,7 +5718,7 @@ var PromptService = class {
     }
     this.plugin.logger.debug(`[PromptService] Loading role definition from file: ${normalizedPath}`);
     const file = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (file instanceof import_obsidian8.TFile) {
+    if (file instanceof import_obsidian7.TFile) {
       try {
         const fileCache = this.app.metadataCache.getFileCache(file);
         const frontmatter = fileCache == null ? void 0 : fileCache.frontmatter;
@@ -5447,7 +5735,7 @@ var PromptService = class {
         return definition;
       } catch (error) {
         this.plugin.logger.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
-        new import_obsidian8.Notice(`Error loading role: ${file.basename}. Check console.`);
+        new import_obsidian7.Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
         return null;
       }
@@ -5678,10 +5966,10 @@ ${processedHistoryString}`);
 };
 
 // src/ChatManager.ts
-var import_obsidian10 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/Chat.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 var Chat = class {
   // Додати властивість
   /**
@@ -5694,12 +5982,12 @@ var Chat = class {
   constructor(adapter, settings, data, filePath, logger) {
     this.adapter = adapter;
     this.pluginSettings = settings;
-    this.filePath = (0, import_obsidian9.normalizePath)(filePath);
+    this.filePath = (0, import_obsidian8.normalizePath)(filePath);
     this.metadata = data.metadata;
     this.messages = data.messages.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
     this.logger = logger;
     this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
-    this.debouncedSave = (0, import_obsidian9.debounce)(this._saveToFile.bind(this), 1500, true);
+    this.debouncedSave = (0, import_obsidian8.debounce)(this._saveToFile.bind(this), 1500, true);
   }
   // --- Message Management ---
   /**
@@ -5849,7 +6137,7 @@ var Chat = class {
       return true;
     } catch (error) {
       console.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
-      new import_obsidian9.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
+      new import_obsidian8.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
@@ -5863,7 +6151,7 @@ var Chat = class {
    */
   static async loadFromFile(filePath, adapter, settings, logger) {
     var _a;
-    const normPath = (0, import_obsidian9.normalizePath)(filePath);
+    const normPath = (0, import_obsidian8.normalizePath)(filePath);
     logger.debug(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
     try {
       if (!await adapter.exists(normPath)) {
@@ -5877,12 +6165,12 @@ var Chat = class {
         return new Chat(adapter, settings, data, normPath, logger);
       } else {
         logger.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
-        new import_obsidian9.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
+        new import_obsidian8.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
         return null;
       }
     } catch (e) {
       logger.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
-      new import_obsidian9.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
+      new import_obsidian8.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
       return null;
     }
   }
@@ -5902,7 +6190,7 @@ var Chat = class {
       return true;
     } catch (e) {
       console.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
-      new import_obsidian9.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
+      new import_obsidian8.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
@@ -5985,12 +6273,28 @@ var ChatManager = class {
     this.updateChatsFolderPath();
     await this.ensureFoldersExist();
     await this.loadChatIndex(true);
-    this.plugin.logger.info(`ChatManager initialized. Index has ${Object.keys(this.chatIndex).length} chats.`);
+    const savedActiveId = await this.plugin.loadDataKey(ACTIVE_CHAT_ID_KEY);
+    if (savedActiveId && this.chatIndex[savedActiveId]) {
+      this.plugin.logger.info(`Restoring active chat ID from settings: ${savedActiveId}`);
+      await this.setActiveChat(savedActiveId);
+    } else {
+      if (savedActiveId)
+        this.plugin.logger.warn(`Saved active chat ID ${savedActiveId} not found in index, clearing.`);
+      await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
+      const availableChats = this.listAvailableChats();
+      if (availableChats.length > 0) {
+        await this.setActiveChat(availableChats[0].id);
+      }
+    }
+    this.plugin.logger.info(`ChatManager initialized. Index has ${Object.keys(this.chatIndex).length} chats. Active ID: ${this.activeChatId}`);
   }
   updateChatsFolderPath() {
     var _a;
     const settingsPath = (_a = this.plugin.settings.chatHistoryFolderPath) == null ? void 0 : _a.trim();
-    this.chatsFolderPath = settingsPath && settingsPath !== "/" ? (0, import_obsidian10.normalizePath)(settingsPath) : "/";
+    this.chatsFolderPath = settingsPath ? (0, import_obsidian9.normalizePath)(settingsPath) : "/";
+    if (this.chatsFolderPath !== "/" && this.chatsFolderPath.endsWith("/")) {
+      this.chatsFolderPath = this.chatsFolderPath.slice(0, -1);
+    }
     this.plugin.logger.debug(`Chat history folder path set to: ${this.chatsFolderPath}`);
   }
   updateTaskState(tasks) {
@@ -6001,26 +6305,31 @@ var ChatManager = class {
     return this.currentTaskState;
   }
   async ensureFoldersExist() {
-    const historyPath = this.plugin.settings.chatHistoryFolderPath;
-    const exportPath = this.plugin.settings.chatExportFolderPath;
+    var _a, _b;
+    const historyPath = (_a = this.plugin.settings.chatHistoryFolderPath) == null ? void 0 : _a.trim();
+    const exportPath = (_b = this.plugin.settings.chatExportFolderPath) == null ? void 0 : _b.trim();
     this.plugin.logger.debug(`Ensuring folders exist: History='${historyPath}', Export='${exportPath}'`);
     const checkAndCreate = async (folderPath, folderDesc) => {
       if (!folderPath || folderPath === "/")
         return;
+      const normalized = (0, import_obsidian9.normalizePath)(folderPath);
       try {
-        if (!await this.adapter.exists(folderPath)) {
-          this.plugin.logger.info(`${folderDesc} folder doesn't exist. Creating: ${folderPath}`);
-          await this.adapter.mkdir(folderPath);
+        const exists = await this.adapter.exists(normalized);
+        if (!exists) {
+          this.plugin.logger.info(`${folderDesc} folder doesn't exist. Creating: ${normalized}`);
+          await this.adapter.mkdir(normalized);
         } else {
-          const stat = await this.adapter.stat(folderPath);
+          const stat = await this.adapter.stat(normalized);
           if ((stat == null ? void 0 : stat.type) !== "folder") {
-            this.plugin.logger.error(`Path for ${folderDesc} exists but is not a folder: ${folderPath}`);
-            new import_obsidian10.Notice(`Error: Path for ${folderDesc} is not a folder.`);
+            this.plugin.logger.error(`Path for ${folderDesc} exists but is not a folder: ${normalized}`);
+            new import_obsidian9.Notice(`Error: Path for ${folderDesc} is not a folder.`);
+          } else {
+            this.plugin.logger.debug(`${folderDesc} folder already exists: ${normalized}`);
           }
         }
       } catch (error) {
-        this.plugin.logger.error(`Error creating/checking ${folderDesc} directory '${folderPath}':`, error);
-        new import_obsidian10.Notice(`Error creating folder for ${folderDesc}. Check settings and permissions.`);
+        this.plugin.logger.error(`Error creating/checking ${folderDesc} directory '${normalized}':`, error);
+        new import_obsidian9.Notice(`Error creating folder for ${folderDesc}. Check settings and permissions.`);
       }
     };
     await checkAndCreate(historyPath, "Chat History");
@@ -6030,18 +6339,51 @@ var ChatManager = class {
     var _a;
     this.plugin.logger.debug(`Loading chat index... (forceScan: ${forceScan})`);
     const storedIndex = await this.plugin.loadDataKey(CHAT_INDEX_KEY);
-    if (!forceScan && storedIndex && Object.keys(storedIndex).length > 0) {
-      this.chatIndex = storedIndex;
-      this.plugin.logger.debug(`Loaded ${Object.keys(this.chatIndex).length} chat(s) from stored index.`);
-      return;
+    const settingsPath = (_a = this.plugin.settings.chatHistoryFolderPath) == null ? void 0 : _a.trim();
+    const currentPath = settingsPath && settingsPath !== "/" ? (0, import_obsidian9.normalizePath)(settingsPath) : "/";
+    if (currentPath !== this.chatsFolderPath) {
+      this.plugin.logger.info("Chat history folder path changed, forcing index rescan.");
+      this.updateChatsFolderPath();
+      forceScan = true;
     }
+    if (!forceScan && storedIndex && typeof storedIndex === "object" && Object.keys(storedIndex).length > 0) {
+      const firstKey = Object.keys(storedIndex)[0];
+      if (storedIndex[firstKey] && typeof storedIndex[firstKey].name === "string") {
+        this.chatIndex = storedIndex;
+        this.plugin.logger.debug(`Loaded ${Object.keys(this.chatIndex).length} chat(s) from stored index.`);
+        return;
+      } else {
+        this.plugin.logger.warn("Stored chat index seems invalid, forcing rescan.");
+        forceScan = true;
+      }
+    } else if (!forceScan) {
+      this.plugin.logger.info("No valid stored index found or empty, forcing rescan.");
+      forceScan = true;
+    }
+    if (forceScan) {
+      await this.rebuildIndexFromFiles();
+    }
+  }
+  async rebuildIndexFromFiles() {
+    var _a, _b;
     this.plugin.logger.info(`Rebuilding chat index by scanning files in: ${this.chatsFolderPath}`);
     const newIndex = {};
     let filesScanned = 0;
     let chatsLoaded = 0;
     try {
       if (this.chatsFolderPath !== "/" && !await this.adapter.exists(this.chatsFolderPath)) {
-        this.plugin.logger.warn(`Chat history folder '${this.chatsFolderPath}' not found during scan. Index will be empty.`);
+        this.plugin.logger.warn(`Chat history folder '${this.chatsFolderPath}' not found during scan. Creating it.`);
+        try {
+          await this.adapter.mkdir(this.chatsFolderPath);
+          this.plugin.logger.info(`Created chat history folder: ${this.chatsFolderPath}`);
+        } catch (mkdirError) {
+          this.plugin.logger.error(`Failed to create chat history folder ${this.chatsFolderPath}. Index will be empty.`, mkdirError);
+          this.chatIndex = {};
+          await this.saveChatIndex();
+          return;
+        }
+      } else if (this.chatsFolderPath !== "/" && ((_a = await this.adapter.stat(this.chatsFolderPath)) == null ? void 0 : _a.type) !== "folder") {
+        this.plugin.logger.error(`Chat history path '${this.chatsFolderPath}' exists but is not a folder. Index will be empty.`);
         this.chatIndex = {};
         await this.saveChatIndex();
         return;
@@ -6049,32 +6391,31 @@ var ChatManager = class {
       const listResult = await this.adapter.list(this.chatsFolderPath);
       const chatFiles = listResult.files.filter((filePath) => {
         const fileName = filePath.substring(filePath.lastIndexOf("/") + 1);
-        return fileName.endsWith(".json") && !fileName.startsWith(".");
+        const isInCurrentFolder = (0, import_obsidian9.normalizePath)(filePath).split("/").length === (this.chatsFolderPath === "/" ? 1 : this.chatsFolderPath.split("/").length + 1);
+        return isInCurrentFolder && fileName.endsWith(".json") && /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.json$/.test(fileName);
       });
       filesScanned = chatFiles.length;
       this.plugin.logger.debug(`Found ${filesScanned} potential chat files to scan.`);
       for (const fullPath of chatFiles) {
         const fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
-        const chatId = fileName.endsWith(".json") ? fileName.slice(0, -5) : null;
-        if (!chatId)
-          continue;
+        const chatId = fileName.slice(0, -5);
         try {
           const jsonContent = await this.adapter.read(fullPath);
           const data = JSON.parse(jsonContent);
-          if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && data.metadata.id === chatId && data.metadata.name && data.metadata.lastModified && data.metadata.createdAt) {
-            const metadata = data.metadata;
+          if (((_b = data == null ? void 0 : data.metadata) == null ? void 0 : _b.id) === chatId && typeof data.metadata.name === "string" && data.metadata.name.trim() !== "" && data.metadata.lastModified && !isNaN(new Date(data.metadata.lastModified).getTime()) && data.metadata.createdAt && !isNaN(new Date(data.metadata.createdAt).getTime())) {
+            const meta = data.metadata;
             newIndex[chatId] = {
-              name: metadata.name,
-              lastModified: typeof metadata.lastModified === "string" ? metadata.lastModified : new Date(metadata.lastModified || Date.now()).toISOString(),
-              createdAt: typeof metadata.createdAt === "string" ? metadata.createdAt : new Date(metadata.createdAt || Date.now()).toISOString(),
-              ...metadata.modelName && { modelName: metadata.modelName },
-              ...metadata.selectedRolePath && { selectedRolePath: metadata.selectedRolePath },
-              ...metadata.temperature !== void 0 && { temperature: metadata.temperature },
-              ...metadata.contextWindow !== void 0 && { contextWindow: metadata.contextWindow }
+              name: meta.name,
+              lastModified: new Date(meta.lastModified).toISOString(),
+              createdAt: new Date(meta.createdAt).toISOString(),
+              ...meta.modelName && { modelName: meta.modelName },
+              ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
+              ...typeof meta.temperature === "number" && { temperature: meta.temperature },
+              ...typeof meta.contextWindow === "number" && { contextWindow: meta.contextWindow }
             };
             chatsLoaded++;
           } else {
-            this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID mismatch or missing required fields (name, lastModified, createdAt).`);
+            this.plugin.logger.warn(`Metadata validation FAILED for file: ${fullPath}. ID: ${chatId}. Required fields: name, lastModified, createdAt.`, data == null ? void 0 : data.metadata);
           }
         } catch (e) {
           this.plugin.logger.error(`Error reading or parsing chat file ${fullPath} during index scan:`, e);
@@ -6084,7 +6425,12 @@ var ChatManager = class {
       await this.saveChatIndex();
       this.plugin.logger.info(`Index rebuilt: ${chatsLoaded} chats loaded from ${filesScanned} scanned files.`);
     } catch (error) {
-      this.plugin.logger.error(`Critical error during index rebuild scan:`, error);
+      if (error.code === "EPERM" || error.code === "EACCES") {
+        this.plugin.logger.error(`Permission error accessing chat history folder ${this.chatsFolderPath}. Please check permissions. Index rebuild failed.`, error);
+        new import_obsidian9.Notice(`Permission error accessing chat folder: ${this.chatsFolderPath}`);
+      } else {
+        this.plugin.logger.error(`Critical error during index rebuild scan in ${this.chatsFolderPath}:`, error);
+      }
       this.chatIndex = {};
       await this.saveChatIndex();
     }
@@ -6095,30 +6441,44 @@ var ChatManager = class {
   }
   getChatFilePath(id) {
     const fileName = `${id}.json`;
-    return this.chatsFolderPath === "/" ? (0, import_obsidian10.normalizePath)(fileName) : (0, import_obsidian10.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
+    if (this.chatsFolderPath === "/") {
+      return (0, import_obsidian9.normalizePath)(fileName);
+    } else {
+      return (0, import_obsidian9.normalizePath)(`${this.chatsFolderPath}/${fileName}`);
+    }
   }
   async saveChatAndUpdateIndex(chat) {
-    const saved = await chat.saveImmediately();
-    if (saved) {
+    var _a;
+    try {
+      await chat.save();
       const meta = chat.metadata;
       const storedMeta = {
         name: meta.name,
         lastModified: meta.lastModified,
+        // Використовуємо оновлений час з метаданих чату
         createdAt: meta.createdAt,
         ...meta.modelName && { modelName: meta.modelName },
         ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
-        ...meta.temperature !== void 0 && { temperature: meta.temperature },
-        ...meta.contextWindow !== void 0 && { contextWindow: meta.contextWindow }
+        ...typeof meta.temperature === "number" && { temperature: meta.temperature },
+        ...typeof meta.contextWindow === "number" && { contextWindow: meta.contextWindow }
       };
-      this.chatIndex[meta.id] = storedMeta;
-      await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
+      if (JSON.stringify(this.chatIndex[meta.id]) !== JSON.stringify(storedMeta)) {
+        this.chatIndex[meta.id] = storedMeta;
+        await this.saveChatIndex();
+        this.plugin.emit("chat-list-updated");
+        this.plugin.logger.debug(`Chat index updated for ${meta.id} after save trigger.`);
+      } else {
+        this.plugin.logger.debug(`Index for chat ${meta.id} unchanged after save trigger, skipping index save/event.`);
+      }
       return true;
+    } catch (error) {
+      this.plugin.logger.error(`Error occurred during chat.save() for chat ${(_a = chat == null ? void 0 : chat.metadata) == null ? void 0 : _a.id}:`, error);
+      return false;
     }
-    return false;
   }
   async createNewChat(name) {
     this.plugin.logger.info(`Creating new chat...`);
+    await this.ensureFoldersExist();
     try {
       const now = new Date();
       const newId = v4_default();
@@ -6136,23 +6496,43 @@ var ChatManager = class {
       const constructorSettings = { ...this.plugin.settings };
       const chatData = { metadata: initialMetadata, messages: [] };
       const newChat = new Chat(this.adapter, constructorSettings, chatData, filePath, this.plugin.logger);
-      const saved = await this.saveChatAndUpdateIndex(newChat);
-      if (!saved)
+      const storedMeta = {
+        name: initialMetadata.name,
+        lastModified: initialMetadata.lastModified,
+        createdAt: initialMetadata.createdAt,
+        ...initialMetadata.modelName && { modelName: initialMetadata.modelName },
+        ...initialMetadata.selectedRolePath && { selectedRolePath: initialMetadata.selectedRolePath },
+        ...typeof initialMetadata.temperature === "number" && { temperature: initialMetadata.temperature },
+        ...typeof initialMetadata.contextWindow === "number" && { contextWindow: initialMetadata.contextWindow }
+      };
+      this.chatIndex[newId] = storedMeta;
+      await this.saveChatIndex();
+      this.plugin.emit("chat-list-updated");
+      const savedImmediately = await newChat.saveImmediately();
+      if (!savedImmediately) {
+        delete this.chatIndex[newId];
+        await this.saveChatIndex();
+        this.plugin.emit("chat-list-updated");
         throw new Error("Failed to save initial chat file.");
+      }
       this.loadedChats[newId] = newChat;
       await this.setActiveChat(newId);
       this.plugin.logger.info(`Created and activated new chat: ${newChat.metadata.name} (ID: ${newId})`);
       return newChat;
     } catch (error) {
       this.plugin.logger.error("Error creating new chat:", error);
-      new import_obsidian10.Notice("Error creating new chat session.");
+      new import_obsidian9.Notice("Error creating new chat session.");
       return null;
     }
   }
   listAvailableChats() {
     return Object.entries(this.chatIndex).map(([id, storedMeta]) => {
-      if (!storedMeta || typeof storedMeta.name !== "string" || typeof storedMeta.lastModified !== "string" || typeof storedMeta.createdAt !== "string") {
+      if (!storedMeta || typeof storedMeta !== "object" || typeof storedMeta.name !== "string" || typeof storedMeta.lastModified !== "string" || typeof storedMeta.createdAt !== "string") {
         this.plugin.logger.warn(`Invalid or incomplete metadata found in index for chat ID: ${id}. Skipping in list.`, storedMeta);
+        return null;
+      }
+      if (isNaN(new Date(storedMeta.lastModified).getTime()) || isNaN(new Date(storedMeta.createdAt).getTime())) {
+        this.plugin.logger.warn(`Invalid date format found in index for chat ID: ${id}. Skipping.`, storedMeta);
         return null;
       }
       return {
@@ -6165,7 +6545,16 @@ var ChatManager = class {
         temperature: storedMeta.temperature,
         contextWindow: storedMeta.contextWindow
       };
-    }).filter((chatMeta) => chatMeta !== null).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+    }).filter((chatMeta) => chatMeta !== null).sort((a, b) => {
+      const dateA = new Date(a.lastModified).getTime();
+      const dateB = new Date(b.lastModified).getTime();
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+      const createdA = new Date(a.createdAt).getTime();
+      const createdB = new Date(b.createdAt).getTime();
+      return createdB - createdA;
+    });
   }
   getActiveChatId() {
     return this.activeChatId;
@@ -6178,8 +6567,13 @@ var ChatManager = class {
     }
     this.plugin.logger.debug(`Chat ${id} not in memory cache, loading from file...`);
     if (!this.chatIndex[id]) {
-      this.plugin.logger.warn(`Chat ID ${id} not found in index during getChat.`);
-      return null;
+      this.plugin.logger.warn(`Chat ID ${id} not found in index during getChat. Attempting rescan...`);
+      await this.rebuildIndexFromFiles();
+      if (!this.chatIndex[id]) {
+        this.plugin.logger.error(`Chat ID ${id} still not found in index after rescan.`);
+        return null;
+      }
+      this.plugin.logger.info(`Chat ID ${id} found in index after rescan.`);
     }
     const filePath = this.getChatFilePath(id);
     try {
@@ -6187,21 +6581,70 @@ var ChatManager = class {
       if (chat) {
         this.plugin.logger.debug(`Successfully loaded chat ${id}. Caching.`);
         this.loadedChats[id] = chat;
+        const storedMeta = this.chatIndex[id];
+        const currentMeta = chat.metadata;
+        const indexMetaForCompare = {
+          // Створюємо об'єкт з індексу для порівняння
+          name: storedMeta.name,
+          lastModified: storedMeta.lastModified,
+          createdAt: storedMeta.createdAt,
+          modelName: storedMeta.modelName,
+          selectedRolePath: storedMeta.selectedRolePath,
+          temperature: storedMeta.temperature,
+          contextWindow: storedMeta.contextWindow
+        };
+        const fileMetaForCompare = {
+          // Створюємо об'єкт з файлу для порівняння
+          name: currentMeta.name,
+          lastModified: currentMeta.lastModified,
+          createdAt: currentMeta.createdAt,
+          modelName: currentMeta.modelName,
+          selectedRolePath: currentMeta.selectedRolePath,
+          temperature: currentMeta.temperature,
+          contextWindow: currentMeta.contextWindow
+        };
+        if (JSON.stringify(indexMetaForCompare) !== JSON.stringify(fileMetaForCompare)) {
+          this.plugin.logger.warn(`Metadata mismatch between index and loaded file for ${id}. Updating index.`);
+          await this.saveChatAndUpdateIndex(chat);
+        }
         return chat;
       } else {
         this.plugin.logger.error(`Chat.loadFromFile returned null for ${id}. Removing from index if still present.`);
-        if (this.chatIndex[id]) {
-          delete this.chatIndex[id];
-          await this.saveChatIndex();
-          this.plugin.emit("chat-list-updated");
-        }
+        await this.deleteChatFileAndIndexEntry(id, filePath);
         if (this.activeChatId === id)
           await this.setActiveChat(null);
         return null;
       }
     } catch (error) {
       this.plugin.logger.error(`Unexpected error during getChat for ${id} from ${filePath}:`, error);
+      if (error.code === "ENOENT") {
+        this.plugin.logger.warn(`File not found for chat ${id} during getChat. Removing from index.`);
+        await this.deleteChatFileAndIndexEntry(id, filePath, false);
+        if (this.activeChatId === id)
+          await this.setActiveChat(null);
+      }
       return null;
+    }
+  }
+  async deleteChatFileAndIndexEntry(id, filePath, deleteFile = true) {
+    let indexChanged = false;
+    if (this.loadedChats[id])
+      delete this.loadedChats[id];
+    if (this.chatIndex[id]) {
+      delete this.chatIndex[id];
+      indexChanged = true;
+    }
+    if (deleteFile) {
+      try {
+        if (await this.adapter.exists(filePath))
+          await this.adapter.remove(filePath);
+      } catch (e) {
+        this.plugin.logger.error(`Error removing chat file ${filePath} during cleanup:`, e);
+      }
+    }
+    if (indexChanged) {
+      await this.saveChatIndex();
+      this.plugin.emit("chat-list-updated");
     }
   }
   async getActiveChat() {
@@ -6214,13 +6657,17 @@ var ChatManager = class {
       this.plugin.logger.debug(`Returning cached active chat object: ${this.activeChatId}`);
       return this.activeChat;
     }
-    this.plugin.logger.debug(`Active chat ${this.activeChatId} not in active cache, calling getChat...`);
+    this.plugin.logger.debug(`Active chat ${this.activeChatId} not in active cache or ID mismatch, calling getChat...`);
     const chat = await this.getChat(this.activeChatId);
     if (chat) {
       this.activeChat = chat;
       return chat;
     } else {
-      this.plugin.logger.warn(`Failed to load active chat ${this.activeChatId} via getChat.`);
+      this.plugin.logger.warn(`Failed to load active chat ${this.activeChatId} via getChat. Perhaps it was deleted?`);
+      const availableChats = this.listAvailableChats();
+      const nextActiveId = availableChats.length > 0 ? availableChats[0].id : null;
+      this.plugin.logger.info(`Setting active chat to ${nextActiveId} after failing to load ${this.activeChatId}`);
+      await this.setActiveChat(nextActiveId);
       return null;
     }
   }
@@ -6228,13 +6675,24 @@ var ChatManager = class {
     this.plugin.logger.debug(`setActiveChat called with ID: ${id}`);
     const previousActiveId = this.activeChatId;
     if (id && !this.chatIndex[id]) {
-      this.plugin.logger.error(`Attempted to set active chat to non-existent ID: ${id}. Aborting.`);
-      new import_obsidian10.Notice(`Error: Chat with ID ${id} not found.`);
-      return;
+      this.plugin.logger.error(`Attempted to set active chat to non-existent ID: ${id}. Reloading index and trying again...`);
+      await this.rebuildIndexFromFiles();
+      if (!this.chatIndex[id]) {
+        this.plugin.logger.error(`Chat ID ${id} still not found after index reload. Aborting setActiveChat.`);
+        new import_obsidian9.Notice(`Error: Chat with ID ${id} not found.`);
+        if (this.activeChatId === id) {
+          this.activeChatId = null;
+          this.activeChat = null;
+          this.plugin.emit("active-chat-changed", { chatId: null, chat: null });
+        }
+        return;
+      }
+      this.plugin.logger.info(`Chat ID ${id} found after index reload. Proceeding.`);
     }
     if (id === previousActiveId) {
       this.plugin.logger.debug(`Chat ${id} is already active.`);
       if (id && !this.activeChat) {
+        this.plugin.logger.debug(`Active chat cache was null for active ID ${id}. Reloading.`);
         this.activeChat = await this.getChat(id);
       }
       return;
@@ -6245,31 +6703,31 @@ var ChatManager = class {
     if (id) {
       loadedChat = await this.getChat(id);
       if (!loadedChat) {
-        this.plugin.logger.error(`Failed to load chat data AFTER validating ID ${id}. Resetting active chat to null.`);
+        this.plugin.logger.error(`CRITICAL: Failed to load chat ${id} via getChat even though it was in the index. Resetting active chat to null.`);
         this.activeChatId = null;
         id = null;
       } else {
         this.activeChat = loadedChat;
+        this.plugin.logger.debug(`Set active chat cache to ID: ${id}`);
       }
+    } else {
+      this.plugin.logger.info("Active chat set to null.");
     }
     this.plugin.logger.info(`Active chat changed from ${previousActiveId} to ${id}`);
     this.plugin.emit("active-chat-changed", { chatId: id, chat: loadedChat });
   }
-  async addMessageToActiveChat(role, content) {
+  async addMessageToActiveChat(role, content, timestamp) {
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
       this.plugin.logger.error("Cannot add message: No active chat.");
-      new import_obsidian10.Notice("Error: No active chat session.");
+      new import_obsidian9.Notice("Error: No active chat session.");
       return null;
     }
-    const newMessage = activeChat.addMessage(role, content);
-    this.plugin.logger.debug(`Added ${role} message to active chat ${activeChat.metadata.id}.`);
-    if (this.chatIndex[activeChat.metadata.id]) {
-      this.chatIndex[activeChat.metadata.id].lastModified = activeChat.metadata.lastModified;
-      await this.saveChatIndex();
-    }
+    const messageTimestamp = timestamp || new Date();
+    const newMessage = activeChat.addMessage(role, content, messageTimestamp);
+    this.plugin.logger.debug(`Added ${role} message with timestamp ${messageTimestamp.toISOString()} to active chat ${activeChat.metadata.id}.`);
+    await this.saveChatAndUpdateIndex(activeChat);
     this.plugin.emit("message-added", { chatId: activeChat.metadata.id, message: newMessage });
-    this.plugin.emit("chat-list-updated");
     return newMessage;
   }
   async clearActiveChatMessages() {
@@ -6280,110 +6738,99 @@ var ChatManager = class {
     }
     this.plugin.logger.info(`Clearing messages for chat: ${activeChat.metadata.id}`);
     activeChat.clearMessages();
-    if (this.chatIndex[activeChat.metadata.id]) {
-      this.chatIndex[activeChat.metadata.id].lastModified = activeChat.metadata.lastModified;
-      await this.saveChatIndex();
-    }
+    await this.saveChatAndUpdateIndex(activeChat);
     this.plugin.emit("messages-cleared", activeChat.metadata.id);
-    this.plugin.emit("chat-list-updated");
   }
+  // --- ВИПРАВЛЕНО: Прибрано перевірку 'changed' ---
   async updateActiveChatMetadata(metadataUpdate) {
     var _a, _b, _c, _d;
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
       this.plugin.logger.warn("Cannot update metadata, no active chat.");
-      new import_obsidian10.Notice("No active chat to update metadata for.");
+      new import_obsidian9.Notice("No active chat to update metadata for.");
       return false;
     }
     this.plugin.logger.debug(`Updating metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
     const oldRolePath = activeChat.metadata.selectedRolePath;
     const oldModelName = activeChat.metadata.modelName;
-    const changed = activeChat.updateMetadata(metadataUpdate);
-    if (changed) {
-      this.plugin.logger.debug(`Metadata changed. Chat ${activeChat.metadata.id} save scheduled by Chat class.`);
-      if (this.chatIndex[activeChat.metadata.id]) {
-        const meta = activeChat.metadata;
-        const storedMeta = {
-          name: meta.name,
-          lastModified: meta.lastModified,
-          createdAt: meta.createdAt,
-          ...meta.modelName && { modelName: meta.modelName },
-          ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
-          ...meta.temperature !== void 0 && { temperature: meta.temperature },
-          ...meta.contextWindow !== void 0 && { contextWindow: meta.contextWindow }
-        };
-        this.chatIndex[meta.id] = storedMeta;
-        await this.saveChatIndex();
-      }
-      const newRolePath = activeChat.metadata.selectedRolePath;
-      const newModelName = activeChat.metadata.modelName;
-      let roleChanged = false;
-      let modelChanged = false;
-      if (metadataUpdate.selectedRolePath !== void 0 && oldRolePath !== newRolePath) {
-        roleChanged = true;
-      }
-      if (metadataUpdate.modelName !== void 0 && oldModelName !== newModelName) {
-        modelChanged = true;
-      }
-      if (roleChanged) {
-        try {
-          const newRoleName = await this.plugin.findRoleNameByPath(newRolePath);
-          this.plugin.logger.debug(`Emitting 'role-changed': ${newRoleName}`);
-          this.plugin.emit("role-changed", newRoleName);
-          (_b = (_a = this.plugin.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
-        } catch (e) {
-          this.plugin.logger.error("Error finding role name/emitting role-changed:", e);
-        }
-      }
-      if (modelChanged) {
-        this.plugin.logger.debug(`Emitting 'model-changed': ${newModelName}`);
-        this.plugin.emit("model-changed", newModelName || "");
-        (_d = (_c = this.plugin.promptService) == null ? void 0 : _c.clearModelDetailsCache) == null ? void 0 : _d.call(_c);
-      }
-      this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
-      this.plugin.emit("chat-list-updated");
-      return true;
-    } else {
-      this.plugin.logger.debug("Metadata update called, but no actual changes detected.");
-      return false;
+    const oldName = activeChat.metadata.name;
+    const oldTemperature = activeChat.metadata.temperature;
+    const oldContextWindow = activeChat.metadata.contextWindow;
+    activeChat.updateMetadata(metadataUpdate);
+    this.plugin.logger.debug(`Metadata updated in Chat object for ${activeChat.metadata.id}. Save scheduled.`);
+    await this.saveChatAndUpdateIndex(activeChat);
+    const newMeta = activeChat.metadata;
+    let roleChanged = false;
+    let modelChanged = false;
+    if (metadataUpdate.selectedRolePath !== void 0 && oldRolePath !== newMeta.selectedRolePath) {
+      roleChanged = true;
     }
+    if (metadataUpdate.modelName !== void 0 && oldModelName !== newMeta.modelName) {
+      modelChanged = true;
+    }
+    if (roleChanged) {
+      try {
+        const newRoleName = await this.plugin.findRoleNameByPath(newMeta.selectedRolePath);
+        this.plugin.logger.debug(`Emitting 'role-changed': ${newRoleName}`);
+        this.plugin.emit("role-changed", newRoleName);
+        (_b = (_a = this.plugin.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
+      } catch (e) {
+        this.plugin.logger.error("Error finding role name/emitting role-changed:", e);
+      }
+    }
+    if (modelChanged) {
+      this.plugin.logger.debug(`Emitting 'model-changed': ${newMeta.modelName}`);
+      this.plugin.emit("model-changed", newMeta.modelName || "");
+      (_d = (_c = this.plugin.promptService) == null ? void 0 : _c.clearModelDetailsCache) == null ? void 0 : _d.call(_c);
+    }
+    this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
+    return true;
   }
+  // --- Кінець виправлення ---
   async deleteChat(id) {
     this.plugin.logger.info(`Deleting chat ID: ${id}`);
     const chatExistedInIndex = !!this.chatIndex[id];
     const filePath = this.getChatFilePath(id);
     let success = true;
+    const wasActive = id === this.activeChatId;
     try {
-      if (this.loadedChats[id]) {
+      if (this.loadedChats[id])
         delete this.loadedChats[id];
-        this.plugin.logger.debug(`Removed chat ${id} from memory cache.`);
-      }
-      if (chatExistedInIndex) {
+      if (wasActive)
+        this.activeChat = null;
+      let indexChanged = false;
+      if (this.chatIndex[id]) {
         delete this.chatIndex[id];
-        await this.saveChatIndex();
-        this.plugin.logger.debug(`Removed chat ${id} from index.`);
+        indexChanged = true;
       }
-      if (await this.adapter.exists(filePath)) {
-        await this.adapter.remove(filePath);
-        this.plugin.logger.debug(`Removed chat file: ${filePath}`);
-      } else {
-        if (chatExistedInIndex) {
+      try {
+        if (await this.adapter.exists(filePath)) {
+          await this.adapter.remove(filePath);
+          this.plugin.logger.debug(`Removed chat file: ${filePath}`);
+        } else if (chatExistedInIndex) {
           this.plugin.logger.warn(`Chat file not found during deletion (but was in index): ${filePath}`);
         }
+      } catch (fileError) {
+        this.plugin.logger.error(`Error removing chat file ${filePath}:`, fileError);
+      }
+      if (indexChanged) {
+        await this.saveChatIndex();
+        this.plugin.logger.debug(`Removed chat ${id} from index.`);
+        this.plugin.emit("chat-list-updated");
       }
     } catch (error) {
-      this.plugin.logger.error(`Error during deletion process for chat ${id} or its file ${filePath}:`, error);
-      new import_obsidian10.Notice(`Error deleting chat ${id}.`);
+      this.plugin.logger.error(`Error during deletion process for chat ${id}:`, error);
+      new import_obsidian9.Notice(`Error deleting chat ${id}.`);
       success = false;
-      await this.loadChatIndex(true);
+      await this.rebuildIndexFromFiles();
     } finally {
-      if (id === this.activeChatId) {
+      if (wasActive) {
         this.plugin.logger.info(`Deleted active chat ${id}. Selecting new active chat...`);
         const availableChats = this.listAvailableChats();
         const nextActiveId = availableChats.length > 0 ? availableChats[0].id : null;
         await this.setActiveChat(nextActiveId);
+      } else if (success && chatExistedInIndex) {
       }
-      this.plugin.emit("chat-list-updated");
     }
     return success && chatExistedInIndex;
   }
@@ -6392,9 +6839,10 @@ var ChatManager = class {
     const originalChat = await this.getChat(chatIdToClone);
     if (!originalChat) {
       this.plugin.logger.error(`Cannot clone: Original chat ${chatIdToClone} not found.`);
-      new import_obsidian10.Notice("Original chat not found.");
+      new import_obsidian9.Notice("Original chat not found.");
       return null;
     }
+    await this.ensureFoldersExist();
     try {
       const clonedData = originalChat.toJSON();
       const now = new Date();
@@ -6406,16 +6854,32 @@ var ChatManager = class {
       clonedData.metadata.lastModified = now.toISOString();
       const constructorSettings = { ...this.plugin.settings };
       const clonedChat = new Chat(this.adapter, constructorSettings, clonedData, newFilePath, this.plugin.logger);
-      const saved = await this.saveChatAndUpdateIndex(clonedChat);
-      if (!saved)
+      const storedMeta = {
+        name: clonedData.metadata.name,
+        lastModified: clonedData.metadata.lastModified,
+        createdAt: clonedData.metadata.createdAt,
+        ...clonedData.metadata.modelName && { modelName: clonedData.metadata.modelName },
+        ...clonedData.metadata.selectedRolePath && { selectedRolePath: clonedData.metadata.selectedRolePath },
+        ...typeof clonedData.metadata.temperature === "number" && { temperature: clonedData.metadata.temperature },
+        ...typeof clonedData.metadata.contextWindow === "number" && { contextWindow: clonedData.metadata.contextWindow }
+      };
+      this.chatIndex[newId] = storedMeta;
+      await this.saveChatIndex();
+      this.plugin.emit("chat-list-updated");
+      const savedImmediately = await clonedChat.saveImmediately();
+      if (!savedImmediately) {
+        delete this.chatIndex[newId];
+        await this.saveChatIndex();
+        this.plugin.emit("chat-list-updated");
         throw new Error("Failed to save the cloned chat file.");
+      }
       this.loadedChats[newId] = clonedChat;
       await this.setActiveChat(newId);
       this.plugin.logger.info(`Cloned chat "${clonedChat.metadata.name}" created and activated.`);
       return clonedChat;
     } catch (error) {
       this.plugin.logger.error("Error cloning chat:", error);
-      new import_obsidian10.Notice("An error occurred while cloning the chat.");
+      new import_obsidian9.Notice("An error occurred while cloning the chat.");
       return null;
     }
   }
@@ -6426,77 +6890,82 @@ var ChatManager = class {
       this.plugin.logger.error(`Cannot delete messages: Chat ${chatId} not found.`);
       return false;
     }
-    if (userMessageIndex < 0 || userMessageIndex >= chat.messages.length - 1) {
-      this.plugin.logger.warn(`Invalid index (${userMessageIndex}) or last message, nothing to delete after in chat ${chatId}.`);
+    if (userMessageIndex < -1 || userMessageIndex >= chat.messages.length) {
+      this.plugin.logger.warn(`Invalid index (${userMessageIndex}) for chat ${chatId} with ${chat.messages.length} messages.`);
+      return false;
+    }
+    if (userMessageIndex === chat.messages.length - 1) {
+      this.plugin.logger.debug(`Index ${userMessageIndex} points to the last message. Nothing to delete after.`);
       return true;
     }
     const originalLength = chat.messages.length;
-    chat.messages = chat.messages.slice(0, userMessageIndex + 1);
+    chat.messages.length = userMessageIndex + 1;
     chat.updateMetadata({});
     this.plugin.logger.debug(`Messages for chat ${chatId} truncated from ${originalLength} to ${chat.messages.length}. Save scheduled.`);
-    if (this.chatIndex[chatId]) {
-      this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
-      await this.saveChatIndex();
-    }
+    await this.saveChatAndUpdateIndex(chat);
     if (this.activeChatId === chatId) {
       this.activeChat = chat;
       this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
+      this.plugin.emit("active-chat-changed", { chatId, chat });
     }
-    this.plugin.emit("active-chat-changed", { chatId, chat });
     return true;
   }
-  // --- НОВИЙ МЕТОД: Видалення конкретного повідомлення за міткою часу ---
   async deleteMessageByTimestamp(chatId, timestampToDelete) {
     this.plugin.logger.info(`Attempting to delete message with timestamp ${timestampToDelete.toISOString()} from chat ${chatId}`);
     const chat = await this.getChat(chatId);
     if (!chat) {
       this.plugin.logger.error(`Cannot delete message: Chat ${chatId} not found.`);
-      new import_obsidian10.Notice(`Error: Chat ${chatId} not found.`);
+      new import_obsidian9.Notice(`Error: Chat ${chatId} not found.`);
       return false;
     }
-    const initialMessageCount = chat.messages.length;
-    const messageIndex = chat.messages.findIndex(
-      (msg) => msg.timestamp.getTime() === timestampToDelete.getTime()
-    );
+    const timeTarget = timestampToDelete.getTime();
+    const tolerance = 500;
+    let messageIndex = -1;
+    for (let i = 0; i < chat.messages.length; i++) {
+      if (Math.abs(chat.messages[i].timestamp.getTime() - timeTarget) < tolerance) {
+        messageIndex = i;
+        break;
+      }
+    }
     if (messageIndex === -1) {
-      this.plugin.logger.warn(`Message with timestamp ${timestampToDelete.toISOString()} not found in chat ${chatId}. Cannot delete.`);
+      this.plugin.logger.warn(`Message with timestamp ~${timestampToDelete.toISOString()} (tolerance ${tolerance}ms) not found in chat ${chatId}. Cannot delete.`);
+      new import_obsidian9.Notice("Message not found.");
+      return false;
+    }
+    return await this.deleteMessageByIndex(chatId, messageIndex);
+  }
+  async deleteMessageByIndex(chatId, messageIndex) {
+    const chat = this.loadedChats[chatId] || await this.getChat(chatId);
+    if (!chat || messageIndex < 0 || messageIndex >= chat.messages.length) {
+      this.plugin.logger.error(`Cannot delete message by index ${messageIndex}: Chat ${chatId} not found or index out of bounds.`);
       return false;
     }
     try {
       const deletedMessage = chat.messages.splice(messageIndex, 1)[0];
       this.plugin.logger.debug(`Removed message at index ${messageIndex} (Role: ${deletedMessage == null ? void 0 : deletedMessage.role}) from chat ${chatId}.`);
-      if (chat.messages.length < initialMessageCount) {
-        chat.updateMetadata({});
-        if (this.chatIndex[chatId]) {
-          this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
-          await this.saveChatIndex();
-          this.plugin.logger.debug(`Updated chat index for ${chatId} after message deletion.`);
-        }
-        if (this.activeChatId === chatId) {
-          this.activeChat = chat;
-          this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
-        }
-        this.plugin.emit("message-deleted", { chatId, timestamp: timestampToDelete });
-        this.plugin.emit("chat-list-updated");
-        return true;
-      } else {
-        this.plugin.logger.warn(`Message deletion for chat ${chatId}, timestamp ${timestampToDelete.toISOString()} seemed to fail (length unchanged).`);
-        return false;
+      chat.updateMetadata({});
+      await this.saveChatAndUpdateIndex(chat);
+      if (this.activeChatId === chatId) {
+        this.activeChat = chat;
+        this.plugin.logger.debug(`Updated active chat cache for ${chatId} after message deletion.`);
+        this.plugin.emit("active-chat-changed", { chatId, chat });
       }
+      if (deletedMessage) {
+        this.plugin.emit("message-deleted", { chatId, timestamp: deletedMessage.timestamp });
+      }
+      return true;
     } catch (error) {
-      this.plugin.logger.error(`Error during message deletion process for chat ${chatId}, timestamp ${timestampToDelete.toISOString()}:`, error);
-      new import_obsidian10.Notice("Error deleting message.");
+      this.plugin.logger.error(`Error during message deletion by index ${messageIndex} for chat ${chatId}:`, error);
+      new import_obsidian9.Notice("Error deleting message.");
       return false;
     }
   }
-  // ChatManager.ts
-  // --- НОВИЙ МЕТОД: Очищення повідомлень для конкретного чату за ID ---
   async clearChatMessagesById(chatId) {
     this.plugin.logger.info(`Attempting to clear messages for chat ${chatId}`);
     const chat = await this.getChat(chatId);
     if (!chat) {
       this.plugin.logger.error(`Cannot clear messages: Chat ${chatId} not found.`);
-      new import_obsidian10.Notice(`Error: Chat ${chatId} not found.`);
+      new import_obsidian9.Notice(`Error: Chat ${chatId} not found.`);
       return false;
     }
     if (chat.messages.length === 0) {
@@ -6505,41 +6974,33 @@ var ChatManager = class {
     }
     try {
       chat.clearMessages();
-      this.plugin.logger.debug(`Messages cleared for chat ${chatId}. Save scheduled by Chat class.`);
-      if (this.chatIndex[chatId]) {
-        this.chatIndex[chatId].lastModified = chat.metadata.lastModified;
-        await this.saveChatIndex();
-        this.plugin.logger.debug(`Updated chat index for ${chatId} after clearing messages.`);
-      }
+      await this.saveChatAndUpdateIndex(chat);
       const isActive = chatId === this.activeChatId;
       if (isActive) {
         this.activeChat = chat;
         this.plugin.logger.debug(`Updated active chat cache for ${chatId} after clearing messages.`);
         this.plugin.emit("messages-cleared", chatId);
       }
-      this.plugin.emit("chat-list-updated");
       return true;
     } catch (error) {
       this.plugin.logger.error(`Error during message clearing process for chat ${chatId}:`, error);
-      new import_obsidian10.Notice("Error clearing messages.");
+      new import_obsidian9.Notice("Error clearing messages.");
       return false;
     }
   }
-  // ChatManager.ts
-  // ... (інші методи класу)
-  /** Перейменовує конкретний чат за його ID */
+  // --- ВИПРАВЛЕНО: Прибрано перевірку 'changed' ---
   async renameChat(chatId, newName) {
     const trimmedName = newName.trim();
     if (!trimmedName) {
       this.plugin.logger.warn(`Attempted to rename chat ${chatId} with an empty name.`);
-      new import_obsidian10.Notice("Chat name cannot be empty.");
+      new import_obsidian9.Notice("Chat name cannot be empty.");
       return false;
     }
     this.plugin.logger.info(`Attempting to rename chat ${chatId} to "${trimmedName}"`);
     const chat = await this.getChat(chatId);
     if (!chat) {
       this.plugin.logger.error(`Cannot rename: Chat ${chatId} not found.`);
-      new import_obsidian10.Notice("Chat not found.");
+      new import_obsidian9.Notice("Chat not found.");
       return false;
     }
     if (chat.metadata.name === trimmedName) {
@@ -6547,50 +7008,28 @@ var ChatManager = class {
       return true;
     }
     try {
-      const changed = chat.updateMetadata({ name: trimmedName });
-      if (changed) {
-        this.plugin.logger.debug(`Chat ${chatId} name updated. Save scheduled by Chat class.`);
-        if (this.chatIndex[chatId]) {
-          const meta = chat.metadata;
-          const storedMeta = {
-            name: meta.name,
-            // Нове ім'я
-            lastModified: meta.lastModified,
-            // Оновлений час
-            createdAt: meta.createdAt,
-            ...meta.modelName && { modelName: meta.modelName },
-            ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
-            ...meta.temperature !== void 0 && { temperature: meta.temperature },
-            ...meta.contextWindow !== void 0 && { contextWindow: meta.contextWindow }
-          };
-          this.chatIndex[meta.id] = storedMeta;
-          await this.saveChatIndex();
-          this.plugin.logger.debug(`Updated chat index for ${chatId} after rename.`);
-        }
-        this.plugin.emit("chat-list-updated");
-        if (this.activeChatId === chatId) {
-          this.activeChat = chat;
-          this.plugin.emit("active-chat-changed", { chatId, chat });
-        }
-        return true;
-      } else {
-        this.plugin.logger.warn(`updateMetadata reported no change for chat ${chatId} rename.`);
-        return false;
+      chat.updateMetadata({ name: trimmedName });
+      this.plugin.logger.debug(`Chat ${chatId} name updated in Chat object. Save scheduled.`);
+      await this.saveChatAndUpdateIndex(chat);
+      if (this.activeChatId === chatId) {
+        this.activeChat = chat;
+        this.plugin.emit("active-chat-changed", { chatId, chat });
       }
+      return true;
     } catch (error) {
       this.plugin.logger.error(`Error renaming chat ${chatId}:`, error);
-      new import_obsidian10.Notice("An error occurred while renaming the chat.");
+      new import_obsidian9.Notice("An error occurred while renaming the chat.");
       return false;
     }
   }
-  // ... (решта коду класу ChatManager)
+  // --- Кінець виправлення ---
 };
 
 // src/main.ts
 var import_child_process = require("child_process");
 
 // src/TranslationService.ts
-var import_obsidian11 = require("obsidian");
+var import_obsidian10 = require("obsidian");
 var GOOGLE_TRANSLATE_API_URL = "https://translation.googleapis.com/language/translate/v2";
 var TranslationService = class {
   constructor(plugin) {
@@ -6611,7 +7050,7 @@ var TranslationService = class {
     }
     if (!apiKey) {
       console.error("Google Translation API Key is missing.");
-      new import_obsidian11.Notice("Translation Error: Google Cloud Translation API Key is not configured in settings.");
+      new import_obsidian10.Notice("Translation Error: Google Cloud Translation API Key is not configured in settings.");
       return null;
     }
     if (!text) {
@@ -6620,7 +7059,7 @@ var TranslationService = class {
     }
     if (!targetLang) {
       console.error("Target language is not set for translation.");
-      new import_obsidian11.Notice("Translation Error: Target language not configured.");
+      new import_obsidian10.Notice("Translation Error: Target language not configured.");
       return null;
     }
     console.log(`[TranslationService] Translating to ${targetLang}...`);
@@ -6641,7 +7080,7 @@ var TranslationService = class {
       if (!response.ok) {
         const errorMsg = ((_a = data.error) == null ? void 0 : _a.message) || `HTTP error ${response.status}`;
         console.error(`Google Translate API error: ${errorMsg}`, data);
-        new import_obsidian11.Notice(`Translation Error: ${errorMsg}`);
+        new import_obsidian10.Notice(`Translation Error: ${errorMsg}`);
         return null;
       }
       if (((_b = data.data) == null ? void 0 : _b.translations) && data.data.translations.length > 0) {
@@ -6650,12 +7089,12 @@ var TranslationService = class {
         return translatedText;
       } else {
         console.error("Google Translate API returned unexpected response structure:", data);
-        new import_obsidian11.Notice("Translation Error: Unexpected response from API.");
+        new import_obsidian10.Notice("Translation Error: Unexpected response from API.");
         return null;
       }
     } catch (error) {
       console.error("Error calling Google Translate API:", error);
-      new import_obsidian11.Notice(`Translation Error: Failed to fetch. ${error.message}`);
+      new import_obsidian10.Notice(`Translation Error: Failed to fetch. ${error.message}`);
       return null;
     }
   }
@@ -6675,9 +7114,9 @@ var TranslationService = class {
 var SESSIONS_INDEX_KEY_V1 = "chatSessionsIndex_v1";
 var ACTIVE_SESSION_ID_KEY_V1 = "activeChatSessionId_v1";
 var SESSIONS_INDEX_KEY = "chatIndex_v2";
-var ACTIVE_CHAT_ID_KEY2 = "activeChatId_v2";
+var ACTIVE_CHAT_ID_KEY = "activeChatId_v2";
 var CHAT_INDEX_KEY = "chatIndex_v2";
-var OllamaPlugin2 = class extends import_obsidian12.Plugin {
+var OllamaPlugin2 = class extends import_obsidian11.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -6833,7 +7272,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
         if (this.settings.ragEnabled)
           await this.ragService.indexDocuments();
         else
-          new import_obsidian12.Notice("RAG is disabled in settings.");
+          new import_obsidian11.Notice("RAG is disabled in settings.");
       }
     });
     this.addCommand({
@@ -6849,7 +7288,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       callback: async () => {
         await this.listRoleFiles(true);
         this.emit("roles-updated");
-        new import_obsidian12.Notice("Role list refreshed.");
+        new import_obsidian11.Notice("Role list refreshed.");
       }
     });
     this.addCommand({
@@ -6858,7 +7297,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       callback: async () => {
         const newChat = await this.chatManager.createNewChat();
         if (newChat) {
-          new import_obsidian12.Notice(`Created new chat: ${newChat.metadata.name}`);
+          new import_obsidian11.Notice(`Created new chat: ${newChat.metadata.name}`);
         }
       }
     });
@@ -6893,7 +7332,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
           (_a = this.ragService) == null ? void 0 : _a.indexDocuments();
         }, 5e3);
       }
-      const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY2);
+      const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
       if (savedActiveId && this.settings.saveMessageHistory) {
         this.logger.info(
           `Layout ready, restoring active chat ID: ${savedActiveId}`
@@ -6905,7 +7344,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
         );
       }
     });
-    const debouncedRoleClear = (0, import_obsidian12.debounce)(
+    const debouncedRoleClear = (0, import_obsidian11.debounce)(
       () => {
         var _a, _b, _c, _d;
         this.logger.debug(
@@ -6919,7 +7358,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       1500,
       true
     );
-    this.fileChangeHandlerDebounced = (0, import_obsidian12.debounce)(
+    this.fileChangeHandlerDebounced = (0, import_obsidian11.debounce)(
       (file) => {
         if (!file)
           return;
@@ -6936,7 +7375,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       true
     );
     const handleModifyEvent = (file) => {
-      if (file instanceof import_obsidian12.TFile) {
+      if (file instanceof import_obsidian11.TFile) {
         this.logger.debug(`Modify event: ${file.path}`);
         this.fileChangeHandlerDebounced(file);
         this.handleTaskFileModify(file);
@@ -7005,7 +7444,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     var _a, _b;
     const folderPath = (_a = this.settings.ragFolderPath) == null ? void 0 : _a.trim();
     const fileName = (_b = this.settings.dailyTaskFileName) == null ? void 0 : _b.trim();
-    const newPath = folderPath && fileName ? (0, import_obsidian12.normalizePath)(`${folderPath}/${fileName}`) : null;
+    const newPath = folderPath && fileName ? (0, import_obsidian11.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
       this.logger.info(`Daily task file path set to: ${newPath}`);
       this.dailyTaskFilePath = newPath;
@@ -7117,12 +7556,12 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
   // --- Кінець логіки файлу завдань ---
   // Обробник змін для ролей та RAG (без debounce)
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear, isDeletion = false) {
-    const normPath = (0, import_obsidian12.normalizePath)(changedPath);
+    const normPath = (0, import_obsidian11.normalizePath)(changedPath);
     this.logger.debug(
       `Handling file change for path: ${normPath}, isDeletion: ${isDeletion}`
     );
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian12.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian12.normalizePath)(`${this.manifest.dir}/roles`) : null;
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian11.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian11.normalizePath)(`${this.manifest.dir}/roles`) : null;
     let isRoleFile = false;
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/")) {
@@ -7135,7 +7574,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       this.logger.debug(`Role file change detected: ${normPath}`);
       debouncedRoleClear();
     }
-    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian12.normalizePath)(this.settings.ragFolderPath) : null;
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian11.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && normPath.startsWith(ragFolderPath + "/")) {
       if (normPath !== this.dailyTaskFilePath) {
         this.logger.debug(
@@ -7167,18 +7606,18 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
           this.logger.info(
             `Saving activeChatId (${lastActiveId}) on unload.`
           );
-          await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, lastActiveId);
+          await this.saveDataKey(ACTIVE_CHAT_ID_KEY, lastActiveId);
         } else {
           this.logger.info(
             `No active chat ID found to save on unload.`
           );
-          await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, null);
+          await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
         }
       } else {
         this.logger.info(
           `History saving disabled or chatManager missing, not saving active chat ID.`
         );
-        await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, null);
+        await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
       }
     } catch (error) {
       this.logger.error("Error saving active chat ID on unload:", error);
@@ -7248,14 +7687,14 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
           await leaf.setViewState({ type: viewType, active: true });
         } catch (e) {
           this.logger.error("Error setting view state:", e);
-          new import_obsidian12.Notice("Error opening AI Forge view.");
+          new import_obsidian11.Notice("Error opening AI Forge view.");
           return;
         }
       } else {
         this.logger.error(
           "Failed to get or create leaf for AI Forge view."
         );
-        new import_obsidian12.Notice("Could not open AI Forge view.");
+        new import_obsidian11.Notice("Could not open AI Forge view.");
         return;
       }
     }
@@ -7283,9 +7722,9 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       delete this.settings[SESSIONS_INDEX_KEY_V1];
       migrated = true;
     }
-    if (loadedData && loadedData[ACTIVE_SESSION_ID_KEY_V1] !== void 0 && this.settings[ACTIVE_CHAT_ID_KEY2] === void 0) {
+    if (loadedData && loadedData[ACTIVE_SESSION_ID_KEY_V1] !== void 0 && this.settings[ACTIVE_CHAT_ID_KEY] === void 0) {
       this.logger.info("Migrating active chat id key v1 -> v2");
-      this.settings[ACTIVE_CHAT_ID_KEY2] = loadedData[ACTIVE_SESSION_ID_KEY_V1];
+      this.settings[ACTIVE_CHAT_ID_KEY] = loadedData[ACTIVE_SESSION_ID_KEY_V1];
       delete this.settings[ACTIVE_SESSION_ID_KEY_V1];
       migrated = true;
     }
@@ -7326,7 +7765,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     this.logger.debug("Clear active chat history command triggered.");
     if (!this.chatManager) {
       this.logger.error("ChatManager not ready for clearMessageHistory.");
-      new import_obsidian12.Notice("Error: Chat Manager not ready.");
+      new import_obsidian11.Notice("Error: Chat Manager not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
@@ -7340,15 +7779,15 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
             `User confirmed clearing history for chat: ${activeChat.metadata.id}`
           );
           await this.chatManager.clearActiveChatMessages();
-          new import_obsidian12.Notice(
+          new import_obsidian11.Notice(
             `History cleared for "${activeChat.metadata.name}".`
           );
         }
       ).open();
     } else if (activeChat) {
-      new import_obsidian12.Notice("Chat history is already empty.");
+      new import_obsidian11.Notice("Chat history is already empty.");
     } else {
-      new import_obsidian12.Notice("No active chat to clear.");
+      new import_obsidian11.Notice("No active chat to clear.");
     }
   }
   // List Role Files Method (з виправленням path.basename)
@@ -7369,7 +7808,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     const builtInRoleFileName = "Productivity_Assistant.md";
     let builtInRolePath = null;
     if (pluginDir) {
-      builtInRolePath = (0, import_obsidian12.normalizePath)(
+      builtInRolePath = (0, import_obsidian11.normalizePath)(
         `${pluginDir}/roles/${builtInRoleFileName}`
       );
       this.logger.debug(
@@ -7409,7 +7848,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
         "Plugin directory not found, cannot locate built-in roles."
       );
     }
-    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian12.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian11.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
       this.logger.debug(
         `Processing user roles from: ${userRolesFolderPath}`
@@ -7473,7 +7912,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       this.logger.error(
         "Node.js environment not available. Cannot execute system command."
       );
-      new import_obsidian12.Notice("Cannot execute system command.");
+      new import_obsidian11.Notice("Cannot execute system command.");
       return {
         stdout: "",
         stderr: "Node.js required.",
@@ -7502,14 +7941,14 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
   }
   // --- Session Management Command Helpers ---
   async showChatSwitcher() {
-    new import_obsidian12.Notice("Switch Chat UI not implemented yet.");
+    new import_obsidian11.Notice("Switch Chat UI not implemented yet.");
   }
   // У файлі src/main.ts
   async renameActiveChat() {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian12.Notice("No active chat to rename.");
+      new import_obsidian11.Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
@@ -7538,7 +7977,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
             );
           }
         } else if (newName !== null) {
-          new import_obsidian12.Notice("Rename cancelled or name unchanged.");
+          new import_obsidian11.Notice("Rename cancelled or name unchanged.");
         }
       }
     ).open();
@@ -7547,7 +7986,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
     var _a;
     const activeChat = await ((_a = this.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
-      new import_obsidian12.Notice("No active chat.");
+      new import_obsidian11.Notice("No active chat.");
       return;
     }
     const chatName = activeChat.metadata.name;
@@ -7560,9 +7999,9 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
           activeChat.metadata.id
         );
         if (success) {
-          new import_obsidian12.Notice(`Chat "${chatName}" deleted.`);
+          new import_obsidian11.Notice(`Chat "${chatName}" deleted.`);
         } else {
-          new import_obsidian12.Notice(`Failed to delete chat "${chatName}".`);
+          new import_obsidian11.Notice(`Failed to delete chat "${chatName}".`);
         }
       }
     ).open();
@@ -7573,7 +8012,7 @@ var OllamaPlugin2 = class extends import_obsidian12.Plugin {
       `Handling 'active-chat-changed' locally. New active ID: ${data.chatId}`
     );
     if (this.settings.saveMessageHistory) {
-      await this.saveDataKey(ACTIVE_CHAT_ID_KEY2, data.chatId);
+      await this.saveDataKey(ACTIVE_CHAT_ID_KEY, data.chatId);
       this.logger.debug(`Saved active chat ID: ${data.chatId}`);
     }
   }
