@@ -481,10 +481,10 @@ export class OllamaView extends ItemView {
       this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
       "lucide-folder-open"
     ); // Початкова іконка
-    this.chatPanelHeaderEl.createSpan({
-      cls: "menu-option-text",
-      text: "Chats",
-    });
+    // this.chatPanelHeaderEl.createSpan({
+    //   cls: "menu-option-text",
+    //   text: "Chats",
+    // });
 
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       // Додаємо is-expanded для початкового стану

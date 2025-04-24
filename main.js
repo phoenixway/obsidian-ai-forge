@@ -1675,10 +1675,6 @@ This action cannot be undone.`,
       this.chatPanelHeaderEl.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }),
       "lucide-folder-open"
     );
-    this.chatPanelHeaderEl.createSpan({
-      cls: "menu-option-text",
-      text: "Chats"
-    });
     this.chatPanelListEl = this.rolePanelEl.createDiv({
       // Додаємо is-expanded для початкового стану
       cls: [
