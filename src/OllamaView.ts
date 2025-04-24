@@ -742,13 +742,14 @@ export class OllamaView extends ItemView {
         this.handleNewChatClick
       );
     else console.error("newChatOption missing!");
-    if (this.renameChatOption)
-      this.registerDomEvent(
-        this.renameChatOption,
-        "click",
-        this.handleRenameChatClick
-      );
-    else console.error("renameChatOption missing!");
+    if (this.renameChatOption) {
+      // Обгортаємо виклик в анонімну функцію, щоб викликати без аргументів
+      this.registerDomEvent(this.renameChatOption, 'click', () => {
+          this.handleRenameChatClick(); // Виклик без параметрів означає "перейменувати активний чат"
+      });
+  } else {
+      console.error("renameChatOption missing!");
+  }
     if (this.cloneChatOption)
       this.registerDomEvent(
         this.cloneChatOption,
@@ -1433,81 +1434,76 @@ export class OllamaView extends ItemView {
   };
   // У файлі src/OllamaView.ts
 
-  private handleRenameChatClick = async (): Promise<void> => {
-    this.closeMenu();
-    const activeChat = await this.plugin.chatManager?.getActiveChat();
-    if (!activeChat) {
-      new Notice("No active chat to rename.");
-      return;
-    }
-    const currentName = activeChat.metadata.name;
-    const chatId = activeChat.metadata.id; // Для логування
+  private handleRenameChatClick = async (chatIdToRename?: string, currentChatName?: string): Promise<void> => {
+    let chatId: string | null = chatIdToRename ?? null;
+    let currentName: string | null = currentChatName ?? null;
 
-    new PromptModal(
-      this.app,
-      "Rename Chat",
-      `Enter new name for "${currentName}":`,
-      currentName,
-      async (newName) => {
-        let noticeMessage = "Rename cancelled or name unchanged."; // Повідомлення за замовчуванням
-        const trimmedName = newName?.trim(); // Обрізаємо та обробляємо null
-
-        if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-          this.plugin.logger.debug(
-            `[OllamaView] Attempting rename for chat ${chatId} to "${trimmedName}" via updateActiveChatMetadata`
-          );
-
-          // --- ВИПРАВЛЕННЯ: Використовуємо updateActiveChatMetadata ---
-          const success =
-            await this.plugin.chatManager.updateActiveChatMetadata({
-              name: trimmedName,
-            });
-          // ----------------------------------------------------------
-          this.plugin.logger.debug(
-            `[handleRenameChatClick] updateActiveChatMetadata returned: ${success}`
-          );
-          if (success) {
-            // Подія active-chat-changed, викликана в updateActiveChatMetadata,
-            // оновить UI. Notice тут може бути необов'язковим.
-            noticeMessage = `Chat renamed to "${trimmedName}"`;
-            this.plugin.logger.info(
-              `Chat ${chatId} rename initiated to "${trimmedName}".`
-            );
-            // --- ДОДАНО: Примусове оновлення ПІСЛЯ await ---
-            // Перевіряємо, чи підменю чатів все ще розгорнуте
-            if (
-              this.chatSubmenuContent &&
-              !this.chatSubmenuContent.classList.contains(
-                CSS_CLASS_SUBMENU_CONTENT_HIDDEN
-              )
-            ) {
-              this.plugin.logger.info(
-                "[handleRenameChatClick] Forcing chat list menu refresh after rename completed."
-              );
-              await this.renderChatListMenu(); // Використовуємо await
-            } else {
-              this.plugin.logger.debug(
-                "[handleRenameChatClick] Chat list submenu is closed after rename, not forcing refresh."
-              );
-            }
-          } else {
-            noticeMessage = "Failed to rename chat.";
-            this.plugin.logger.error(
-              `[OllamaView] Failed to rename chat ${chatId} using updateActiveChatMetadata.`
-            );
-          }
-        } else if (trimmedName && trimmedName === currentName) {
-          noticeMessage = "Name unchanged.";
-        } else if (newName === null || trimmedName === "") {
-          // Явна перевірка скасування/порожнього імені
-          noticeMessage = "Rename cancelled or invalid name entered.";
+    // Якщо ID не передано, отримуємо дані активного чату
+    if (!chatId || !currentName) {
+        this.plugin.logger.debug("[handleRenameChatClick] No chat ID provided, getting active chat...");
+        const activeChat = await this.plugin.chatManager?.getActiveChat();
+        if (!activeChat) {
+            new Notice("No active chat to rename.");
+            return;
         }
-        // Показуємо фінальне повідомлення
-        new Notice(noticeMessage);
-        this.focusInput(); // Повертаємо фокус
-      }
+        chatId = activeChat.metadata.id;
+        currentName = activeChat.metadata.name;
+    }
+     this.plugin.logger.debug(`[handleRenameChatClick] Initiating rename for chat ${chatId} (current name: "${currentName}")`);
+    // Закриваємо головне меню, якщо воно було відкрито (для виклику з нього)
+     this.closeMenu();
+
+    // Перевіряємо ще раз, чи отримали ми дані
+     if (!chatId || currentName === null) { // currentName може бути порожнім рядком, це нормально
+        this.plugin.logger.error("[handleRenameChatClick] Failed to determine chat ID or current name.");
+        new Notice("Could not initiate rename process.");
+        return;
+     }
+
+    // Показуємо модальне вікно для вводу нового імені
+    new PromptModal(
+        this.app,
+        "Rename Chat",
+        `Enter new name for "${currentName}":`,
+        currentName, // Попередньо заповнене поле
+        async (newName) => {
+            let noticeMessage = "Rename cancelled or name unchanged.";
+            const trimmedName = newName?.trim();
+
+            if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
+                 this.plugin.logger.debug(`Attempting rename for chat ${chatId} to "${trimmedName}" via ChatManager.renameChat`);
+                 // --- ВИКЛИКАЄМО НОВИЙ МЕТОД МЕНЕДЖЕРА ---
+                 const success = await this.plugin.chatManager.renameChat(chatId!, trimmedName); // Використовуємо chatId!, бо ми його перевірили
+                 // ----------------------------------------
+                 if (success) {
+                     noticeMessage = `Chat renamed to "${trimmedName}"`;
+                     // UI оновиться через події 'chat-list-updated' та 'active-chat-changed' (якщо чат активний)
+                     // Додаткове оновлення списку в меню, якщо воно видиме (перенесено з попередньої версії)
+                     if ( this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN) ) {
+                         this.plugin.logger.info("[handleRenameChatClick] Forcing chat list menu refresh after rename.");
+                         await this.renderChatListMenu();
+                     }
+                 } else {
+                     noticeMessage = "Failed to rename chat."; // Помилка оброблена в renameChat
+                 }
+            } else if (trimmedName && trimmedName === currentName) {
+                 noticeMessage = "Name unchanged.";
+            } else if (newName === null || trimmedName === "") {
+                 noticeMessage = "Rename cancelled or invalid name entered.";
+            }
+            new Notice(noticeMessage);
+            this.focusInput();
+        }
     ).open();
-  };
+};
+
+// --- НОВИЙ обробник для контекстного меню ---
+private handleContextMenuRename(chatId: string, currentName: string): void {
+  this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
+  // Просто викликаємо основний обробник, передаючи параметри
+  this.handleRenameChatClick(chatId, currentName);
+}
+
   private handleCloneChatClick = async (): Promise<void> => {
     this.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat();
@@ -4613,62 +4609,61 @@ private async toggleSidebarSection(clickedHeaderEl: HTMLElement): Promise<void> 
   }
 }
 
-    // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - через 'dom' з 'as any') ---
-    private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
-      event.preventDefault();
-      const menu = new Menu();
+// --- Оновлений метод показу контекстного меню ---
+private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
+  event.preventDefault();
+  const menu = new Menu();
 
-      // 1. Клонувати
-      menu.addItem((item) =>
-          item
-              .setTitle("Clone Chat")
-              .setIcon("lucide-copy-plus")
-              .onClick(() => this.handleContextMenuClone(chatMeta.id))
-      );
+  // 1. Клонувати
+  menu.addItem((item) =>
+      item
+          .setTitle("Clone Chat")
+          .setIcon("lucide-copy-plus")
+          .onClick(() => this.handleContextMenuClone(chatMeta.id))
+  );
 
-      // 2. Експортувати
-      menu.addItem((item) =>
-          item
-              .setTitle("Export to Note")
-              .setIcon("lucide-download")
-              .onClick(() => this.exportSpecificChat(chatMeta.id))
-      );
+  // --- ДОДАНО: Перейменувати ---
+  menu.addItem((item) =>
+      item
+          .setTitle("Rename Chat")
+          .setIcon("lucide-pencil") // Іконка олівця
+          .onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name)) // Викликаємо новий обробник
+  );
+  // --- КІНЕЦЬ ДОДАНОГО ---
 
-      menu.addSeparator();
 
-      // 3. Очистити повідомлення
-      menu.addItem((item) => {
-          item // Конфігуруємо базові речі
-              .setTitle("Clear Messages")
-              .setIcon("lucide-trash")
-              .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-          // --- ЗМІНА: Використовуємо 'dom' з твердженням типу 'as any' ---
-          try { // Додаємо try-catch про всяк випадок
-              (item as any).dom.addClass("danger-option");
-          } catch (e) {
-               this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
-          }
-      });
+  // 3. Експортувати
+  menu.addItem((item) =>
+      item
+          .setTitle("Export to Note")
+          .setIcon("lucide-download")
+          .onClick(() => this.exportSpecificChat(chatMeta.id))
+  );
 
-      // 4. Видалити чат
-      menu.addItem((item) => {
-          item // Конфігуруємо базові речі
-              .setTitle("Delete Chat")
-              .setIcon("lucide-trash-2")
-              .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-           // --- ЗМІНА: Використовуємо 'dom' з твердженням типу 'as any' ---
-           try {
-              (item as any).dom.addClass("danger-option");
-           } catch (e) {
-               this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
-           }
-      });
+  menu.addSeparator();
 
-      menu.showAtMouseEvent(event); // Показуємо меню в місці кліку
-  }
+  // 4. Очистити повідомлення
+  menu.addItem((item) => {
+      item
+          .setTitle("Clear Messages")
+          .setIcon("lucide-trash")
+          .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
+       try { (item as any).el.addClass("danger-option"); } // Використовуємо .el або .dom
+       catch (e) { this.plugin.logger.error("Failed to add danger class using item.el/dom:", e, item); }
+  });
 
-  // ... (решта методів класу) ...
-  // ... (решта методів без змін) ...
+  // 5. Видалити чат
+  menu.addItem((item) => {
+      item
+          .setTitle("Delete Chat")
+          .setIcon("lucide-trash-2")
+          .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
+       try { (item as any).el.addClass("danger-option"); } // Використовуємо .el або .dom
+       catch (e) { this.plugin.logger.error("Failed to add danger class using item.el/dom:", e, item); }
+  });
+
+  menu.showAtMouseEvent(event);
+}
   
   private async handleContextMenuClone(chatId: string): Promise<void> {
     this.plugin.logger.info(`Context menu: Clone requested for chat ${chatId}`);

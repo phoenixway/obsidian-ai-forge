@@ -602,6 +602,77 @@ export class ChatManager {
              return false;
         }
     }
-    // --- Кінець нового методу ---
+// ChatManager.ts
 
+    // ... (інші методи класу)
+
+    /** Перейменовує конкретний чат за його ID */
+    async renameChat(chatId: string, newName: string): Promise<boolean> {
+        const trimmedName = newName.trim();
+        if (!trimmedName) {
+            this.plugin.logger.warn(`Attempted to rename chat ${chatId} with an empty name.`);
+            new Notice("Chat name cannot be empty.");
+            return false;
+        }
+
+        this.plugin.logger.info(`Attempting to rename chat ${chatId} to "${trimmedName}"`);
+        const chat = await this.getChat(chatId); // Отримуємо об'єкт чату
+
+        if (!chat) {
+            this.plugin.logger.error(`Cannot rename: Chat ${chatId} not found.`);
+            new Notice("Chat not found.");
+            return false;
+        }
+
+        if (chat.metadata.name === trimmedName) {
+             this.plugin.logger.debug(`Chat ${chatId} already has the name "${trimmedName}". No changes needed.`);
+             return true; // Ім'я не змінилося
+        }
+
+        try {
+            // Використовуємо існуючий механізм оновлення метаданих в Chat
+            const changed = chat.updateMetadata({ name: trimmedName });
+
+            if (changed) {
+                 this.plugin.logger.debug(`Chat ${chatId} name updated. Save scheduled by Chat class.`);
+                // Оновлюємо індекс негайно
+                if (this.chatIndex[chatId]) {
+                     const meta = chat.metadata;
+                     const storedMeta: ChatSessionStored = {
+                         name: meta.name, // Нове ім'я
+                         lastModified: meta.lastModified, // Оновлений час
+                         createdAt: meta.createdAt,
+                          ...(meta.modelName && { modelName: meta.modelName }),
+                          ...(meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath }),
+                          ...(meta.temperature !== undefined && { temperature: meta.temperature }),
+                          ...(meta.contextWindow !== undefined && { contextWindow: meta.contextWindow }),
+                     };
+                     this.chatIndex[meta.id] = storedMeta;
+                     await this.saveChatIndex();
+                     this.plugin.logger.debug(`Updated chat index for ${chatId} after rename.`);
+                }
+
+                // Сповіщаємо про оновлення списку
+                this.plugin.emit('chat-list-updated');
+
+                // Якщо перейменований чат був активним, сповістимо про зміну метаданих
+                if (this.activeChatId === chatId) {
+                    this.activeChat = chat; // Оновлюємо кеш
+                    this.plugin.emit('active-chat-changed', { chatId: chatId, chat: chat });
+                }
+                return true;
+            } else {
+                 // Цей випадок малоймовірний, якщо ми вже перевірили ім'я вище
+                 this.plugin.logger.warn(`updateMetadata reported no change for chat ${chatId} rename.`);
+                 return false;
+            }
+
+        } catch(error) {
+            this.plugin.logger.error(`Error renaming chat ${chatId}:`, error);
+            new Notice("An error occurred while renaming the chat.");
+            return false;
+        }
+    }
+
+// ... (решта коду класу ChatManager)
 } // End of ChatManager class

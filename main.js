@@ -718,56 +718,47 @@ var OllamaView = class extends import_obsidian3.ItemView {
       }
     };
     // У файлі src/OllamaView.ts
-    this.handleRenameChatClick = async () => {
+    this.handleRenameChatClick = async (chatIdToRename, currentChatName) => {
       var _a;
+      let chatId = chatIdToRename != null ? chatIdToRename : null;
+      let currentName = currentChatName != null ? currentChatName : null;
+      if (!chatId || !currentName) {
+        this.plugin.logger.debug("[handleRenameChatClick] No chat ID provided, getting active chat...");
+        const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+        if (!activeChat) {
+          new import_obsidian3.Notice("No active chat to rename.");
+          return;
+        }
+        chatId = activeChat.metadata.id;
+        currentName = activeChat.metadata.name;
+      }
+      this.plugin.logger.debug(`[handleRenameChatClick] Initiating rename for chat ${chatId} (current name: "${currentName}")`);
       this.closeMenu();
-      const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-      if (!activeChat) {
-        new import_obsidian3.Notice("No active chat to rename.");
+      if (!chatId || currentName === null) {
+        this.plugin.logger.error("[handleRenameChatClick] Failed to determine chat ID or current name.");
+        new import_obsidian3.Notice("Could not initiate rename process.");
         return;
       }
-      const currentName = activeChat.metadata.name;
-      const chatId = activeChat.metadata.id;
       new PromptModal(
         this.app,
         "Rename Chat",
         `Enter new name for "${currentName}":`,
         currentName,
+        // Попередньо заповнене поле
         async (newName) => {
           let noticeMessage = "Rename cancelled or name unchanged.";
           const trimmedName = newName == null ? void 0 : newName.trim();
           if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-            this.plugin.logger.debug(
-              `[OllamaView] Attempting rename for chat ${chatId} to "${trimmedName}" via updateActiveChatMetadata`
-            );
-            const success = await this.plugin.chatManager.updateActiveChatMetadata({
-              name: trimmedName
-            });
-            this.plugin.logger.debug(
-              `[handleRenameChatClick] updateActiveChatMetadata returned: ${success}`
-            );
+            this.plugin.logger.debug(`Attempting rename for chat ${chatId} to "${trimmedName}" via ChatManager.renameChat`);
+            const success = await this.plugin.chatManager.renameChat(chatId, trimmedName);
             if (success) {
               noticeMessage = `Chat renamed to "${trimmedName}"`;
-              this.plugin.logger.info(
-                `Chat ${chatId} rename initiated to "${trimmedName}".`
-              );
-              if (this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(
-                CSS_CLASS_SUBMENU_CONTENT_HIDDEN
-              )) {
-                this.plugin.logger.info(
-                  "[handleRenameChatClick] Forcing chat list menu refresh after rename completed."
-                );
+              if (this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+                this.plugin.logger.info("[handleRenameChatClick] Forcing chat list menu refresh after rename.");
                 await this.renderChatListMenu();
-              } else {
-                this.plugin.logger.debug(
-                  "[handleRenameChatClick] Chat list submenu is closed after rename, not forcing refresh."
-                );
               }
             } else {
               noticeMessage = "Failed to rename chat.";
-              this.plugin.logger.error(
-                `[OllamaView] Failed to rename chat ${chatId} using updateActiveChatMetadata.`
-              );
             }
           } else if (trimmedName && trimmedName === currentName) {
             noticeMessage = "Name unchanged.";
@@ -1831,14 +1822,13 @@ This action cannot be undone.`,
       );
     else
       console.error("newChatOption missing!");
-    if (this.renameChatOption)
-      this.registerDomEvent(
-        this.renameChatOption,
-        "click",
-        this.handleRenameChatClick
-      );
-    else
+    if (this.renameChatOption) {
+      this.registerDomEvent(this.renameChatOption, "click", () => {
+        this.handleRenameChatClick();
+      });
+    } else {
       console.error("renameChatOption missing!");
+    }
     if (this.cloneChatOption)
       this.registerDomEvent(
         this.cloneChatOption,
@@ -2075,6 +2065,11 @@ This action cannot be undone.`,
         }
       }
     });
+  }
+  // --- НОВИЙ обробник для контекстного меню ---
+  handleContextMenuRename(chatId, currentName) {
+    this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
+    this.handleRenameChatClick(chatId, currentName);
   }
   // --- UI Update Methods ---
   updateInputPlaceholder(roleName) {
@@ -3900,12 +3895,16 @@ This action cannot be undone.`,
       }
     }
   }
-  // --- ОНОВЛЕНИЙ МЕТОД: Показ контекстного меню (виправлено додавання CSS класу - через 'dom' з 'as any') ---
+  // --- Оновлений метод показу контекстного меню ---
   showChatContextMenu(event, chatMeta) {
     event.preventDefault();
     const menu = new import_obsidian3.Menu();
     menu.addItem(
       (item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
+      // Викликаємо новий обробник
     );
     menu.addItem(
       (item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id))
@@ -3914,23 +3913,21 @@ This action cannot be undone.`,
     menu.addItem((item) => {
       item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
       try {
-        item.dom.addClass("danger-option");
+        item.el.addClass("danger-option");
       } catch (e) {
-        this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
+        this.plugin.logger.error("Failed to add danger class using item.el/dom:", e, item);
       }
     });
     menu.addItem((item) => {
       item.setTitle("Delete Chat").setIcon("lucide-trash-2").onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
       try {
-        item.dom.addClass("danger-option");
+        item.el.addClass("danger-option");
       } catch (e) {
-        this.plugin.logger.error("Failed to add danger class using item.dom:", e, item);
+        this.plugin.logger.error("Failed to add danger class using item.el/dom:", e, item);
       }
     });
     menu.showAtMouseEvent(event);
   }
-  // ... (решта методів класу) ...
-  // ... (решта методів без змін) ...
   async handleContextMenuClone(chatId) {
     this.plugin.logger.info(`Context menu: Clone requested for chat ${chatId}`);
     const cloningNotice = new import_obsidian3.Notice("Cloning chat...", 0);
@@ -6534,7 +6531,65 @@ var ChatManager = class {
       return false;
     }
   }
-  // --- Кінець нового методу ---
+  // ChatManager.ts
+  // ... (інші методи класу)
+  /** Перейменовує конкретний чат за його ID */
+  async renameChat(chatId, newName) {
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      this.plugin.logger.warn(`Attempted to rename chat ${chatId} with an empty name.`);
+      new import_obsidian10.Notice("Chat name cannot be empty.");
+      return false;
+    }
+    this.plugin.logger.info(`Attempting to rename chat ${chatId} to "${trimmedName}"`);
+    const chat = await this.getChat(chatId);
+    if (!chat) {
+      this.plugin.logger.error(`Cannot rename: Chat ${chatId} not found.`);
+      new import_obsidian10.Notice("Chat not found.");
+      return false;
+    }
+    if (chat.metadata.name === trimmedName) {
+      this.plugin.logger.debug(`Chat ${chatId} already has the name "${trimmedName}". No changes needed.`);
+      return true;
+    }
+    try {
+      const changed = chat.updateMetadata({ name: trimmedName });
+      if (changed) {
+        this.plugin.logger.debug(`Chat ${chatId} name updated. Save scheduled by Chat class.`);
+        if (this.chatIndex[chatId]) {
+          const meta = chat.metadata;
+          const storedMeta = {
+            name: meta.name,
+            // Нове ім'я
+            lastModified: meta.lastModified,
+            // Оновлений час
+            createdAt: meta.createdAt,
+            ...meta.modelName && { modelName: meta.modelName },
+            ...meta.selectedRolePath && { selectedRolePath: meta.selectedRolePath },
+            ...meta.temperature !== void 0 && { temperature: meta.temperature },
+            ...meta.contextWindow !== void 0 && { contextWindow: meta.contextWindow }
+          };
+          this.chatIndex[meta.id] = storedMeta;
+          await this.saveChatIndex();
+          this.plugin.logger.debug(`Updated chat index for ${chatId} after rename.`);
+        }
+        this.plugin.emit("chat-list-updated");
+        if (this.activeChatId === chatId) {
+          this.activeChat = chat;
+          this.plugin.emit("active-chat-changed", { chatId, chat });
+        }
+        return true;
+      } else {
+        this.plugin.logger.warn(`updateMetadata reported no change for chat ${chatId} rename.`);
+        return false;
+      }
+    } catch (error) {
+      this.plugin.logger.error(`Error renaming chat ${chatId}:`, error);
+      new import_obsidian10.Notice("An error occurred while renaming the chat.");
+      return false;
+    }
+  }
+  // ... (решта коду класу ChatManager)
 };
 
 // src/main.ts
