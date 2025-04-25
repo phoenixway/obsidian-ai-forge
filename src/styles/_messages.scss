@@ -370,3 +370,62 @@
   */
 
 } // --- Кінець медіа-запиту ---
+
+.scroll-to-bottom-button {
+  position: absolute; // Позиціонування відносно батьківського .ollama-chat-area-content
+  bottom: 15px; // Відступ від нижнього краю
+  right: 20px; // Відступ від правого краю
+  z-index: 50; // Має бути над повідомленнями
+
+  width: 36px; // Розмір кнопки
+  height: 36px;
+  border-radius: 50%; // Кругла
+  background-color: var(--background-secondary); // Фон, схожий на фон повідомлень ШІ або інший
+  color: var(--text-muted); // Колір іконки
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: var(--shadow-s); // Тінь для виділення
+  cursor: pointer;
+
+  display: flex; // Для центрування іконки
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+
+  opacity: 0; // Прихована за замовчуванням
+  visibility: hidden;
+  transform: translateY(10px); // Початкова позиція для анімації появи
+  transition: opacity 0.2s ease-out, visibility 0s linear 0.2s, transform 0.2s ease-out, background-color 0.15s ease;
+
+  .svg-icon {
+    width: 20px; // Розмір іконки
+    height: 20px;
+  }
+
+  &:hover {
+    background-color: var(--background-modifier-hover);
+    color: var(--text-normal);
+    transform: translateY(8px) scale(1.05); // Невеликий підйом при наведенні
+  }
+
+   &:active {
+      transform: translateY(9px) scale(1); // Невелике "натискання"
+   }
+
+  // Клас для видимої кнопки
+  &.visible {
+    opacity: 0.85; // Не повністю непрозора, щоб не заважати
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.2s ease-out, visibility 0s linear 0s, transform 0.2s ease-out, background-color 0.15s ease;
+
+     &:hover {
+          opacity: 1; // Повна непрозорість при наведенні
+     }
+  }
+}
+
+// Опціонально: Можна додати анімацію появи лічильника на індикаторі нових повідомлень,
+// коли з'являється і кнопка прокрутки вниз, якщо ви додаєте лічильник.
+.new-message-indicator.visible {
+   // Стилі для видимого індикатора
+}
