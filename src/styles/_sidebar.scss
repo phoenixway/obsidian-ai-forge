@@ -257,7 +257,7 @@
 .ollama-chat-panel-list {
     .ollama-chat-panel-item { // Або .ollama-chat-list-item, якщо використовували спільний клас
       .chat-panel-item-date {
-        font-size: var(--font-ui-smaller); /* Використовуємо менший шрифт Obsidian */
+        font-size: calc(var(--font-ui-smaller) * 0.5); /* Використовуємо менший шрифт Obsidian */
         /* Або можете вказати конкретний розмір, наприклад: font-size: 0.85em; */
         /* Або: font-size: 11px; */
         color: var(--text-faint); /* Можна зробити текст трохи тьмянішим */
