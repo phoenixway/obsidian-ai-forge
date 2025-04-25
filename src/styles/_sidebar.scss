@@ -110,13 +110,12 @@
     transition: max-height 0.3s ease-out, padding 0.3s ease-out; // Animate height and padding
     box-sizing: border-box;
     padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
-    // flex-shrink: 0; // Prevent shrinking in parent flex container
     min-height: 0; // Allow shrinking to 0
 
     // Expanded state (when .is-expanded class is added via TS)
     &.is-expanded {
-        max-height: 70vh; // Max height limit (adjust as needed)
-        overflow-y: auto; // Enable internal vertical scrolling
+        // max-height встановлюється через JS в toggleSidebarSection
+        overflow-y: auto; // Enable internal vertical scrolling WHEN needed (set by JS)
         padding-top: calc(var(--chat-spacing-unit) * 1);
         padding-bottom: calc(var(--chat-spacing-unit) * 1);
     }
@@ -131,7 +130,7 @@
 
     // List items (Chats or Roles) - using specific classes
     .ollama-role-panel-item,
-    .ollama-chat-panel-item {
+    .ollama-chat-panel-item { // Використовуємо більш специфічний клас .ollama-chat-panel-item
         &.menu-option { // Base styles inherited from .menu-option added in TS
             display: flex;
             align-items: center; // Default vertical centering
@@ -178,7 +177,7 @@
     }
 
     // Chat list item specific layout adjustments
-    .ollama-chat-panel-item {
+    .ollama-chat-panel-item { // Використовуємо цей клас
        &.menu-option {
             justify-content: space-between; // Push text block and options button apart
             padding: calc(var(--chat-spacing-unit) * 1.5) // Override base padding
@@ -198,10 +197,16 @@
                      font-size: calc(var(--font-ui-small) * 0.95); // Ensure size consistency
                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                  }
+                 // --- ЗМІНЕНО: Стилі для дати в бічній панелі ---
                  .chat-panel-item-date {
-                     font-size: 0.85em; color: var(--text-faint);
+                     // font-size: 0.85em; // Попереднє значення
+                     font-size: var(--font-ui-smaller); // <--- Новий менший розмір
+                     color: var(--text-faint);
                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                     opacity: 0.9; // Додатково
+                     margin-top: 2px; // Невеликий відступ
                  }
+                 // --- КІНЕЦЬ ЗМІН ---
             }
 
            // Options button "..."
@@ -252,3 +257,29 @@
         .menu-item-icon svg { color: var(--text-on-accent) !important; }
     }
 }
+
+/* Стилі для дати в списку чатів БІЧНОЇ ПАНЕЛІ - ВЖЕ ІНТЕГРОВАНО ВИЩЕ */
+// .ollama-chat-panel-list {
+//     .ollama-chat-panel-item { // Або .ollama-chat-list-item, якщо використовували спільний клас
+//       .chat-panel-item-date {
+//         font-size: var(--font-ui-smaller); /* Використовуємо менший шрифт Obsidian */
+//         color: var(--text-faint); /* Можна зробити текст трохи тьмянішим */
+//         opacity: 0.9; /* Трохи зменшити прозорість */
+//         margin-top: 2px; /* Невеликий відступ зверху, якщо потрібно */
+//       }
+//     }
+//   }
+
+/* Стилі для дати в списку чатів ВИПАДАЮЧОГО МЕНЮ - ВЖЕ ІНТЕГРОВАНО ВИЩЕ */
+//   .ollama-chat-menu {
+//     .chat-list-container {
+//       .chat-option { // Або .ollama-chat-list-item
+//         .chat-option-date {
+//           font-size: var(--font-ui-smaller); /* Той самий менший шрифт */
+//           color: var(--text-faint);
+//           opacity: 0.9;
+//           margin-top: 1px; /* Менший відступ у меню */
+//         }
+//       }
+//     }
+//   }
