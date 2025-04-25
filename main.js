@@ -119,6 +119,7 @@ var PromptModal = class extends import_obsidian2.Modal {
 
 // src/OllamaView.ts
 var VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
+var SCROLL_THRESHOLD = 150;
 var CSS_CLASS_CONTAINER = "ollama-container";
 var CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
 var CSS_CLASS_INPUT_CONTAINER = "chat-input-container";
@@ -1049,25 +1050,17 @@ This action cannot be undone.`,
     this.handleNewMessageIndicatorClick = () => {
       var _a, _b;
       if (this.chatContainer) {
-        this.chatContainer.scrollTo({
-          top: this.chatContainer.scrollHeight,
-          behavior: "smooth"
-        });
+        this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: "smooth" });
       }
       (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
       (_b = this.scrollToBottomButton) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
-    // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
     this.handleScrollToBottomClick = () => {
       var _a, _b;
       this.plugin.logger.debug("Scroll to bottom button clicked.");
       if (this.chatContainer) {
-        this.chatContainer.scrollTo({
-          top: this.chatContainer.scrollHeight,
-          behavior: "smooth"
-          // Плавна прокрутка
-        });
+        this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: "smooth" });
       }
       (_a = this.scrollToBottomButton) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
       (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
@@ -2115,6 +2108,7 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
+  // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
   // --- UI Update Methods ---
   updateInputPlaceholder(roleName) {
     if (this.inputEl) {
@@ -2201,7 +2195,7 @@ This action cannot be undone.`,
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     this.plugin.logger.debug(
       "[loadAndDisplayActiveChat] Start loading/displaying active chat..."
     );
@@ -2298,28 +2292,20 @@ This action cannot be undone.`,
     }
     if (activeChat !== null && !errorOccurred) {
       if (activeChat.messages && activeChat.messages.length > 0) {
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Rendering ${activeChat.messages.length} messages.`
-        );
         this.hideEmptyState();
         this.renderMessages(activeChat.messages);
         this.checkAllMessagesForCollapsing();
-        this.plugin.logger.debug(
-          "[loadAndDisplayActiveChat] Scrolling to bottom after rendering messages."
-        );
         setTimeout(() => {
           this.guaranteedScrollToBottom(100, false);
+          setTimeout(() => {
+            this.updateScrollStateAndIndicators();
+          }, 150);
         }, 150);
       } else {
-        this.plugin.logger.debug(
-          "[loadAndDisplayActiveChat] Active chat exists but has no messages. Showing empty state."
-        );
         this.showEmptyState();
+        (_i = this.scrollToBottomButton) == null ? void 0 : _i.classList.remove(CSS_CLASS_VISIBLE);
       }
     } else {
-      this.plugin.logger.debug(
-        "[loadAndDisplayActiveChat] No active chat or error occurred earlier. Showing empty state."
-      );
       this.showEmptyState();
     }
     this.plugin.logger.debug(
@@ -2404,6 +2390,7 @@ This action cannot be undone.`,
       const forceScroll = !isUserOrError;
       this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
     }
+    setTimeout(() => this.updateScrollStateAndIndicators(), 100);
     this.hideEmptyState();
   }
   async sendMessage() {
@@ -4337,10 +4324,29 @@ This action cannot be undone.`,
       }
     ).open();
   }
-  // Метод handleNewChatClick вже існує і використовується кнопкою в заголовку
-  // Метод handleExportChatClick використовується пунктом меню у випадаючому меню
-  // Переконайтесь, що метод findRoleNameByPath також існує
-  // ... (решта методів класу OllamaView)
+  /** Перевіряє, чи користувач прокрутив чат вгору */
+  isChatScrolledUp() {
+    if (!this.chatContainer)
+      return false;
+    const scrollableDistance = this.chatContainer.scrollHeight - this.chatContainer.clientHeight;
+    if (scrollableDistance <= 0)
+      return false;
+    const distanceFromBottom = scrollableDistance - this.chatContainer.scrollTop;
+    return distanceFromBottom >= SCROLL_THRESHOLD;
+  }
+  /** Оновлює стан userScrolledUp та видимість кнопок/індикаторів, пов'язаних зі скролом */
+  updateScrollStateAndIndicators() {
+    var _a, _b;
+    if (!this.chatContainer)
+      return;
+    const wasScrolledUp = this.userScrolledUp;
+    this.userScrolledUp = this.isChatScrolledUp();
+    (_a = this.scrollToBottomButton) == null ? void 0 : _a.classList.toggle(CSS_CLASS_VISIBLE, this.userScrolledUp);
+    if (wasScrolledUp && !this.userScrolledUp) {
+      (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
+    }
+    this.plugin.logger.debug(`[updateScrollStateAndIndicators] User scrolled up: ${this.userScrolledUp}`);
+  }
 };
 
 // src/settings.ts

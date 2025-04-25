@@ -24,6 +24,8 @@ import { Chat, ChatMetadata } from "./Chat"; // Клас Chat та типи
 // Використовуйте унікальний ID, наприклад, на основі назви плагіна
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
+const SCROLL_THRESHOLD = 150; // Поріг для визначення "прокручено вгору"
+
 // --- CSS Classes ---
 const CSS_CLASS_CONTAINER = "ollama-container";
 const CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
@@ -1857,32 +1859,24 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
 
 private handleNewMessageIndicatorClick = (): void => {
   if (this.chatContainer) {
-      this.chatContainer.scrollTo({
-          top: this.chatContainer.scrollHeight,
-          behavior: "smooth",
-      });
+      this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: "smooth" });
   }
   this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
-  this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // <--- Ховаємо і цю кнопку
-  this.userScrolledUp = false;
-};
-
-// --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
-private handleScrollToBottomClick = (): void => {
-  this.plugin.logger.debug("Scroll to bottom button clicked.");
-  if (this.chatContainer) {
-      this.chatContainer.scrollTo({
-          top: this.chatContainer.scrollHeight,
-          behavior: 'smooth' // Плавна прокрутка
-      });
-  }
-  // Кнопка зникне автоматично завдяки handleScroll, коли прокрутка завершиться,
-  // але можна приховати її одразу для кращого відгуку
-  this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE);
-  this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); // Також ховаємо індикатор нових повідомлень
+  this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // Ховаємо кнопку прокрутки
   this.userScrolledUp = false; // Оновлюємо стан
 };
 
+private handleScrollToBottomClick = (): void => {
+  this.plugin.logger.debug("Scroll to bottom button clicked.");
+  if (this.chatContainer) {
+      this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: 'smooth' });
+  }
+  this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // Ховаємо одразу
+  this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+  this.userScrolledUp = false; // Оновлюємо стан
+};
+
+// --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
   // --- UI Update Methods ---
   private updateInputPlaceholder(roleName: string | null | undefined): void {
     if (this.inputEl) {
@@ -2193,28 +2187,20 @@ private handleScrollToBottomClick = (): void => {
     // --- Крок 5: Завантаження ПОВІДОМЛЕНЬ ---
     if (activeChat !== null && !errorOccurred) {
       if (activeChat.messages && activeChat.messages.length > 0) {
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Rendering ${activeChat.messages.length} messages.`
-        );
         this.hideEmptyState();
         this.renderMessages(activeChat.messages);
         this.checkAllMessagesForCollapsing();
-        this.plugin.logger.debug(
-          "[loadAndDisplayActiveChat] Scrolling to bottom after rendering messages."
-        );
         setTimeout(() => {
           this.guaranteedScrollToBottom(100, false);
+          setTimeout(() => {
+            this.updateScrollStateAndIndicators(); // <--- Явний виклик для оновлення стану кнопки
+       }, 150); 
         }, 150);
       } else {
-        this.plugin.logger.debug(
-          "[loadAndDisplayActiveChat] Active chat exists but has no messages. Showing empty state."
-        );
         this.showEmptyState();
+        this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // Ховаємо кнопку, якщо чат порожній
       }
     } else {
-      this.plugin.logger.debug(
-        "[loadAndDisplayActiveChat] No active chat or error occurred earlier. Showing empty state."
-      );
       this.showEmptyState();
     }
 
@@ -2539,7 +2525,6 @@ private handleScrollToBottomClick = (): void => {
     messagesToRender.forEach((message) => {
       this.renderMessageInternal(message, messagesToRender); // Render each message
     });
-    //console.log(`[OllamaView] Rendered ${messagesToRender.length} messages.`);
   }
 
   /** Appends a single message to the display */
@@ -2577,7 +2562,7 @@ private handleScrollToBottomClick = (): void => {
       // Use slightly longer delay for AI messages to allow rendering
       this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
     }
-
+    setTimeout(() => this.updateScrollStateAndIndicators(), 100);
     this.hideEmptyState(); // Ensure empty state is hidden
   }
 
@@ -5172,6 +5157,34 @@ private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
     ).open();
   }
 
+/** Перевіряє, чи користувач прокрутив чат вгору */
+private isChatScrolledUp(): boolean {
+  if (!this.chatContainer) return false;
+  // Перевіряємо, чи взагалі є що скролити
+  const scrollableDistance = this.chatContainer.scrollHeight - this.chatContainer.clientHeight;
+  if (scrollableDistance <= 0) return false; // Немає скролу - не може бути прокручено вгору
 
+  // Перевіряємо, чи поточна позиція далека від низу
+  const distanceFromBottom = scrollableDistance - this.chatContainer.scrollTop;
+  return distanceFromBottom >= SCROLL_THRESHOLD;
+}
   
+ /** Оновлює стан userScrolledUp та видимість кнопок/індикаторів, пов'язаних зі скролом */
+ private updateScrollStateAndIndicators(): void {
+  if (!this.chatContainer) return; // Перевірка контейнера
+
+  const wasScrolledUp = this.userScrolledUp;
+  this.userScrolledUp = this.isChatScrolledUp(); // Визначаємо поточний стан
+
+  // Оновлюємо кнопку "Scroll to Bottom"
+  this.scrollToBottomButton?.classList.toggle(CSS_CLASS_VISIBLE, this.userScrolledUp);
+
+  // Оновлюємо індикатор нових повідомлень (ховаємо, якщо дійшли до низу)
+  if (wasScrolledUp && !this.userScrolledUp) {
+      this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+  }
+   // Логіка показу індикатора нових повідомлень залишається в addMessageToDisplay
+   this.plugin.logger.debug(`[updateScrollStateAndIndicators] User scrolled up: ${this.userScrolledUp}`);
+}
+
 } // END OF OllamaView CLASS
