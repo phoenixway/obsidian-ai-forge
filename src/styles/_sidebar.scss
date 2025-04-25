@@ -1,6 +1,296 @@
-/* --- TEMPORARY TEST --- */
-.chat-panel-item-date {
-    font-size: 8px !important; // Use an obvious, fixed size and !important for testing
-    color: red !important;
+// src/styles/_sidebar.scss
+// Styles for the Ollama sidebar panel and its accordion sections
+
+// --- Sidebar Panel (Hosts Accordion) ---
+.ollama-role-panel {
+    display: flex;
+    flex-direction: column; // Vertical layout for headers and content sections
+    width: 240px; // Sidebar width
+    flex-shrink: 0; // Prevent shrinking
+    background-color: var(--background-secondary);
+    border-right: 1px solid var(--divider-color);
+    height: 100%; // Take full height of parent container
+    overflow: hidden; // Panel itself DOES NOT scroll
+    box-sizing: border-box;
+
+    // Separator BETWEEN accordion sections (direct child of panel)
+     > hr.menu-separator {
+         margin: calc(var(--chat-spacing-unit) * 1.5) // Reduced vertical margin
+                 calc(var(--chat-spacing-unit) * 1.5); // Horizontal margin
+         border: none;
+         border-top: 1px solid var(--divider-color); // Use main divider color
+         height: 0;
+         flex-shrink: 0; // Prevent separator from shrinking
+    }
 }
-/* --- END TEMPORARY TEST --- */
+// --- End Sidebar Panel ---
+
+
+// --- Sidebar Accordion Sections ---
+
+// Header for collapsible sections (Chats, Roles)
+.ollama-sidebar-section-header {
+    // Inherits .menu-option class from TS for base clickable style
+    display: flex;
+    justify-content: space-between; // Pushes left (icon+text) and right (button) apart
+    align-items: baseline; // Align icon/text baselines
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 1.5) // Less padding on the right due to button
+               calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5); // Standard left padding
+    user-select: none;
+    cursor: pointer;
+    flex-shrink: 0; // Prevent header from shrinking vertically
+    position: relative;
+    border-radius: var(--radius-s);
+    margin: 1px calc(var(--chat-spacing-unit) * 1); // Add slight horizontal margin to pull in from edges
+
+    &:hover {
+      background-color: var(--background-modifier-hover);
+    }
+
+    // Left part wrapper (Icon + Text)
+    .ollama-sidebar-header-left {
+        display: flex;
+        align-items: baseline;
+        overflow: hidden; // Clip overflowing text
+        margin-right: var(--chat-spacing-unit); // Space between text and potential button
+    }
+
+    // Accordion Icon (Folder)
+    .ollama-sidebar-section-icon {
+        margin-right: 14px; // Space between icon and text
+        min-width: 18px; // Ensure consistent width
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+
+        .svg-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--text-faint); // Base icon color
+        }
+    }
+    &:hover .ollama-sidebar-section-icon .svg-icon {
+        color: var(--text-muted); // Icon color on header hover
+    }
+
+    // Header Text ("Chats", "Roles")
+    .menu-option-text {
+        font-weight: 500;
+        color: var(--text-normal);
+        line-height: 1.2; // Adjust for baseline alignment
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    // "New Chat" Button (+) in Header
+    .ollama-sidebar-header-button {
+        // Uses .clickable-icon base styles from Obsidian (added via TS)
+        padding: 2px;
+        margin-left: auto; // Push to the far right
+        flex-shrink: 0;
+        color: var(--text-muted);
+        opacity: 0.7;
+        background: none; border: none; box-shadow: none; // Make it look like icon-only
+
+        &:hover {
+            color: var(--text-normal);
+            opacity: 1;
+            background-color: var(--background-modifier-hover);
+        }
+        .svg-icon { width: 18px; height: 18px; }
+    }
+}
+
+// Content area for collapsible sections (holds the lists)
+.ollama-sidebar-section-content {
+    overflow: hidden; // Clips content during animation, contains padding
+    max-height: 0; // Collapsed by default
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out; // Animate height and padding
+    box-sizing: border-box;
+    padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
+    min-height: 0; // Allow shrinking to 0
+
+    // Expanded state (when .is-expanded class is added via TS)
+    &.is-expanded {
+        max-height: 70vh; // Max height limit (adjust as needed) // Встановлюється JS
+        overflow-y: auto; // Enable internal vertical scrolling // Встановлюється JS
+        padding-top: calc(var(--chat-spacing-unit) * 1);
+        padding-bottom: calc(var(--chat-spacing-unit) * 1);
+    }
+
+    // Scrollbar styling for the content section (when visible)
+    &::-webkit-scrollbar { width: 6px; }
+    &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
+    &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+
+    // --- Styles for elements INSIDE the content lists ---
+
+    // List items (Chats or Roles) - using specific classes
+    .ollama-role-panel-item,
+    .ollama-chat-panel-item {
+        &.menu-option { // Base styles inherited from .menu-option added in TS
+            display: flex;
+            align-items: center; // Default vertical centering
+            padding: calc(var(--chat-spacing-unit) * 1.8) // Standard padding for role items
+                     calc(var(--chat-spacing-unit) * 1.5);
+            margin: 1px 0;
+            cursor: pointer;
+            border-radius: var(--radius-s);
+
+            &:hover {
+                background-color: var(--background-modifier-hover);
+            }
+
+            .menu-option-icon { // Icon within list items
+                margin-right: 10px;
+                min-width: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+                .svg-icon { width: 15px; height: 15px; }
+            }
+
+            .menu-option-text { // General text within items (used for role name)
+                font-size: calc(var(--font-ui-small) * 0.95);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex-grow: 1; // Allow text to take space
+            }
+
+            // Active state styling
+            &.is-active {
+                background-color: var(--interactive-accent-translucent);
+                // Text colors handled below for specific elements
+                .menu-option-icon { color: var(--interactive-accent); }
+                &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
+            }
+            // Style for custom role icon
+            &.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
+                color: var(--text-faint);
+            }
+
+            .ollama-chat-item-text-wrapper {
+                display: flex;
+                flex-direction: column;
+                flex-grow: 1;
+                overflow: hidden;
+                margin-right: 8px;
+                line-height: 1.3;
+                gap: 1px;
+
+                 .chat-panel-item-name {
+                     font-size: calc(var(--font-ui-small) * 0.95);
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                 }
+                 // --- MODIFY THIS RULE ---
+                 .chat-panel-item-date {
+                     font-size: var(--font-ui-smaller); // <--- APPLY DESIRED SIZE HERE
+                     color: var(--text-faint);
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                     opacity: 0.9; // Optional: Add opacity
+                     margin-top: 2px; // Optional: Add margin
+                 }
+                 // --- END MODIFICATION ---
+            }
+        }
+    }
+
+    // Chat list item specific layout adjustments
+//     .ollama-chat-panel-item {
+//        &.menu-option {
+//             justify-content: space-between; // Push text block and options button apart
+//             padding: calc(var(--chat-spacing-unit) * 1.5) // Override base padding
+//                      calc(var(--chat-spacing-unit) * 1.5);
+
+//            // Wrapper for Name/Date
+//            .ollama-chat-item-text-wrapper {
+//                 display: flex;
+//                 flex-direction: column;
+//                 flex-grow: 1;
+//                 overflow: hidden;
+//                 margin-right: 8px;
+//                 line-height: 1.3;
+//                 gap: 1px;
+
+//                  .chat-panel-item-name {
+//                      font-size: calc(var(--font-ui-small) * 0.95); // Ensure size consistency
+//                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+//                  }
+//                  // --- ВИПРАВЛЕННЯ ТУТ ---
+//                  .chat-panel-item-date {
+//                     //font-size: calc(var(--font-ui-small) * 0.5); // Старе правило - ДУЖЕ МАЛЕ
+//                     font-size: var(--font-ui-smaller); // <-- Встановлюємо бажаний розмір тут
+//                     color: var(--text-faint);
+//                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+//                     opacity: 0.9; // <-- Додано з вашого правила
+//                     margin-top: 2px; // <-- Додано з вашого правила
+//                 }
+//                  // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+//             }
+
+//            // Options button "..."
+//            .ollama-chat-item-options {
+//                 padding: 3px; margin: -3px; flex-shrink: 0; opacity: 0;
+//                 transition: opacity 0.15s ease-in-out; border-radius: var(--radius-s);
+//                 background: none; border: none; color: var(--text-muted);
+//                 &:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); }
+//                 .svg-icon { width: 18px; height: 18px; }
+//             }
+//             &:hover .ollama-chat-item-options { opacity: 0.7; &:hover { opacity: 1; } }
+
+//             // Active state text colors specific to chat item structure
+//             &.is-active {
+//                 .chat-panel-item-name { color: var(--text-accent-hover); font-weight: 500; }
+//                 .chat-panel-item-date {
+//                     color: var(--text-accent-hover); opacity: 0.8;
+//                     // Можна тут перевизначити font-size, якщо для активного чату потрібен інший
+//                     // font-size: var(--font-ui-smaller);
+//                 }
+//             }
+//        }
+//     }
+
+//     // Empty list message
+//      .menu-info-text {
+//         padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 1);
+//         color: var(--text-faint);
+//         font-style: italic;
+//         font-size: calc(var(--font-ui-small) * 0.9);
+//     }
+
+//     // Separator INSIDE lists (e.g., after "None" in Roles if added back)
+//      hr.menu-separator {
+//         margin: calc(var(--chat-spacing-unit) * 1.5) 0; // Only vertical margin
+//         border: none;
+//         border-top: 1px solid var(--background-modifier-border); // Lighter border inside lists
+//         flex-shrink: 0;
+//     }
+}
+// --- End Sidebar Accordion Sections ---
+
+// Note: Styles for the context menu items (.danger-option) should be in a more global file
+// or _menu.scss if you have one, but can be placed here if needed.
+.menu-item.danger-option {
+    color: var(--text-error) !important;
+    .menu-item-icon svg { color: var(--text-error) !important; }
+    &:hover {
+        color: var(--text-on-accent) !important;
+        background-color: var(--background-modifier-error-hover) !important;
+        .menu-item-icon svg { color: var(--text-on-accent) !important; }
+    }
+}
+
+// --- ВИДАЛЕНО ДУБЛІКАТ ПРАВИЛ В КІНЦІ ФАЙЛУ ---
+/* Стилі для дати в списку чатів БІЧНОЇ ПАНЕЛІ (це правило видалено, бо воно вже є вище) */
+/* .ollama-chat-panel-list { ... } */
+
+/* Стилі для дати в списку чатів ВИПАДАЮЧОГО МЕНЮ (це правило має бути в _menu.scss) */
+/* .ollama-chat-menu { ... } */
+
+/* Це правило також видалено, бо воно дублює і використовує !important без потреби */
+/* .ollama-chat-panel-list .ollama-chat-panel-item .chat-panel-item-date { ... } */
