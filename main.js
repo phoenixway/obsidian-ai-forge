@@ -2406,11 +2406,8 @@ This action cannot be undone.`,
     }
     this.hideEmptyState();
   }
-  // OllamaView.ts
-  // ... (інші методи класу до sendMessage) ...
-  // --- ПОВНА ВЕРСІЯ МЕТОДУ: sendMessage ---
   async sendMessage() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
       if (this.currentAbortController !== null) {
@@ -2434,16 +2431,9 @@ This action cannot be undone.`,
     let accumulatedResponse = "";
     const responseStartTime = new Date();
     (_b = this.stopGeneratingButton) == null ? void 0 : _b.show();
-    this.updateSendButtonState();
+    (_c = this.sendButton) == null ? void 0 : _c.hide();
     try {
-      const userMessage = await this.plugin.chatManager.addMessageToActiveChat(
-        "user",
-        userMessageContent,
-        void 0,
-        // Timestamp для користувача не передаємо
-        true
-        // Генеруємо подію message-added
-      );
+      const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent, void 0, true);
       if (!userMessage) {
         throw new Error("Failed to add user message to history.");
       }
@@ -2455,23 +2445,14 @@ This action cannot be undone.`,
       assistantMessageElInternal = assistantMessageElement;
       const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
       assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
-      this.currentAssistantMessage = {
-        groupEl: assistantMessageGroupEl,
-        contentEl: assistantContentEl,
-        fullContent: "",
-        // Поки що порожньо
-        timestamp: responseStartTime
-      };
+      this.currentAssistantMessage = { groupEl: assistantMessageGroupEl, contentEl: assistantContentEl, fullContent: "", timestamp: responseStartTime };
       this.guaranteedScrollToBottom(50, true);
       this.plugin.logger.info("[OllamaView] Starting stream request...");
       const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
       for await (const chunk of stream) {
         if ("error" in chunk && chunk.error) {
-          if (chunk.error.includes("aborted by user")) {
-            this.plugin.logger.debug("[OllamaView] Stream iterator yielded abort error chunk.");
-          } else {
+          if (!chunk.error.includes("aborted by user"))
             throw new Error(chunk.error);
-          }
         }
         if ("response" in chunk && chunk.response && assistantContentEl) {
           accumulatedResponse += chunk.response;
@@ -2481,66 +2462,37 @@ This action cannot be undone.`,
           this.checkMessageForCollapsing(assistantMessageElement);
         }
         if ("done" in chunk && chunk.done) {
-          this.plugin.logger.info("[OllamaView] Stream finished (done=true received).");
           break;
         }
       }
       this.plugin.logger.debug(`[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`);
       if (accumulatedResponse.trim()) {
-        await this.plugin.chatManager.addMessageToActiveChat(
-          "assistant",
-          accumulatedResponse,
-          responseStartTime,
-          // Використовуємо час початку відповіді
-          false
-          // <-- НЕ генерувати подію message-added
-        );
+        await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false);
         this.plugin.logger.debug(`Saved final assistant message (length: ${accumulatedResponse.length}) to chat history.`);
       } else {
-        this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
-        this.addMessageToDisplay("system", "Assistant provided an empty response.", new Date());
-        assistantMessageGroupEl == null ? void 0 : assistantMessageGroupEl.remove();
-        this.currentAssistantMessage = null;
       }
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
-      if (error.name === "AbortError" || ((_c = error.message) == null ? void 0 : _c.includes("aborted")) || ((_d = error.message) == null ? void 0 : _d.includes("aborted by user"))) {
+      if (error.name === "AbortError" || ((_d = error.message) == null ? void 0 : _d.includes("aborted")) || ((_e = error.message) == null ? void 0 : _e.includes("aborted by user"))) {
         this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
         this.addMessageToDisplay("system", "Generation stopped.", new Date());
         if (this.currentAssistantMessage && accumulatedResponse.trim()) {
-          this.plugin.logger.info(`[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`);
-          await this.plugin.chatManager.addMessageToActiveChat(
-            "assistant",
-            accumulatedResponse,
-            (_e = this.currentAssistantMessage.timestamp) != null ? _e : responseStartTime,
-            // Використовуємо збережений час
-            false
-            // <-- НЕ генерувати подію message-added
-          ).catch((e) => this.plugin.logger.error("Failed to save partial message after abort:", e));
+          await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, (_f = this.currentAssistantMessage.timestamp) != null ? _f : responseStartTime, false).catch((e) => this.plugin.logger.error("Failed to save partial message after abort:", e));
           if (this.currentAssistantMessage.contentEl) {
             this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + "\n\n[...] _(Stopped)_");
           }
-        } else if ((_f = this.currentAssistantMessage) == null ? void 0 : _f.groupEl) {
-          this.plugin.logger.debug("Removing assistant message placeholder after cancellation with no response.");
+        } else if ((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) {
           this.currentAssistantMessage.groupEl.remove();
           this.currentAssistantMessage = null;
         }
       } else {
-        this.addMessageToDisplay(
-          "error",
-          `Error: ${error.message || "Unknown streaming error."}`,
-          new Date()
-        );
-        if (assistantMessageGroupEl) {
-          this.plugin.logger.debug("Removing assistant message placeholder due to error.");
-          assistantMessageGroupEl.remove();
-        }
+        this.addMessageToDisplay("error", `Error: ${error.message || "Unknown streaming error."}`, new Date());
+        assistantMessageGroupEl == null ? void 0 : assistantMessageGroupEl.remove();
         this.currentAssistantMessage = null;
       }
     } finally {
       this.plugin.logger.debug("[OllamaView] sendMessage finally block executing. Cleaning up UI state.");
-      if (((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) && ((_h = this.currentAssistantMessage) == null ? void 0 : _h.contentEl) && assistantMessageElInternal) {
-        const finalTimestamp = (_i = this.currentAssistantMessage.timestamp) != null ? _i : responseStartTime;
+      if (((_h = this.currentAssistantMessage) == null ? void 0 : _h.groupEl) && ((_i = this.currentAssistantMessage) == null ? void 0 : _i.contentEl) && assistantMessageElInternal) {
+        const finalTimestamp = (_j = this.currentAssistantMessage.timestamp) != null ? _j : responseStartTime;
         const finalContent = accumulatedResponse;
         const targetContentElement = this.currentAssistantMessage.contentEl;
         const messageWrapper = assistantMessageElInternal.parentElement;
@@ -2559,36 +2511,27 @@ This action cannot be undone.`,
             (0, import_obsidian3.setIcon)(translateBtn, "languages");
             this.registerDomEvent(translateBtn, "click", (e) => {
               e.stopPropagation();
-              if (targetContentElement && targetContentElement.isConnected) {
+              if (targetContentElement && targetContentElement.isConnected)
                 this.handleTranslateClick(finalContent, targetContentElement, translateBtn);
-              } else {
-                this.plugin.logger.error("Translate click handler (finally): targetContentElement is null or not connected!");
+              else
                 new import_obsidian3.Notice("Cannot translate: message content element not found.");
-              }
             });
           }
           const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
           (0, import_obsidian3.setIcon)(deleteBtn, "trash");
           this.registerDomEvent(deleteBtn, "click", (e) => {
             e.stopPropagation();
-            const tempMsgForDelete = { role: "assistant", content: finalContent, timestamp: finalTimestamp };
-            this.handleDeleteMessageClick(tempMsgForDelete);
+            this.handleDeleteMessageClick({ role: "assistant", content: finalContent, timestamp: finalTimestamp });
           });
-        } else {
-          this.plugin.logger.warn("[OllamaView] finally: Could not find message-wrapper to add action buttons.");
         }
         const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
         existingTimestamp == null ? void 0 : existingTimestamp.remove();
-        assistantMessageElInternal.createDiv({
-          cls: CSS_CLASS_TIMESTAMP,
-          text: this.formatTime(finalTimestamp)
-        });
+        assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
         this.checkMessageForCollapsing(assistantMessageElInternal);
-      } else {
-        this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed or null).");
       }
       this.setLoadingState(false);
-      (_j = this.stopGeneratingButton) == null ? void 0 : _j.hide();
+      (_k = this.stopGeneratingButton) == null ? void 0 : _k.hide();
+      (_l = this.sendButton) == null ? void 0 : _l.show();
       this.currentAbortController = null;
       this.currentAssistantMessage = null;
       this.updateSendButtonState();
@@ -2596,7 +2539,6 @@ This action cannot be undone.`,
       this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
     }
   }
-  // ... (решта коду OllamaView.ts після sendMessage) ...
   // --- Core Rendering Logic ---
   /** Renders a single message bubble based on the message object and context */
   renderMessageInternal(message, messageContext) {
@@ -2819,9 +2761,6 @@ This action cannot be undone.`,
       }
     ).open();
   }
-  // OllamaView.ts
-  // ... (інші методи класу до handleRegenerateClick) ...
-  // --- ПОВНА ВЕРСІЯ МЕТОДУ: handleRegenerateClick ---
   async handleRegenerateClick(userMessage) {
     var _a;
     this.plugin.logger.info(
@@ -2860,7 +2799,7 @@ This action cannot be undone.`,
       "Confirm Regeneration",
       "This will delete all messages after this prompt and generate a new response. Continue?",
       async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
         this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
         this.currentAbortController = new AbortController();
         let assistantMessageGroupEl = null;
@@ -2870,7 +2809,7 @@ This action cannot be undone.`,
         const responseStartTime = new Date();
         this.setLoadingState(true);
         (_a2 = this.stopGeneratingButton) == null ? void 0 : _a2.show();
-        this.updateSendButtonState();
+        (_b = this.sendButton) == null ? void 0 : _b.hide();
         try {
           this.plugin.logger.debug(`Deleting messages after index ${messageIndex} in chat ${chatId}...`);
           const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
@@ -2942,7 +2881,7 @@ This action cannot be undone.`,
           }
         } catch (error) {
           this.plugin.logger.error("Error during regeneration process:", error);
-          if (error.name === "AbortError" || ((_b = error.message) == null ? void 0 : _b.includes("aborted")) || ((_c = error.message) == null ? void 0 : _c.includes("aborted by user"))) {
+          if (error.name === "AbortError" || ((_c = error.message) == null ? void 0 : _c.includes("aborted")) || ((_d = error.message) == null ? void 0 : _d.includes("aborted by user"))) {
             this.plugin.logger.info("[OllamaView] Regeneration was cancelled by user.");
             this.addMessageToDisplay("system", "Regeneration stopped.", new Date());
             if (this.currentAssistantMessage && accumulatedResponse.trim()) {
@@ -2950,14 +2889,14 @@ This action cannot be undone.`,
               await this.plugin.chatManager.addMessageToActiveChat(
                 "assistant",
                 accumulatedResponse,
-                (_d = this.currentAssistantMessage.timestamp) != null ? _d : responseStartTime,
+                (_e = this.currentAssistantMessage.timestamp) != null ? _e : responseStartTime,
                 false
                 // НЕ генерувати подію
               ).catch((e) => this.plugin.logger.error("Failed to save partial message after regeneration abort:", e));
               if (this.currentAssistantMessage.contentEl) {
                 this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + "\n\n[...] _(Stopped)_");
               }
-            } else if ((_e = this.currentAssistantMessage) == null ? void 0 : _e.groupEl) {
+            } else if ((_f = this.currentAssistantMessage) == null ? void 0 : _f.groupEl) {
               this.plugin.logger.debug("Removing assistant message placeholder after regeneration cancellation with no response.");
               this.currentAssistantMessage.groupEl.remove();
               this.currentAssistantMessage = null;
@@ -2972,8 +2911,8 @@ This action cannot be undone.`,
           }
         } finally {
           this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block executing. Cleaning up UI state.");
-          if (((_f = this.currentAssistantMessage) == null ? void 0 : _f.groupEl) && ((_g = this.currentAssistantMessage) == null ? void 0 : _g.contentEl) && assistantMessageElInternal) {
-            const finalTimestamp = (_h = this.currentAssistantMessage.timestamp) != null ? _h : responseStartTime;
+          if (((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) && ((_h = this.currentAssistantMessage) == null ? void 0 : _h.contentEl) && assistantMessageElInternal) {
+            const finalTimestamp = (_i = this.currentAssistantMessage.timestamp) != null ? _i : responseStartTime;
             const finalContent = accumulatedResponse;
             const targetContentElement = this.currentAssistantMessage.contentEl;
             const messageWrapper = assistantMessageElInternal.parentElement;
@@ -3021,7 +2960,8 @@ This action cannot be undone.`,
             this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed or null).");
           }
           this.setLoadingState(false);
-          (_i = this.stopGeneratingButton) == null ? void 0 : _i.hide();
+          (_j = this.stopGeneratingButton) == null ? void 0 : _j.hide();
+          (_k = this.sendButton) == null ? void 0 : _k.show();
           this.currentAbortController = null;
           this.currentAssistantMessage = null;
           this.updateSendButtonState();
@@ -3029,10 +2969,8 @@ This action cannot be undone.`,
           this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
         }
       }
-      // Кінець колбеку ConfirmModal
     ).open();
   }
-  // ... (решта коду OllamaView.ts після handleRegenerateClick) ...
   // --- Action Button Handlers ---
   handleCopyClick(content, buttonEl) {
     let textToCopy = content;
