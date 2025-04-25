@@ -3381,31 +3381,53 @@ private handleScrollToBottomClick = (): void => {
     }
 }
 
-  // --- Rendering Helpers ---
-  private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
-    const settings = this.plugin.settings;
-    const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
-    const avatarContent = isUser
-      ? settings.userAvatarContent
-      : settings.aiAvatarContent;
-    const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
-    const avatarEl = groupEl.createDiv({
-      cls: `${CSS_CLASS_AVATAR} ${avatarClass}`,
-    });
+private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
+  const settings = this.plugin.settings;
+  const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
+  const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
+  const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
 
-    if (avatarType === "initials") {
-      avatarEl.textContent = avatarContent || (isUser ? "U" : "A");
-    } else if (avatarType === "icon") {
-      try {
-        setIcon(avatarEl, avatarContent || (isUser ? "user" : "bot"));
-      } catch (e) {
-        //console.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
-        avatarEl.textContent = isUser ? "U" : "A"; // Fallback
+  // --- ОНОВЛЕНО: Додано обробку 'image' ---
+  const avatarEl = groupEl.createDiv({ cls: [CSS_CLASS_AVATAR, avatarClass] });
+
+  avatarEl.empty(); // Очищаємо вміст перед додаванням нового
+
+  if (avatarType === 'image' && avatarContent) {
+      // Тип 'image' і шлях вказано
+      const imagePath = normalizePath(avatarContent);
+      const imageFile = this.app.vault.getAbstractFileByPath(imagePath);
+
+      if (imageFile instanceof TFile) {
+          // Файл знайдено, отримуємо ресурсний шлях
+          const imageUrl = this.app.vault.getResourcePath(imageFile);
+          avatarEl.createEl('img', {
+               attr: { src: imageUrl, alt: isUser ? 'User Avatar' : 'AI Avatar' }, // Додаємо alt атрибут
+               cls: 'ollama-avatar-image' // Додаємо клас для стилізації
+          });
+           // Додаємо title з шляхом до файлу для налагодження
+           avatarEl.title = `Avatar from: ${imagePath}`;
+      } else {
+          // Файл не знайдено або це не файл - відкат до ініціалів
+          this.plugin.logger.warn(`Avatar image not found or invalid path: "${imagePath}". Falling back to initials.`);
+          avatarEl.textContent = isUser ? 'U' : 'AI'; // Запасний варіант - ініціали
+          avatarEl.title = `Avatar image path invalid: ${imagePath}`; // Підказка для користувача
       }
-    } else {
-      avatarEl.textContent = isUser ? "U" : "A"; // Default fallback
-    }
+  } else if (avatarType === 'icon') {
+      // Обробка іконки (як раніше)
+      try {
+          setIcon(avatarEl, avatarContent || (isUser ? 'user' : 'bot'));
+      } catch (e) {
+          this.plugin.logger.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
+          avatarEl.textContent = (isUser ? settings.userAvatarContent.substring(0,1) : settings.aiAvatarContent.substring(0,1) ) || (isUser ? 'U' : 'A'); // Запасний варіант - ініціали
+      }
+  } else { // 'initials' або невідомий тип
+      // Обробка ініціалів (як раніше)
+      avatarEl.textContent = avatarContent.substring(0, 2) || (isUser ? 'U' : 'A'); // Беремо перші два символи або дефолтні
   }
+  // --- Кінець ОНОВЛЕНО ---
+}
+
+  // --- Rendering Helpers ---
   private renderDateSeparator(date: Date): void {
     if (!this.chatContainer) return;
     this.chatContainer.createDiv({

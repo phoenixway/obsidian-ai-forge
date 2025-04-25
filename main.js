@@ -3038,27 +3038,42 @@ This action cannot be undone.`,
       buttonEl.setAttribute("title", `Translate to ${targetLangName}`);
     }
   }
-  // --- Rendering Helpers ---
   renderAvatar(groupEl, isUser) {
     const settings = this.plugin.settings;
     const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
     const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
     const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
-    const avatarEl = groupEl.createDiv({
-      cls: `${CSS_CLASS_AVATAR} ${avatarClass}`
-    });
-    if (avatarType === "initials") {
-      avatarEl.textContent = avatarContent || (isUser ? "U" : "A");
+    const avatarEl = groupEl.createDiv({ cls: [CSS_CLASS_AVATAR, avatarClass] });
+    avatarEl.empty();
+    if (avatarType === "image" && avatarContent) {
+      const imagePath = (0, import_obsidian3.normalizePath)(avatarContent);
+      const imageFile = this.app.vault.getAbstractFileByPath(imagePath);
+      if (imageFile instanceof import_obsidian3.TFile) {
+        const imageUrl = this.app.vault.getResourcePath(imageFile);
+        avatarEl.createEl("img", {
+          attr: { src: imageUrl, alt: isUser ? "User Avatar" : "AI Avatar" },
+          // Додаємо alt атрибут
+          cls: "ollama-avatar-image"
+          // Додаємо клас для стилізації
+        });
+        avatarEl.title = `Avatar from: ${imagePath}`;
+      } else {
+        this.plugin.logger.warn(`Avatar image not found or invalid path: "${imagePath}". Falling back to initials.`);
+        avatarEl.textContent = isUser ? "U" : "AI";
+        avatarEl.title = `Avatar image path invalid: ${imagePath}`;
+      }
     } else if (avatarType === "icon") {
       try {
         (0, import_obsidian3.setIcon)(avatarEl, avatarContent || (isUser ? "user" : "bot"));
       } catch (e) {
-        avatarEl.textContent = isUser ? "U" : "A";
+        this.plugin.logger.warn(`Failed to set avatar icon "${avatarContent}". Falling back to initials.`, e);
+        avatarEl.textContent = (isUser ? settings.userAvatarContent.substring(0, 1) : settings.aiAvatarContent.substring(0, 1)) || (isUser ? "U" : "A");
       }
     } else {
-      avatarEl.textContent = isUser ? "U" : "A";
+      avatarEl.textContent = avatarContent.substring(0, 2) || (isUser ? "U" : "A");
     }
   }
+  // --- Rendering Helpers ---
   renderDateSeparator(date) {
     if (!this.chatContainer)
       return;
@@ -4368,10 +4383,8 @@ var Logger = class {
     this.fileLogLevel = 3 /* WARN */;
     this.fileLoggingEnabled = false;
     this.logCallerInfo = false;
-    // <--- Прапорець для опції
     this.logFileMaxSizeMB = 5;
     this.logQueue = [];
-    // Буфер для запису у файл
     this.isWritingToFile = false;
     this.writeDebounceTimeout = null;
     this.plugin = plugin;
@@ -4388,26 +4401,17 @@ var Logger = class {
       this.info("Logger initialized.");
     }
   }
+  // --- ДОДАНО: Публічний метод для отримання шляху ---
+  getLogFilePath() {
+    return this.logFilePath;
+  }
+  // --- КІНЕЦЬ ДОДАНОГО МЕТОДУ ---
   getLogLevelName(level) {
     return LogLevel[level] || "UNKNOWN";
   }
   getLogLevelFromString(levelString, defaultLevel = 2 /* INFO */) {
-    switch (levelString == null ? void 0 : levelString.toUpperCase()) {
-      case "DEBUG":
-        return 1 /* DEBUG */;
-      case "INFO":
-        return 2 /* INFO */;
-      case "WARN":
-        return 3 /* WARN */;
-      case "ERROR":
-        return 4 /* ERROR */;
-      case "NONE":
-        return 5 /* NONE */;
-      default:
-        return defaultLevel;
-    }
+    return LogLevel[levelString == null ? void 0 : levelString.toUpperCase()] || defaultLevel;
   }
-  // --- Оновлення Налаштувань ---
   updateSettings(settings) {
     if (settings.consoleLogLevel !== void 0) {
       this.consoleLogLevel = this.getLogLevelFromString(settings.consoleLogLevel, 2 /* INFO */);
@@ -4429,38 +4433,18 @@ var Logger = class {
       this.logCallerInfo = settings.logCallerInfo;
       console.log(`[Logger] Log Caller Info enabled: ${this.logCallerInfo}`);
     }
+    if (settings.logFilePath !== void 0) {
+      this.logFilePath = (0, import_obsidian4.normalizePath)(settings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
+      console.log(`[Logger] Log file path updated to: ${this.logFilePath}`);
+    }
+    if (settings.logFileMaxSizeMB !== void 0) {
+      this.logFileMaxSizeMB = settings.logFileMaxSizeMB || 5;
+      console.log(`[Logger] Log file max size updated to: ${this.logFileMaxSizeMB} MB`);
+    }
   }
-  // --- Отримання Інформації про Викликаючого ---
-  /**
-   * Намагається визначити ім'я/контекст функції, що викликала метод логера.
-   * УВАГА: Має вплив на продуктивність! Використовуйте обережно.
-   */
   getCallerInfo() {
-    var _a, _b;
-    if (!this.logCallerInfo) {
-      return "unknown";
-    }
-    try {
-      const err = new Error();
-      const stackLines = (_a = err.stack) == null ? void 0 : _a.split("\n");
-      if (stackLines && stackLines.length > 3) {
-        const callerLine = stackLines[3];
-        const match = callerLine.match(/at (?:new )?([\w$.<>\[\] ]+)?(?: \[as \w+\])? ?\(?/);
-        let callerName = (_b = match == null ? void 0 : match[1]) == null ? void 0 : _b.trim();
-        if (callerName) {
-          callerName = callerName.replace(/^Object\./, "");
-          callerName = callerName.replace(/<anonymous>/, "anonymous");
-          if (callerName.includes("/") || callerName.includes("\\")) {
-            return "(file context)";
-          }
-          return callerName;
-        }
-      }
-    } catch (e) {
-    }
     return "unknown";
   }
-  // --- Методи Логування ---
   debug(...args) {
     this.log(1 /* DEBUG */, console.debug, ...args);
   }
@@ -4473,7 +4457,6 @@ var Logger = class {
   error(...args) {
     this.log(4 /* ERROR */, console.error, ...args);
   }
-  // --- Ядро Логування ---
   log(level, consoleMethod, ...args) {
     const caller = this.getCallerInfo();
     if (level >= this.consoleLogLevel) {
@@ -4484,83 +4467,16 @@ var Logger = class {
       this.queueOrWriteToFile(level, caller, args);
     }
   }
-  // --- Робота з Файлом (з чергою/буфером) ---
   queueOrWriteToFile(level, caller, args) {
-    try {
-      const timestamp = new Date().toISOString();
-      const levelName = this.getLogLevelName(level);
-      const message = args.map((arg) => {
-        if (typeof arg === "string")
-          return arg;
-        if (arg instanceof Error)
-          return arg.stack || arg.message;
-        try {
-          return JSON.stringify(arg);
-        } catch (e) {
-          return String(arg);
-        }
-      }).join(" ");
-      const callerInfo = this.logCallerInfo && caller !== "unknown" ? ` [${caller}]` : "";
-      const logLine = `${timestamp} [${levelName}]${callerInfo} ${message}
-`;
-      this.logQueue.push(logLine);
-      if (!this.isWritingToFile) {
-        this.triggerWriteToFile();
-      }
-    } catch (error) {
-      console.error("[Logger] Error formatting log line:", error);
-    }
   }
   triggerWriteToFile() {
-    if (this.writeDebounceTimeout) {
-      clearTimeout(this.writeDebounceTimeout);
-    }
-    this.writeDebounceTimeout = setTimeout(async () => {
-      if (this.isWritingToFile || this.logQueue.length === 0) {
-        return;
-      }
-      this.isWritingToFile = true;
-      const linesToWrite = [...this.logQueue];
-      this.logQueue = [];
-      try {
-        const contentToWrite = linesToWrite.join("");
-        await this.adapter.append(this.logFilePath, contentToWrite);
-      } catch (error) {
-        console.error("[Logger] Failed to write batch to log file:", error);
-        this.logQueue.unshift(...linesToWrite);
-      } finally {
-        this.isWritingToFile = false;
-        if (this.logQueue.length > 0) {
-          this.triggerWriteToFile();
-        }
-      }
-    }, 500);
   }
   async rotateLogFileIfNeeded() {
-    if (!this.fileLoggingEnabled)
-      return;
-    try {
-      if (await this.adapter.exists(this.logFilePath)) {
-        const stats = await this.adapter.stat(this.logFilePath);
-        const maxSizeInBytes = (this.logFileMaxSizeMB || 5) * 1024 * 1024;
-        if (stats && stats.type === "file" && stats.size > maxSizeInBytes) {
-          const backupPath = this.logFilePath + ".bak";
-          console.log(`[Logger] Rotating log file (size ${stats.size} > ${maxSizeInBytes}). Backup: ${backupPath}`);
-          if (await this.adapter.exists(backupPath)) {
-            await this.adapter.remove(backupPath);
-          }
-          await this.adapter.rename(this.logFilePath, backupPath);
-        }
-      }
-    } catch (error) {
-      console.error("[Logger] Error rotating log file:", error);
-    }
   }
 };
 
 // src/settings.ts
 var LANGUAGES2 = {
-  /* ... ваш довгий список мов ... */
   "af": "Afrikaans",
   "sq": "Albanian",
   "am": "Amharic",
@@ -4680,15 +4596,17 @@ var DEFAULT_SETTINGS = {
   contextWindow: 4096,
   // Roles
   userRolesFolderPath: "/etc/ai-forge/roles",
+  // Приклад шляху
   selectedRolePath: "",
   followRole: true,
   // Storage & History
   saveMessageHistory: true,
   chatHistoryFolderPath: "/etc/ai-forge/chats",
+  // Приклад шляху
   chatExportFolderPath: "/etc/ai-forge/xports",
+  // Приклад шляху
   // View Behavior
   openChatInTab: false,
-  // За замовчуванням - бічна панель
   maxMessageHeight: 300,
   // Appearance
   userAvatarType: "initials",
@@ -4698,6 +4616,7 @@ var DEFAULT_SETTINGS = {
   // RAG
   ragEnabled: false,
   ragFolderPath: "etc/ai-forge/rag",
+  // Приклад шляху
   ragEnableSemanticSearch: true,
   ragEmbeddingModel: "nomic-embed-text",
   ragChunkSize: 512,
@@ -4724,6 +4643,7 @@ var DEFAULT_SETTINGS = {
   fileLogLevel: "WARN",
   logCallerInfo: false,
   logFilePath: "",
+  // Logger сам підставить шлях до папки плагіна
   logFileMaxSizeMB: 5
 };
 var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
@@ -4837,41 +4757,77 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
       (_b = (_a = this.plugin.view) == null ? void 0 : _a.checkAllMessagesForCollapsing) == null ? void 0 : _b.call(_a);
     }));
     this.createSectionHeader("Appearance");
-    new import_obsidian5.Setting(containerEl).setName("User Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("User Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").addOption("image", "Image (Vault Path)").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
       this.plugin.settings.userAvatarType = value;
       await this.plugin.saveSettings();
       this.display();
     }));
+    const userAvatarSetting = new import_obsidian5.Setting(containerEl).setDesc(" ");
+    userAvatarSetting.controlEl.addClass("ai-forge-avatar-content-setting");
     if (this.plugin.settings.userAvatarType === "initials") {
-      new import_obsidian5.Setting(containerEl).setName("User Initials").setDesc("Max 2 chars.").addText((text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
-        this.plugin.settings.userAvatarContent = value.trim().substring(0, 2) || "U";
+      userAvatarSetting.setName("User Initials").setDesc("Max 2 chars.");
+      userAvatarSetting.addText((text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+        this.plugin.settings.userAvatarContent = value.trim().substring(0, 2) || DEFAULT_SETTINGS.userAvatarContent;
         await this.plugin.saveSettings();
       }));
-    } else {
-      new import_obsidian5.Setting(containerEl).setName("User Icon ID").setDesc('Obsidian icon ID (e.g., "user").').addText((text) => text.setPlaceholder("user").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+    } else if (this.plugin.settings.userAvatarType === "icon") {
+      userAvatarSetting.setName("User Icon ID").setDesc('Obsidian icon ID (e.g., "user").');
+      userAvatarSetting.addText((text) => text.setPlaceholder("user").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
         this.plugin.settings.userAvatarContent = value.trim() || "user";
         await this.plugin.saveSettings();
       }));
+    } else if (this.plugin.settings.userAvatarType === "image") {
+      userAvatarSetting.setName("User Avatar Image Path");
+      userAvatarSetting.setDesc("Full path to the image file (png/jpeg/jpg) within your vault.");
+      userAvatarSetting.addText((text) => text.setPlaceholder("e.g., Assets/Images/user.png").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+        const normalizedPath = (0, import_obsidian5.normalizePath)(value.trim());
+        if (normalizedPath === "" || /\.(png|jpg|jpeg)$/i.test(normalizedPath)) {
+          this.plugin.settings.userAvatarContent = normalizedPath;
+        } else {
+          new import_obsidian5.Notice("Invalid path. Please provide a path to a .png or .jpeg/jpg file, or leave empty.");
+          text.setValue(this.plugin.settings.userAvatarContent);
+          return;
+        }
+        await this.plugin.saveSettings();
+      }));
     }
-    new import_obsidian5.Setting(containerEl).setName("AI Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("AI Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").addOption("image", "Image (Vault Path)").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
       this.plugin.settings.aiAvatarType = value;
       await this.plugin.saveSettings();
       this.display();
     }));
+    const aiAvatarSetting = new import_obsidian5.Setting(containerEl).setDesc(" ");
+    aiAvatarSetting.controlEl.addClass("ai-forge-avatar-content-setting");
     if (this.plugin.settings.aiAvatarType === "initials") {
-      new import_obsidian5.Setting(containerEl).setName("AI Initials").setDesc("Max 2 chars.").addText((text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
-        this.plugin.settings.aiAvatarContent = value.trim().substring(0, 2) || "AI";
+      aiAvatarSetting.setName("AI Initials").setDesc("Max 2 chars.");
+      aiAvatarSetting.addText((text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+        this.plugin.settings.aiAvatarContent = value.trim().substring(0, 2) || DEFAULT_SETTINGS.aiAvatarContent;
         await this.plugin.saveSettings();
       }));
-    } else {
-      new import_obsidian5.Setting(containerEl).setName("AI Icon ID").setDesc('Obsidian icon ID (e.g., "bot").').addText((text) => text.setPlaceholder("bot").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+    } else if (this.plugin.settings.aiAvatarType === "icon") {
+      aiAvatarSetting.setName("AI Icon ID").setDesc('Obsidian icon ID (e.g., "bot").');
+      aiAvatarSetting.addText((text) => text.setPlaceholder("bot").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
         this.plugin.settings.aiAvatarContent = value.trim() || "bot";
+        await this.plugin.saveSettings();
+      }));
+    } else if (this.plugin.settings.aiAvatarType === "image") {
+      aiAvatarSetting.setName("AI Avatar Image Path");
+      aiAvatarSetting.setDesc("Full path to the image file (png/jpeg/jpg) within your vault.");
+      aiAvatarSetting.addText((text) => text.setPlaceholder("e.g., Assets/Images/ai.png").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+        const normalizedPath = (0, import_obsidian5.normalizePath)(value.trim());
+        if (normalizedPath === "" || /\.(png|jpg|jpeg)$/i.test(normalizedPath)) {
+          this.plugin.settings.aiAvatarContent = normalizedPath;
+        } else {
+          new import_obsidian5.Notice("Invalid path. Please provide a path to a .png or .jpeg/jpg file, or leave empty.");
+          text.setValue(this.plugin.settings.aiAvatarContent);
+          return;
+        }
         await this.plugin.saveSettings();
       }));
     }
     this.createSectionHeader("Roles & Personas");
     new import_obsidian5.Setting(containerEl).setName("Custom Roles Folder Path").setDesc("Folder with custom role (.md) files.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.userRolesFolderPath).setValue(this.plugin.settings.userRolesFolderPath).onChange(async (value) => {
-      this.plugin.settings.userRolesFolderPath = value.trim();
+      this.plugin.settings.userRolesFolderPath = (0, import_obsidian5.normalizePath)(value.trim()) || DEFAULT_SETTINGS.userRolesFolderPath;
       await this.plugin.saveSettings();
       this.debouncedUpdateRolePath();
     }));
@@ -4886,15 +4842,17 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
       this.display();
     }));
     if (this.plugin.settings.saveMessageHistory) {
-      new import_obsidian5.Setting(containerEl).setName("Chat History Folder Path").setDesc("Folder to store chat history (.json files).").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath).setValue(this.plugin.settings.chatHistoryFolderPath).onChange(async (value) => {
-        this.plugin.settings.chatHistoryFolderPath = value.trim() || DEFAULT_SETTINGS.chatHistoryFolderPath;
+      new import_obsidian5.Setting(containerEl).setName("Chat History Folder Path").setDesc('Folder to store chat history (.json files). Use "/" for vault root.').addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath).setValue(this.plugin.settings.chatHistoryFolderPath).onChange(async (value) => {
+        this.plugin.settings.chatHistoryFolderPath = value.trim() === "/" ? "/" : (0, import_obsidian5.normalizePath)(value.trim()) || DEFAULT_SETTINGS.chatHistoryFolderPath;
         await this.plugin.saveSettings();
         this.debouncedUpdateChatPath();
       }));
     }
     new import_obsidian5.Setting(containerEl).setName("Chat Export Folder Path").setDesc("Default folder for exported Markdown chats.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.chatExportFolderPath || "Vault Root").setValue(this.plugin.settings.chatExportFolderPath).onChange(async (value) => {
-      this.plugin.settings.chatExportFolderPath = value.trim();
+      this.plugin.settings.chatExportFolderPath = (0, import_obsidian5.normalizePath)(value.trim()) || DEFAULT_SETTINGS.chatExportFolderPath;
       await this.plugin.saveSettings();
+      if (this.plugin.chatManager)
+        await this.plugin.chatManager.ensureFoldersExist();
     }));
     this.createSectionHeader("Retrieval-Augmented Generation (RAG)");
     new import_obsidian5.Setting(containerEl).setName("Enable RAG").setDesc("Allow retrieving info from notes for context.").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
@@ -4907,13 +4865,13 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
     if (this.plugin.settings.ragEnabled) {
       new import_obsidian5.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder with notes for RAG.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.ragFolderPath).setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
         var _a, _b, _c, _d;
-        this.plugin.settings.ragFolderPath = value.trim() || DEFAULT_SETTINGS.ragFolderPath;
+        this.plugin.settings.ragFolderPath = (0, import_obsidian5.normalizePath)(value.trim()) || DEFAULT_SETTINGS.ragFolderPath;
         await this.plugin.saveSettings();
         this.debouncedUpdateRagPath();
         (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
         (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
       }));
-      new import_obsidian5.Setting(containerEl).setName("Enable Semantic Search").setDesc("Use embeddings (more accurate).").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnableSemanticSearch).onChange(async (value) => {
+      new import_obsidian5.Setting(containerEl).setName("Enable Semantic Search").setDesc("Use embeddings (more accurate). If OFF, uses keyword search.").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnableSemanticSearch).onChange(async (value) => {
         this.plugin.settings.ragEnableSemanticSearch = value;
         await this.plugin.saveSettings();
         this.display();
@@ -4943,7 +4901,7 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
                 }
               });
             }
-            dropdown.setValue(models.includes(previousValue) ? previousValue : commonEmbedModels[0] || "");
+            dropdown.setValue(models.includes(previousValue) ? previousValue : commonEmbedModels.length > 0 ? commonEmbedModels[0] : "");
           } catch (error) {
             console.error("Error fetching models for embedding dropdown:", error);
             dropdown.selectEl.innerHTML = "";
@@ -4974,24 +4932,24 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
           await this.plugin.saveSettings();
           this.debouncedUpdateRagPath();
         }));
-        new import_obsidian5.Setting(containerEl).setName("Similarity Threshold").setDesc("Min relevance score (0.0-1.0).").addSlider((slider) => slider.setLimits(0, 1, 0.05).setValue(this.plugin.settings.ragSimilarityThreshold).setDynamicTooltip().onChange(async (value) => {
+        new import_obsidian5.Setting(containerEl).setName("Similarity Threshold").setDesc("Min relevance score (0.0-1.0). Higher = stricter matching.").addSlider((slider) => slider.setLimits(0, 1, 0.05).setValue(this.plugin.settings.ragSimilarityThreshold).setDynamicTooltip().onChange(async (value) => {
           this.plugin.settings.ragSimilarityThreshold = value;
           await this.plugin.saveSettings();
         }));
-        new import_obsidian5.Setting(containerEl).setName("Top K Results").setDesc("Max number of relevant chunks.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragTopK)).setValue(String(this.plugin.settings.ragTopK)).onChange(async (value) => {
+        new import_obsidian5.Setting(containerEl).setName("Top K Results").setDesc("Max number of relevant chunks to retrieve.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragTopK)).setValue(String(this.plugin.settings.ragTopK)).onChange(async (value) => {
           const num = parseInt(value.trim(), 10);
           this.plugin.settings.ragTopK = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.ragTopK;
           await this.plugin.saveSettings();
         }));
       }
-      new import_obsidian5.Setting(containerEl).setName("Max Chars Per Doc (Legacy?)").setDesc("Max chars per chunk (0=no limit).").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.maxCharsPerDoc)).setValue(String(this.plugin.settings.maxCharsPerDoc)).onChange(async (value) => {
+      new import_obsidian5.Setting(containerEl).setName("Max Chars Per Document (During Context Build)").setDesc("Limits characters included per retrieved document in the final prompt (0=no limit).").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.maxCharsPerDoc)).setValue(String(this.plugin.settings.maxCharsPerDoc)).onChange(async (value) => {
         const num = parseInt(value.trim(), 10);
         this.plugin.settings.maxCharsPerDoc = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.maxCharsPerDoc;
         await this.plugin.saveSettings();
       }));
     }
     this.createSectionHeader("Productivity Assistant Features");
-    new import_obsidian5.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate daily task integration etc.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate daily task integration & advanced context management.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
       var _a, _b, _c, _d;
       this.plugin.settings.enableProductivityFeatures = value;
       await this.plugin.saveSettings();
@@ -5000,36 +4958,38 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
       (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
     }));
     if (this.plugin.settings.enableProductivityFeatures) {
-      new import_obsidian5.Setting(containerEl).setName("Daily Task File Name").setDesc("Filename in RAG folder.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.dailyTaskFileName).setValue(this.plugin.settings.dailyTaskFileName).onChange(async (value) => {
+      new import_obsidian5.Setting(containerEl).setName("Daily Task File Name").setDesc("Filename within the RAG folder used for daily tasks.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.dailyTaskFileName).setValue(this.plugin.settings.dailyTaskFileName).onChange(async (value) => {
         var _a, _b, _c, _d;
         this.plugin.settings.dailyTaskFileName = value.trim() || DEFAULT_SETTINGS.dailyTaskFileName;
         await this.plugin.saveSettings();
         (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
         (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
       }));
-      new import_obsidian5.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enable summarization/chunking.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
+      new import_obsidian5.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enable automatic chat summarization and message chunking for long conversations.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
         this.plugin.settings.useAdvancedContextStrategy = value;
         await this.plugin.saveSettings();
         this.display();
       }));
       if (this.plugin.settings.useAdvancedContextStrategy) {
-        new import_obsidian5.Setting(containerEl).setName("Enable Context Summarization").setDesc("Summarize older chat history.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
+        new import_obsidian5.Setting(containerEl).setName("Enable Context Summarization").setDesc("Automatically summarize older parts of the conversation.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
           this.plugin.settings.enableSummarization = value;
           await this.plugin.saveSettings();
           this.display();
         }));
         if (this.plugin.settings.enableSummarization) {
-          new import_obsidian5.Setting(containerEl).setName("Summarization Prompt").setDesc("Use {text_to_summarize}.").addTextArea((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
-            this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
-            await this.plugin.saveSettings();
-          }).inputEl.setAttrs({ rows: 4 }));
+          new import_obsidian5.Setting(containerEl).setName("Summarization Prompt").setDesc("Prompt used for summarization. Use {text_to_summarize} placeholder.").addTextArea(
+            (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
+              this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
+              await this.plugin.saveSettings();
+            }).inputEl.setAttrs({ rows: 4 })
+          );
         }
-        new import_obsidian5.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Recent messages kept verbatim.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
+        new import_obsidian5.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages excluded from summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
           const num = parseInt(value.trim(), 10);
           this.plugin.settings.keepLastNMessagesBeforeSummary = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
           await this.plugin.saveSettings();
         }));
-        new import_obsidian5.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate token size for summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
+        new import_obsidian5.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate size of text chunks passed to the summarization model.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
           const num = parseInt(value.trim(), 10);
           this.plugin.settings.summarizationChunkSize = !isNaN(num) && num > 100 ? num : DEFAULT_SETTINGS.summarizationChunkSize;
           await this.plugin.saveSettings();
@@ -5041,11 +5001,11 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
       this.plugin.settings.googleApiKey = value.trim();
       await this.plugin.saveSettings();
     }));
-    new import_obsidian5.Setting(containerEl).setName("Speech Recognition Language").setDesc("Language for voice input.").addDropdown((dropdown) => {
+    new import_obsidian5.Setting(containerEl).setName("Speech Recognition Language").setDesc("Language for voice input (e.g., en-US, uk-UA).").addDropdown((dropdown) => {
       const speechLangs = {
         "uk-UA": "Ukrainian",
         "en-US": "English (US)"
-        /* ... інші мови ... */
+        /* ... add more if needed ... */
       };
       for (const code in speechLangs) {
         dropdown.addOption(code, speechLangs[code]);
@@ -5070,7 +5030,7 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
-      new import_obsidian5.Setting(containerEl).setName("Google Cloud Translation API Key").setDesc("Required for translation. Keep confidential.").addText((text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleTranslationApiKey).onChange(async (value) => {
+      new import_obsidian5.Setting(containerEl).setName("Google Cloud Translation API Key").setDesc("Required for translation feature. Keep confidential.").addText((text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleTranslationApiKey).onChange(async (value) => {
         this.plugin.settings.googleTranslationApiKey = value.trim();
         await this.plugin.saveSettings();
       }));
@@ -5086,7 +5046,7 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
       this.plugin.settings.consoleLogLevel = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian5.Setting(containerEl).setName("Enable File Logging").setDesc(`Log to ${this.plugin.manifest.dir}/ai-forge.log (for debugging).`).addToggle((toggle) => toggle.setValue(this.plugin.settings.fileLoggingEnabled).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Enable File Logging").setDesc(`Log to ${this.plugin.logger.getLogFilePath()} (for debugging).`).addToggle((toggle) => toggle.setValue(this.plugin.settings.fileLoggingEnabled).onChange(async (value) => {
       this.plugin.settings.fileLoggingEnabled = value;
       await this.plugin.saveSettings();
       this.display();
@@ -5100,6 +5060,7 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
         this.plugin.settings.logCallerInfo = value;
         await this.plugin.saveSettings();
       }));
+      new import_obsidian5.Setting(containerEl).setName("Log File Path").setDesc("Current location of the log file.").addText((text) => text.setValue(this.plugin.logger.getLogFilePath()).setDisabled(true));
     }
   }
 };

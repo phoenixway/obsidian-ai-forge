@@ -78,6 +78,17 @@
   z-index: 5; // Above potential background elements
   flex-shrink: 0;
 
+  overflow: hidden; 
+  
+  img.ollama-avatar-image {
+    display: block; // Прибирає можливий нижній відступ
+    width: 100%;    // Заповнює всю ширину/висоту батьківського div
+    height: 100%;
+    object-fit: cover; // Масштабує зображення, зберігаючи пропорції і обрізаючи зайве
+                       // Можна спробувати 'contain', якщо хочете бачити все зображення
+    object-position: center; // Центрує зображення
+  }
+
   .svg-icon { width: 60%; height: 60%; }
 
   .user-message-group & {
