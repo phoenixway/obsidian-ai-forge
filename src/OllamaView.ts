@@ -2018,12 +2018,15 @@ private handleScrollToBottomClick = (): void => {
       this.emptyStateEl = null;
     }
   }
+  
   public setLoadingState(isLoading: boolean): void {
     this.isProcessing = isLoading;
     if (this.inputEl) this.inputEl.disabled = isLoading;
-    // Кнопку Stop показуємо/ховаємо в sendMessage/finally
-    // this.stopGeneratingButton?.toggle(isLoading); // Не керуємо тут
-    this.updateSendButtonState(); // Це оновить sendButton
+
+    // Керування кнопками Send/Stop (як раніше)
+    this.updateSendButtonState();
+
+    // Керування іншими кнопками вводу
     if (this.voiceButton) {
         this.voiceButton.disabled = isLoading;
         this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
@@ -2036,7 +2039,25 @@ private handleScrollToBottomClick = (): void => {
         this.menuButton.disabled = isLoading;
         this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
-    // console.log(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
+
+    // --- НОВЕ: Керування кнопками "Show More/Less" ---
+    if (this.chatContainer) {
+        if (isLoading) {
+            // Ховаємо всі кнопки "Show More"
+            this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`)
+                .forEach(button => {
+                    button.style.display = 'none'; // Приховуємо кнопку
+                });
+             this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
+        } else {
+            // Після завершення генерації - перевіряємо всі повідомлення заново
+            this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after generation finished.");
+            this.checkAllMessagesForCollapsing(); // Цей метод відновить кнопки де потрібно
+        }
+    }
+    // --- КІНЕЦЬ НОВОГО БЛОКУ ---
+
+    this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
 }
 
   // Load and Display Chat (Тепер оновлює і температуру)
@@ -4198,73 +4219,91 @@ private renderAvatar(groupEl: HTMLElement, isUser: boolean): void {
       : { hasThinkingTags: false, format: "none" };
   }
 
-  // --- Message Collapsing ---
   private checkMessageForCollapsing(messageEl: HTMLElement): void {
-    const c = messageEl.querySelector<HTMLElement>(
-      `.${CSS_CLASS_CONTENT_COLLAPSIBLE}`
-    );
-    const h = this.plugin.settings.maxMessageHeight;
-    if (!c || h <= 0) {
-      // Якщо контент є, але висота не обмежена, просто видаляємо кнопку і стиль, якщо вони були
-      if (c && h <= 0) {
-        const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-        b?.remove();
-        c.style.maxHeight = "";
-        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      }
-      return;
+    const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const maxH = this.plugin.settings.maxMessageHeight;
+
+    // Перевіряємо, чи існує контент і чи обмеження висоти активне
+    if (!contentCollapsible || maxH <= 0) {
+        // Якщо обмеження вимкнене, прибираємо кнопку і стилі згортання, якщо вони були
+        if (contentCollapsible && maxH <= 0) {
+            const showMoreButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+            showMoreButton?.remove();
+            contentCollapsible.style.maxHeight = "";
+            contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        }
+        return;
     }
 
+    // Використовуємо requestAnimationFrame для надійного вимірювання scrollHeight
     requestAnimationFrame(() => {
-      // Вимірювання в наступному кадрі
-      if (!c) return; // Повторна перевірка елемента
-      const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-      b?.remove(); // Видаляємо стару кнопку, якщо є
-      c.style.maxHeight = ""; // Скидаємо max-height для вимірювання
-      c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      const sh = c.scrollHeight; // Вимірюємо реальну висоту вмісту
-      if (sh > h) {
-        c.style.maxHeight = `${h}px`;
-        c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        const smb = messageEl.createEl("button", {
-          cls: CSS_CLASS_SHOW_MORE_BUTTON,
-          text: "Show More ▼",
-        });
-        this.registerDomEvent(smb, "click", () =>
-          this.toggleMessageCollapse(c, smb)
-        );
-      } else {
-        // Висота менша або дорівнює ліміту, кнопка не потрібна
-        // Переконуємося, що стилі зняті (про всяк випадок)
-        c.style.maxHeight = "";
-        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      }
+         // Перевірка ще раз, бо елемент міг зникнути
+         if (!contentCollapsible || !contentCollapsible.isConnected) return;
+
+        // Видаляємо стару кнопку, якщо вона існує
+        const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+        existingButton?.remove();
+
+        // Важливо: тимчасово знімаємо обмеження max-height, щоб виміряти повну висоту
+        contentCollapsible.style.maxHeight = '';
+        const scrollHeight = contentCollapsible.scrollHeight;
+
+        // Порівнюємо реальну висоту з лімітом
+        if (scrollHeight > maxH) {
+            // Вміст занадто довгий: обрізаємо і додаємо кнопку
+            contentCollapsible.style.maxHeight = `${maxH}px`;
+            contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+            const showMoreButton = messageEl.createEl("button", {
+                cls: CSS_CLASS_SHOW_MORE_BUTTON,
+                text: "Show More ▼",
+            });
+            // --- ВИПРАВЛЕНО: Передаємо this як Component ---
+            this.registerDomEvent(showMoreButton, "click", () => this.toggleMessageCollapse(contentCollapsible, showMoreButton));
+            // ---------------------------------------------
+
+            // --- ДОДАНО: Ховаємо кнопку, якщо йде генерація ---
+            if (this.isProcessing) {
+                 showMoreButton.style.display = 'none';
+            }
+            // --------------------------------------------
+
+        } else {
+            // Вміст достатньо короткий: переконуємось, що стилі зняті
+            contentCollapsible.style.maxHeight = '';
+            contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        }
     });
-  }
-  public checkAllMessagesForCollapsing(): void {
-    /* ... (Implementation from previous responses) ... */ this.chatContainer
-      ?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`)
+}
+
+public checkAllMessagesForCollapsing(): void {
+  this.plugin.logger.debug("Running checkAllMessagesForCollapsing");
+  this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`)
       .forEach((msgEl) => {
-        this.checkMessageForCollapsing(msgEl);
+          this.checkMessageForCollapsing(msgEl);
       });
-  }
-  private toggleMessageCollapse(
-    contentEl: HTMLElement,
-    buttonEl: HTMLButtonElement
-  ): void {
-    /* ... (Implementation from previous responses) ... */ const i =
-      contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
-    const h = this.plugin.settings.maxMessageHeight;
-    if (i) {
-      contentEl.style.maxHeight = "";
+}
+  
+private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement ): void {
+  const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+  const maxHeightLimit = this.plugin.settings.maxMessageHeight;
+
+  if (isCollapsed) {
+      // Розгортаємо
+      contentEl.style.maxHeight = ''; // Знімаємо обмеження
       contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show Less ▲");
-    } else {
-      contentEl.style.maxHeight = `${h}px`;
+  } else {
+      // Згортаємо
+      contentEl.style.maxHeight = `${maxHeightLimit}px`; // Встановлюємо ліміт
       contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show More ▼");
-    }
+      // Плавна прокрутка, щоб верхня частина згорнутого блоку стала видимою
+       // (затримка для завершення анімації)
+       setTimeout(() => {
+            contentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+       }, 310); // Трохи більше за тривалість анімації (0.3s)
   }
+}
 
   // --- Helpers & Utilities ---
   public getChatContainer(): HTMLElement {

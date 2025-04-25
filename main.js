@@ -2182,6 +2182,18 @@ This action cannot be undone.`,
       this.menuButton.disabled = isLoading;
       this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
+    if (this.chatContainer) {
+      if (isLoading) {
+        this.chatContainer.querySelectorAll(`.${CSS_CLASS_SHOW_MORE_BUTTON}`).forEach((button) => {
+          button.style.display = "none";
+        });
+        this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
+      } else {
+        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after generation finished.");
+        this.checkAllMessagesForCollapsing();
+      }
+    }
+    this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
   }
   // Load and Display Chat (Тепер оновлює і температуру)
   // В src/OllamaView.ts
@@ -3734,64 +3746,63 @@ This action cannot be undone.`,
   detectThinkingTags(content) {
     return /<think>[\s\S]*?<\/think>/gi.test(content) ? { hasThinkingTags: true, format: "standard" } : { hasThinkingTags: false, format: "none" };
   }
-  // --- Message Collapsing ---
   checkMessageForCollapsing(messageEl) {
-    const c = messageEl.querySelector(
-      `.${CSS_CLASS_CONTENT_COLLAPSIBLE}`
-    );
-    const h = this.plugin.settings.maxMessageHeight;
-    if (!c || h <= 0) {
-      if (c && h <= 0) {
-        const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-        b == null ? void 0 : b.remove();
-        c.style.maxHeight = "";
-        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+    const contentCollapsible = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const maxH = this.plugin.settings.maxMessageHeight;
+    if (!contentCollapsible || maxH <= 0) {
+      if (contentCollapsible && maxH <= 0) {
+        const showMoreButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+        showMoreButton == null ? void 0 : showMoreButton.remove();
+        contentCollapsible.style.maxHeight = "";
+        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       }
       return;
     }
     requestAnimationFrame(() => {
-      if (!c)
+      if (!contentCollapsible || !contentCollapsible.isConnected)
         return;
-      const b = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-      b == null ? void 0 : b.remove();
-      c.style.maxHeight = "";
-      c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      const sh = c.scrollHeight;
-      if (sh > h) {
-        c.style.maxHeight = `${h}px`;
-        c.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        const smb = messageEl.createEl("button", {
+      const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      existingButton == null ? void 0 : existingButton.remove();
+      contentCollapsible.style.maxHeight = "";
+      const scrollHeight = contentCollapsible.scrollHeight;
+      if (scrollHeight > maxH) {
+        contentCollapsible.style.maxHeight = `${maxH}px`;
+        contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+        const showMoreButton = messageEl.createEl("button", {
           cls: CSS_CLASS_SHOW_MORE_BUTTON,
           text: "Show More \u25BC"
         });
-        this.registerDomEvent(
-          smb,
-          "click",
-          () => this.toggleMessageCollapse(c, smb)
-        );
+        this.registerDomEvent(showMoreButton, "click", () => this.toggleMessageCollapse(contentCollapsible, showMoreButton));
+        if (this.isProcessing) {
+          showMoreButton.style.display = "none";
+        }
       } else {
-        c.style.maxHeight = "";
-        c.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        contentCollapsible.style.maxHeight = "";
+        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       }
     });
   }
   checkAllMessagesForCollapsing() {
     var _a;
+    this.plugin.logger.debug("Running checkAllMessagesForCollapsing");
     (_a = this.chatContainer) == null ? void 0 : _a.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
       this.checkMessageForCollapsing(msgEl);
     });
   }
   toggleMessageCollapse(contentEl, buttonEl) {
-    const i = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
-    const h = this.plugin.settings.maxMessageHeight;
-    if (i) {
+    const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+    const maxHeightLimit = this.plugin.settings.maxMessageHeight;
+    if (isCollapsed) {
       contentEl.style.maxHeight = "";
       contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show Less \u25B2");
     } else {
-      contentEl.style.maxHeight = `${h}px`;
+      contentEl.style.maxHeight = `${maxHeightLimit}px`;
       contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show More \u25BC");
+      setTimeout(() => {
+        contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 310);
     }
   }
   // --- Helpers & Utilities ---
