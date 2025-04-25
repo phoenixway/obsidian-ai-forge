@@ -219,6 +219,7 @@ var CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button";
 var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
 var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 var CSS_CLASS_STOP_BUTTON = "stop-generating-button";
+var CSS_CLASS_SCROLL_BOTTOM_BUTTON = "scroll-to-bottom-button";
 var LANGUAGES = {
   af: "Afrikaans",
   sq: "Albanian",
@@ -1033,9 +1034,8 @@ This action cannot be undone.`,
         clearTimeout(this.resizeTimeout);
       this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100);
     };
-    // --- Scroll Handling ---
     this.handleScroll = () => {
-      if (!this.chatContainer || !this.newMessagesIndicatorEl)
+      if (!this.chatContainer || !this.newMessagesIndicatorEl || !this.scrollToBottomButton)
         return;
       const threshold = 150;
       const atBottom = this.chatContainer.scrollHeight - this.chatContainer.scrollTop - this.chatContainer.clientHeight < threshold;
@@ -1044,9 +1044,10 @@ This action cannot be undone.`,
       if (previousScrolledUp && atBottom) {
         this.newMessagesIndicatorEl.classList.remove(CSS_CLASS_VISIBLE);
       }
+      this.scrollToBottomButton.classList.toggle(CSS_CLASS_VISIBLE, this.userScrolledUp);
     };
     this.handleNewMessageIndicatorClick = () => {
-      var _a;
+      var _a, _b;
       if (this.chatContainer) {
         this.chatContainer.scrollTo({
           top: this.chatContainer.scrollHeight,
@@ -1054,6 +1055,22 @@ This action cannot be undone.`,
         });
       }
       (_a = this.newMessagesIndicatorEl) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
+      (_b = this.scrollToBottomButton) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
+      this.userScrolledUp = false;
+    };
+    // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
+    this.handleScrollToBottomClick = () => {
+      var _a, _b;
+      this.plugin.logger.debug("Scroll to bottom button clicked.");
+      if (this.chatContainer) {
+        this.chatContainer.scrollTo({
+          top: this.chatContainer.scrollHeight,
+          behavior: "smooth"
+          // Плавна прокрутка
+        });
+      }
+      (_a = this.scrollToBottomButton) == null ? void 0 : _a.classList.remove(CSS_CLASS_VISIBLE);
+      (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
     // private adjustTextareaHeight = (): void => {
@@ -1637,6 +1654,12 @@ This action cannot be undone.`,
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
     (0, import_obsidian3.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+    this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
+      cls: [CSS_CLASS_SCROLL_BOTTOM_BUTTON, "clickable-icon"],
+      // Додаємо clickable-icon для стандартних стилів
+      attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" }
+    });
+    (0, import_obsidian3.setIcon)(this.scrollToBottomButton, "arrow-down");
     const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
     this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
     const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
@@ -1917,6 +1940,11 @@ This action cannot be undone.`,
         "click",
         this.handleNewMessageIndicatorClick
       );
+    if (this.scrollToBottomButton) {
+      this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
+    } else {
+      console.error("scrollToBottomButton missing!");
+    }
     this.register(this.plugin.on("model-changed", this.handleModelChange));
     this.register(this.plugin.on("role-changed", this.handleRoleChange));
     this.register(this.plugin.on("roles-updated", this.handleRolesUpdated));

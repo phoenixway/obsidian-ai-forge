@@ -142,6 +142,7 @@ const CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
 const CSS_CHAT_ITEM_MAIN = "ollama-chat-item-main"; // Обгортка для назви/дати
 const CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options"; // Кнопка "..."
 const CSS_CLASS_STOP_BUTTON = "stop-generating-button"; // Новий клас
+const CSS_CLASS_SCROLL_BOTTOM_BUTTON = "scroll-to-bottom-button"; // <--- Новий клас
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -324,6 +325,7 @@ export class OllamaView extends ItemView {
   private chatPanelHeaderEl!: HTMLElement; // Нова властивість для заголовка чатів
   private rolePanelHeaderEl!: HTMLElement; // Нова властивість для заголовка ролей
   private rolesSectionContainerEl!: HTMLElement; // <-- Нова властивість
+  private scrollToBottomButton!: HTMLButtonElement; // <--- Нова властивість
 
   private stopGeneratingButton!: HTMLButtonElement; // Нова кнопка
   private currentAbortController: AbortController | null = null; // Для переривання запиту
@@ -524,6 +526,15 @@ export class OllamaView extends ItemView {
       this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
       setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
       this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+
+      this.scrollToBottomButton = this.chatContainerEl.createEl('button', {
+        cls: [CSS_CLASS_SCROLL_BOTTOM_BUTTON, 'clickable-icon'], // Додаємо clickable-icon для стандартних стилів
+        attr: { 'aria-label': 'Scroll to bottom', title: 'Scroll to bottom' }
+    });
+    setIcon(this.scrollToBottomButton, 'arrow-down'); // Іконка стрілки вниз
+    // Кнопка прихована за замовчуванням через CSS (відсутність класу 'visible')
+    // -----------------------------------------
+
 
       // Контейнер вводу
       const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
@@ -840,6 +851,10 @@ export class OllamaView extends ItemView {
         this.handleNewMessageIndicatorClick
       );
 
+      if (this.scrollToBottomButton) {
+        this.registerDomEvent( this.scrollToBottomButton, "click", this.handleScrollToBottomClick );
+    } else { console.error("scrollToBottomButton missing!"); }
+
     //   this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
     //     e.stopPropagation();
     //     this.handleNewChatClick();
@@ -894,6 +909,7 @@ export class OllamaView extends ItemView {
         this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
     }
 };
+
 
   //   public handleSettingsUpdated = async (): Promise<void> => {
   //     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
@@ -1816,31 +1832,56 @@ private handleContextMenuRename(chatId: string, currentName: string): void {
     this.resizeTimeout = setTimeout(() => this.adjustTextareaHeight(), 100);
   };
 
-  // --- Scroll Handling ---
   private handleScroll = (): void => {
-    if (!this.chatContainer || !this.newMessagesIndicatorEl) return;
-    const threshold = 150;
+    if (!this.chatContainer || !this.newMessagesIndicatorEl || !this.scrollToBottomButton) return; // Додано scrollToBottomButton
+
+    const threshold = 150; // Поріг, коли вважати, що користувач прокрутив вгору
     const atBottom =
-      this.chatContainer.scrollHeight -
+        this.chatContainer.scrollHeight -
         this.chatContainer.scrollTop -
-        this.chatContainer.clientHeight <
-      threshold;
+        this.chatContainer.clientHeight < threshold;
+
     const previousScrolledUp = this.userScrolledUp;
     this.userScrolledUp = !atBottom;
+
+    // Показуємо/ховаємо індикатор нових повідомлень
     if (previousScrolledUp && atBottom) {
-      this.newMessagesIndicatorEl.classList.remove(CSS_CLASS_VISIBLE);
+        this.newMessagesIndicatorEl.classList.remove(CSS_CLASS_VISIBLE);
     }
-  };
-  private handleNewMessageIndicatorClick = (): void => {
-    if (this.chatContainer) {
+    // (Логіка показу індикатора нових повідомлень залишається в addMessageToDisplay)
+
+    // --- ДОДАНО: Показуємо/ховаємо кнопку "Прокрутити вниз" ---
+    this.scrollToBottomButton.classList.toggle(CSS_CLASS_VISIBLE, this.userScrolledUp);
+    // -------------------------------------------------------
+};
+
+private handleNewMessageIndicatorClick = (): void => {
+  if (this.chatContainer) {
       this.chatContainer.scrollTo({
-        top: this.chatContainer.scrollHeight,
-        behavior: "smooth",
+          top: this.chatContainer.scrollHeight,
+          behavior: "smooth",
       });
-    }
-    this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
-    this.userScrolledUp = false;
-  };
+  }
+  this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
+  this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // <--- Ховаємо і цю кнопку
+  this.userScrolledUp = false;
+};
+
+// --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
+private handleScrollToBottomClick = (): void => {
+  this.plugin.logger.debug("Scroll to bottom button clicked.");
+  if (this.chatContainer) {
+      this.chatContainer.scrollTo({
+          top: this.chatContainer.scrollHeight,
+          behavior: 'smooth' // Плавна прокрутка
+      });
+  }
+  // Кнопка зникне автоматично завдяки handleScroll, коли прокрутка завершиться,
+  // але можна приховати її одразу для кращого відгуку
+  this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE);
+  this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE); // Також ховаємо індикатор нових повідомлень
+  this.userScrolledUp = false; // Оновлюємо стан
+};
 
   // --- UI Update Methods ---
   private updateInputPlaceholder(roleName: string | null | undefined): void {
