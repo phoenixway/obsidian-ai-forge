@@ -10,7 +10,8 @@
   max-width: 800px; // Обмеження ширини, якщо потрібно для центрованого контенту всередині
   margin-left: auto;  // Центрування, якщо max-width активний
   margin-right: auto; // Центрування
-  margin-top: 15px; // Скидаємо верхній margin, бо відступ керується з _layout.scss
+  margin-top: 105px; // Скидаємо верхній margin, бо відступ керується з _layout.scss
+  padding-top: 20px;;
   width: 100%;    // Займає всю ширину .ollama-main-chat-area (важливо!)
   box-sizing: border-box; // Включаємо padding/border у розміри
   padding:
