@@ -5172,10 +5172,6 @@ private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
     ).open();
   }
 
-  // Метод handleNewChatClick вже існує і використовується кнопкою в заголовку
-  // Метод handleExportChatClick використовується пунктом меню у випадаючому меню
 
-  // Переконайтесь, що метод findRoleNameByPath також існує
-
-  // ... (решта методів класу OllamaView)
+  
 } // END OF OllamaView CLASS
