@@ -228,7 +228,7 @@
         }
         .chat-panel-item-date {
           font-size: calc(var(--font-ui-small) * 0.5);
-          color: var(--text-faint);
+          color: red; //var(--text-faint);
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
