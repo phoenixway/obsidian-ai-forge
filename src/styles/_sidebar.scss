@@ -110,13 +110,12 @@
     transition: max-height 0.3s ease-out, padding 0.3s ease-out; // Animate height and padding
     box-sizing: border-box;
     padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
-    // flex-shrink: 0; // Prevent shrinking in parent flex container
     min-height: 0; // Allow shrinking to 0
 
     // Expanded state (when .is-expanded class is added via TS)
     &.is-expanded {
-        max-height: 70vh; // Max height limit (adjust as needed)
-        overflow-y: auto; // Enable internal vertical scrolling
+        max-height: 70vh; // Max height limit (adjust as needed) // Встановлюється JS
+        overflow-y: auto; // Enable internal vertical scrolling // Встановлюється JS
         padding-top: calc(var(--chat-spacing-unit) * 1);
         padding-bottom: calc(var(--chat-spacing-unit) * 1);
     }
@@ -198,10 +197,16 @@
                      font-size: calc(var(--font-ui-small) * 0.95); // Ensure size consistency
                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                  }
+                 // --- ВИПРАВЛЕННЯ ТУТ ---
                  .chat-panel-item-date {
-                     font-size: calc(var(--font-ui-small) * 0.5); color: var(--text-faint);
+                     //font-size: calc(var(--font-ui-small) * 0.5); // Старе правило - ДУЖЕ МАЛЕ
+                     font-size: var(--font-ui-smaller); // <-- Встановлюємо бажаний розмір тут
+                     color: var(--text-faint);
                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                     opacity: 0.9; // <-- Додано з вашого правила
+                     margin-top: 2px; // <-- Додано з вашого правила
                  }
+                 // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
             }
 
            // Options button "..."
@@ -217,8 +222,10 @@
             // Active state text colors specific to chat item structure
             &.is-active {
                 .chat-panel-item-name { color: var(--text-accent-hover); font-weight: 500; }
-                .chat-panel-item-date { 
-                    color: var(--text-accent-hover); opacity: 0.8; 
+                .chat-panel-item-date {
+                    color: var(--text-accent-hover); opacity: 0.8;
+                    // Можна тут перевизначити font-size, якщо для активного чату потрібен інший
+                    // font-size: var(--font-ui-smaller);
                 }
             }
        }
@@ -244,7 +251,6 @@
 
 // Note: Styles for the context menu items (.danger-option) should be in a more global file
 // or _menu.scss if you have one, but can be placed here if needed.
-// Example (assuming it's not elsewhere):
 .menu-item.danger-option {
     color: var(--text-error) !important;
     .menu-item-icon svg { color: var(--text-error) !important; }
@@ -255,36 +261,12 @@
     }
 }
 
-/* Стилі для дати в списку чатів БІЧНОЇ ПАНЕЛІ */
-.ollama-chat-panel-list {
-    .ollama-chat-panel-item { // Або .ollama-chat-list-item, якщо використовували спільний клас
-      .chat-panel-item-date {
-        font-size: calc(var(--font-ui-smaller) * 0.5); /* Використовуємо менший шрифт Obsidian */
-        /* Або можете вказати конкретний розмір, наприклад: font-size: 0.85em; */
-        /* Або: font-size: 11px; */
-        color: var(--text-faint); /* Можна зробити текст трохи тьмянішим */
-        opacity: 0.9; /* Трохи зменшити прозорість */
-        margin-top: 2px; /* Невеликий відступ зверху, якщо потрібно */
-      }
-    }
-  }
-  
-  /* Стилі для дати в списку чатів ВИПАДАЮЧОГО МЕНЮ */
-  .ollama-chat-menu {
-    .chat-list-container {
-      .chat-option { // Або .ollama-chat-list-item
-        .chat-option-date {
-          font-size: var(--font-ui-smaller); /* Той самий менший шрифт */
-          /* Або: font-size: 0.85em; */
-          /* Або: font-size: 11px; */
-          color: var(--text-faint);
-          opacity: 0.9;
-          margin-top: 1px; /* Менший відступ у меню */
-        }
-      }
-    }
-  }
+// --- ВИДАЛЕНО ДУБЛІКАТ ПРАВИЛ В КІНЦІ ФАЙЛУ ---
+/* Стилі для дати в списку чатів БІЧНОЇ ПАНЕЛІ (це правило видалено, бо воно вже є вище) */
+/* .ollama-chat-panel-list { ... } */
 
-  .ollama-chat-panel-list .ollama-chat-panel-item .chat-panel-item-date {
-    font-size: var(--font-ui-smaller) !important; 
-  }
+/* Стилі для дати в списку чатів ВИПАДАЮЧОГО МЕНЮ (це правило має бути в _menu.scss) */
+/* .ollama-chat-menu { ... } */
+
+/* Це правило також видалено, бо воно дублює і використовує !important без потреби */
+/* .ollama-chat-panel-list .ollama-chat-panel-item .chat-panel-item-date { ... } */
