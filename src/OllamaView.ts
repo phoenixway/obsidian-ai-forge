@@ -4974,8 +4974,16 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
       // --------------------------------
 
       try {
-          const prompt = `Provide a concise summary of the following text:\n\n"""\n${textToSummarize}\n"""\n\nSummary:`;
-          const requestBody = { /* ... */ }; // Тіло запиту як раніше
+        const prompt = `Provide a concise summary of the following text:\n\n"""\n${textToSummarize}\n"""\n\nSummary:`;
+        const requestBody = {
+            model: summarizationModel,
+            prompt: prompt,
+            stream: false,
+            temperature: 0.2,
+             options: {
+                 num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow,
+             },
+        };
 
           this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
           const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
@@ -4988,11 +4996,23 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
           }
 
       } catch (error: any) {
-           this.plugin.logger.error("Error during summarization:", error);
-           let userMessage = "Summarization failed: ";
-           if (error instanceof Error) { /* ... обробка помилок ... */ }
-           else { userMessage += "Unknown error occurred."; }
-           new Notice(userMessage, 6000);
+          // --- ОБРОБКА ПОМИЛОК ---
+          this.plugin.logger.error("Error during summarization:", error);
+          // Формуємо повідомлення для користувача
+          let userMessage = "Summarization failed: ";
+          if (error instanceof Error) {
+               // Намагаємось надати більш конкретну інформацію
+              if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
+                  userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
+              } else if (error.message.includes("connect") || error.message.includes("fetch")) {
+                   userMessage += "Could not connect to Ollama server.";
+              } else {
+                   userMessage += error.message; // Загальна помилка
+              }
+          } else {
+              userMessage += "Unknown error occurred.";
+          }
+          new Notice(userMessage, 6000); // Показуємо сповіщення довше
       } finally {
           // --- ОНОВЛЕНО: Відновлення стану кнопки ---
            setIcon(buttonEl, originalIcon);

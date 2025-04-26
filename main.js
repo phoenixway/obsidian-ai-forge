@@ -4267,7 +4267,13 @@ ${textToSummarize}
 
 Summary:`;
       const requestBody = {
-        /* ... */
+        model: summarizationModel,
+        prompt,
+        stream: false,
+        temperature: 0.2,
+        options: {
+          num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow
+        }
       };
       this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
@@ -4281,6 +4287,13 @@ Summary:`;
       this.plugin.logger.error("Error during summarization:", error);
       let userMessage = "Summarization failed: ";
       if (error instanceof Error) {
+        if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
+          userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
+        } else if (error.message.includes("connect") || error.message.includes("fetch")) {
+          userMessage += "Could not connect to Ollama server.";
+        } else {
+          userMessage += error.message;
+        }
       } else {
         userMessage += "Unknown error occurred.";
       }
