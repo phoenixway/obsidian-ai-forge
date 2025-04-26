@@ -3625,19 +3625,30 @@ This action cannot be undone.`,
     });
   }
   toggleMessageCollapse(contentEl, buttonEl) {
-    const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
     const maxHeightLimit = this.plugin.settings.maxMessageHeight;
-    if (isCollapsed) {
-      contentEl.style.maxHeight = "";
-      contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      buttonEl.setText("Show Less \u25B2");
-    } else {
+    const isInitialExpandedState = buttonEl.hasAttribute("data-initial-state");
+    if (isInitialExpandedState) {
+      buttonEl.removeAttribute("data-initial-state");
       contentEl.style.maxHeight = `${maxHeightLimit}px`;
       contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show More \u25BC");
       setTimeout(() => {
         contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }, 310);
+    } else {
+      const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+      if (isCollapsed) {
+        contentEl.style.maxHeight = "";
+        contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        buttonEl.setText("Show Less \u25B2");
+      } else {
+        contentEl.style.maxHeight = `${maxHeightLimit}px`;
+        contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+        buttonEl.setText("Show More \u25BC");
+        setTimeout(() => {
+          contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 310);
+      }
     }
   }
   // --- Helpers & Utilities ---
@@ -4177,9 +4188,8 @@ This action cannot be undone.`,
     const contentCollapsible = messageEl.querySelector(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
     const maxH = this.plugin.settings.maxMessageHeight;
     const isAssistantMessage = messageEl.classList.contains(CSS_CLASS_OLLAMA_MESSAGE);
-    if (!contentCollapsible) {
+    if (!contentCollapsible)
       return;
-    }
     if (this.isProcessing && isAssistantMessage) {
       const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
@@ -4199,19 +4209,24 @@ This action cannot be undone.`,
         return;
       const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
-      const oldMaxHeight = contentCollapsible.style.maxHeight;
+      const currentMaxHeight = contentCollapsible.style.maxHeight;
       contentCollapsible.style.maxHeight = "";
       const scrollHeight = contentCollapsible.scrollHeight;
-      contentCollapsible.style.maxHeight = oldMaxHeight;
+      contentCollapsible.style.maxHeight = currentMaxHeight;
       if (scrollHeight > maxH) {
-        contentCollapsible.style.maxHeight = `${maxH}px`;
-        contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        const showMoreButton = messageEl.createEl("button", {
+        const collapseButton = messageEl.createEl("button", {
           cls: CSS_CLASS_SHOW_MORE_BUTTON,
-          text: "Show More \u25BC"
-          // Початковий текст кнопки
+          text: "Show Less \u25B2"
+          // <--- Початковий текст
         });
-        this.registerDomEvent(showMoreButton, "click", () => this.toggleMessageCollapse(contentCollapsible, showMoreButton));
+        collapseButton.setAttribute("data-initial-state", "expanded");
+        this.registerDomEvent(
+          collapseButton,
+          "click",
+          () => this.toggleMessageCollapse(contentCollapsible, collapseButton)
+        );
+        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        contentCollapsible.style.maxHeight = "";
       } else {
         contentCollapsible.style.maxHeight = "";
         contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
