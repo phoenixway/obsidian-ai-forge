@@ -4502,6 +4502,7 @@ var DEFAULT_SETTINGS = {
   summarizationPrompt: "Summarize the key points discussed so far in this conversation:\n\n{text_to_summarize}",
   keepLastNMessagesBeforeSummary: 10,
   summarizationChunkSize: 1500,
+  summarizationModelName: "",
   // Speech & Translation
   googleApiKey: "",
   speechLanguage: "uk-UA",
@@ -4839,6 +4840,51 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
           }).inputEl.setAttrs({ rows: 4 })
         );
       }
+      let summarizationModelDropdown = null;
+      const updateSummarizationOptions = async (dropdown, button) => {
+        if (!dropdown)
+          return;
+        const currentVal = this.plugin.settings.summarizationModelName;
+        dropdown.selectEl.innerHTML = "";
+        dropdown.addOption("", "Loading models...");
+        dropdown.setDisabled(true);
+        button == null ? void 0 : button.setDisabled(true).setIcon("loader");
+        try {
+          const models = await this.plugin.ollamaService.getModels();
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "-- Select Summarization Model --");
+          if (models && models.length > 0) {
+            models.forEach((modelName) => {
+              dropdown.addOption(modelName, modelName);
+            });
+            dropdown.setValue(models.includes(currentVal) ? currentVal : "");
+          } else {
+            dropdown.addOption("", "No models found");
+            dropdown.setValue("");
+          }
+        } catch (error) {
+          this.plugin.logger.error("Error fetching models for summarization settings:", error);
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "Error loading models!");
+          dropdown.setValue("");
+        } finally {
+          dropdown.setDisabled(false);
+          button == null ? void 0 : button.setDisabled(false).setIcon("refresh-cw");
+        }
+      };
+      new import_obsidian5.Setting(containerEl).setName("Summarization Model").setDesc("Model used for summarizing chat history and individual messages.").addDropdown(async (dropdown) => {
+        summarizationModelDropdown = dropdown;
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.summarizationModelName = value;
+          await this.plugin.saveSettings();
+        });
+        await updateSummarizationOptions(dropdown);
+      }).addExtraButton((button) => {
+        button.setIcon("refresh-cw").setTooltip("Refresh model list").onClick(async () => {
+          await updateSummarizationOptions(summarizationModelDropdown, button);
+          new import_obsidian5.Notice("Model list refreshed!");
+        });
+      });
       new import_obsidian5.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages excluded from summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
         const num = parseInt(value.trim(), 10);
         this.plugin.settings.keepLastNMessagesBeforeSummary = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
