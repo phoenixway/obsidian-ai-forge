@@ -4039,91 +4039,34 @@ export class OllamaView extends ItemView {
       : { hasThinkingTags: false, format: "none" };
   }
 
-  private checkMessageForCollapsing(messageEl: HTMLElement): void {
-    const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
-    const maxH = this.plugin.settings.maxMessageHeight;
-
-    // Перевіряємо, чи існує контент і чи обмеження висоти активне
-    if (!contentCollapsible || maxH <= 0) {
-      // Якщо обмеження вимкнене, прибираємо кнопку і стилі згортання, якщо вони були
-      if (contentCollapsible && maxH <= 0) {
-        const showMoreButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-        showMoreButton?.remove();
-        contentCollapsible.style.maxHeight = "";
-        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      }
-      return;
-    }
-
-    // Використовуємо requestAnimationFrame для надійного вимірювання scrollHeight
-    requestAnimationFrame(() => {
-      // Перевірка ще раз, бо елемент міг зникнути
-      if (!contentCollapsible || !contentCollapsible.isConnected) return;
-
-      // Видаляємо стару кнопку, якщо вона існує
-      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-      existingButton?.remove();
-
-      // Важливо: тимчасово знімаємо обмеження max-height, щоб виміряти повну висоту
-      contentCollapsible.style.maxHeight = "";
-      const scrollHeight = contentCollapsible.scrollHeight;
-
-      // Порівнюємо реальну висоту з лімітом
-      if (scrollHeight > maxH) {
-        // Вміст занадто довгий: обрізаємо і додаємо кнопку
-        contentCollapsible.style.maxHeight = `${maxH}px`;
-        contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        const showMoreButton = messageEl.createEl("button", {
-          cls: CSS_CLASS_SHOW_MORE_BUTTON,
-          text: "Show More ▼",
-        });
-        // --- ВИПРАВЛЕНО: Передаємо this як Component ---
-        this.registerDomEvent(showMoreButton, "click", () =>
-          this.toggleMessageCollapse(contentCollapsible, showMoreButton)
-        );
-        // ---------------------------------------------
-
-        // --- ДОДАНО: Ховаємо кнопку, якщо йде генерація ---
-        if (this.isProcessing) {
-          showMoreButton.style.display = "none";
-        }
-        // --------------------------------------------
-      } else {
-        // Вміст достатньо короткий: переконуємось, що стилі зняті
-        contentCollapsible.style.maxHeight = "";
-        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      }
-    });
-  }
-
+  
   public checkAllMessagesForCollapsing(): void {
     this.plugin.logger.debug("Running checkAllMessagesForCollapsing");
-    this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => {
-      this.checkMessageForCollapsing(msgEl);
-    });
-  }
+    this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`)
+        .forEach((msgEl) => {
+            this.checkMessageForCollapsing(msgEl);
+        });
+}
 
-  private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void {
-    const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
-    const maxHeightLimit = this.plugin.settings.maxMessageHeight;
 
-    if (isCollapsed) {
-      // Розгортаємо
-      contentEl.style.maxHeight = ""; // Знімаємо обмеження
+private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement ): void {
+  // ... (код як раніше) ...
+  const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+  const maxHeightLimit = this.plugin.settings.maxMessageHeight;
+
+  if (isCollapsed) {
+      contentEl.style.maxHeight = '';
       contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show Less ▲");
-    } else {
-      // Згортаємо
-      contentEl.style.maxHeight = `${maxHeightLimit}px`; // Встановлюємо ліміт
+  } else {
+      contentEl.style.maxHeight = `${maxHeightLimit}px`;
       contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
       buttonEl.setText("Show More ▼");
-      // Плавна прокрутка, щоб верхня частина згорнутого блоку стала видимою
-      // (затримка для завершення анімації)
       setTimeout(() => {
-        contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }, 310); // Трохи більше за тривалість анімації (0.3s)
-    }
+          contentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+       }, 310);
   }
+}
 
   // --- Helpers & Utilities ---
   public getChatContainer(): HTMLElement {
@@ -4142,7 +4085,6 @@ export class OllamaView extends ItemView {
     this.showEmptyState();
     this.updateSendButtonState();
     setTimeout(() => this.focusInput(), 50); // Refocus after clear
-    //console.log("[OllamaView] Display and internal state cleared.");
   }
   // public addLoadingIndicator(): HTMLElement {
   //   // Adds the visual "thinking" dots indicator
@@ -5028,4 +4970,79 @@ export class OllamaView extends ItemView {
     // Логіка показу індикатора нових повідомлень залишається в addMessageToDisplay
     this.plugin.logger.debug(`[updateScrollStateAndIndicators] User scrolled up: ${this.userScrolledUp}`);
   }
+
+  private checkMessageForCollapsing(messageEl: HTMLElement): void {
+    const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASS_CONTENT_COLLAPSIBLE}`);
+    const maxH = this.plugin.settings.maxMessageHeight;
+    const isAssistantMessage = messageEl.classList.contains(CSS_CLASS_OLLAMA_MESSAGE);
+
+    // Перевіряємо, чи існує контент
+    if (!contentCollapsible) {
+        return;
+    }
+
+    // --- НОВА ЛОГІКА: Перевірка стану isProcessing для повідомлень ШІ ---
+    // Якщо йде генерація І це повідомлення асистента - НЕ згортаємо і НЕ показуємо кнопку
+    if (this.isProcessing && isAssistantMessage) {
+         // Переконуємось, що стилі зняті і кнопки немає
+         const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+         existingButton?.remove();
+         contentCollapsible.style.maxHeight = ''; // Знімаємо обмеження
+         contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED); // Прибираємо клас
+         // this.plugin.logger.trace(`[checkMessageForCollapsing] Skipping collapse during processing for assistant message.`);
+         return; // Виходимо, нічого більше не робимо
+    }
+    // --- КІНЕЦЬ НОВОЇ ЛОГІКИ ---
+
+    // Якщо генерація не йде, або це повідомлення користувача, або обмеження вимкнено
+    if (maxH <= 0) {
+        // Обмеження вимкнене: прибираємо кнопку і стилі, якщо вони були
+        const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+        existingButton?.remove();
+        contentCollapsible.style.maxHeight = "";
+        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        return;
+    }
+
+    // Обмеження активне і генерація не йде (або це повідомлення користувача)
+    // Використовуємо requestAnimationFrame для надійного вимірювання scrollHeight
+    requestAnimationFrame(() => {
+        if (!contentCollapsible || !contentCollapsible.isConnected) return;
+
+        // Видаляємо стару кнопку перед перевіркою
+        const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+        existingButton?.remove();
+
+        // Знімаємо обмеження max-height тимчасово для вимірювання
+        const oldMaxHeight = contentCollapsible.style.maxHeight; // Зберігаємо старе значення, якщо потрібно
+        contentCollapsible.style.maxHeight = '';
+        const scrollHeight = contentCollapsible.scrollHeight;
+        contentCollapsible.style.maxHeight = oldMaxHeight; // Повертаємо старе значення швидко
+
+        // Порівнюємо реальну висоту з лімітом
+        if (scrollHeight > maxH) {
+            // Вміст занадто довгий: обрізаємо і додаємо кнопку "Show More"
+            //  this.plugin.logger.trace(`[checkMessageForCollapsing] Content too long (${scrollHeight} > ${maxH}), collapsing.`);
+            contentCollapsible.style.maxHeight = `${maxH}px`;
+            contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+            const showMoreButton = messageEl.createEl("button", {
+                cls: CSS_CLASS_SHOW_MORE_BUTTON,
+                text: "Show More ▼", // Початковий текст кнопки
+            });
+            this.registerDomEvent(showMoreButton, "click", () => this.toggleMessageCollapse(contentCollapsible, showMoreButton));
+
+             // Перевірка: Якщо генерація завершилась щойно, а ми тут, кнопка має бути видима
+             // (Ця перевірка може бути зайвою, оскільки isProcessing тут буде false)
+             // if (this.isProcessing) {
+             //      showMoreButton.style.display = 'none';
+             // }
+
+        } else {
+            // Вміст достатньо короткий: переконуємось, що стилі зняті
+            //  this.plugin.logger.trace(`[checkMessageForCollapsing] Content short enough (${scrollHeight} <= ${maxH}), ensuring expanded.`);
+            contentCollapsible.style.maxHeight = '';
+            contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        }
+    });
+}
 } // END OF OllamaView CLASS
