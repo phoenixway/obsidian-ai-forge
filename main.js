@@ -120,35 +120,67 @@ var PromptModal = class extends import_obsidian2.Modal {
 // src/SummaryModal.ts
 var import_obsidian3 = require("obsidian");
 var SummaryModal = class extends import_obsidian3.Modal {
-  constructor(app, title, summary) {
-    super(app);
+  // Зберігаємо посилання для оновлення
+  constructor(plugin, title, summary) {
+    super(plugin.app);
+    this.plugin = plugin;
     this.modalTitle = title;
     this.summaryText = summary;
   }
-  onOpen() {
+  async onOpen() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl("h3", { text: this.modalTitle });
-    const summaryContainer = contentEl.createDiv({ cls: "summary-modal-content" });
-    summaryContainer.setText(this.summaryText);
-    summaryContainer.style.maxHeight = "60vh";
-    summaryContainer.style.overflowY = "auto";
-    summaryContainer.style.whiteSpace = "pre-wrap";
-    summaryContainer.style.backgroundColor = "var(--background-secondary)";
-    summaryContainer.style.padding = "10px";
-    summaryContainer.style.borderRadius = "5px";
-    summaryContainer.style.border = "1px solid var(--background-modifier-border)";
-    summaryContainer.style.marginBottom = "15px";
-    summaryContainer.style.userSelect = "text";
-    new import_obsidian3.Setting(contentEl).addButton((btn) => btn.setButtonText("Copy to Clipboard").setCta().onClick(() => {
+    this.summaryContainer = contentEl.createDiv({ cls: "summary-modal-content" });
+    this.summaryContainer.setText(this.summaryText);
+    this.summaryContainer.style.maxHeight = "60vh";
+    this.summaryContainer.style.overflowY = "auto";
+    this.summaryContainer.style.whiteSpace = "pre-wrap";
+    this.summaryContainer.style.backgroundColor = "var(--background-secondary)";
+    this.summaryContainer.style.padding = "10px";
+    this.summaryContainer.style.borderRadius = "5px";
+    this.summaryContainer.style.border = "1px solid var(--background-modifier-border)";
+    this.summaryContainer.style.marginBottom = "15px";
+    this.summaryContainer.style.userSelect = "text";
+    const buttonContainer = new import_obsidian3.Setting(contentEl).addButton((btn) => btn.setButtonText("Copy").setTooltip("Copy summary to clipboard").setIcon("copy").onClick(() => {
       navigator.clipboard.writeText(this.summaryText).then(() => {
-        new import_obsidian3.Notice("Summary copied to clipboard!");
+        new import_obsidian3.Notice("Summary copied!");
       }, (err) => {
         new import_obsidian3.Notice("Failed to copy summary.");
-        console.error("Copy summary error:", err);
+        this.plugin.logger.error("Copy summary error:", err);
       });
-      this.close();
-    })).addButton((btn) => btn.setButtonText("Close").onClick(() => {
+    }));
+    if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey) {
+      buttonContainer.addButton((translateBtn) => {
+        translateBtn.setButtonText("Translate").setTooltip(`Translate to ${this.plugin.settings.translationTargetLanguage}`).setIcon("languages").onClick(async () => {
+          const targetLang = this.plugin.settings.translationTargetLanguage;
+          if (!targetLang) {
+            new import_obsidian3.Notice("Target translation language not set in settings.");
+            return;
+          }
+          translateBtn.setButtonText("Translating...");
+          translateBtn.setDisabled(true);
+          translateBtn.setIcon("loader");
+          try {
+            const translatedSummary = await this.plugin.translationService.translate(this.summaryText, targetLang);
+            if (translatedSummary !== null) {
+              this.summaryContainer.setText(translatedSummary);
+              this.summaryText = translatedSummary;
+              new import_obsidian3.Notice(`Summary translated to ${targetLang}`);
+            } else {
+            }
+          } catch (error) {
+            this.plugin.logger.error("Error translating summary in modal:", error);
+            new import_obsidian3.Notice("Translation failed.");
+          } finally {
+            translateBtn.setButtonText("Translate");
+            translateBtn.setDisabled(false);
+            translateBtn.setIcon("languages");
+          }
+        });
+      });
+    }
+    buttonContainer.addButton((btn) => btn.setButtonText("Close").onClick(() => {
       this.close();
     }));
   }
@@ -4202,17 +4234,22 @@ This action cannot be undone.`,
     });
   }
   // OllamaView.ts
-  // --- НОВИЙ МЕТОД: Обробник кліку на кнопку сумаризації ---
+  // ... (інші методи) ...
+  // --- ПОВНА ВЕРСІЯ: handleSummarizeClick ---
   async handleSummarizeClick(originalContent, buttonEl) {
     var _a;
+    this.plugin.logger.debug("Summarize button clicked.");
     const summarizationModel = this.plugin.settings.summarizationModelName;
     if (!summarizationModel) {
+      new import_obsidian4.Notice("Please select a summarization model in AI Forge settings (Productivity section).");
       return;
     }
     let textToSummarize = originalContent;
     if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
+      textToSummarize = this.decodeHtmlEntities(originalContent).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     }
     if (!textToSummarize || textToSummarize.length < 50) {
+      new import_obsidian4.Notice("Message is too short to summarize meaningfully.");
       return;
     }
     const originalIcon = ((_a = buttonEl.querySelector(".svg-icon")) == null ? void 0 : _a.getAttribute("icon-name")) || "scroll-text";
@@ -4233,18 +4270,39 @@ Summary:`;
         model: summarizationModel,
         prompt,
         stream: false,
+        // Не потоковий запит
         temperature: 0.2,
+        // Низька температура для фактологічної сумаризації
         options: {
-          /* ... */
+          // Можна обмежити контекст, якщо потрібно, але для сумаризації одного повідомлення це може бути необов'язково
+          num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow
+          // top_k: 20,
+          // top_p: 0.5
         }
       };
       this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && responseData.response) {
-        new SummaryModal(this.app, "Message Summary", responseData.response.trim()).open();
+        this.plugin.logger.debug(`Summarization successful. Length: ${responseData.response.length}`);
+        new SummaryModal(this.plugin, "Message Summary", responseData.response.trim()).open();
       } else {
+        throw new Error("Received empty response from summarization model.");
       }
     } catch (error) {
+      this.plugin.logger.error("Error during summarization:", error);
+      let userMessage = "Summarization failed: ";
+      if (error instanceof Error) {
+        if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
+          userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
+        } else if (error.message.includes("connect") || error.message.includes("fetch")) {
+          userMessage += "Could not connect to Ollama server.";
+        } else {
+          userMessage += error.message;
+        }
+      } else {
+        userMessage += "Unknown error occurred.";
+      }
+      new import_obsidian4.Notice(userMessage, 6e3);
     } finally {
       (0, import_obsidian4.setIcon)(buttonEl, originalIcon);
       buttonEl.disabled = false;

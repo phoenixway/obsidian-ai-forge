@@ -4940,45 +4940,99 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
 
 // OllamaView.ts
 
-    // --- НОВИЙ МЕТОД: Обробник кліку на кнопку сумаризації ---
-    private async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
-      // ... (Код методу, наданий раніше, має бути коректним після додавання імпорту OllamaGenerateResponse) ...
-      const summarizationModel = this.plugin.settings.summarizationModelName;
-      if (!summarizationModel) { /* ... */ return; }
-      let textToSummarize = originalContent;
-      if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) { /* ... remove tags ... */ }
-      if (!textToSummarize || textToSummarize.length < 50) { /* ... */ return; }
+    // ... (інші методи) ...
 
-      // Set loading state
-      const originalIcon = buttonEl.querySelector('.svg-icon')?.getAttribute('icon-name') || 'scroll-text';
-      setIcon(buttonEl, "loader");
+    // --- ПОВНА ВЕРСІЯ: handleSummarizeClick ---
+    private async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
+      this.plugin.logger.debug("Summarize button clicked.");
+      const summarizationModel = this.plugin.settings.summarizationModelName;
+
+      if (!summarizationModel) {
+          new Notice("Please select a summarization model in AI Forge settings (Productivity section).");
+          return;
+      }
+
+      // Видаляємо <think> теги перед сумаризацією
+      let textToSummarize = originalContent;
+      if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
+           textToSummarize = this.decodeHtmlEntities(originalContent)
+               .replace(/<think>[\s\S]*?<\/think>/g, "")
+               .trim();
+      }
+
+      // Перевірка мінімальної довжини (наприклад, 50 символів)
+      if (!textToSummarize || textToSummarize.length < 50) {
+           new Notice("Message is too short to summarize meaningfully.");
+           return;
+      }
+
+      // Встановлюємо стан завантаження кнопки
+      const originalIcon = buttonEl.querySelector('.svg-icon')?.getAttribute('icon-name') || 'scroll-text'; // Зберігаємо стару іконку
+      setIcon(buttonEl, "loader"); // Іконка завантаження
       buttonEl.disabled = true;
       const originalTitle = buttonEl.title;
       buttonEl.title = 'Summarizing...';
-      buttonEl.addClass(CSS_CLASS_DISABLED);
+      buttonEl.addClass(CSS_CLASS_DISABLED); // Додатково сірий вигляд
 
       try {
+          // Готуємо промпт
           const prompt = `Provide a concise summary of the following text:\n\n"""\n${textToSummarize}\n"""\n\nSummary:`;
+
+          // Готуємо тіло запиту
           const requestBody = {
               model: summarizationModel,
               prompt: prompt,
-              stream: false,
-              temperature: 0.2,
-               options: { /* ... */ },
+              stream: false, // Не потоковий запит
+              temperature: 0.2, // Низька температура для фактологічної сумаризації
+              options: {
+                   // Можна обмежити контекст, якщо потрібно, але для сумаризації одного повідомлення це може бути необов'язково
+                   num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow,
+                   // top_k: 20,
+                   // top_p: 0.5
+              },
           };
-           this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
-          // Використовуємо generateRaw
-          const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody); // <--- Перевірте, що тип імпортовано
 
+          this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
+          // Викликаємо сервіс Ollama
+          const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
+
+          // Обробляємо успішну відповідь
           if (responseData && responseData.response) {
-               new SummaryModal(this.app, "Message Summary", responseData.response.trim()).open();
-          } else { /* ... */ }
-      } catch (error: any) { /* ... */ }
-      finally {
-          setIcon(buttonEl, originalIcon);
-          buttonEl.disabled = false;
-          buttonEl.title = originalTitle;
-          buttonEl.removeClass(CSS_CLASS_DISABLED);
+              this.plugin.logger.debug(`Summarization successful. Length: ${responseData.response.length}`);
+              // Показуємо результат у модальному вікні
+              new SummaryModal(this.plugin, "Message Summary", responseData.response.trim()).open();
+          } else {
+              // Якщо відповідь прийшла, але поле response порожнє
+               throw new Error("Received empty response from summarization model.");
+          }
+
+      } catch (error: any) {
+          // --- ОБРОБКА ПОМИЛОК ---
+           this.plugin.logger.error("Error during summarization:", error);
+           // Формуємо повідомлення для користувача
+           let userMessage = "Summarization failed: ";
+           if (error instanceof Error) {
+                // Намагаємось надати більш конкретну інформацію
+               if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
+                   userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
+               } else if (error.message.includes("connect") || error.message.includes("fetch")) {
+                    userMessage += "Could not connect to Ollama server.";
+               } else {
+                    userMessage += error.message; // Загальна помилка
+               }
+           } else {
+               userMessage += "Unknown error occurred.";
+           }
+           new Notice(userMessage, 6000); // Показуємо сповіщення довше
+          // --- КІНЕЦЬ ОБРОБКИ ПОМИЛОК ---
+      } finally {
+          // --- ВІДНОВЛЕННЯ СТАНУ КНОПКИ ---
+           setIcon(buttonEl, originalIcon); // Повертаємо оригінальну іконку
+           buttonEl.disabled = false;
+           buttonEl.title = originalTitle;
+           buttonEl.removeClass(CSS_CLASS_DISABLED);
+          //  this.plugin.logger.trace("Summarize button state restored.");
+          // --- КІНЕЦЬ ВІДНОВЛЕННЯ СТАНУ ---
       }
   }
 

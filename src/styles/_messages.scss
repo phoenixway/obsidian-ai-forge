@@ -58,6 +58,8 @@
    max-width: var(--chat-message-max-width); // Apply the fixed PX max-width here
    gap: calc(var(--chat-spacing-unit) * 0.75); // Vertical gap between message bubble and action buttons below it
    // align-items (flex-start/flex-end) are set by the parent group rule
+
+
 }
 
 
@@ -236,6 +238,20 @@
   .regenerate-button {
      // color: var(--text-warning); // Example accent
   }
+  button.summarize-button {
+    // Можна додати специфічний колір або інші налаштування
+    // Наприклад:
+    // color: var(--text-accent);
+    // &:hover {
+    //   color: var(--text-accent-hover);
+    // }
+  }
+
+
+// Стилі для модального вікна сумаризації (якщо потрібно)
+.summary-modal-content {
+  // Стилі для контейнера з текстом сумаризації
+}
 
 
 // Show buttons on hover of the MESSAGE BUBBLE (as buttons are now siblings)
@@ -439,4 +455,8 @@
 // коли з'являється і кнопка прокрутки вниз, якщо ви додаєте лічильник.
 .new-message-indicator.visible {
    // Стилі для видимого індикатора
+}
+
+.summary-modal-content {
+  // Стилі для контейнера з текстом сумаризації
 }
