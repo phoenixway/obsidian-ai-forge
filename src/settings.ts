@@ -592,6 +592,68 @@ export class OllamaSettingTab extends PluginSettingTab {
                     }));
         }
 
+        this.createSectionHeader('Advanced Context Management');
+        new Setting(containerEl)
+            .setName('Use Advanced Context Strategy')
+            .setDesc('Enable automatic chat summarization and message chunking for long conversations.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.useAdvancedContextStrategy)
+                .onChange(async (value) => {
+                    this.plugin.settings.useAdvancedContextStrategy = value;
+                    await this.plugin.saveSettings();
+                    this.display(); // Re-render settings to show/hide summarization options
+                }));
+
+        if (this.plugin.settings.useAdvancedContextStrategy) {
+            new Setting(containerEl)
+                .setName('Enable Context Summarization')
+                .setDesc('Automatically summarize older parts of the conversation.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.enableSummarization)
+                    .onChange(async (value) => {
+                        this.plugin.settings.enableSummarization = value;
+                        await this.plugin.saveSettings();
+                        this.display(); // Re-render to show/hide prompt
+                    }));
+
+            if (this.plugin.settings.enableSummarization) {
+                new Setting(containerEl)
+                    .setName('Summarization Prompt')
+                    .setDesc('Prompt used for summarization. Use {text_to_summarize} placeholder.')
+                    .addTextArea(text => text
+                        .setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt)
+                        .setValue(this.plugin.settings.summarizationPrompt)
+                        .onChange(async (value) => {
+                            this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
+                            await this.plugin.saveSettings();
+                        }).inputEl.setAttrs({ rows: 4 })
+                    );
+            }
+
+            new Setting(containerEl)
+                .setName('Keep Last N Messages Before Summary')
+                .setDesc('Number of recent messages excluded from summarization.')
+                .addText(text => text
+                    .setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString())
+                    .setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString())
+                    .onChange(async (value) => {
+                        const num = parseInt(value.trim(), 10);
+                        this.plugin.settings.keepLastNMessagesBeforeSummary = (!isNaN(num) && num >= 0) ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
+                        await this.plugin.saveSettings();
+                    }));
+
+            new Setting(containerEl)
+                .setName('Summarization Chunk Size (Tokens)')
+                .setDesc('Approximate size of text chunks passed to the summarization model.')
+                .addText(text => text
+                    .setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString())
+                    .setValue(this.plugin.settings.summarizationChunkSize.toString())
+                    .onChange(async (value) => {
+                        const num = parseInt(value.trim(), 10);
+                        this.plugin.settings.summarizationChunkSize = (!isNaN(num) && num > 100) ? num : DEFAULT_SETTINGS.summarizationChunkSize;
+                        await this.plugin.saveSettings();
+                    }));
+        }
 
         // --- Секція: Productivity Assistant Features ---
         this.createSectionHeader('Productivity Assistant Features');
