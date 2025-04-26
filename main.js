@@ -4831,7 +4831,7 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
       }));
     }
     this.createSectionHeader("Productivity Assistant Features");
-    new import_obsidian5.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate daily task integration & advanced context management.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate daily task integration.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
       var _a, _b, _c, _d;
       this.plugin.settings.enableProductivityFeatures = value;
       await this.plugin.saveSettings();
@@ -4847,36 +4847,6 @@ var OllamaSettingTab = class extends import_obsidian5.PluginSettingTab {
         (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
         (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
       }));
-      new import_obsidian5.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enable automatic chat summarization and message chunking for long conversations.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
-        this.plugin.settings.useAdvancedContextStrategy = value;
-        await this.plugin.saveSettings();
-        this.display();
-      }));
-      if (this.plugin.settings.useAdvancedContextStrategy) {
-        new import_obsidian5.Setting(containerEl).setName("Enable Context Summarization").setDesc("Automatically summarize older parts of the conversation.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
-          this.plugin.settings.enableSummarization = value;
-          await this.plugin.saveSettings();
-          this.display();
-        }));
-        if (this.plugin.settings.enableSummarization) {
-          new import_obsidian5.Setting(containerEl).setName("Summarization Prompt").setDesc("Prompt used for summarization. Use {text_to_summarize} placeholder.").addTextArea(
-            (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
-              this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
-              await this.plugin.saveSettings();
-            }).inputEl.setAttrs({ rows: 4 })
-          );
-        }
-        new import_obsidian5.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages excluded from summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
-          const num = parseInt(value.trim(), 10);
-          this.plugin.settings.keepLastNMessagesBeforeSummary = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
-          await this.plugin.saveSettings();
-        }));
-        new import_obsidian5.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate size of text chunks passed to the summarization model.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
-          const num = parseInt(value.trim(), 10);
-          this.plugin.settings.summarizationChunkSize = !isNaN(num) && num > 100 ? num : DEFAULT_SETTINGS.summarizationChunkSize;
-          await this.plugin.saveSettings();
-        }));
-      }
     }
     this.createSectionHeader("Speech & Translation");
     new import_obsidian5.Setting(containerEl).setName("Google API Key (Speech-to-Text)").setDesc("Required for voice input. Keep confidential.").addText((text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
