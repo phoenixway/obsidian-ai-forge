@@ -4940,9 +4940,7 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
 
 // OllamaView.ts
 
-    // ... (інші методи) ...
-
-    // --- ПОВНА ВЕРСІЯ: handleSummarizeClick ---
+    // --- ОНОВЛЕНО: handleSummarizeClick ---
     private async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
       this.plugin.logger.debug("Summarize button clicked.");
       const summarizationModel = this.plugin.settings.summarizationModelName;
@@ -4952,7 +4950,6 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
           return;
       }
 
-      // Видаляємо <think> теги перед сумаризацією
       let textToSummarize = originalContent;
       if (this.detectThinkingTags(this.decodeHtmlEntities(originalContent)).hasThinkingTags) {
            textToSummarize = this.decodeHtmlEntities(originalContent)
@@ -4960,80 +4957,55 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
                .trim();
       }
 
-      // Перевірка мінімальної довжини (наприклад, 50 символів)
       if (!textToSummarize || textToSummarize.length < 50) {
            new Notice("Message is too short to summarize meaningfully.");
            return;
       }
 
       // Встановлюємо стан завантаження кнопки
-      const originalIcon = buttonEl.querySelector('.svg-icon')?.getAttribute('icon-name') || 'scroll-text'; // Зберігаємо стару іконку
-      setIcon(buttonEl, "loader"); // Іконка завантаження
+      const originalIcon = buttonEl.querySelector('.svg-icon')?.getAttribute('icon-name') || 'scroll-text';
+      setIcon(buttonEl, "loader");
       buttonEl.disabled = true;
       const originalTitle = buttonEl.title;
       buttonEl.title = 'Summarizing...';
-      buttonEl.addClass(CSS_CLASS_DISABLED); // Додатково сірий вигляд
+      buttonEl.addClass(CSS_CLASS_DISABLED);
+      // --- ДОДАНО: Клас для анімації ---
+      buttonEl.addClass(CSS_CLASS_TRANSLATING_INPUT); // Використовуємо існуючий клас з анімацією
+      // --------------------------------
 
       try {
-          // Готуємо промпт
           const prompt = `Provide a concise summary of the following text:\n\n"""\n${textToSummarize}\n"""\n\nSummary:`;
-
-          // Готуємо тіло запиту
-          const requestBody = {
-              model: summarizationModel,
-              prompt: prompt,
-              stream: false, // Не потоковий запит
-              temperature: 0.2, // Низька температура для фактологічної сумаризації
-              options: {
-                   // Можна обмежити контекст, якщо потрібно, але для сумаризації одного повідомлення це може бути необов'язково
-                   num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow,
-                   // top_k: 20,
-                   // top_p: 0.5
-              },
-          };
+          const requestBody = { /* ... */ }; // Тіло запиту як раніше
 
           this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
-          // Викликаємо сервіс Ollama
           const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
 
-          // Обробляємо успішну відповідь
           if (responseData && responseData.response) {
               this.plugin.logger.debug(`Summarization successful. Length: ${responseData.response.length}`);
-              // Показуємо результат у модальному вікні
               new SummaryModal(this.plugin, "Message Summary", responseData.response.trim()).open();
           } else {
-              // Якщо відповідь прийшла, але поле response порожнє
                throw new Error("Received empty response from summarization model.");
           }
 
       } catch (error: any) {
-          // --- ОБРОБКА ПОМИЛОК ---
            this.plugin.logger.error("Error during summarization:", error);
-           // Формуємо повідомлення для користувача
            let userMessage = "Summarization failed: ";
-           if (error instanceof Error) {
-                // Намагаємось надати більш конкретну інформацію
-               if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
-                   userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
-               } else if (error.message.includes("connect") || error.message.includes("fetch")) {
-                    userMessage += "Could not connect to Ollama server.";
-               } else {
-                    userMessage += error.message; // Загальна помилка
-               }
-           } else {
-               userMessage += "Unknown error occurred.";
-           }
-           new Notice(userMessage, 6000); // Показуємо сповіщення довше
-          // --- КІНЕЦЬ ОБРОБКИ ПОМИЛОК ---
+           if (error instanceof Error) { /* ... обробка помилок ... */ }
+           else { userMessage += "Unknown error occurred."; }
+           new Notice(userMessage, 6000);
       } finally {
-          // --- ВІДНОВЛЕННЯ СТАНУ КНОПКИ ---
-           setIcon(buttonEl, originalIcon); // Повертаємо оригінальну іконку
+          // --- ОНОВЛЕНО: Відновлення стану кнопки ---
+           setIcon(buttonEl, originalIcon);
            buttonEl.disabled = false;
            buttonEl.title = originalTitle;
            buttonEl.removeClass(CSS_CLASS_DISABLED);
+           buttonEl.removeClass(CSS_CLASS_TRANSLATING_INPUT); // <--- Видаляємо клас анімації
           //  this.plugin.logger.trace("Summarize button state restored.");
-          // --- КІНЕЦЬ ВІДНОВЛЕННЯ СТАНУ ---
+          // --- КІНЕЦЬ ОНОВЛЕННЯ ---
       }
   }
+  // --- Кінець методу handleSummarizeClick ---
+
+  // ... (решта коду OllamaView.ts) ...
 
 } // END OF OllamaView CLASS

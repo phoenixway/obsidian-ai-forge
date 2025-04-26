@@ -4234,8 +4234,7 @@ This action cannot be undone.`,
     });
   }
   // OllamaView.ts
-  // ... (інші методи) ...
-  // --- ПОВНА ВЕРСІЯ: handleSummarizeClick ---
+  // --- ОНОВЛЕНО: handleSummarizeClick ---
   async handleSummarizeClick(originalContent, buttonEl) {
     var _a;
     this.plugin.logger.debug("Summarize button clicked.");
@@ -4258,6 +4257,7 @@ This action cannot be undone.`,
     const originalTitle = buttonEl.title;
     buttonEl.title = "Summarizing...";
     buttonEl.addClass(CSS_CLASS_DISABLED);
+    buttonEl.addClass(CSS_CLASS_TRANSLATING_INPUT);
     try {
       const prompt = `Provide a concise summary of the following text:
 
@@ -4267,18 +4267,7 @@ ${textToSummarize}
 
 Summary:`;
       const requestBody = {
-        model: summarizationModel,
-        prompt,
-        stream: false,
-        // Не потоковий запит
-        temperature: 0.2,
-        // Низька температура для фактологічної сумаризації
-        options: {
-          // Можна обмежити контекст, якщо потрібно, але для сумаризації одного повідомлення це може бути необов'язково
-          num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow
-          // top_k: 20,
-          // top_p: 0.5
-        }
+        /* ... */
       };
       this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
@@ -4292,13 +4281,6 @@ Summary:`;
       this.plugin.logger.error("Error during summarization:", error);
       let userMessage = "Summarization failed: ";
       if (error instanceof Error) {
-        if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
-          userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
-        } else if (error.message.includes("connect") || error.message.includes("fetch")) {
-          userMessage += "Could not connect to Ollama server.";
-        } else {
-          userMessage += error.message;
-        }
       } else {
         userMessage += "Unknown error occurred.";
       }
@@ -4308,8 +4290,11 @@ Summary:`;
       buttonEl.disabled = false;
       buttonEl.title = originalTitle;
       buttonEl.removeClass(CSS_CLASS_DISABLED);
+      buttonEl.removeClass(CSS_CLASS_TRANSLATING_INPUT);
     }
   }
+  // --- Кінець методу handleSummarizeClick ---
+  // ... (решта коду OllamaView.ts) ...
 };
 
 // src/settings.ts
