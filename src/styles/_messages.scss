@@ -460,3 +460,20 @@
 .summary-modal-content {
   // Стилі для контейнера з текстом сумаризації
 }
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+// Універсальний клас для анімації завантаження іконки в кнопці
+.button-loading {
+  // Можна додати стилі для самої кнопки в стані завантаження, якщо потрібно
+  // Наприклад:
+  // cursor: default; // Змінити курсор
+
+  // Головне - анімація для іконки всередині
+  .svg-icon {
+    animation: spin 1s linear infinite;
+  }
+}

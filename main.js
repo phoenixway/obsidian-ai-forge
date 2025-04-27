@@ -4217,7 +4217,6 @@ This action cannot be undone.`,
         const collapseButton = messageEl.createEl("button", {
           cls: CSS_CLASS_SHOW_MORE_BUTTON,
           text: "Show Less \u25B2"
-          // <--- Початковий текст
         });
         collapseButton.setAttribute("data-initial-state", "expanded");
         this.registerDomEvent(
@@ -4234,7 +4233,7 @@ This action cannot be undone.`,
     });
   }
   // OllamaView.ts
-  // --- ОНОВЛЕНО: handleSummarizeClick ---
+  // --- ОНОВЛЕНО: handleSummarizeClick з новим класом анімації ---
   async handleSummarizeClick(originalContent, buttonEl) {
     var _a;
     this.plugin.logger.debug("Summarize button clicked.");
@@ -4257,7 +4256,8 @@ This action cannot be undone.`,
     const originalTitle = buttonEl.title;
     buttonEl.title = "Summarizing...";
     buttonEl.addClass(CSS_CLASS_DISABLED);
-    buttonEl.addClass(CSS_CLASS_TRANSLATING_INPUT);
+    buttonEl.addClass("button-loading");
+    this.plugin.logger.debug("Added 'button-loading' class to summarize button");
     try {
       const prompt = `Provide a concise summary of the following text:
 
@@ -4288,7 +4288,7 @@ Summary:`;
       let userMessage = "Summarization failed: ";
       if (error instanceof Error) {
         if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
-          userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
+          userMessage += `Model '${summarizationModel}' not found.`;
         } else if (error.message.includes("connect") || error.message.includes("fetch")) {
           userMessage += "Could not connect to Ollama server.";
         } else {
@@ -4303,9 +4303,11 @@ Summary:`;
       buttonEl.disabled = false;
       buttonEl.title = originalTitle;
       buttonEl.removeClass(CSS_CLASS_DISABLED);
-      buttonEl.removeClass(CSS_CLASS_TRANSLATING_INPUT);
+      buttonEl.removeClass("button-loading");
     }
   }
+  // --- Кінець методу handleSummarizeClick ---
+  // ... (решта коду OllamaView.ts) ...
   // --- Кінець методу handleSummarizeClick ---
   // ... (решта коду OllamaView.ts) ...
 };

@@ -4874,7 +4874,6 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
 
     if (!contentCollapsible) return;
 
-    // Якщо йде генерація І це повідомлення асистента - НЕ згортаємо
     if (this.isProcessing && isAssistantMessage) {
         const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
         existingButton?.remove();
@@ -4883,7 +4882,6 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
         return;
     }
 
-    // Якщо обмеження вимкнене (maxH <= 0) - НЕ згортаємо
     if (maxH <= 0) {
          const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
          existingButton?.remove();
@@ -4892,55 +4890,40 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
         return;
     }
 
-    // Генерація завершена, обмеження активне - перевіряємо висоту
     requestAnimationFrame(() => {
         if (!contentCollapsible || !contentCollapsible.isConnected) return;
 
         const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
-        existingButton?.remove(); // Завжди видаляємо стару кнопку перед перевіркою
+        existingButton?.remove();
 
-        // Зберігаємо поточний стан max-height перед скиданням для вимірювання
         const currentMaxHeight = contentCollapsible.style.maxHeight;
-        contentCollapsible.style.maxHeight = ''; // Скидаємо для вимірювання
+        contentCollapsible.style.maxHeight = '';
         const scrollHeight = contentCollapsible.scrollHeight;
-        contentCollapsible.style.maxHeight = currentMaxHeight; // Повертаємо попередній стан
+        contentCollapsible.style.maxHeight = currentMaxHeight;
 
         if (scrollHeight > maxH) {
-            // --- ВИПРАВЛЕННЯ: Створюємо кнопку, АЛЕ НЕ згортаємо одразу ---
-            // this.plugin.logger.trace(`[checkMessageForCollapsing] Content too long (${scrollHeight} > ${maxH}), adding button.`);
-
-            // Створюємо кнопку "Show Less"
             const collapseButton = messageEl.createEl("button", {
                 cls: CSS_CLASS_SHOW_MORE_BUTTON,
-                text: "Show Less ▲", // <--- Початковий текст
+                text: "Show Less ▲",
             });
-            // Встановлюємо атрибут, щоб позначити початковий розгорнутий стан
             collapseButton.setAttribute('data-initial-state', 'expanded');
 
-            // Додаємо обробник кліку
             this.registerDomEvent(collapseButton, "click", () =>
                 this.toggleMessageCollapse(contentCollapsible, collapseButton)
             );
 
-            // НЕ додаємо клас collapsed і НЕ встановлюємо max-height тут
-            // contentCollapsible.style.maxHeight = `${maxH}px`; // ВИДАЛЕНО
-            // contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED); // ВИДАЛЕНО
-            contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED); // Переконуємось, що клас знято
-            contentCollapsible.style.maxHeight = ''; // Переконуємось, що немає обмеження
-
-            // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+            contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+            contentCollapsible.style.maxHeight = '';
         } else {
-            // Вміст достатньо короткий: переконуємось, що стилі зняті і кнопки немає
             contentCollapsible.style.maxHeight = '';
             contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-            // Кнопка вже видалена вище
         }
     });
 }
 
 // OllamaView.ts
 
-    // --- ОНОВЛЕНО: handleSummarizeClick ---
+    // --- ОНОВЛЕНО: handleSummarizeClick з новим класом анімації ---
     private async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
       this.plugin.logger.debug("Summarize button clicked.");
       const summarizationModel = this.plugin.settings.summarizationModelName;
@@ -4964,28 +4947,29 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
 
       // Встановлюємо стан завантаження кнопки
       const originalIcon = buttonEl.querySelector('.svg-icon')?.getAttribute('icon-name') || 'scroll-text';
-      setIcon(buttonEl, "loader");
+      setIcon(buttonEl, "loader"); // Встановлюємо іконку завантаження
       buttonEl.disabled = true;
       const originalTitle = buttonEl.title;
       buttonEl.title = 'Summarizing...';
       buttonEl.addClass(CSS_CLASS_DISABLED);
-      // --- ДОДАНО: Клас для анімації ---
-      buttonEl.addClass(CSS_CLASS_TRANSLATING_INPUT); // Використовуємо існуючий клас з анімацією
-      // --------------------------------
+      // --- ВИКОРИСТОВУЄМО НОВИЙ КЛАС ---
+      buttonEl.addClass('button-loading'); // Додаємо клас для анімації
+      this.plugin.logger.debug("Added 'button-loading' class to summarize button");
+      // -------------------------------
 
       try {
-        const prompt = `Provide a concise summary of the following text:\n\n"""\n${textToSummarize}\n"""\n\nSummary:`;
-        const requestBody = {
-            model: summarizationModel,
-            prompt: prompt,
-            stream: false,
-            temperature: 0.2,
-             options: {
-                 num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow,
-             },
-        };
+          const prompt = `Provide a concise summary of the following text:\n\n"""\n${textToSummarize}\n"""\n\nSummary:`;
+          const requestBody = {
+              model: summarizationModel,
+              prompt: prompt,
+              stream: false,
+              temperature: 0.2,
+               options: {
+                   num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow,
+               },
+          };
 
-          this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
+           this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
           const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
 
           if (responseData && responseData.response) {
@@ -4996,34 +4980,29 @@ private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElemen
           }
 
       } catch (error: any) {
-          // --- ОБРОБКА ПОМИЛОК ---
-          this.plugin.logger.error("Error during summarization:", error);
-          // Формуємо повідомлення для користувача
-          let userMessage = "Summarization failed: ";
-          if (error instanceof Error) {
-               // Намагаємось надати більш конкретну інформацію
-              if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
-                  userMessage += `Model '${summarizationModel}' not found. Check model name or Ollama server.`;
-              } else if (error.message.includes("connect") || error.message.includes("fetch")) {
-                   userMessage += "Could not connect to Ollama server.";
-              } else {
-                   userMessage += error.message; // Загальна помилка
-              }
-          } else {
-              userMessage += "Unknown error occurred.";
-          }
-          new Notice(userMessage, 6000); // Показуємо сповіщення довше
+           this.plugin.logger.error("Error during summarization:", error);
+           let userMessage = "Summarization failed: ";
+           if (error instanceof Error) {
+               if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) { userMessage += `Model '${summarizationModel}' not found.`; }
+               else if (error.message.includes("connect") || error.message.includes("fetch")) { userMessage += "Could not connect to Ollama server."; }
+               else { userMessage += error.message; }
+           } else { userMessage += "Unknown error occurred."; }
+           new Notice(userMessage, 6000);
       } finally {
-          // --- ОНОВЛЕНО: Відновлення стану кнопки ---
+          // --- ВІДНОВЛЕННЯ СТАНУ КНОПКИ ---
            setIcon(buttonEl, originalIcon);
            buttonEl.disabled = false;
            buttonEl.title = originalTitle;
            buttonEl.removeClass(CSS_CLASS_DISABLED);
-           buttonEl.removeClass(CSS_CLASS_TRANSLATING_INPUT); // <--- Видаляємо клас анімації
+           buttonEl.removeClass('button-loading'); // <--- Видаляємо новий клас
+          //  this.plugin.logger.debug("Removed 'button-loading' class from summarize button");
           //  this.plugin.logger.trace("Summarize button state restored.");
-          // --- КІНЕЦЬ ОНОВЛЕННЯ ---
+          // --- КІНЕЦЬ ВІДНОВЛЕННЯ ---
       }
   }
+  // --- Кінець методу handleSummarizeClick ---
+
+  // ... (решта коду OllamaView.ts) ...
   // --- Кінець методу handleSummarizeClick ---
 
   // ... (решта коду OllamaView.ts) ...
