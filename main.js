@@ -5073,53 +5073,52 @@ var RagService = class {
     this.metadataCache = plugin.app.metadataCache;
     this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
   }
-  // src/ragService.ts -> splitIntoChunks
+  // src/ragService.ts -> splitIntoChunks (Версія 3 - Розділення за Заголовками)
   splitIntoChunks(text, chunkSize) {
     if (!text)
       return [];
-    this.plugin.logger.debug(`[RagService Chunking] Input text length: ${text.length}`);
+    this.plugin.logger.debug(`[RagService Chunking v3] Input text length: ${text.length}`);
     const lines = text.split("\n");
     const chunks = [];
-    let currentChunk = "";
-    this.plugin.logger.debug(`[RagService Chunking] Found ${lines.length} lines.`);
+    let currentChunkLines = [];
+    const minChunkLength = 15;
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (trimmedLine.length === 0) {
-        if (currentChunk.length > 0) {
-          chunks.push(currentChunk);
-          currentChunk = "";
-        }
-        continue;
-      }
-      const potentialLength = currentChunk.length + trimmedLine.length + (currentChunk.length > 0 ? 1 : 0);
-      if (potentialLength <= chunkSize) {
-        if (currentChunk.length > 0) {
-          currentChunk += "\n" + trimmedLine;
+      const isHeading = trimmedLine.startsWith("# ");
+      if (currentChunkLines.length > 0 && (isHeading || currentChunkLines.join("\n").length + trimmedLine.length + 1 > chunkSize)) {
+        const chunkText = currentChunkLines.join("\n").trim();
+        if (chunkText.length >= minChunkLength) {
+          chunks.push(chunkText);
         } else {
-          currentChunk = trimmedLine;
+          this.plugin.logger.debug(`[RagService Chunking v3] Skipping short chunk (length ${chunkText.length}): "${chunkText.substring(0, 70)}..."`);
         }
-      } else {
-        if (currentChunk.length > 0) {
-          chunks.push(currentChunk);
-        }
+        currentChunkLines = [];
+      }
+      if (trimmedLine.length > 0) {
         if (trimmedLine.length <= chunkSize) {
-          currentChunk = trimmedLine;
+          currentChunkLines.push(trimmedLine);
         } else {
-          this.plugin.logger.debug(`[RagService Chunking] Line too long (${trimmedLine.length}), splitting...`);
+          this.plugin.logger.debug(`[RagService Chunking v3] Line too long (${trimmedLine.length}), splitting...`);
           for (let i = 0; i < trimmedLine.length; i += chunkSize) {
-            chunks.push(trimmedLine.substring(i, i + chunkSize));
+            const subChunk = trimmedLine.substring(i, i + chunkSize);
+            if (subChunk.length >= minChunkLength) {
+              chunks.push(subChunk);
+            }
           }
-          currentChunk = "";
+          currentChunkLines = [];
         }
       }
     }
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
+    if (currentChunkLines.length > 0) {
+      const chunkText = currentChunkLines.join("\n").trim();
+      if (chunkText.length >= minChunkLength) {
+        chunks.push(chunkText);
+      } else {
+        this.plugin.logger.debug(`[RagService Chunking v3] Skipping final short chunk (length ${chunkText.length}): "${chunkText.substring(0, 70)}..."`);
+      }
     }
-    const minChunkLength = 15;
-    const filteredChunks = chunks.filter((chunk) => chunk.trim().length >= minChunkLength);
-    this.plugin.logger.debug(`[RagService Chunking] Produced ${chunks.length} raw chunks, ${filteredChunks.length} chunks after filtering (>=${minChunkLength} chars).`);
-    return filteredChunks;
+    this.plugin.logger.debug(`[RagService Chunking v3] Produced ${chunks.length} chunks after filtering (>=${minChunkLength} chars).`);
+    return chunks;
   }
   /**
    * ОНОВЛЕНО: Індексує markdown файли, розпізнаючи тег 'personal-focus'.

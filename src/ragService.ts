@@ -38,81 +38,73 @@ export class RagService {
     this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
   }
 
-// src/ragService.ts -> splitIntoChunks
+// src/ragService.ts -> splitIntoChunks (Версія 3 - Розділення за Заголовками)
 
 private splitIntoChunks(text: string, chunkSize: number): string[] {
   if (!text) return [];
-  this.plugin.logger.debug(`[RagService Chunking] Input text length: ${text.length}`);
+  this.plugin.logger.debug(`[RagService Chunking v3] Input text length: ${text.length}`);
 
-  // --- ЗМІНЕНО: Розділяємо за ОДИНИМ розривом рядка ---
   const lines = text.split('\n');
-  // ----------------------------------------------------
-
   const chunks: string[] = [];
-  let currentChunk = "";
-  this.plugin.logger.debug(`[RagService Chunking] Found ${lines.length} lines.`);
+  let currentChunkLines: string[] = []; // Збираємо рядки поточного чанка
+  const minChunkLength = 15; // Мінімальна довжина (символів)
 
   for (const line of lines) {
-      const trimmedLine = line.trim();
+    const trimmedLine = line.trim();
 
-      // Пропускаємо повністю порожні рядки
-      if (trimmedLine.length === 0) {
-          // Якщо поточний чанк не порожній, завершуємо його
-          if (currentChunk.length > 0) {
-              chunks.push(currentChunk);
-              currentChunk = "";
-          }
-          continue;
-      }
+    // Перевіряємо, чи це заголовок Markdown (починається з '# ')
+    const isHeading = trimmedLine.startsWith('# ');
 
-      // Перевіряємо, чи додавання нового рядка не перевищить chunkSize
-      // Додаємо 1 для символу нового рядка, який буде між рядками
-      const potentialLength = currentChunk.length + trimmedLine.length + (currentChunk.length > 0 ? 1 : 0);
-
-      if (potentialLength <= chunkSize) {
-          // Додаємо до поточного чанка
-          if (currentChunk.length > 0) {
-              currentChunk += "\n" + trimmedLine;
-          } else {
-              currentChunk = trimmedLine;
-          }
+    // Якщо це заголовок АБО додавання цього рядка перевищить ліміт
+    // АБО поточний чанк вже існує і ми зустріли заголовок -> завершуємо поточний чанк
+    if (currentChunkLines.length > 0 && (isHeading || (currentChunkLines.join('\n').length + trimmedLine.length + 1) > chunkSize)) {
+      const chunkText = currentChunkLines.join('\n').trim();
+      if (chunkText.length >= minChunkLength) {
+           chunks.push(chunkText);
+          // this.plugin.logger.debug(`[RagService Chunking v3] Added chunk (length ${chunkText.length}): "${chunkText.substring(0, 70)}..."`);
       } else {
-          // Поточний чанк заповнений або новий рядок занадто великий
-          // 1. Завершуємо поточний чанк, якщо він не порожній
-          if (currentChunk.length > 0) {
-              chunks.push(currentChunk);
-          }
-          // 2. Обробляємо поточний рядок
-          if (trimmedLine.length <= chunkSize) {
-              // Починаємо новий чанк з цим рядком
-              currentChunk = trimmedLine;
-          } else {
-              // Поточний рядок сам по собі занадто великий, розбиваємо його
-               this.plugin.logger.debug(`[RagService Chunking] Line too long (${trimmedLine.length}), splitting...`);
-               for (let i = 0; i < trimmedLine.length; i += chunkSize) {
-                  chunks.push(trimmedLine.substring(i, i + chunkSize));
-               }
-               // Після розбивки довгого рядка, наступний рядок почне новий чанк
-               currentChunk = "";
-          }
+           this.plugin.logger.debug(`[RagService Chunking v3] Skipping short chunk (length ${chunkText.length}): "${chunkText.substring(0, 70)}..."`);
       }
+      currentChunkLines = []; // Починаємо збирати новий чанк
+    }
+
+    // Додаємо непустий рядок до поточного чанка, якщо він не призведе до негайного перевищення ліміту
+    // (Це обробляє випадок, коли сам рядок довший за chunkSize)
+    if (trimmedLine.length > 0) {
+        if (trimmedLine.length <= chunkSize) {
+          currentChunkLines.push(trimmedLine);
+        } else {
+           // Рядок сам по собі занадто великий, розбиваємо його
+           this.plugin.logger.debug(`[RagService Chunking v3] Line too long (${trimmedLine.length}), splitting...`);
+           for (let i = 0; i < trimmedLine.length; i += chunkSize) {
+              const subChunk = trimmedLine.substring(i, i + chunkSize);
+               if (subChunk.length >= minChunkLength) {
+                   chunks.push(subChunk); // Додаємо розбитий під-чанк одразу
+                  //  this.plugin.logger.debug(`[RagService Chunking v3] Added split sub-chunk (length ${subChunk.length}): "${subChunk.substring(0, 70)}..."`);
+               }
+           }
+           // Поточний чанк залишається порожнім, бо ми обробили цей довгий рядок
+           currentChunkLines = [];
+        }
+    }
   }
 
-  // Додаємо останній зібраний чанк, якщо він не порожній
-  if (currentChunk.length > 0) {
-      chunks.push(currentChunk);
+  // Додаємо останній зібраний чанк, якщо він не порожній і достатньо довгий
+  if (currentChunkLines.length > 0) {
+    const chunkText = currentChunkLines.join('\n').trim();
+    if (chunkText.length >= minChunkLength) {
+      chunks.push(chunkText);
+      // this.plugin.logger.debug(`[RagService Chunking v3] Added final chunk (length ${chunkText.length}): "${chunkText.substring(0, 70)}..."`);
+    } else {
+         this.plugin.logger.debug(`[RagService Chunking v3] Skipping final short chunk (length ${chunkText.length}): "${chunkText.substring(0, 70)}..."`);
+    }
   }
 
-  // --- ЗМІНЕНО: Фільтруємо короткі чанки (можна зробити менший поріг) ---
-  const minChunkLength = 15; // Зменшив мінімальну довжину
-  const filteredChunks = chunks.filter(chunk => chunk.trim().length >= minChunkLength);
-  // -----------------------------------------------------------------
-
-  this.plugin.logger.debug(`[RagService Chunking] Produced ${chunks.length} raw chunks, ${filteredChunks.length} chunks after filtering (>=${minChunkLength} chars).`);
+  this.plugin.logger.debug(`[RagService Chunking v3] Produced ${chunks.length} chunks after filtering (>=${minChunkLength} chars).`);
   // Log перших декількох чанків для перевірки
-  // filteredChunks.slice(0, 5).forEach((c, i) => this.plugin.logger.debug(`Chunk ${i+1}: "${c.substring(0,100)}..."`));
+  // chunks.slice(0, 5).forEach((c, i) => this.plugin.logger.debug(`Chunk ${i+1}: "${c.substring(0,100)}..."`));
 
-  return filteredChunks;
+  return chunks;
 }
   /**
    * ОНОВЛЕНО: Індексує markdown файли, розпізнаючи тег 'personal-focus'.
