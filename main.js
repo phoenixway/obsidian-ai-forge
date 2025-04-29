@@ -2317,22 +2317,39 @@ This action cannot be undone.`,
     (_b = this.stopGeneratingButton) == null ? void 0 : _b.show();
     (_c = this.sendButton) == null ? void 0 : _c.hide();
     try {
-      const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent, void 0, true);
+      const userMessage = await this.plugin.chatManager.addMessageToActiveChat(
+        "user",
+        userMessageContent,
+        void 0,
+        true
+      );
       if (!userMessage) {
         throw new Error("Failed to add user message to history.");
       }
-      assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+      assistantMessageGroupEl = this.chatContainer.createDiv({
+        cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
+      });
       this.renderAvatar(assistantMessageGroupEl, false);
       const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
       messageWrapper.style.order = "2";
-      const assistantMessageElement = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+      const assistantMessageElement = messageWrapper.createDiv({
+        cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`
+      });
       assistantMessageElInternal = assistantMessageElement;
       const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
       assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
-      this.currentAssistantMessage = { groupEl: assistantMessageGroupEl, contentEl: assistantContentEl, fullContent: "", timestamp: responseStartTime };
+      this.currentAssistantMessage = {
+        groupEl: assistantMessageGroupEl,
+        contentEl: assistantContentEl,
+        fullContent: "",
+        timestamp: responseStartTime
+      };
       this.guaranteedScrollToBottom(50, true);
       this.plugin.logger.info("[OllamaView] Starting stream request...");
-      const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
+      const stream = this.plugin.ollamaService.generateChatResponseStream(
+        activeChat,
+        this.currentAbortController.signal
+      );
       for await (const chunk of stream) {
         if ("error" in chunk && chunk.error) {
           if (!chunk.error.includes("aborted by user"))
@@ -2349,10 +2366,19 @@ This action cannot be undone.`,
           break;
         }
       }
-      this.plugin.logger.debug(`[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`);
+      this.plugin.logger.debug(
+        `[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`
+      );
       if (accumulatedResponse.trim()) {
-        await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false);
-        this.plugin.logger.debug(`Saved final assistant message (length: ${accumulatedResponse.length}) to chat history.`);
+        await this.plugin.chatManager.addMessageToActiveChat(
+          "assistant",
+          accumulatedResponse,
+          responseStartTime,
+          false
+        );
+        this.plugin.logger.debug(
+          `Saved final assistant message (length: ${accumulatedResponse.length}) to chat history.`
+        );
       } else {
         this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
         this.addMessageToDisplay("system", "Assistant provided an empty response.", new Date());
@@ -2365,10 +2391,20 @@ This action cannot be undone.`,
         this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
         this.addMessageToDisplay("system", "Generation stopped.", new Date());
         if (this.currentAssistantMessage && accumulatedResponse.trim()) {
-          this.plugin.logger.info(`[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`);
-          await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, (_f = this.currentAssistantMessage.timestamp) != null ? _f : responseStartTime, false).catch((e) => this.plugin.logger.error("Failed to save partial message after abort:", e));
+          this.plugin.logger.info(
+            `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
+          );
+          await this.plugin.chatManager.addMessageToActiveChat(
+            "assistant",
+            accumulatedResponse,
+            (_f = this.currentAssistantMessage.timestamp) != null ? _f : responseStartTime,
+            false
+          ).catch((e) => this.plugin.logger.error("Failed to save partial message after abort:", e));
           if (this.currentAssistantMessage.contentEl) {
-            this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + "\n\n[...] _(Stopped)_");
+            this.renderAssistantContent(
+              this.currentAssistantMessage.contentEl,
+              accumulatedResponse + "\n\n[...] _(Stopped)_"
+            );
           }
         } else if ((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) {
           this.currentAssistantMessage.groupEl.remove();
@@ -2390,14 +2426,20 @@ This action cannot be undone.`,
           const existingActions = messageWrapper.querySelector(".message-actions-wrapper");
           existingActions == null ? void 0 : existingActions.remove();
           const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-          const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+          const copyBtn = buttonsWrapper.createEl("button", {
+            cls: CSS_CLASS_COPY_BUTTON,
+            attr: { "aria-label": "Copy", title: "Copy" }
+          });
           (0, import_obsidian4.setIcon)(copyBtn, "copy");
           this.registerDomEvent(copyBtn, "click", (e) => {
             e.stopPropagation();
             this.handleCopyClick(finalContent, copyBtn);
           });
           if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
-            const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
+            const translateBtn = buttonsWrapper.createEl("button", {
+              cls: CSS_CLASS_TRANSLATE_BUTTON,
+              attr: { "aria-label": "Translate", title: "Translate" }
+            });
             (0, import_obsidian4.setIcon)(translateBtn, "languages");
             this.registerDomEvent(translateBtn, "click", (e) => {
               e.stopPropagation();
@@ -2408,14 +2450,20 @@ This action cannot be undone.`,
             });
           }
           if (this.plugin.settings.summarizationModelName && finalContent.trim()) {
-            const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
+            const summarizeBtn = buttonsWrapper.createEl("button", {
+              cls: CSS_CLASS_SUMMARIZE_BUTTON,
+              attr: { title: "Summarize message" }
+            });
             (0, import_obsidian4.setIcon)(summarizeBtn, "scroll-text");
             this.registerDomEvent(summarizeBtn, "click", (e) => {
               e.stopPropagation();
               this.handleSummarizeClick(finalContent, summarizeBtn);
             });
           }
-          const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+          const deleteBtn = buttonsWrapper.createEl("button", {
+            cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION],
+            attr: { "aria-label": "Delete message", title: "Delete Message" }
+          });
           (0, import_obsidian4.setIcon)(deleteBtn, "trash");
           this.registerDomEvent(deleteBtn, "click", (e) => {
             e.stopPropagation();
@@ -2429,7 +2477,9 @@ This action cannot be undone.`,
         assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
         this.checkMessageForCollapsing(assistantMessageElInternal);
       } else {
-        this.plugin.logger.debug("[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed or null).");
+        this.plugin.logger.debug(
+          "[OllamaView] finally: Skipping final UI update for assistant message (it was likely removed or null)."
+        );
       }
       this.setLoadingState(false);
       (_k = this.stopGeneratingButton) == null ? void 0 : _k.hide();
@@ -2493,15 +2543,10 @@ This action cannot be undone.`,
     } else {
       messageGroup = lastElement;
       if (!messageGroup.hasAttribute("data-timestamp")) {
-        messageGroup.setAttribute(
-          "data-timestamp",
-          message.timestamp.getTime().toString()
-        );
+        messageGroup.setAttribute("data-timestamp", message.timestamp.getTime().toString());
       }
     }
-    let messageWrapper = messageGroup.querySelector(
-      ".message-wrapper"
-    );
+    let messageWrapper = messageGroup.querySelector(".message-wrapper");
     if (!messageWrapper) {
       messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
       if (messageGroup.classList.contains(CSS_CLASS_USER_GROUP)) {
@@ -2539,10 +2584,7 @@ This action cannot be undone.`,
         });
         break;
       case "error":
-        (0, import_obsidian4.setIcon)(
-          contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }),
-          "alert-triangle"
-        );
+        (0, import_obsidian4.setIcon)(contentEl.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
         contentEl.createSpan({
           cls: CSS_CLASS_ERROR_TEXT,
           text: message.content
@@ -2611,10 +2653,7 @@ This action cannot be undone.`,
       text: this.formatTime(message.timestamp)
     });
     messageEl.addClass(CSS_CLASS_MESSAGE_ARRIVING);
-    setTimeout(
-      () => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING),
-      500
-    );
+    setTimeout(() => messageEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
     return messageEl;
   }
   // OllamaView.ts
@@ -2665,11 +2704,11 @@ This action cannot be undone.`,
   // --- ПОВНА ВИПРАВЛЕНА ВЕРСІЯ МЕТОДУ: handleRegenerateClick ---
   async handleRegenerateClick(userMessage) {
     var _a;
-    this.plugin.logger.info(
-      `Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`
-    );
+    this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
     if (this.currentAbortController) {
-      this.plugin.logger.warn("Cannot regenerate while another generation is in progress. Cancelling current one first.");
+      this.plugin.logger.warn(
+        "Cannot regenerate while another generation is in progress. Cancelling current one first."
+      );
       this.cancelGeneration();
       await new Promise((resolve) => setTimeout(resolve, 150));
       if (this.currentAbortController) {
@@ -2688,7 +2727,10 @@ This action cannot be undone.`,
       (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime()
     );
     if (messageIndex === -1) {
-      this.plugin.logger.error("Could not find the user message in the active chat history for regeneration.", userMessage);
+      this.plugin.logger.error(
+        "Could not find the user message in the active chat history for regeneration.",
+        userMessage
+      );
       new import_obsidian4.Notice("Error: Could not find the message to regenerate from.");
       return;
     }
@@ -2727,19 +2769,35 @@ This action cannot be undone.`,
           await this.loadAndDisplayActiveChat();
           this.scrollToBottom();
           this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
-          assistantMessageGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}` });
+          assistantMessageGroupEl = this.chatContainer.createDiv({
+            cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
+          });
           this.renderAvatar(assistantMessageGroupEl, false);
           const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
           messageWrapper.style.order = "2";
-          const assistantMessageElement = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}` });
+          const assistantMessageElement = messageWrapper.createDiv({
+            cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`
+          });
           assistantMessageElInternal = assistantMessageElement;
           const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-          assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
-          this.currentAssistantMessage = { groupEl: assistantMessageGroupEl, contentEl: assistantContentEl, fullContent: "", timestamp: responseStartTime };
+          assistantContentEl = contentContainer.createDiv({
+            cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}`
+          });
+          this.currentAssistantMessage = {
+            groupEl: assistantMessageGroupEl,
+            contentEl: assistantContentEl,
+            fullContent: "",
+            timestamp: responseStartTime
+          };
           targetContentElement = assistantContentEl;
           this.guaranteedScrollToBottom(50, true);
-          this.plugin.logger.info(`Starting regeneration stream request for chat ${chatId} based on history up to index ${messageIndex}`);
-          const stream = this.plugin.ollamaService.generateChatResponseStream(updatedChat, (_c = this.currentAbortController) == null ? void 0 : _c.signal);
+          this.plugin.logger.info(
+            `Starting regeneration stream request for chat ${chatId} based on history up to index ${messageIndex}`
+          );
+          const stream = this.plugin.ollamaService.generateChatResponseStream(
+            updatedChat,
+            (_c = this.currentAbortController) == null ? void 0 : _c.signal
+          );
           for await (const chunk of stream) {
             if ("error" in chunk && chunk.error) {
               if (!chunk.error.includes("aborted by user"))
@@ -2756,10 +2814,19 @@ This action cannot be undone.`,
               break;
             }
           }
-          this.plugin.logger.debug(`Regeneration stream completed successfully. Final response length: ${accumulatedResponse.length}`);
+          this.plugin.logger.debug(
+            `Regeneration stream completed successfully. Final response length: ${accumulatedResponse.length}`
+          );
           if (accumulatedResponse.trim()) {
-            await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false);
-            this.plugin.logger.debug(`Saved final regenerated message (length: ${accumulatedResponse.length}) to chat history.`);
+            await this.plugin.chatManager.addMessageToActiveChat(
+              "assistant",
+              accumulatedResponse,
+              responseStartTime,
+              false
+            );
+            this.plugin.logger.debug(
+              `Saved final regenerated message (length: ${accumulatedResponse.length}) to chat history.`
+            );
           } else {
             this.plugin.logger.warn("[OllamaView] Regeneration stream finished but accumulated response is empty.");
             this.addMessageToDisplay("system", "Assistant provided an empty response during regeneration.", new Date());
@@ -2772,13 +2839,25 @@ This action cannot be undone.`,
             this.plugin.logger.info("[OllamaView] Regeneration was cancelled by user.");
             this.addMessageToDisplay("system", "Regeneration stopped.", new Date());
             if (this.currentAssistantMessage && accumulatedResponse.trim()) {
-              this.plugin.logger.info(`[OllamaView] Saving partial response after regeneration cancellation (length: ${accumulatedResponse.length})`);
-              await this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, (_f = this.currentAssistantMessage.timestamp) != null ? _f : responseStartTime, false).catch((e) => this.plugin.logger.error("Failed to save partial message after regeneration abort:", e));
+              this.plugin.logger.info(
+                `[OllamaView] Saving partial response after regeneration cancellation (length: ${accumulatedResponse.length})`
+              );
+              await this.plugin.chatManager.addMessageToActiveChat(
+                "assistant",
+                accumulatedResponse,
+                (_f = this.currentAssistantMessage.timestamp) != null ? _f : responseStartTime,
+                false
+              ).catch((e) => this.plugin.logger.error("Failed to save partial message after regeneration abort:", e));
               if (this.currentAssistantMessage.contentEl) {
-                this.renderAssistantContent(this.currentAssistantMessage.contentEl, accumulatedResponse + "\n\n[...] _(Stopped)_");
+                this.renderAssistantContent(
+                  this.currentAssistantMessage.contentEl,
+                  accumulatedResponse + "\n\n[...] _(Stopped)_"
+                );
               }
             } else if ((_g = this.currentAssistantMessage) == null ? void 0 : _g.groupEl) {
-              this.plugin.logger.debug("Removing assistant message placeholder after regeneration cancellation with no response.");
+              this.plugin.logger.debug(
+                "Removing assistant message placeholder after regeneration cancellation with no response."
+              );
               this.currentAssistantMessage.groupEl.remove();
               this.currentAssistantMessage = null;
             }
@@ -2800,14 +2879,20 @@ This action cannot be undone.`,
               const existingActions = messageWrapper.querySelector(".message-actions-wrapper");
               existingActions == null ? void 0 : existingActions.remove();
               const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-              const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+              const copyBtn = buttonsWrapper.createEl("button", {
+                cls: CSS_CLASS_COPY_BUTTON,
+                attr: { "aria-label": "Copy", title: "Copy" }
+              });
               (0, import_obsidian4.setIcon)(copyBtn, "copy");
               this.registerDomEvent(copyBtn, "click", (e) => {
                 e.stopPropagation();
                 this.handleCopyClick(finalContent, copyBtn);
               });
               if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
-                const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
+                const translateBtn = buttonsWrapper.createEl("button", {
+                  cls: CSS_CLASS_TRANSLATE_BUTTON,
+                  attr: { "aria-label": "Translate", title: "Translate" }
+                });
                 (0, import_obsidian4.setIcon)(translateBtn, "languages");
                 this.registerDomEvent(translateBtn, "click", (e) => {
                   e.stopPropagation();
@@ -2818,14 +2903,20 @@ This action cannot be undone.`,
                 });
               }
               if (this.plugin.settings.summarizationModelName && finalContent.trim()) {
-                const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASS_SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
+                const summarizeBtn = buttonsWrapper.createEl("button", {
+                  cls: CSS_CLASS_SUMMARIZE_BUTTON,
+                  attr: { title: "Summarize message" }
+                });
                 (0, import_obsidian4.setIcon)(summarizeBtn, "scroll-text");
                 this.registerDomEvent(summarizeBtn, "click", (e) => {
                   e.stopPropagation();
                   this.handleSummarizeClick(finalContent, summarizeBtn);
                 });
               }
-              const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+              const deleteBtn = buttonsWrapper.createEl("button", {
+                cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASS_DANGER_OPTION],
+                attr: { "aria-label": "Delete message", title: "Delete Message" }
+              });
               (0, import_obsidian4.setIcon)(deleteBtn, "trash");
               this.registerDomEvent(deleteBtn, "click", (e) => {
                 e.stopPropagation();
@@ -2837,7 +2928,9 @@ This action cannot be undone.`,
             assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
             this.checkMessageForCollapsing(assistantMessageElInternal);
           } else {
-            this.plugin.logger.debug("[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed or null).");
+            this.plugin.logger.debug(
+              "[OllamaView] finally (regenerate): Skipping final UI update for assistant message (it was likely removed or null)."
+            );
           }
           this.setLoadingState(false);
           (_j = this.stopGeneratingButton) == null ? void 0 : _j.hide();
@@ -2912,12 +3005,15 @@ This action cannot be undone.`,
         const translationContentEl = translationContainer.createDiv({
           cls: CSS_CLASS_TRANSLATION_CONTENT
         });
-        await import_obsidian4.MarkdownRenderer.renderMarkdown(
+        await import_obsidian4.MarkdownRenderer.render(
+          // <--- Змінено назву тут
+          this.app,
           translatedText,
           translationContentEl,
           (_c = (_b = this.plugin.app.vault.getRoot()) == null ? void 0 : _b.path) != null ? _c : "",
           this
         );
+        this.fixBrokenTwemojiImages(translationContentEl);
         const targetLangName = LANGUAGES[targetLang] || targetLang;
         translationContainer.createEl("div", {
           cls: "translation-indicator",
@@ -2984,19 +3080,28 @@ This action cannot be undone.`,
   // Потрібно переконатися, що цей метод може обробляти частковий Markdown
   // і не кидає помилок, якщо, наприклад, блок коду ще не закритий.
   // Поточна реалізація з MarkdownRenderer.renderMarkdown може бути достатньо стійкою.
-  renderAssistantContent(containerEl, content) {
+  async renderAssistantContent(containerEl, content) {
     var _a, _b;
     const decodedContent = this.decodeHtmlEntities(content);
     const thinkingInfo = this.detectThinkingTags(decodedContent);
     containerEl.empty();
     if (thinkingInfo.hasThinkingTags) {
-      const processedHtml = this.processThinkingTags(decodedContent);
+      const processedHtml = await this.processThinkingTags(decodedContent);
       containerEl.innerHTML = processedHtml;
+      this.fixBrokenTwemojiImages(containerEl);
       this.addThinkingToggleListeners(containerEl);
       this.addCodeBlockEnhancements(containerEl);
     } else {
       try {
-        import_obsidian4.MarkdownRenderer.renderMarkdown(decodedContent, containerEl, (_b = (_a = this.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", this);
+        await import_obsidian4.MarkdownRenderer.render(
+          // <--- Змінено назву тут
+          this.app,
+          decodedContent,
+          containerEl,
+          (_b = (_a = this.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
+          this
+        );
+        this.fixBrokenTwemojiImages(containerEl);
         this.addCodeBlockEnhancements(containerEl);
       } catch (error) {
         this.plugin.logger.error(
@@ -3006,6 +3111,7 @@ This action cannot be undone.`,
           decodedContent.substring(0, 500)
         );
         containerEl.setText(decodedContent);
+        this.fixBrokenTwemojiImages(containerEl);
       }
     }
   }
@@ -3558,31 +3664,47 @@ This action cannot be undone.`,
     this.mediaRecorder = null;
   }
   // --- Thinking Tag Handling ---
-  processThinkingTags(content) {
+  async processThinkingTags(content) {
     const r = /<think>([\s\S]*?)<\/think>/g;
     let i = 0;
     const p = [];
     let m;
+    const processNormalText = async (text) => {
+      if (text) {
+        p.push(await this.markdownToHtml(text));
+      }
+    };
+    const processThinkBlock = async (thinkContent) => {
+      const renderedThinkContent = await this.markdownToHtml(thinkContent);
+      const headerHtml = `<div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">\u25BA</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div>`;
+      const contentHtml = `<div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${renderedThinkContent}</div>`;
+      p.push(`<div class="${CSS_CLASS_THINKING_BLOCK}">${headerHtml}${contentHtml}</div>`);
+    };
     while ((m = r.exec(content)) !== null) {
-      if (m.index > i)
-        p.push(this.markdownToHtml(content.substring(i, m.index)));
-      const c = m[1];
-      const h = `<div class="${CSS_CLASS_THINKING_BLOCK}"><div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">\u25BA</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div><div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${this.markdownToHtml(
-        c
-      )}</div></div>`;
-      p.push(h);
+      if (m.index > i) {
+        await processNormalText(content.substring(i, m.index));
+      }
+      await processThinkBlock(m[1]);
       i = r.lastIndex;
     }
-    if (i < content.length)
-      p.push(this.markdownToHtml(content.substring(i)));
+    if (i < content.length) {
+      await processNormalText(content.substring(i));
+    }
     return p.join("");
   }
-  markdownToHtml(markdown) {
+  async markdownToHtml(markdown) {
     var _a, _b;
     if (!(markdown == null ? void 0 : markdown.trim()))
       return "";
     const d = document.createElement("div");
-    import_obsidian4.MarkdownRenderer.renderMarkdown(markdown, d, (_b = (_a = this.app.workspace.getActiveFile()) == null ? void 0 : _a.path) != null ? _b : "", this);
+    await import_obsidian4.MarkdownRenderer.render(
+      // <--- Змінено назву тут
+      this.app,
+      markdown,
+      d,
+      (_b = (_a = this.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
+      this
+    );
     return d.innerHTML;
   }
   addThinkingToggleListeners(contentEl) {
@@ -4306,10 +4428,35 @@ Summary:`;
       buttonEl.removeClass("button-loading");
     }
   }
-  // --- Кінець методу handleSummarizeClick ---
-  // ... (решта коду OllamaView.ts) ...
-  // --- Кінець методу handleSummarizeClick ---
-  // ... (решта коду OllamaView.ts) ...
+  // OllamaView.ts
+  // Додайте цей метод всередині класу OllamaView
+  fixBrokenTwemojiImages(containerElement) {
+    if (!containerElement || typeof containerElement.querySelectorAll !== "function") {
+      this.plugin.logger.warn("[fixBrokenTwemojiImages] Invalid container element provided.");
+      return;
+    }
+    try {
+      const brokenImages = containerElement.querySelectorAll(
+        'img[src^="https://twemoji.maxcdn.com"]'
+      );
+      if (brokenImages.length > 0) {
+        brokenImages.forEach((img) => {
+          const originalEmoji = img.getAttribute("alt");
+          if (originalEmoji && img.parentNode) {
+            const textNode = document.createTextNode(originalEmoji);
+            img.parentNode.replaceChild(textNode, img);
+          } else {
+            this.plugin.logger.warn(
+              `[fixBrokenTwemojiImages] Could not replace broken img (alt: ${originalEmoji}, parentNode: ${!!img.parentNode}). Removing img tag.`
+            );
+            img.remove();
+          }
+        });
+      }
+    } catch (error) {
+      this.plugin.logger.error("[fixBrokenTwemojiImages] Error processing container:", error, containerElement);
+    }
+  }
 };
 
 // src/settings.ts
