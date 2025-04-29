@@ -40,25 +40,31 @@ export class RagService {
 
   private splitIntoChunks(text: string, chunkSize: number): string[] {
     if (!text) return [];
-    const paragraphs = text.split(/\n\s*\n/); // Розділяємо на абзаци
+    this.plugin.logger.debug(`[RagService Chunking] Input text length: ${text.length}`); // Log input length
+    const paragraphs = text.split(/\n\s*\n/);
     const chunks: string[] = [];
+    this.plugin.logger.debug(`[RagService Chunking] Found ${paragraphs.length} paragraphs.`); // Log paragraph count
 
     for (const p of paragraphs) {
         const trimmedP = p.trim();
         if (trimmedP.length === 0) continue;
 
         if (trimmedP.length > chunkSize) {
-            // Проста розбивка (можна покращити, наприклад, за реченнями)
+             this.plugin.logger.debug(`[RagService Chunking] Paragraph too long (${trimmedP.length}), splitting...`); // Log splitting
             for (let i = 0; i < trimmedP.length; i += chunkSize) {
-                chunks.push(trimmedP.substring(i, i + chunkSize));
+                const subChunk = trimmedP.substring(i, i + chunkSize);
+                // this.plugin.logger.debug(`[RagService Chunking] Raw sub-chunk: "${subChunk.substring(0,50)}..."`); // Log raw sub-chunk
+                chunks.push(subChunk);
             }
         } else {
+            // this.plugin.logger.debug(`[RagService Chunking] Adding paragraph as chunk: "${trimmedP.substring(0,50)}..."`); // Log added paragraph
             chunks.push(trimmedP);
         }
     }
-    // Мінімальна довжина чанка (можна винести в налаштування)
-    return chunks.filter(chunk => chunk.length > 20);
-  }
+    const filteredChunks = chunks.filter(chunk => chunk.length > 20); // Apply filter
+    this.plugin.logger.debug(`[RagService Chunking] Produced ${chunks.length} raw chunks, ${filteredChunks.length} chunks after filtering (>20 chars).`); // Log counts
+    return filteredChunks;
+}
 
   /**
    * ОНОВЛЕНО: Індексує markdown файли, розпізнаючи тег 'personal-focus'.

@@ -5076,21 +5076,27 @@ var RagService = class {
   splitIntoChunks(text, chunkSize) {
     if (!text)
       return [];
+    this.plugin.logger.debug(`[RagService Chunking] Input text length: ${text.length}`);
     const paragraphs = text.split(/\n\s*\n/);
     const chunks = [];
+    this.plugin.logger.debug(`[RagService Chunking] Found ${paragraphs.length} paragraphs.`);
     for (const p of paragraphs) {
       const trimmedP = p.trim();
       if (trimmedP.length === 0)
         continue;
       if (trimmedP.length > chunkSize) {
+        this.plugin.logger.debug(`[RagService Chunking] Paragraph too long (${trimmedP.length}), splitting...`);
         for (let i = 0; i < trimmedP.length; i += chunkSize) {
-          chunks.push(trimmedP.substring(i, i + chunkSize));
+          const subChunk = trimmedP.substring(i, i + chunkSize);
+          chunks.push(subChunk);
         }
       } else {
         chunks.push(trimmedP);
       }
     }
-    return chunks.filter((chunk) => chunk.length > 20);
+    const filteredChunks = chunks.filter((chunk) => chunk.length > 20);
+    this.plugin.logger.debug(`[RagService Chunking] Produced ${chunks.length} raw chunks, ${filteredChunks.length} chunks after filtering (>20 chars).`);
+    return filteredChunks;
   }
   /**
    * ОНОВЛЕНО: Індексує markdown файли, розпізнаючи тег 'personal-focus'.
