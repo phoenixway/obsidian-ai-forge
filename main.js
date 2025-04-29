@@ -5063,23 +5063,16 @@ var OllamaSettingTab = class extends import_obsidian6.PluginSettingTab {
 // src/ragService.ts
 var import_obsidian7 = require("obsidian");
 var RagService = class {
-  // Модель за замовчуванням
   constructor(plugin) {
-    // --- ЗМІНЕНО: Зберігаємо ембединги чанків ---
     this.chunkEmbeddings = [];
-    // ------------------------------------------
     this.isIndexing = false;
     this.embeddingModelName = "nomic-embed-text";
     this.plugin = plugin;
     this.adapter = plugin.app.vault.adapter;
+    this.vault = plugin.app.vault;
+    this.metadataCache = plugin.app.metadataCache;
     this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
   }
-  /**
-   * Розбиває текст на чанки (проста версія - за абзацами).
-   * @param text Вхідний текст документа (бажано без YAML).Я
-   * @param chunkSize Максимальна довжина чанка в символах (з налаштувань).
-   * @returns Масив текстових чанків.
-   */
   splitIntoChunks(text, chunkSize) {
     if (!text)
       return [];
@@ -5100,17 +5093,12 @@ var RagService = class {
     return chunks.filter((chunk) => chunk.length > 20);
   }
   /**
-   * Індексує markdown файли: розбиває на чанки, генерує embeddings, зберігає в пам'яті.
+   * ОНОВЛЕНО: Індексує markdown файли, розпізнаючи тег 'personal-focus'.
    */
   async indexDocuments() {
     var _a, _b;
-    if (!this.plugin.settings.ragEnabled) {
-      this.plugin.logger.debug("[RagService] RAG indexing skipped (disabled in settings).");
-      this.chunkEmbeddings = [];
-      return;
-    }
-    if (!this.plugin.settings.ragEnableSemanticSearch) {
-      this.plugin.logger.debug("[RagService] Semantic Search indexing skipped (disabled in settings).");
+    if (!this.plugin.settings.ragEnabled || !this.plugin.settings.ragEnableSemanticSearch) {
+      this.plugin.logger.debug("[RagService] RAG semantic indexing skipped (disabled in settings).");
       this.chunkEmbeddings = [];
       return;
     }
@@ -5119,55 +5107,57 @@ var RagService = class {
       return;
     }
     this.isIndexing = true;
-    this.plugin.logger.debug("[RagService] Starting semantic indexing...");
+    this.plugin.logger.info("[RagService] Starting semantic indexing...");
     const startTime = Date.now();
     this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
     const chunkSize = this.plugin.settings.ragChunkSize || DEFAULT_SETTINGS.ragChunkSize;
-    this.plugin.logger.debug(`[RagService] Using embedding model: ${this.embeddingModelName}, Chunk size: ${chunkSize}`);
+    const personalFocusTag = "personal-focus";
+    this.plugin.logger.debug(`[RagService] Using embedding model: ${this.embeddingModelName}, Chunk size: ${chunkSize}, Personal Focus Tag: '${personalFocusTag}'`);
     const newEmbeddings = [];
     try {
       const folderPath = this.plugin.settings.ragFolderPath;
-      const vault = this.plugin.app.vault;
-      const metadataCache = this.plugin.app.metadataCache;
-      this.plugin.logger.debug(`[RagService] RAG folder path: "${folderPath}"`);
-      const files = await this.getMarkdownFiles(vault, folderPath);
+      const files = await this.getMarkdownFiles(this.vault, folderPath);
       this.plugin.logger.debug(`[RagService] Found ${files.length} markdown files in "${folderPath}".`);
       let processedFiles = 0;
+      let personalFocusFiles = 0;
       for (const file of files) {
-        this.plugin.logger.debug(`[RagService] Processing file: ${file.path}`);
         try {
-          const content = await vault.read(file);
-          const fileCache = metadataCache.getFileCache(file);
+          const content = await this.vault.read(file);
+          const fileCache = this.metadataCache.getFileCache(file);
           const frontmatter = (fileCache == null ? void 0 : fileCache.frontmatter) || {};
+          const isPersonal = frontmatter[personalFocusTag] === true;
+          if (isPersonal) {
+            personalFocusFiles++;
+            this.plugin.logger.debug(`[RagService] File ${file.path} marked as personal focus.`);
+          }
           let bodyContent = content;
           if (fileCache == null ? void 0 : fileCache.frontmatterPosition) {
             bodyContent = content.substring(fileCache.frontmatterPosition.end.offset).trim();
           }
           const chunks = this.splitIntoChunks(bodyContent, chunkSize);
           if (!chunks || chunks.length === 0) {
-            this.plugin.logger.debug(`[RagService] No valid chunks found in ${file.path}, skipping.`);
             continue;
           }
-          this.plugin.logger.debug(`[RagService] Generating ${chunks.length} embeddings for ${file.path} using ${this.embeddingModelName}...`);
           const vectors = await this.plugin.ollamaService.generateEmbeddings(chunks, this.embeddingModelName);
           if (vectors && vectors.length === chunks.length) {
             const metadata = {
               ...frontmatter,
+              // Копіюємо весь frontmatter
               path: file.path,
               filename: file.name,
               created: (_a = file.stat) == null ? void 0 : _a.ctime,
               modified: (_b = file.stat) == null ? void 0 : _b.mtime,
-              "personal-logs": frontmatter["personal-logs"] === true
+              isPersonalFocus: isPersonal
+              // <-- Зберігаємо прапорець
             };
             for (let i = 0; i < chunks.length; i++) {
               newEmbeddings.push({
                 text: chunks[i],
                 vector: vectors[i],
                 metadata
-                // Додаємо однакові метадані до всіх чанків файлу
+                // Всі чанки файлу мають однакові метадані
               });
             }
-            this.plugin.logger.debug(`[RagService] Successfully embedded ${vectors.length} chunks from ${file.path}`);
             processedFiles++;
           } else {
             this.plugin.logger.warn(`[RagService] Mismatch or error generating embeddings for ${file.path}. Expected ${chunks.length}, got ${vectors == null ? void 0 : vectors.length}`);
@@ -5178,16 +5168,13 @@ var RagService = class {
       }
       this.chunkEmbeddings = newEmbeddings;
       const duration = (Date.now() - startTime) / 1e3;
-      this.plugin.logger.debug(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files.`);
+      this.plugin.logger.info(`[RagService] Semantic indexing complete in ${duration.toFixed(2)}s. Indexed ${this.chunkEmbeddings.length} chunks from ${processedFiles} files (${personalFocusFiles} personal focus files).`);
     } catch (error) {
       this.plugin.logger.error("[RagService] Error during indexing process:", error);
     } finally {
       this.isIndexing = false;
     }
   }
-  /**
-   * Get all markdown files in the specified folder path
-   */
   async getMarkdownFiles(vault, folderPath) {
     const files = [];
     if (!folderPath) {
@@ -5207,7 +5194,6 @@ var RagService = class {
     }
     return files;
   }
-  // --- Обчислення Косинусної Подібності ---
   calculateCosineSimilarity(vecA, vecB) {
     if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) {
       return 0;
@@ -5227,12 +5213,9 @@ var RagService = class {
       return 0;
     return dotProduct / magnitude;
   }
-  // ----------------------------------------------------------------------------
   /**
    * Знаходить релевантні ЧАНКИ документів за допомогою семантичної подібності.
-   * @param query Запит користувача.
-   * @param limit Максимальна кількість чанків для повернення (з налаштувань topK).
-   * @returns Масив об'єктів ChunkVector, відсортований за подібністю.
+   * Повертає чанки з метаданими, включаючи прапорець isPersonalFocus.
    */
   async findRelevantDocuments(query, limit) {
     var _a;
@@ -5270,67 +5253,72 @@ var RagService = class {
     }
   }
   /**
-   * Готує контекст для LLM з найбільш релевантних чанків документів.
+   * ОНОВЛЕНО: Готує контекст для LLM, розділяючи "особистий фокус" та "загальний" контекст.
    * @param query Запит користувача для пошуку релевантних чанків.
    * @returns Рядок з форматованим контекстом або порожній рядок.
    */
   async prepareContext(query) {
-    if (!this.plugin.settings.ragEnabled) {
+    if (!this.plugin.settings.ragEnabled || !this.plugin.settings.ragEnableSemanticSearch) {
+      this.plugin.logger.debug("[RagService] Context preparation skipped (RAG or semantic search disabled).");
       return "";
     }
-    if (this.plugin.settings.ragEnableSemanticSearch) {
-      const topK = this.plugin.settings.ragTopK || DEFAULT_SETTINGS.ragTopK;
-      const relevantChunks = await this.findRelevantDocuments(query, topK);
-      if (relevantChunks.length === 0) {
-        this.plugin.logger.debug("[RagService] No relevant documents found via semantic search for context.");
-        return "";
+    const topK = this.plugin.settings.ragTopK || DEFAULT_SETTINGS.ragTopK;
+    const relevantChunks = await this.findRelevantDocuments(query, topK);
+    if (relevantChunks.length === 0) {
+      this.plugin.logger.debug("[RagService] No relevant documents found for context.");
+      return "";
+    }
+    this.plugin.logger.debug(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
+    const personalFocusChunks = [];
+    const generalContextChunks = [];
+    relevantChunks.forEach((chunk) => {
+      if (chunk.metadata.isPersonalFocus) {
+        personalFocusChunks.push(chunk);
+      } else {
+        generalContextChunks.push(chunk);
       }
-      this.plugin.logger.debug(`[RagService] Preparing context from ${relevantChunks.length} top chunks.`);
-      let context = "### Context from User Notes (Semantic Search):\n\n";
-      relevantChunks.forEach((chunk, index) => {
+    });
+    let finalContext = "";
+    if (personalFocusChunks.length > 0) {
+      finalContext += "### Personal Focus Context (User's Life State & Goals):\n";
+      finalContext += "IMPORTANT: This section contains key information about the user's current situation, priorities, and desired actions. Use it for strategic planning, progress tracking, and aligning suggestions with their core objectives.\n\n";
+      personalFocusChunks.forEach((chunk, index) => {
+        var _a, _b, _c;
+        let header = `--- Chunk ${index + 1} from Personal Focus Note: ${((_a = chunk.metadata) == null ? void 0 : _a.filename) || chunk.metadata.path}`;
+        header += ` (Score: ${(_c = (_b = chunk.score) == null ? void 0 : _b.toFixed(3)) != null ? _c : "N/A"}) ---
+`;
+        finalContext += header;
+        finalContext += chunk.text.trim() + "\n\n";
+      });
+      this.plugin.logger.debug(`[RagService] Added ${personalFocusChunks.length} personal focus chunks to context.`);
+    } else {
+      this.plugin.logger.debug(`[RagService] No personal focus chunks found among relevant results.`);
+    }
+    if (generalContextChunks.length > 0) {
+      if (finalContext) {
+        finalContext += "---\n\n";
+      }
+      finalContext += "### General Context from User Notes:\n";
+      finalContext += "This section contains potentially relevant background information from the user's general notes.\n\n";
+      generalContextChunks.forEach((chunk, index) => {
         var _a, _b, _c, _d;
         let header = `--- Chunk ${index + 1} from: ${((_a = chunk.metadata) == null ? void 0 : _a.filename) || chunk.metadata.path}`;
         if (((_b = chunk.metadata) == null ? void 0 : _b["personal-logs"]) === true)
           header += ` [Type: Personal Log]`;
         header += ` (Score: ${(_d = (_c = chunk.score) == null ? void 0 : _c.toFixed(3)) != null ? _d : "N/A"}) ---
 `;
-        context += header;
-        context += chunk.text.trim() + "\n\n";
+        finalContext += header;
+        finalContext += chunk.text.trim() + "\n\n";
       });
-      context += "### End of Context\n\n";
-      return context.trim();
+      this.plugin.logger.debug(`[RagService] Added ${generalContextChunks.length} general context chunks to context.`);
     } else {
-      this.plugin.logger.debug("[RagService] Semantic search disabled. Using legacy keyword search (if implemented) or skipping RAG.");
-      return "";
+      this.plugin.logger.debug(`[RagService] No general context chunks found among relevant results.`);
     }
+    if (finalContext) {
+      finalContext += "### End of Context\n";
+    }
+    return finalContext.trim();
   }
-  // Додатково: Функції для старого пошуку, якщо ви їх залишаєте
-  /*
-      private findRelevantDocuments_Keyword(query: string, limit: number): DocumentVector[] {
-          // ... ваша стара логіка пошуку за ключовими словами ...
-          const scoredDocs = this.documents
-            .map(doc => ({ doc, score: this.calculateRelevanceScore(doc, query) }))
-            .filter(item => item.score > 0);
-          scoredDocs.sort((a, b) => b.score - a.score);
-          return scoredDocs.slice(0, limit).map(item => ({...item.doc, score: item.score}));
-      }
-  
-      private formatKeywordContext(docs: DocumentVector[]): string {
-           let context = "### Context from User Notes (Keyword Search):\n\n";
-           docs.forEach((doc, index) => {
-               let header = `--- Document ${index + 1}: ${doc.metadata?.filename || doc.path} (Score: ${doc.score?.toFixed(0)}) ---\n`;
-               // ... решта форматування ...
-               const contentToUse = doc.body || doc.content;
-               const maxCharsPerDoc = this.plugin.settings.maxCharsPerDoc || 1500;
-               const truncatedContent = contentToUse.length > maxCharsPerDoc
-                 ? contentToUse.substring(0, maxCharsPerDoc) + "...\n[Content Truncated]"
-                 : contentToUse;
-               context += header + truncatedContent + "\n\n";
-           });
-           context += "### End of Context\n\n";
-           return context.trim();
-      }
-      */
 };
 
 // src/OllamaService.ts
@@ -5685,11 +5673,8 @@ var import_obsidian8 = require("obsidian");
 var PromptService = class {
   constructor(plugin) {
     this.currentSystemPrompt = null;
-    // Кеш для системного промпту ролі
     this.currentRolePath = null;
-    // Кеш для шляху поточної ролі
     this.roleCache = {};
-    // Кеш для завантажених ролей
     this.modelDetailsCache = {};
     this.plugin = plugin;
     this.app = plugin.app;
@@ -5709,9 +5694,6 @@ var PromptService = class {
     this.plugin.logger.debug("[PromptService] Clearing model details cache.");
     this.modelDetailsCache = {};
   }
-  /**
-   * Завантажує визначення ролі (системний промпт + тип) з файлу або кешу.
-   */
   async getRoleDefinition(rolePath) {
     var _a, _b, _c;
     const normalizedPath = rolePath ? (0, import_obsidian8.normalizePath)(rolePath) : null;
@@ -5728,7 +5710,14 @@ var PromptService = class {
     }
     if (!normalizedPath || !this.plugin.settings.followRole) {
       this.plugin.logger.debug("[PromptService] No role path or followRole disabled. Role definition is null.");
-      return { systemPrompt: null, isProductivityPersona: false };
+      const definition = {
+        systemPrompt: null,
+        // Тут не можемо визначити isProductivityPersona без читання файлу,
+        // але для випадку без ролі це не важливо. Якщо б логіка була іншою,
+        // треба було б додати перевірку файлу тут.
+        isProductivityPersona: false
+      };
+      return definition;
     }
     if (this.roleCache[normalizedPath]) {
       this.plugin.logger.debug(`[PromptService] Returning newly cached role definition for: ${normalizedPath}`);
@@ -5756,17 +5745,14 @@ var PromptService = class {
         this.plugin.logger.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
         new import_obsidian8.Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
-        return null;
+        return { systemPrompt: null, isProductivityPersona: false };
       }
     } else {
       this.plugin.logger.warn(`[PromptService] Role file not found or not a file: ${normalizedPath}`);
       this.currentSystemPrompt = null;
-      return null;
+      return { systemPrompt: null, isProductivityPersona: false };
     }
   }
-  /**
-   * Перевіряє, чи активна зараз роль "продуктивності".
-   */
   async _isProductivityPersonaActive(rolePath) {
     var _a;
     if (!this.plugin.settings.enableProductivityFeatures) {
@@ -5776,34 +5762,38 @@ var PromptService = class {
     return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
   }
   /**
-  * Повертає фінальний системний промпт для API, можливо включаючи RAG інструкції.
-  * Не включає RAG контент чи історію.
-  */
+   * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції.
+   */
   async getSystemPromptForAPI(chatMetadata) {
-    var _a;
+    var _a, _b;
     const settings = this.plugin.settings;
-    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI checking chat path: '${chatMetadata.selectedRolePath}', settings path: '${settings.selectedRolePath}'`);
+    this.plugin.logger.debug(`[PromptService] Building system prompt for chat: ${chatMetadata.id}, Role path: ${(_a = chatMetadata.selectedRolePath) != null ? _a : settings.selectedRolePath}`);
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
-    this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI using determined path: '${selectedRolePath}'`);
     let roleDefinition = null;
     if (selectedRolePath && settings.followRole) {
-      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI loading definition for: '${selectedRolePath}'`);
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
-    } else {
-      this.plugin.logger.debug(`[PromptService] getSystemPromptForAPI skipping role load (Path: '${selectedRolePath}', Follow: ${settings.followRole})`);
     }
-    let roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
-    const isProductivityActive = (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
+    const roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
+    const isProductivityActive = (_b = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _b : false;
     const ragInstructions = `
 --- RAG Data Interpretation Rules ---
-1.  You have access to context chunks from the user's notes provided under '### Context from User Notes (...)'. Each chunk originates from a specific file indicated in its header.
-2.  Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress.
-3.  Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) represents a potential user goal, task, objective, idea, or key point. **Pay special attention to categorizing these:**
+You will be provided context from the user's notes, potentially split into two sections:
+1.  '### Personal Focus Context (User's Life State & Goals)':
+    * This section contains HIGH-PRIORITY information reflecting the user's current situation, desired state, goals, priorities, and actions they believe they should take.
+    * TREAT THIS SECTION AS THE PRIMARY SOURCE for understanding the user's core objectives and current life context.
+    * Use this to align your suggestions, track progress on stated goals/priorities, and provide strategic guidance.
+2.  '### General Context from User Notes':
+    * This section contains potentially relevant background information from the user's general notes, identified based on semantic similarity to the current query.
+    * Use this for supplementary details and broader context.
+
+General Rules for BOTH Context Sections:
+* Each context chunk originates from a specific file indicated in its header (e.g., "--- Chunk 1 from Personal Focus Note: My Goals.md ..."). You can refer to source files by name.
+* Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress.
+* Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) represents a potential user goal, task, objective, idea, or key point. **Pay special attention to categorizing these:**
     * **Critical Goals/Tasks:** Identify these if the line contains tags like #critical, #critical\u{1F198} or keywords like "\u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E", "critical", "\u0442\u0435\u0440\u043C\u0456\u043D\u043E\u0432\u043E", "urgent". **Prioritize discussing these items, potential blockers, and progress.**
     * **Weekly Goals/Tasks:** Identify these if the line contains tags like #week, #weekly or keywords like "weekly", "\u0442\u0438\u0436\u043D\u0435\u0432\u0430", "\u0442\u0438\u0436\u043D\u0435\u0432\u0438\u0439". Consider their relevance for the current or upcoming week's planning.
     * Use the surrounding text and the source document name for context for all identified items.
-4.  You can refer to specific source files by their names mentioned in the context chunk headers (e.g., "Chunk 2 from 'My Notes.md' suggests...").
-5.  If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the entire provided context ('### Context from User Notes (...)'). Analyze themes across different chunks and documents.
+* If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context (both Personal Focus and General Context sections). Analyze themes across different chunks and documents.
 --- End RAG Data Interpretation Rules ---
         `.trim();
     let finalSystemPrompt = "";
@@ -5832,8 +5822,9 @@ var PromptService = class {
     return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
   }
   /**
-      * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
-      */
+   * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
+   * Використовує оновлений `prepareContext` з `RagService`.
+   */
   async preparePromptBody(history, chatMetadata) {
     var _a, _b;
     this.plugin.logger.debug("[PromptService] Preparing prompt body...");
@@ -5858,8 +5849,8 @@ var PromptService = class {
       }
     }
     const approxTaskTokens = this._countTokens(taskContext);
-    const maxRagTokens = settings.ragEnabled ? settings.ragTopK * settings.ragChunkSize / 4 * 1.5 : 0;
-    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 200;
+    const maxRagTokens = settings.ragEnabled ? settings.ragTopK * settings.ragChunkSize / 4 * 1.8 : 0;
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250;
     this.plugin.logger.debug(`[PromptService] Max tokens available for history processing: ${maxHistoryTokens}`);
     let processedHistoryString = "";
     if (isProductivityActive && settings.useAdvancedContextStrategy) {
@@ -5901,20 +5892,22 @@ ${processedHistoryString}`);
     this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
     return finalPromptBody;
   }
-  // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages залишаються
-  // але мають використовувати this.plugin.logger замість console.log/warn
+  // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages
+  // залишаються без структурних змін (тільки логування)
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
     for (let i = history.length - 1; i >= 0; i--) {
       const message = history[i];
+      if (message.role === "system" || message.role === "error")
+        continue;
       const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
       const messageTokens = this._countTokens(formattedMessage) + 5;
       if (currentTokens + messageTokens <= maxTokens) {
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
       } else {
-        this.plugin.logger.debug(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens).`);
+        this.plugin.logger.debug(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens). Stopping history inclusion.`);
         break;
       }
     }
@@ -5925,18 +5918,84 @@ ${processedHistoryString}`);
     const settings = this.plugin.settings;
     const processedParts = [];
     let currentTokens = 0;
-    const keepN = Math.min(history.length, settings.keepLastNMessagesBeforeSummary || 3);
-    const messagesToKeep = history.slice(-keepN);
-    const messagesToProcess = history.slice(0, -keepN);
+    const keepN = Math.max(0, settings.keepLastNMessagesBeforeSummary || 3);
+    const actualKeepN = Math.min(history.length, keepN);
+    const messagesToKeep = history.slice(-actualKeepN);
+    const messagesToProcess = history.slice(0, -actualKeepN);
     this.plugin.logger.debug(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
     if (messagesToProcess.length > 0) {
+      let olderContextTokens = 0;
+      let olderContextContent = "";
       if (settings.enableSummarization) {
-        this.plugin.logger.info("[PromptService] Summarization enabled...");
-      } else {
-        this.plugin.logger.info("[PromptService] Summarization disabled. Including older messages directly if space allows.");
+        this.plugin.logger.info("[PromptService] Summarization enabled, attempting to summarize older messages...");
+        const summary = await this._summarizeMessages(messagesToProcess, chatMetadata);
+        if (summary) {
+          olderContextContent = `[Summary of earlier conversation]:
+${summary}`;
+          olderContextTokens = this._countTokens(olderContextContent) + 10;
+        } else {
+          this.plugin.logger.warn("[PromptService] Summarization failed or returned empty. Will try to include older messages directly.");
+        }
+      }
+      if (!olderContextContent) {
+        this.plugin.logger.info("[PromptService] Including older messages directly if space allows.");
+        let includedOlderCount = 0;
+        for (let i = messagesToProcess.length - 1; i >= 0; i--) {
+          const message = messagesToProcess[i];
+          if (message.role === "system" || message.role === "error")
+            continue;
+          const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+          const messageTokens = this._countTokens(formattedMessage) + 5;
+          if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
+            olderContextContent = formattedMessage + "\n\n" + olderContextContent;
+            olderContextTokens += messageTokens;
+            includedOlderCount++;
+          } else {
+            this.plugin.logger.debug(`[PromptService] Token limit reached while including older messages directly (${currentTokens + olderContextTokens}/${maxTokens}). Included ${includedOlderCount}.`);
+            break;
+          }
+        }
+        if (includedOlderCount > 0) {
+          olderContextContent = `[Start of older messages directly included]:
+${olderContextContent.trim()}
+[End of older messages]`;
+          olderContextTokens += 10;
+        }
+      }
+      if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
+        processedParts.push(olderContextContent);
+        currentTokens += olderContextTokens;
+        this.plugin.logger.debug(`[PromptService] Added older context part (${olderContextTokens} tokens). Current total: ${currentTokens}`);
+      } else if (olderContextContent) {
+        this.plugin.logger.warn(`[PromptService] Older context part (${olderContextTokens} tokens) exceeds limit (${maxTokens - currentTokens} available). Skipping.`);
       }
     }
-    this.plugin.logger.debug(`[PromptService] Advanced context built. Total approx tokens: ${currentTokens}`);
+    let keptMessagesString = "";
+    let keptMessagesTokens = 0;
+    let includedKeptCount = 0;
+    for (let i = messagesToKeep.length - 1; i >= 0; i--) {
+      const message = messagesToKeep[i];
+      if (message.role === "system" || message.role === "error")
+        continue;
+      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+      const messageTokens = this._countTokens(formattedMessage) + 5;
+      if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
+        keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
+        keptMessagesTokens += messageTokens;
+        includedKeptCount++;
+      } else {
+        this.plugin.logger.debug(`[PromptService] Token limit reached while including kept messages (${currentTokens + keptMessagesTokens}/${maxTokens}). Included ${includedKeptCount}.`);
+        break;
+      }
+    }
+    if (keptMessagesString) {
+      processedParts.push(keptMessagesString.trim());
+      currentTokens += keptMessagesTokens;
+      this.plugin.logger.debug(`[PromptService] Added kept messages part (${keptMessagesTokens} tokens). Final total: ${currentTokens}`);
+    } else {
+      this.plugin.logger.debug("[PromptService] No kept messages to add or token limit prevented inclusion.");
+    }
+    this.plugin.logger.debug(`[PromptService] Advanced context built. Final approx tokens: ${currentTokens}`);
     return processedParts.join("\n\n").trim();
   }
   async _summarizeMessages(messagesToSummarize, chatMetadata) {
@@ -5944,30 +6003,36 @@ ${processedHistoryString}`);
       return null;
     }
     this.plugin.logger.info(`[PromptService] Summarizing chunk of ${messagesToSummarize.length} messages...`);
-    const textToSummarize = messagesToSummarize.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
+    const textToSummarize = messagesToSummarize.filter((m) => m.role === "user" || m.role === "assistant").map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
     if (!textToSummarize.trim()) {
-      this.plugin.logger.warn("[PromptService] No actual text content in messages to summarize.");
+      this.plugin.logger.warn("[PromptService] No actual user/assistant text content in messages to summarize.");
       return null;
     }
     const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely:\n\n{text_to_summarize}";
     const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
-    const modelName = chatMetadata.modelName || this.plugin.settings.modelName;
+    const summarizationModelName = this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
+    this.plugin.logger.debug(`[PromptService] Using model for summarization: ${summarizationModelName}`);
     const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
     const requestBody = {
-      model: modelName,
+      model: summarizationModelName,
+      // Використовуємо визначену модель
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.3,
+      // Низька температура для консистентної сумаризації
       options: {
         num_ctx: summarizationContextWindow
+        // Можна додати stop token, якщо потрібно, наприклад ["User:", "Assistant:"]
       },
-      system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points and decisions."
+      // Системний промпт для сумаризатора
+      system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, and unresolved questions."
     };
     try {
       if (!this.plugin.ollamaService) {
         this.plugin.logger.error("[PromptService] OllamaService is not available for summarization.");
         return null;
       }
+      this.plugin.logger.debug(`[PromptService] Sending summarization request. Prompt length: ${summarizationFullPrompt.length}`);
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
         const summary = responseData.response.trim();
@@ -5978,7 +6043,7 @@ ${processedHistoryString}`);
         return null;
       }
     } catch (error) {
-      this.plugin.logger.error("[PromptService] Error during summarization request:", error, "Request body (first 100 chars):", JSON.stringify(requestBody).substring(0, 100));
+      this.plugin.logger.error("[PromptService] Error during summarization request:", error, "Request body (model/options):", { model: requestBody.model, options: requestBody.options });
       return null;
     }
   }
