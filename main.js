@@ -5073,29 +5073,52 @@ var RagService = class {
     this.metadataCache = plugin.app.metadataCache;
     this.embeddingModelName = this.plugin.settings.ragEmbeddingModel || DEFAULT_SETTINGS.ragEmbeddingModel;
   }
+  // src/ragService.ts -> splitIntoChunks
   splitIntoChunks(text, chunkSize) {
     if (!text)
       return [];
     this.plugin.logger.debug(`[RagService Chunking] Input text length: ${text.length}`);
-    const paragraphs = text.split(/\n\s*\n/);
+    const lines = text.split("\n");
     const chunks = [];
-    this.plugin.logger.debug(`[RagService Chunking] Found ${paragraphs.length} paragraphs.`);
-    for (const p of paragraphs) {
-      const trimmedP = p.trim();
-      if (trimmedP.length === 0)
+    let currentChunk = "";
+    this.plugin.logger.debug(`[RagService Chunking] Found ${lines.length} lines.`);
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (trimmedLine.length === 0) {
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk);
+          currentChunk = "";
+        }
         continue;
-      if (trimmedP.length > chunkSize) {
-        this.plugin.logger.debug(`[RagService Chunking] Paragraph too long (${trimmedP.length}), splitting...`);
-        for (let i = 0; i < trimmedP.length; i += chunkSize) {
-          const subChunk = trimmedP.substring(i, i + chunkSize);
-          chunks.push(subChunk);
+      }
+      const potentialLength = currentChunk.length + trimmedLine.length + (currentChunk.length > 0 ? 1 : 0);
+      if (potentialLength <= chunkSize) {
+        if (currentChunk.length > 0) {
+          currentChunk += "\n" + trimmedLine;
+        } else {
+          currentChunk = trimmedLine;
         }
       } else {
-        chunks.push(trimmedP);
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk);
+        }
+        if (trimmedLine.length <= chunkSize) {
+          currentChunk = trimmedLine;
+        } else {
+          this.plugin.logger.debug(`[RagService Chunking] Line too long (${trimmedLine.length}), splitting...`);
+          for (let i = 0; i < trimmedLine.length; i += chunkSize) {
+            chunks.push(trimmedLine.substring(i, i + chunkSize));
+          }
+          currentChunk = "";
+        }
       }
     }
-    const filteredChunks = chunks.filter((chunk) => chunk.length > 20);
-    this.plugin.logger.debug(`[RagService Chunking] Produced ${chunks.length} raw chunks, ${filteredChunks.length} chunks after filtering (>20 chars).`);
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk);
+    }
+    const minChunkLength = 15;
+    const filteredChunks = chunks.filter((chunk) => chunk.trim().length >= minChunkLength);
+    this.plugin.logger.debug(`[RagService Chunking] Produced ${chunks.length} raw chunks, ${filteredChunks.length} chunks after filtering (>=${minChunkLength} chars).`);
     return filteredChunks;
   }
   /**
