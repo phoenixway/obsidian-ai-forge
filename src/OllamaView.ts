@@ -2108,207 +2108,198 @@ export class OllamaView extends ItemView {
     return headerEl?.getAttribute("data-collapsed") === "false";
   }
 
-  async loadAndDisplayActiveChat(): Promise<void> {
-    // ... (Keep the logic for fetching chat, models, role, updating metadata) ...
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
+  // OllamaView.ts
 
-    this.clearChatContainerInternal(); // Очищуємо перед рендерингом
-    this.currentMessages = [];
-    this.lastRenderedMessageDate = null;
+async loadAndDisplayActiveChat(): Promise<void> {
+  this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
 
-    let activeChat: Chat | null = null;
-    let availableModels: string[] = [];
-    let finalModelName: string | null = null;
-    let finalRolePath: string | null | undefined = undefined; // Зберігаємо шлях
-    let finalRoleName: string = "None"; // Значення за замовчуванням
-    let finalTemperature: number | null | undefined = undefined;
-    let errorOccurred = false;
+  this.clearChatContainerInternal(); // Clear display and local state
+  this.currentMessages = [];
+  this.lastRenderedMessageDate = null;
 
-    // Крок 1: Отримати чат, моделі, роль
-    try {
+  let activeChat: Chat | null = null;
+  let availableModels: string[] = []; // Keep track of available models
+  let finalModelName: string | null = null;
+  let finalRolePath: string | null | undefined = undefined;
+  let finalRoleName: string = "None";
+  let finalTemperature: number | null | undefined = undefined;
+  let errorOccurred = false;
+
+  // Step 1: Fetch essential data
+  try {
       activeChat = (await this.plugin.chatManager?.getActiveChat()) || null;
       this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`);
-      availableModels = await this.plugin.ollamaService.getModels();
+      availableModels = await this.plugin.ollamaService.getModels(); // Get models early
       this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(", ")}`);
 
       finalRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
       finalRoleName = await this.findRoleNameByPath(finalRolePath);
       this.plugin.logger.debug(
-        `[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || "None"}', Name='${finalRoleName}'`
+          `[loadAndDisplayActiveChat] Determined role: Path='<span class="math-inline">\{finalRolePath \|\| "None"\}', Name\='</span>{finalRoleName}'`
       );
-    } catch (error) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching active chat, models, or role:", error);
-      new Notice("Error connecting to Ollama or loading chat data.", 5000);
-      errorOccurred = true;
-      finalModelName = null;
-      finalTemperature = this.plugin.settings.temperature;
-      finalRolePath = this.plugin.settings.selectedRolePath;
-      finalRoleName = await this.findRoleNameByPath(finalRolePath);
-      activeChat = null;
-    }
+  } catch (error) {
+       this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
+       new Notice("Error connecting to Ollama or loading chat data.", 5000);
+       errorOccurred = true;
+       // Set fallbacks based on global settings
+       finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (availableModels[0] ?? null);
+       finalTemperature = this.plugin.settings.temperature;
+       finalRolePath = this.plugin.settings.selectedRolePath;
+       finalRoleName = await this.findRoleNameByPath(finalRolePath);
+       activeChat = null;
+  }
 
-    // Step 2, 3, 4: Determine model and update metadata (if no load error)
-    if (!errorOccurred && activeChat) {
+  // Steps 2, 3, 4: Determine final model/temp and update metadata if needed (only if chat loaded)
+  if (!errorOccurred && activeChat) {
+      // ... (keep logic for determining finalModelName based on availability) ...
       let preferredModel = activeChat.metadata?.modelName || this.plugin.settings.modelName;
-      if (availableModels.length > 0) {
-        if (preferredModel && availableModels.includes(preferredModel)) {
-          finalModelName = preferredModel;
-        } else {
-          finalModelName = availableModels[0];
-          this.plugin.logger.warn(
-            `[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`
-          );
-        }
-      } else {
-        finalModelName = null;
-        this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
-      }
-      this.plugin.logger.debug(
-        `[loadAndDisplayActiveChat] Determined final model for chat: ${finalModelName ?? "None"}`
+  if (availableModels.length > 0) {
+    if (preferredModel && availableModels.includes(preferredModel)) {
+      finalModelName = preferredModel;
+    } else {
+      finalModelName = availableModels[0];
+      this.plugin.logger.warn(
+        `[loadAndDisplayActiveChat] Preferred model '<span class="math-inline">\{preferredModel\}' not available\. Using first available\: '</span>{finalModelName}'.`
       );
+    }
+  } else {
+    finalModelName = null;
+    this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
+  }
 
-      // Update chat metadata if needed (run in background, don't await fully)
+      // Update metadata if model differs (async in background)
       if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-        this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch(updateError => {
-          this.plugin.logger.error(
-            "[loadAndDisplayActiveChat] Background error updating chat model metadata:",
-            updateError
-          );
-        });
+           this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch(updateError => {
+               this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
+           });
       }
       finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-      this.plugin.logger.debug(`[loadAndDisplayActiveChat] Determined final temperature for chat: ${finalTemperature}`);
-    } else if (!errorOccurred && !activeChat) {
-      // No active chat, use global settings
-      finalModelName = availableModels.includes(this.plugin.settings.modelName)
-        ? this.plugin.settings.modelName
-        : availableModels.length > 0
-        ? availableModels[0]
-        : null;
-      finalTemperature = this.plugin.settings.temperature;
-      this.plugin.logger.debug(
-        `[loadAndDisplayActiveChat] Using global model: ${
-          finalModelName ?? "None"
-        }, Temp: ${finalTemperature}, Role: ${finalRoleName}`
-      );
-    }
+  } else if (!errorOccurred && !activeChat) {
+       // Set model/temp based on global settings if no chat exists
+       finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (availableModels[0] ?? null);
+       finalTemperature = this.plugin.settings.temperature;
+  }
+   // If an error occurred during initial fetch, finalModelName/Temp/Role are already set to fallbacks
 
-    // --- Step 5: Render Messages (MODIFIED) ---
-    if (activeChat !== null && !errorOccurred && activeChat.messages?.length > 0) {
+
+  // --- Step 5: Render Messages Sequentially (FIXED) ---
+  if (activeChat !== null && !errorOccurred && activeChat.messages?.length > 0) {
       this.hideEmptyState();
-      this.currentMessages = [...activeChat.messages]; // Update local cache first
-      this.lastRenderedMessageDate = null; // Reset date separator logic
+      this.currentMessages = [...activeChat.messages]; // Ensure local cache matches
+      this.lastRenderedMessageDate = null; // Reset date logic
 
-      // Render messages one by one using the appropriate renderers
-      const renderPromises: Promise<HTMLElement | null>[] = [];
+      // --- Loop and render/append one by one ---
       for (const message of this.currentMessages) {
-        // Add date separator if needed (logic can be simplified if renderers handle it)
-        const isNewDay =
-          !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
-        if (isNewDay) {
-          this.renderDateSeparator(message.timestamp);
-          this.lastRenderedMessageDate = message.timestamp;
-        } else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) {
-          this.lastRenderedMessageDate = message.timestamp;
-        }
+          let messageGroupEl: HTMLElement | null = null;
 
-        // Choose renderer
-        let renderPromise: Promise<HTMLElement | null> | null = null;
-        try {
-          if (message.role === "system") {
-            const renderer = new SystemMessageRenderer(this.app, message, { formatTime: this.formatTime });
-            renderPromise = Promise.resolve(renderer.render()); // System renderer is sync
-          } else if (message.role === "assistant") {
-            const renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
-            renderPromise = renderer.render(); // Assistant renderer is async
-          } else if (message.role === "user") {
-            renderPromise = Promise.resolve(this.renderUserMessage(message)); // User renderer is sync
-          } else if (message.role === "error") {
-            this.renderOrUpdateErrorGroup(false); // Error handled separately
-            renderPromise = Promise.resolve(this.errorGroupElement);
+          // Check if date separator needed BEFORE rendering this message
+          const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+          const isFirstMessageInContainer = this.chatContainer.children.length === 0;
+
+          if (isNewDay || isFirstMessageInContainer) {
+              // Render separator only if it's actually a new day or the very first message
+              if (isNewDay) {
+                   this.renderDateSeparator(message.timestamp);
+              }
+              this.lastRenderedMessageDate = message.timestamp; // Update last date
           }
-        } catch (renderError) {
-          this.plugin.logger.error("Error creating message renderer:", renderError, message);
-          renderPromise = Promise.resolve(null); // Skip this message on error
-        }
 
-        if (renderPromise) {
-          renderPromises.push(renderPromise);
-        }
-      }
 
-      // Await all rendering promises and append elements
-      const renderedElements = await Promise.all(renderPromises);
-      renderedElements.forEach(el => {
-        if (el && el !== this.errorGroupElement) {
-          // Don't re-append error group if already handled
-          this.chatContainer.appendChild(el);
-        }
-      });
+          // Render the message itself
+          try {
+              if (message.role === "system") {
+                  const renderer = new SystemMessageRenderer(this.app, message, { formatTime: this.formatTime });
+                  messageGroupEl = renderer.render();
+              } else if (message.role === "assistant") {
+                  const renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
+                  messageGroupEl = await renderer.render(); // Await async renderer
+              } else if (message.role === "user") {
+                  messageGroupEl = this.renderUserMessage(message); // Sync renderer
+              } else if (message.role === "error") {
+                   // Assuming error handling adds directly or updates this.errorGroupElement
+                   const isContinuing = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+                   this.consecutiveErrorMessages.push(message); // Add error to buffer
+                   this.renderOrUpdateErrorGroup(isContinuing);
+                   messageGroupEl = this.errorGroupElement;
+                   this.lastMessageElement = messageGroupEl; // Update last element for errors
+              }
+          } catch (renderError) {
+               this.plugin.logger.error("Error rendering message during load:", renderError, message);
+               // Optionally add an error message to the display here if desired
+          }
 
-      // Check collapsing for all messages AFTER they are in the DOM
+          // Append the rendered element if successful
+          if (messageGroupEl && !messageGroupEl.parentElement) { // Append only if not already added (e.g., error group)
+              this.chatContainer.appendChild(messageGroupEl);
+               // Update lastMessageElement ONLY for non-error messages here
+               if(message.role !== 'error') {
+                  this.lastMessageElement = messageGroupEl;
+               }
+          }
+      } // End for loop
+
+      // Check collapsing for all messages AFTER loop finishes and all are in DOM
       this.checkAllMessagesForCollapsing();
 
-      // Scroll and update indicators after rendering
+      // Scroll and update indicators after ALL messages are rendered
       setTimeout(() => {
-        this.guaranteedScrollToBottom(100, false);
-        setTimeout(() => {
-          this.updateScrollStateAndIndicators();
-        }, 150);
-      }, 150);
-    } else {
+          this.guaranteedScrollToBottom(100, false); // Scroll gently to bottom
+          setTimeout(() => {
+              this.updateScrollStateAndIndicators(); // Update buttons based on final scroll position
+          }, 150);
+      }, 150); // Delay to allow layout reflow
+
+  } else {
+      // No messages or chat loaded
       this.showEmptyState();
-      this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE);
-    }
-
-    // --- Step 6 & 7: Update UI and Input State ---
-    // ... (keep the rest of the logic for updating displays and input state) ...
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
-    this.updateInputPlaceholder(finalRoleName);
-    this.updateRoleDisplay(finalRoleName);
-    this.updateModelDisplay(finalModelName);
-    this.updateTemperatureIndicator(finalTemperature);
-
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
-    const panelUpdatePromises = [];
-    if (this.isSidebarSectionVisible("chats")) {
-      panelUpdatePromises.push(
-        this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-      );
-    }
-    if (this.isSidebarSectionVisible("roles")) {
-      panelUpdatePromises.push(
-        this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-      );
-    }
-    // Await panel updates if any were queued
-    if (panelUpdatePromises.length > 0) {
-      await Promise.all(panelUpdatePromises);
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Visible sidebar panels updated.");
-    }
-
-    // --- Input State ---
-    if (finalModelName === null) {
-      this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
-      if (this.inputEl) {
-        this.inputEl.disabled = true;
-        this.inputEl.placeholder = "No models available...";
-      }
-      // Assuming CSS_CLASS_DISABLED exists
-      if (this.sendButton) {
-        this.sendButton.disabled = true;
-        this.sendButton.classList.add(CSS_CLASS_DISABLED);
-      }
-      this.setLoadingState(false); // Ensure loading state is off
-    } else {
-      if (this.inputEl) {
-        this.inputEl.disabled = this.isProcessing; // Should be false here unless something else set it
-      }
-      this.updateSendButtonState();
-    }
-
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
+      this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // Hide scroll button
   }
+
+  // --- Step 6 & 7: Update other UI elements ---
+  this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
+  this.updateInputPlaceholder(finalRoleName);
+  this.updateRoleDisplay(finalRoleName);
+  this.updateModelDisplay(finalModelName);
+  this.updateTemperatureIndicator(finalTemperature);
+
+  // Update side panels if visible
+  this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
+  const panelUpdatePromises = [];
+  if (this.isSidebarSectionVisible("chats")) {
+      panelUpdatePromises.push(
+          this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
+      );
+  }
+  if (this.isSidebarSectionVisible("roles")) {
+      panelUpdatePromises.push(
+          this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
+      );
+  }
+  if (panelUpdatePromises.length > 0) {
+      await Promise.all(panelUpdatePromises);
+  }
+
+  // Set input state based on model availability
+  if (finalModelName === null) {
+       this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
+       if (this.inputEl) {
+          this.inputEl.disabled = true;
+          this.inputEl.placeholder = "No models available...";
+       }
+       if (this.sendButton) {
+          this.sendButton.disabled = true;
+          this.sendButton.classList.add(CSS_CLASS_DISABLED);
+       }
+       this.setLoadingState(false);
+  } else {
+       if (this.inputEl) {
+          this.inputEl.disabled = this.isProcessing; // Should be false initially
+       }
+       this.updateSendButtonState();
+  }
+
+  this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
+}
 
   private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
     this.plugin.logger.debug(
