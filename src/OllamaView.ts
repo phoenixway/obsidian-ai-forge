@@ -2310,121 +2310,147 @@ export class OllamaView extends ItemView {
     });
   }
 
-  addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
-    if (!this.chatContainer) return;
+  // OllamaView.ts
 
-    const newMessage: Message = { role, content, timestamp };
+/**
+ * Додає повідомлення до візуального відображення чату, обробляючи різні ролі,
+ * групуючи та сумаризуючи послідовні помилки, та уникаючи дублікатів.
+ * @param role Роль повідомлення ('user', 'assistant', 'system', 'error').
+ * @param content Текст повідомлення.
+ * @param timestamp Час створення повідомлення.
+ */
+addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
+  // Перевірка наявності контейнера чату
+  if (!this.chatContainer) {
+      this.plugin.logger.error("[addMessageToDisplay] Chat container not found!");
+      return;
+  }
 
-    // --- Скидання стану помилок при отриманні НЕ-помилки ---
-    if (role !== "error" && this.consecutiveErrorMessages.length > 0) {
-      this.plugin.logger.debug("[addMessageToDisplay] Non-error message received, finalizing previous error group.");
-      if (this.consecutiveErrorMessages.length > 1 && !this.isSummarizingErrors && this.errorGroupElement) {
-        this.triggerErrorSummarization(this.errorGroupElement, [...this.consecutiveErrorMessages]);
-      }
-      this.consecutiveErrorMessages = [];
-      this.errorGroupElement = null;
-    }
-    // ------------------------------------------------------
+  const newMessage: Message = { role, content, timestamp };
+  let messageGroupEl: HTMLElement | null = null; // Змінна для зберігання кореневого елемента групи
 
-    let messageGroupEl: HTMLElement | null = null;
+  // --- Обробка Помилок ---
+  if (role === 'error') {
+      this.plugin.logger.debug("[addMessageToDisplay] Received error message:", content);
 
-    // --- Обробка різних ролей ---
-    if (role === "system") {
-      this.plugin.logger.debug("[addMessageToDisplay] Rendering system message using SystemMessageRenderer.");
-      this.hideEmptyState(); // Приховуємо порожній стан
-
-      // Перевірка роздільника дати (якщо потрібно для системних)
-      const isNewDay =
-        !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, newMessage.timestamp);
-      if (isNewDay) {
-        this.renderDateSeparator(newMessage.timestamp);
-        this.lastRenderedMessageDate = newMessage.timestamp;
-      } else if (!this.lastRenderedMessageDate) {
-        this.lastRenderedMessageDate = newMessage.timestamp; // Для першого повідомлення
-      }
-
-      // Створюємо екземпляр рендерера, передаючи залежності
-      const systemMessageRenderer = new SystemMessageRenderer(this.app, newMessage, { formatTime: this.formatTime }); // Передаємо функцію форматування
-      messageGroupEl = systemMessageRenderer.render(); // Отримуємо DOM-елемент
-
-      this.chatContainer.appendChild(messageGroupEl); // Додаємо в DOM
-
-      // Реєструємо загальні обробники, якщо потрібно (наприклад, видалення)
-      const deleteBtn = messageGroupEl.querySelector(`.${CSS_CLASS_DELETE_MESSAGE_BUTTON}`); // Припускаємо, що кнопка видалення додається? (Поточний рендерер її не додає)
-      if (deleteBtn instanceof HTMLButtonElement) {
-        this.registerDomEvent(deleteBtn, "click", e => {
-          e.stopPropagation();
-          this.handleDeleteMessageClick(newMessage);
-        });
-      }
-    } else if (role === "error") {
-      this.plugin.logger.debug("[addMessageToDisplay] Handling error message.");
-      const lastError =
-        this.consecutiveErrorMessages.length > 0
+      // 1. Перевірка на ідентичну ПОСЛІДОВНУ помилку
+      const lastError = this.consecutiveErrorMessages.length > 0
           ? this.consecutiveErrorMessages[this.consecutiveErrorMessages.length - 1]
           : null;
       if (lastError && lastError.content === content) {
-        this.plugin.logger.debug("[addMessageToDisplay] Skipping identical consecutive error message.");
-        if (this.errorGroupElement) {
-          this.updateErrorGroupTimestamp(this.errorGroupElement, timestamp);
-        }
-        return;
+          this.plugin.logger.debug("[addMessageToDisplay] Skipping identical consecutive error message.");
+          // Оновлюємо час останньої помилки в існуючій групі
+           if (this.errorGroupElement) {
+               this.updateErrorGroupTimestamp(this.errorGroupElement, timestamp);
+           }
+          return; // <-- Вихід, дублікат не обробляється
       }
+
+      // 2. Додаємо нову унікальну помилку до послідовності
       this.consecutiveErrorMessages.push(newMessage);
-      const isContinuingErrorSequence =
-        this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+      this.plugin.logger.debug(`[addMessageToDisplay] Added error. Total consecutive errors: ${this.consecutiveErrorMessages.length}`);
+
+      // 3. Визначаємо, чи це продовження існуючої групи помилок
+       const isContinuingErrorSequence = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+
+      // 4. Відображаємо або оновлюємо групу помилок
       this.renderOrUpdateErrorGroup(isContinuingErrorSequence);
-      // messageGroupEl встановлюється всередині renderOrUpdateErrorGroup
-      messageGroupEl = this.errorGroupElement; // Посилаємось на групу помилок
-    } else {
-      // user або assistant
-      this.plugin.logger.debug(`[addMessageToDisplay] Rendering ${role} message using renderMessageInternal.`);
+      messageGroupEl = this.errorGroupElement; // renderOrUpdateErrorGroup оновлює this.errorGroupElement
+
+      // Примітка: Помилки не додаються до this.currentMessages, щоб уникнути засмічення історії,
+      // оскільки вони візуально групуються/сумаризуються.
+
+  // --- Обробка НЕ-Помилкових Повідомлень ---
+  } else {
+      // 1. Завершуємо попередню групу помилок, якщо вона була
+      if (this.consecutiveErrorMessages.length > 0) {
+          this.plugin.logger.debug("[addMessageToDisplay] Non-error message received, finalizing previous error group.");
+          // Запускаємо фінальну сумаризацію, якщо потрібно
+          if (this.consecutiveErrorMessages.length > 1 && !this.isSummarizingErrors && this.errorGroupElement) {
+               this.triggerErrorSummarization(this.errorGroupElement, [...this.consecutiveErrorMessages]);
+          }
+          // Скидаємо стан помилок
+          this.consecutiveErrorMessages = [];
+          this.errorGroupElement = null;
+      }
+
+      // Переконуємось, що порожній стан приховано
       this.hideEmptyState();
-      // renderMessageInternal сам додає елемент до chatContainer і обробляє дати/групування
-      const messageEl = this.renderMessageInternal(newMessage, [...this.currentMessages, newMessage]);
-      if (messageEl) {
-        messageGroupEl = (messageEl.closest(`.${CSS_CLASS_MESSAGE_GROUP}`) as HTMLElement) ?? messageEl;
-        this.checkMessageForCollapsing(messageEl);
-      }
-      // lastMessageElement оновлюється всередині renderMessageInternal
-      // currentMessages також оновлюються там (або мають оновлюватись)
-    }
 
-    // --- Оновлення спільного стану ---
-    if (messageGroupEl) {
-      this.lastMessageElement = messageGroupEl; // Оновлюємо останній елемент групи
-      // Додаємо анімацію появи для нових груп (крім оновлюваних помилок)
-      if (role !== "error" || this.consecutiveErrorMessages.length === 1) {
-        messageGroupEl.addClass(CSS_CLASS_MESSAGE_ARRIVING); // Додаємо клас анімації до групи
-        setTimeout(() => messageGroupEl?.removeClass(CSS_CLASS_MESSAGE_ARRIVING), 500);
+      // 2. Обробка роздільника дат (робимо перед додаванням елемента)
+      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, newMessage.timestamp);
+      if (isNewDay) {
+          this.renderDateSeparator(newMessage.timestamp);
+          this.lastRenderedMessageDate = newMessage.timestamp;
+      } else if (!this.lastRenderedMessageDate && this.chatContainer.children.length === 0) {
+           // Встановлюємо дату для самого першого повідомлення
+           this.lastRenderedMessageDate = newMessage.timestamp;
       }
-    } else if (role !== "error") {
-      // Якщо renderMessageInternal повернув null (малоймовірно)
-      this.lastMessageElement = null;
-    }
-    // Не оновлюємо lastRenderedMessageDate тут для помилок, бо renderDateSeparator може бути викликаний вище
 
-    // --- Скрол (тільки якщо це не оновлення групи помилок, яке вже скролить) ---
-    if (!(role === "error" && this.consecutiveErrorMessages.length > 1)) {
-      const isUserMessage = role === "user";
-      if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
-        this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
-      } else if (!this.userScrolledUp) {
-        const forceScroll = !isUserMessage;
-        this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+      // 3. Обробка конкретної ролі
+      if (role === 'system') {
+          this.plugin.logger.debug("[addMessageToDisplay] Rendering system message using SystemMessageRenderer.");
+          const systemMessageRenderer = new SystemMessageRenderer(this.app, newMessage, { formatTime: this.formatTime });
+          messageGroupEl = systemMessageRenderer.render();
+          this.chatContainer.appendChild(messageGroupEl);
+
+          // Додаємо системне повідомлення до історії (якщо потрібно)
+           this.currentMessages.push(newMessage);
+           this.plugin.logger.debug(`[addMessageToDisplay] Added system message to currentMessages cache. Total: ${this.currentMessages.length}`);
+
+           // Тут можна додати реєстрацію специфічних слухачів для системних повідомлень, якщо потрібно
+
+      } else { // 'user' or 'assistant'
+          this.plugin.logger.debug(`[addMessageToDisplay] Rendering ${role} message using renderMessageInternal.`);
+          // renderMessageInternal сам додасть елемент до DOM, оновить історію і поверне створений елемент повідомлення (не групи)
+          const messageEl = this.renderMessageInternal(newMessage, [...this.currentMessages]); // Передаємо копію поточного контексту
+          if (messageEl) {
+              messageGroupEl = messageEl.closest(`.${CSS_CLASS_MESSAGE_GROUP}`) as HTMLElement ?? null;
+               // checkMessageForCollapsing викликається всередині renderMessageInternal (або після renderAssistantContent)
+          }
+          // this.currentMessages оновлюється всередині renderMessageInternal для user/assistant
+          // this.lastMessageElement також оновлюється всередині renderMessageInternal
       }
-      setTimeout(() => this.updateScrollStateAndIndicators(), 100);
-    }
-
-    // --- Оновлення історії чату ---
-    // Вирішіть, чи додавати системні та помилкові повідомлення до основної історії
-    if (role !== "error") {
-      // Помилки поки не додаємо до основної історії
-      // Перевірте, чи renderMessageInternal вже додає до this.currentMessages
-      // Якщо ні, додайте тут:
-      // this.currentMessages.push(newMessage);
-    }
   }
+
+  // --- Загальні дії після додавання/оновлення елемента ---
+  if (messageGroupEl) {
+      // Оновлюємо посилання на останню додану/оновлену ГРУПУ
+      // (для системних, помилок; для user/assistant це дублює оновлення в renderMessageInternal, але безпечно)
+      this.lastMessageElement = messageGroupEl;
+
+      // Додаємо анімацію появи тільки для НОВИХ груп
+      // Не додаємо для оновлених груп помилок (коли errorCount > 1)
+      const isNewErrorGroup = role === 'error' && this.consecutiveErrorMessages.length === 1;
+      const isNonError = role !== 'error';
+
+      if ((isNewErrorGroup || isNonError) && !messageGroupEl.classList.contains(CSS_CLASS_MESSAGE_ARRIVING)) {
+           messageGroupEl.classList.add(CSS_CLASS_MESSAGE_ARRIVING);
+           setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+      }
+  } else if (role !== 'error'){
+      // Якщо з якоїсь причини елемент не було створено (крім помилок)
+      this.lastMessageElement = null;
+       this.plugin.logger.warn(`[addMessageToDisplay] messageGroupEl was null after processing role: ${role}`);
+  }
+
+  // --- Обробка скролу (викликаємо завжди, крім випадку оновлення групи помилок) ---
+   const isUpdatingErrorGroup = role === 'error' && this.consecutiveErrorMessages.length > 1;
+   if (!isUpdatingErrorGroup) {
+      const isUserMessage = role === "user";
+      // Якщо ми прокручені вгору І це повідомлення від ШІ/системи - показуємо індикатор
+      if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
+          this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
+      }
+      // Якщо ми внизу - прокручуємо далі
+      else if (!this.userScrolledUp) {
+          const forceScroll = !isUserMessage; // Примусово для ШІ/системи
+          this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+      }
+      // Оновлюємо стан кнопок скролу
+      setTimeout(() => this.updateScrollStateAndIndicators(), 100);
+   }
+}
 
   // OllamaView.ts
 

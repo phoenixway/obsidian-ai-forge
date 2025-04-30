@@ -2324,42 +2324,24 @@ This action cannot be undone.`,
       this.renderMessageInternal(message, messagesToRender);
     });
   }
+  // OllamaView.ts
+  /**
+   * Додає повідомлення до візуального відображення чату, обробляючи різні ролі,
+   * групуючи та сумаризуючи послідовні помилки, та уникаючи дублікатів.
+   * @param role Роль повідомлення ('user', 'assistant', 'system', 'error').
+   * @param content Текст повідомлення.
+   * @param timestamp Час створення повідомлення.
+   */
   addMessageToDisplay(role, content, timestamp) {
     var _a;
-    if (!this.chatContainer)
+    if (!this.chatContainer) {
+      this.plugin.logger.error("[addMessageToDisplay] Chat container not found!");
       return;
-    const newMessage = { role, content, timestamp };
-    if (role !== "error" && this.consecutiveErrorMessages.length > 0) {
-      this.plugin.logger.debug("[addMessageToDisplay] Non-error message received, finalizing previous error group.");
-      if (this.consecutiveErrorMessages.length > 1 && !this.isSummarizingErrors && this.errorGroupElement) {
-        this.triggerErrorSummarization(this.errorGroupElement, [...this.consecutiveErrorMessages]);
-      }
-      this.consecutiveErrorMessages = [];
-      this.errorGroupElement = null;
     }
+    const newMessage = { role, content, timestamp };
     let messageGroupEl = null;
-    if (role === "system") {
-      this.plugin.logger.debug("[addMessageToDisplay] Rendering system message using SystemMessageRenderer.");
-      this.hideEmptyState();
-      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, newMessage.timestamp);
-      if (isNewDay) {
-        this.renderDateSeparator(newMessage.timestamp);
-        this.lastRenderedMessageDate = newMessage.timestamp;
-      } else if (!this.lastRenderedMessageDate) {
-        this.lastRenderedMessageDate = newMessage.timestamp;
-      }
-      const systemMessageRenderer = new SystemMessageRenderer(this.app, newMessage, { formatTime: this.formatTime });
-      messageGroupEl = systemMessageRenderer.render();
-      this.chatContainer.appendChild(messageGroupEl);
-      const deleteBtn = messageGroupEl.querySelector(`.${CSS_CLASS_DELETE_MESSAGE_BUTTON}`);
-      if (deleteBtn instanceof HTMLButtonElement) {
-        this.registerDomEvent(deleteBtn, "click", (e) => {
-          e.stopPropagation();
-          this.handleDeleteMessageClick(newMessage);
-        });
-      }
-    } else if (role === "error") {
-      this.plugin.logger.debug("[addMessageToDisplay] Handling error message.");
+    if (role === "error") {
+      this.plugin.logger.debug("[addMessageToDisplay] Received error message:", content);
       const lastError = this.consecutiveErrorMessages.length > 0 ? this.consecutiveErrorMessages[this.consecutiveErrorMessages.length - 1] : null;
       if (lastError && lastError.content === content) {
         this.plugin.logger.debug("[addMessageToDisplay] Skipping identical consecutive error message.");
@@ -2369,28 +2351,56 @@ This action cannot be undone.`,
         return;
       }
       this.consecutiveErrorMessages.push(newMessage);
+      this.plugin.logger.debug(`[addMessageToDisplay] Added error. Total consecutive errors: ${this.consecutiveErrorMessages.length}`);
       const isContinuingErrorSequence = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
       this.renderOrUpdateErrorGroup(isContinuingErrorSequence);
       messageGroupEl = this.errorGroupElement;
     } else {
-      this.plugin.logger.debug(`[addMessageToDisplay] Rendering ${role} message using renderMessageInternal.`);
+      if (this.consecutiveErrorMessages.length > 0) {
+        this.plugin.logger.debug("[addMessageToDisplay] Non-error message received, finalizing previous error group.");
+        if (this.consecutiveErrorMessages.length > 1 && !this.isSummarizingErrors && this.errorGroupElement) {
+          this.triggerErrorSummarization(this.errorGroupElement, [...this.consecutiveErrorMessages]);
+        }
+        this.consecutiveErrorMessages = [];
+        this.errorGroupElement = null;
+      }
       this.hideEmptyState();
-      const messageEl = this.renderMessageInternal(newMessage, [...this.currentMessages, newMessage]);
-      if (messageEl) {
-        messageGroupEl = (_a = messageEl.closest(`.${CSS_CLASS_MESSAGE_GROUP}`)) != null ? _a : messageEl;
-        this.checkMessageForCollapsing(messageEl);
+      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, newMessage.timestamp);
+      if (isNewDay) {
+        this.renderDateSeparator(newMessage.timestamp);
+        this.lastRenderedMessageDate = newMessage.timestamp;
+      } else if (!this.lastRenderedMessageDate && this.chatContainer.children.length === 0) {
+        this.lastRenderedMessageDate = newMessage.timestamp;
+      }
+      if (role === "system") {
+        this.plugin.logger.debug("[addMessageToDisplay] Rendering system message using SystemMessageRenderer.");
+        const systemMessageRenderer = new SystemMessageRenderer(this.app, newMessage, { formatTime: this.formatTime });
+        messageGroupEl = systemMessageRenderer.render();
+        this.chatContainer.appendChild(messageGroupEl);
+        this.currentMessages.push(newMessage);
+        this.plugin.logger.debug(`[addMessageToDisplay] Added system message to currentMessages cache. Total: ${this.currentMessages.length}`);
+      } else {
+        this.plugin.logger.debug(`[addMessageToDisplay] Rendering ${role} message using renderMessageInternal.`);
+        const messageEl = this.renderMessageInternal(newMessage, [...this.currentMessages]);
+        if (messageEl) {
+          messageGroupEl = (_a = messageEl.closest(`.${CSS_CLASS_MESSAGE_GROUP}`)) != null ? _a : null;
+        }
       }
     }
     if (messageGroupEl) {
       this.lastMessageElement = messageGroupEl;
-      if (role !== "error" || this.consecutiveErrorMessages.length === 1) {
-        messageGroupEl.addClass(CSS_CLASS_MESSAGE_ARRIVING);
-        setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.removeClass(CSS_CLASS_MESSAGE_ARRIVING), 500);
+      const isNewErrorGroup = role === "error" && this.consecutiveErrorMessages.length === 1;
+      const isNonError = role !== "error";
+      if ((isNewErrorGroup || isNonError) && !messageGroupEl.classList.contains(CSS_CLASS_MESSAGE_ARRIVING)) {
+        messageGroupEl.classList.add(CSS_CLASS_MESSAGE_ARRIVING);
+        setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
       }
     } else if (role !== "error") {
       this.lastMessageElement = null;
+      this.plugin.logger.warn(`[addMessageToDisplay] messageGroupEl was null after processing role: ${role}`);
     }
-    if (!(role === "error" && this.consecutiveErrorMessages.length > 1)) {
+    const isUpdatingErrorGroup = role === "error" && this.consecutiveErrorMessages.length > 1;
+    if (!isUpdatingErrorGroup) {
       const isUserMessage = role === "user";
       if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
         this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE);
@@ -2399,8 +2409,6 @@ This action cannot be undone.`,
         this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
       }
       setTimeout(() => this.updateScrollStateAndIndicators(), 100);
-    }
-    if (role !== "error") {
     }
   }
   // OllamaView.ts
