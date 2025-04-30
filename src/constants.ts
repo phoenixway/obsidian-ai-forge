@@ -19,4 +19,7 @@ export const CSS_CLASSES = {
     REGENERATE_BUTTON: "regenerate-button", // Likely needed
     COPY_BUTTON: "copy-button", // Likely needed
     DELETE_MESSAGE_BUTTON: "delete-message-button", // Likely needed
+    MESSAGE_ARRIVING: "message-arriving",
+    VISIBLE: "visible", 
+    DISABLED: "disabled"
 };

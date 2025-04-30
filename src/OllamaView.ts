@@ -21,12 +21,15 @@ import { RoleInfo } from "./ChatManager"; // Тип RoleInfo
 import { Chat, ChatMetadata } from "./Chat"; // Клас Chat та типи
 import { SummaryModal } from "./SummaryModal";
 import { OllamaGenerateResponse } from "./types";
-import { SystemMessageRenderer } from "./SystemMessageRenderer";
 import { CSS_CLASSES } from "./constants";
-import { AssistantMessageRenderer } from "./AssistantMessageRenderer"; // <-- NEW IMPORT
+
 import * as RendererUtils from "./MessageRendererUtils";
-// --- View Type ID ---
-// Використовуйте унікальний ID, наприклад, на основі назви плагіна
+import { UserMessageRenderer } from "./renderers/UserMessageRenderer";
+import { AssistantMessageRenderer } from "./renderers/AssistantMessageRenderer";
+import { SystemMessageRenderer } from "./renderers/SystemMessageRenderer";
+import { ErrorMessageRenderer } from "./renderers/ErrorMessageRenderer";
+
+
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
 const SCROLL_THRESHOLD = 150; // Поріг для визначення "прокручено вгору"
@@ -1695,153 +1698,139 @@ export class OllamaView extends ItemView {
       this.renderRoleList();
     }
   };
-  // OllamaView.ts
-
-  //   private handleActiveChatChanged = (data: { chatId: string | null, chat: Chat | null }): void => {
-  //     this.plugin.logger.debug(`[OllamaView] Active chat changed event received. New ID: ${data.chatId}`);
-  //     this.loadAndDisplayActiveChat(); // Цей метод тепер має оновити все, включаючи панель ролей
-  //     // Додатково оновити список ролей у випадаючому меню, якщо воно відкрите
-  //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-  //         this.plugin.logger.debug("[OllamaView] Active chat changed, role submenu open, refreshing role list menu.");
-  //         this.renderRoleList(); // Оновлення списку в меню
-  //     }
-  // }
-
-  // OllamaView.ts (Повна версія методу handleMessageAdded після рефакторингу)
-
+  
   private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
     // 1. Перевірка: чи це активний чат?
     if (data.chatId !== this.plugin.chatManager?.getActiveChatId()) {
-      this.plugin.logger.debug(
-        `[handleMessageAdded] Event ignored: Message for chat ${
-          data.chatId
-        }, but active chat is ${this.plugin.chatManager?.getActiveChatId()}.`
-      );
-      return; // Ігноруємо, якщо повідомлення не для активного чату
+        // ... (лог ігнорування)
+        return;
     }
 
     // 2. Перевірка на дублікат (за часом) у локальному кеші
-    // Це допомагає уникнути подвійного рендерингу, якщо подія надійде двічі
     if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime())) {
-      this.plugin.logger.warn(
-        `[handleMessageAdded] Message with timestamp ${data.message.timestamp.toISOString()} already exists in local cache. Skipping render.`
-      );
-      return;
+         // ... (лог дублікату)
+        return;
     }
 
     // 3. Додаємо повідомлення до локального кешу ПЕРЕД рендерингом
     this.currentMessages.push(data.message);
-    this.plugin.logger.debug(
-      `[handleMessageAdded] Added message (role: ${data.message.role}) to local cache. Total: ${this.currentMessages.length}`
-    );
+    // ... (лог додавання в кеш)
 
     // 4. Перевіряємо наявність контейнера
     if (!this.chatContainer) {
-      this.plugin.logger.error("[handleMessageAdded] Chat container not found!");
-      return;
+        this.plugin.logger.error("[handleMessageAdded] Chat container not found!");
+        return;
     }
 
     // 5. Визначаємо, чи потрібен роздільник дат
     const isNewDay =
-      !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
+        !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
     if (isNewDay) {
-      this.renderDateSeparator(data.message.timestamp); // Припускаємо, що renderDateSeparator існує
-      this.lastRenderedMessageDate = data.message.timestamp;
+        this.renderDateSeparator(data.message.timestamp);
+        this.lastRenderedMessageDate = data.message.timestamp;
     } else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) {
-      // Встановлюємо дату для першого повідомлення в порожньому чаті
-      this.lastRenderedMessageDate = data.message.timestamp;
+        this.lastRenderedMessageDate = data.message.timestamp;
     }
 
     // 6. Приховуємо стан "немає повідомлень"
-    this.hideEmptyState(); // Припускаємо, що hideEmptyState існує
+    this.hideEmptyState();
 
-    let messageGroupEl: HTMLElement | null = null; // Елемент групи повідомлення
+    let messageGroupEl: HTMLElement | null = null;
 
-    // 7. Рендеринг повідомлення залежно від ролі
+    // --- 7. РЕНДЕРИНГ ПОВІДОМЛЕННЯ ЧЕРЕЗ ВІДПОВІДНИЙ КЛАС ---
     try {
-      this.plugin.logger.debug(`[handleMessageAdded] Rendering message with role: ${data.message.role}`);
+        this.plugin.logger.debug(`[handleMessageAdded] Rendering message with role: ${data.message.role}`);
+        let renderer: UserMessageRenderer | AssistantMessageRenderer | SystemMessageRenderer | ErrorMessageRenderer | null = null;
 
-      if (data.message.role === "system") {
-        // Використовуємо SystemMessageRenderer
-        const renderer = new SystemMessageRenderer(this.app, data.message, { formatTime: this.formatTime }); // Передаємо метод форматування часу
-        messageGroupEl = renderer.render(); // render() тут синхронний
-      } else if (data.message.role === "assistant") {
-        // Використовуємо AssistantMessageRenderer
-        const renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this); // Передаємо this (OllamaView) як контекст
-        messageGroupEl = await renderer.render(); // render() тут асинхронний через Markdown
-      } else if (data.message.role === "user") {
-        // Використовуємо внутрішній метод рендерингу (або майбутній UserMessageRenderer)
-        messageGroupEl = this.renderUserMessage(data.message); // Припускаємо, що renderUserMessage існує і синхронний
-      } else if (data.message.role === "error") {
-        // Обробка помилок (залишаємо поточну логіку)
-        // Припускаємо, що renderOrUpdateErrorGroup додає елемент до DOM і оновлює this.errorGroupElement
-        this.renderOrUpdateErrorGroup(false); // false означає початок нової групи (або оновлення, якщо вже є)
-        messageGroupEl = this.errorGroupElement; // Отримуємо посилання на групу помилок
-      } else {
-        this.plugin.logger.warn(`[handleMessageAdded] Unknown message role encountered: ${data.message.role}`);
-      }
-
-      // 8. Додаємо відрендерений елемент до контейнера (якщо він був створений)
-      if (messageGroupEl) {
-        // Переконуємось, що елемент ще не в DOM (актуально для errorGroup)
-        if (!messageGroupEl.parentElement) {
-          this.chatContainer.appendChild(messageGroupEl);
-          this.plugin.logger.debug(`[handleMessageAdded] Appended message group for role: ${data.message.role}`);
-        } else {
-          this.plugin.logger.debug(
-            `[handleMessageAdded] Message group for role ${data.message.role} already in DOM (likely error group update).`
-          );
+        switch (data.message.role) {
+            case "user":
+                renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this);
+                break;
+            case "assistant":
+                renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
+                break;
+            case "system":
+                renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
+                break;
+            case "error":
+                // Логіка групування помилок залишається тут поки що.
+                // Цей блок лише додає помилку до буфера і викликає метод оновлення групи.
+                this.consecutiveErrorMessages.push(data.message);
+                const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+                if (!isContinuingError) {
+                    // Якщо це НЕ продовження, скидаємо попередню групу (якщо вона була)
+                    this.errorGroupElement = null;
+                    this.consecutiveErrorMessages = [data.message]; // Починаємо новий список
+                }
+                // Викликаємо метод, що створить/оновить групу і використає ErrorMessageRenderer всередині
+                this.renderOrUpdateErrorGroup(isContinuingError);
+                messageGroupEl = this.errorGroupElement; // renderOrUpdateErrorGroup оновить this.errorGroupElement
+                break; // Важливо вийти, бо рендеринг вже відбувся
+            default:
+                this.plugin.logger.warn(`[handleMessageAdded] Unknown message role encountered: ${data.message.role}`);
         }
 
-        // 9. Анімація та логіка скролу
-        // Застосовуємо анімацію тільки якщо елемент щойно додано (не оновлено)
-        // (Примітка: логіка errorGroup може потребувати корекції тут, якщо вона не повертає consistently)
-        const isErrorUpdate = data.message.role === "error" && this.consecutiveErrorMessages?.length > 1; // Приблизна перевірка
-        if (!isErrorUpdate && !messageGroupEl.classList.contains(CSS_CLASS_MESSAGE_ARRIVING)) {
-          messageGroupEl.classList.add(CSS_CLASS_MESSAGE_ARRIVING); // Потрібно мати цей клас
-          setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+        // Якщо це не помилка, викликаємо рендеринг
+        if (renderer) {
+            const result = renderer.render(); // Може бути Promise або HTMLElement
+            if (result instanceof Promise) {
+                messageGroupEl = await result;
+            } else {
+                messageGroupEl = result;
+            }
         }
+        // --- КІНЕЦЬ БЛОКУ РЕНДЕРИНГУ ---
 
-        // Оновлення скролу та індикатора нових повідомлень
-        const isUserMessage = data.message.role === "user";
-        if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
-          // Якщо користувач прокрутив вгору і прийшло не його повідомлення - показуємо індикатор
-          this.newMessagesIndicatorEl.classList.add(CSS_CLASS_VISIBLE); // Потрібно мати цей клас
-        } else if (!this.userScrolledUp) {
-          // Якщо користувач внизу - прокручуємо вниз
-          const forceScroll = !isUserMessage; // Примусово для ШІ/системи/помилки
-          this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll); // Припускаємо, що guaranteedScrollToBottom існує
+        // 8. Додаємо відрендерений елемент до контейнера (якщо він був створений і це не помилка, що вже оброблена)
+        if (messageGroupEl && data.message.role !== 'error') {
+            this.chatContainer.appendChild(messageGroupEl);
+            this.lastMessageElement = messageGroupEl; // Оновлюємо останній елемент
+            this.plugin.logger.debug(`[handleMessageAdded] Appended message group for role: ${data.message.role}`);
+
+            // 9. Анімація та логіка скролу
+            messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+            setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+
+             const isUserMessage = data.message.role === "user";
+             if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
+                 this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE);
+             } else if (!this.userScrolledUp) {
+                 const forceScroll = !isUserMessage;
+                 this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
+             }
+             // Оновлюємо стан кнопок/індикаторів скролу з невеликою затримкою
+             setTimeout(() => this.updateScrollStateAndIndicators(), 100);
+        } else if (data.message.role !== 'error') {
+             this.plugin.logger.warn(
+                 `[handleMessageAdded] messageGroupEl was null after attempting to render role: ${data.message.role}. Message not added to DOM.`
+             );
         }
-        // Оновлюємо стан кнопок/індикаторів скролу з невеликою затримкою
-        setTimeout(() => this.updateScrollStateAndIndicators(), 100); // Припускаємо, що updateScrollStateAndIndicators існує
-      } else if (data.message.role !== "error") {
-        this.plugin.logger.warn(
-          `[handleMessageAdded] messageGroupEl was null after attempting to render role: ${data.message.role}. Message not added to DOM.`
-        );
-      }
     } catch (error) {
-      // 10. Обробка помилок рендерингу
-      this.plugin.logger.error(
-        `[handleMessageAdded] Error rendering message (role: ${data.message.role}):`,
-        error,
-        data.message
-      );
-      // Можна додати повідомлення про помилку рендерингу в чат
-      // this.renderOrUpdateErrorGroup(false); // Наприклад, показати як загальну помилку
-      // this.errorGroupElement.querySelector(`.${CSS_CLASS_ERROR_TEXT}`)?.setText("Failed to display message.");
+        // 10. Обробка помилок рендерингу
+        this.plugin.logger.error(`[handleMessageAdded] Error rendering message (role: ${data.message.role}):`, error, data.message);
+        // Можна додати повідомлення про помилку рендерингу в чат
+         const renderErrorMsg: Message = {
+             role: 'error',
+             content: `Failed to display ${data.message.role} message. Error: ${error instanceof Error ? error.message : String(error)}`,
+             timestamp: new Date()
+         };
+         this.consecutiveErrorMessages.push(renderErrorMsg);
+         const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+         if (!isContinuingError) {
+             this.errorGroupElement = null;
+             this.consecutiveErrorMessages = [renderErrorMsg];
+         }
+         this.renderOrUpdateErrorGroup(isContinuingError);
     }
 
     // 11. Оновлюємо список чатів у випадаючому меню, якщо воно відкрите
     if (this.isMenuOpen()) {
-      // Перевіряємо, чи розгорнуте підменю чатів
-      const isChatSubmenuVisible =
-        this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
-      if (isChatSubmenuVisible) {
-        this.plugin.logger.debug("[handleMessageAdded] Chat submenu open, refreshing chat list menu.");
-        this.renderChatListMenu(); // Припускаємо, що renderChatListMenu існує
-      }
+        const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+        if (isChatSubmenuVisible) {
+            this.renderChatListMenu();
+        }
     }
-  }
+}
 
   private handleMessagesCleared = (chatId: string): void => {
     if (chatId === this.plugin.chatManager?.getActiveChatId()) {
@@ -2108,198 +2097,217 @@ export class OllamaView extends ItemView {
     return headerEl?.getAttribute("data-collapsed") === "false";
   }
 
-  // OllamaView.ts
+  async loadAndDisplayActiveChat(): Promise<void> {
+		// ... (початок методу: очищення, отримання даних чату, моделей, ролі, температури) ...
+        // Ця частина залишається переважно такою ж
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
 
-async loadAndDisplayActiveChat(): Promise<void> {
-  this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
+        this.clearChatContainerInternal(); // Clear display and local state
+        this.currentMessages = [];
+        this.lastRenderedMessageDate = null;
+        this.lastMessageElement = null; // Скидаємо останній елемент
+        this.consecutiveErrorMessages = []; // Скидаємо буфер помилок
+        this.errorGroupElement = null; // Скидаємо групу помилок
 
-  this.clearChatContainerInternal(); // Clear display and local state
-  this.currentMessages = [];
-  this.lastRenderedMessageDate = null;
+        let activeChat: Chat | null = null;
+        let availableModels: string[] = [];
+        let finalModelName: string | null = null;
+        let finalRolePath: string | null | undefined = undefined;
+        let finalRoleName: string = "None";
+        let finalTemperature: number | null | undefined = undefined;
+        let errorOccurred = false;
 
-  let activeChat: Chat | null = null;
-  let availableModels: string[] = []; // Keep track of available models
-  let finalModelName: string | null = null;
-  let finalRolePath: string | null | undefined = undefined;
-  let finalRoleName: string = "None";
-  let finalTemperature: number | null | undefined = undefined;
-  let errorOccurred = false;
+        // Step 1: Fetch essential data
+        try {
+            // ... (отримання activeChat, availableModels, finalRolePath, finalRoleName) ...
+             activeChat = (await this.plugin.chatManager?.getActiveChat()) || null;
+             this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`);
+             availableModels = await this.plugin.ollamaService.getModels(); // Get models early
+             this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(", ")}`);
 
-  // Step 1: Fetch essential data
-  try {
-      activeChat = (await this.plugin.chatManager?.getActiveChat()) || null;
-      this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`);
-      availableModels = await this.plugin.ollamaService.getModels(); // Get models early
-      this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(", ")}`);
+             finalRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+             finalRoleName = await this.findRoleNameByPath(finalRolePath);
+             this.plugin.logger.debug(
+                 `[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || "None"}', Name='${finalRoleName}'`
+             );
+        } catch (error) {
+            // ... (обробка помилки завантаження даних) ...
+             this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
+             new Notice("Error connecting to Ollama or loading chat data.", 5000);
+             errorOccurred = true;
+             // Set fallbacks based on global settings
+             finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (availableModels[0] ?? null);
+             finalTemperature = this.plugin.settings.temperature;
+             finalRolePath = this.plugin.settings.selectedRolePath;
+             finalRoleName = await this.findRoleNameByPath(finalRolePath);
+             activeChat = null;
+        }
 
-      finalRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-      finalRoleName = await this.findRoleNameByPath(finalRolePath);
-      this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Determined role: Path='<span class="math-inline">\{finalRolePath \|\| "None"\}', Name\='</span>{finalRoleName}'`
-      );
-  } catch (error) {
-       this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
-       new Notice("Error connecting to Ollama or loading chat data.", 5000);
-       errorOccurred = true;
-       // Set fallbacks based on global settings
-       finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (availableModels[0] ?? null);
-       finalTemperature = this.plugin.settings.temperature;
-       finalRolePath = this.plugin.settings.selectedRolePath;
-       finalRoleName = await this.findRoleNameByPath(finalRolePath);
-       activeChat = null;
-  }
+        // Steps 2, 3, 4: Determine final model/temp and update metadata if needed (only if chat loaded)
+        if (!errorOccurred && activeChat) {
+            // ... (визначення finalModelName та finalTemperature, оновлення метаданих) ...
+             let preferredModel = activeChat.metadata?.modelName || this.plugin.settings.modelName;
+            if (availableModels.length > 0) {
+                if (preferredModel && availableModels.includes(preferredModel)) {
+                    finalModelName = preferredModel;
+                } else {
+                    finalModelName = availableModels[0];
+                    this.plugin.logger.warn(
+                        `[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`
+                    );
+                }
+            } else {
+                finalModelName = null;
+                this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
+            }
+             // Update metadata if model differs (async in background)
+             if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
+                 this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch(updateError => {
+                     this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
+                 });
+             }
+             finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
+        } else if (!errorOccurred && !activeChat) {
+            // Set model/temp based on global settings if no chat exists
+            finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (availableModels[0] ?? null);
+            finalTemperature = this.plugin.settings.temperature;
+        }
+         // If an error occurred during initial fetch, finalModelName/Temp/Role are already set to fallbacks
 
-  // Steps 2, 3, 4: Determine final model/temp and update metadata if needed (only if chat loaded)
-  if (!errorOccurred && activeChat) {
-      // ... (keep logic for determining finalModelName based on availability) ...
-      let preferredModel = activeChat.metadata?.modelName || this.plugin.settings.modelName;
-  if (availableModels.length > 0) {
-    if (preferredModel && availableModels.includes(preferredModel)) {
-      finalModelName = preferredModel;
-    } else {
-      finalModelName = availableModels[0];
-      this.plugin.logger.warn(
-        `[loadAndDisplayActiveChat] Preferred model '<span class="math-inline">\{preferredModel\}' not available\. Using first available\: '</span>{finalModelName}'.`
-      );
-    }
-  } else {
-    finalModelName = null;
-    this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
-  }
+        // --- Step 5: Render Messages Sequentially using Renderers (REFACTORED) ---
+        if (activeChat !== null && !errorOccurred && activeChat.messages?.length > 0) {
+            this.hideEmptyState();
+            this.currentMessages = [...activeChat.messages]; // Ensure local cache matches
+            this.lastRenderedMessageDate = null; // Reset date logic
 
-      // Update metadata if model differs (async in background)
-      if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-           this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch(updateError => {
-               this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
-           });
-      }
-      finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-  } else if (!errorOccurred && !activeChat) {
-       // Set model/temp based on global settings if no chat exists
-       finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (availableModels[0] ?? null);
-       finalTemperature = this.plugin.settings.temperature;
-  }
-   // If an error occurred during initial fetch, finalModelName/Temp/Role are already set to fallbacks
+            for (const message of this.currentMessages) {
+                let messageGroupEl: HTMLElement | null = null;
+
+                // Check if date separator needed BEFORE rendering this message
+                const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+                const isFirstMessageInContainer = this.chatContainer.children.length === 0;
+
+                if (isNewDay || isFirstMessageInContainer) {
+                    if (isNewDay) {
+                        this.renderDateSeparator(message.timestamp);
+                    }
+                    this.lastRenderedMessageDate = message.timestamp; // Update last date
+                }
+
+                // Render the message itself using appropriate renderer
+                try {
+                    let renderer: UserMessageRenderer | AssistantMessageRenderer | SystemMessageRenderer | ErrorMessageRenderer | null = null;
+                    switch (message.role) {
+                        case "user":
+                            renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
+                            break;
+                        case "assistant":
+                            renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
+                            break;
+                        case "system":
+                            renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
+                            break;
+                        case "error":
+                             // Якщо при завантаженні зустрічаємо помилку, рендеримо її як окрему групу
+                             renderer = new ErrorMessageRenderer(this.app, this.plugin, message, this);
+                             // Скидаємо логіку групування послідовних помилок при повному перезавантаженні
+                             this.lastMessageElement = null;
+                             this.errorGroupElement = null;
+                             this.consecutiveErrorMessages = [];
+                            break;
+                        default:
+                             this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role: ${message.role}`);
+                    }
+
+                    if (renderer) {
+                        const result = renderer.render();
+                        if (result instanceof Promise) {
+                            messageGroupEl = await result;
+                        } else {
+                            messageGroupEl = result;
+                        }
+                    }
+
+                } catch (renderError) {
+                    this.plugin.logger.error("Error rendering message during load:", renderError, message);
+                    // Optionally add an error message to the display here if desired
+                    const errorDiv = this.chatContainer.createDiv({ cls: 'render-error' });
+                    errorDiv.setText(`Error rendering message (role: ${message.role})`);
+                    messageGroupEl = errorDiv; // Assign errorDiv to messageGroupEl to be appended
+                }
+
+                // Append the rendered element if successful
+                if (messageGroupEl) {
+                    this.chatContainer.appendChild(messageGroupEl);
+                    this.lastMessageElement = messageGroupEl; // Оновлюємо посилання на останній елемент
+                }
+            } // End for loop
+
+            // Check collapsing for all messages AFTER loop finishes and all are in DOM
+             setTimeout(() => this.checkAllMessagesForCollapsing(), 100); // Затримка для розрахунку висоти
+
+            // Scroll and update indicators after ALL messages are rendered
+            setTimeout(() => {
+                this.guaranteedScrollToBottom(100, false); // Scroll gently to bottom
+                setTimeout(() => {
+                    this.updateScrollStateAndIndicators(); // Update buttons based on final scroll position
+                }, 150);
+            }, 150); // Delay to allow layout reflow
+
+        } else {
+            // No messages or chat loaded
+            this.showEmptyState();
+            this.scrollToBottomButton?.classList.remove(CSS_CLASSES.VISIBLE); // Hide scroll button
+        }
+        // --- End Refactored Step 5 ---
 
 
-  // --- Step 5: Render Messages Sequentially (FIXED) ---
-  if (activeChat !== null && !errorOccurred && activeChat.messages?.length > 0) {
-      this.hideEmptyState();
-      this.currentMessages = [...activeChat.messages]; // Ensure local cache matches
-      this.lastRenderedMessageDate = null; // Reset date logic
+		// --- Step 6 & 7: Update other UI elements (залишається як було) ---
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
+        this.updateInputPlaceholder(finalRoleName);
+        this.updateRoleDisplay(finalRoleName);
+        this.updateModelDisplay(finalModelName);
+        this.updateTemperatureIndicator(finalTemperature);
 
-      // --- Loop and render/append one by one ---
-      for (const message of this.currentMessages) {
-          let messageGroupEl: HTMLElement | null = null;
+        // Update side panels if visible
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
+        const panelUpdatePromises = [];
+        if (this.isSidebarSectionVisible("chats")) {
+             panelUpdatePromises.push(
+                 this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
+             );
+        }
+        if (this.isSidebarSectionVisible("roles")) {
+             panelUpdatePromises.push(
+                 this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
+             );
+        }
+        if (panelUpdatePromises.length > 0) {
+             await Promise.all(panelUpdatePromises);
+        }
 
-          // Check if date separator needed BEFORE rendering this message
-          const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
-          const isFirstMessageInContainer = this.chatContainer.children.length === 0;
+        // Set input state based on model availability
+        if (finalModelName === null) {
+             // ... (disable input if no model) ...
+             this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
+             if (this.inputEl) {
+                 this.inputEl.disabled = true;
+                 this.inputEl.placeholder = "No models available...";
+             }
+             if (this.sendButton) {
+                 this.sendButton.disabled = true;
+                 this.sendButton.classList.add(CSS_CLASSES.DISABLED);
+             }
+             this.setLoadingState(false);
+        } else {
+             if (this.inputEl) {
+                 this.inputEl.disabled = this.isProcessing; // Should be false initially
+             }
+             this.updateSendButtonState();
+        }
 
-          if (isNewDay || isFirstMessageInContainer) {
-              // Render separator only if it's actually a new day or the very first message
-              if (isNewDay) {
-                   this.renderDateSeparator(message.timestamp);
-              }
-              this.lastRenderedMessageDate = message.timestamp; // Update last date
-          }
-
-
-          // Render the message itself
-          try {
-              if (message.role === "system") {
-                  const renderer = new SystemMessageRenderer(this.app, message, { formatTime: this.formatTime });
-                  messageGroupEl = renderer.render();
-              } else if (message.role === "assistant") {
-                  const renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
-                  messageGroupEl = await renderer.render(); // Await async renderer
-              } else if (message.role === "user") {
-                  messageGroupEl = this.renderUserMessage(message); // Sync renderer
-              } else if (message.role === "error") {
-                   // Assuming error handling adds directly or updates this.errorGroupElement
-                   const isContinuing = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
-                   this.consecutiveErrorMessages.push(message); // Add error to buffer
-                   this.renderOrUpdateErrorGroup(isContinuing);
-                   messageGroupEl = this.errorGroupElement;
-                   this.lastMessageElement = messageGroupEl; // Update last element for errors
-              }
-          } catch (renderError) {
-               this.plugin.logger.error("Error rendering message during load:", renderError, message);
-               // Optionally add an error message to the display here if desired
-          }
-
-          // Append the rendered element if successful
-          if (messageGroupEl && !messageGroupEl.parentElement) { // Append only if not already added (e.g., error group)
-              this.chatContainer.appendChild(messageGroupEl);
-               // Update lastMessageElement ONLY for non-error messages here
-               if(message.role !== 'error') {
-                  this.lastMessageElement = messageGroupEl;
-               }
-          }
-      } // End for loop
-
-      // Check collapsing for all messages AFTER loop finishes and all are in DOM
-      this.checkAllMessagesForCollapsing();
-
-      // Scroll and update indicators after ALL messages are rendered
-      setTimeout(() => {
-          this.guaranteedScrollToBottom(100, false); // Scroll gently to bottom
-          setTimeout(() => {
-              this.updateScrollStateAndIndicators(); // Update buttons based on final scroll position
-          }, 150);
-      }, 150); // Delay to allow layout reflow
-
-  } else {
-      // No messages or chat loaded
-      this.showEmptyState();
-      this.scrollToBottomButton?.classList.remove(CSS_CLASS_VISIBLE); // Hide scroll button
-  }
-
-  // --- Step 6 & 7: Update other UI elements ---
-  this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
-  this.updateInputPlaceholder(finalRoleName);
-  this.updateRoleDisplay(finalRoleName);
-  this.updateModelDisplay(finalModelName);
-  this.updateTemperatureIndicator(finalTemperature);
-
-  // Update side panels if visible
-  this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
-  const panelUpdatePromises = [];
-  if (this.isSidebarSectionVisible("chats")) {
-      panelUpdatePromises.push(
-          this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-      );
-  }
-  if (this.isSidebarSectionVisible("roles")) {
-      panelUpdatePromises.push(
-          this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-      );
-  }
-  if (panelUpdatePromises.length > 0) {
-      await Promise.all(panelUpdatePromises);
-  }
-
-  // Set input state based on model availability
-  if (finalModelName === null) {
-       this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
-       if (this.inputEl) {
-          this.inputEl.disabled = true;
-          this.inputEl.placeholder = "No models available...";
-       }
-       if (this.sendButton) {
-          this.sendButton.disabled = true;
-          this.sendButton.classList.add(CSS_CLASS_DISABLED);
-       }
-       this.setLoadingState(false);
-  } else {
-       if (this.inputEl) {
-          this.inputEl.disabled = this.isProcessing; // Should be false initially
-       }
-       this.updateSendButtonState();
-  }
-
-  this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
-}
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
+	}
 
   private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
     this.plugin.logger.debug(
@@ -2770,7 +2778,7 @@ async sendMessage(): Promise<void> {
 
 // OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
 
-private async handleRegenerateClick(userMessage: Message): Promise<void> {
+public async handleRegenerateClick(userMessage: Message): Promise<void> {
   this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
 
   // --- Check for ongoing generation ---
@@ -4835,85 +4843,82 @@ public async handleTranslateClick(
     }
   }
 
-  /**
-   * Створює нову групу для відображення помилок або оновлює існуючу.
-   * @param isContinuing Чи це продовження попередньої послідовності помилок.
-   */
-  private renderOrUpdateErrorGroup(isContinuing: boolean): void {
-    if (!this.chatContainer) return;
+   // --- ОНОВЛЕНИЙ renderOrUpdateErrorGroup ---
+    /**
+     * Створює нову групу для відображення помилок або оновлює існуючу.
+     * Тепер використовує ErrorMessageRenderer для створення візуального блоку.
+     * @param isContinuing Чи це продовження попередньої послідовності помилок.
+     */
+    private renderOrUpdateErrorGroup(isContinuing: boolean): void {
+      if (!this.chatContainer) return;
 
-    const errorsToDisplay = [...this.consecutiveErrorMessages]; // Копія поточних помилок
-    const errorCount = errorsToDisplay.length;
-    const lastErrorTimestamp = errorsToDisplay[errorCount - 1].timestamp;
-
-    let groupEl: HTMLElement;
-    let contentContainer: HTMLElement;
-
-    if (isContinuing && this.errorGroupElement) {
-      // --- Оновлення існуючої групи ---
-      this.plugin.logger.debug("[renderOrUpdateErrorGroup] Updating existing error group.");
-      groupEl = this.errorGroupElement;
-      // Знаходимо контейнер для контенту помилки
-      contentContainer = groupEl.querySelector(`.${CSS_CLASS_ERROR_TEXT}`) as HTMLElement;
-      if (!contentContainer) {
-        this.plugin.logger.error(
-          "[renderOrUpdateErrorGroup] Could not find error text container in existing group!",
-          groupEl
-        );
-        // Спробуємо створити його аварійно
-        const messageWrapper = groupEl.querySelector(".message-wrapper") || groupEl; // Де шукати?
-        const messageBubble =
-          messageWrapper.querySelector(`.${CSS_CLASS_ERROR_MESSAGE}`) ||
-          messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_ERROR_MESSAGE}` });
-        const contentWrapper =
-          messageBubble.querySelector(`.${CSS_CLASSES.CONTENT_CONTAINER}`) ||
-          messageBubble.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-        contentContainer = contentWrapper.createDiv({ cls: CSS_CLASS_ERROR_TEXT });
+      const errorsToDisplay = [...this.consecutiveErrorMessages]; // Копія поточних помилок
+      if (errorsToDisplay.length === 0) {
+          this.plugin.logger.warn("[renderOrUpdateErrorGroup] Called with no errors in buffer.");
+          return; // Нічого не робити, якщо немає помилок
       }
-      contentContainer.empty(); // Очищаємо попередній вміст
-      this.updateErrorGroupTimestamp(groupEl, lastErrorTimestamp); // Оновлюємо час
-    } else {
-      // --- Створення нової групи ---
-      this.plugin.logger.debug("[renderOrUpdateErrorGroup] Creating new error group.");
-      this.hideEmptyState(); // Приховуємо порожній стан
+      const errorCount = errorsToDisplay.length;
+      const lastError = errorsToDisplay[errorCount - 1]; // Остання помилка в буфері
 
-      // Скидаємо прапорець сумаризації для нової групи
-      this.isSummarizingErrors = false;
+      let groupEl: HTMLElement;
+      let contentContainer: HTMLElement | null = null; // Може не існувати спочатку
 
-      groupEl = this.chatContainer.createDiv({
-        cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_ERROR_GROUP}`,
-        attr: { "data-timestamp": lastErrorTimestamp.getTime().toString() },
-      });
-      this.errorGroupElement = groupEl; // Зберігаємо посилання на нову групу
-      this.lastMessageElement = groupEl; // Встановлюємо як останній елемент
+      if (isContinuing && this.errorGroupElement) {
+          // --- Оновлення існуючої групи ---
+          this.plugin.logger.debug("[renderOrUpdateErrorGroup] Updating existing error group.");
+          groupEl = this.errorGroupElement;
+          // Знаходимо контейнер для контенту помилки
+          contentContainer = groupEl.querySelector(`.${CSS_CLASS_ERROR_TEXT}`); // Використовуємо константу
+          if (contentContainer) {
+               contentContainer.empty(); // Очищаємо попередній вміст (сумарі або список)
+          } else {
+               // Це не повинно трапитися, якщо структура консистентна
+               this.plugin.logger.error("[renderOrUpdateErrorGroup] Could not find error text container in existing group!");
+               // Спробувати знайти/створити аварійно? Або просто ігнорувати оновлення?
+               // Поки що просто вийдемо, щоб уникнути подальших помилок
+               return;
+          }
+          this.updateErrorGroupTimestamp(groupEl, lastError.timestamp); // Оновлюємо час останньої помилки
+      } else {
+          // --- Створення нової групи за допомогою ErrorMessageRenderer ---
+          this.plugin.logger.debug("[renderOrUpdateErrorGroup] Creating new error group using ErrorMessageRenderer.");
+          this.hideEmptyState(); // Приховуємо порожній стан
+          this.isSummarizingErrors = false; // Скидаємо прапорець сумаризації для нової групи
 
-      // Додаємо обгортку та саму "бульбашку" повідомлення
-      const messageWrapper = groupEl.createDiv({ cls: "message-wrapper" }); // Обгортка
-      messageWrapper.style.order = "2"; // Для правильного розташування
-      const messageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_ERROR_MESSAGE}` });
-      const contentWrapper = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER }); // Контейнер для іконки + тексту
-      setIcon(contentWrapper.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
-      contentContainer = contentWrapper.createDiv({ cls: CSS_CLASS_ERROR_TEXT }); // Контейнер для тексту помилки/сумарі
+          // Використовуємо ErrorMessageRenderer для створення базової структури групи ОДНІЄЇ помилки (останньої)
+          // Це дасть нам правильну структуру, іконку, мітку часу, кнопки.
+          const renderer = new ErrorMessageRenderer(this.app, this.plugin, lastError, this);
+          groupEl = renderer.render(); // render() синхронний для ErrorMessageRenderer
+          contentContainer = groupEl.querySelector(`.${CSS_CLASS_ERROR_TEXT}`); // Знаходимо контейнер тексту
 
-      // Додаємо позначку часу до бульбашки
-      messageEl.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(lastErrorTimestamp) });
-    }
-
-    // --- Відображення контенту ---
-    if (errorCount === 1) {
-      // Показуємо текст єдиної помилки
-      contentContainer.setText(errorsToDisplay[0].content);
-    } else {
-      // Показуємо індикатор завантаження і запускаємо сумаризацію (якщо ще не запущена)
-      contentContainer.setText(`Multiple errors occurred (${errorCount}). Summarizing...`);
-      if (!this.isSummarizingErrors) {
-        this.triggerErrorSummarization(groupEl, errorsToDisplay);
+          // Додаємо нову групу в DOM і оновлюємо посилання
+          this.chatContainer.appendChild(groupEl);
+          this.errorGroupElement = groupEl; // Зберігаємо посилання на нову групу
+          this.lastMessageElement = groupEl; // Встановлюємо як останній елемент
       }
-    }
 
-    // Прокрутка до низу, щоб показати/оновити групу помилок
-    this.guaranteedScrollToBottom(50, true);
+      // --- Відображення контенту (одна помилка або сумарі/список) ---
+      if (contentContainer) { // Переконуємося, що контейнер знайдено
+          if (errorCount === 1) {
+              // Показуємо текст єдиної помилки (він вже встановлений ErrorMessageRenderer)
+              contentContainer.setText(lastError.content); // Перезаписуємо на випадок оновлення
+          } else {
+              // Показуємо індикатор завантаження і запускаємо сумаризацію (якщо ще не запущена)
+              contentContainer.setText(`Multiple errors occurred (${errorCount}). Summarizing...`);
+              if (!this.isSummarizingErrors) {
+                  // Передаємо САМЕ ЕЛЕМЕНТ ГРУПИ, а не контейнер тексту, бо fallback може змінити структуру
+                  this.triggerErrorSummarization(groupEl, errorsToDisplay);
+              }
+          }
+      } else {
+           this.plugin.logger.error("[renderOrUpdateErrorGroup] Failed to find/create content container for error group.");
+      }
+
+
+      // Прокрутка до низу, щоб показати/оновити групу помилок
+      this.guaranteedScrollToBottom(50, true);
   }
+
 
   /** Оновлює атрибут та текст мітки часу для групи помилок */
   private updateErrorGroupTimestamp(groupEl: HTMLElement, timestamp: Date): void {
@@ -5040,85 +5045,5 @@ public async handleTranslateClick(
     }
   }
 
-  private renderUserMessage(message: Message): HTMLElement | null {
-    if (!this.chatContainer) return null;
 
-    // Basic grouping logic (simplified, assumes date separator handled before call)
-    const groupClass = `${CSS_CLASSES.MESSAGE_GROUP} user-message-group`; // Assuming CSS_CLASS_USER_GROUP exists
-    const messageClass = `${CSS_CLASSES.MESSAGE} user-message`; // Assuming CSS_CLASS_USER_MESSAGE exists
-
-    // Find last group; if it's a user group, append, otherwise create new
-    let messageGroup = this.chatContainer.lastElementChild as HTMLElement;
-    if (!messageGroup || !messageGroup.classList.contains("user-message-group")) {
-      messageGroup = this.chatContainer.createDiv({
-        cls: groupClass,
-        attr: { "data-timestamp": message.timestamp.getTime().toString() },
-      });
-      // Assuming renderAvatar method exists or is imported
-      RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, true);
-    } else {
-      // Update timestamp of existing group
-      messageGroup.setAttribute("data-timestamp", message.timestamp.getTime().toString());
-    }
-
-    // Create message structure
-    let messageWrapper = messageGroup.querySelector(".message-wrapper") as HTMLElement;
-    if (!messageWrapper) {
-      messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
-      messageWrapper.style.order = "1"; // User messages on the right
-    }
-
-    const messageEl = messageWrapper.createDiv({ cls: messageClass });
-    const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER }); // Assuming this exists
-    const contentEl = contentContainer.createDiv({ cls: CSS_CLASSES.CONTENT }); // Assuming this exists
-
-    // Render simple text content for user messages
-    message.content.split("\n").forEach((line, i, arr) => {
-      contentEl.appendText(line);
-      if (i < arr.length - 1) contentEl.createEl("br");
-    });
-
-    // Add action buttons (Regenerate, Copy, Delete)
-    const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-    // Regenerate
-    // @ts-ignore // Assuming CSS_CLASS_REGENERATE_BUTTON exists
-    const regenerateBtn = buttonsWrapper.createEl("button", {
-      cls: CSS_CLASS_REGENERATE_BUTTON,
-      attr: { title: "Regenerate response" },
-    });
-    setIcon(regenerateBtn, "refresh-cw");
-    this.registerDomEvent(regenerateBtn, "click", e => {
-      e.stopPropagation();
-      this.handleRegenerateClick(message); // Assuming handleRegenerateClick exists
-    });
-    // Copy
-    const copyBtn = buttonsWrapper.createEl("button", {
-      cls: CSS_CLASS_COPY_BUTTON, // Assuming this exists
-      attr: { title: "Copy text" },
-    });
-    setIcon(copyBtn, "copy");
-    this.registerDomEvent(copyBtn, "click", e => {
-      e.stopPropagation();
-      this.handleCopyClick(message.content, copyBtn); // Assuming handleCopyClick exists
-    });
-    // Delete
-    const deleteBtn = buttonsWrapper.createEl("button", {
-      cls: [CSS_CLASS_DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], // Assuming these exist
-      attr: { "aria-label": "Delete message", title: "Delete Message" },
-    });
-    setIcon(deleteBtn, "trash");
-    this.registerDomEvent(deleteBtn, "click", e => {
-      e.stopPropagation();
-      this.handleDeleteMessageClick(message); // Assuming handleDeleteMessageClick exists
-    });
-
-    // Add timestamp
-    messageEl.createDiv({
-      cls: CSS_CLASSES.TIMESTAMP, // Assuming this exists
-      text: this.formatTime(message.timestamp),
-    });
-
-    // Return the group element (consistent with previous logic if needed)
-    return messageGroup;
-  }
 } // END OF OllamaView CLASS
