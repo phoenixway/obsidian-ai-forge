@@ -4969,74 +4969,101 @@ public async handleTranslateClick(
     }
   }
 
-  /**
-   * Асинхронно запускає процес сумаризації помилок.
-   */
   private async triggerErrorSummarization(targetGroupElement: HTMLElement, errors: Message[]): Promise<void> {
-    if (!this.plugin.settings.summarizationModelName || this.isSummarizingErrors) {
-      if (!this.plugin.settings.summarizationModelName)
-        this.plugin.logger.warn("[triggerErrorSummarization] Summarization model not set, cannot summarize errors.");
-      if (this.isSummarizingErrors)
-        this.plugin.logger.debug("[triggerErrorSummarization] Summarization already in progress, skipping.");
-      // Якщо сумаризація неможлива або вже йде, показуємо список
-      this.displayErrorListFallback(targetGroupElement, errors);
+    // --- ТИМЧАСОВЕ ВИМКНЕННЯ СУМАРИЗАЦІЇ ---
+    const ENABLE_ERROR_SUMMARIZATION = false; // Встановіть true, щоб увімкнути назад
+    // -----------------------------------------
+
+    if (!ENABLE_ERROR_SUMMARIZATION) {
+        this.plugin.logger.info("[triggerErrorSummarization] Error summarization is disabled. Displaying list fallback.");
+        this.displayErrorListFallback(targetGroupElement, errors);
+        // Не встановлюємо isSummarizingErrors = true, бо процес не запускається
+        return; // Виходимо одразу
+    }
+
+    // --- Оригінальна логіка (виконується, тільки якщо ENABLE_ERROR_SUMMARIZATION = true) ---
+	if (!this.plugin.settings.summarizationModelName || this.isSummarizingErrors) {
+		if (!this.plugin.settings.summarizationModelName)
+			this.plugin.logger.warn("[triggerErrorSummarization] Summarization model not set, cannot summarize errors.");
+		if (this.isSummarizingErrors)
+			this.plugin.logger.debug("[triggerErrorSummarization] Summarization already in progress, skipping.");
+		// Якщо сумаризація неможлива або вже йде, показуємо список
+		this.displayErrorListFallback(targetGroupElement, errors);
+		return;
+	}
+
+	this.isSummarizingErrors = true; // Встановлюємо прапорець ТІЛЬКИ якщо реально запускаємо
+	this.plugin.logger.info(`[triggerErrorSummarization] Starting summarization for ${errors.length} errors.`);
+
+	try {
+		const summary = await this.summarizeErrors(errors);
+		const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`) as HTMLElement;
+
+		if (!contentContainer || !contentContainer.isConnected) {
+			this.plugin.logger.warn(
+				"[triggerErrorSummarization] Error content container disappeared before summarization finished."
+			);
+			// this.isSummarizingErrors = false; // Скидається у finally
+			return;
+		}
+
+		contentContainer.empty(); // Очищаємо "Summarizing..."
+
+		if (summary) {
+			contentContainer.setText(`Multiple errors occurred. Summary:\n${summary}`);
+		} else {
+			this.plugin.logger.warn(
+				"[triggerErrorSummarization] Summarization failed or returned empty. Displaying list fallback."
+			);
+			this.displayErrorListFallback(targetGroupElement, errors); // Використовуємо fallback
+		}
+	} catch (error) {
+		this.plugin.logger.error("[triggerErrorSummarization] Unexpected error during summarization process:", error);
+		this.displayErrorListFallback(targetGroupElement, errors); // Fallback при будь-якій помилці
+	} finally {
+		this.isSummarizingErrors = false; // Завжди скидаємо прапорець
+		this.plugin.logger.debug("[triggerErrorSummarization] Summarization process finished (or was bypassed).");
+	}
+     // --- Кінець оригінальної логіки ---
+}
+
+
+private displayErrorListFallback(targetGroupElement: HTMLElement, errors: Message[]): void {
+  const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`) as HTMLElement;
+  // Додамо перевірку, чи контейнер існує і чи він є частиною DOM
+  if (!contentContainer || !contentContainer.isConnected) {
+      this.plugin.logger.warn("[displayErrorListFallback] Target content container not found or not connected.");
+      // Якщо елемент групи ще існує, спробуємо знайти/створити контейнер знову? Або просто вийти.
+      // Поки що просто виходимо, щоб уникнути помилок.
+      if (!targetGroupElement.isConnected) {
+           this.plugin.logger.warn("[displayErrorListFallback] Target group element also not connected.");
+      }
       return;
-    }
-
-    this.isSummarizingErrors = true;
-    this.plugin.logger.info(`[triggerErrorSummarization] Starting summarization for ${errors.length} errors.`);
-
-    try {
-      const summary = await this.summarizeErrors(errors);
-      const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASS_ERROR_TEXT}`) as HTMLElement;
-
-      if (!contentContainer || !contentContainer.isConnected) {
-        this.plugin.logger.warn(
-          "[triggerErrorSummarization] Error content container disappeared before summarization finished."
-        );
-        // Можливо, група була видалена або чат очищено
-        this.isSummarizingErrors = false; // Скидаємо прапорець
-        return;
-      }
-
-      contentContainer.empty(); // Очищаємо "Summarizing..."
-
-      if (summary) {
-        contentContainer.setText(`Multiple errors occurred. Summary:\n${summary}`);
-      } else {
-        this.plugin.logger.warn(
-          "[triggerErrorSummarization] Summarization failed or returned empty. Displaying list fallback."
-        );
-        this.displayErrorListFallback(targetGroupElement, errors); // Використовуємо fallback
-      }
-    } catch (error) {
-      this.plugin.logger.error("[triggerErrorSummarization] Unexpected error during summarization process:", error);
-      this.displayErrorListFallback(targetGroupElement, errors); // Fallback при будь-якій помилці
-    } finally {
-      this.isSummarizingErrors = false; // Завжди скидаємо прапорець
-      this.plugin.logger.debug("[triggerErrorSummarization] Summarization process finished.");
-    }
   }
 
-  /**
-   * Відображає простий нумерований список унікальних повідомлень про помилки.
-   */
-  private displayErrorListFallback(targetGroupElement: HTMLElement, errors: Message[]): void {
-    const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASS_ERROR_TEXT}`) as HTMLElement;
-    if (!contentContainer) return;
-
-    contentContainer.empty();
-    const uniqueErrors = Array.from(new Set(errors.map(e => e.content.trim())));
-    contentContainer.createDiv({
+  contentContainer.empty(); // Очищуємо попередній вміст (наприклад, "Summarizing...")
+  const uniqueErrors = Array.from(new Set(errors.map(e => e.content.trim())));
+  contentContainer.createDiv({
+      // Додаємо кількість унікальних помилок для ясності
       text: `Multiple errors occurred (${errors.length} total, ${uniqueErrors.length} unique):`,
-    });
-    const listEl = contentContainer.createEl("ol");
-    listEl.style.marginTop = "5px";
-    listEl.style.paddingLeft = "20px"; // Відступ для нумерованого списку
-    uniqueErrors.forEach(errorMsg => {
-      listEl.createEl("li", { text: errorMsg });
-    });
-  }
+      cls: "error-summary-header" // Додатковий клас для можливої стилізації
+  });
+  // Використовуємо <ul> для кращої семантики списку
+  const listEl = contentContainer.createEl("ul");
+  listEl.style.marginTop = "5px";
+  listEl.style.paddingLeft = "20px"; // Відступ для списку
+  listEl.style.listStyle = "disc"; // Стиль маркера
+
+  uniqueErrors.forEach(errorMsg => {
+      // Використовуємо textContent для безпечного відображення тексту помилки
+      const listItem = listEl.createEl("li");
+      listItem.textContent = errorMsg;
+  });
+
+  // Переконаємось, що група помилок видима після оновлення
+  this.guaranteedScrollToBottom(50, true);
+}
+
 
   /**
    * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama.

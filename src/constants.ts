@@ -21,5 +21,6 @@ export const CSS_CLASSES = {
     DELETE_MESSAGE_BUTTON: "delete-message-button", // Likely needed
     MESSAGE_ARRIVING: "message-arriving",
     VISIBLE: "visible", 
-    DISABLED: "disabled"
+    DISABLED: "disabled",
+    ERROR_TEXT: "error-message-text", // Додаємо відсутню константу
 };

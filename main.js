@@ -224,7 +224,9 @@ var CSS_CLASSES = {
   // Likely needed
   MESSAGE_ARRIVING: "message-arriving",
   VISIBLE: "visible",
-  DISABLED: "disabled"
+  DISABLED: "disabled",
+  ERROR_TEXT: "error-message-text"
+  // Додаємо відсутню константу
 };
 
 // src/MessageRendererUtils.ts
@@ -4761,10 +4763,13 @@ Summary:`;
       timestampEl.setText(this.formatTime(timestamp));
     }
   }
-  /**
-   * Асинхронно запускає процес сумаризації помилок.
-   */
   async triggerErrorSummarization(targetGroupElement, errors) {
+    const ENABLE_ERROR_SUMMARIZATION = false;
+    if (!ENABLE_ERROR_SUMMARIZATION) {
+      this.plugin.logger.info("[triggerErrorSummarization] Error summarization is disabled. Displaying list fallback.");
+      this.displayErrorListFallback(targetGroupElement, errors);
+      return;
+    }
     if (!this.plugin.settings.summarizationModelName || this.isSummarizingErrors) {
       if (!this.plugin.settings.summarizationModelName)
         this.plugin.logger.warn("[triggerErrorSummarization] Summarization model not set, cannot summarize errors.");
@@ -4777,12 +4782,11 @@ Summary:`;
     this.plugin.logger.info(`[triggerErrorSummarization] Starting summarization for ${errors.length} errors.`);
     try {
       const summary = await this.summarizeErrors(errors);
-      const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASS_ERROR_TEXT2}`);
+      const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`);
       if (!contentContainer || !contentContainer.isConnected) {
         this.plugin.logger.warn(
           "[triggerErrorSummarization] Error content container disappeared before summarization finished."
         );
-        this.isSummarizingErrors = false;
         return;
       }
       contentContainer.empty();
@@ -4800,27 +4804,35 @@ ${summary}`);
       this.displayErrorListFallback(targetGroupElement, errors);
     } finally {
       this.isSummarizingErrors = false;
-      this.plugin.logger.debug("[triggerErrorSummarization] Summarization process finished.");
+      this.plugin.logger.debug("[triggerErrorSummarization] Summarization process finished (or was bypassed).");
     }
   }
-  /**
-   * Відображає простий нумерований список унікальних повідомлень про помилки.
-   */
   displayErrorListFallback(targetGroupElement, errors) {
-    const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASS_ERROR_TEXT2}`);
-    if (!contentContainer)
+    const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`);
+    if (!contentContainer || !contentContainer.isConnected) {
+      this.plugin.logger.warn("[displayErrorListFallback] Target content container not found or not connected.");
+      if (!targetGroupElement.isConnected) {
+        this.plugin.logger.warn("[displayErrorListFallback] Target group element also not connected.");
+      }
       return;
+    }
     contentContainer.empty();
     const uniqueErrors = Array.from(new Set(errors.map((e) => e.content.trim())));
     contentContainer.createDiv({
-      text: `Multiple errors occurred (${errors.length} total, ${uniqueErrors.length} unique):`
+      // Додаємо кількість унікальних помилок для ясності
+      text: `Multiple errors occurred (${errors.length} total, ${uniqueErrors.length} unique):`,
+      cls: "error-summary-header"
+      // Додатковий клас для можливої стилізації
     });
-    const listEl = contentContainer.createEl("ol");
+    const listEl = contentContainer.createEl("ul");
     listEl.style.marginTop = "5px";
     listEl.style.paddingLeft = "20px";
+    listEl.style.listStyle = "disc";
     uniqueErrors.forEach((errorMsg) => {
-      listEl.createEl("li", { text: errorMsg });
+      const listItem = listEl.createEl("li");
+      listItem.textContent = errorMsg;
     });
+    this.guaranteedScrollToBottom(50, true);
   }
   /**
    * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama.
