@@ -705,159 +705,199 @@ export class OllamaView extends ItemView {
     content.style.paddingBottom = "0";
     return { header, content, section };
   };
-  // --- Event Listeners (with Custom Div Menu) ---
-  // OllamaView.ts
+
   private attachEventListeners(): void {
-    // ... (перевірки та слухачі для inputEl, sendButton, menuButton і т.д. як були) ...
-    if (!this.inputEl) console.error("inputEl missing!");
-    if (!this.sendButton) console.error("sendButton missing!");
-    if (!this.menuButton) console.error("menuButton missing!");
-    if (!this.modelDisplayEl) console.error("modelDisplayEl missing!");
-    if (!this.roleDisplayEl) console.error("roleDisplayEl missing!");
-    if (!this.temperatureIndicatorEl) console.error("temperatureIndicatorEl missing!");
-    if (!this.translateInputButton) console.error("translateInputButton missing!");
-    if (!this.toggleLocationButton) console.error("toggleLocationButton missing!");
-    if (!this.chatContainer) console.error("chatContainer missing!");
+    // --- Null Checks for Required Elements ---
+    // Input Area
+    if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
+    if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
+    if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing during attachEventListeners!");
+    if (!this.voiceButton) console.error("OllamaView: voiceButton missing during attachEventListeners!");
+    if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing during attachEventListeners!");
+    if (!this.menuButton) console.error("OllamaView: menuButton missing during attachEventListeners!");
+    if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing during attachEventListeners!");
+    if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing during attachEventListeners!");
+    if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing during attachEventListeners!");
+    if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing during attachEventListeners!");
+    // Chat Area
+    if (!this.chatContainer) console.error("OllamaView: chatContainer missing during attachEventListeners!");
+    if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing during attachEventListeners!");
+    if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing during attachEventListeners!");
+    // Sidebar
+    if (!this.chatPanelHeaderEl) console.error("OllamaView: chatPanelHeaderEl missing during attachEventListeners!");
+    if (!this.rolePanelHeaderEl) console.error("OllamaView: rolePanelHeaderEl missing during attachEventListeners!");
+    if (!this.newChatSidebarButton) console.error("OllamaView: newChatSidebarButton missing during attachEventListeners!");
+    // Dropdown Menu
+    if (!this.modelSubmenuHeader) console.error("OllamaView: modelSubmenuHeader missing during attachEventListeners!");
+    if (!this.roleSubmenuHeader) console.error("OllamaView: roleSubmenuHeader missing during attachEventListeners!");
+    if (!this.chatSubmenuHeader) console.error("OllamaView: chatSubmenuHeader missing during attachEventListeners!");
+    if (!this.newChatOption) console.error("OllamaView: newChatOption missing during attachEventListeners!");
+    if (!this.renameChatOption) console.error("OllamaView: renameChatOption missing during attachEventListeners!");
+    if (!this.cloneChatOption) console.error("OllamaView: cloneChatOption missing during attachEventListeners!");
+    if (!this.exportChatOption) console.error("OllamaView: exportChatOption missing during attachEventListeners!");
+    if (!this.clearChatOption) console.error("OllamaView: clearChatOption missing during attachEventListeners!");
+    if (!this.deleteChatOption) console.error("OllamaView: deleteChatOption missing during attachEventListeners!");
+    if (!this.toggleViewLocationOption) console.error("OllamaView: toggleViewLocationOption missing during attachEventListeners!");
+    if (!this.settingsOption) console.error("OllamaView: settingsOption missing during attachEventListeners!");
 
-    // Слухачі поля вводу
+    // --- Input Textarea Listeners ---
     if (this.inputEl) {
-      this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
-      this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
+        // Ensure handlers like handleKeyDown use 'this' correctly (e.g., defined as arrow functions)
+        this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
+        this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
     }
-    // Слухачі кнопок
-    if (this.sendButton) this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
-    if (this.voiceButton) this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
-    if (this.translateInputButton)
-      this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
-    if (this.menuButton) this.registerDomEvent(this.menuButton, "click", this.handleMenuClick);
-    if (this.modelDisplayEl) this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
-    if (this.roleDisplayEl) this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
-    if (this.temperatureIndicatorEl)
-      this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
-    if (this.toggleLocationButton)
-      this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
 
-    // --- ЗМІНЕНО: Слухачі для заголовків секцій бічної панелі ---
+    // --- Input Control Buttons Listeners ---
+    if (this.sendButton) {
+        this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
+    }
+    if (this.stopGeneratingButton) {
+        // cancelGeneration is already an arrow function, preserving 'this'
+        this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
+    }
+    if (this.voiceButton) {
+        this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
+    }
+    if (this.translateInputButton) {
+        this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
+    }
+    if (this.menuButton) {
+        this.registerDomEvent(this.menuButton, "click", this.handleMenuClick);
+    }
+    if (this.toggleLocationButton) {
+        this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
+    }
+
+    // --- Input Info Indicators Listeners ---
+    if (this.modelDisplayEl) {
+        this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
+    }
+    if (this.roleDisplayEl) {
+        this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
+    }
+    if (this.temperatureIndicatorEl) {
+        this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
+    }
+
+    // --- Sidebar Panel Elements Listeners ---
+    // Sidebar Section Headers (Accordion Toggle)
     if (this.chatPanelHeaderEl) {
-      this.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSidebarSection(this.chatPanelHeaderEl));
-    } else {
-      console.error("chatPanelHeaderEl missing!");
+        // Use arrow function to ensure 'this' in toggleSidebarSection is correct
+        this.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSidebarSection(this.chatPanelHeaderEl));
     }
     if (this.rolePanelHeaderEl) {
-      this.registerDomEvent(this.rolePanelHeaderEl, "click", () => this.toggleSidebarSection(this.rolePanelHeaderEl));
-    } else {
-      console.error("rolePanelHeaderEl missing!");
+        // Use arrow function to ensure 'this' in toggleSidebarSection is correct
+        this.registerDomEvent(this.rolePanelHeaderEl, "click", () => this.toggleSidebarSection(this.rolePanelHeaderEl));
     }
-    // --- КІНЕЦЬ ЗМІН ---
+    // Sidebar "New Chat" Button
+    if (this.newChatSidebarButton) {
+        // Use arrow function for the handler to ensure 'this.handleNewChatClick' has correct context
+        this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
+            e.stopPropagation(); // Prevent toggling the section accidentally
+            this.handleNewChatClick(); // Assumes handleNewChatClick is arrow function or bound
+        });
+    }
 
-    // Слухачі для підменю (акордеон) у випадаючому меню (як були)
-    if (this.modelSubmenuHeader)
-      this.registerDomEvent(this.modelSubmenuHeader, "click", () =>
-        this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")
-      );
-    else console.error("modelSubmenuHeader missing!");
-    if (this.roleSubmenuHeader)
-      this.registerDomEvent(this.roleSubmenuHeader, "click", () =>
-        this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")
-      );
-    else console.error("roleSubmenuHeader missing!");
-    if (this.chatSubmenuHeader)
-      this.registerDomEvent(this.chatSubmenuHeader, "click", () =>
-        this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")
-      );
-    else console.error("chatSubmenuHeader missing!");
+    // --- Dropdown Menu Listeners ---
+    // Submenu Headers (Accordion Toggle)
+    if (this.modelSubmenuHeader && this.modelSubmenuContent) {
+        // Use arrow function for handler to ensure 'this' in toggleSubmenu is correct
+        this.registerDomEvent(this.modelSubmenuHeader, "click", () =>
+            this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")
+        );
+    }
+    if (this.roleSubmenuHeader && this.roleSubmenuContent) {
+        // Use arrow function for handler to ensure 'this' in toggleSubmenu is correct
+        this.registerDomEvent(this.roleSubmenuHeader, "click", () =>
+            this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")
+        );
+    }
+    if (this.chatSubmenuHeader && this.chatSubmenuContent) {
+        // Use arrow function for handler to ensure 'this' in toggleSubmenu is correct
+        this.registerDomEvent(this.chatSubmenuHeader, "click", () =>
+            this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")
+        );
+    }
 
-    this.registerDomEvent(this.newChatSidebarButton, "click", e => {
-      e.stopPropagation(); // Зупиняємо спливання, щоб не згорнути/розгорнути секцію
-      this.handleNewChatClick(); // Викликаємо існуючий обробник
-    });
-
-    // Слухачі для прямих опцій меню (як були)
-    // ... (newChatOption, renameChatOption, etc.) ...
-    if (this.newChatOption) this.registerDomEvent(this.newChatOption, "click", this.handleNewChatClick);
-    else console.error("newChatOption missing!");
+    // Direct Dropdown Menu Options
+    if (this.newChatOption) {
+        this.registerDomEvent(this.newChatOption, "click", this.handleNewChatClick);
+    }
     if (this.renameChatOption) {
-      // Обгортаємо виклик в анонімну функцію, щоб викликати без аргументів
-      this.registerDomEvent(this.renameChatOption, "click", () => {
-        this.handleRenameChatClick(); // Виклик без параметрів означає "перейменувати активний чат"
-      });
-    } else {
-      console.error("renameChatOption missing!");
+        // Use arrow function for handler to call handleRenameChatClick correctly
+        this.registerDomEvent(this.renameChatOption, "click", () => {
+            this.handleRenameChatClick(); // Calls handler for the active chat
+        });
     }
-    if (this.cloneChatOption) this.registerDomEvent(this.cloneChatOption, "click", this.handleCloneChatClick);
-    else console.error("cloneChatOption missing!");
-    if (this.exportChatOption) this.registerDomEvent(this.exportChatOption, "click", this.handleExportChatClick);
-    else console.error("exportChatOption missing!");
-    if (this.clearChatOption) this.registerDomEvent(this.clearChatOption, "click", this.handleClearChatClick);
-    else console.error("clearChatOption missing!");
-    if (this.deleteChatOption) this.registerDomEvent(this.deleteChatOption, "click", this.handleDeleteChatClick);
-    else console.error("deleteChatOption missing!");
-    if (this.toggleViewLocationOption)
-      this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick);
-    else console.error("toggleViewLocationOption missing!");
-    if (this.settingsOption) this.registerDomEvent(this.settingsOption, "click", this.handleSettingsClick);
-    else console.error("settingsOption missing!");
+    if (this.cloneChatOption) {
+        this.registerDomEvent(this.cloneChatOption, "click", this.handleCloneChatClick);
+    }
+    if (this.exportChatOption) {
+        this.registerDomEvent(this.exportChatOption, "click", this.handleExportChatClick);
+    }
+    if (this.clearChatOption) {
+        this.registerDomEvent(this.clearChatOption, "click", this.handleClearChatClick);
+    }
+    if (this.deleteChatOption) {
+        this.registerDomEvent(this.deleteChatOption, "click", this.handleDeleteChatClick);
+    }
+    if (this.toggleViewLocationOption) {
+        this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick);
+    }
+    if (this.settingsOption) {
+        this.registerDomEvent(this.settingsOption, "click", this.handleSettingsClick);
+    }
 
-    // Window/Workspace/Document listeners (як були)
-    this.registerDomEvent(window, "resize", this.handleWindowResize);
-    this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
-    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
-    this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
-    this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
-    if (this.chatContainer) this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
-    if (this.newMessagesIndicatorEl)
-      this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
-
+    // --- Chat Area Listeners ---
+    if (this.chatContainer) {
+        // scrollListenerDebounced is created with debounce, should handle 'this' from its definition context
+        this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
+    }
+    if (this.newMessagesIndicatorEl) {
+        this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
+    }
     if (this.scrollToBottomButton) {
-      this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
-    } else {
-      console.error("scrollToBottomButton missing!");
+        this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
     }
 
-    //   this.registerDomEvent(this.newChatSidebarButton, 'click', (e) => {
-    //     e.stopPropagation();
-    //     this.handleNewChatClick();
-    // });
-    // Plugin/ChatManager Event Listeners
-    this.register(this.plugin.on("model-changed", this.handleModelChange));
-    this.register(this.plugin.on("role-changed", this.handleRoleChange));
+    // --- Window/Workspace/Document Listeners ---
+    this.registerDomEvent(window, "resize", this.handleWindowResize);
+    this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize)); // Ensure handleWindowResize is arrow fn or bound
+    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu); // Ensure handleDocumentClickForMenu is arrow fn or bound
+    this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange); // Ensure handleVisibilityChange is arrow fn or bound
+    this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange)); // Ensure handleActiveLeafChange is arrow fn or bound
 
-    // Оновлення ПАНЕЛІ РОЛЕЙ та ВИПАДАЮЧОГО МЕНЮ РОЛЕЙ при зміні файлів ролей
-    this.register(this.plugin.on("roles-updated", this.handleRolesUpdated)); // Оновлює кеш і меню
+    // --- Plugin Event Listeners (Using Arrow Functions to preserve 'this') ---
+    this.register(this.plugin.on("model-changed", (modelName) => this.handleModelChange(modelName)));
+    this.register(this.plugin.on("role-changed", (roleName) => this.handleRoleChange(roleName)));
+    this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated())); // Assuming handleRolesUpdated doesn't need 'this' or is arrow fn
     this.register(
-      this.plugin.on("roles-updated", () => {
-        // Оновлює панель (якщо видима)
-        if (this.rolePanelHeaderEl?.getAttribute("data-collapsed") === "false") {
-          this.updateRolePanelList();
-        }
-      })
+        this.plugin.on("roles-updated", () => {
+            // This one uses an arrow function, preserving 'this'
+            if (this.rolePanelHeaderEl?.getAttribute("data-collapsed") === "false") {
+                this.updateRolePanelList(); // Needs 'this' context
+            }
+        })
     );
+    this.register(this.plugin.on("active-chat-changed", (data) => this.handleActiveChatChanged(data)));
+    this.register(this.plugin.on("message-added", (data) => this.handleMessageAdded(data))); // Corrected binding here
+    this.register(this.plugin.on("messages-cleared", (chatId) => this.handleMessagesCleared(chatId)));
+    this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
+    this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
+    this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
 
-    this.register(this.plugin.on("active-chat-changed", this.handleActiveChatChanged));
-    this.register(this.plugin.on("message-added", this.handleMessageAdded));
-    this.register(this.plugin.on("messages-cleared", this.handleMessagesCleared));
-    this.register(this.plugin.on("chat-list-updated", this.handleChatListUpdated));
-    this.register(this.plugin.on("settings-updated", this.handleSettingsUpdated));
-    this.register(this.plugin.on("message-deleted", this.handleMessageDeleted));
-    if (this.stopGeneratingButton) {
-      this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
-    } else {
-      console.error("stopGeneratingButton missing!");
-    }
-    this.plugin.logger.debug("[OllamaView] Event listeners attached.");
-  }
+    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
+}
 
   private cancelGeneration = (): void => {
     if (this.currentAbortController) {
-      this.plugin.logger.info("[OllamaView] User requested generation cancellation.");
-      this.currentAbortController.abort();
-      // Не потрібно тут очищати this.currentAbortController, це зробить finally блок у sendMessage
-      // Можна додати системне повідомлення про зупинку
-      // this.addMessageToDisplay("system", "Generation stopped by user.", new Date());
+        // Тепер 'this.plugin' має бути доступним
+        this.plugin.logger.info("[OllamaView] User requested generation cancellation.");
+        this.currentAbortController.abort();
     } else {
-      this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
+        this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
     }
-  };
+};
 
   //   public handleSettingsUpdated = async (): Promise<void> => {
   //     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
