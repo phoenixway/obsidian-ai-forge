@@ -146,9 +146,13 @@ export default class OllamaPlugin extends Plugin {
     // Реєстрація обробників подій плагіна
     // --- ВИПРАВЛЕННЯ: Використовуємо this.on і тип message ---
     this.register(
-      this.on("ollama-connection-error", (message: string) => {
-        this.view?.addMessageToDisplay?.("error", message, new Date());
-      })
+      this.on("ollama-connection-error", async (message: string) => {
+        if (this.chatManager) {
+          await this.chatManager.addMessageToActiveChat("error", message, new Date());
+     } else {
+          this.logger.error("Cannot display connection error: ChatManager not available.");
+          new Notice(`Ollama Connection Error: ${message}`); // Fallback notice
+     }      })
     );
     this.register(this.on("active-chat-changed", this.handleActiveChatChangedLocally.bind(this)));
     this.register(
