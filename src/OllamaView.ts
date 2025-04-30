@@ -5488,49 +5488,81 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
   }
 
   /**
-   * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama.
-   * @param errors Масив повідомлень про помилки.
-   * @returns Рядок з сумаризацією або null у разі помилки.
-   */
-  private async summarizeErrors(errors: Message[]): Promise<string | null> {
-    const modelName = this.plugin.settings.summarizationModelName;
-    if (!modelName) return null; // Модель не налаштована
+ * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama,
+ * з можливістю використання запасної моделі.
+ * @param errors Масив повідомлень про помилки.
+ * @returns Рядок з сумаризацією або null у разі помилки.
+ */
+private async summarizeErrors(errors: Message[]): Promise<string | null> {
+  const settings = this.plugin.settings;
+  const primaryModel = settings.summarizationModelName?.trim();
+  const fallbackModel = settings.fallbackSummarizationModelName?.trim();
 
-    if (errors.length < 2) return errors[0]?.content || null; // Немає сенсу сумаризувати менше 2
-
-    // Форматуємо помилки для промпту
-    const uniqueErrorContents = Array.from(new Set(errors.map(e => e.content.trim())));
-    const errorsText = uniqueErrorContents.map((msg, index) => `Error ${index + 1}: ${msg}`).join("\n");
-    const prompt = `Concisely summarize the following ${uniqueErrorContents.length} unique error messages reported by the system. Focus on the core issue(s):\n\n${errorsText}\n\nSummary:`;
-
-    const requestBody = {
-      model: modelName,
-      prompt: prompt,
-      stream: false,
-      temperature: 0.2, // Низька температура для фактологічної сумаризації
-      options: {
-        num_ctx: this.plugin.settings.contextWindow > 1024 ? 1024 : this.plugin.settings.contextWindow, // Обмежуємо контекст для сумаризації
-        // Можна додати stop tokens, якщо модель схильна продовжувати занадто довго
-        // stop: ["Error"]
-      },
-      system: "You are an assistant that summarizes lists of technical error messages accurately and concisely.",
-    };
-
-    try {
-      this.plugin.logger.debug(
-        `[summarizeErrors] Sending request to model ${modelName}. Prompt length: ${prompt.length}`
-      );
-      const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
-      if (responseData && responseData.response) {
-        this.plugin.logger.debug(`[summarizeErrors] Summarization successful.`);
-        return responseData.response.trim();
-      } else {
-        this.plugin.logger.warn("[summarizeErrors] Received empty or invalid response from Ollama.");
-        return null;
-      }
-    } catch (error) {
-      this.plugin.logger.error("[summarizeErrors] Failed to summarize errors:", error);
-      return null;
-    }
+  if (!primaryModel && !fallbackModel) {
+      this.plugin.logger.warn("[summarizeErrors] No primary or fallback summarization model configured.");
+      return null; // Немає жодної моделі для спроби
   }
+
+  if (errors.length < 2) return errors[0]?.content || null; // Немає сенсу сумаризувати менше 2
+
+  // Форматуємо помилки для промпту (однаково для обох спроб)
+  const uniqueErrorContents = Array.from(new Set(errors.map(e => e.content.trim())));
+  const errorsText = uniqueErrorContents.map((msg, index) => `Error ${index + 1}: ${msg}`).join("\n");
+  const prompt = `Concisely summarize the following ${uniqueErrorContents.length} unique error messages reported by the system. Focus on the core issue(s):\n\n${errorsText}\n\nSummary:`;
+
+  // --- Внутрішня функція для спроби сумаризації ---
+  const trySummarization = async (modelToUse: string): Promise<{ summary: string | null; modelNotFound: boolean; error: any | null }> => {
+      if (!modelToUse) {
+          return { summary: null, modelNotFound: false, error: null }; // Модель не вказана
+      }
+      this.plugin.logger.info(`[summarizeErrors] Attempting summarization using model: ${modelToUse}`);
+      const requestBody = {
+          model: modelToUse,
+          prompt: prompt,
+          stream: false,
+          temperature: 0.2,
+          options: {
+              num_ctx: settings.contextWindow > 1024 ? 1024 : settings.contextWindow,
+               // stop: ["Error"] // Можна додати стоп-токени
+          },
+          system: "You are an assistant that summarizes lists of technical error messages accurately and concisely."
+      };
+
+      try {
+          const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
+          if (responseData && responseData.response) {
+              this.plugin.logger.debug(`[summarizeErrors] Summarization successful with ${modelToUse}.`);
+              return { summary: responseData.response.trim(), modelNotFound: false, error: null };
+          } else {
+              this.plugin.logger.warn(`[summarizeErrors] Received empty or invalid response from model ${modelToUse}.`);
+              // Вважаємо це не помилкою "модель не знайдена", а просто невдалою генерацією
+              return { summary: null, modelNotFound: false, error: new Error("Empty response") };
+          }
+      } catch (error: any) {
+          this.plugin.logger.error(`[summarizeErrors] Failed to summarize errors using model ${modelToUse}:`, error);
+          // Перевіряємо, чи помилка схожа на "model not found"
+          const isModelNotFound = error.message?.toLowerCase().includes("model not found") ||
+                                  error.message?.includes("404"); // Ollama може повертати 404
+          return { summary: null, modelNotFound: isModelNotFound, error: error };
+      }
+  };
+
+  // --- Спроба 1: Основна модель ---
+  let result = await trySummarization(primaryModel);
+
+  // --- Спроба 2: Запасна модель (якщо перша не вдалася через відсутність моделі або не була вказана) ---
+  // Переходимо до запасної, якщо:
+  // 1. Основна модель не була вказана (!primaryModel)
+  // 2. Або спроба з основною моделлю повернула помилку "modelNotFound" (result.modelNotFound)
+  if (result.summary === null && fallbackModel && (!primaryModel || result.modelNotFound)) {
+      this.plugin.logger.info("[summarizeErrors] Primary model failed or not set, trying fallback model.");
+      result = await trySummarization(fallbackModel); // Викликаємо з запасною моделлю
+  }
+
+  // Повертаємо результат або null, якщо обидві спроби невдалі
+  return result.summary;
+}
+
+
+  
 } // END OF OllamaView CLASS
