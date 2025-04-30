@@ -2989,6 +2989,7 @@ This action cannot be undone.`,
     ).open();
   }
   // OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
+  // OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
   async handleRegenerateClick(userMessage) {
     var _a;
     this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
@@ -3057,32 +3058,27 @@ This action cannot be undone.`,
           this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
           assistantPlaceholderGroupEl = this.chatContainer.createDiv({
             cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`
-            // Переконайтесь, що ці константи доступні
           });
           renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
           const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
           messageWrapper.style.order = "2";
           const assistantMessageElement = messageWrapper.createDiv({
             cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`
-            // Переконайтесь, що ці константи доступні
           });
           const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
           assistantContentEl = contentContainer.createDiv({
             cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`
-            // Переконайтесь, що ці константи доступні
           });
           const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
           for (let i = 0; i < 3; i++)
             dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
           this.guaranteedScrollToBottom(50, true);
-          this.plugin.logger.info(
-            `Starting regeneration stream request for chat ${chatId}...`
-          );
+          this.plugin.logger.info(`Starting regeneration stream request for chat ${chatId}...`);
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             updatedChat,
-            // Використовуємо ОНОВЛЕНУ історію
+            // Use the history *after* deletion
             this.currentAbortController.signal
-            // Передаємо сигнал для скасування
+            // Pass cancellation signal
           );
           let firstChunk = true;
           for await (const chunk of stream) {
@@ -3101,9 +3097,7 @@ This action cannot be undone.`,
                 this,
                 this.plugin,
                 assistantContentEl,
-                // Елемент для оновлення
                 accumulatedResponse
-                // Поточна накопичена відповідь
               );
               this.guaranteedScrollToBottom(50, false);
               this.checkMessageForCollapsing(assistantMessageElement);
@@ -3123,7 +3117,7 @@ This action cannot be undone.`,
               accumulatedResponse,
               responseStartTime,
               false
-              // Подію згенерує ChatManager
+              // Event is triggered by ChatManager internally
             );
             this.plugin.logger.debug("Saved final regenerated message to chat history.");
           } else {
@@ -3150,9 +3144,10 @@ This action cannot be undone.`,
               await this.plugin.chatManager.addMessageToActiveChat(
                 "assistant",
                 accumulatedResponse,
+                // The partial content
                 responseStartTime,
                 false
-                // Подію згенерує ChatManager
+                // Event triggered by manager
               );
             }
           } else {
@@ -3175,7 +3170,7 @@ This action cannot be undone.`,
           this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
         }
       }
-      // Кінець колбеку ConfirmModal
+      // End of ConfirmModal callback
     ).open();
   }
   handleCopyClick(content, buttonEl) {

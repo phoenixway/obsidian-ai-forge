@@ -2777,38 +2777,38 @@ async sendMessage(): Promise<void> {
 
   // OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
 
+// OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
+
 private async handleRegenerateClick(userMessage: Message): Promise<void> {
   this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
 
-  // Перевірка, чи не йде вже генерація
+  // --- Check for ongoing generation ---
   if (this.currentAbortController) {
       this.plugin.logger.warn(
           "Cannot regenerate while another generation is in progress. Cancelling current one first."
       );
-      this.cancelGeneration(); // Спробувати скасувати поточну
-      await new Promise(resolve => setTimeout(resolve, 150)); // Дати час на обробку скасування
+      this.cancelGeneration(); // Attempt to cancel
+      await new Promise(resolve => setTimeout(resolve, 150)); // Give time for cancellation
       if (this.currentAbortController) {
-          // Якщо скасування ще не завершилось
+          // If still processing after delay
           this.plugin.logger.warn("Previous generation cancellation still processing. Please try again shortly.");
           new Notice("Please wait for the current generation to stop completely.");
           return;
       }
   }
 
-  // Отримання активного чату
+  // --- Get active chat and message index ---
   const activeChat = await this.plugin.chatManager?.getActiveChat();
   if (!activeChat) {
       new Notice("Cannot regenerate: No active chat found.");
       return;
   }
   const chatId = activeChat.metadata.id;
-
-  // Знаходження індексу повідомлення користувача, після якого треба регенерувати
   const messageIndex = activeChat.messages.findIndex(
       msg => msg.timestamp.getTime() === userMessage.timestamp.getTime()
   );
 
-  // Перевірки індексу
+  // --- Validate message index ---
   if (messageIndex === -1) {
       this.plugin.logger.error(
           "Could not find the user message in the active chat history for regeneration.",
@@ -2818,148 +2818,144 @@ private async handleRegenerateClick(userMessage: Message): Promise<void> {
       return;
   }
   if (messageIndex === activeChat.messages.length - 1) {
-      // Якщо це останнє повідомлення, регенерувати нічого
       new Notice("This is the last message, nothing to regenerate after it.");
       return;
   }
 
-  // Модальне вікно підтвердження
+  // --- Confirm with user ---
   new ConfirmModal(
       this.app,
       "Confirm Regeneration",
       "This will delete all messages after this prompt and generate a new response. Continue?",
       async () => {
-          // --- Логіка після підтвердження ---
+          // --- Regeneration logic after confirmation ---
           this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
 
-          // Локальні змінні для цього процесу регенерації
-          this.currentAbortController = new AbortController(); // Контролер скасування для цього запиту
-          let assistantPlaceholderGroupEl: HTMLElement | null = null; // DOM-елемент плейсхолдера
-          let assistantContentEl: HTMLElement | null = null; // DOM-елемент для контенту в плейсхолдері
-          let accumulatedResponse = ""; // Накопичена відповідь
-          const responseStartTime = new Date(); // Час початку генерації
+          // Local variables for this regeneration process
+          this.currentAbortController = new AbortController(); // New controller for this request
+          let assistantPlaceholderGroupEl: HTMLElement | null = null; // Placeholder DOM element
+          let assistantContentEl: HTMLElement | null = null; // Placeholder content DOM element
+          let accumulatedResponse = ""; // Accumulated streaming response
+          const responseStartTime = new Date(); // Timestamp for the new assistant message
 
-          // Оновлення стану UI: початок завантаження
+          // Update UI to loading state
           this.setLoadingState(true);
           this.stopGeneratingButton?.show();
           this.sendButton?.hide();
 
           try {
-              // 1. Видалення повідомлень після вказаного індексу через ChatManager
+              // 1. Delete messages after the target user message via ChatManager
               this.plugin.logger.debug(`Deleting messages after index ${messageIndex} in chat ${chatId}...`);
               const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
               if (!deleteSuccess) {
-                  // Якщо ChatManager повернув false (або мав кинути помилку)
                   throw new Error("Failed to delete subsequent messages.");
               }
               this.plugin.logger.debug("Subsequent messages deleted successfully.");
 
-              // 2. Отримання ОНОВЛЕНОГО стану чату (після видалення)
+              // 2. Get the updated chat state (important!)
               const updatedChat = await this.plugin.chatManager.getActiveChat();
               if (!updatedChat || updatedChat.metadata.id !== chatId) {
-                  // Перевірка, чи активний чат правильний після видалення
                   throw new Error("Failed to get updated chat state after deleting messages or active chat changed unexpectedly.");
               }
 
-              // 3. Перезавантаження відображення чату на основі оновленої історії
+              // 3. Reload the entire chat display based on the updated history
+              // This ensures the UI accurately reflects the state before regeneration starts
               this.plugin.logger.debug("Reloading chat display after message deletion...");
-              await this.loadAndDisplayActiveChat(); // Цей метод очистить контейнер і відрендерить повідомлення з updatedChat
-              this.scrollToBottom(); // Прокрутити вниз після перезавантаження
+              await this.loadAndDisplayActiveChat();
+              this.scrollToBottom(); // Scroll down after reload
 
-              // 4. Створення DOM-елемента ПЛЕЙСХОЛДЕРА для потокової відповіді
+              // 4. Create the temporary streaming placeholder in the DOM
               this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
               assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-                  cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`, // Переконайтесь, що ці константи доступні
+                  cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`,
               });
-              // --- ВИПРАВЛЕНИЙ ВИКЛИК renderAvatar ---
+              // --- FIXED: Use RendererUtils.renderAvatar ---
               RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
-              // ------------------------------------
+              // ------------------------------------------
               const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
               messageWrapper.style.order = "2";
               const assistantMessageElement = messageWrapper.createDiv({
-                  cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`, // Переконайтесь, що ці константи доступні
+                  cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
               });
-              const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER }); // Переконайтесь, що ця константа доступна
+              const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
               assistantContentEl = contentContainer.createDiv({
-                  cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`, // Переконайтесь, що ці константи доступні
+                  cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`,
               });
-              // Додаємо індикатор завантаження ("думаючі" крапки)
+              // Add "thinking" dots indicator
               const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-               for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-              this.guaranteedScrollToBottom(50, true); // Прокрутка до плейсхолдера
+              for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+              this.guaranteedScrollToBottom(50, true); // Scroll to show placeholder
 
-              // 5. Запуск потокової генерації відповіді на основі скороченої історії
-              this.plugin.logger.info(
-                  `Starting regeneration stream request for chat ${chatId}...`
-              );
+              // 5. Start the streaming generation request using the updated history
+              this.plugin.logger.info(`Starting regeneration stream request for chat ${chatId}...`);
               const stream = this.plugin.ollamaService.generateChatResponseStream(
-                  updatedChat, // Використовуємо ОНОВЛЕНУ історію
-                  this.currentAbortController.signal // Передаємо сигнал для скасування
+                  updatedChat, // Use the history *after* deletion
+                  this.currentAbortController.signal // Pass cancellation signal
               );
 
-              // 6. Обробка потоку
+              // 6. Process the stream chunks
               let firstChunk = true;
               for await (const chunk of stream) {
                   if ("error" in chunk && chunk.error) {
                       if (!chunk.error.includes("aborted by user")) throw new Error(chunk.error);
                   }
                   if ("response" in chunk && chunk.response && assistantContentEl) {
-                      if (firstChunk) {
-                          assistantContentEl.empty(); // Прибираємо крапки при першому шматку тексту
+                       if (firstChunk) {
+                          assistantContentEl.empty(); // Remove thinking dots
                           firstChunk = false;
                       }
-                      accumulatedResponse += chunk.response; // Накопичуємо відповідь
-                      // --- ВИПРАВЛЕНИЙ ВИКЛИК renderAssistantContent ---
-                      // Оновлюємо вміст плейсхолдера за допомогою утиліти
+                      accumulatedResponse += chunk.response;
+                      // --- FIXED: Use RendererUtils.renderAssistantContent ---
+                      // Update placeholder content using the utility function
                       await RendererUtils.renderAssistantContent(
                           this.app,
                           this,
                           this.plugin,
-                          assistantContentEl, // Елемент для оновлення
-                          accumulatedResponse // Поточна накопичена відповідь
+                          assistantContentEl,
+                          accumulatedResponse
                       );
-                      // -----------------------------------------
-                      this.guaranteedScrollToBottom(50, false); // Підтримуємо скрол
-                      this.checkMessageForCollapsing(assistantMessageElement); // Перевіряємо згортання
+                      // --------------------------------------------------
+                      this.guaranteedScrollToBottom(50, false);
+                      this.checkMessageForCollapsing(assistantMessageElement);
                   }
                   if ("done" in chunk && chunk.done) {
-                      break; // Потік завершено
+                      break; // Stream finished
                   }
               }
 
-              // 7. Потік завершився успішно
+              // 7. Stream completed successfully
               this.plugin.logger.debug(
                   `Regeneration stream completed successfully. Final response length: ${accumulatedResponse.length}`
               );
-              // Видаляємо плейсхолдер ПЕРЕД додаванням фінального повідомлення через ChatManager
+              // Remove placeholder *before* adding final message via ChatManager event
               assistantPlaceholderGroupEl?.remove();
               assistantPlaceholderGroupEl = null;
 
               if (accumulatedResponse.trim()) {
-                   // Додаємо фінальну відповідь в історію; подія 'message-added' відрендерить її
+                  // Add the final message to history. The 'message-added' event will handle rendering.
                   await this.plugin.chatManager.addMessageToActiveChat(
                       "assistant",
                       accumulatedResponse,
                       responseStartTime,
-                      false // Подію згенерує ChatManager
+                      false // Event is triggered by ChatManager internally
                   );
                   this.plugin.logger.debug("Saved final regenerated message to chat history.");
               } else {
-                  // Якщо відповідь порожня після успішного стріму
+                  // Handle empty response case
                   this.plugin.logger.warn("[OllamaView] Regeneration stream finished but response empty.");
-                  // --- ВИПРАВЛЕНИЙ ВИКЛИК для системного повідомлення ---
+                   // --- FIXED: Use ChatManager to add system message ---
                   await this.plugin.chatManager.addMessageToActiveChat(
                       "system",
                       "Assistant provided an empty response during regeneration.",
                       new Date()
                   );
-                  // ------------------------------------------------
+                  // ---------------------------------------------------
               }
 
           } catch (error: any) {
-              // 8. Обробка помилок під час регенерації
+              // 8. Handle errors during the regeneration process
               this.plugin.logger.error("Error during regeneration process:", error);
-              // Завжди видаляємо плейсхолдер при помилці
+              // Ensure placeholder is removed if an error occurred
               assistantPlaceholderGroupEl?.remove();
               assistantPlaceholderGroupEl = null;
 
@@ -2968,52 +2964,53 @@ private async handleRegenerateClick(userMessage: Message): Promise<void> {
                   error.message?.includes("aborted") ||
                   error.message?.includes("aborted by user")
               ) {
-                  // Обробка скасування користувачем
+                  // Handle user cancellation
                   this.plugin.logger.info("[OllamaView] Regeneration was cancelled by user.");
-                   // --- ВИПРАВЛЕНИЙ ВИКЛИК для системного повідомлення ---
+                   // --- FIXED: Use ChatManager to add system message ---
                   await this.plugin.chatManager.addMessageToActiveChat(
                       "system",
                       "Regeneration stopped.",
                       new Date()
                   );
-                   // ------------------------------------------------
+                   // ---------------------------------------------------
                   if (accumulatedResponse.trim()) {
+                      // Save partial response if available
                       this.plugin.logger.info("Saving partial response after regeneration cancellation...");
-                       // --- ВИПРАВЛЕНИЙ ВИКЛИК для часткової відповіді ---
+                      // --- FIXED: Use ChatManager to add partial assistant message ---
                       await this.plugin.chatManager.addMessageToActiveChat(
                           "assistant",
-                          accumulatedResponse,
+                          accumulatedResponse, // The partial content
                           responseStartTime,
-                          false // Подію згенерує ChatManager
+                          false // Event triggered by manager
                       );
-                       // -------------------------------------------------
+                      // ----------------------------------------------------------
                   }
               } else {
-                  // Інші помилки
+                  // Handle other errors
                   new Notice(`Regeneration failed: ${error.message || "Unknown error"}`);
-                   // --- ВИПРАВЛЕНИЙ ВИКЛИК для повідомлення про помилку ---
-                   await this.plugin.chatManager.addMessageToActiveChat(
+                  // --- FIXED: Use ChatManager to add error message ---
+                  await this.plugin.chatManager.addMessageToActiveChat(
                       "error",
                       `Regeneration failed: ${error.message || "Unknown error"}`,
-                       new Date()
-                   );
-                   // ---------------------------------------------------
+                      new Date()
+                  );
+                  // -------------------------------------------------
               }
           } finally {
-              // 9. Блок finally - завжди виконується для очищення стану
+              // 9. Always execute cleanup
               this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block executing.");
-              // Додаткова перевірка та видалення плейсхолдера про всяк випадок
+              // Safety check to ensure placeholder is removed
               assistantPlaceholderGroupEl?.remove();
-              // Скидання стану завантаження, кнопок, контролера скасування
+              // Reset loading state and buttons
               this.setLoadingState(false);
               this.stopGeneratingButton?.hide();
               this.sendButton?.show();
-              this.currentAbortController = null; // Очищаємо контролер
+              this.currentAbortController = null; // Clear the abort controller
               this.updateSendButtonState();
               this.focusInput();
               this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
           }
-      } // Кінець колбеку ConfirmModal
+      } // End of ConfirmModal callback
   ).open();
 }
 
