@@ -1,26 +1,30 @@
 {
 	"compilerOptions": {
-		"baseUrl": ".",
-		"inlineSourceMap": true,
-		"inlineSources": true,
-		"module": "ESNext",
-		"target": "ES6",
-		"allowJs": true,
-		"noImplicitAny": true,
-		"moduleResolution": "node",
-		"importHelpers": true,
-		"isolatedModules": true,
-		"allowSyntheticDefaultImports": true,
-		"strictNullChecks": true,
-		"lib": ["DOM", "ES6", "DOM.Iterable", "ScriptHost", "ES2023"],
-		"rootDir": "src"
+	  "baseUrl": ".",
+	  "inlineSourceMap": true,
+	  "inlineSources": true,
+	  "module": "ESNext",
+	  "target": "ES6",
+	  "allowJs": true,
+	  "noImplicitAny": true,
+	  "moduleResolution": "node",
+	  "importHelpers": true,
+	  "isolatedModules": true,
+	  "allowSyntheticDefaultImports": true,
+	  "strictNullChecks": true,
+	  "lib": ["DOM", "ES6", "DOM.Iterable", "ScriptHost", "ES2023"],
+	  "paths": {
+		"@/*": ["src/*"]
+	  }
 	},
-	"include": ["src/**/*.ts"],
+	"include": [
+		"src/**/*.ts",
+		"tests/**/*.ts"
+	],
 	"exclude": [
-		"node_modules",
-		"main.js", // <--- Явно виключаємо вихідний файл esbuild
-		"manifest.json", // <--- Також гарна ідея виключити маніфест
-		"styles.css" // <--- І стилі (якщо є)
-		// Додайте сюди інші папки/файли, які не є вихідним кодом TS, якщо потрібно
+	  "node_modules",
+	  "main.js",
+	  "manifest.json",
+	  "styles.css"
 	]
-}
+  }

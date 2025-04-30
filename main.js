@@ -190,10 +190,23 @@ var SummaryModal = class extends import_obsidian3.Modal {
   }
 };
 
-// src/SystemMessageRender.ts
+// src/SystemMessageRenderer.ts
 var import_obsidian4 = require("obsidian");
+
+// src/constants.ts
+var CSS_CLASSES = {
+  MESSAGE_GROUP: "message-group",
+  SYSTEM_GROUP: "system-message-group",
+  MESSAGE: "message",
+  SYSTEM_MESSAGE: "system-message",
+  CONTENT_CONTAINER: "message-content-container",
+  SYSTEM_ICON: "system-icon",
+  SYSTEM_TEXT: "system-message-text",
+  TIMESTAMP: "message-timestamp"
+};
+
+// src/SystemMessageRenderer.ts
 var SystemMessageRenderer = class {
-  // Зберігатимемо створений елемент
   constructor(app, message, formatter) {
     this.element = null;
     if (message.role !== "system") {
@@ -203,39 +216,38 @@ var SystemMessageRenderer = class {
     this.message = message;
     this.formatter = formatter;
   }
-  /**
-   * Створює DOM-структуру для системного повідомлення.
-   * НЕ додає елемент до DOM чату, просто створює та повертає його.
-   * @returns Корневий HTMLElement групи повідомлень.
-   */
+  getIconType() {
+    switch (this.message.type) {
+      case "warning":
+        return "alert-triangle";
+      case "error":
+        return "alert-circle";
+      default:
+        return "info";
+    }
+  }
   render() {
     const message = this.message;
     const messageGroup = document.createElement("div");
-    messageGroup.classList.add(CSS_CLASS_MESSAGE_GROUP, CSS_CLASS_SYSTEM_GROUP);
+    messageGroup.classList.add(CSS_CLASSES.MESSAGE_GROUP, CSS_CLASSES.SYSTEM_GROUP);
     messageGroup.setAttribute("data-timestamp", message.timestamp.getTime().toString());
     const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
     messageWrapper.style.order = "2";
-    const messageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_SYSTEM_MESSAGE}` });
-    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
-    const iconSpan = contentContainer.createSpan({ cls: CSS_CLASS_SYSTEM_ICON });
-    (0, import_obsidian4.setIcon)(iconSpan, "info");
+    const messageEl = messageWrapper.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.SYSTEM_MESSAGE}` });
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
+    const iconSpan = contentContainer.createSpan({ cls: CSS_CLASSES.SYSTEM_ICON });
+    (0, import_obsidian4.setIcon)(iconSpan, this.getIconType());
     contentContainer.createSpan({
-      cls: CSS_CLASS_SYSTEM_TEXT,
+      cls: CSS_CLASSES.SYSTEM_TEXT,
       text: message.content
     });
     messageEl.createDiv({
-      cls: CSS_CLASS_TIMESTAMP,
+      cls: CSS_CLASSES.TIMESTAMP,
       text: this.formatter.formatTime(message.timestamp)
-      // Використовуємо переданий форматер
     });
     this.element = messageGroup;
     return this.element;
   }
-  // Тут можна додати методи-колбеки для специфічних дій системних повідомлень,
-  // якщо вони знадобляться в майбутньому. Наприклад:
-  // public handleSomeAction(): void {
-  //    console.log("System message action for:", this.message.content);
-  // }
 };
 
 // src/OllamaView.ts
@@ -258,28 +270,21 @@ var CSS_CLASS_SUBMENU_CONTENT = "submenu-content";
 var CSS_CLASS_SUBMENU_CONTENT_HIDDEN = "submenu-content-hidden";
 var CSS_CLASS_SETTINGS_OPTION = "settings-option";
 var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
-var CSS_CLASS_MESSAGE_GROUP = "message-group";
 var CSS_CLASS_USER_GROUP = "user-message-group";
 var CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
-var CSS_CLASS_SYSTEM_GROUP = "system-message-group";
 var CSS_CLASS_ERROR_GROUP = "error-message-group";
 var CSS_CLASS_MESSAGE = "message";
 var CSS_CLASS_USER_MESSAGE = "user-message";
 var CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
-var CSS_CLASS_SYSTEM_MESSAGE = "system-message";
 var CSS_CLASS_ERROR_MESSAGE = "error-message";
-var CSS_CLASS_SYSTEM_ICON = "system-icon";
 var CSS_CLASS_ERROR_ICON = "error-icon";
-var CSS_CLASS_SYSTEM_TEXT = "system-message-text";
 var CSS_CLASS_ERROR_TEXT = "error-message-text";
-var CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
 var CSS_CLASS_CONTENT = "message-content";
 var CSS_CLASS_THINKING_BLOCK = "thinking-block";
 var CSS_CLASS_THINKING_HEADER = "thinking-header";
 var CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
 var CSS_CLASS_THINKING_TITLE = "thinking-title";
 var CSS_CLASS_THINKING_CONTENT = "thinking-content";
-var CSS_CLASS_TIMESTAMP = "message-timestamp";
 var CSS_CLASS_COPY_BUTTON = "copy-button";
 var CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
 var CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
@@ -552,7 +557,7 @@ var OllamaView = class extends import_obsidian5.ItemView {
         return;
       }
       const timestampMs = data.timestamp.getTime();
-      const selector = `.${CSS_CLASS_MESSAGE_GROUP}[data-timestamp="${timestampMs}"]`;
+      const selector = `.${CSS_CLASSES.MESSAGE_GROUP}[data-timestamp="${timestampMs}"]`;
       try {
         const messageGroupEl = this.chatContainer.querySelector(selector);
         if (messageGroupEl instanceof HTMLElement) {
@@ -2383,7 +2388,7 @@ This action cannot be undone.`,
         this.plugin.logger.debug(`[addMessageToDisplay] Rendering ${role} message using renderMessageInternal.`);
         const messageEl = this.renderMessageInternal(newMessage, [...this.currentMessages]);
         if (messageEl) {
-          messageGroupEl = (_a = messageEl.closest(`.${CSS_CLASS_MESSAGE_GROUP}`)) != null ? _a : null;
+          messageGroupEl = (_a = messageEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) != null ? _a : null;
         }
       }
     }
@@ -2449,7 +2454,7 @@ This action cannot be undone.`,
         throw new Error("Failed to add user message to history.");
       }
       assistantMessageGroupEl = this.chatContainer.createDiv({
-        cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
+        cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
       });
       this.renderAvatar(assistantMessageGroupEl, false);
       const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
@@ -2458,7 +2463,7 @@ This action cannot be undone.`,
         cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`
       });
       assistantMessageElInternal = assistantMessageElement;
-      const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+      const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
       assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
       this.currentAssistantMessage = {
         groupEl: assistantMessageGroupEl,
@@ -2594,9 +2599,9 @@ This action cannot be undone.`,
         } else {
           this.plugin.logger.warn("[OllamaView] finally: Could not find message-wrapper to add action buttons.");
         }
-        const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+        const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
         existingTimestamp == null ? void 0 : existingTimestamp.remove();
-        assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
+        assistantMessageElInternal.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(finalTimestamp) });
         this.checkMessageForCollapsing(assistantMessageElInternal);
       } else {
         this.plugin.logger.debug(
@@ -2646,7 +2651,7 @@ This action cannot be undone.`,
       this.lastRenderedMessageDate = message.timestamp;
     }
     let messageGroup = null;
-    let groupClass = CSS_CLASS_MESSAGE_GROUP;
+    let groupClass = CSS_CLASSES.MESSAGE_GROUP;
     let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`;
     let showAvatar = true;
     let isUser = false;
@@ -2689,7 +2694,7 @@ This action cannot be undone.`,
       }
     }
     const messageEl = messageWrapper.createDiv({ cls: messageClass });
-    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
     contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
     if (message.role === "assistant") {
@@ -2753,7 +2758,7 @@ This action cannot be undone.`,
       e.stopPropagation();
       this.handleDeleteMessageClick(message);
     });
-    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+    messageEl.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(message.timestamp) });
     this.currentMessages.push(message);
     this.plugin.logger.debug(
       `[renderMessageInternal] Added ${message.role} message to currentMessages cache. Total: ${this.currentMessages.length}`
@@ -2874,7 +2879,7 @@ This action cannot be undone.`,
           this.scrollToBottom();
           this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
           assistantMessageGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
+            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`
           });
           this.renderAvatar(assistantMessageGroupEl, false);
           const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
@@ -2883,7 +2888,7 @@ This action cannot be undone.`,
             cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`
           });
           assistantMessageElInternal = assistantMessageElement;
-          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
           assistantContentEl = contentContainer.createDiv({
             cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}`
           });
@@ -3027,9 +3032,9 @@ This action cannot be undone.`,
                 this.handleDeleteMessageClick({ role: "assistant", content: finalContent, timestamp: finalTimestamp });
               });
             }
-            const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+            const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
             existingTimestamp == null ? void 0 : existingTimestamp.remove();
-            assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
+            assistantMessageElInternal.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(finalTimestamp) });
             this.checkMessageForCollapsing(assistantMessageElInternal);
           } else {
             this.plugin.logger.debug(
@@ -4588,7 +4593,7 @@ Summary:`;
         );
         const messageWrapper = groupEl.querySelector(".message-wrapper") || groupEl;
         const messageBubble = messageWrapper.querySelector(`.${CSS_CLASS_ERROR_MESSAGE}`) || messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_ERROR_MESSAGE}` });
-        const contentWrapper = messageBubble.querySelector(`.${CSS_CLASS_CONTENT_CONTAINER}`) || messageBubble.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+        const contentWrapper = messageBubble.querySelector(`.${CSS_CLASSES.CONTENT_CONTAINER}`) || messageBubble.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
         contentContainer = contentWrapper.createDiv({ cls: CSS_CLASS_ERROR_TEXT });
       }
       contentContainer.empty();
@@ -4598,7 +4603,7 @@ Summary:`;
       this.hideEmptyState();
       this.isSummarizingErrors = false;
       groupEl = this.chatContainer.createDiv({
-        cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_ERROR_GROUP}`,
+        cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_ERROR_GROUP}`,
         attr: { "data-timestamp": lastErrorTimestamp.getTime().toString() }
       });
       this.errorGroupElement = groupEl;
@@ -4606,10 +4611,10 @@ Summary:`;
       const messageWrapper = groupEl.createDiv({ cls: "message-wrapper" });
       messageWrapper.style.order = "2";
       const messageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_ERROR_MESSAGE}` });
-      const contentWrapper = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+      const contentWrapper = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
       (0, import_obsidian5.setIcon)(contentWrapper.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
       contentContainer = contentWrapper.createDiv({ cls: CSS_CLASS_ERROR_TEXT });
-      messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(lastErrorTimestamp) });
+      messageEl.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(lastErrorTimestamp) });
     }
     if (errorCount === 1) {
       contentContainer.setText(errorsToDisplay[0].content);
@@ -4624,7 +4629,7 @@ Summary:`;
   /** Оновлює атрибут та текст мітки часу для групи помилок */
   updateErrorGroupTimestamp(groupEl, timestamp) {
     groupEl.setAttribute("data-timestamp", timestamp.getTime().toString());
-    const timestampEl = groupEl.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+    const timestampEl = groupEl.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
     if (timestampEl) {
       timestampEl.setText(this.formatTime(timestamp));
     }
@@ -4691,22 +4696,17 @@ ${summary}`);
     });
   }
   /**
-  * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama,
-  * з можливістю використання запасної моделі.
-  * @param errors Масив повідомлень про помилки.
-  * @returns Рядок з сумаризацією або null у разі помилки.
-  */
+   * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama.
+   * @param errors Масив повідомлень про помилки.
+   * @returns Рядок з сумаризацією або null у разі помилки.
+   */
   async summarizeErrors(errors) {
-    var _a, _b, _c;
-    const settings = this.plugin.settings;
-    const primaryModel = (_a = settings.summarizationModelName) == null ? void 0 : _a.trim();
-    const fallbackModel = (_b = settings.fallbackSummarizationModelName) == null ? void 0 : _b.trim();
-    if (!primaryModel && !fallbackModel) {
-      this.plugin.logger.warn("[summarizeErrors] No primary or fallback summarization model configured.");
+    var _a;
+    const modelName = this.plugin.settings.summarizationModelName;
+    if (!modelName)
       return null;
-    }
     if (errors.length < 2)
-      return ((_c = errors[0]) == null ? void 0 : _c.content) || null;
+      return ((_a = errors[0]) == null ? void 0 : _a.content) || null;
     const uniqueErrorContents = Array.from(new Set(errors.map((e) => e.content.trim())));
     const errorsText = uniqueErrorContents.map((msg, index) => `Error ${index + 1}: ${msg}`).join("\n");
     const prompt = `Concisely summarize the following ${uniqueErrorContents.length} unique error messages reported by the system. Focus on the core issue(s):
@@ -4714,44 +4714,36 @@ ${summary}`);
 ${errorsText}
 
 Summary:`;
-    const trySummarization = async (modelToUse) => {
-      var _a2, _b2;
-      if (!modelToUse) {
-        return { summary: null, modelNotFound: false, error: null };
-      }
-      this.plugin.logger.info(`[summarizeErrors] Attempting summarization using model: ${modelToUse}`);
-      const requestBody = {
-        model: modelToUse,
-        prompt,
-        stream: false,
-        temperature: 0.2,
-        options: {
-          num_ctx: settings.contextWindow > 1024 ? 1024 : settings.contextWindow
-          // stop: ["Error"] // Можна додати стоп-токени
-        },
-        system: "You are an assistant that summarizes lists of technical error messages accurately and concisely."
-      };
-      try {
-        const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
-        if (responseData && responseData.response) {
-          this.plugin.logger.debug(`[summarizeErrors] Summarization successful with ${modelToUse}.`);
-          return { summary: responseData.response.trim(), modelNotFound: false, error: null };
-        } else {
-          this.plugin.logger.warn(`[summarizeErrors] Received empty or invalid response from model ${modelToUse}.`);
-          return { summary: null, modelNotFound: false, error: new Error("Empty response") };
-        }
-      } catch (error) {
-        this.plugin.logger.error(`[summarizeErrors] Failed to summarize errors using model ${modelToUse}:`, error);
-        const isModelNotFound = ((_a2 = error.message) == null ? void 0 : _a2.toLowerCase().includes("model not found")) || ((_b2 = error.message) == null ? void 0 : _b2.includes("404"));
-        return { summary: null, modelNotFound: isModelNotFound, error };
-      }
+    const requestBody = {
+      model: modelName,
+      prompt,
+      stream: false,
+      temperature: 0.2,
+      // Низька температура для фактологічної сумаризації
+      options: {
+        num_ctx: this.plugin.settings.contextWindow > 1024 ? 1024 : this.plugin.settings.contextWindow
+        // Обмежуємо контекст для сумаризації
+        // Можна додати stop tokens, якщо модель схильна продовжувати занадто довго
+        // stop: ["Error"]
+      },
+      system: "You are an assistant that summarizes lists of technical error messages accurately and concisely."
     };
-    let result = await trySummarization(primaryModel);
-    if (result.summary === null && fallbackModel && (!primaryModel || result.modelNotFound)) {
-      this.plugin.logger.info("[summarizeErrors] Primary model failed or not set, trying fallback model.");
-      result = await trySummarization(fallbackModel);
+    try {
+      this.plugin.logger.debug(
+        `[summarizeErrors] Sending request to model ${modelName}. Prompt length: ${prompt.length}`
+      );
+      const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
+      if (responseData && responseData.response) {
+        this.plugin.logger.debug(`[summarizeErrors] Summarization successful.`);
+        return responseData.response.trim();
+      } else {
+        this.plugin.logger.warn("[summarizeErrors] Received empty or invalid response from Ollama.");
+        return null;
+      }
+    } catch (error) {
+      this.plugin.logger.error("[summarizeErrors] Failed to summarize errors:", error);
+      return null;
     }
-    return result.summary;
   }
 };
 

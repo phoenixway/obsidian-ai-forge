@@ -45,7 +45,9 @@ export interface Message {
     role: MessageRole;
     content: string;
     timestamp: Date;
+    type?: 'warning' | 'error' | 'info'; // Add the optional 'type' property
 }
+
 export type MessageRole = "user" | "assistant" | "system" | "error";
 
 export interface ChatMetadata {

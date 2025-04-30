@@ -21,7 +21,8 @@ import { RoleInfo } from "./ChatManager"; // Тип RoleInfo
 import { Chat, ChatMetadata } from "./Chat"; // Клас Chat та типи
 import { SummaryModal } from "./SummaryModal";
 import { OllamaGenerateResponse } from "./types";
-import { SystemMessageRenderer } from "./SystemMessageRender";
+import { SystemMessageRenderer } from "./SystemMessageRenderer";
+import { CSS_CLASSES } from "./constants";
 
 // --- View Type ID ---
 // Використовуйте унікальний ID, наприклад, на основі назви плагіна
@@ -47,21 +48,21 @@ const CSS_CLASS_SUBMENU_CONTENT = "submenu-content"; // Контейнер дл�
 const CSS_CLASS_SUBMENU_CONTENT_HIDDEN = "submenu-content-hidden"; // Клас для прихованого контейнера
 const CSS_CLASS_SETTINGS_OPTION = "settings-option";
 const CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
-export const CSS_CLASS_MESSAGE_GROUP = "message-group";
+// export const CSS_CLASS_MESSAGE_GROUP = "message-group";
 const CSS_CLASS_USER_GROUP = "user-message-group";
 const CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
-export const CSS_CLASS_SYSTEM_GROUP = "system-message-group";
+// export const CSS_CLASS_SYSTEM_GROUP = "system-message-group";
 const CSS_CLASS_ERROR_GROUP = "error-message-group";
 export const CSS_CLASS_MESSAGE = "message";
 const CSS_CLASS_USER_MESSAGE = "user-message";
 const CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
-export const CSS_CLASS_SYSTEM_MESSAGE = "system-message";
+// export const CSS_CLASS_SYSTEM_MESSAGE = "system-message";
 const CSS_CLASS_ERROR_MESSAGE = "error-message";
-export const CSS_CLASS_SYSTEM_ICON = "system-icon";
+// export const CSS_CLASS_SYSTEM_ICON = "system-icon";
 const CSS_CLASS_ERROR_ICON = "error-icon";
-export const CSS_CLASS_SYSTEM_TEXT = "system-message-text";
+// export const CSS_CLASS_SYSTEM_TEXT = "system-message-text";
 const CSS_CLASS_ERROR_TEXT = "error-message-text";
-export const CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
+// export const CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
 const CSS_CLASS_CONTENT = "message-content";
 const CSS_CLASS_THINKING_DOTS = "thinking-dots";
 const CSS_CLASS_THINKING_DOT = "thinking-dot";
@@ -70,7 +71,7 @@ const CSS_CLASS_THINKING_HEADER = "thinking-header";
 const CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
 const CSS_CLASS_THINKING_TITLE = "thinking-title";
 const CSS_CLASS_THINKING_CONTENT = "thinking-content";
-export const CSS_CLASS_TIMESTAMP = "message-timestamp";
+// export const CSS_CLASS_TIMESTAMP = "message-timestamp";
 const CSS_CLASS_COPY_BUTTON = "copy-button";
 const CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
 const CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
@@ -897,7 +898,7 @@ export class OllamaView extends ItemView {
     }
 
     const timestampMs = data.timestamp.getTime();
-    const selector = `.${CSS_CLASS_MESSAGE_GROUP}[data-timestamp="${timestampMs}"]`;
+    const selector = `.${CSS_CLASSES.MESSAGE_GROUP}[data-timestamp="${timestampMs}"]`;
 
     try {
       const messageGroupEl = this.chatContainer.querySelector(selector);
@@ -2405,7 +2406,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
           // renderMessageInternal сам додасть елемент до DOM, оновить історію і поверне створений елемент повідомлення (не групи)
           const messageEl = this.renderMessageInternal(newMessage, [...this.currentMessages]); // Передаємо копію поточного контексту
           if (messageEl) {
-              messageGroupEl = messageEl.closest(`.${CSS_CLASS_MESSAGE_GROUP}`) as HTMLElement ?? null;
+              messageGroupEl = messageEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`) as HTMLElement ?? null;
                // checkMessageForCollapsing викликається всередині renderMessageInternal (або після renderAssistantContent)
           }
           // this.currentMessages оновлюється всередині renderMessageInternal для user/assistant
@@ -2498,7 +2499,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
 
       // 2. Створюємо ПЛЕЙСХОЛДЕР для повідомлення асистента
       assistantMessageGroupEl = this.chatContainer.createDiv({
-        cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`,
+        cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`,
       });
       this.renderAvatar(assistantMessageGroupEl, false);
       const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
@@ -2507,7 +2508,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
         cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`,
       });
       assistantMessageElInternal = assistantMessageElement;
-      const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+      const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
       assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}` });
       this.currentAssistantMessage = {
         groupEl: assistantMessageGroupEl,
@@ -2678,9 +2679,9 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
         }
 
         // Timestamp
-        const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+        const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
         existingTimestamp?.remove();
-        assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
+        assistantMessageElInternal.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(finalTimestamp) });
         // Check collapsing
         this.checkMessageForCollapsing(assistantMessageElInternal);
       } else {
@@ -2744,7 +2745,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
 
     // ... (логіка групування, створення groupClass, messageClass, showAvatar, isUser) ...
     let messageGroup: HTMLElement | null = null;
-    let groupClass = CSS_CLASS_MESSAGE_GROUP;
+    let groupClass = CSS_CLASSES.MESSAGE_GROUP;
     let messageClass = `${CSS_CLASS_MESSAGE} ${CSS_CLASS_MESSAGE_ARRIVING}`; // Анімацію додаємо тут до повідомлення, а не групи?
     let showAvatar = true;
     let isUser = false;
@@ -2796,7 +2797,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
       }
     }
     const messageEl = messageWrapper.createDiv({ cls: messageClass });
-    const contentContainer = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+    const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASS_CONTENT });
 
     // ... (рендерінг контенту user/assistant за допомогою renderAssistantContent/createTextNode) ...
@@ -2868,7 +2869,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
     });
 
     // ... (додавання мітки часу) ...
-    messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(message.timestamp) });
+    messageEl.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(message.timestamp) });
 
     // --- ОНОВЛЕННЯ ІСТОРІЇ ПОВІДОМЛЕНЬ ---
     // Якщо renderMessageInternal відповідає за додавання до історії, робимо це тут
@@ -3029,7 +3030,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
           // 4. Створюємо ПЛЕЙСХОЛДЕР
           this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
           assistantMessageGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`,
+            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`,
           });
           this.renderAvatar(assistantMessageGroupEl, false);
           const messageWrapper = assistantMessageGroupEl.createDiv({ cls: "message-wrapper" });
@@ -3038,7 +3039,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
             cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`,
           });
           assistantMessageElInternal = assistantMessageElement; // Зберігаємо для finally
-          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
           assistantContentEl = contentContainer.createDiv({
             cls: `${CSS_CLASS_CONTENT} ${CSS_CLASS_CONTENT_COLLAPSIBLE}`,
           });
@@ -3217,9 +3218,9 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
             }
 
             // Timestamp
-            const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+            const existingTimestamp = assistantMessageElInternal.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
             existingTimestamp?.remove();
-            assistantMessageElInternal.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(finalTimestamp) });
+            assistantMessageElInternal.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(finalTimestamp) });
             // Check collapsing
             this.checkMessageForCollapsing(assistantMessageElInternal);
           } else {
@@ -5360,8 +5361,8 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
           messageWrapper.querySelector(`.${CSS_CLASS_ERROR_MESSAGE}`) ||
           messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_ERROR_MESSAGE}` });
         const contentWrapper =
-          messageBubble.querySelector(`.${CSS_CLASS_CONTENT_CONTAINER}`) ||
-          messageBubble.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER });
+          messageBubble.querySelector(`.${CSS_CLASSES.CONTENT_CONTAINER}`) ||
+          messageBubble.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
         contentContainer = contentWrapper.createDiv({ cls: CSS_CLASS_ERROR_TEXT });
       }
       contentContainer.empty(); // Очищаємо попередній вміст
@@ -5375,7 +5376,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
       this.isSummarizingErrors = false;
 
       groupEl = this.chatContainer.createDiv({
-        cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_ERROR_GROUP}`,
+        cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASS_ERROR_GROUP}`,
         attr: { "data-timestamp": lastErrorTimestamp.getTime().toString() },
       });
       this.errorGroupElement = groupEl; // Зберігаємо посилання на нову групу
@@ -5385,12 +5386,12 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
       const messageWrapper = groupEl.createDiv({ cls: "message-wrapper" }); // Обгортка
       messageWrapper.style.order = "2"; // Для правильного розташування
       const messageEl = messageWrapper.createDiv({ cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_ERROR_MESSAGE}` });
-      const contentWrapper = messageEl.createDiv({ cls: CSS_CLASS_CONTENT_CONTAINER }); // Контейнер для іконки + тексту
+      const contentWrapper = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER }); // Контейнер для іконки + тексту
       setIcon(contentWrapper.createSpan({ cls: CSS_CLASS_ERROR_ICON }), "alert-triangle");
       contentContainer = contentWrapper.createDiv({ cls: CSS_CLASS_ERROR_TEXT }); // Контейнер для тексту помилки/сумарі
 
       // Додаємо позначку часу до бульбашки
-      messageEl.createDiv({ cls: CSS_CLASS_TIMESTAMP, text: this.formatTime(lastErrorTimestamp) });
+      messageEl.createDiv({ cls: CSS_CLASSES.TIMESTAMP, text: this.formatTime(lastErrorTimestamp) });
     }
 
     // --- Відображення контенту ---
@@ -5412,7 +5413,7 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
   /** Оновлює атрибут та текст мітки часу для групи помилок */
   private updateErrorGroupTimestamp(groupEl: HTMLElement, timestamp: Date): void {
     groupEl.setAttribute("data-timestamp", timestamp.getTime().toString());
-    const timestampEl = groupEl.querySelector(`.${CSS_CLASS_TIMESTAMP}`);
+    const timestampEl = groupEl.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
     if (timestampEl) {
       timestampEl.setText(this.formatTime(timestamp));
     }
@@ -5488,81 +5489,49 @@ addMessageToDisplay(role: MessageRole, content: string, timestamp: Date): void {
   }
 
   /**
- * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama,
- * з можливістю використання запасної моделі.
- * @param errors Масив повідомлень про помилки.
- * @returns Рядок з сумаризацією або null у разі помилки.
- */
-private async summarizeErrors(errors: Message[]): Promise<string | null> {
-  const settings = this.plugin.settings;
-  const primaryModel = settings.summarizationModelName?.trim();
-  const fallbackModel = settings.fallbackSummarizationModelName?.trim();
+   * Виконує сумаризацію списку повідомлень про помилки за допомогою Ollama.
+   * @param errors Масив повідомлень про помилки.
+   * @returns Рядок з сумаризацією або null у разі помилки.
+   */
+  private async summarizeErrors(errors: Message[]): Promise<string | null> {
+    const modelName = this.plugin.settings.summarizationModelName;
+    if (!modelName) return null; // Модель не налаштована
 
-  if (!primaryModel && !fallbackModel) {
-      this.plugin.logger.warn("[summarizeErrors] No primary or fallback summarization model configured.");
-      return null; // Немає жодної моделі для спроби
-  }
+    if (errors.length < 2) return errors[0]?.content || null; // Немає сенсу сумаризувати менше 2
 
-  if (errors.length < 2) return errors[0]?.content || null; // Немає сенсу сумаризувати менше 2
+    // Форматуємо помилки для промпту
+    const uniqueErrorContents = Array.from(new Set(errors.map(e => e.content.trim())));
+    const errorsText = uniqueErrorContents.map((msg, index) => `Error ${index + 1}: ${msg}`).join("\n");
+    const prompt = `Concisely summarize the following ${uniqueErrorContents.length} unique error messages reported by the system. Focus on the core issue(s):\n\n${errorsText}\n\nSummary:`;
 
-  // Форматуємо помилки для промпту (однаково для обох спроб)
-  const uniqueErrorContents = Array.from(new Set(errors.map(e => e.content.trim())));
-  const errorsText = uniqueErrorContents.map((msg, index) => `Error ${index + 1}: ${msg}`).join("\n");
-  const prompt = `Concisely summarize the following ${uniqueErrorContents.length} unique error messages reported by the system. Focus on the core issue(s):\n\n${errorsText}\n\nSummary:`;
+    const requestBody = {
+      model: modelName,
+      prompt: prompt,
+      stream: false,
+      temperature: 0.2, // Низька температура для фактологічної сумаризації
+      options: {
+        num_ctx: this.plugin.settings.contextWindow > 1024 ? 1024 : this.plugin.settings.contextWindow, // Обмежуємо контекст для сумаризації
+        // Можна додати stop tokens, якщо модель схильна продовжувати занадто довго
+        // stop: ["Error"]
+      },
+      system: "You are an assistant that summarizes lists of technical error messages accurately and concisely.",
+    };
 
-  // --- Внутрішня функція для спроби сумаризації ---
-  const trySummarization = async (modelToUse: string): Promise<{ summary: string | null; modelNotFound: boolean; error: any | null }> => {
-      if (!modelToUse) {
-          return { summary: null, modelNotFound: false, error: null }; // Модель не вказана
+    try {
+      this.plugin.logger.debug(
+        `[summarizeErrors] Sending request to model ${modelName}. Prompt length: ${prompt.length}`
+      );
+      const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
+      if (responseData && responseData.response) {
+        this.plugin.logger.debug(`[summarizeErrors] Summarization successful.`);
+        return responseData.response.trim();
+      } else {
+        this.plugin.logger.warn("[summarizeErrors] Received empty or invalid response from Ollama.");
+        return null;
       }
-      this.plugin.logger.info(`[summarizeErrors] Attempting summarization using model: ${modelToUse}`);
-      const requestBody = {
-          model: modelToUse,
-          prompt: prompt,
-          stream: false,
-          temperature: 0.2,
-          options: {
-              num_ctx: settings.contextWindow > 1024 ? 1024 : settings.contextWindow,
-               // stop: ["Error"] // Можна додати стоп-токени
-          },
-          system: "You are an assistant that summarizes lists of technical error messages accurately and concisely."
-      };
-
-      try {
-          const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
-          if (responseData && responseData.response) {
-              this.plugin.logger.debug(`[summarizeErrors] Summarization successful with ${modelToUse}.`);
-              return { summary: responseData.response.trim(), modelNotFound: false, error: null };
-          } else {
-              this.plugin.logger.warn(`[summarizeErrors] Received empty or invalid response from model ${modelToUse}.`);
-              // Вважаємо це не помилкою "модель не знайдена", а просто невдалою генерацією
-              return { summary: null, modelNotFound: false, error: new Error("Empty response") };
-          }
-      } catch (error: any) {
-          this.plugin.logger.error(`[summarizeErrors] Failed to summarize errors using model ${modelToUse}:`, error);
-          // Перевіряємо, чи помилка схожа на "model not found"
-          const isModelNotFound = error.message?.toLowerCase().includes("model not found") ||
-                                  error.message?.includes("404"); // Ollama може повертати 404
-          return { summary: null, modelNotFound: isModelNotFound, error: error };
-      }
-  };
-
-  // --- Спроба 1: Основна модель ---
-  let result = await trySummarization(primaryModel);
-
-  // --- Спроба 2: Запасна модель (якщо перша не вдалася через відсутність моделі або не була вказана) ---
-  // Переходимо до запасної, якщо:
-  // 1. Основна модель не була вказана (!primaryModel)
-  // 2. Або спроба з основною моделлю повернула помилку "modelNotFound" (result.modelNotFound)
-  if (result.summary === null && fallbackModel && (!primaryModel || result.modelNotFound)) {
-      this.plugin.logger.info("[summarizeErrors] Primary model failed or not set, trying fallback model.");
-      result = await trySummarization(fallbackModel); // Викликаємо з запасною моделлю
+    } catch (error) {
+      this.plugin.logger.error("[summarizeErrors] Failed to summarize errors:", error);
+      return null;
+    }
   }
-
-  // Повертаємо результат або null, якщо обидві спроби невдалі
-  return result.summary;
-}
-
-
-  
 } // END OF OllamaView CLASS
