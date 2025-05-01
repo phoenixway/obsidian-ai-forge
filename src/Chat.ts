@@ -1,8 +1,9 @@
 // Chat.ts
 import { normalizePath, DataAdapter, Notice, debounce } from "obsidian";
-import { Message, MessageRole } from "./OllamaView"; // Assuming OllamaView exports these
+import { MessageRole } from "./OllamaView"; // Assuming OllamaView exports these
 import { OllamaPluginSettings } from "./settings"; // Assuming settings exports this
 import { Logger } from "./Logger";
+import { Message } from "./types";
 
 /**
  * Type definition for settings relevant to the Chat constructor.

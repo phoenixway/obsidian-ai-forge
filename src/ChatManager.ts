@@ -2,8 +2,9 @@
 import { App, Notice, DataAdapter, normalizePath, TFolder, debounce } from "obsidian";
 import OllamaPlugin, { ACTIVE_CHAT_ID_KEY, CHAT_INDEX_KEY } from "./main";
 import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat";
-import { MessageRole, Message } from './OllamaView'; // Припускаємо, що типи тут
+import { MessageRole } from './OllamaView'; // Припускаємо, що типи тут
 import { v4 as uuidv4 } from 'uuid';
+import { Message } from "./types";
 
 // Інтерфейси
 interface ChatSessionStored {

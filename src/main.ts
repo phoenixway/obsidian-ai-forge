@@ -12,7 +12,7 @@ import {
   FuzzySuggestModal,
   EventRef, // Імпортуємо EventRef
 } from "obsidian";
-import { OllamaView, VIEW_TYPE_OLLAMA_PERSONAS, Message, MessageRole } from "./OllamaView";
+import { OllamaView, VIEW_TYPE_OLLAMA_PERSONAS, MessageRole } from "./OllamaView";
 import { OllamaSettingTab, DEFAULT_SETTINGS, OllamaPluginSettings } from "./settings";
 import { RagService } from "./ragService";
 import { OllamaService } from "./OllamaService";
