@@ -708,17 +708,29 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     return messageGroup;
   }
   /**
-  * Статичний метод для рендерингу контенту асистента (Markdown, код, емодзі).
-     * @param contentEl - DOM-елемент для рендерингу.
-     * @param markdownText - Текст у форматі Markdown.
-     * @param app - Екземпляр App.
-     * @param plugin - Екземпляр OllamaPlugin.
-     * @param view - Екземпляр OllamaView.
-  */
+   * Статичний метод для рендерингу контенту асистента (Markdown, код, емодзі).
+   * Тепер обережніше видаляє індикатор завантаження.
+      * @param contentEl - DOM-елемент для рендерингу.
+      * @param markdownText - Текст у форматі Markdown для рендерингу.
+      * @param app - Екземпляр App.
+      * @param plugin - Екземпляр OllamaPlugin.
+      * @param view - Екземпляр OllamaView.
+   */
   static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
     plugin.logger.debug("[renderAssistantContent STAT] Entering.");
-    contentEl.empty();
+    const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+    if (markdownText.trim().length > 0 && dotsEl) {
+      plugin.logger.debug("[renderAssistantContent STAT] First chunk received, removing thinking dots.");
+      dotsEl.remove();
+    } else if (!dotsEl && contentEl.hasChildNodes()) {
+      plugin.logger.debug("[renderAssistantContent STAT] Subsequent chunk, clearing contentEl.");
+      contentEl.empty();
+    } else if (!dotsEl && !contentEl.hasChildNodes()) {
+      plugin.logger.debug("[renderAssistantContent STAT] No dots and no content, proceeding.");
+    } else {
+      plugin.logger.debug("[renderAssistantContent STAT] Empty markdown chunk received, dots untouched.");
+    }
     let processedMarkdown = markdownText;
     try {
       const decoded = decodeHtmlEntities(markdownText);
@@ -730,18 +742,13 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     } catch (e) {
       plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e);
     }
+    if (processedMarkdown.trim().length === 0) {
+      plugin.logger.debug("[renderAssistantContent STAT] No content to render after processing.");
+      return;
+    }
     plugin.logger.debug("[renderAssistantContent STAT] Starting MarkdownRenderer.render...");
     try {
-      await import_obsidian7.MarkdownRenderer.render(
-        app,
-        // Використовуємо переданий app
-        processedMarkdown,
-        contentEl,
-        (_b = (_a = plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
-        // Використовуємо переданий plugin
-        view
-        // Використовуємо переданий view
-      );
+      await import_obsidian7.MarkdownRenderer.render(app, processedMarkdown, contentEl, (_b = (_a = plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", view);
       plugin.logger.debug("[renderAssistantContent STAT] MarkdownRenderer.render finished successfully.");
     } catch (error) {
       plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
