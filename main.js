@@ -942,7 +942,6 @@ var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
 var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
 var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
-var CSS_CLASSES_DANGER_OPTION = "danger-option";
 var CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
 var CSS_EXPANDED_CLASS = "is-expanded";
 var CSS_CHAT_PANEL_LIST = "ollama-chat-panel-list";
@@ -975,7 +974,9 @@ var SidebarManager = class {
           container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
         } else {
           chats.forEach((chatMeta) => {
-            const chatOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_CLASS_MENU_OPTION, CSS_CLASS_CHAT_LIST_ITEM] });
+            const chatOptionEl = container.createDiv({
+              cls: [CSS_ROLE_PANEL_ITEM, CSS_CLASS_MENU_OPTION, CSS_CLASS_CHAT_LIST_ITEM]
+            });
             const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
             (0, import_obsidian10.setIcon)(iconSpan, chatMeta.id === currentActiveId ? "check" : "message-square");
             if (chatMeta.id === currentActiveId)
@@ -988,7 +989,10 @@ var SidebarManager = class {
               this.plugin.logger.warn(`[SidebarManager.updateChatList] Invalid date for chat ${chatMeta.id}`);
             }
             textWrapper.createDiv({ cls: CSS_CHAT_PANEL_ITEM_DATE, text: dateText });
-            const optionsBtn = chatOptionEl.createEl("button", { cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" } });
+            const optionsBtn = chatOptionEl.createEl("button", {
+              cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"],
+              attr: { "aria-label": "Chat options", title: "More options" }
+            });
             (0, import_obsidian10.setIcon)(optionsBtn, "lucide-more-horizontal");
             this.plugin.registerDomEvent(chatOptionEl, "click", async (e) => {
               var _a;
@@ -1039,7 +1043,9 @@ var SidebarManager = class {
         const roles = await this.plugin.listRoleFiles(true);
         const activeChat = await this.plugin.chatManager.getActiveChat();
         const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        const noneOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION] });
+        const noneOptionEl = container.createDiv({
+          cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION]
+        });
         const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
         noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None" });
         (0, import_obsidian10.setIcon)(noneIconSpan, !currentRolePath ? "check" : "slash");
@@ -1055,7 +1061,11 @@ var SidebarManager = class {
           (0, import_obsidian10.setIcon)(iconSpan, roleInfo.path === currentRolePath ? "check" : roleInfo.isCustom ? "user" : "file-text");
           if (roleInfo.path === currentRolePath)
             roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-          this.plugin.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+          this.plugin.registerDomEvent(
+            roleOptionEl,
+            "click",
+            () => this.handleRolePanelItemClick(roleInfo, currentRolePath)
+          );
         });
         this.plugin.logger.debug(`[SidebarManager.updateRoleList] Finished rendering ${roles.length + 1} role items.`);
       } catch (error) {
@@ -1181,9 +1191,21 @@ var SidebarManager = class {
     let otherContentEl = null;
     let otherSectionType = null;
     if (sectionType === "chats") {
-      [contentEl, updateFunction, otherHeaderEl, otherContentEl, otherSectionType] = [this.chatPanelListEl, this.updateChatList, this.rolePanelHeaderEl, this.rolePanelListEl, "roles"];
+      [contentEl, updateFunction, otherHeaderEl, otherContentEl, otherSectionType] = [
+        this.chatPanelListEl,
+        this.updateChatList,
+        this.rolePanelHeaderEl,
+        this.rolePanelListEl,
+        "roles"
+      ];
     } else if (sectionType === "roles") {
-      [contentEl, updateFunction, otherHeaderEl, otherContentEl, otherSectionType] = [this.rolePanelListEl, this.updateRoleList, this.chatPanelHeaderEl, this.chatPanelListEl, "chats"];
+      [contentEl, updateFunction, otherHeaderEl, otherContentEl, otherSectionType] = [
+        this.rolePanelListEl,
+        this.updateRoleList,
+        this.chatPanelHeaderEl,
+        this.chatPanelListEl,
+        "chats"
+      ];
     }
     if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
       this.plugin.logger.error("Sidebar toggle elements missing:", sectionType);
@@ -1229,42 +1251,41 @@ var SidebarManager = class {
         this.newChatSidebarButton.hide();
     }
   }
+  //  private showChatContextMenu(event: MouseEvent | PointerEvent, chatMeta: ChatMetadata): void {
+  //      event.preventDefault();
+  //      const menu = new Menu();
+  //      menu.addItem(item => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id)));
+  //      menu.addItem(item => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name)));
+  //      menu.addItem(item => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id)));
+  //      menu.addSeparator();
+  //      menu.addItem(item => {
+  //          item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
+  //          setTimeout(() => { try { const iel = (item as any)?.el; if (iel instanceof HTMLElement) { iel.addClass(CSS_CLASSES_DANGER_OPTION); } else { this.plugin.logger.warn("item.el issue (Clear)"); } } catch(e) { this.plugin.logger.error("addClass error (Clear):", e); } }, 0);
+  //      });
+  //      menu.addItem(item => {
+  //          item.setTitle("Delete Chat").setIcon("lucide-trash-2").onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
+  //           setTimeout(() => { try { const iel = (item as any)?.el; if (iel instanceof HTMLElement) { iel.addClass(CSS_CLASSES_DANGER_OPTION); } else { this.plugin.logger.warn("item.el issue (Delete)"); } } catch(e) { this.plugin.logger.error("addClass error (Delete):", e); } }, 0);
+  //      });
+  //      menu.showAtMouseEvent(event);
+  //  }
   showChatContextMenu(event, chatMeta) {
     event.preventDefault();
     const menu = new import_obsidian10.Menu();
-    menu.addItem((item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id)));
-    menu.addItem((item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name)));
-    menu.addItem((item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id)));
+    menu.addItem(
+      (item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id))
+    );
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-      setTimeout(() => {
-        try {
-          const iel = item == null ? void 0 : item.el;
-          if (iel instanceof HTMLElement) {
-            iel.addClass(CSS_CLASSES_DANGER_OPTION);
-          } else {
-            this.plugin.logger.warn("item.el issue (Clear)");
-          }
-        } catch (e) {
-          this.plugin.logger.error("addClass error (Clear):", e);
-        }
-      }, 0);
     });
     menu.addItem((item) => {
       item.setTitle("Delete Chat").setIcon("lucide-trash-2").onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-      setTimeout(() => {
-        try {
-          const iel = item == null ? void 0 : item.el;
-          if (iel instanceof HTMLElement) {
-            iel.addClass(CSS_CLASSES_DANGER_OPTION);
-          } else {
-            this.plugin.logger.warn("item.el issue (Delete)");
-          }
-        } catch (e) {
-          this.plugin.logger.error("addClass error (Delete):", e);
-        }
-      }, 0);
     });
     menu.showAtMouseEvent(event);
   }
@@ -1511,7 +1532,11 @@ var SidebarManager = class {
       return "Yesterday";
     if (diffDays < 7)
       return `${diffDays} days ago`;
-    return date.toLocaleDateString(void 0, { month: "short", day: "numeric", year: date.getFullYear() !== now.getFullYear() ? "numeric" : void 0 });
+    return date.toLocaleDateString(void 0, {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : void 0
+    });
   }
   isSameDay(date1, date2) {
     if (!(date1 instanceof Date) || !(date2 instanceof Date) || isNaN(date1.getTime()) || isNaN(date2.getTime()))
