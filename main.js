@@ -225,8 +225,9 @@ var CSS_CLASSES = {
   MESSAGE_ARRIVING: "message-arriving",
   VISIBLE: "visible",
   DISABLED: "disabled",
-  ERROR_TEXT: "error-message-text"
+  ERROR_TEXT: "error-message-text",
   // Додаємо відсутню константу
+  SHOW_MORE_BUTTON: "show-more-button"
 };
 
 // src/MessageRendererUtils.ts
@@ -822,7 +823,6 @@ var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 var CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
 var CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option";
 var CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
-var CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
 var CSS_CLASS_MODEL_OPTION = "model-option";
 var CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
 var CSS_CLASS_ROLE_OPTION = "role-option";
@@ -2777,6 +2777,7 @@ This action cannot be undone.`,
       this.emptyStateEl = null;
     }
   }
+  // OllamaView.ts
   setLoadingState(isLoading) {
     this.isProcessing = isLoading;
     if (this.inputEl)
@@ -2784,25 +2785,24 @@ This action cannot be undone.`,
     this.updateSendButtonState();
     if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
-      this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+      this.voiceButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
     }
     if (this.translateInputButton) {
       this.translateInputButton.disabled = isLoading;
-      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+      this.translateInputButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
     }
     if (this.menuButton) {
       this.menuButton.disabled = isLoading;
-      this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+      this.menuButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
     }
     if (this.chatContainer) {
       if (isLoading) {
-        this.chatContainer.querySelectorAll(`.${CSS_CLASS_SHOW_MORE_BUTTON}`).forEach((button) => {
+        this.chatContainer.querySelectorAll(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach((button) => {
           button.style.display = "none";
         });
         this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
       } else {
-        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after generation finished.");
-        this.checkAllMessagesForCollapsing();
+        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing SKIPPED.");
       }
     }
     this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
@@ -4573,14 +4573,14 @@ This action cannot be undone.`,
     if (!contentCollapsible)
       return;
     if (this.isProcessing && isAssistantMessage) {
-      const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       return;
     }
     if (maxH <= 0) {
-      const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
@@ -4589,7 +4589,7 @@ This action cannot be undone.`,
     requestAnimationFrame(() => {
       if (!contentCollapsible || !contentCollapsible.isConnected)
         return;
-      const existingButton = messageEl.querySelector(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       const currentMaxHeight = contentCollapsible.style.maxHeight;
       contentCollapsible.style.maxHeight = "";
@@ -4597,7 +4597,7 @@ This action cannot be undone.`,
       contentCollapsible.style.maxHeight = currentMaxHeight;
       if (scrollHeight > maxH) {
         const collapseButton = messageEl.createEl("button", {
-          cls: CSS_CLASS_SHOW_MORE_BUTTON,
+          cls: CSS_CLASSES.SHOW_MORE_BUTTON,
           text: "Show Less \u25B2"
         });
         collapseButton.setAttribute("data-initial-state", "expanded");

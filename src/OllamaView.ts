@@ -103,7 +103,6 @@ const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
 const CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option"; // Назву класу залишаємо
 // const CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
 const CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
-const CSS_CLASS_SHOW_MORE_BUTTON = "show-more-button";
 const CSS_CLASS_MODEL_OPTION = "model-option"; // Стиль для елементів списку
 const CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container"; // Специфічний клас для контейнера
 const CSS_CLASS_ROLE_OPTION = "role-option";
@@ -2081,45 +2080,46 @@ export class OllamaView extends ItemView {
     }
   }
 
-  public setLoadingState(isLoading: boolean): void {
-    this.isProcessing = isLoading;
-    if (this.inputEl) this.inputEl.disabled = isLoading;
+  // OllamaView.ts
 
-    // Керування кнопками Send/Stop (як раніше)
-    this.updateSendButtonState();
+public setLoadingState(isLoading: boolean): void {
+  this.isProcessing = isLoading;
+  if (this.inputEl) this.inputEl.disabled = isLoading;
 
-    // Керування іншими кнопками вводу
-    if (this.voiceButton) {
+  // Керування кнопками Send/Stop
+  this.updateSendButtonState();
+
+  // Керування іншими кнопками вводу
+  if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
-      this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
-    }
-    if (this.translateInputButton) {
-      this.translateInputButton.disabled = isLoading;
-      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
-    }
-    if (this.menuButton) {
-      this.menuButton.disabled = isLoading;
-      this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
-    }
-
-    // --- НОВЕ: Керування кнопками "Show More/Less" ---
-    if (this.chatContainer) {
-      if (isLoading) {
-        // Ховаємо всі кнопки "Show More"
-        this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`).forEach(button => {
-          button.style.display = "none"; // Приховуємо кнопку
-        });
-        this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
-      } else {
-        // Після завершення генерації - перевіряємо всі повідомлення заново
-        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after generation finished.");
-        this.checkAllMessagesForCollapsing(); // Цей метод відновить кнопки де потрібно
-      }
-    }
-    // --- КІНЕЦЬ НОВОГО БЛОКУ ---
-
-    this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
+      this.voiceButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading); // Переконайтесь, що DISABLED є в CSS_CLASSES
   }
+  if (this.translateInputButton) {
+      this.translateInputButton.disabled = isLoading;
+      this.translateInputButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+  }
+  if (this.menuButton) {
+      this.menuButton.disabled = isLoading;
+      this.menuButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+  }
+
+  // Керування кнопками "Show More/Less"
+  if (this.chatContainer) {
+      if (isLoading) {
+          // Ховаємо кнопки при завантаженні
+          this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach(button => {
+              button.style.display = "none";
+          });
+          this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
+      } else {
+          // --- ТИМЧАСОВО КОМЕНТУЄМО ВИКЛИК ---
+          this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing SKIPPED.");
+          // this.checkAllMessagesForCollapsing(); // <--- ЗАКОМЕНТУВАТИ ЦЕЙ РЯДОК
+          // --- КІНЕЦЬ КОМЕНТАРЯ ---
+      }
+  }
+  this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
+}
 
   // Load and Display Chat (Тепер оновлює і температуру)
 
@@ -4731,7 +4731,7 @@ public async handleTranslateClick(
     if (!contentCollapsible) return;
 
     if (this.isProcessing && isAssistantMessage) {
-      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton?.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
@@ -4739,7 +4739,7 @@ public async handleTranslateClick(
     }
 
     if (maxH <= 0) {
-      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton?.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
@@ -4749,7 +4749,7 @@ public async handleTranslateClick(
     requestAnimationFrame(() => {
       if (!contentCollapsible || !contentCollapsible.isConnected) return;
 
-      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASS_SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton?.remove();
 
       const currentMaxHeight = contentCollapsible.style.maxHeight;
@@ -4759,7 +4759,7 @@ public async handleTranslateClick(
 
       if (scrollHeight > maxH) {
         const collapseButton = messageEl.createEl("button", {
-          cls: CSS_CLASS_SHOW_MORE_BUTTON,
+          cls: CSS_CLASSES.SHOW_MORE_BUTTON,
           text: "Show Less ▲",
         });
         collapseButton.setAttribute("data-initial-state", "expanded");
