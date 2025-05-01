@@ -6568,13 +6568,6 @@ var OllamaSettingTab = class extends import_obsidian13.PluginSettingTab {
       );
     }
     this.createSectionHeader("Speech & Translation");
-    new import_obsidian13.Setting(containerEl).setName("Enable Translation Feature").setDesc("Show translate buttons.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.enableTranslation).onChange(async (value) => {
-        this.plugin.settings.enableTranslation = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
     new import_obsidian13.Setting(containerEl).setName("Translation Provider").setDesc("Select the service for message and input translation.").addDropdown(
       (dropdown) => dropdown.addOption("none", "Disabled").addOption("google", "Google Translate API").addOption("ollama", "Ollama (Local Model)").setValue(this.plugin.settings.translationProvider).onChange(async (value) => {
         this.plugin.settings.translationProvider = value;

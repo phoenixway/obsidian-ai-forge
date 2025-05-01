@@ -964,16 +964,16 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     // --- Секція: Speech & Translation ---
     this.createSectionHeader("Speech & Translation");
-    new Setting(containerEl)
-    .setName("Enable Translation Feature")
-    .setDesc("Show translate buttons.")
-    .addToggle(toggle =>
-      toggle.setValue(this.plugin.settings.enableTranslation).onChange(async value => {
-        this.plugin.settings.enableTranslation = value;
-        await this.plugin.saveSettings();
-        this.display(); // Перемалювати
-      })
-    );
+    // new Setting(containerEl)
+    // .setName("Enable Translation Feature")
+    // .setDesc("Show translate buttons.")
+    // .addToggle(toggle =>
+    //   toggle.setValue(this.plugin.settings.enableTranslation).onChange(async value => {
+    //     this.plugin.settings.enableTranslation = value;
+    //     await this.plugin.saveSettings();
+    //     this.display(); // Перемалювати
+    //   })
+    // );
     // --- НОВЕ: Вибір Провайдера Перекладу ---
     new Setting(containerEl)
       .setName("Translation Provider")
