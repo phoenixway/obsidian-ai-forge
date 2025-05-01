@@ -2650,14 +2650,11 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
-  // --- Переконайтесь, що handleMessageAdded виглядає так: ---
+  // OllamaView.ts
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     try {
       if (!data || !data.message) {
-        this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
-        if (this.currentMessageAddedResolver) {
-        }
         return;
       }
       this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
@@ -2691,8 +2688,9 @@ This action cannot be undone.`,
             rendererRan = true;
             break;
           case "assistant":
-            renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
-            rendererRan = true;
+            this.plugin.logger.error("[handleMessageAdded] Reached ASSISTANT case. SKIPPING RENDERER execution for test.");
+            rendererRan = false;
+            messageGroupEl = null;
             break;
           case "system":
             renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
@@ -2705,8 +2703,13 @@ This action cannot be undone.`,
             this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
         }
         if (renderer) {
+          this.plugin.logger.debug(`[handleMessageAdded] Calling renderer.render() for role: ${data.message.role}`);
           const result = renderer.render();
-          messageGroupEl = result instanceof Promise ? await result : result;
+          if (result instanceof Promise) {
+            messageGroupEl = await result;
+          } else {
+            messageGroupEl = result;
+          }
         }
         if (rendererRan) {
           this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? "defined" : "null"}. Role: ${data.message.role}`);
@@ -2724,18 +2727,25 @@ This action cannot be undone.`,
         }
       } catch (renderError) {
         this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError);
-        this.handleErrorMessage({ role: "error", content: `Failed to display ${data.message.role} message. Error: ${renderError.message}`, timestamp: new Date() });
+        this.handleErrorMessage({ role: "error", content: `Failed to display ${data.message.role} message. Render Error: ${renderError.message}`, timestamp: new Date() });
       }
+      this.plugin.logger.debug(`[handleMessageAdded] Main rendering logic finished for Role: ${data.message.role}`);
     } catch (outerError) {
       this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
       this.handleErrorMessage({ role: "error", content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
     } finally {
       if (this.currentMessageAddedResolver) {
-        this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${(_b = data == null ? void 0 : data.message) == null ? void 0 : _b.role}. Might be premature if error occurred.`);
-        this.currentMessageAddedResolver();
+        this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${(_b = data == null ? void 0 : data.message) == null ? void 0 : _b.role}.`);
+        try {
+          this.currentMessageAddedResolver();
+        } catch (e) {
+          this.plugin.logger.error("Error resolving promise:", e);
+        }
         this.currentMessageAddedResolver = null;
+      } else {
+        this.plugin.logger.debug(`[handleMessageAdded] No resolver found in finally block. Role: ${(_c = data == null ? void 0 : data.message) == null ? void 0 : _c.role}`);
       }
-      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${(_c = data == null ? void 0 : data.message) == null ? void 0 : _c.role}, Ts: ${(_e = (_d = data == null ? void 0 : data.message) == null ? void 0 : _d.timestamp) == null ? void 0 : _e.getTime()}`);
+      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${(_d = data == null ? void 0 : data.message) == null ? void 0 : _d.role}, Ts: ${(_f = (_e = data == null ? void 0 : data.message) == null ? void 0 : _e.timestamp) == null ? void 0 : _f.getTime()}`);
     }
   }
   // --- UI Update Methods ---
