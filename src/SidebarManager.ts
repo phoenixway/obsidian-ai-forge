@@ -493,56 +493,53 @@ export class SidebarManager {
 
         menu.addSeparator();
 
-        // --- ВИПРАВЛЕННЯ ДЛЯ "Clear Messages" ---
+        // --- ОНОВЛЕНО: "Clear Messages" з setTimeout ---
         menu.addItem(item => {
             item
                 .setTitle("Clear Messages")
                 .setIcon("lucide-trash")
                 .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
 
-            // Безпечний доступ до item.el
-            try {
-               // Використовуємо (item as any) через можливі проблеми з типами,
-               // але додаємо перевірку на існування el та instanceof HTMLElement
-               const itemEl = (item as any)?.el;
-               if (itemEl instanceof HTMLElement) {
-                   itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
-               } else if (itemEl) {
-                    // Якщо el існує, але не HTMLElement (дуже дивно)
-                    this.plugin.logger.warn("item.el was not an HTMLElement for 'Clear Messages'", itemEl);
-                } else {
-                    // Якщо el взагалі undefined або null
-                    this.plugin.logger.warn("item.el is undefined/null for 'Clear Messages' menu item.");
+            // Відкладаємо доступ до item.el
+            setTimeout(() => {
+                try {
+                    const itemEl = (item as any)?.el;
+                    if (itemEl instanceof HTMLElement) {
+                        itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
+                    } else {
+                        // Логуємо, тільки якщо і після затримки не спрацювало
+                        this.plugin.logger.warn("item.el is still undefined/null or not HTMLElement after timeout (Clear Messages).");
+                    }
+                } catch (e) {
+                    this.plugin.logger.error("Error adding danger class inside timeout (Clear Messages):", e);
                 }
-            } catch (e) {
-                this.plugin.logger.error("Error adding danger class to 'Clear Messages':", e);
-            }
+            }, 0); // Нульова затримка
         });
-        // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+        // --- КІНЕЦЬ ОНОВЛЕННЯ ---
 
-        // --- ВИПРАВЛЕННЯ ДЛЯ "Delete Chat" ---
+        // --- ОНОВЛЕНО: "Delete Chat" з setTimeout ---
         menu.addItem(item => {
             item
                 .setTitle("Delete Chat")
                 .setIcon("lucide-trash-2")
                 .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
 
-             // Безпечний доступ до item.el
-             try {
-                const itemEl = (item as any)?.el;
-                if (itemEl instanceof HTMLElement) {
-                    itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
-                } else if (itemEl) {
-                    this.plugin.logger.warn("item.el was not an HTMLElement for 'Delete Chat'", itemEl);
-                } else {
-                     this.plugin.logger.warn("item.el is undefined/null for 'Delete Chat' menu item.");
-                 }
-            } catch (e) {
-                this.plugin.logger.error("Error adding danger class to 'Delete Chat':", e);
-            }
+            // Відкладаємо доступ до item.el
+            setTimeout(() => {
+                 try {
+                    const itemEl = (item as any)?.el;
+                    if (itemEl instanceof HTMLElement) {
+                        itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
+                    } else {
+                         // Логуємо, тільки якщо і після затримки не спрацювало
+                         this.plugin.logger.warn("item.el is still undefined/null or not HTMLElement after timeout (Delete Chat).");
+                     }
+                } catch (e) {
+                    this.plugin.logger.error("Error adding danger class inside timeout (Delete Chat):", e);
+                }
+            }, 0); // Нульова затримка
         });
-        // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-
+       // --- КІНЕЦЬ ОНОВЛЕННЯ ---
 
         menu.showAtMouseEvent(event);
     }
