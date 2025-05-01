@@ -1313,11 +1313,33 @@ var SidebarManager = class {
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-      item.el.addClass(CSS_CLASSES_DANGER_OPTION);
+      try {
+        const itemEl = item == null ? void 0 : item.el;
+        if (itemEl instanceof HTMLElement) {
+          itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
+        } else if (itemEl) {
+          this.plugin.logger.warn("item.el was not an HTMLElement for 'Clear Messages'", itemEl);
+        } else {
+          this.plugin.logger.warn("item.el is undefined/null for 'Clear Messages' menu item.");
+        }
+      } catch (e) {
+        this.plugin.logger.error("Error adding danger class to 'Clear Messages':", e);
+      }
     });
     menu.addItem((item) => {
       item.setTitle("Delete Chat").setIcon("lucide-trash-2").onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-      item.el.addClass(CSS_CLASSES_DANGER_OPTION);
+      try {
+        const itemEl = item == null ? void 0 : item.el;
+        if (itemEl instanceof HTMLElement) {
+          itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
+        } else if (itemEl) {
+          this.plugin.logger.warn("item.el was not an HTMLElement for 'Delete Chat'", itemEl);
+        } else {
+          this.plugin.logger.warn("item.el is undefined/null for 'Delete Chat' menu item.");
+        }
+      } catch (e) {
+        this.plugin.logger.error("Error adding danger class to 'Delete Chat':", e);
+      }
     });
     menu.showAtMouseEvent(event);
   }

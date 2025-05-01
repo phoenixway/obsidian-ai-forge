@@ -466,52 +466,87 @@ export class SidebarManager {
         }
     };
 
-     private showChatContextMenu(event: MouseEvent | PointerEvent, chatMeta: ChatMetadata): void {
-         event.preventDefault();
-         const menu = new Menu();
+    private showChatContextMenu(event: MouseEvent | PointerEvent, chatMeta: ChatMetadata): void {
+        event.preventDefault();
+        const menu = new Menu();
 
-         menu.addItem(item =>
-             item
-                 .setTitle("Clone Chat")
-                 .setIcon("lucide-copy-plus")
-                 .onClick(() => this.handleContextMenuClone(chatMeta.id))
-         );
+        menu.addItem(item =>
+            item
+                .setTitle("Clone Chat")
+                .setIcon("lucide-copy-plus")
+                .onClick(() => this.handleContextMenuClone(chatMeta.id))
+        );
 
-         menu.addItem(item =>
-             item
-                 .setTitle("Rename Chat")
-                 .setIcon("lucide-pencil")
-                 .onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
-         );
+        menu.addItem(item =>
+            item
+                .setTitle("Rename Chat")
+                .setIcon("lucide-pencil")
+                .onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
+        );
 
-         menu.addItem(item =>
-             item
-                 .setTitle("Export to Note")
-                 .setIcon("lucide-download")
-                 .onClick(() => this.exportSpecificChat(chatMeta.id))
-         );
+        menu.addItem(item =>
+            item
+                .setTitle("Export to Note")
+                .setIcon("lucide-download")
+                .onClick(() => this.exportSpecificChat(chatMeta.id))
+        );
 
-         menu.addSeparator();
+        menu.addSeparator();
 
-         menu.addItem(item => {
-             item
-                 .setTitle("Clear Messages")
-                 .setIcon("lucide-trash")
-                 .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-                 (item as any).el.addClass(CSS_CLASSES_DANGER_OPTION); // <--- Повертаємо (item as any)
-            //  item.el.addClass(CSS_CLASSES_DANGER_OPTION); // <--- ВИПРАВЛЕНО: dom -> el
-         });
+        // --- ВИПРАВЛЕННЯ ДЛЯ "Clear Messages" ---
+        menu.addItem(item => {
+            item
+                .setTitle("Clear Messages")
+                .setIcon("lucide-trash")
+                .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
 
-         menu.addItem(item => {
-             item
-                 .setTitle("Delete Chat")
-                 .setIcon("lucide-trash-2")
-                 .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-    (item as any).el.addClass(CSS_CLASSES_DANGER_OPTION); // <--- Повертаємо (item as any)         
-    });
+            // Безпечний доступ до item.el
+            try {
+               // Використовуємо (item as any) через можливі проблеми з типами,
+               // але додаємо перевірку на існування el та instanceof HTMLElement
+               const itemEl = (item as any)?.el;
+               if (itemEl instanceof HTMLElement) {
+                   itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
+               } else if (itemEl) {
+                    // Якщо el існує, але не HTMLElement (дуже дивно)
+                    this.plugin.logger.warn("item.el was not an HTMLElement for 'Clear Messages'", itemEl);
+                } else {
+                    // Якщо el взагалі undefined або null
+                    this.plugin.logger.warn("item.el is undefined/null for 'Clear Messages' menu item.");
+                }
+            } catch (e) {
+                this.plugin.logger.error("Error adding danger class to 'Clear Messages':", e);
+            }
+        });
+        // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
 
-         menu.showAtMouseEvent(event);
-     }
+        // --- ВИПРАВЛЕННЯ ДЛЯ "Delete Chat" ---
+        menu.addItem(item => {
+            item
+                .setTitle("Delete Chat")
+                .setIcon("lucide-trash-2")
+                .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
+
+             // Безпечний доступ до item.el
+             try {
+                const itemEl = (item as any)?.el;
+                if (itemEl instanceof HTMLElement) {
+                    itemEl.addClass(CSS_CLASSES_DANGER_OPTION);
+                } else if (itemEl) {
+                    this.plugin.logger.warn("item.el was not an HTMLElement for 'Delete Chat'", itemEl);
+                } else {
+                     this.plugin.logger.warn("item.el is undefined/null for 'Delete Chat' menu item.");
+                 }
+            } catch (e) {
+                this.plugin.logger.error("Error adding danger class to 'Delete Chat':", e);
+            }
+        });
+        // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
+
+        menu.showAtMouseEvent(event);
+    }
+
 
      private async handleContextMenuClone(chatId: string): Promise<void> {
         this.plugin.logger.info(`[SidebarManager Context] Clone requested for chat ${chatId}`);
