@@ -1674,7 +1674,15 @@ export class OllamaView extends ItemView {
       // Initial checks
       if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) { console.error("[handleMessageAdded] CRITICAL: 'this', 'this.plugin', 'this.chatContainer' or 'this.plugin.chatManager' is undefined/null at start!"); if (this?.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; } return; }
       if (data.chatId !== this.plugin.chatManager.getActiveChatId()) { this.plugin.logger.debug(`[handleMessageAdded] Ignored: Event for different chat.`); if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; } return; }
-      if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime())) { this.plugin.logger.warn(`[handleMessageAdded] Ignored: Duplicate timestamp.`); if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; } return; }
+      if (this.currentMessages.some(m =>
+        m.timestamp.getTime() === data.message.timestamp.getTime() &&
+        m.role === data.message.role 
+    )) {        this.plugin.logger.warn(`[handleMessageAdded] Ignored: Duplicate timestamp.`); 
+        if (this.currentMessageAddedResolver) { 
+          this.currentMessageAddedResolver(); 
+          this.currentMessageAddedResolver = null; } 
+          return; 
+        }
 
 
       this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`);
@@ -1749,15 +1757,16 @@ export class OllamaView extends ItemView {
        this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
        this.handleErrorMessage({ role: 'error', content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
   } finally {
-      // Resolve promise if it exists
-      if (this.currentMessageAddedResolver) {
-          this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${data?.message?.role}.`);
-          try { this.currentMessageAddedResolver(); } catch (e) { this.plugin.logger.error("Error resolving promise:", e); }
-          this.currentMessageAddedResolver = null;
-      } else {
-           this.plugin.logger.debug(`[handleMessageAdded] No resolver found in finally block. Role: ${data?.message?.role}`);
-      }
-      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`);
+// Resolve promise if it exists
+if (this.currentMessageAddedResolver) {
+  this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${data?.message?.role}.`);
+  try { this.currentMessageAddedResolver(); } catch (e) { this.plugin.logger.error("Error resolving promise:", e); }
+  this.currentMessageAddedResolver = null;
+} else {
+   this.plugin.logger.debug(`[handleMessageAdded] No resolver found in finally block. Role: ${data?.message?.role}`);
+}
+this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`); // LOG H
+
   }
 }
 

@@ -2666,7 +2666,9 @@ This action cannot be undone.`,
         }
         return;
       }
-      if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime())) {
+      if (this.currentMessages.some(
+        (m) => m.timestamp.getTime() === data.message.timestamp.getTime() && m.role === data.message.role
+      )) {
         this.plugin.logger.warn(`[handleMessageAdded] Ignored: Duplicate timestamp.`);
         if (this.currentMessageAddedResolver) {
           this.currentMessageAddedResolver();
