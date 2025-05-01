@@ -4942,7 +4942,8 @@ export class OllamaView extends ItemView {
               }
             }
           }
-          this.guaranteedScrollToBottom(50, false);
+          this.guaranteedScrollToBottom(50, true); // Примусовий скрол під час стрімінгу
+          // this.guaranteedScrollToBottom(50, false);
         }
         if ("done" in chunk && chunk.done) {
           break;

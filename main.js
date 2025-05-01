@@ -4932,7 +4932,7 @@ Summary:`;
               }
             }
           }
-          this.guaranteedScrollToBottom(50, false);
+          this.guaranteedScrollToBottom(50, true);
         }
         if ("done" in chunk && chunk.done) {
           break;
