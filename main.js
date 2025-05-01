@@ -6076,7 +6076,10 @@ var DEFAULT_SETTINGS = {
   // Logger сам підставить шлях до папки плагіна
   logFileMaxSizeMB: 5,
   fallbackSummarizationModelName: "http://localhost:11434",
-  fixBrokenEmojis: true
+  fixBrokenEmojis: true,
+  translationProvider: "none",
+  // За замовчуванням вимкнено
+  ollamaTranslationModel: ""
 };
 var OllamaSettingTab = class extends import_obsidian13.PluginSettingTab {
   constructor(app, plugin) {
@@ -6565,6 +6568,85 @@ var OllamaSettingTab = class extends import_obsidian13.PluginSettingTab {
       );
     }
     this.createSectionHeader("Speech & Translation");
+    new import_obsidian13.Setting(containerEl).setName("Translation Provider").setDesc("Select the service for message and input translation.").addDropdown(
+      (dropdown) => dropdown.addOption("none", "Disabled").addOption("google", "Google Translate API").addOption("ollama", "Ollama (Local Model)").setValue(this.plugin.settings.translationProvider).onChange(async (value) => {
+        this.plugin.settings.translationProvider = value;
+        this.plugin.settings.enableTranslation = value !== "none";
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
+    if (this.plugin.settings.translationProvider === "google") {
+      new import_obsidian13.Setting(containerEl).setName("Target Translation Language (Google)").setDesc("Translate messages/input into this language using Google.").addDropdown((dropdown) => {
+        for (const code in LANGUAGES2) {
+          dropdown.addOption(code, LANGUAGES2[code]);
+        }
+        dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async (value) => {
+          this.plugin.settings.translationTargetLanguage = value;
+          await this.plugin.saveSettings();
+        });
+      });
+      new import_obsidian13.Setting(containerEl).setName("Google Cloud Translation API Key").setDesc("Required for Google translation feature. Keep confidential.").addText(
+        (text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleTranslationApiKey).onChange(async (value) => {
+          this.plugin.settings.googleTranslationApiKey = value.trim();
+          await this.plugin.saveSettings();
+        })
+      );
+    }
+    if (this.plugin.settings.translationProvider === "ollama") {
+      let ollamaTranslationModelDropdown = null;
+      const updateOllamaTranslationOptions = async (dropdown, button) => {
+        if (!dropdown)
+          return;
+        const currentVal = this.plugin.settings.ollamaTranslationModel;
+        dropdown.selectEl.innerHTML = "";
+        dropdown.addOption("", "Loading models...");
+        dropdown.setDisabled(true);
+        button == null ? void 0 : button.setDisabled(true).setIcon("loader");
+        try {
+          const models = await this.plugin.ollamaService.getModels();
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "-- Select Ollama Translation Model --");
+          if (models && models.length > 0) {
+            models.forEach((m) => dropdown.addOption(m, m));
+            dropdown.setValue(models.includes(currentVal) ? currentVal : "");
+          } else {
+            dropdown.addOption("", "No models found");
+            dropdown.setValue("");
+          }
+        } catch (error) {
+          this.plugin.logger.error("Error fetching models for Ollama translation settings:", error);
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "Error loading models!");
+          dropdown.setValue("");
+        } finally {
+          dropdown.setDisabled(false);
+          button == null ? void 0 : button.setDisabled(false).setIcon("refresh-cw");
+        }
+      };
+      new import_obsidian13.Setting(containerEl).setName("Ollama Translation Model").setDesc("Ollama model to use for translation tasks.").addDropdown(async (dropdown) => {
+        ollamaTranslationModelDropdown = dropdown;
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.ollamaTranslationModel = value;
+          await this.plugin.saveSettings();
+        });
+        await updateOllamaTranslationOptions(dropdown);
+      }).addExtraButton((button) => {
+        button.setIcon("refresh-cw").setTooltip("Refresh model list").onClick(async () => {
+          await updateOllamaTranslationOptions(ollamaTranslationModelDropdown, button);
+          new import_obsidian13.Notice("Model list refreshed!");
+        });
+      });
+      new import_obsidian13.Setting(containerEl).setName("Target Translation Language (Ollama)").setDesc("Translate messages/input into this language using Ollama.").addDropdown((dropdown) => {
+        for (const code in LANGUAGES2) {
+          dropdown.addOption(code, LANGUAGES2[code]);
+        }
+        dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async (value) => {
+          this.plugin.settings.translationTargetLanguage = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    }
     new import_obsidian13.Setting(containerEl).setName("Google API Key (Speech-to-Text)").setDesc("Required for voice input. Keep confidential.").addText(
       (text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
         this.plugin.settings.googleApiKey = value.trim();

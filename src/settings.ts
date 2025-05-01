@@ -133,6 +133,8 @@ const LANGUAGES: Record<string, string> = {
 // --- Тип аватара (ДОДАНО 'image') ---
 export type AvatarType = "initials" | "icon" | "image";
 
+export type TranslationProvider = 'google' | 'ollama' | 'none';
+
 // --- Інтерфейс налаштувань ---
 export interface OllamaPluginSettings extends LoggerSettings {
   ollamaServerUrl: string;
@@ -174,6 +176,8 @@ export interface OllamaPluginSettings extends LoggerSettings {
   summarizationModelName: string;
   fallbackSummarizationModelName: string;
   fixBrokenEmojis: boolean; // Налаштування для виправлення емодзі
+  translationProvider: TranslationProvider; // Вибір провайдера
+  ollamaTranslationModel: string; // Модель Ollama для перекладу
 }
 
 // --- Значення за замовчуванням ---
@@ -240,6 +244,8 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   logFileMaxSizeMB: 5,
   fallbackSummarizationModelName: "http://localhost:11434",
   fixBrokenEmojis: true,
+  translationProvider: 'none', // За замовчуванням вимкнено
+  ollamaTranslationModel: '',
 };
 
 // --- Клас вкладки налаштувань ---
@@ -958,6 +964,109 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     // --- Секція: Speech & Translation ---
     this.createSectionHeader("Speech & Translation");
+    // --- НОВЕ: Вибір Провайдера Перекладу ---
+    new Setting(containerEl)
+      .setName("Translation Provider")
+      .setDesc("Select the service for message and input translation.")
+      .addDropdown(dropdown => dropdown
+        .addOption('none', 'Disabled')
+        .addOption('google', 'Google Translate API')
+        .addOption('ollama', 'Ollama (Local Model)')
+        .setValue(this.plugin.settings.translationProvider)
+        .onChange(async (value: TranslationProvider) => {
+          this.plugin.settings.translationProvider = value;
+          // Вмикаємо/вимикаємо загальний перемикач залежно від вибору
+          this.plugin.settings.enableTranslation = value !== 'none';
+          await this.plugin.saveSettings();
+          this.display(); // Перемалювати налаштування, щоб показати/сховати залежні опції
+        })
+      );
+
+    // --- Умовні налаштування для Google Translate ---
+    if (this.plugin.settings.translationProvider === 'google') {
+        new Setting(containerEl)
+        .setName("Target Translation Language (Google)")
+        .setDesc("Translate messages/input into this language using Google.")
+        .addDropdown(dropdown => {
+          for (const code in LANGUAGES) {
+            dropdown.addOption(code, LANGUAGES[code]);
+          }
+          dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async value => {
+            this.plugin.settings.translationTargetLanguage = value;
+            await this.plugin.saveSettings();
+          });
+        });
+      new Setting(containerEl)
+        .setName("Google Cloud Translation API Key")
+        .setDesc("Required for Google translation feature. Keep confidential.")
+        .addText(text =>
+          text
+            .setPlaceholder("Enter API Key")
+            .setValue(this.plugin.settings.googleTranslationApiKey)
+            .onChange(async value => {
+              this.plugin.settings.googleTranslationApiKey = value.trim();
+              await this.plugin.saveSettings();
+            })
+        );
+    }
+
+    // --- Умовні налаштування для Ollama ---
+    if (this.plugin.settings.translationProvider === 'ollama') {
+        let ollamaTranslationModelDropdown: DropdownComponent | null = null;
+        const updateOllamaTranslationOptions = async (dropdown: DropdownComponent | null, button?: ExtraButtonComponent) => {
+            if (!dropdown) return;
+            const currentVal = this.plugin.settings.ollamaTranslationModel;
+            dropdown.selectEl.innerHTML = ""; dropdown.addOption("", "Loading models..."); dropdown.setDisabled(true);
+            button?.setDisabled(true).setIcon("loader");
+            try {
+                const models = await this.plugin.ollamaService.getModels();
+                dropdown.selectEl.innerHTML = ""; dropdown.addOption("", "-- Select Ollama Translation Model --");
+                if (models && models.length > 0) {
+                    models.forEach(m => dropdown.addOption(m, m));
+                    dropdown.setValue(models.includes(currentVal) ? currentVal : "");
+                } else { dropdown.addOption("", "No models found"); dropdown.setValue(""); }
+            } catch (error) { /* ... обробка помилки ... */
+                 this.plugin.logger.error("Error fetching models for Ollama translation settings:", error);
+                 dropdown.selectEl.innerHTML = ""; dropdown.addOption("", "Error loading models!"); dropdown.setValue("");
+             } finally { dropdown.setDisabled(false); button?.setDisabled(false).setIcon("refresh-cw"); }
+        };
+
+         new Setting(containerEl)
+            .setName("Ollama Translation Model")
+            .setDesc("Ollama model to use for translation tasks.")
+            .addDropdown(async dropdown => {
+                ollamaTranslationModelDropdown = dropdown;
+                dropdown.onChange(async value => {
+                    this.plugin.settings.ollamaTranslationModel = value;
+                    await this.plugin.saveSettings();
+                });
+                await updateOllamaTranslationOptions(dropdown); // Initial load
+            })
+            .addExtraButton(button => {
+                button.setIcon("refresh-cw").setTooltip("Refresh model list")
+                    .onClick(async () => { await updateOllamaTranslationOptions(ollamaTranslationModelDropdown, button); new Notice("Model list refreshed!"); });
+            });
+
+         // Target language for Ollama (може бути той самий, що й для Google, або окремий)
+         // Поки що використовуємо спільний translationTargetLanguage
+         new Setting(containerEl)
+            .setName("Target Translation Language (Ollama)")
+            .setDesc("Translate messages/input into this language using Ollama.")
+            .addDropdown(dropdown => {
+              for (const code in LANGUAGES) {
+                dropdown.addOption(code, LANGUAGES[code]);
+              }
+              dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async value => {
+                this.plugin.settings.translationTargetLanguage = value;
+                await this.plugin.saveSettings();
+              });
+            });
+            // TODO: Можливо, додати поле для "Source Language" для Ollama,
+            // або реалізувати автодетектування (що складніше). Поки що припускаємо
+            // переклад з мови інтерфейсу або англійської.
+
+    }
+
     new Setting(containerEl)
       .setName("Google API Key (Speech-to-Text)")
       .setDesc("Required for voice input. Keep confidential.")
