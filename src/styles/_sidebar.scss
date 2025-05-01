@@ -330,3 +330,23 @@
   background-color: var(--background-modifier-error-hover); /* Червонуватий фон при наведенні */
   color: var(--text-on-error) !important; /* Білий текст на червоному фоні */
 }
+
+
+/* Стилізуємо пункти меню за їх aria-label */
+.menu-item[aria-label="Clear Messages"],
+.menu-item[aria-label="Delete Chat"] {
+    color: var(--text-error) !important;
+}
+
+/* Опціонально: стиль іконки */
+.menu-item[aria-label="Clear Messages"] .menu-item-icon,
+.menu-item[aria-label="Delete Chat"] .menu-item-icon {
+   color: var(--text-error);
+}
+
+/* Опціонально: стиль при наведенні */
+.menu-item[aria-label="Clear Messages"]:hover,
+.menu-item[aria-label="Delete Chat"]:hover {
+  background-color: var(--background-modifier-error-hover);
+  color: var(--text-on-error) !important;
+}
