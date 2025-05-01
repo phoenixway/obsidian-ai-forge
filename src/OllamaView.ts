@@ -1747,99 +1747,97 @@ export class OllamaView extends ItemView {
     }
   };
   
-  // --- Переконайтесь, що handleMessageAdded виглядає так: ---
+  // OllamaView.ts
+
+// ЗАМІНІТЬ ваш поточний handleMessageAdded на ЦЮ ВЕРСІЮ для тестування
 private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
-  // --- Top-Level Try/Catch ---
+  const isAssistant = data?.message?.role === 'assistant';
+  const timestamp = data?.message?.timestamp?.getTime();
+
+  // Логуємо вхід максимально рано
+  this.plugin.logger.error(`[handleMessageAdded - TEST] <<< ENTERED >>> Role: ${data?.message?.role}, Ts: ${timestamp}`);
+
   try {
-      // --- Very First Check ---
-      if (!data || !data.message) {
-          this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
-          if (this.currentMessageAddedResolver) { /* ... resolve promise ... */ }
+      // Мінімальні перевірки
+      if (!data || !data.message || !this.chatContainer) {
+          this.plugin.logger.error("[handleMessageAdded - TEST] Invalid data or chatContainer missing.");
           return;
       }
-      // --- End First Check ---
-
-      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`); // LOG A
-
-      // Initial checks (using 'this')
-      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) { /* ... log critical error and return ... */ return; }
-      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) { /* ... log ignored, resolve, return ... */ return; }
-      if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime())) { /* ... log duplicate, resolve, return ... */ return; }
-
-      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`); // LOG B
-
-      this.currentMessages.push(data.message);
-      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
-      if (isNewDay) { this.renderDateSeparator(data.message.timestamp); this.lastRenderedMessageDate = data.message.timestamp; }
-      else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) { this.lastRenderedMessageDate = data.message.timestamp; }
-      this.hideEmptyState();
-
-      let messageGroupEl: HTMLElement | null = null;
-      let rendererRan = false;
-
-      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`); // LOG C
-      // --- Inner Try/Catch for Rendering Specifics ---
-      try {
-          let renderer: UserMessageRenderer | AssistantMessageRenderer | SystemMessageRenderer | null = null;
-
-          switch (data.message.role) {
-               case "user": renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
-               case "assistant": renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
-               case "system": renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
-               case "error":
-                   // --- ВИКЛИКАЄМО НОВИЙ МЕТОД ---
-                   this.handleErrorMessage(data.message);
-                   // --- КІНЕЦЬ ВИКЛИКУ ---
-                   break; // Error handling is separate
-               default: this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
-          }
-
-          // ... (решта коду рендерингу та додавання стандартних повідомлень) ...
-           if (renderer) {
-               const result = renderer.render();
-               messageGroupEl = result instanceof Promise ? await result : result;
-           }
-            if (rendererRan) {
-                this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? 'defined' : 'null'}. Role: ${data.message.role}`); // LOG D
-            }
-
-            // Append standard message element
-            if (rendererRan && messageGroupEl) {
-               if (this.chatContainer) { // Extra check
-                   this.chatContainer.appendChild(messageGroupEl);
-                   this.lastMessageElement = messageGroupEl;
-                   if (!messageGroupEl.isConnected) { /* ... log error ... */ }
-                   this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`); // LOG E
-
-                   // ... (Animation and scroll logic) ...
-               } else { /* ... log error ... */ }
-            } else if (rendererRan && !messageGroupEl) { /* ... log warning ... */ }
-
-
-      } catch (renderError: any) {
-           // Log errors from the rendering process itself
-           this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError); // LOG F
-           // --- ВИКЛИКАЄМО НОВИЙ МЕТОД ---
-           this.handleErrorMessage({ role: 'error', content: `Failed to display ${data.message.role} message. Error: ${renderError.message}`, timestamp: new Date() });
-           // --- КІНЕЦЬ ВИКЛИКУ ---
+      if (data.chatId !== this.plugin.chatManager?.getActiveChatId()) {
+          this.plugin.logger.debug("[handleMessageAdded - TEST] Ignoring message for different chat.");
+          return;
       }
-      // --- End Inner Try/Catch ---
+      // Тимчасово ігноруємо перевірку дублікатів для простоти тесту
+      // if (this.currentMessages.some(m => m.timestamp.getTime() === timestamp)) { return; }
+
+      this.plugin.logger.debug(`[handleMessageAdded - TEST] Passed initial checks. Role: ${data.message.role}`);
+
+      // Додаємо в кеш
+      this.currentMessages.push(data.message);
+      this.hideEmptyState(); // Спробуємо залишити, раптом проблема тут?
+
+      // --- Спрощений рендеринг ТІЛЬКИ для асистента ---
+      if (isAssistant) {
+          this.plugin.logger.warn(`[handleMessageAdded - TEST] >>> Handling ASSISTANT message. Appending simple div.`);
+          let simpleDiv: HTMLDivElement | null = null;
+          try {
+               simpleDiv = this.chatContainer.createDiv({
+                  text: `ASSISTANT TEST - TS: ${timestamp} - Content: ${data.message.content.substring(0, 50)}...`,
+                  cls: 'assistant-test-message' // Додамо клас для легкого пошуку в інспекторі
+               });
+
+               if (!simpleDiv || !simpleDiv.isConnected) {
+                  this.plugin.logger.error("[handleMessageAdded - TEST] Simple div NOT connected after createDiv!");
+               } else {
+                  this.plugin.logger.warn("[handleMessageAdded - TEST] Simple div appended successfully.");
+                  this.lastMessageElement = simpleDiv; // Оновлюємо останній елемент
+                  this.guaranteedScrollToBottom(100, true); // Прокручуємо до нього
+               }
+          } catch (e: any) {
+              this.plugin.logger.error("[handleMessageAdded - TEST] Error creating/appending simple div:", e);
+              // Спробуємо додати текстовий вузол як fallback
+               try {
+                  this.chatContainer.appendText(`[ERROR CREATING TEST DIV: ${e.message}]`);
+               } catch {}
+          }
+      } else {
+           this.plugin.logger.debug(`[handleMessageAdded - TEST] Skipping rendering for role: ${data.message.role}`);
+           // Можна тимчасово не рендерити інші повідомлення, щоб сфокусуватися на асистенті
+           // Або залишити їх рендеринг, якщо він не заважає
+            /*
+            try {
+                // Оригінальна логіка рендерингу для інших ролей (user, system, error)
+                // ... (використовуйте відповідні renderers або handleErrorMessage)
+            } catch (e: any) {
+                 this.plugin.logger.error(`[handleMessageAdded - TEST] Error rendering other role ${data.message.role}:`, e);
+            }
+            */
+      }
+      // --- Кінець спрощеного рендерингу ---
+
+      this.plugin.logger.debug(`[handleMessageAdded - TEST] Main logic finished for Role: ${data.message.role}`);
 
   } catch (outerError: any) {
-       // Catch errors from the initial checks or other parts of the handler
-       this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
-       // Можливо, тут теж треба викликати handleErrorMessage
-        this.handleErrorMessage({ role: 'error', content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
+      // Ловимо помилки, що виникли до внутрішнього try або в базових операціях
+      this.plugin.logger.error("[handleMessageAdded - TEST] <<< CAUGHT OUTER ERROR >>>", outerError);
   } finally {
-      // Ensure promise is always resolved
+      // Резолвимо Promise, якщо він є, щоб розблокувати sendMessage
       if (this.currentMessageAddedResolver) {
-          this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${data?.message?.role}. Might be premature if error occurred.`);
-          this.currentMessageAddedResolver();
+          // Використовуємо WARN, щоб бачити, коли саме він резолвиться
+          this.plugin.logger.warn(`[handleMessageAdded - TEST] Resolving promise in finally. Role: ${data?.message?.role}.`);
+          try {
+               this.currentMessageAddedResolver();
+          } catch (resolveError) {
+               this.plugin.logger.error("[handleMessageAdded - TEST] Error calling resolver!", resolveError);
+          }
           this.currentMessageAddedResolver = null;
+      } else {
+           this.plugin.logger.debug(`[handleMessageAdded - TEST] No resolver found in finally. Role: ${data?.message?.role}`);
       }
-       this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`); // LOG H
+      // Логуємо вихід з finally
+      this.plugin.logger.error(`[handleMessageAdded - TEST] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${timestamp}`);
   }
-}
+} // Кінець тестового handleMessageAdded
 
 
   private handleMessagesCleared = (chatId: string): void => {

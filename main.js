@@ -1610,6 +1610,7 @@ This action cannot be undone.`,
         this.renderRoleList();
       }
     };
+    // Кінець тестового handleMessageAdded
     this.handleMessagesCleared = (chatId) => {
       var _a;
       if (chatId === ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
@@ -2561,92 +2562,67 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
-  // --- Переконайтесь, що handleMessageAdded виглядає так: ---
+  // OllamaView.ts
+  // ЗАМІНІТЬ ваш поточний handleMessageAdded на ЦЮ ВЕРСІЮ для тестування
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    const isAssistant = ((_a = data == null ? void 0 : data.message) == null ? void 0 : _a.role) === "assistant";
+    const timestamp = (_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime();
+    this.plugin.logger.error(`[handleMessageAdded - TEST] <<< ENTERED >>> Role: ${(_d = data == null ? void 0 : data.message) == null ? void 0 : _d.role}, Ts: ${timestamp}`);
     try {
-      if (!data || !data.message) {
-        this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
-        if (this.currentMessageAddedResolver) {
-        }
+      if (!data || !data.message || !this.chatContainer) {
+        this.plugin.logger.error("[handleMessageAdded - TEST] Invalid data or chatContainer missing.");
         return;
       }
-      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
-      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) {
+      if (data.chatId !== ((_e = this.plugin.chatManager) == null ? void 0 : _e.getActiveChatId())) {
+        this.plugin.logger.debug("[handleMessageAdded - TEST] Ignoring message for different chat.");
         return;
       }
-      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) {
-        return;
-      }
-      if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime())) {
-        return;
-      }
-      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`);
+      this.plugin.logger.debug(`[handleMessageAdded - TEST] Passed initial checks. Role: ${data.message.role}`);
       this.currentMessages.push(data.message);
-      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
-      if (isNewDay) {
-        this.renderDateSeparator(data.message.timestamp);
-        this.lastRenderedMessageDate = data.message.timestamp;
-      } else if (!this.lastRenderedMessageDate && ((_a = this.chatContainer) == null ? void 0 : _a.children.length) === 0) {
-        this.lastRenderedMessageDate = data.message.timestamp;
-      }
       this.hideEmptyState();
-      let messageGroupEl = null;
-      let rendererRan = false;
-      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`);
-      try {
-        let renderer = null;
-        switch (data.message.role) {
-          case "user":
-            renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this);
-            rendererRan = true;
-            break;
-          case "assistant":
-            renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
-            rendererRan = true;
-            break;
-          case "system":
-            renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
-            rendererRan = true;
-            break;
-          case "error":
-            this.handleErrorMessage(data.message);
-            break;
-          default:
-            this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
-        }
-        if (renderer) {
-          const result = renderer.render();
-          messageGroupEl = result instanceof Promise ? await result : result;
-        }
-        if (rendererRan) {
-          this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? "defined" : "null"}. Role: ${data.message.role}`);
-        }
-        if (rendererRan && messageGroupEl) {
-          if (this.chatContainer) {
-            this.chatContainer.appendChild(messageGroupEl);
-            this.lastMessageElement = messageGroupEl;
-            if (!messageGroupEl.isConnected) {
-            }
-            this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`);
+      if (isAssistant) {
+        this.plugin.logger.warn(`[handleMessageAdded - TEST] >>> Handling ASSISTANT message. Appending simple div.`);
+        let simpleDiv = null;
+        try {
+          simpleDiv = this.chatContainer.createDiv({
+            text: `ASSISTANT TEST - TS: ${timestamp} - Content: ${data.message.content.substring(0, 50)}...`,
+            cls: "assistant-test-message"
+            // Додамо клас для легкого пошуку в інспекторі
+          });
+          if (!simpleDiv || !simpleDiv.isConnected) {
+            this.plugin.logger.error("[handleMessageAdded - TEST] Simple div NOT connected after createDiv!");
           } else {
+            this.plugin.logger.warn("[handleMessageAdded - TEST] Simple div appended successfully.");
+            this.lastMessageElement = simpleDiv;
+            this.guaranteedScrollToBottom(100, true);
           }
-        } else if (rendererRan && !messageGroupEl) {
+        } catch (e) {
+          this.plugin.logger.error("[handleMessageAdded - TEST] Error creating/appending simple div:", e);
+          try {
+            this.chatContainer.appendText(`[ERROR CREATING TEST DIV: ${e.message}]`);
+          } catch (e2) {
+          }
         }
-      } catch (renderError) {
-        this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError);
-        this.handleErrorMessage({ role: "error", content: `Failed to display ${data.message.role} message. Error: ${renderError.message}`, timestamp: new Date() });
+      } else {
+        this.plugin.logger.debug(`[handleMessageAdded - TEST] Skipping rendering for role: ${data.message.role}`);
       }
+      this.plugin.logger.debug(`[handleMessageAdded - TEST] Main logic finished for Role: ${data.message.role}`);
     } catch (outerError) {
-      this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
-      this.handleErrorMessage({ role: "error", content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
+      this.plugin.logger.error("[handleMessageAdded - TEST] <<< CAUGHT OUTER ERROR >>>", outerError);
     } finally {
       if (this.currentMessageAddedResolver) {
-        this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${(_b = data == null ? void 0 : data.message) == null ? void 0 : _b.role}. Might be premature if error occurred.`);
-        this.currentMessageAddedResolver();
+        this.plugin.logger.warn(`[handleMessageAdded - TEST] Resolving promise in finally. Role: ${(_f = data == null ? void 0 : data.message) == null ? void 0 : _f.role}.`);
+        try {
+          this.currentMessageAddedResolver();
+        } catch (resolveError) {
+          this.plugin.logger.error("[handleMessageAdded - TEST] Error calling resolver!", resolveError);
+        }
         this.currentMessageAddedResolver = null;
+      } else {
+        this.plugin.logger.debug(`[handleMessageAdded - TEST] No resolver found in finally. Role: ${(_g = data == null ? void 0 : data.message) == null ? void 0 : _g.role}`);
       }
-      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${(_c = data == null ? void 0 : data.message) == null ? void 0 : _c.role}, Ts: ${(_e = (_d = data == null ? void 0 : data.message) == null ? void 0 : _d.timestamp) == null ? void 0 : _e.getTime()}`);
+      this.plugin.logger.error(`[handleMessageAdded - TEST] <<< EXITED (finally) >>> Role: ${(_h = data == null ? void 0 : data.message) == null ? void 0 : _h.role}, Ts: ${timestamp}`);
     }
   }
   // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
