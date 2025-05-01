@@ -2414,7 +2414,11 @@ This action cannot be undone.`,
       })
     );
     this.register(this.plugin.on("active-chat-changed", (data) => this.handleActiveChatChanged(data)));
-    this.register(this.plugin.on("message-added", (data) => this.handleMessageAdded(data)));
+    this.register(this.plugin.on("message-added", (data) => {
+      var _a, _b, _c;
+      this.plugin.logger.error(`[OllamaView Listener] 'message-added' listener called. Role: ${(_a = data == null ? void 0 : data.message) == null ? void 0 : _a.role}. Timestamp: ${(_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime()}`);
+      this.handleMessageAdded(data);
+    }));
     this.register(this.plugin.on("messages-cleared", (chatId) => this.handleMessagesCleared(chatId)));
     this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
     this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
@@ -2557,110 +2561,93 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
+  // --- Переконайтесь, що handleMessageAdded виглядає так: ---
   async handleMessageAdded(data) {
-    var _a, _b;
-    if (data.chatId !== ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
-      return;
-    }
-    if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime())) {
-      return;
-    }
-    this.currentMessages.push(data.message);
-    if (!this.chatContainer) {
-      this.plugin.logger.error("[handleMessageAdded] Chat container not found!");
-      return;
-    }
-    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
-    if (isNewDay) {
-      this.renderDateSeparator(data.message.timestamp);
-      this.lastRenderedMessageDate = data.message.timestamp;
-    } else if (!this.lastRenderedMessageDate && ((_b = this.chatContainer) == null ? void 0 : _b.children.length) === 0) {
-      this.lastRenderedMessageDate = data.message.timestamp;
-    }
-    this.hideEmptyState();
-    let messageGroupEl = null;
+    var _a, _b, _c, _d, _e;
     try {
-      this.plugin.logger.debug(`[handleMessageAdded] Rendering message with role: ${data.message.role}`);
-      let renderer = null;
-      switch (data.message.role) {
-        case "user":
-          renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this);
-          break;
-        case "assistant":
-          renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
-          break;
-        case "system":
-          renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
-          break;
-        case "error":
-          this.consecutiveErrorMessages.push(data.message);
-          const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
-          if (!isContinuingError) {
-            this.errorGroupElement = null;
-            this.consecutiveErrorMessages = [data.message];
+      if (!data || !data.message) {
+        this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
+        if (this.currentMessageAddedResolver) {
+        }
+        return;
+      }
+      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
+      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) {
+        return;
+      }
+      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) {
+        return;
+      }
+      if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime())) {
+        return;
+      }
+      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`);
+      this.currentMessages.push(data.message);
+      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
+      if (isNewDay) {
+        this.renderDateSeparator(data.message.timestamp);
+        this.lastRenderedMessageDate = data.message.timestamp;
+      } else if (!this.lastRenderedMessageDate && ((_a = this.chatContainer) == null ? void 0 : _a.children.length) === 0) {
+        this.lastRenderedMessageDate = data.message.timestamp;
+      }
+      this.hideEmptyState();
+      let messageGroupEl = null;
+      let rendererRan = false;
+      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`);
+      try {
+        let renderer = null;
+        switch (data.message.role) {
+          case "user":
+            renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
+            break;
+          case "assistant":
+            renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
+            break;
+          case "system":
+            renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
+            break;
+          case "error":
+            this.handleErrorMessage(data.message);
+            break;
+          default:
+            this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
+        }
+        if (renderer) {
+          const result = renderer.render();
+          messageGroupEl = result instanceof Promise ? await result : result;
+        }
+        if (rendererRan) {
+          this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? "defined" : "null"}. Role: ${data.message.role}`);
+        }
+        if (rendererRan && messageGroupEl) {
+          if (this.chatContainer) {
+            this.chatContainer.appendChild(messageGroupEl);
+            this.lastMessageElement = messageGroupEl;
+            if (!messageGroupEl.isConnected) {
+            }
+            this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`);
+          } else {
           }
-          this.renderOrUpdateErrorGroup(isContinuingError);
-          messageGroupEl = this.errorGroupElement;
-          break;
-        default:
-          this.plugin.logger.warn(`[handleMessageAdded] Unknown message role encountered: ${data.message.role}`);
-      }
-      if (renderer) {
-        const result = renderer.render();
-        if (result instanceof Promise) {
-          messageGroupEl = await result;
-        } else {
-          messageGroupEl = result;
+        } else if (rendererRan && !messageGroupEl) {
         }
+      } catch (renderError) {
+        this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError);
+        this.handleErrorMessage({ role: "error", content: `Failed to display ${data.message.role} message. Error: ${renderError.message}`, timestamp: new Date() });
       }
-      if (messageGroupEl && data.message.role !== "error") {
-        this.chatContainer.appendChild(messageGroupEl);
-        this.lastMessageElement = messageGroupEl;
-        this.plugin.logger.debug(`[handleMessageAdded] Appended message group for role: ${data.message.role}`);
-        messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-        setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-        const isUserMessage = data.message.role === "user";
-        if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
-          this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE);
-        } else if (!this.userScrolledUp) {
-          const forceScroll = !isUserMessage;
-          this.guaranteedScrollToBottom(forceScroll ? 100 : 50, forceScroll);
-        }
-        setTimeout(() => this.updateScrollStateAndIndicators(), 100);
-      } else if (data.message.role !== "error") {
-        this.plugin.logger.warn(
-          `[handleMessageAdded] messageGroupEl was null after attempting to render role: ${data.message.role}. Message not added to DOM.`
-        );
+    } catch (outerError) {
+      this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
+      this.handleErrorMessage({ role: "error", content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
+    } finally {
+      if (this.currentMessageAddedResolver) {
+        this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${(_b = data == null ? void 0 : data.message) == null ? void 0 : _b.role}. Might be premature if error occurred.`);
+        this.currentMessageAddedResolver();
+        this.currentMessageAddedResolver = null;
       }
-    } catch (error) {
-      this.plugin.logger.error(`[handleMessageAdded] Error rendering message (role: ${data.message.role}):`, error, data.message);
-      const renderErrorMsg = {
-        role: "error",
-        content: `Failed to display ${data.message.role} message. Error: ${error instanceof Error ? error.message : String(error)}`,
-        timestamp: new Date()
-      };
-      this.consecutiveErrorMessages.push(renderErrorMsg);
-      const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
-      if (!isContinuingError) {
-        this.errorGroupElement = null;
-        this.consecutiveErrorMessages = [renderErrorMsg];
-      }
-      this.renderOrUpdateErrorGroup(isContinuingError);
+      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${(_c = data == null ? void 0 : data.message) == null ? void 0 : _c.role}, Ts: ${(_e = (_d = data == null ? void 0 : data.message) == null ? void 0 : _d.timestamp) == null ? void 0 : _e.getTime()}`);
     }
-    if (this.isMenuOpen()) {
-      const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-      if (isChatSubmenuVisible) {
-        this.renderChatListMenu();
-      }
-    }
-    if (this.currentMessageAddedResolver) {
-      this.plugin.logger.debug(`handleMessageAdded: Resolving promise for role ${data.message.role}, ts: ${data.message.timestamp.getTime()}`);
-      this.currentMessageAddedResolver();
-      this.currentMessageAddedResolver = null;
-    } else {
-      this.plugin.logger.debug(`handleMessageAdded: No active resolver found for role ${data.message.role}, ts: ${data.message.timestamp.getTime()}`);
-    }
-    this.plugin.logger.info(`[handleMessageAdded] <<< EXITED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
   }
   // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
   // --- UI Update Methods ---
@@ -4886,6 +4873,38 @@ Summary:`;
     } catch (error) {
       this.plugin.logger.error("[summarizeErrors] Failed to summarize errors:", error);
       return null;
+    }
+  }
+  /**
+  * Централізовано обробляє повідомлення про помилки,
+  * керує буфером послідовних помилок та викликає оновлення/створення групи помилок.
+  * @param errorMessage - Повідомлення про помилку для обробки.
+  */
+  handleErrorMessage(errorMessage) {
+    if (errorMessage.role !== "error") {
+      this.plugin.logger.warn(`handleErrorMessage called with non-error message role: ${errorMessage.role}`);
+      return;
+    }
+    this.consecutiveErrorMessages.push(errorMessage);
+    const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+    if (!isContinuingError) {
+      this.errorGroupElement = null;
+      this.consecutiveErrorMessages = [errorMessage];
+    }
+    try {
+      this.renderOrUpdateErrorGroup(isContinuingError);
+    } catch (error) {
+      this.plugin.logger.error("[handleErrorMessage] Failed to render/update error group:", error);
+      try {
+        const fallbackErrorNode = document.createTextNode(`[Failed to display error: ${errorMessage.content}]`);
+        if (this.chatContainer) {
+          this.chatContainer.appendChild(fallbackErrorNode);
+          this.chatContainer.appendChild(document.createElement("br"));
+          this.guaranteedScrollToBottom(50, true);
+        }
+      } catch (fallbackError2) {
+        console.error("Failed even to display fallback text node for error:", fallbackError2);
+      }
     }
   }
 };
@@ -7530,6 +7549,8 @@ var ChatManager = class {
     this.plugin.logger.debug(`Added ${role} message with timestamp ${messageTimestamp.toISOString()} to active chat ${activeChat.metadata.id}. Emit event: ${emitEvent}`);
     const indexUpdated = await this.saveChatAndUpdateIndex(activeChat);
     if (emitEvent && indexUpdated) {
+      const eventData = { chatId: this.activeChatId, message: newMessage };
+      this.plugin.logger.error("[ChatManager] >>> Emitting 'message-added' event NOW. Data:", eventData);
       this.plugin.emit("message-added", { chatId: activeChat.metadata.id, message: newMessage });
     }
     return newMessage;

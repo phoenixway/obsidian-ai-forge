@@ -588,6 +588,8 @@ export class ChatManager {
 
         // --- ВИПРАВЛЕНО: Генеруємо подію тільки якщо emitEvent = true ---
         if (emitEvent && indexUpdated) { // Генеруємо тільки якщо збереження індексу вдалося
+            const eventData = { chatId: this.activeChatId, message: newMessage };
+            this.plugin.logger.error("[ChatManager] >>> Emitting 'message-added' event NOW. Data:", eventData); // LOG EMIT
             this.plugin.emit('message-added', { chatId: activeChat.metadata.id, message: newMessage });
         }
         // --- Кінець виправлення ---
