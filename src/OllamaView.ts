@@ -706,194 +706,107 @@ export class OllamaView extends ItemView {
     return { header, content, section };
   };
 
-  private attachEventListeners(): void {
-    // --- Null Checks for Required Elements ---
-    // Input Area
-    if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
-    if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
-    if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing during attachEventListeners!");
-    if (!this.voiceButton) console.error("OllamaView: voiceButton missing during attachEventListeners!");
-    if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing during attachEventListeners!");
-    if (!this.menuButton) console.error("OllamaView: menuButton missing during attachEventListeners!");
-    if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing during attachEventListeners!");
-    if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing during attachEventListeners!");
-    if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing during attachEventListeners!");
-    if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing during attachEventListeners!");
-    // Chat Area
-    if (!this.chatContainer) console.error("OllamaView: chatContainer missing during attachEventListeners!");
-    if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing during attachEventListeners!");
-    if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing during attachEventListeners!");
-    // Sidebar
-    if (!this.chatPanelHeaderEl) console.error("OllamaView: chatPanelHeaderEl missing during attachEventListeners!");
-    if (!this.rolePanelHeaderEl) console.error("OllamaView: rolePanelHeaderEl missing during attachEventListeners!");
-    if (!this.newChatSidebarButton) console.error("OllamaView: newChatSidebarButton missing during attachEventListeners!");
-    // Dropdown Menu
-    if (!this.modelSubmenuHeader) console.error("OllamaView: modelSubmenuHeader missing during attachEventListeners!");
-    if (!this.roleSubmenuHeader) console.error("OllamaView: roleSubmenuHeader missing during attachEventListeners!");
-    if (!this.chatSubmenuHeader) console.error("OllamaView: chatSubmenuHeader missing during attachEventListeners!");
-    if (!this.newChatOption) console.error("OllamaView: newChatOption missing during attachEventListeners!");
-    if (!this.renameChatOption) console.error("OllamaView: renameChatOption missing during attachEventListeners!");
-    if (!this.cloneChatOption) console.error("OllamaView: cloneChatOption missing during attachEventListeners!");
-    if (!this.exportChatOption) console.error("OllamaView: exportChatOption missing during attachEventListeners!");
-    if (!this.clearChatOption) console.error("OllamaView: clearChatOption missing during attachEventListeners!");
-    if (!this.deleteChatOption) console.error("OllamaView: deleteChatOption missing during attachEventListeners!");
-    if (!this.toggleViewLocationOption) console.error("OllamaView: toggleViewLocationOption missing during attachEventListeners!");
-    if (!this.settingsOption) console.error("OllamaView: settingsOption missing during attachEventListeners!");
+  
+    // --- Event Listeners (ПОВНА ВЕРСІЯ) ---
+    private attachEventListeners(): void {
+      // Null Checks for Required Elements
+      if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
+      if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
+      if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing during attachEventListeners!");
+      if (!this.voiceButton) console.error("OllamaView: voiceButton missing during attachEventListeners!");
+      if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing during attachEventListeners!");
+      if (!this.menuButton) console.error("OllamaView: menuButton missing during attachEventListeners!");
+      if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing during attachEventListeners!");
+      if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing during attachEventListeners!");
+      if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing during attachEventListeners!");
+      if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing during attachEventListeners!");
+      if (!this.chatContainer) console.error("OllamaView: chatContainer missing during attachEventListeners!");
+      if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing during attachEventListeners!");
+      if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing during attachEventListeners!");
+      if (!this.chatPanelHeaderEl) console.error("OllamaView: chatPanelHeaderEl missing during attachEventListeners!");
+      if (!this.rolePanelHeaderEl) console.error("OllamaView: rolePanelHeaderEl missing during attachEventListeners!");
+      if (!this.newChatSidebarButton) console.error("OllamaView: newChatSidebarButton missing during attachEventListeners!");
+      if (!this.modelSubmenuHeader) console.error("OllamaView: modelSubmenuHeader missing during attachEventListeners!");
+      if (!this.roleSubmenuHeader) console.error("OllamaView: roleSubmenuHeader missing during attachEventListeners!");
+      if (!this.chatSubmenuHeader) console.error("OllamaView: chatSubmenuHeader missing during attachEventListeners!");
+      if (!this.newChatOption) console.error("OllamaView: newChatOption missing during attachEventListeners!");
+      if (!this.renameChatOption) console.error("OllamaView: renameChatOption missing during attachEventListeners!");
+      if (!this.cloneChatOption) console.error("OllamaView: cloneChatOption missing during attachEventListeners!");
+      if (!this.exportChatOption) console.error("OllamaView: exportChatOption missing during attachEventListeners!");
+      if (!this.clearChatOption) console.error("OllamaView: clearChatOption missing during attachEventListeners!");
+      if (!this.deleteChatOption) console.error("OllamaView: deleteChatOption missing during attachEventListeners!");
+      if (!this.toggleViewLocationOption) console.error("OllamaView: toggleViewLocationOption missing during attachEventListeners!");
+      if (!this.settingsOption) console.error("OllamaView: settingsOption missing during attachEventListeners!");
 
-    // --- Input Textarea Listeners ---
-    if (this.inputEl) {
-        // Ensure handlers like handleKeyDown use 'this' correctly (e.g., defined as arrow functions)
-        this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
-        this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
-    }
+      // Input Textarea Listeners
+      if (this.inputEl) {
+          this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
+          this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
+      }
 
-    // --- Input Control Buttons Listeners ---
-    if (this.sendButton) {
-        this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
-    }
-    if (this.stopGeneratingButton) {
-        // cancelGeneration is already an arrow function, preserving 'this'
-        this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
-    }
-    if (this.voiceButton) {
-        this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
-    }
-    if (this.translateInputButton) {
-        this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
-    }
-    if (this.menuButton) {
-        this.registerDomEvent(this.menuButton, "click", this.handleMenuClick);
-    }
-    if (this.toggleLocationButton) {
-        this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
-    }
+      // Input Control Buttons Listeners
+      if (this.sendButton) { this.registerDomEvent(this.sendButton, "click", this.handleSendClick); }
+      if (this.stopGeneratingButton) { this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration); } // cancelGeneration - стрілкова функція
+      if (this.voiceButton) { this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick); }
+      if (this.translateInputButton) { this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick); }
+      if (this.menuButton) { this.registerDomEvent(this.menuButton, "click", this.handleMenuClick); }
+      if (this.toggleLocationButton) { this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick); }
 
-    // --- Input Info Indicators Listeners ---
-    if (this.modelDisplayEl) {
-        this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
-    }
-    if (this.roleDisplayEl) {
-        this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
-    }
-    if (this.temperatureIndicatorEl) {
-        this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
-    }
+       // Input Info Indicators Listeners
+       if (this.modelDisplayEl) { this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick); }
+       if (this.roleDisplayEl) { this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick); }
+       if (this.temperatureIndicatorEl) { this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick); }
 
-    // --- Sidebar Panel Elements Listeners ---
-    // Sidebar Section Headers (Accordion Toggle)
-    if (this.chatPanelHeaderEl) {
-        // Use arrow function to ensure 'this' in toggleSidebarSection is correct
-        this.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSidebarSection(this.chatPanelHeaderEl));
-    }
-    if (this.rolePanelHeaderEl) {
-        // Use arrow function to ensure 'this' in toggleSidebarSection is correct
-        this.registerDomEvent(this.rolePanelHeaderEl, "click", () => this.toggleSidebarSection(this.rolePanelHeaderEl));
-    }
-    // Sidebar "New Chat" Button
-    if (this.newChatSidebarButton) {
-        // Use arrow function for the handler to ensure 'this.handleNewChatClick' has correct context
-        this.registerDomEvent(this.newChatSidebarButton, "click", (e) => {
-            e.stopPropagation(); // Prevent toggling the section accidentally
-            this.handleNewChatClick(); // Assumes handleNewChatClick is arrow function or bound
-        });
-    }
+      // Sidebar Panel Elements Listeners
+      if (this.chatPanelHeaderEl) { this.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSidebarSection(this.chatPanelHeaderEl)); }
+      if (this.rolePanelHeaderEl) { this.registerDomEvent(this.rolePanelHeaderEl, "click", () => this.toggleSidebarSection(this.rolePanelHeaderEl)); }
+      if (this.newChatSidebarButton) { this.registerDomEvent(this.newChatSidebarButton, "click", (e) => { e.stopPropagation(); this.handleNewChatClick(); }); }
 
-    // --- Dropdown Menu Listeners ---
-    // Submenu Headers (Accordion Toggle)
-    if (this.modelSubmenuHeader && this.modelSubmenuContent) {
-        // Use arrow function for handler to ensure 'this' in toggleSubmenu is correct
-        this.registerDomEvent(this.modelSubmenuHeader, "click", () =>
-            this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")
-        );
-    }
-    if (this.roleSubmenuHeader && this.roleSubmenuContent) {
-        // Use arrow function for handler to ensure 'this' in toggleSubmenu is correct
-        this.registerDomEvent(this.roleSubmenuHeader, "click", () =>
-            this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")
-        );
-    }
-    if (this.chatSubmenuHeader && this.chatSubmenuContent) {
-        // Use arrow function for handler to ensure 'this' in toggleSubmenu is correct
-        this.registerDomEvent(this.chatSubmenuHeader, "click", () =>
-            this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")
-        );
-    }
+      // Dropdown Menu Listeners
+      if (this.modelSubmenuHeader && this.modelSubmenuContent) { this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")); }
+      if (this.roleSubmenuHeader && this.roleSubmenuContent) { this.registerDomEvent(this.roleSubmenuHeader, "click", () => this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")); }
+      if (this.chatSubmenuHeader && this.chatSubmenuContent) { this.registerDomEvent(this.chatSubmenuHeader, "click", () => this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")); }
+      if (this.newChatOption) { this.registerDomEvent(this.newChatOption, "click", this.handleNewChatClick); }
+      if (this.renameChatOption) { this.registerDomEvent(this.renameChatOption, "click", () => { this.handleRenameChatClick(); }); }
+      if (this.cloneChatOption) { this.registerDomEvent(this.cloneChatOption, "click", this.handleCloneChatClick); }
+      if (this.exportChatOption) { this.registerDomEvent(this.exportChatOption, "click", this.handleExportChatClick); }
+      if (this.clearChatOption) { this.registerDomEvent(this.clearChatOption, "click", this.handleClearChatClick); }
+      if (this.deleteChatOption) { this.registerDomEvent(this.deleteChatOption, "click", this.handleDeleteChatClick); }
+      if (this.toggleViewLocationOption) { this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick); }
+      if (this.settingsOption) { this.registerDomEvent(this.settingsOption, "click", this.handleSettingsClick); }
 
-    // Direct Dropdown Menu Options
-    if (this.newChatOption) {
-        this.registerDomEvent(this.newChatOption, "click", this.handleNewChatClick);
-    }
-    if (this.renameChatOption) {
-        // Use arrow function for handler to call handleRenameChatClick correctly
-        this.registerDomEvent(this.renameChatOption, "click", () => {
-            this.handleRenameChatClick(); // Calls handler for the active chat
-        });
-    }
-    if (this.cloneChatOption) {
-        this.registerDomEvent(this.cloneChatOption, "click", this.handleCloneChatClick);
-    }
-    if (this.exportChatOption) {
-        this.registerDomEvent(this.exportChatOption, "click", this.handleExportChatClick);
-    }
-    if (this.clearChatOption) {
-        this.registerDomEvent(this.clearChatOption, "click", this.handleClearChatClick);
-    }
-    if (this.deleteChatOption) {
-        this.registerDomEvent(this.deleteChatOption, "click", this.handleDeleteChatClick);
-    }
-    if (this.toggleViewLocationOption) {
-        this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick);
-    }
-    if (this.settingsOption) {
-        this.registerDomEvent(this.settingsOption, "click", this.handleSettingsClick);
-    }
+      // Chat Area Listeners
+      if (this.chatContainer) { this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced); }
+      if (this.newMessagesIndicatorEl) { this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick); }
+      if (this.scrollToBottomButton) { this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick); }
 
-    // --- Chat Area Listeners ---
-    if (this.chatContainer) {
-        // scrollListenerDebounced is created with debounce, should handle 'this' from its definition context
-        this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
-    }
-    if (this.newMessagesIndicatorEl) {
-        this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
-    }
-    if (this.scrollToBottomButton) {
-        this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
-    }
+      // Window/Workspace/Document Listeners
+      this.registerDomEvent(window, "resize", this.handleWindowResize);
+      this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
+      this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
+      this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
+      this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
 
-    // --- Window/Workspace/Document Listeners ---
-    this.registerDomEvent(window, "resize", this.handleWindowResize);
-    this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize)); // Ensure handleWindowResize is arrow fn or bound
-    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu); // Ensure handleDocumentClickForMenu is arrow fn or bound
-    this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange); // Ensure handleVisibilityChange is arrow fn or bound
-    this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange)); // Ensure handleActiveLeafChange is arrow fn or bound
+      // Plugin Event Listeners (Using Arrow Functions for 'this' binding)
+      this.register(this.plugin.on("model-changed", (modelName) => this.handleModelChange(modelName)));
+      this.register(this.plugin.on("role-changed", (roleName) => this.handleRoleChange(roleName)));
+      this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
+      this.register(this.plugin.on("roles-updated", () => { if (this.rolePanelHeaderEl?.getAttribute("data-collapsed") === "false") { this.updateRolePanelList(); } }));
+      this.register(this.plugin.on("active-chat-changed", (data) => this.handleActiveChatChanged(data)));
+      // --- Listener, що викликає handleMessageAdded ---
+      this.register(this.plugin.on("message-added", (data) => {
+           this.plugin.logger.error(`[OllamaView Listener] 'message-added' listener called. Role: ${data?.message?.role}. Timestamp: ${data?.message?.timestamp?.getTime()}`);
+           this.handleMessageAdded(data); // Викликаємо обробник
+      }));
+      // --- Кінець ---
+      this.register(this.plugin.on("messages-cleared", (chatId) => this.handleMessagesCleared(chatId)));
+      this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
+      this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
+      this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
 
-    // --- Plugin Event Listeners (Using Arrow Functions to preserve 'this') ---
-    this.register(this.plugin.on("model-changed", (modelName) => this.handleModelChange(modelName)));
-    this.register(this.plugin.on("role-changed", (roleName) => this.handleRoleChange(roleName)));
-    this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated())); // Assuming handleRolesUpdated doesn't need 'this' or is arrow fn
-    this.register(
-        this.plugin.on("roles-updated", () => {
-            // This one uses an arrow function, preserving 'this'
-            if (this.rolePanelHeaderEl?.getAttribute("data-collapsed") === "false") {
-                this.updateRolePanelList(); // Needs 'this' context
-            }
-        })
-    );
-    this.register(this.plugin.on("active-chat-changed", (data) => this.handleActiveChatChanged(data)));
-    // this.register(this.plugin.on("message-added", (data) => this.handleMessageAdded(data))); // Corrected binding here
-    this.register(this.plugin.on("message-added", (data) => {
-      // Log that the listener function itself was invoked
-      this.plugin.logger.error(`[OllamaView Listener] 'message-added' listener called. Role: ${data?.message?.role}. Timestamp: ${data?.message?.timestamp?.getTime()}`);
-      // Now call the actual handler
-      this.handleMessageAdded(data);
-  }));
-    this.register(this.plugin.on("messages-cleared", (chatId) => this.handleMessagesCleared(chatId)));
-    this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
-    this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
-    this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
+      this.plugin.logger.debug("[OllamaView] All event listeners attached.");
+  }
 
-    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
-}
 
   private cancelGeneration = (): void => {
     if (this.currentAbortController) {
@@ -1745,107 +1658,98 @@ export class OllamaView extends ItemView {
     }
   };
   
-// OllamaView.ts
-
-private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
-  // --- Top-Level Try/Catch ---
+ // --- Message Handling (ПОВНА ВЕРСІЯ З РЕНДЕРЕРАМИ) ---
+ private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
+  // Top-Level Try/Catch
   try {
-      // --- Very First Check ---
-      if (!data || !data.message) { /* ... */ return; }
+      // Very First Check
+      if (!data || !data.message) {
+          this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
+          if (this.currentMessageAddedResolver) { this.plugin.logger.error("[handleMessageAdded] Resolving promise due to invalid data."); this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; }
+          return;
+      }
 
-      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`); // LOG A
+      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
 
       // Initial checks
-      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) { /* ... */ return; }
-      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) { /* ... */ return; }
-      if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime())) { /* ... */ return; }
+      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) { console.error("[handleMessageAdded] CRITICAL: 'this', 'this.plugin', 'this.chatContainer' or 'this.plugin.chatManager' is undefined/null at start!"); if (this?.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; } return; }
+      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) { this.plugin.logger.debug(`[handleMessageAdded] Ignored: Event for different chat.`); if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; } return; }
+      if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime())) { this.plugin.logger.warn(`[handleMessageAdded] Ignored: Duplicate timestamp.`); if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; } return; }
 
-      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`); // LOG B
 
-      // Код між LOG B і LOG C
+      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`);
+
       this.currentMessages.push(data.message);
       const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
       if (isNewDay) { this.renderDateSeparator(data.message.timestamp); this.lastRenderedMessageDate = data.message.timestamp; }
       else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) { this.lastRenderedMessageDate = data.message.timestamp; }
       this.hideEmptyState();
-      // Кінець коду між LOG B і LOG C
-
 
       let messageGroupEl: HTMLElement | null = null;
       let rendererRan = false;
 
-      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`); // LOG C
-      // --- Inner Try/Catch for Rendering Specifics ---
+      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`);
+      // Inner Try/Catch for Rendering Specifics
       try {
           let renderer: UserMessageRenderer | AssistantMessageRenderer | SystemMessageRenderer | null = null;
 
           switch (data.message.role) {
-               case "user":
-                   renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this);
-                   rendererRan = true;
-                   break;
-               case "assistant":
-                   // --- ТИМЧАСОВИЙ ТЕСТ: ПРОПУСКАЄМО РЕНДЕРЕР ---
-                   this.plugin.logger.error("[handleMessageAdded] Reached ASSISTANT case. SKIPPING RENDERER execution for test.");
-                   rendererRan = false; // Немає рендерера -> не будемо додавати елемент
-                   messageGroupEl = null;
-                   // Закоментуємо реальний виклик:
-                   // renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
-                   // rendererRan = true;
-                   // --- КІНЕЦЬ ТЕСТУ ---
-                   break;
-               case "system":
-                   renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
-                   rendererRan = true;
-                   break;
+               case "user": renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
+               case "assistant": renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
+               case "system": renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
                case "error":
-                   this.handleErrorMessage(data.message);
+                   this.handleErrorMessage(data.message); // Errors handled separately
                    break;
                default: this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
           }
 
-          // Викликаємо рендеринг, якщо це стандартне повідомлення (і не асистент у цьому тесті)
           if (renderer) {
               this.plugin.logger.debug(`[handleMessageAdded] Calling renderer.render() for role: ${data.message.role}`);
               const result = renderer.render();
               if (result instanceof Promise) {
-                  // AssistantMessageRenderer.render() is async, but we skip it in this test
-                  // If other renderers become async, await is needed here
+                  this.plugin.logger.debug(`[handleMessageAdded] Awaiting async render for role: ${data.message.role}`);
                   messageGroupEl = await result;
+                  this.plugin.logger.debug(`[handleMessageAdded] Async render finished for role: ${data.message.role}`);
               } else {
                   messageGroupEl = result;
               }
           }
-          // Логуємо результат рендерингу
-          if (rendererRan) {
-               this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? 'defined' : 'null'}. Role: ${data.message.role}`); // LOG D
-          }
+           if (rendererRan) {
+                this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? 'defined' : 'null'}. Role: ${data.message.role}`);
+           }
 
-          // --- Додаємо стандартний елемент повідомлення в DOM (пропускається для assistant в цьому тесті) ---
-          if (rendererRan && messageGroupEl) {
-               if (this.chatContainer) {
-                   this.chatContainer.appendChild(messageGroupEl);
-                   this.lastMessageElement = messageGroupEl;
-                   if (!messageGroupEl.isConnected) { /* ... log error ... */ }
-                   this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`); // LOG E
-                   // ... (Animation and scroll logic) ...
-               } else { /* ... log error ... */ }
-          } else if (rendererRan && !messageGroupEl) { /* ... log warning ... */ }
+           // Append standard message element
+           if (rendererRan && messageGroupEl) {
+                if (this.chatContainer) {
+                    this.chatContainer.appendChild(messageGroupEl);
+                    this.lastMessageElement = messageGroupEl;
+                    if (!messageGroupEl.isConnected) { this.plugin.logger.error(`[handleMessageAdded] Node not connected immediately after appendChild! Role: ${data.message.role}`); }
+                    this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`);
+
+                    // Animation and scroll logic
+                    messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+                    setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+                    const isUserMessage = data.message.role === "user";
+                    if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) { this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE); }
+                    else if (!this.userScrolledUp) { this.guaranteedScrollToBottom(isUserMessage ? 50 : 100, !isUserMessage); }
+                    setTimeout(() => this.updateScrollStateAndIndicators(), 100);
+
+                } else { this.plugin.logger.error("[handleMessageAdded] chatContainer became null before appendChild!"); }
+           } else if (rendererRan && !messageGroupEl) { this.plugin.logger.warn(`[handleMessageAdded] messageGroupEl was null after render ran for role: ${data.message.role}.`); }
 
 
       } catch (renderError: any) {
-           this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError); // LOG F
+           this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError);
            this.handleErrorMessage({ role: 'error', content: `Failed to display ${data.message.role} message. Render Error: ${renderError.message}`, timestamp: new Date() });
       }
       // --- End Inner Try/Catch ---
-
-      this.plugin.logger.debug(`[handleMessageAdded] Main rendering logic finished for Role: ${data.message.role}`); // Новий лог
+      this.plugin.logger.debug(`[handleMessageAdded] Main rendering logic finished for Role: ${data.message.role}`);
 
   } catch (outerError: any) {
        this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
        this.handleErrorMessage({ role: 'error', content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
   } finally {
-      // Завжди резолвимо Promise
+      // Resolve promise if it exists
       if (this.currentMessageAddedResolver) {
           this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${data?.message?.role}.`);
           try { this.currentMessageAddedResolver(); } catch (e) { this.plugin.logger.error("Error resolving promise:", e); }
@@ -1853,9 +1757,10 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       } else {
            this.plugin.logger.debug(`[handleMessageAdded] No resolver found in finally block. Role: ${data?.message?.role}`);
       }
-      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`); // LOG H
+      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`);
   }
 }
+
 
 
   private handleMessagesCleared = (chatId: string): void => {
@@ -2017,46 +1922,30 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
     }
   }
 
-  // OllamaView.ts
+  
+    // --- State Management ---
+    public setLoadingState(isLoading: boolean): void {
+      this.isProcessing = isLoading;
+      if (this.inputEl) this.inputEl.disabled = isLoading;
+      this.updateSendButtonState(); // Updates Send/Stop visibility too
+      if (this.voiceButton) { this.voiceButton.disabled = isLoading; this.voiceButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading); }
+      if (this.translateInputButton) { this.translateInputButton.disabled = isLoading; this.translateInputButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading); }
+      if (this.menuButton) { this.menuButton.disabled = isLoading; this.menuButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading); }
 
-public setLoadingState(isLoading: boolean): void {
-  this.isProcessing = isLoading;
-  if (this.inputEl) this.inputEl.disabled = isLoading;
-
-  // Керування кнопками Send/Stop
-  this.updateSendButtonState();
-
-  // Керування іншими кнопками вводу
-  if (this.voiceButton) {
-      this.voiceButton.disabled = isLoading;
-      this.voiceButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading); // Переконайтесь, що DISABLED є в CSS_CLASSES
-  }
-  if (this.translateInputButton) {
-      this.translateInputButton.disabled = isLoading;
-      this.translateInputButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
-  }
-  if (this.menuButton) {
-      this.menuButton.disabled = isLoading;
-      this.menuButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
-  }
-
-  // Керування кнопками "Show More/Less"
-  if (this.chatContainer) {
-      if (isLoading) {
-          // Ховаємо кнопки при завантаженні
-          this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach(button => {
-              button.style.display = "none";
-          });
-          this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
-      } else {
-          // --- ТИМЧАСОВО КОМЕНТУЄМО ВИКЛИК ---
-          this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing SKIPPED.");
-          // this.checkAllMessagesForCollapsing(); // <--- ЗАКОМЕНТУВАТИ ЦЕЙ РЯДОК
-          // --- КІНЕЦЬ КОМЕНТАРЯ ---
+      // Керування кнопками "Show More/Less"
+      if (this.chatContainer) {
+          if (isLoading) {
+               this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach(button => { button.style.display = "none"; });
+               this.plugin.logger.debug("[setLoadingState] Hid 'Show More' buttons.");
+           } else {
+               // --- ПОВЕРТАЄМО ВИКЛИК ---
+               this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after operation finished.");
+               this.checkAllMessagesForCollapsing(); // Перевіряємо згортання після завершення
+               // --- КІНЕЦЬ ПОВЕРНЕННЯ ---
+           }
       }
+      this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
   }
-  this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
-}
 
   // Load and Display Chat (Тепер оновлює і температуру)
 
@@ -2439,215 +2328,132 @@ private async handleActiveChatChanged(data: { chatId: string | null; chat: Chat 
   };
 
 
-async sendMessage(): Promise<void> {
+  // --- Sending Message (ПОВНА ВЕРСІЯ З PROMISE) ---
+  async sendMessage(): Promise<void> {
     const content = this.inputEl.value.trim();
-    if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
-         if (!content) this.plugin.logger.debug("sendMessage prevented: input empty.");
-         if (this.isProcessing) this.plugin.logger.debug("sendMessage prevented: already processing.");
-         if (this.sendButton.disabled) this.plugin.logger.debug("sendMessage prevented: send button disabled.");
-         if (this.currentAbortController) this.plugin.logger.debug("sendMessage prevented: generation already in progress (AbortController exists).");
-        return;
-    }
-
+    if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) { /* ... logs ... */ return; }
     const activeChat = await this.plugin.chatManager?.getActiveChat();
-    if (!activeChat) {
-        new Notice("Error: No active chat session found.");
-        return;
-    }
+    if (!activeChat) { new Notice("Error: No active chat session found."); return; }
 
     const userMessageContent = this.inputEl.value;
-    this.clearInputField(); // Очищуємо одразу
-    this.setLoadingState(true); // Встановлюємо стан завантаження
-    this.hideEmptyState(); // Приховуємо стан "немає повідомлень"
+    this.clearInputField();
+    this.setLoadingState(true);
+    this.hideEmptyState();
 
-    this.currentAbortController = new AbortController(); // Новий контролер для скасування
-    let assistantPlaceholderGroupEl: HTMLElement | null = null; // Плейсхолдер для ШІ
-    let assistantContentEl: HTMLElement | null = null; // Контейнер контенту в плейсхолдері
-    let accumulatedResponse = ""; // Накопичена відповідь
-    const responseStartTime = new Date(); // Час початку відповіді ШІ
+    this.currentAbortController = new AbortController();
+    let assistantPlaceholderGroupEl: HTMLElement | null = null;
+    let assistantContentEl: HTMLElement | null = null;
+    let accumulatedResponse = "";
+    const responseStartTime = new Date();
 
-    this.stopGeneratingButton?.show(); // Показуємо Stop
-    this.sendButton?.hide(); // Ховаємо Send
+    this.stopGeneratingButton?.show();
+    this.sendButton?.hide();
 
-    // Оголошуємо змінну для Promise поза try, щоб вона була доступна в finally
     let handleMessageAddedPromise: Promise<void> | null = null;
 
     try {
-        // 1. Додаємо повідомлення користувача (чекаємо завершення)
+        // 1. Add user message
         this.plugin.logger.debug("sendMessage: Adding user message to ChatManager...");
         const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
-        if (!userMessage) {
-            throw new Error("Failed to add user message to history.");
-        }
+        if (!userMessage) { throw new Error("Failed to add user message to history."); }
         this.plugin.logger.debug("sendMessage: User message added successfully.");
-        // Примітка: Ми не чекаємо handleMessageAdded для повідомлення користувача тут,
-        // бо його рендеринг не повинен блокувати початок генерації відповіді ШІ.
 
-        // 2. Створюємо ПЛЕЙСХОЛДЕР для потокового повідомлення асистента
-        this.plugin.logger.debug("sendMessage: Creating streaming placeholder for assistant message...");
-        // ... (код створення плейсхолдера assistantPlaceholderGroupEl та assistantContentEl) ...
-        assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`,
-        });
+        // 2. Create placeholder
+        this.plugin.logger.debug("sendMessage: Creating streaming placeholder...");
+        // ... (code to create placeholder) ...
+        assistantPlaceholderGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}` });
         RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
-        const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-        messageWrapper.style.order = "2";
-        const assistantMessageElement = messageWrapper.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
-        });
+        const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" }); messageWrapper.style.order = "2";
+        const assistantMessageElement = messageWrapper.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}` });
         const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-        assistantContentEl = contentContainer.createDiv({
-            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`
-        });
-        const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-        for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-        assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-        setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+        assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}` });
+        const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS }); for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+        assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING); setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
         this.guaranteedScrollToBottom(50, true);
 
-
-        // 3. Запускаємо потоковий запит до Ollama
+        // 3. Start stream
         this.plugin.logger.info("[OllamaView] Starting stream request...");
-        const stream = this.plugin.ollamaService.generateChatResponseStream(
-            activeChat, // Передаємо актуальний стан чату
-            this.currentAbortController.signal
-        );
+        const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
 
-        // 4. Обробляємо потік
+        // 4. Process stream
         let firstChunk = true;
         for await (const chunk of stream) {
-            // ... (обробка помилок у chunk) ...
-             if ("error" in chunk && chunk.error) {
-                if (!chunk.error.includes("aborted by user")) {
-                    this.plugin.logger.error("Error chunk received from stream:", chunk.error);
-                    throw new Error(chunk.error); // Кидаємо помилку для обробки в catch
-                } else {
-                    this.plugin.logger.debug("Stream aborted by user chunk received.");
-                    // Не кидаємо помилку тут, бо AbortError буде оброблено в catch
-                    break; // Виходимо з циклу обробки потоку
-                }
-             }
-
-            // Обробка частини відповіді
+            if ("error" in chunk && chunk.error) { if (!chunk.error.includes("aborted by user")) { throw new Error(chunk.error); } else { break; } }
             if ("response" in chunk && chunk.response && assistantContentEl) {
-                if (firstChunk) {
-                    assistantContentEl.empty();
-                    firstChunk = false;
-                }
+                if (firstChunk) { assistantContentEl.empty(); firstChunk = false; }
                 accumulatedResponse += chunk.response;
-
-                // Оновлюємо вміст плейсхолдера
-                await RendererUtils.renderAssistantContent(
-                    this.app, this, this.plugin, // Передаємо 'this'
-                    assistantContentEl, accumulatedResponse
-                );
-
+                // Update placeholder content (using internal method of Assistant renderer is better, but utils might still work)
+                // For now, assuming utils:
+                await RendererUtils.renderAssistantContent(this.app, this, this.plugin, assistantContentEl, accumulatedResponse);
                 this.guaranteedScrollToBottom(50, false);
                 this.checkMessageForCollapsing(assistantMessageElement);
             }
+            if ("done" in chunk && chunk.done) { break; }
+        }
 
-             // Перевірка завершення потоку
-             if ("done" in chunk && chunk.done) {
-                  this.plugin.logger.debug("Stream indicated done.");
-                  break; // Виходимо з циклу
-             }
-        } // кінець for await
+        // 5. Stream completed successfully
+        this.plugin.logger.debug(`[OllamaView] Stream completed successfully. Length: ${accumulatedResponse.length}`);
+        assistantPlaceholderGroupEl?.remove(); assistantPlaceholderGroupEl = null;
 
-        // 5. Потік завершився УСПІШНО (не через помилку або AbortError)
-        this.plugin.logger.debug(
-            `[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`
-        );
-
-        // Видаляємо плейсхолдер
-        assistantPlaceholderGroupEl?.remove();
-        assistantPlaceholderGroupEl = null;
-
-        // --- Логіка додавання фінального повідомлення з Promise ---
+        // Add final assistant message and wait for handleMessageAdded
         if (accumulatedResponse.trim()) {
             this.plugin.logger.debug(`sendMessage: Preparing to add final assistant message and wait.`);
-            let resolver: () => void;
-            handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
-            this.currentMessageAddedResolver = resolver!; // Зберігаємо resolver
-
-            // Викликаємо додавання БЕЗ await тут
-            this.plugin.chatManager.addMessageToActiveChat(
-                "assistant", accumulatedResponse, responseStartTime
-            );
-            this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (assistant), now awaiting promise...");
-            await handleMessageAddedPromise; // Чекаємо на завершення handleMessageAdded
-            this.plugin.logger.debug("sendMessage: Promise for assistant message resolved.");
-
-        } else {
-             // Обробка порожньої відповіді - тут теж бажано чекати, якщо addMessageToActiveChat генерує подію
-            this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
-            let resolver: () => void;
-            handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
+            let resolver: () => void; handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
             this.currentMessageAddedResolver = resolver!;
-
-            this.plugin.chatManager.addMessageToActiveChat(
-                 "system", "Assistant provided an empty response.", new Date()
-            );
+            this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
+            this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (assistant), now awaiting promise...");
+            await handleMessageAddedPromise;
+            this.plugin.logger.debug("sendMessage: Promise for assistant message resolved.");
+        } else {
+            this.plugin.logger.warn("[OllamaView] Stream finished but response empty.");
+            let resolver: () => void; handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
+            this.currentMessageAddedResolver = resolver!;
+            this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response.", new Date());
             this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (system-empty), now awaiting promise...");
             await handleMessageAddedPromise;
-             this.plugin.logger.debug("sendMessage: Promise for system-empty message resolved.");
+            this.plugin.logger.debug("sendMessage: Promise for system-empty message resolved.");
         }
-        // --- Кінець логіки з Promise ---
 
     } catch (error: any) {
-        // 6. Обробка ПОМИЛОК (включаючи AbortError)
+        // 6. Handle errors
         this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
-        assistantPlaceholderGroupEl?.remove(); // Гарантовано видаляємо плейсхолдер
-        assistantPlaceholderGroupEl = null;
-        this.currentMessageAddedResolver = null; // Скидаємо resolver у разі помилки
+        assistantPlaceholderGroupEl?.remove(); assistantPlaceholderGroupEl = null;
+        this.currentMessageAddedResolver = null; // Clear resolver on error
 
         let errorMsgContent = `Error: ${error.message || "Unknown streaming error."}`;
         let errorMsgRole: "system" | "error" = "error";
         let savePartialResponse = false;
 
-        // Перевіряємо, чи це помилка скасування
         if (error.name === "AbortError" || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
-             this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
-             errorMsgContent = "Generation stopped.";
-             errorMsgRole = "system"; // Повідомлення про зупинку - системне
-             if (accumulatedResponse.trim()) {
-                 savePartialResponse = true; // Зберігатимемо часткову відповідь
-             }
+            this.plugin.logger.info("[OllamaView] Generation cancelled by user.");
+            errorMsgContent = "Generation stopped."; errorMsgRole = "system";
+            if (accumulatedResponse.trim()) { savePartialResponse = true; }
         }
 
-        // Додаємо системне повідомлення або помилку через ChatManager і чекаємо на обробку
-        let errorResolver: () => void;
-        const errorMessagePromise = new Promise<void>((resolve) => { errorResolver = resolve; });
+        // Add error/system message and wait
+        let errorResolver: () => void; const errorMessagePromise = new Promise<void>((resolve) => { errorResolver = resolve; });
         this.currentMessageAddedResolver = errorResolver!;
-
         this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgContent, new Date());
-        this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (${errorMsgRole}), now awaiting promise...`);
+        this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (${errorMsgRole}), awaiting promise...`);
         await errorMessagePromise;
         this.plugin.logger.debug(`sendMessage: Promise for ${errorMsgRole} message resolved.`);
 
-
-        // Зберігаємо часткову відповідь асистента, якщо потрібно, і теж чекаємо
+        // Save partial response if needed and wait
         if (savePartialResponse) {
-            this.plugin.logger.info(
-                `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
-            );
-             let partialResolver: () => void;
-             const partialMessagePromise = new Promise<void>((resolve) => { partialResolver = resolve; });
-             this.currentMessageAddedResolver = partialResolver!;
-
-             this.plugin.chatManager.addMessageToActiveChat(
-                 "assistant", accumulatedResponse, responseStartTime
-             );
-             this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (partial assistant), now awaiting promise...`);
-             await partialMessagePromise;
-             this.plugin.logger.debug(`sendMessage: Promise for partial assistant message resolved.`);
+            this.plugin.logger.info(`Saving partial response (length: ${accumulatedResponse.length})`);
+            let partialResolver: () => void; const partialMessagePromise = new Promise<void>((resolve) => { partialResolver = resolve; });
+            this.currentMessageAddedResolver = partialResolver!;
+            this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
+            this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (partial assistant), awaiting promise...`);
+            await partialMessagePromise;
+            this.plugin.logger.debug(`sendMessage: Promise for partial assistant message resolved.`);
         }
 
     } finally {
-        // 7. Блок finally виконується ЗАВЖДИ після try або catch
-        this.currentMessageAddedResolver = null; // Гарантовано скидаємо resolver
+        // 7. Finally block
+        this.currentMessageAddedResolver = null; // Ensure resolver is cleared
         this.plugin.logger.debug("[OllamaView] sendMessage finally block executing.");
-        // Тепер setLoadingState викликається після завершення обробки останнього повідомлення
-        this.setLoadingState(false);
+        this.setLoadingState(false); // Restore UI state
         this.stopGeneratingButton?.hide();
         this.sendButton?.show();
         this.currentAbortController = null;
@@ -2656,6 +2462,7 @@ async sendMessage(): Promise<void> {
         this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
     }
 }
+
 
 
   public async handleDeleteMessageClick(messageToDelete: Message): Promise<void> {
@@ -5013,51 +4820,26 @@ private displayErrorListFallback(targetGroupElement: HTMLElement, errors: Messag
     }
   }
 
-  /**
- * Централізовано обробляє повідомлення про помилки,
- * керує буфером послідовних помилок та викликає оновлення/створення групи помилок.
- * @param errorMessage - Повідомлення про помилку для обробки.
- */
-private handleErrorMessage(errorMessage: Message): void {
-  if (errorMessage.role !== 'error') {
-      this.plugin.logger.warn(`handleErrorMessage called with non-error message role: ${errorMessage.role}`);
-      // Можливо, тут варто просто вийти або обробити як системне повідомлення?
-      // Поки що просто виходимо.
-      return;
+     // --- Error Handling (ПОВНА ВЕРСІЯ) ---
+     private handleErrorMessage(errorMessage: Message): void {
+      if (errorMessage.role !== 'error') {
+          this.plugin.logger.warn(`handleErrorMessage called with non-error message role: ${errorMessage.role}`);
+          return;
+      }
+      this.consecutiveErrorMessages.push(errorMessage);
+      const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
+      if (!isContinuingError) {
+          this.errorGroupElement = null;
+          this.consecutiveErrorMessages = [errorMessage];
+      }
+      try {
+          this.renderOrUpdateErrorGroup(isContinuingError);
+      } catch (error) {
+           this.plugin.logger.error("[handleErrorMessage] Failed to render/update error group:", error);
+           try { /* ... fallback text node ... */ } catch {}
+      }
   }
 
-  // Додаємо помилку до буфера
-  this.consecutiveErrorMessages.push(errorMessage);
-
-  // Визначаємо, чи це продовження існуючої серії помилок
-  const isContinuingError = this.lastMessageElement === this.errorGroupElement && this.errorGroupElement !== null;
-
-  if (!isContinuingError) {
-      // Якщо це НЕ продовження, скидаємо посилання на стару групу
-      // і переконуємося, що буфер починається з поточної помилки
-      this.errorGroupElement = null;
-      this.consecutiveErrorMessages = [errorMessage]; // Починаємо новий список
-  }
-
-  // Викликаємо метод, який створить/оновить групу помилок в DOM
-  // Цей метод відповідає за рендеринг та додавання/оновлення елемента.
-  try {
-      this.renderOrUpdateErrorGroup(isContinuingError);
-  } catch (error) {
-       this.plugin.logger.error("[handleErrorMessage] Failed to render/update error group:", error);
-       // Тут можна додати ще більш базовий fallback, якщо renderOrUpdateErrorGroup зазнає невдачі
-       try {
-          const fallbackErrorNode = document.createTextNode(`[Failed to display error: ${errorMessage.content}]`);
-          if (this.chatContainer) {
-              this.chatContainer.appendChild(fallbackErrorNode);
-              this.chatContainer.appendChild(document.createElement('br'));
-              this.guaranteedScrollToBottom(50, true);
-          }
-       } catch (fallbackError2) {
-          console.error("Failed even to display fallback text node for error:", fallbackError2);
-       }
-  }
-}
 
 
 } // END OF OllamaView CLASS

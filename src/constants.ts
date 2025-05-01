@@ -27,5 +27,29 @@ export const CSS_CLASSES = {
     SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden",
     CODE_BLOCK_COPY_BUTTON: "code-block-copy-button",
     CODE_BLOCK_LANGUAGE: "code-block-language",
+    AVATAR: "message-group-avatar",
 
+    // Roles/Types
+    USER_MESSAGE_GROUP: "user-message-group",
+    ERROR_GROUP: "error-message-group",
+    ERROR_MESSAGE: "error-message",
+
+    // Content Specific
+    CONTENT_COLLAPSED: "message-content-collapsed",
+    ERROR_ICON: "error-icon",
+    TRANSLATION_CONTAINER: "translation-container",
+    TRANSLATION_CONTENT: "translation-content",
+    AVATAR_USER: "user-avatar",
+    AVATAR_AI: "ai-avatar",
+
+    // Buttons & Actions
+    TRANSLATE_BUTTON: "translate-button",
+    SUMMARIZE_BUTTON: "summarize-button",
+    STOP_BUTTON: "stop-generating-button",
+    SCROLL_BOTTOM_BUTTON: "scroll-to-bottom-button",
+
+    // States & Modifiers
+    TRANSLATION_PENDING: "translation-pending", // For translate button maybe?
+    RECORDING: "recording", // For voice button
 };
+export const SCROLL_THRESHOLD = 150;

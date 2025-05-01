@@ -230,7 +230,29 @@ var CSS_CLASSES = {
   SHOW_MORE_BUTTON: "show-more-button",
   SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden",
   CODE_BLOCK_COPY_BUTTON: "code-block-copy-button",
-  CODE_BLOCK_LANGUAGE: "code-block-language"
+  CODE_BLOCK_LANGUAGE: "code-block-language",
+  AVATAR: "message-group-avatar",
+  // Roles/Types
+  USER_MESSAGE_GROUP: "user-message-group",
+  ERROR_GROUP: "error-message-group",
+  ERROR_MESSAGE: "error-message",
+  // Content Specific
+  CONTENT_COLLAPSED: "message-content-collapsed",
+  ERROR_ICON: "error-icon",
+  TRANSLATION_CONTAINER: "translation-container",
+  TRANSLATION_CONTENT: "translation-content",
+  AVATAR_USER: "user-avatar",
+  AVATAR_AI: "ai-avatar",
+  // Buttons & Actions
+  TRANSLATE_BUTTON: "translate-button",
+  SUMMARIZE_BUTTON: "summarize-button",
+  STOP_BUTTON: "stop-generating-button",
+  SCROLL_BOTTOM_BUTTON: "scroll-to-bottom-button",
+  // States & Modifiers
+  TRANSLATION_PENDING: "translation-pending",
+  // For translate button maybe?
+  RECORDING: "recording"
+  // For voice button
 };
 
 // src/MessageRendererUtils.ts
@@ -667,11 +689,6 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
 
 // src/renderers/AssistantMessageRenderer.ts
 var import_obsidian7 = require("obsidian");
-var CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
-var CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
-var CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
-var CSS_CLASS_SUMMARIZE_BUTTON = "summarize-button";
-var CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
 var AssistantMessageRenderer = class extends BaseMessageRenderer {
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
@@ -681,18 +698,18 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   }
   async render() {
     this.plugin.logger.debug(`[AssistantMessageRenderer] Starting render for ts: ${this.message.timestamp.getTime()}`);
-    const messageGroup = this.createMessageGroupWrapper([CSS_CLASS_OLLAMA_GROUP]);
+    const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
     this.addAvatar(messageGroup, false);
     const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
     messageWrapper.style.order = "2";
-    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASS_OLLAMA_MESSAGE]);
-    contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling renderAssistantContent...`);
+    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
+    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling renderAssistantContentInternal...`);
     try {
       await this.renderAssistantContentInternal(contentEl, this.message.content);
-      this.plugin.logger.debug(`[AssistantMessageRenderer] renderAssistantContent finished.`);
+      this.plugin.logger.debug(`[AssistantMessageRenderer] renderAssistantContentInternal finished successfully.`);
     } catch (error) {
-      this.plugin.logger.error(`[AssistantMessageRenderer] Error during renderAssistantContentInternal:`, error);
+      this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling renderAssistantContentInternal FAILED:`, error);
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
       throw error;
     }
@@ -710,7 +727,9 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     this.plugin.logger.debug(`[AssistantMessageRenderer] Finished render for ts: ${this.message.timestamp.getTime()}`);
     return messageGroup;
   }
-  // Переносимо логіку з RendererUtils сюди, щоб додати логування
+  /**
+   * Внутрішній метод для рендерингу контенту асистента (Markdown, код, емодзі).
+   */
   async renderAssistantContentInternal(contentEl, markdownText) {
     var _a, _b;
     this.plugin.logger.debug("[renderAssistantContentInternal] Entering.");
@@ -719,13 +738,10 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     try {
       const decoded = decodeHtmlEntities(markdownText);
       const thinkDetection = detectThinkingTags(decoded);
+      processedMarkdown = thinkDetection.contentWithoutTags;
       if (thinkDetection.hasThinkingTags) {
-        this.plugin.logger.debug("[renderAssistantContentInternal] Found <think> tags, removing them.");
-        processedMarkdown = thinkDetection.contentWithoutTags.trim();
-      } else {
-        processedMarkdown = decoded;
+        this.plugin.logger.debug("[renderAssistantContentInternal] Removed <think> tags.");
       }
-      this.plugin.logger.debug("[renderAssistantContentInternal] HTML entities decoded and <think> tags processed.");
     } catch (e) {
       this.plugin.logger.error("[renderAssistantContentInternal] Error during decoding/tag removal:", e);
       processedMarkdown = markdownText;
@@ -737,20 +753,18 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         processedMarkdown,
         contentEl,
         (_b = (_a = this.plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
-        // Шлях для рендерингу відносних посилань
         this.view
         // Передаємо контекст View
       );
-      this.plugin.logger.debug("[renderAssistantContentInternal] MarkdownRenderer.render finished.");
+      this.plugin.logger.debug("[renderAssistantContentInternal] MarkdownRenderer.render finished successfully.");
     } catch (error) {
-      this.plugin.logger.error("[renderAssistantContentInternal] MarkdownRenderer.render FAILED:", error);
+      this.plugin.logger.error("[renderAssistantContentInternal] <<< MARKDOWN RENDER FAILED >>>:", error);
       contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
       throw error;
     }
     this.plugin.logger.debug("[renderAssistantContentInternal] Processing code blocks...");
     try {
       enhanceCodeBlocks(contentEl, this.view);
-      this.plugin.logger.debug("[renderAssistantContentInternal] Code blocks processed.");
     } catch (error) {
       this.plugin.logger.error("[renderAssistantContentInternal] Error processing code blocks:", error);
     }
@@ -758,7 +772,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       this.plugin.logger.debug("[renderAssistantContentInternal] Fixing Twemoji images...");
       try {
         fixBrokenTwemojiImages(contentEl);
-        this.plugin.logger.debug("[renderAssistantContentInternal] Twemoji fixed.");
       } catch (error) {
         this.plugin.logger.error("[renderAssistantContentInternal] Error fixing Twemoji:", error);
       }
@@ -769,21 +782,14 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   addAssistantActionButtons(messageWrapper, contentEl) {
     const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
     const finalContent = this.message.content;
-    const copyBtn = buttonsWrapper.createEl("button", {
-      cls: CSS_CLASSES.COPY_BUTTON,
-      attr: { "aria-label": "Copy", title: "Copy" }
-    });
+    const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
     (0, import_obsidian7.setIcon)(copyBtn, "copy");
     this.view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
       this.view.handleCopyClick(finalContent, copyBtn);
     });
     if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
-      const translateBtn = buttonsWrapper.createEl("button", {
-        cls: CSS_CLASS_TRANSLATE_BUTTON,
-        // Перевірте наявність у constants.ts
-        attr: { "aria-label": "Translate", title: "Translate" }
-      });
+      const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
       (0, import_obsidian7.setIcon)(translateBtn, "languages");
       this.view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
@@ -795,21 +801,14 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       });
     }
     if (this.plugin.settings.summarizationModelName && finalContent.trim()) {
-      const summarizeBtn = buttonsWrapper.createEl("button", {
-        cls: CSS_CLASS_SUMMARIZE_BUTTON,
-        // Перевірте наявність у constants.ts
-        attr: { title: "Summarize message" }
-      });
+      const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
       (0, import_obsidian7.setIcon)(summarizeBtn, "scroll-text");
       this.view.registerDomEvent(summarizeBtn, "click", (e) => {
         e.stopPropagation();
         this.view.handleSummarizeClick(finalContent, summarizeBtn);
       });
     }
-    const deleteBtn = buttonsWrapper.createEl("button", {
-      cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION],
-      attr: { "aria-label": "Delete message", title: "Delete Message" }
-    });
+    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
     (0, import_obsidian7.setIcon)(deleteBtn, "trash");
     this.view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
@@ -2332,6 +2331,7 @@ This action cannot be undone.`,
     this.settingsOption.createSpan({ cls: "menu-option-text", text: "Settings" });
     this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
+  // --- Event Listeners (ПОВНА ВЕРСІЯ) ---
   attachEventListeners() {
     if (!this.inputEl)
       console.error("OllamaView: inputEl missing during attachEventListeners!");
@@ -2431,25 +2431,13 @@ This action cannot be undone.`,
       });
     }
     if (this.modelSubmenuHeader && this.modelSubmenuContent) {
-      this.registerDomEvent(
-        this.modelSubmenuHeader,
-        "click",
-        () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")
-      );
+      this.registerDomEvent(this.modelSubmenuHeader, "click", () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"));
     }
     if (this.roleSubmenuHeader && this.roleSubmenuContent) {
-      this.registerDomEvent(
-        this.roleSubmenuHeader,
-        "click",
-        () => this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")
-      );
+      this.registerDomEvent(this.roleSubmenuHeader, "click", () => this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles"));
     }
     if (this.chatSubmenuHeader && this.chatSubmenuContent) {
-      this.registerDomEvent(
-        this.chatSubmenuHeader,
-        "click",
-        () => this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")
-      );
+      this.registerDomEvent(this.chatSubmenuHeader, "click", () => this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats"));
     }
     if (this.newChatOption) {
       this.registerDomEvent(this.newChatOption, "click", this.handleNewChatClick);
@@ -2494,14 +2482,12 @@ This action cannot be undone.`,
     this.register(this.plugin.on("model-changed", (modelName) => this.handleModelChange(modelName)));
     this.register(this.plugin.on("role-changed", (roleName) => this.handleRoleChange(roleName)));
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
-    this.register(
-      this.plugin.on("roles-updated", () => {
-        var _a;
-        if (((_a = this.rolePanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "false") {
-          this.updateRolePanelList();
-        }
-      })
-    );
+    this.register(this.plugin.on("roles-updated", () => {
+      var _a;
+      if (((_a = this.rolePanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "false") {
+        this.updateRolePanelList();
+      }
+    }));
     this.register(this.plugin.on("active-chat-changed", (data) => this.handleActiveChatChanged(data)));
     this.register(this.plugin.on("message-added", (data) => {
       var _a, _b, _c;
@@ -2650,21 +2636,42 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
-  // OllamaView.ts
+  // --- Message Handling (ПОВНА ВЕРСІЯ З РЕНДЕРЕРАМИ) ---
   async handleMessageAdded(data) {
     var _a, _b, _c, _d, _e, _f;
     try {
       if (!data || !data.message) {
+        this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
+        if (this.currentMessageAddedResolver) {
+          this.plugin.logger.error("[handleMessageAdded] Resolving promise due to invalid data.");
+          this.currentMessageAddedResolver();
+          this.currentMessageAddedResolver = null;
+        }
         return;
       }
       this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
       if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) {
+        console.error("[handleMessageAdded] CRITICAL: 'this', 'this.plugin', 'this.chatContainer' or 'this.plugin.chatManager' is undefined/null at start!");
+        if (this == null ? void 0 : this.currentMessageAddedResolver) {
+          this.currentMessageAddedResolver();
+          this.currentMessageAddedResolver = null;
+        }
         return;
       }
       if (data.chatId !== this.plugin.chatManager.getActiveChatId()) {
+        this.plugin.logger.debug(`[handleMessageAdded] Ignored: Event for different chat.`);
+        if (this.currentMessageAddedResolver) {
+          this.currentMessageAddedResolver();
+          this.currentMessageAddedResolver = null;
+        }
         return;
       }
       if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime())) {
+        this.plugin.logger.warn(`[handleMessageAdded] Ignored: Duplicate timestamp.`);
+        if (this.currentMessageAddedResolver) {
+          this.currentMessageAddedResolver();
+          this.currentMessageAddedResolver = null;
+        }
         return;
       }
       this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`);
@@ -2688,9 +2695,8 @@ This action cannot be undone.`,
             rendererRan = true;
             break;
           case "assistant":
-            this.plugin.logger.error("[handleMessageAdded] Reached ASSISTANT case. SKIPPING RENDERER execution for test.");
-            rendererRan = false;
-            messageGroupEl = null;
+            renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
             break;
           case "system":
             renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
@@ -2706,7 +2712,9 @@ This action cannot be undone.`,
           this.plugin.logger.debug(`[handleMessageAdded] Calling renderer.render() for role: ${data.message.role}`);
           const result = renderer.render();
           if (result instanceof Promise) {
+            this.plugin.logger.debug(`[handleMessageAdded] Awaiting async render for role: ${data.message.role}`);
             messageGroupEl = await result;
+            this.plugin.logger.debug(`[handleMessageAdded] Async render finished for role: ${data.message.role}`);
           } else {
             messageGroupEl = result;
           }
@@ -2719,11 +2727,23 @@ This action cannot be undone.`,
             this.chatContainer.appendChild(messageGroupEl);
             this.lastMessageElement = messageGroupEl;
             if (!messageGroupEl.isConnected) {
+              this.plugin.logger.error(`[handleMessageAdded] Node not connected immediately after appendChild! Role: ${data.message.role}`);
             }
             this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`);
+            messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+            setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+            const isUserMessage = data.message.role === "user";
+            if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
+              this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE);
+            } else if (!this.userScrolledUp) {
+              this.guaranteedScrollToBottom(isUserMessage ? 50 : 100, !isUserMessage);
+            }
+            setTimeout(() => this.updateScrollStateAndIndicators(), 100);
           } else {
+            this.plugin.logger.error("[handleMessageAdded] chatContainer became null before appendChild!");
           }
         } else if (rendererRan && !messageGroupEl) {
+          this.plugin.logger.warn(`[handleMessageAdded] messageGroupEl was null after render ran for role: ${data.message.role}.`);
         }
       } catch (renderError) {
         this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError);
@@ -2804,7 +2824,7 @@ This action cannot be undone.`,
       this.emptyStateEl = null;
     }
   }
-  // OllamaView.ts
+  // --- State Management ---
   setLoadingState(isLoading) {
     this.isProcessing = isLoading;
     if (this.inputEl)
@@ -2827,9 +2847,10 @@ This action cannot be undone.`,
         this.chatContainer.querySelectorAll(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach((button) => {
           button.style.display = "none";
         });
-        this.plugin.logger.debug("[setLoadingState] Hid existing 'Show More' buttons.");
+        this.plugin.logger.debug("[setLoadingState] Hid 'Show More' buttons.");
       } else {
-        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing SKIPPED.");
+        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after operation finished.");
+        this.checkAllMessagesForCollapsing();
       }
     }
     this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
@@ -3060,18 +3081,11 @@ This action cannot be undone.`,
       `[handleActiveChatChanged] <<< \u0417\u0410\u0412\u0415\u0420\u0428\u0415\u041D\u041E \u041E\u0411\u0420\u041E\u0411\u041A\u0423 \u041F\u041E\u0414\u0406\u0407 >>> \u0414\u043B\u044F ID: ${(_a = data.chatId) != null ? _a : "null"}`
     );
   }
+  // --- Sending Message (ПОВНА ВЕРСІЯ З PROMISE) ---
   async sendMessage() {
     var _a, _b, _c, _d, _e, _f, _g;
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
-      if (!content)
-        this.plugin.logger.debug("sendMessage prevented: input empty.");
-      if (this.isProcessing)
-        this.plugin.logger.debug("sendMessage prevented: already processing.");
-      if (this.sendButton.disabled)
-        this.plugin.logger.debug("sendMessage prevented: send button disabled.");
-      if (this.currentAbortController)
-        this.plugin.logger.debug("sendMessage prevented: generation already in progress (AbortController exists).");
       return;
     }
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
@@ -3098,20 +3112,14 @@ This action cannot be undone.`,
         throw new Error("Failed to add user message to history.");
       }
       this.plugin.logger.debug("sendMessage: User message added successfully.");
-      this.plugin.logger.debug("sendMessage: Creating streaming placeholder for assistant message...");
-      assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-        cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`
-      });
+      this.plugin.logger.debug("sendMessage: Creating streaming placeholder...");
+      assistantPlaceholderGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}` });
       renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
       const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
       messageWrapper.style.order = "2";
-      const assistantMessageElement = messageWrapper.createDiv({
-        cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`
-      });
+      const assistantMessageElement = messageWrapper.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}` });
       const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-      assistantContentEl = contentContainer.createDiv({
-        cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`
-      });
+      assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}` });
       const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
       for (let i = 0; i < 3; i++)
         dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
@@ -3119,19 +3127,13 @@ This action cannot be undone.`,
       setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
       this.guaranteedScrollToBottom(50, true);
       this.plugin.logger.info("[OllamaView] Starting stream request...");
-      const stream = this.plugin.ollamaService.generateChatResponseStream(
-        activeChat,
-        // Передаємо актуальний стан чату
-        this.currentAbortController.signal
-      );
+      const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
       let firstChunk = true;
       for await (const chunk of stream) {
         if ("error" in chunk && chunk.error) {
           if (!chunk.error.includes("aborted by user")) {
-            this.plugin.logger.error("Error chunk received from stream:", chunk.error);
             throw new Error(chunk.error);
           } else {
-            this.plugin.logger.debug("Stream aborted by user chunk received.");
             break;
           }
         }
@@ -3141,25 +3143,15 @@ This action cannot be undone.`,
             firstChunk = false;
           }
           accumulatedResponse += chunk.response;
-          await renderAssistantContent(
-            this.app,
-            this,
-            this.plugin,
-            // Передаємо 'this'
-            assistantContentEl,
-            accumulatedResponse
-          );
+          await renderAssistantContent(this.app, this, this.plugin, assistantContentEl, accumulatedResponse);
           this.guaranteedScrollToBottom(50, false);
           this.checkMessageForCollapsing(assistantMessageElement);
         }
         if ("done" in chunk && chunk.done) {
-          this.plugin.logger.debug("Stream indicated done.");
           break;
         }
       }
-      this.plugin.logger.debug(
-        `[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`
-      );
+      this.plugin.logger.debug(`[OllamaView] Stream completed successfully. Length: ${accumulatedResponse.length}`);
       assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.remove();
       assistantPlaceholderGroupEl = null;
       if (accumulatedResponse.trim()) {
@@ -3169,26 +3161,18 @@ This action cannot be undone.`,
           resolver = resolve;
         });
         this.currentMessageAddedResolver = resolver;
-        this.plugin.chatManager.addMessageToActiveChat(
-          "assistant",
-          accumulatedResponse,
-          responseStartTime
-        );
+        this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
         this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (assistant), now awaiting promise...");
         await handleMessageAddedPromise;
         this.plugin.logger.debug("sendMessage: Promise for assistant message resolved.");
       } else {
-        this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
+        this.plugin.logger.warn("[OllamaView] Stream finished but response empty.");
         let resolver;
         handleMessageAddedPromise = new Promise((resolve) => {
           resolver = resolve;
         });
         this.currentMessageAddedResolver = resolver;
-        this.plugin.chatManager.addMessageToActiveChat(
-          "system",
-          "Assistant provided an empty response.",
-          new Date()
-        );
+        this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response.", new Date());
         this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (system-empty), now awaiting promise...");
         await handleMessageAddedPromise;
         this.plugin.logger.debug("sendMessage: Promise for system-empty message resolved.");
@@ -3202,7 +3186,7 @@ This action cannot be undone.`,
       let errorMsgRole = "error";
       let savePartialResponse = false;
       if (error.name === "AbortError" || ((_d = error.message) == null ? void 0 : _d.includes("aborted")) || ((_e = error.message) == null ? void 0 : _e.includes("aborted by user"))) {
-        this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
+        this.plugin.logger.info("[OllamaView] Generation cancelled by user.");
         errorMsgContent = "Generation stopped.";
         errorMsgRole = "system";
         if (accumulatedResponse.trim()) {
@@ -3215,24 +3199,18 @@ This action cannot be undone.`,
       });
       this.currentMessageAddedResolver = errorResolver;
       this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgContent, new Date());
-      this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (${errorMsgRole}), now awaiting promise...`);
+      this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (${errorMsgRole}), awaiting promise...`);
       await errorMessagePromise;
       this.plugin.logger.debug(`sendMessage: Promise for ${errorMsgRole} message resolved.`);
       if (savePartialResponse) {
-        this.plugin.logger.info(
-          `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
-        );
+        this.plugin.logger.info(`Saving partial response (length: ${accumulatedResponse.length})`);
         let partialResolver;
         const partialMessagePromise = new Promise((resolve) => {
           partialResolver = resolve;
         });
         this.currentMessageAddedResolver = partialResolver;
-        this.plugin.chatManager.addMessageToActiveChat(
-          "assistant",
-          accumulatedResponse,
-          responseStartTime
-        );
-        this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (partial assistant), now awaiting promise...`);
+        this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
+        this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (partial assistant), awaiting promise...`);
         await partialMessagePromise;
         this.plugin.logger.debug(`sendMessage: Promise for partial assistant message resolved.`);
       }
@@ -4973,11 +4951,7 @@ Summary:`;
       return null;
     }
   }
-  /**
-  * Централізовано обробляє повідомлення про помилки,
-  * керує буфером послідовних помилок та викликає оновлення/створення групи помилок.
-  * @param errorMessage - Повідомлення про помилку для обробки.
-  */
+  // --- Error Handling (ПОВНА ВЕРСІЯ) ---
   handleErrorMessage(errorMessage) {
     if (errorMessage.role !== "error") {
       this.plugin.logger.warn(`handleErrorMessage called with non-error message role: ${errorMessage.role}`);
@@ -4994,14 +4968,7 @@ Summary:`;
     } catch (error) {
       this.plugin.logger.error("[handleErrorMessage] Failed to render/update error group:", error);
       try {
-        const fallbackErrorNode = document.createTextNode(`[Failed to display error: ${errorMessage.content}]`);
-        if (this.chatContainer) {
-          this.chatContainer.appendChild(fallbackErrorNode);
-          this.chatContainer.appendChild(document.createElement("br"));
-          this.guaranteedScrollToBottom(50, true);
-        }
-      } catch (fallbackError2) {
-        console.error("Failed even to display fallback text node for error:", fallbackError2);
+      } catch (e) {
       }
     }
   }
