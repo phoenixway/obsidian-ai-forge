@@ -348,6 +348,8 @@ export class OllamaView extends ItemView {
   private errorGroupElement: HTMLElement | null = null; // Посилання на активний контейнер групи помилок
   private isSummarizingErrors = false; // Прапорець, щоб уникнути одночасних сумаризацій
 
+  private currentMessageAddedResolver: (() => void) | null = null;
+
   // private currentAssistantMessage: {
   //   // Для зберігання посилання на поточне повідомлення асистента
   //   groupEl: HTMLElement | null;
@@ -1868,6 +1870,15 @@ export class OllamaView extends ItemView {
             this.renderChatListMenu();
         }
     }
+    if (this.currentMessageAddedResolver) {
+      this.plugin.logger.debug(`handleMessageAdded: Resolving promise for role ${data.message.role}, ts: ${data.message.timestamp.getTime()}`);
+      this.currentMessageAddedResolver(); // Викликаємо збережений resolver
+      this.currentMessageAddedResolver = null; // Скидаємо його
+  } else {
+       // Це може статися, якщо повідомлення додано не через sendMessage (наприклад, при завантаженні чату)
+       this.plugin.logger.debug(`handleMessageAdded: No active resolver found for role ${data.message.role}, ts: ${data.message.timestamp.getTime()}`);
+  }
+  this.plugin.logger.info(`[handleMessageAdded] <<< EXITED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
 }
 
   private handleMessagesCleared = (chatId: string): void => {
@@ -2523,215 +2534,226 @@ public setLoadingState(isLoading: boolean): void {
     this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
   };
 
-// OllamaView.ts (Повна версія методу sendMessage після рефакторингу)
 
 async sendMessage(): Promise<void> {
-  const content = this.inputEl.value.trim();
-  // Перевірка: чи є що відправляти, чи не йде обробка, чи не вимкнена кнопка, чи не існує вже контролер
-  if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
-    if (this.currentAbortController !== null) {
-      this.plugin.logger.debug("sendMessage prevented: generation already in progress.");
-    }
-    if (!content) {
-         this.plugin.logger.debug("sendMessage prevented: input is empty.");
-    }
-     if (this.isProcessing) {
-         this.plugin.logger.debug("sendMessage prevented: isProcessing is true.");
-    }
-      if (this.sendButton.disabled) {
-         this.plugin.logger.debug("sendMessage prevented: send button is disabled.");
-    }
-    return;
-  }
-
-  const activeChat = await this.plugin.chatManager?.getActiveChat();
-  if (!activeChat) {
-      new Notice("Error: No active chat session found.");
-      return;
-  }
-
-  const userMessageContent = this.inputEl.value;
-  this.clearInputField();
-  this.setLoadingState(true);
-  this.hideEmptyState();
-
-  this.currentAbortController = new AbortController();
-  let assistantPlaceholderGroupEl: HTMLElement | null = null;
-  let assistantContentEl: HTMLElement | null = null; // Потрібно для оновлення плейсхолдера
-  let accumulatedResponse = "";
-  const responseStartTime = new Date();
-
-  this.stopGeneratingButton?.show();
-  this.sendButton?.hide();
-
-try {
-  // 1. Додаємо повідомлення користувача (це вже було з await)
-  this.plugin.logger.debug("Adding user message to ChatManager...");
-  const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
-  if (!userMessage) {
-    throw new Error("Failed to add user message to history.");
-  }
-  this.plugin.logger.debug("User message added to history successfully.");
-
-  // 2. Створюємо ПЛЕЙСХОЛДЕР для потокового повідомлення асистента
-  this.plugin.logger.debug("Creating streaming placeholder for assistant message...");
-  // ... (код створення assistantPlaceholderGroupEl та assistantContentEl) ...
-      assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-           cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`, // Використовуємо класи з constants.ts
-       });
-       RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
-       const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-       messageWrapper.style.order = "2";
-       const assistantMessageElement = messageWrapper.createDiv({
-           cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
-       });
-       const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-       assistantContentEl = contentContainer.createDiv({
-           cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`
-       });
-       // Початковий вміст плейсхолдера (крапки "думає...")
-       const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-       for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-       // Анімація появи плейсхолдера
-       assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-       setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-       this.guaranteedScrollToBottom(50, true); // Прокручуємо вниз
-
-  // 3. Запускаємо потоковий запит до Ollama
-  this.plugin.logger.info("[OllamaView] Starting stream request...");
-  const stream = this.plugin.ollamaService.generateChatResponseStream(
-    activeChat,
-    this.currentAbortController.signal
-  );
-
-  // 4. Обробляємо кожен шматок (chunk) з потоку
-      let firstChunk = true;
-  for await (const chunk of stream) {
-          // ... (обробка помилок у chunk) ...
-          if ("error" in chunk && chunk.error) {
-               if (!chunk.error.includes("aborted by user")) {
-                   this.plugin.logger.error("Error chunk received from stream:", chunk.error);
-                   throw new Error(chunk.error);
-               } else {
-                   this.plugin.logger.debug("Stream aborted by user chunk received.");
-                   break;
-               }
-           }
-
-    // Обробка частини відповіді
-          if ("response" in chunk && chunk.response && assistantContentEl) {
-      if (firstChunk) {
-        assistantContentEl.empty(); // Видаляємо крапки "думає..."
-        firstChunk = false;
-      }
-      accumulatedResponse += chunk.response;
-
-      // Оновлюємо вміст ПЛЕЙСХОЛДЕРА
-      await RendererUtils.renderAssistantContent(
-        this.app,
-        this, // <--- ЗМІНЕНО З this.view НА this
-        this.plugin,
-        assistantContentEl,
-        accumulatedResponse
-      );
-
-      // Підтримуємо прокрутку
-      this.guaranteedScrollToBottom(50, false);
-      // Перевіряємо згортання під час стрімінгу
-      this.checkMessageForCollapsing(assistantMessageElement); // Передаємо бульбашку повідомлення
+    const content = this.inputEl.value.trim();
+    if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
+         if (!content) this.plugin.logger.debug("sendMessage prevented: input empty.");
+         if (this.isProcessing) this.plugin.logger.debug("sendMessage prevented: already processing.");
+         if (this.sendButton.disabled) this.plugin.logger.debug("sendMessage prevented: send button disabled.");
+         if (this.currentAbortController) this.plugin.logger.debug("sendMessage prevented: generation already in progress (AbortController exists).");
+        return;
     }
 
-          // Перевірка завершення потоку
-          if ("done" in chunk && chunk.done) {
-               this.plugin.logger.debug("Stream indicated done.");
-               break;
-          }
-  } // кінець for await
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (!activeChat) {
+        new Notice("Error: No active chat session found.");
+        return;
+    }
 
-  // 5. Потік завершився УСПІШНО
-  this.plugin.logger.debug(
-    `[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`
-  );
+    const userMessageContent = this.inputEl.value;
+    this.clearInputField(); // Очищуємо одразу
+    this.setLoadingState(true); // Встановлюємо стан завантаження
+    this.hideEmptyState(); // Приховуємо стан "немає повідомлень"
 
-  // Видаляємо плейсхолдер ПЕРЕД додаванням фінального повідомлення
-  assistantPlaceholderGroupEl?.remove();
-  assistantPlaceholderGroupEl = null;
+    this.currentAbortController = new AbortController(); // Новий контролер для скасування
+    let assistantPlaceholderGroupEl: HTMLElement | null = null; // Плейсхолдер для ШІ
+    let assistantContentEl: HTMLElement | null = null; // Контейнер контенту в плейсхолдері
+    let accumulatedResponse = ""; // Накопичена відповідь
+    const responseStartTime = new Date(); // Час початку відповіді ШІ
 
-  if (accumulatedResponse.trim()) {
-    // --- ДОДАНО AWAIT ---
-    // Додаємо фінальне повідомлення асистента до ChatManager.
-          // Чекаємо завершення цієї операції (і опосередковано handleMessageAdded).
-    this.plugin.logger.debug(
-      `Adding final assistant message (length: ${accumulatedResponse.length}) to chat history via ChatManager.`
-    );
-    await this.plugin.chatManager.addMessageToActiveChat(
-      "assistant",
-      accumulatedResponse,
-      responseStartTime,
-              // false // Цей параметр може бути непотрібним, якщо ChatManager сам вирішує, коли генерувати подію
-    );
-          // --- КІНЕЦЬ ЗМІНИ ---
-  } else {
-    // Обробка випадку, коли відповідь порожня
-    this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
-    await this.plugin.chatManager.addMessageToActiveChat(
-      "system",
-      "Assistant provided an empty response.",
-      new Date()
-    );
-  }
+    this.stopGeneratingButton?.show(); // Показуємо Stop
+    this.sendButton?.hide(); // Ховаємо Send
 
-} catch (error: any) {
-  // 6. Обробка ПОМИЛОК
-  this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
-  assistantPlaceholderGroupEl?.remove(); // Завжди видаляємо плейсхолдер
-  assistantPlaceholderGroupEl = null;
+    // Оголошуємо змінну для Promise поза try, щоб вона була доступна в finally
+    let handleMessageAddedPromise: Promise<void> | null = null;
 
-      let errorMsgContent = `Error: ${error.message || "Unknown streaming error."}`;
-      let savePartialResponse = false;
+    try {
+        // 1. Додаємо повідомлення користувача (чекаємо завершення)
+        this.plugin.logger.debug("sendMessage: Adding user message to ChatManager...");
+        const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
+        if (!userMessage) {
+            throw new Error("Failed to add user message to history.");
+        }
+        this.plugin.logger.debug("sendMessage: User message added successfully.");
+        // Примітка: Ми не чекаємо handleMessageAdded для повідомлення користувача тут,
+        // бо його рендеринг не повинен блокувати початок генерації відповіді ШІ.
 
-      // Перевіряємо, чи це помилка скасування
-  if (error.name === "AbortError" || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
-    this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
-          errorMsgContent = "Generation stopped."; // Системне повідомлення
-          if (accumulatedResponse.trim()) {
-              savePartialResponse = true; // Зберігаємо часткову відповідь
-          }
-  }
-      // Додаємо системне повідомлення АБО помилку через ChatManager
-      await this.plugin.chatManager.addMessageToActiveChat(
-          savePartialResponse ? "system" : "error", // Використовуємо 'system' для зупинки, 'error' для інших
-          errorMsgContent,
-          new Date()
-      );
+        // 2. Створюємо ПЛЕЙСХОЛДЕР для потокового повідомлення асистента
+        this.plugin.logger.debug("sendMessage: Creating streaming placeholder for assistant message...");
+        // ... (код створення плейсхолдера assistantPlaceholderGroupEl та assistantContentEl) ...
+        assistantPlaceholderGroupEl = this.chatContainer.createDiv({
+            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`,
+        });
+        RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
+        const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
+        messageWrapper.style.order = "2";
+        const assistantMessageElement = messageWrapper.createDiv({
+            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
+        });
+        const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
+        assistantContentEl = contentContainer.createDiv({
+            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`
+        });
+        const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+        for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+        assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+        setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+        this.guaranteedScrollToBottom(50, true);
 
-      // Зберігаємо часткову відповідь асистента, якщо є і було скасовано
-      if (savePartialResponse) {
-          this.plugin.logger.info(
-              `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
-          );
-           // --- ДОДАНО AWAIT ---
-          await this.plugin.chatManager.addMessageToActiveChat(
-              "assistant",
-              accumulatedResponse,
-              responseStartTime
-          );
-      }
 
-} finally {
-  // 7. Блок finally виконується ЗАВЖДИ
-      // Тепер він виконується ПІСЛЯ того, як handleMessageAdded для повідомлення асистента (або помилки) мав би завершитись.
-  this.plugin.logger.debug("[OllamaView] sendMessage finally block executing. Cleaning up UI state.");
-  this.setLoadingState(false); // Викликаємо ПІСЛЯ обробки повідомлення
-  this.stopGeneratingButton?.hide();
-  this.sendButton?.show();
-  this.currentAbortController = null;
-  this.updateSendButtonState();
-  this.focusInput();
-  this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
+        // 3. Запускаємо потоковий запит до Ollama
+        this.plugin.logger.info("[OllamaView] Starting stream request...");
+        const stream = this.plugin.ollamaService.generateChatResponseStream(
+            activeChat, // Передаємо актуальний стан чату
+            this.currentAbortController.signal
+        );
+
+        // 4. Обробляємо потік
+        let firstChunk = true;
+        for await (const chunk of stream) {
+            // ... (обробка помилок у chunk) ...
+             if ("error" in chunk && chunk.error) {
+                if (!chunk.error.includes("aborted by user")) {
+                    this.plugin.logger.error("Error chunk received from stream:", chunk.error);
+                    throw new Error(chunk.error); // Кидаємо помилку для обробки в catch
+                } else {
+                    this.plugin.logger.debug("Stream aborted by user chunk received.");
+                    // Не кидаємо помилку тут, бо AbortError буде оброблено в catch
+                    break; // Виходимо з циклу обробки потоку
+                }
+             }
+
+            // Обробка частини відповіді
+            if ("response" in chunk && chunk.response && assistantContentEl) {
+                if (firstChunk) {
+                    assistantContentEl.empty();
+                    firstChunk = false;
+                }
+                accumulatedResponse += chunk.response;
+
+                // Оновлюємо вміст плейсхолдера
+                await RendererUtils.renderAssistantContent(
+                    this.app, this, this.plugin, // Передаємо 'this'
+                    assistantContentEl, accumulatedResponse
+                );
+
+                this.guaranteedScrollToBottom(50, false);
+                this.checkMessageForCollapsing(assistantMessageElement);
+            }
+
+             // Перевірка завершення потоку
+             if ("done" in chunk && chunk.done) {
+                  this.plugin.logger.debug("Stream indicated done.");
+                  break; // Виходимо з циклу
+             }
+        } // кінець for await
+
+        // 5. Потік завершився УСПІШНО (не через помилку або AbortError)
+        this.plugin.logger.debug(
+            `[OllamaView] Stream completed successfully. Final response length: ${accumulatedResponse.length}`
+        );
+
+        // Видаляємо плейсхолдер
+        assistantPlaceholderGroupEl?.remove();
+        assistantPlaceholderGroupEl = null;
+
+        // --- Логіка додавання фінального повідомлення з Promise ---
+        if (accumulatedResponse.trim()) {
+            this.plugin.logger.debug(`sendMessage: Preparing to add final assistant message and wait.`);
+            let resolver: () => void;
+            handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
+            this.currentMessageAddedResolver = resolver!; // Зберігаємо resolver
+
+            // Викликаємо додавання БЕЗ await тут
+            this.plugin.chatManager.addMessageToActiveChat(
+                "assistant", accumulatedResponse, responseStartTime
+            );
+            this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (assistant), now awaiting promise...");
+            await handleMessageAddedPromise; // Чекаємо на завершення handleMessageAdded
+            this.plugin.logger.debug("sendMessage: Promise for assistant message resolved.");
+
+        } else {
+             // Обробка порожньої відповіді - тут теж бажано чекати, якщо addMessageToActiveChat генерує подію
+            this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
+            let resolver: () => void;
+            handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
+            this.currentMessageAddedResolver = resolver!;
+
+            this.plugin.chatManager.addMessageToActiveChat(
+                 "system", "Assistant provided an empty response.", new Date()
+            );
+            this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (system-empty), now awaiting promise...");
+            await handleMessageAddedPromise;
+             this.plugin.logger.debug("sendMessage: Promise for system-empty message resolved.");
+        }
+        // --- Кінець логіки з Promise ---
+
+    } catch (error: any) {
+        // 6. Обробка ПОМИЛОК (включаючи AbortError)
+        this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
+        assistantPlaceholderGroupEl?.remove(); // Гарантовано видаляємо плейсхолдер
+        assistantPlaceholderGroupEl = null;
+        this.currentMessageAddedResolver = null; // Скидаємо resolver у разі помилки
+
+        let errorMsgContent = `Error: ${error.message || "Unknown streaming error."}`;
+        let errorMsgRole: "system" | "error" = "error";
+        let savePartialResponse = false;
+
+        // Перевіряємо, чи це помилка скасування
+        if (error.name === "AbortError" || error.message?.includes("aborted") || error.message?.includes("aborted by user")) {
+             this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
+             errorMsgContent = "Generation stopped.";
+             errorMsgRole = "system"; // Повідомлення про зупинку - системне
+             if (accumulatedResponse.trim()) {
+                 savePartialResponse = true; // Зберігатимемо часткову відповідь
+             }
+        }
+
+        // Додаємо системне повідомлення або помилку через ChatManager і чекаємо на обробку
+        let errorResolver: () => void;
+        const errorMessagePromise = new Promise<void>((resolve) => { errorResolver = resolve; });
+        this.currentMessageAddedResolver = errorResolver!;
+
+        this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgContent, new Date());
+        this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (${errorMsgRole}), now awaiting promise...`);
+        await errorMessagePromise;
+        this.plugin.logger.debug(`sendMessage: Promise for ${errorMsgRole} message resolved.`);
+
+
+        // Зберігаємо часткову відповідь асистента, якщо потрібно, і теж чекаємо
+        if (savePartialResponse) {
+            this.plugin.logger.info(
+                `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
+            );
+             let partialResolver: () => void;
+             const partialMessagePromise = new Promise<void>((resolve) => { partialResolver = resolve; });
+             this.currentMessageAddedResolver = partialResolver!;
+
+             this.plugin.chatManager.addMessageToActiveChat(
+                 "assistant", accumulatedResponse, responseStartTime
+             );
+             this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (partial assistant), now awaiting promise...`);
+             await partialMessagePromise;
+             this.plugin.logger.debug(`sendMessage: Promise for partial assistant message resolved.`);
+        }
+
+    } finally {
+        // 7. Блок finally виконується ЗАВЖДИ після try або catch
+        this.currentMessageAddedResolver = null; // Гарантовано скидаємо resolver
+        this.plugin.logger.debug("[OllamaView] sendMessage finally block executing.");
+        // Тепер setLoadingState викликається після завершення обробки останнього повідомлення
+        this.setLoadingState(false);
+        this.stopGeneratingButton?.hide();
+        this.sendButton?.show();
+        this.currentAbortController = null;
+        this.updateSendButtonState();
+        this.focusInput();
+        this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
+    }
 }
 
-}
+
   public async handleDeleteMessageClick(messageToDelete: Message): Promise<void> {
     this.plugin.logger.debug(`Delete requested for message timestamp: ${messageToDelete.timestamp.toISOString()}`);
 

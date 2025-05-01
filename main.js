@@ -974,7 +974,6 @@ var LANGUAGES = {
   zu: "Zulu"
 };
 var OllamaView = class extends import_obsidian10.ItemView {
-  // Прапорець, щоб уникнути одночасних сумаризацій
   // private currentAssistantMessage: {
   //   // Для зберігання посилання на поточне повідомлення асистента
   //   groupEl: HTMLElement | null;
@@ -1007,6 +1006,8 @@ var OllamaView = class extends import_obsidian10.ItemView {
     this.errorGroupElement = null;
     // Посилання на активний контейнер групи помилок
     this.isSummarizingErrors = false;
+    // Прапорець, щоб уникнути одночасних сумаризацій
+    this.currentMessageAddedResolver = null;
     // Допоміжна функція для створення підменю (з попереднього коду)
     this.createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
       const section = this.menuDropdown.createDiv();
@@ -2651,6 +2652,14 @@ This action cannot be undone.`,
         this.renderChatListMenu();
       }
     }
+    if (this.currentMessageAddedResolver) {
+      this.plugin.logger.debug(`handleMessageAdded: Resolving promise for role ${data.message.role}, ts: ${data.message.timestamp.getTime()}`);
+      this.currentMessageAddedResolver();
+      this.currentMessageAddedResolver = null;
+    } else {
+      this.plugin.logger.debug(`handleMessageAdded: No active resolver found for role ${data.message.role}, ts: ${data.message.timestamp.getTime()}`);
+    }
+    this.plugin.logger.info(`[handleMessageAdded] <<< EXITED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
   }
   // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
   // --- UI Update Methods ---
@@ -2980,23 +2989,18 @@ This action cannot be undone.`,
       `[handleActiveChatChanged] Finished processing event for chat ID: ${(_f = data.chatId) != null ? _f : "null"}`
     );
   }
-  // OllamaView.ts (Повна версія методу sendMessage після рефакторингу)
   async sendMessage() {
     var _a, _b, _c, _d, _e, _f, _g;
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
-      if (this.currentAbortController !== null) {
-        this.plugin.logger.debug("sendMessage prevented: generation already in progress.");
-      }
-      if (!content) {
-        this.plugin.logger.debug("sendMessage prevented: input is empty.");
-      }
-      if (this.isProcessing) {
-        this.plugin.logger.debug("sendMessage prevented: isProcessing is true.");
-      }
-      if (this.sendButton.disabled) {
-        this.plugin.logger.debug("sendMessage prevented: send button is disabled.");
-      }
+      if (!content)
+        this.plugin.logger.debug("sendMessage prevented: input empty.");
+      if (this.isProcessing)
+        this.plugin.logger.debug("sendMessage prevented: already processing.");
+      if (this.sendButton.disabled)
+        this.plugin.logger.debug("sendMessage prevented: send button disabled.");
+      if (this.currentAbortController)
+        this.plugin.logger.debug("sendMessage prevented: generation already in progress (AbortController exists).");
       return;
     }
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
@@ -3015,17 +3019,17 @@ This action cannot be undone.`,
     const responseStartTime = new Date();
     (_b = this.stopGeneratingButton) == null ? void 0 : _b.show();
     (_c = this.sendButton) == null ? void 0 : _c.hide();
+    let handleMessageAddedPromise = null;
     try {
-      this.plugin.logger.debug("Adding user message to ChatManager...");
+      this.plugin.logger.debug("sendMessage: Adding user message to ChatManager...");
       const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
       if (!userMessage) {
         throw new Error("Failed to add user message to history.");
       }
-      this.plugin.logger.debug("User message added to history successfully.");
-      this.plugin.logger.debug("Creating streaming placeholder for assistant message...");
+      this.plugin.logger.debug("sendMessage: User message added successfully.");
+      this.plugin.logger.debug("sendMessage: Creating streaming placeholder for assistant message...");
       assistantPlaceholderGroupEl = this.chatContainer.createDiv({
         cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`
-        // Використовуємо класи з constants.ts
       });
       renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
       const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
@@ -3046,6 +3050,7 @@ This action cannot be undone.`,
       this.plugin.logger.info("[OllamaView] Starting stream request...");
       const stream = this.plugin.ollamaService.generateChatResponseStream(
         activeChat,
+        // Передаємо актуальний стан чату
         this.currentAbortController.signal
       );
       let firstChunk = true;
@@ -3068,8 +3073,8 @@ This action cannot be undone.`,
           await renderAssistantContent(
             this.app,
             this,
-            // <--- ЗМІНЕНО З this.view НА this
             this.plugin,
+            // Передаємо 'this'
             assistantContentEl,
             accumulatedResponse
           );
@@ -3087,54 +3092,82 @@ This action cannot be undone.`,
       assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.remove();
       assistantPlaceholderGroupEl = null;
       if (accumulatedResponse.trim()) {
-        this.plugin.logger.debug(
-          `Adding final assistant message (length: ${accumulatedResponse.length}) to chat history via ChatManager.`
-        );
-        await this.plugin.chatManager.addMessageToActiveChat(
+        this.plugin.logger.debug(`sendMessage: Preparing to add final assistant message and wait.`);
+        let resolver;
+        handleMessageAddedPromise = new Promise((resolve) => {
+          resolver = resolve;
+        });
+        this.currentMessageAddedResolver = resolver;
+        this.plugin.chatManager.addMessageToActiveChat(
           "assistant",
           accumulatedResponse,
           responseStartTime
-          // false // Цей параметр може бути непотрібним, якщо ChatManager сам вирішує, коли генерувати подію
         );
+        this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (assistant), now awaiting promise...");
+        await handleMessageAddedPromise;
+        this.plugin.logger.debug("sendMessage: Promise for assistant message resolved.");
       } else {
         this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
-        await this.plugin.chatManager.addMessageToActiveChat(
+        let resolver;
+        handleMessageAddedPromise = new Promise((resolve) => {
+          resolver = resolve;
+        });
+        this.currentMessageAddedResolver = resolver;
+        this.plugin.chatManager.addMessageToActiveChat(
           "system",
           "Assistant provided an empty response.",
           new Date()
         );
+        this.plugin.logger.debug("sendMessage: Called addMessageToActiveChat (system-empty), now awaiting promise...");
+        await handleMessageAddedPromise;
+        this.plugin.logger.debug("sendMessage: Promise for system-empty message resolved.");
       }
     } catch (error) {
       this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
       assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.remove();
       assistantPlaceholderGroupEl = null;
+      this.currentMessageAddedResolver = null;
       let errorMsgContent = `Error: ${error.message || "Unknown streaming error."}`;
+      let errorMsgRole = "error";
       let savePartialResponse = false;
       if (error.name === "AbortError" || ((_d = error.message) == null ? void 0 : _d.includes("aborted")) || ((_e = error.message) == null ? void 0 : _e.includes("aborted by user"))) {
         this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
         errorMsgContent = "Generation stopped.";
+        errorMsgRole = "system";
         if (accumulatedResponse.trim()) {
           savePartialResponse = true;
         }
       }
-      await this.plugin.chatManager.addMessageToActiveChat(
-        savePartialResponse ? "system" : "error",
-        // Використовуємо 'system' для зупинки, 'error' для інших
-        errorMsgContent,
-        new Date()
-      );
+      let errorResolver;
+      const errorMessagePromise = new Promise((resolve) => {
+        errorResolver = resolve;
+      });
+      this.currentMessageAddedResolver = errorResolver;
+      this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgContent, new Date());
+      this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (${errorMsgRole}), now awaiting promise...`);
+      await errorMessagePromise;
+      this.plugin.logger.debug(`sendMessage: Promise for ${errorMsgRole} message resolved.`);
       if (savePartialResponse) {
         this.plugin.logger.info(
           `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
         );
-        await this.plugin.chatManager.addMessageToActiveChat(
+        let partialResolver;
+        const partialMessagePromise = new Promise((resolve) => {
+          partialResolver = resolve;
+        });
+        this.currentMessageAddedResolver = partialResolver;
+        this.plugin.chatManager.addMessageToActiveChat(
           "assistant",
           accumulatedResponse,
           responseStartTime
         );
+        this.plugin.logger.debug(`sendMessage: Called addMessageToActiveChat (partial assistant), now awaiting promise...`);
+        await partialMessagePromise;
+        this.plugin.logger.debug(`sendMessage: Promise for partial assistant message resolved.`);
       }
     } finally {
-      this.plugin.logger.debug("[OllamaView] sendMessage finally block executing. Cleaning up UI state.");
+      this.currentMessageAddedResolver = null;
+      this.plugin.logger.debug("[OllamaView] sendMessage finally block executing.");
       this.setLoadingState(false);
       (_f = this.stopGeneratingButton) == null ? void 0 : _f.hide();
       (_g = this.sendButton) == null ? void 0 : _g.show();
