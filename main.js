@@ -6568,6 +6568,13 @@ var OllamaSettingTab = class extends import_obsidian13.PluginSettingTab {
       );
     }
     this.createSectionHeader("Speech & Translation");
+    new import_obsidian13.Setting(containerEl).setName("Enable Translation Feature").setDesc("Show translate buttons.").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.enableTranslation).onChange(async (value) => {
+        this.plugin.settings.enableTranslation = value;
+        await this.plugin.saveSettings();
+        this.display();
+      })
+    );
     new import_obsidian13.Setting(containerEl).setName("Translation Provider").setDesc("Select the service for message and input translation.").addDropdown(
       (dropdown) => dropdown.addOption("none", "Disabled").addOption("google", "Google Translate API").addOption("ollama", "Ollama (Local Model)").setValue(this.plugin.settings.translationProvider).onChange(async (value) => {
         this.plugin.settings.translationProvider = value;
@@ -6593,23 +6600,7 @@ var OllamaSettingTab = class extends import_obsidian13.PluginSettingTab {
         })
       );
     }
-    new import_obsidian13.Setting(containerEl).setName("Enable Translation Feature").setDesc("Show translate buttons.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.enableTranslation).onChange(async (value) => {
-        this.plugin.settings.enableTranslation = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
     if (this.plugin.settings.enableTranslation) {
-      new import_obsidian13.Setting(containerEl).setName("Target Translation Language").setDesc("Translate messages/input into this language.").addDropdown((dropdown) => {
-        for (const code in LANGUAGES2) {
-          dropdown.addOption(code, LANGUAGES2[code]);
-        }
-        dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async (value) => {
-          this.plugin.settings.translationTargetLanguage = value;
-          await this.plugin.saveSettings();
-        });
-      });
       if (this.plugin.settings.translationProvider === "ollama") {
         let ollamaTranslationModelDropdown = null;
         const updateOllamaTranslationOptions = async (dropdown, button) => {

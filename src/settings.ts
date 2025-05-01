@@ -964,6 +964,16 @@ export class OllamaSettingTab extends PluginSettingTab {
 
     // --- Секція: Speech & Translation ---
     this.createSectionHeader("Speech & Translation");
+    new Setting(containerEl)
+    .setName("Enable Translation Feature")
+    .setDesc("Show translate buttons.")
+    .addToggle(toggle =>
+      toggle.setValue(this.plugin.settings.enableTranslation).onChange(async value => {
+        this.plugin.settings.enableTranslation = value;
+        await this.plugin.saveSettings();
+        this.display(); // Перемалювати
+      })
+    );
     // --- НОВЕ: Вибір Провайдера Перекладу ---
     new Setting(containerEl)
       .setName("Translation Provider")
@@ -1009,29 +1019,20 @@ export class OllamaSettingTab extends PluginSettingTab {
             })
         );
     }
-    new Setting(containerEl)
-    .setName("Enable Translation Feature")
-    .setDesc("Show translate buttons.")
-    .addToggle(toggle =>
-      toggle.setValue(this.plugin.settings.enableTranslation).onChange(async value => {
-        this.plugin.settings.enableTranslation = value;
-        await this.plugin.saveSettings();
-        this.display(); // Перемалювати
-      })
-    );
+    
   if (this.plugin.settings.enableTranslation) {
-    new Setting(containerEl)
-      .setName("Target Translation Language")
-      .setDesc("Translate messages/input into this language.")
-      .addDropdown(dropdown => {
-        for (const code in LANGUAGES) {
-          dropdown.addOption(code, LANGUAGES[code]);
-        }
-        dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async value => {
-          this.plugin.settings.translationTargetLanguage = value;
-          await this.plugin.saveSettings();
-        });
-      });
+    // new Setting(containerEl)
+    //   .setName("Target Translation Language")
+    //   .setDesc("Translate messages/input into this language.")
+    //   .addDropdown(dropdown => {
+    //     for (const code in LANGUAGES) {
+    //       dropdown.addOption(code, LANGUAGES[code]);
+    //     }
+    //     dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async value => {
+    //       this.plugin.settings.translationTargetLanguage = value;
+    //       await this.plugin.saveSettings();
+    //     });
+    //   });
     
     // --- Умовні налаштування для Ollama ---
     if (this.plugin.settings.translationProvider === 'ollama') {
