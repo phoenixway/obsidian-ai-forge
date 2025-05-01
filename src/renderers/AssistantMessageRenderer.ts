@@ -23,9 +23,9 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
 		}
 	}
 
+	// Метод render залишається методом екземпляра, бо викликає статичні та protected методи
 	public async render(): Promise<HTMLElement> {
         this.plugin.logger.debug(`[AssistantMessageRenderer] Starting render for ts: ${this.message.timestamp.getTime()}`);
-
 		const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
 		this.addAvatar(messageGroup, false);
 		const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
@@ -33,120 +33,136 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
         const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
         contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
 
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling renderAssistantContentInternal...`);
-
+        this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling static renderAssistantContent...`);
         try {
-            // Викликаємо внутрішній метод для рендерингу контенту
-            await this.renderAssistantContentInternal(contentEl, this.message.content);
-            this.plugin.logger.debug(`[AssistantMessageRenderer] renderAssistantContentInternal finished successfully.`);
-
+            // Викликаємо статичний метод для рендерингу контенту
+            await AssistantMessageRenderer.renderAssistantContent(
+                contentEl, this.message.content, this.app, this.plugin, this.view
+            );
+            this.plugin.logger.debug(`[AssistantMessageRenderer] Static renderAssistantContent finished successfully.`);
         } catch (error) {
-             this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling renderAssistantContentInternal FAILED:`, error);
+             this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling static renderAssistantContent FAILED:`, error);
              contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
-             // Перекидаємо помилку, щоб handleMessageAdded міг її обробити і показати користувачу
-             throw error;
+             throw error; // Перекидаємо далі
         }
 
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Adding action buttons...`);
-		this.addAssistantActionButtons(messageWrapper, contentEl); // Додаємо кнопки
-		this.addTimestamp(messageEl); // Додаємо мітку часу
+        this.plugin.logger.debug(`[AssistantMessageRenderer] Adding action buttons (static)...`);
+        // Викликаємо статичний метод для додавання кнопок
+		AssistantMessageRenderer.addAssistantActionButtons(messageWrapper, contentEl, this.message, this.plugin, this.view);
+
+		this.plugin.logger.debug(`[AssistantMessageRenderer] Adding timestamp (static)...`);
+        // Викликаємо статичний метод базового класу для мітки часу
+		BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
 
         this.plugin.logger.debug(`[AssistantMessageRenderer] Scheduling checkMessageForCollapsing...`);
-		setTimeout(() => {
-             if (messageEl.isConnected) {
-                  this.view.checkMessageForCollapsing(messageEl);
-             } else {
-                  this.plugin.logger.warn(`[AssistantMessageRenderer] messageEl not connected when trying to check collapsing.`);
-             }
-        }, 50);
+		setTimeout(() => { if (messageEl.isConnected) this.view.checkMessageForCollapsing(messageEl) }, 50);
 
         this.plugin.logger.debug(`[AssistantMessageRenderer] Finished render for ts: ${this.message.timestamp.getTime()}`);
 		return messageGroup;
 	}
 
-    /**
-     * Внутрішній метод для рендерингу контенту асистента (Markdown, код, емодзі).
-     */
-    private async renderAssistantContentInternal(contentEl: HTMLElement, markdownText: string): Promise<void> {
-        this.plugin.logger.debug("[renderAssistantContentInternal] Entering.");
-        contentEl.empty();
-        let processedMarkdown = markdownText;
+    	/**
+	 * Статичний метод для рендерингу контенту асистента (Markdown, код, емодзі).
+     * @param contentEl - DOM-елемент для рендерингу.
+     * @param markdownText - Текст у форматі Markdown.
+     * @param app - Екземпляр App.
+     * @param plugin - Екземпляр OllamaPlugin.
+     * @param view - Екземпляр OllamaView.
+	 */
+	public static async renderAssistantContent(
+        contentEl: HTMLElement, markdownText: string, app: App, plugin: OllamaPlugin, view: OllamaView
+    ): Promise<void> {
+		plugin.logger.debug("[renderAssistantContent STAT] Entering.");
+		contentEl.empty();
+		let processedMarkdown = markdownText;
 
-        // 1. Декодування/Видалення тегів
-        try {
-            const decoded = RendererUtils.decodeHtmlEntities(markdownText);
-            const thinkDetection = RendererUtils.detectThinkingTags(decoded);
-            processedMarkdown = thinkDetection.contentWithoutTags;
-            if (thinkDetection.hasThinkingTags) { this.plugin.logger.debug("[renderAssistantContentInternal] Removed <think> tags."); }
-        } catch (e) {
-            this.plugin.logger.error("[renderAssistantContentInternal] Error during decoding/tag removal:", e);
-            processedMarkdown = markdownText; // Fallback
-        }
+		// 1. Decode/Remove Tags
+		try {
+			const decoded = RendererUtils.decodeHtmlEntities(markdownText);
+			const thinkDetection = RendererUtils.detectThinkingTags(decoded);
+			processedMarkdown = thinkDetection.contentWithoutTags;
+			if (thinkDetection.hasThinkingTags) { plugin.logger.debug("[renderAssistantContent STAT] Removed <think> tags."); }
+		} catch (e) { plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e); }
 
-        // 2. Рендеринг Markdown (з окремим try/catch)
-        this.plugin.logger.debug("[renderAssistantContentInternal] Starting MarkdownRenderer.render...");
-        try {
-            await MarkdownRenderer.render(
-                this.app,
-                processedMarkdown,
-                contentEl,
-                this.plugin.app.vault.getRoot()?.path ?? "",
-                this.view // Передаємо контекст View
-            );
-             this.plugin.logger.debug("[renderAssistantContentInternal] MarkdownRenderer.render finished successfully.");
-        } catch (error) {
-             this.plugin.logger.error("[renderAssistantContentInternal] <<< MARKDOWN RENDER FAILED >>>:", error);
-             contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
-             // Кидаємо помилку далі
-             throw error;
-        }
-
-        // 3. Обробка блоків коду
-        this.plugin.logger.debug("[renderAssistantContentInternal] Processing code blocks...");
-        try {
-            RendererUtils.enhanceCodeBlocks(contentEl, this.view);
-        } catch (error) { this.plugin.logger.error("[renderAssistantContentInternal] Error processing code blocks:", error); }
-
-        // 4. Виправлення Twemoji
-        if (this.plugin.settings.fixBrokenEmojis) {
-            this.plugin.logger.debug("[renderAssistantContentInternal] Fixing Twemoji images...");
-            try {
-                RendererUtils.fixBrokenTwemojiImages(contentEl);
-            } catch (error) { this.plugin.logger.error("[renderAssistantContentInternal] Error fixing Twemoji:", error); }
-        }
-
-         this.plugin.logger.debug("[renderAssistantContentInternal] Exiting.");
-    }
-
-
-	/** Додає кнопки дій (Copy, Translate, Summarize, Delete) */
-	private addAssistantActionButtons(messageWrapper: HTMLElement, contentEl: HTMLElement): void {
-        // ... (код додавання кнопок, як у попередній відповіді) ...
-         const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-		const finalContent = this.message.content;
-
-		// Copy Button
-		const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
-		setIcon(copyBtn, "copy");
-		this.view.registerDomEvent(copyBtn, "click", e => { e.stopPropagation(); this.view.handleCopyClick(finalContent, copyBtn); });
-
-		// Translate Button
-		if ( this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim() ) {
-			const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
-			setIcon(translateBtn, "languages");
-			this.view.registerDomEvent(translateBtn, "click", e => { e.stopPropagation(); if (contentEl.isConnected) { this.view.handleTranslateClick(finalContent, contentEl, translateBtn); } else { new Notice("Cannot translate: message content element not found."); } });
+		// 2. Render Markdown
+		plugin.logger.debug("[renderAssistantContent STAT] Starting MarkdownRenderer.render...");
+		try {
+			await MarkdownRenderer.render(
+				app, // Використовуємо переданий app
+				processedMarkdown,
+				contentEl,
+				plugin.app.vault.getRoot()?.path ?? "", // Використовуємо переданий plugin
+				view // Використовуємо переданий view
+			);
+			 plugin.logger.debug("[renderAssistantContent STAT] MarkdownRenderer.render finished successfully.");
+		} catch (error) {
+			 plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
+			 contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
+			 throw error; // Кидаємо помилку далі
 		}
 
-		// Summarize Button
-		if (this.plugin.settings.summarizationModelName && finalContent.trim()) {
-			const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
-			setIcon(summarizeBtn, "scroll-text");
-			this.view.registerDomEvent(summarizeBtn, "click", e => { e.stopPropagation(); this.view.handleSummarizeClick(finalContent, summarizeBtn); });
+		// 3. Enhance Code Blocks
+		plugin.logger.debug("[renderAssistantContent STAT] Processing code blocks...");
+		try {
+			RendererUtils.enhanceCodeBlocks(contentEl, view); // Передаємо view
+		} catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error processing code blocks:", error); }
+
+		// 4. Fix Twemoji
+		if (plugin.settings.fixBrokenEmojis) { // Використовуємо переданий plugin
+			plugin.logger.debug("[renderAssistantContent STAT] Fixing Twemoji images...");
+			try {
+				RendererUtils.fixBrokenTwemojiImages(contentEl);
+			} catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error fixing Twemoji:", error); }
 		}
 
-		// Delete Button
-		const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
-		setIcon(deleteBtn, "trash");
-		this.view.registerDomEvent(deleteBtn, "click", e => { e.stopPropagation(); this.view.handleDeleteMessageClick(this.message); });
+		 plugin.logger.debug("[renderAssistantContent STAT] Exiting.");
 	}
+
+
+	/**
+	 * Статичний метод для додавання кнопок дій асистента.
+     * @param messageWrapper - Обгортка повідомлення.
+     * @param contentEl - Елемент контенту (для перекладу).
+     * @param message - Об'єкт повідомлення (для видалення).
+     * @param plugin - Екземпляр OllamaPlugin (для налаштувань).
+     * @param view - Екземпляр OllamaView (для обробників подій).
+	 */
+	public static addAssistantActionButtons(
+        messageWrapper: HTMLElement, contentEl: HTMLElement, message: Message, plugin: OllamaPlugin, view: OllamaView
+    ): void {
+         // Перевіряємо, чи кнопки вже існують
+         if (messageWrapper.querySelector(".message-actions-wrapper")) {
+             // Можна оновити обробники, якщо треба, але поки що просто виходимо
+             plugin.logger.debug("[addAssistantActionButtons STAT] Buttons already exist, skipping.");
+             return;
+         }
+         plugin.logger.debug("[addAssistantActionButtons STAT] Adding buttons...");
+		 const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+		 const finalContent = message.content; // Використовуємо передане повідомлення
+
+		 // Copy Button
+		 const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+		 setIcon(copyBtn, "copy");
+		 view.registerDomEvent(copyBtn, "click", e => { e.stopPropagation(); view.handleCopyClick(finalContent, copyBtn); }); // Використовуємо view
+
+		 // Translate Button
+		 if ( plugin.settings.enableTranslation && plugin.settings.googleTranslationApiKey && finalContent.trim() ) { // Використовуємо plugin
+			 const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
+			 setIcon(translateBtn, "languages");
+			 view.registerDomEvent(translateBtn, "click", e => { e.stopPropagation(); if (contentEl.isConnected) { view.handleTranslateClick(finalContent, contentEl, translateBtn); } else { new Notice("Cannot translate: message content element not found."); } }); // Використовуємо view
+		 }
+
+		 // Summarize Button
+		 if (plugin.settings.summarizationModelName && finalContent.trim()) { // Використовуємо plugin
+			 const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
+			 setIcon(summarizeBtn, "scroll-text");
+			 view.registerDomEvent(summarizeBtn, "click", e => { e.stopPropagation(); view.handleSummarizeClick(finalContent, summarizeBtn); }); // Використовуємо view
+		 }
+
+		 // Delete Button
+		 const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+		 setIcon(deleteBtn, "trash");
+		 view.registerDomEvent(deleteBtn, "click", e => { e.stopPropagation(); view.handleDeleteMessageClick(message); }); // Використовуємо view та message
+	}
+    // --- КІНЕЦЬ СТАТИЧНОГО МЕТОДУ ---
 }

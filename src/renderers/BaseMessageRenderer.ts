@@ -1,10 +1,10 @@
 // src/renderers/BaseMessageRenderer.ts
-import { App, MarkdownRenderer, setIcon } from "obsidian";
+import { App, setIcon } from "obsidian";
 import { Message } from "../types";
 import OllamaPlugin from "../main";
-import { OllamaView } from "../OllamaView"; // Потрібно для контексту та утиліт
+import { OllamaView } from "../OllamaView";
 import { CSS_CLASSES } from "../constants";
-import * as RendererUtils from "../MessageRendererUtils"; // Утиліти рендерингу
+import * as RendererUtils from "../MessageRendererUtils";
 import { IMessageRenderer } from "./IMessageRenderer";
 
 export abstract class BaseMessageRenderer implements IMessageRenderer {
@@ -17,93 +17,59 @@ export abstract class BaseMessageRenderer implements IMessageRenderer {
 		this.app = app;
 		this.plugin = plugin;
 		this.message = message;
-		this.view = view; // Зберігаємо контекст View
+		this.view = view;
 	}
 
-	// Абстрактний метод, який повинні реалізувати підкласи
 	abstract render(): Promise<HTMLElement> | HTMLElement;
 
-	/**
-	 * Створює базову обгортку для групи повідомлень (div.message-group).
-	 * Встановлює часову мітку як атрибут.
-	 * @param groupClasses - Додаткові CSS класи для групи (наприклад, user-message-group).
-	 * @returns Створений HTMLElement групи.
-	 */
 	protected createMessageGroupWrapper(groupClasses: string[] = []): HTMLElement {
 		const messageGroup = document.createElement("div");
 		messageGroup.classList.add(CSS_CLASSES.MESSAGE_GROUP, ...groupClasses);
+		// Встановлюємо timestamp тут, бо він відомий при створенні
 		messageGroup.setAttribute("data-timestamp", this.message.timestamp.getTime().toString());
 		return messageGroup;
 	}
 
+	// --- ЗРОБЛЕНО СТАТИЧНИМ ---
 	/**
 	 * Створює та додає елемент мітки часу до вказаного батьківського елемента.
-	 * @param parentElement - Елемент, куди додати мітку часу (зазвичай сама "бульбашка" повідомлення).
+	 * @param parentElement - Елемент, куди додати мітку часу.
+	 * @param timestamp - Об'єкт Date для форматування.
+	 * @param view - Екземпляр OllamaView для доступу до форматера.
 	 */
-	protected addTimestamp(parentElement: HTMLElement): void {
+	public static addTimestamp(parentElement: HTMLElement, timestamp: Date, view: OllamaView): void {
+		// Перевіряємо, чи мітка часу вже існує (на випадок повторного виклику)
+        if (parentElement.querySelector(`.${CSS_CLASSES.TIMESTAMP}`)) {
+            return;
+        }
 		parentElement.createDiv({
 			cls: CSS_CLASSES.TIMESTAMP,
-			text: this.view.formatTime(this.message.timestamp), // Використовуємо метод форматування з View
+			text: view.formatTime(timestamp), // Використовуємо view для форматування
 		});
 	}
+	// --- КІНЕЦЬ ЗМІНИ ---
 
-	/**
-	 * Додає аватар користувача або асистента до групи повідомлень.
-	 * @param messageGroup - Елемент групи повідомлень.
-	 * @param isUser - Чи це повідомлення користувача (true) чи асистента (false).
-	 */
 	protected addAvatar(messageGroup: HTMLElement, isUser: boolean): void {
 		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, isUser);
 	}
 
-	/**
-	 * Додає стандартні кнопки дій (Копіювати, Видалити) до обгортки повідомлення.
-	 * Специфічні кнопки (Translate, Summarize, Regenerate) додаються в підкласах.
-	 * @param messageWrapper - Обгортка повідомлення (div.message-wrapper).
-	 * @param contentToCopy - Текст, який буде скопійовано.
-	 */
-	protected addBaseActionButtons(messageWrapper: HTMLElement, contentToCopy: string): void {
-		const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-
-		// Copy Button
-		const copyBtn = buttonsWrapper.createEl("button", {
-			cls: CSS_CLASSES.COPY_BUTTON, // Використовуємо константу
-			attr: { "aria-label": "Copy", title: "Copy" },
-		});
-		setIcon(copyBtn, "copy");
-		this.view.registerDomEvent(copyBtn, "click", e => {
-			e.stopPropagation();
-			// Важливо: Передаємо оригінальний, необроблений контент для копіювання,
-			// якщо тільки не потрібно видаляти <think> теги специфічно (це робить Assistant renderer)
-			this.view.handleCopyClick(contentToCopy, copyBtn);
-		});
-
-		// Delete Button
-		const deleteBtn = buttonsWrapper.createEl("button", {
-			cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], // Використовуємо константи
-			attr: { "aria-label": "Delete message", title: "Delete Message" },
-		});
-		setIcon(deleteBtn, "trash");
-		this.view.registerDomEvent(deleteBtn, "click", e => {
-			e.stopPropagation();
-			this.view.handleDeleteMessageClick(this.message);
-		});
+	// addBaseActionButtons залишається методом екземпляра, бо залежить від this.message та this.view
+    protected addBaseActionButtons(messageWrapper: HTMLElement, contentToCopy: string): void {
+		// ... (реалізація як раніше) ...
+         const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+         // Copy Button
+         const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+         setIcon(copyBtn, "copy");
+         this.view.registerDomEvent(copyBtn, "click", e => { e.stopPropagation(); this.view.handleCopyClick(contentToCopy, copyBtn); });
+         // Delete Button
+         const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+         setIcon(deleteBtn, "trash");
+         this.view.registerDomEvent(deleteBtn, "click", e => { e.stopPropagation(); this.view.handleDeleteMessageClick(this.message); });
 	}
 
-    /**
-     * Створює основну "бульбашку" повідомлення та контейнери для контенту.
-     * @param messageWrapper - Обгортка повідомлення (div.message-wrapper).
-     * @param messageClasses - Додаткові CSS класи для самої бульбашки повідомлення.
-     * @returns Об'єкт з посиланнями на створені елементи: messageEl, contentContainer, contentEl.
-     */
-    protected createMessageBubble(messageWrapper: HTMLElement, messageClasses: string[] = []): {
-        messageEl: HTMLElement;
-        contentContainer: HTMLElement;
-        contentEl: HTMLElement;
-    } {
-        const messageEl = messageWrapper.createDiv({
-            cls: [CSS_CLASSES.MESSAGE, ...messageClasses],
-        });
+    protected createMessageBubble(messageWrapper: HTMLElement, messageClasses: string[] = []): { messageEl: HTMLElement; contentContainer: HTMLElement; contentEl: HTMLElement; } {
+        // ... (реалізація як раніше) ...
+        const messageEl = messageWrapper.createDiv({ cls: [CSS_CLASSES.MESSAGE, ...messageClasses] });
         const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
         const contentEl = contentContainer.createDiv({ cls: CSS_CLASSES.CONTENT });
         return { messageEl, contentContainer, contentEl };

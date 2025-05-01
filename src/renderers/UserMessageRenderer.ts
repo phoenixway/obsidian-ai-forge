@@ -41,8 +41,7 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		this.addUserActionButtons(messageWrapper);
 
 		// Додаємо мітку часу
-		this.addTimestamp(messageEl);
-
+		BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
 		return messageGroup;
 	}
 

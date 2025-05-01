@@ -545,76 +545,51 @@ var BaseMessageRenderer = class {
     this.message = message;
     this.view = view;
   }
-  /**
-   * Створює базову обгортку для групи повідомлень (div.message-group).
-   * Встановлює часову мітку як атрибут.
-   * @param groupClasses - Додаткові CSS класи для групи (наприклад, user-message-group).
-   * @returns Створений HTMLElement групи.
-   */
   createMessageGroupWrapper(groupClasses = []) {
     const messageGroup = document.createElement("div");
     messageGroup.classList.add(CSS_CLASSES.MESSAGE_GROUP, ...groupClasses);
     messageGroup.setAttribute("data-timestamp", this.message.timestamp.getTime().toString());
     return messageGroup;
   }
+  // --- ЗРОБЛЕНО СТАТИЧНИМ ---
   /**
    * Створює та додає елемент мітки часу до вказаного батьківського елемента.
-   * @param parentElement - Елемент, куди додати мітку часу (зазвичай сама "бульбашка" повідомлення).
+   * @param parentElement - Елемент, куди додати мітку часу.
+   * @param timestamp - Об'єкт Date для форматування.
+   * @param view - Екземпляр OllamaView для доступу до форматера.
    */
-  addTimestamp(parentElement) {
+  static addTimestamp(parentElement, timestamp, view) {
+    if (parentElement.querySelector(`.${CSS_CLASSES.TIMESTAMP}`)) {
+      return;
+    }
     parentElement.createDiv({
       cls: CSS_CLASSES.TIMESTAMP,
-      text: this.view.formatTime(this.message.timestamp)
-      // Використовуємо метод форматування з View
+      text: view.formatTime(timestamp)
+      // Використовуємо view для форматування
     });
   }
-  /**
-   * Додає аватар користувача або асистента до групи повідомлень.
-   * @param messageGroup - Елемент групи повідомлень.
-   * @param isUser - Чи це повідомлення користувача (true) чи асистента (false).
-   */
+  // --- КІНЕЦЬ ЗМІНИ ---
   addAvatar(messageGroup, isUser) {
     renderAvatar(this.app, this.plugin, messageGroup, isUser);
   }
-  /**
-   * Додає стандартні кнопки дій (Копіювати, Видалити) до обгортки повідомлення.
-   * Специфічні кнопки (Translate, Summarize, Regenerate) додаються в підкласах.
-   * @param messageWrapper - Обгортка повідомлення (div.message-wrapper).
-   * @param contentToCopy - Текст, який буде скопійовано.
-   */
+  // addBaseActionButtons залишається методом екземпляра, бо залежить від this.message та this.view
   addBaseActionButtons(messageWrapper, contentToCopy) {
     const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-    const copyBtn = buttonsWrapper.createEl("button", {
-      cls: CSS_CLASSES.COPY_BUTTON,
-      // Використовуємо константу
-      attr: { "aria-label": "Copy", title: "Copy" }
-    });
+    const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
     (0, import_obsidian5.setIcon)(copyBtn, "copy");
     this.view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
       this.view.handleCopyClick(contentToCopy, copyBtn);
     });
-    const deleteBtn = buttonsWrapper.createEl("button", {
-      cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION],
-      // Використовуємо константи
-      attr: { "aria-label": "Delete message", title: "Delete Message" }
-    });
+    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
     (0, import_obsidian5.setIcon)(deleteBtn, "trash");
     this.view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
       this.view.handleDeleteMessageClick(this.message);
     });
   }
-  /**
-   * Створює основну "бульбашку" повідомлення та контейнери для контенту.
-   * @param messageWrapper - Обгортка повідомлення (div.message-wrapper).
-   * @param messageClasses - Додаткові CSS класи для самої бульбашки повідомлення.
-   * @returns Об'єкт з посиланнями на створені елементи: messageEl, contentContainer, contentEl.
-   */
   createMessageBubble(messageWrapper, messageClasses = []) {
-    const messageEl = messageWrapper.createDiv({
-      cls: [CSS_CLASSES.MESSAGE, ...messageClasses]
-    });
+    const messageEl = messageWrapper.createDiv({ cls: [CSS_CLASSES.MESSAGE, ...messageClasses] });
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASSES.CONTENT });
     return { messageEl, contentContainer, contentEl };
@@ -645,7 +620,7 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         contentEl.createEl("br");
     });
     this.addUserActionButtons(messageWrapper);
-    this.addTimestamp(messageEl);
+    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     return messageGroup;
   }
   /**
@@ -696,6 +671,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
     }
   }
+  // Метод render залишається методом екземпляра, бо викликає статичні та protected методи
   async render() {
     this.plugin.logger.debug(`[AssistantMessageRenderer] Starting render for ts: ${this.message.timestamp.getTime()}`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
@@ -704,35 +680,44 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     messageWrapper.style.order = "2";
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling renderAssistantContentInternal...`);
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling static renderAssistantContent...`);
     try {
-      await this.renderAssistantContentInternal(contentEl, this.message.content);
-      this.plugin.logger.debug(`[AssistantMessageRenderer] renderAssistantContentInternal finished successfully.`);
+      await AssistantMessageRenderer.renderAssistantContent(
+        contentEl,
+        this.message.content,
+        this.app,
+        this.plugin,
+        this.view
+      );
+      this.plugin.logger.debug(`[AssistantMessageRenderer] Static renderAssistantContent finished successfully.`);
     } catch (error) {
-      this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling renderAssistantContentInternal FAILED:`, error);
+      this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling static renderAssistantContent FAILED:`, error);
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
       throw error;
     }
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Adding action buttons...`);
-    this.addAssistantActionButtons(messageWrapper, contentEl);
-    this.addTimestamp(messageEl);
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Adding action buttons (static)...`);
+    AssistantMessageRenderer.addAssistantActionButtons(messageWrapper, contentEl, this.message, this.plugin, this.view);
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Adding timestamp (static)...`);
+    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     this.plugin.logger.debug(`[AssistantMessageRenderer] Scheduling checkMessageForCollapsing...`);
     setTimeout(() => {
-      if (messageEl.isConnected) {
+      if (messageEl.isConnected)
         this.view.checkMessageForCollapsing(messageEl);
-      } else {
-        this.plugin.logger.warn(`[AssistantMessageRenderer] messageEl not connected when trying to check collapsing.`);
-      }
     }, 50);
     this.plugin.logger.debug(`[AssistantMessageRenderer] Finished render for ts: ${this.message.timestamp.getTime()}`);
     return messageGroup;
   }
   /**
-   * Внутрішній метод для рендерингу контенту асистента (Markdown, код, емодзі).
-   */
-  async renderAssistantContentInternal(contentEl, markdownText) {
+  * Статичний метод для рендерингу контенту асистента (Markdown, код, емодзі).
+     * @param contentEl - DOM-елемент для рендерингу.
+     * @param markdownText - Текст у форматі Markdown.
+     * @param app - Екземпляр App.
+     * @param plugin - Екземпляр OllamaPlugin.
+     * @param view - Екземпляр OllamaView.
+  */
+  static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
-    this.plugin.logger.debug("[renderAssistantContentInternal] Entering.");
+    plugin.logger.debug("[renderAssistantContent STAT] Entering.");
     contentEl.empty();
     let processedMarkdown = markdownText;
     try {
@@ -740,81 +725,95 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       const thinkDetection = detectThinkingTags(decoded);
       processedMarkdown = thinkDetection.contentWithoutTags;
       if (thinkDetection.hasThinkingTags) {
-        this.plugin.logger.debug("[renderAssistantContentInternal] Removed <think> tags.");
+        plugin.logger.debug("[renderAssistantContent STAT] Removed <think> tags.");
       }
     } catch (e) {
-      this.plugin.logger.error("[renderAssistantContentInternal] Error during decoding/tag removal:", e);
-      processedMarkdown = markdownText;
+      plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e);
     }
-    this.plugin.logger.debug("[renderAssistantContentInternal] Starting MarkdownRenderer.render...");
+    plugin.logger.debug("[renderAssistantContent STAT] Starting MarkdownRenderer.render...");
     try {
       await import_obsidian7.MarkdownRenderer.render(
-        this.app,
+        app,
+        // Використовуємо переданий app
         processedMarkdown,
         contentEl,
-        (_b = (_a = this.plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
-        this.view
-        // Передаємо контекст View
+        (_b = (_a = plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
+        // Використовуємо переданий plugin
+        view
+        // Використовуємо переданий view
       );
-      this.plugin.logger.debug("[renderAssistantContentInternal] MarkdownRenderer.render finished successfully.");
+      plugin.logger.debug("[renderAssistantContent STAT] MarkdownRenderer.render finished successfully.");
     } catch (error) {
-      this.plugin.logger.error("[renderAssistantContentInternal] <<< MARKDOWN RENDER FAILED >>>:", error);
+      plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
       contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
       throw error;
     }
-    this.plugin.logger.debug("[renderAssistantContentInternal] Processing code blocks...");
+    plugin.logger.debug("[renderAssistantContent STAT] Processing code blocks...");
     try {
-      enhanceCodeBlocks(contentEl, this.view);
+      enhanceCodeBlocks(contentEl, view);
     } catch (error) {
-      this.plugin.logger.error("[renderAssistantContentInternal] Error processing code blocks:", error);
+      plugin.logger.error("[renderAssistantContent STAT] Error processing code blocks:", error);
     }
-    if (this.plugin.settings.fixBrokenEmojis) {
-      this.plugin.logger.debug("[renderAssistantContentInternal] Fixing Twemoji images...");
+    if (plugin.settings.fixBrokenEmojis) {
+      plugin.logger.debug("[renderAssistantContent STAT] Fixing Twemoji images...");
       try {
         fixBrokenTwemojiImages(contentEl);
       } catch (error) {
-        this.plugin.logger.error("[renderAssistantContentInternal] Error fixing Twemoji:", error);
+        plugin.logger.error("[renderAssistantContent STAT] Error fixing Twemoji:", error);
       }
     }
-    this.plugin.logger.debug("[renderAssistantContentInternal] Exiting.");
+    plugin.logger.debug("[renderAssistantContent STAT] Exiting.");
   }
-  /** Додає кнопки дій (Copy, Translate, Summarize, Delete) */
-  addAssistantActionButtons(messageWrapper, contentEl) {
+  /**
+   * Статичний метод для додавання кнопок дій асистента.
+      * @param messageWrapper - Обгортка повідомлення.
+      * @param contentEl - Елемент контенту (для перекладу).
+      * @param message - Об'єкт повідомлення (для видалення).
+      * @param plugin - Екземпляр OllamaPlugin (для налаштувань).
+      * @param view - Екземпляр OllamaView (для обробників подій).
+   */
+  static addAssistantActionButtons(messageWrapper, contentEl, message, plugin, view) {
+    if (messageWrapper.querySelector(".message-actions-wrapper")) {
+      plugin.logger.debug("[addAssistantActionButtons STAT] Buttons already exist, skipping.");
+      return;
+    }
+    plugin.logger.debug("[addAssistantActionButtons STAT] Adding buttons...");
     const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-    const finalContent = this.message.content;
+    const finalContent = message.content;
     const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
     (0, import_obsidian7.setIcon)(copyBtn, "copy");
-    this.view.registerDomEvent(copyBtn, "click", (e) => {
+    view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
-      this.view.handleCopyClick(finalContent, copyBtn);
+      view.handleCopyClick(finalContent, copyBtn);
     });
-    if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
+    if (plugin.settings.enableTranslation && plugin.settings.googleTranslationApiKey && finalContent.trim()) {
       const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
       (0, import_obsidian7.setIcon)(translateBtn, "languages");
-      this.view.registerDomEvent(translateBtn, "click", (e) => {
+      view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
         if (contentEl.isConnected) {
-          this.view.handleTranslateClick(finalContent, contentEl, translateBtn);
+          view.handleTranslateClick(finalContent, contentEl, translateBtn);
         } else {
           new import_obsidian7.Notice("Cannot translate: message content element not found.");
         }
       });
     }
-    if (this.plugin.settings.summarizationModelName && finalContent.trim()) {
+    if (plugin.settings.summarizationModelName && finalContent.trim()) {
       const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
       (0, import_obsidian7.setIcon)(summarizeBtn, "scroll-text");
-      this.view.registerDomEvent(summarizeBtn, "click", (e) => {
+      view.registerDomEvent(summarizeBtn, "click", (e) => {
         e.stopPropagation();
-        this.view.handleSummarizeClick(finalContent, summarizeBtn);
+        view.handleSummarizeClick(finalContent, summarizeBtn);
       });
     }
     const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
     (0, import_obsidian7.setIcon)(deleteBtn, "trash");
-    this.view.registerDomEvent(deleteBtn, "click", (e) => {
+    view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
-      this.view.handleDeleteMessageClick(this.message);
+      view.handleDeleteMessageClick(message);
     });
   }
+  // --- КІНЕЦЬ СТАТИЧНОГО МЕТОДУ ---
 };
 
 // src/renderers/SystemMessageRenderer.ts
@@ -858,7 +857,7 @@ var SystemMessageRenderer = class extends BaseMessageRenderer {
       text: this.message.content
       // Беремо контент з protected властивості базового класу
     });
-    this.addTimestamp(messageEl);
+    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     return messageGroup;
   }
 };
@@ -887,7 +886,7 @@ var ErrorMessageRenderer = class extends BaseMessageRenderer {
     contentEl.addClass(CSS_CLASS_ERROR_TEXT);
     (0, import_obsidian9.setIcon)(contentContainer.createSpan({ cls: CSS_CLASS_ERROR_ICON, prepend: true }), "alert-triangle");
     contentEl.setText(this.message.content);
-    this.addTimestamp(messageEl);
+    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     this.addErrorActionButtons(messageWrapper);
     return messageGroup;
   }
@@ -1740,6 +1739,7 @@ This action cannot be undone.`,
         this.renderRoleList();
       }
     };
+    // Кінець addMessageStandard
     this.handleMessagesCleared = (chatId) => {
       var _a;
       if (chatId === ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
@@ -2637,6 +2637,7 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
+  // OllamaView.ts
   // Допоміжний метод для стандартного додавання повідомлення (User, System, Error, Assistant-Fallback)
   async addMessageStandard(message) {
     var _a;
@@ -2661,6 +2662,10 @@ This action cannot be undone.`,
           break;
         case "error":
           this.handleErrorMessage(message);
+          if (this.currentMessageAddedResolver) {
+            this.currentMessageAddedResolver();
+            this.currentMessageAddedResolver = null;
+          }
           return;
         case "assistant":
           this.plugin.logger.warn(`[addMessageStandard] Rendering assistant message as fallback.`);
@@ -2693,9 +2698,27 @@ This action cannot be undone.`,
       } else if (renderer) {
         this.plugin.logger.warn(`[addMessageStandard] messageGroupEl null after render. Role: ${message.role}`);
       }
+      if (this.currentMessageAddedResolver) {
+        this.plugin.logger.warn(`[addMessageStandard] Resolving promise after standard add. Role: ${message.role}.`);
+        try {
+          this.currentMessageAddedResolver();
+        } catch (e) {
+          this.plugin.logger.error("Error resolving promise in addMessageStandard:", e);
+        }
+        this.currentMessageAddedResolver = null;
+      }
     } catch (error) {
       this.plugin.logger.error(`[addMessageStandard] Error rendering/appending standard message. Role: ${message.role}`, error);
       this.handleErrorMessage({ role: "error", content: `Failed to display ${message.role} message. Render Error: ${error.message}`, timestamp: new Date() });
+      if (this.currentMessageAddedResolver) {
+        this.plugin.logger.warn(`[addMessageStandard] Resolving promise after catching error. Role: ${message.role}.`);
+        try {
+          this.currentMessageAddedResolver();
+        } catch (e) {
+          this.plugin.logger.error("Error resolving promise after error:", e);
+        }
+        this.currentMessageAddedResolver = null;
+      }
     }
   }
   // --- UI Update Methods ---
@@ -4759,7 +4782,7 @@ Summary:`;
   }
   // OllamaView.ts
   async sendMessage() {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
       if (!content)
@@ -4833,7 +4856,23 @@ Summary:`;
         if ("response" in chunk && chunk.response) {
           accumulatedResponse += chunk.response;
           if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && this.activePlaceholder.contentEl) {
-            this.activePlaceholder.contentEl.textContent = accumulatedResponse;
+            try {
+              await AssistantMessageRenderer.renderAssistantContent(
+                this.activePlaceholder.contentEl,
+                // Передаємо елемент контенту плейсхолдера
+                accumulatedResponse,
+                // Передаємо накопичений текст
+                this.app,
+                this.plugin,
+                this
+                // Передаємо контекст
+              );
+            } catch (renderError) {
+              this.plugin.logger.error("Error during streaming render:", renderError);
+              if ((_e = this.activePlaceholder) == null ? void 0 : _e.contentEl) {
+                this.activePlaceholder.contentEl.setText(`[Render Error: ${renderError instanceof Error ? renderError.message : String(renderError)}]`);
+              }
+            }
           }
           this.guaranteedScrollToBottom(50, false);
         }
@@ -4848,7 +4887,7 @@ Summary:`;
     this.plugin.logger.debug(`[OllamaView] Stream processing finished. Final length: ${accumulatedResponse.length}`);
     finalPlaceholderRef = this.activePlaceholder;
     this.activePlaceholder = null;
-    const placeholderStillValid = (finalPlaceholderRef == null ? void 0 : finalPlaceholderRef.timestamp) === responseStartTimeMs && ((_e = finalPlaceholderRef == null ? void 0 : finalPlaceholderRef.groupEl) == null ? void 0 : _e.isConnected);
+    const placeholderStillValid = (finalPlaceholderRef == null ? void 0 : finalPlaceholderRef.timestamp) === responseStartTimeMs && ((_f = finalPlaceholderRef == null ? void 0 : finalPlaceholderRef.groupEl) == null ? void 0 : _f.isConnected);
     try {
       if (streamErrorOccurred) {
         this.plugin.logger.error("sendMessage: Handling stream error.");
@@ -4881,6 +4920,7 @@ Summary:`;
           this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
           await partialMessagePromise;
         }
+        handleMessageAddedPromise = null;
       } else if (!placeholderStillValid) {
         this.plugin.logger.warn("sendMessage: Placeholder invalid/missing after stream. Adding message normally.");
         if (accumulatedResponse.trim()) {
@@ -4905,13 +4945,13 @@ Summary:`;
         this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response.", new Date());
         await handleMessageAddedPromise;
       } else {
-        this.plugin.logger.debug("sendMessage: Stream successful, placeholder valid. Adding message to ChatManager...");
+        this.plugin.logger.debug("sendMessage: Stream successful, placeholder valid. Adding message to ChatManager (no await)...");
         this.plugin.chatManager.addMessageToActiveChat(
           "assistant",
           accumulatedResponse,
           responseStartTime
-          // Передаємо ОРИГІНАЛЬНИЙ час для пошуку плейсхолдера
         );
+        handleMessageAddedPromise = null;
       }
     } catch (error) {
       this.plugin.logger.error("[OllamaView] Error caught AFTER stream processing:", error);
@@ -4926,19 +4966,24 @@ Summary:`;
       } catch (finalErrorErr) {
         console.error("Failed to even add the final error message:", finalErrorErr);
       }
+      handleMessageAddedPromise = null;
     } finally {
-      this.currentMessageAddedResolver = null;
+      if (this.currentMessageAddedResolver) {
+        this.plugin.logger.warn("[sendMessage finally] Clearing potentially unused resolver.");
+        this.currentMessageAddedResolver = null;
+      }
       this.activePlaceholder = null;
       this.plugin.logger.debug("[OllamaView] sendMessage finally block executing.");
       this.setLoadingState(false);
-      (_f = this.stopGeneratingButton) == null ? void 0 : _f.hide();
-      (_g = this.sendButton) == null ? void 0 : _g.show();
+      (_g = this.stopGeneratingButton) == null ? void 0 : _g.hide();
+      (_h = this.sendButton) == null ? void 0 : _h.show();
       this.currentAbortController = null;
       this.updateSendButtonState();
       this.focusInput();
       this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
     }
   }
+  // --- Кінець sendMessage ---
   // OllamaView.ts
   async handleMessageAdded(data) {
     var _a, _b, _c;
@@ -4957,7 +5002,11 @@ Summary:`;
         return;
       }
       if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime() && m.role === data.message.role)) {
-        this.plugin.logger.warn(`[HMA] Ignored: Duplicate timestamp+role.`);
+        this.plugin.logger.warn(`[HMA] Ignored: Duplicate timestamp AND role.`);
+        if (this.currentMessageAddedResolver) {
+          this.currentMessageAddedResolver();
+          this.currentMessageAddedResolver = null;
+        }
         return;
       }
       this.plugin.logger.debug(`[HMA] Passed initial checks. Role: ${data.message.role}`);
@@ -4967,7 +5016,7 @@ Summary:`;
         const placeholderSelector = `div.message-group.placeholder[data-placeholder-timestamp="${timestampMs}"]`;
         const placeholderGroupEl = this.chatContainer.querySelector(placeholderSelector);
         if (placeholderGroupEl && placeholderGroupEl.isConnected) {
-          this.plugin.logger.debug(`[HMA] Found placeholder for assistant ts: ${timestampMs}. Updating in place.`);
+          this.plugin.logger.debug(`[HMA] Found placeholder for assistant ts: ${timestampMs}. Updating in place with final render.`);
           placeholderGroupEl.classList.remove("placeholder");
           placeholderGroupEl.removeAttribute("data-placeholder-timestamp");
           placeholderGroupEl.setAttribute("data-timestamp", timestampMs.toString());
@@ -4976,36 +5025,50 @@ Summary:`;
           const messageEl = placeholderGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
           if (contentEl && messageWrapper && messageEl) {
             contentEl.classList.remove("streaming-text");
-            contentEl.empty();
             try {
-              const tempRenderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
-              await tempRenderer.renderAssistantContentInternal(contentEl, data.message.content);
-              if (!messageWrapper.querySelector(".message-actions-wrapper")) {
-                tempRenderer.addAssistantActionButtons(messageWrapper, contentEl);
-              }
-              if (!messageEl.querySelector(`.${CSS_CLASSES.TIMESTAMP}`)) {
-                tempRenderer.addTimestamp(messageEl);
-              }
+              this.plugin.logger.debug("[HMA] Calling static renderAssistantContent for final update...");
+              await AssistantMessageRenderer.renderAssistantContent(
+                contentEl,
+                data.message.content,
+                this.app,
+                this.plugin,
+                this
+              );
+              this.plugin.logger.debug("[HMA] Final render finished. Adding buttons and timestamp...");
+              AssistantMessageRenderer.addAssistantActionButtons(
+                messageWrapper,
+                contentEl,
+                data.message,
+                this.plugin,
+                this
+              );
+              BaseMessageRenderer.addTimestamp(
+                messageEl,
+                data.message.timestamp,
+                this
+              );
               this.lastMessageElement = placeholderGroupEl;
               setTimeout(() => {
                 if (messageEl.isConnected)
                   this.checkMessageForCollapsing(messageEl);
               }, 50);
             } catch (renderError) {
-              this.plugin.logger.error("[HMA] Error rendering final content into placeholder:", renderError);
-              contentEl.setText(`[Error rendering content: ${renderError instanceof Error ? renderError.message : String(renderError)}]`);
+              this.plugin.logger.error("[HMA] Error during final render/update of placeholder:", renderError);
+              contentEl.setText(`[Error rendering final content: ${renderError instanceof Error ? renderError.message : String(renderError)}]`);
+              placeholderGroupEl.remove();
+              this.handleErrorMessage({ role: "error", content: `Failed to finalize assistant message: ${renderError.message}`, timestamp: new Date() });
             }
           } else {
-            this.plugin.logger.error("[HMA] Could not find required elements inside placeholder! Removing & adding normally.");
+            this.plugin.logger.error("[HMA] Could not find required elements inside placeholder! Removing placeholder and adding normally.");
             placeholderGroupEl.remove();
             await this.addMessageStandard(data.message);
           }
           this.plugin.logger.info(`[HMA] <<< EXITED (updated placeholder) >>> Role: assistant, Ts: ${timestampMs}`);
           return;
         } else {
-          this.plugin.logger.warn(`[HMA] Placeholder not found for assistant ts: ${timestampMs}. Adding normally.`);
+          this.plugin.logger.warn(`[HMA] Placeholder not found or disconnected for assistant ts: ${timestampMs}. Adding normally.`);
           await this.addMessageStandard(data.message);
-          this.plugin.logger.info(`[HMA] <<< EXITED (added normally) >>> Role: assistant, Ts: ${timestampMs}`);
+          this.plugin.logger.info(`[HMA] <<< EXITED (added normally fallback) >>> Role: assistant, Ts: ${timestampMs}`);
           return;
         }
       }
@@ -5014,10 +5077,15 @@ Summary:`;
     } catch (outerError) {
       this.plugin.logger.error("[HMA] <<< CAUGHT OUTER ERROR >>>", outerError);
       this.handleErrorMessage({ role: "error", content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
+      if (this.currentMessageAddedResolver) {
+        this.currentMessageAddedResolver();
+        this.currentMessageAddedResolver = null;
+      }
     } finally {
       this.plugin.logger.info(`[HMA] <<< EXITING finally block >>> Role: ${(_a = data == null ? void 0 : data.message) == null ? void 0 : _a.role}, Ts: ${(_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime()}`);
     }
   }
+  // Кінець handleMessageAdded
 };
 
 // src/settings.ts

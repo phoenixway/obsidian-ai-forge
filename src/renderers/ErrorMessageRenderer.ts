@@ -42,8 +42,7 @@ export class ErrorMessageRenderer extends BaseMessageRenderer {
 		contentEl.setText(this.message.content);
 
 		// Додаємо мітку часу
-		this.addTimestamp(messageEl);
-
+		BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
 		// Додаємо базові кнопки дій (Copy, Delete) - опціонально для помилок?
 		// this.addBaseActionButtons(messageWrapper, this.message.content);
         // Або тільки кнопку Copy?

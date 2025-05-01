@@ -28,6 +28,7 @@ import { UserMessageRenderer } from "./renderers/UserMessageRenderer";
 import { AssistantMessageRenderer } from "./renderers/AssistantMessageRenderer";
 import { SystemMessageRenderer } from "./renderers/SystemMessageRenderer";
 import { ErrorMessageRenderer } from "./renderers/ErrorMessageRenderer";
+import { BaseMessageRenderer } from "./renderers/BaseMessageRenderer";
 
 
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
@@ -1659,7 +1660,9 @@ export class OllamaView extends ItemView {
     }
   };
   
- 	// Допоміжний метод для стандартного додавання повідомлення (User, System, Error, Assistant-Fallback)
+ 	// OllamaView.ts
+
+	// Допоміжний метод для стандартного додавання повідомлення (User, System, Error, Assistant-Fallback)
 	private async addMessageStandard(message: Message): Promise<void> {
 		this.plugin.logger.debug(`[addMessageStandard] Adding message standardly. Role: ${message.role}`);
 
@@ -1676,7 +1679,12 @@ export class OllamaView extends ItemView {
 			switch (message.role) {
 				case "user": renderer = new UserMessageRenderer(this.app, this.plugin, message, this); break;
 				case "system": renderer = new SystemMessageRenderer(this.app, this.plugin, message, this); break;
-				case "error": this.handleErrorMessage(message); return; // Помилки обробляються окремо
+				case "error":
+                    // Помилки обробляються централізовано, включаючи додавання в DOM
+                    this.handleErrorMessage(message);
+                    // Потрібно резолвити Promise, якщо sendMessage його очікує для помилки
+                    if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; }
+                    return;
 				case "assistant": // Використовується тільки якщо плейсхолдер не знайдено
 					 this.plugin.logger.warn(`[addMessageStandard] Rendering assistant message as fallback.`);
 					 renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
@@ -1706,12 +1714,27 @@ export class OllamaView extends ItemView {
 			} else if (renderer) {
 				 this.plugin.logger.warn(`[addMessageStandard] messageGroupEl null after render. Role: ${message.role}`);
 			}
+
+             // Резолвимо Promise ТІЛЬКИ якщо він є і стосується цього стандартного додавання
+             // (наприклад, для системних повідомлень або fallback асистента/помилки)
+             if (this.currentMessageAddedResolver) {
+                this.plugin.logger.warn(`[addMessageStandard] Resolving promise after standard add. Role: ${message.role}.`);
+                try { this.currentMessageAddedResolver(); } catch (e) { this.plugin.logger.error("Error resolving promise in addMessageStandard:", e); }
+                this.currentMessageAddedResolver = null;
+             }
+
 		} catch (error: any) {
 			this.plugin.logger.error(`[addMessageStandard] Error rendering/appending standard message. Role: ${message.role}`, error);
-			// Показуємо помилку через централізований обробник
+            // Якщо помилка рендерингу сталася тут, показуємо її
 			this.handleErrorMessage({ role: 'error', content: `Failed to display ${message.role} message. Render Error: ${error.message}`, timestamp: new Date() });
+             // Резолвимо Promise, щоб sendMessage не завис
+             if (this.currentMessageAddedResolver) {
+                this.plugin.logger.warn(`[addMessageStandard] Resolving promise after catching error. Role: ${message.role}.`);
+                try { this.currentMessageAddedResolver(); } catch (e) { this.plugin.logger.error("Error resolving promise after error:", e); }
+                this.currentMessageAddedResolver = null;
+             }
 		}
-	}
+	} // Кінець addMessageStandard
 
   private handleMessagesCleared = (chatId: string): void => {
     if (chatId === this.plugin.chatManager?.getActiveChatId()) {
@@ -4688,9 +4711,9 @@ async sendMessage(): Promise<void> {
   this.stopGeneratingButton?.show();
   this.sendButton?.hide();
 
-  let handleMessageAddedPromise: Promise<void> | null = null; // Для помилок/системних/fallback
-  let streamErrorOccurred: Error | null = null;
-  let finalPlaceholderRef: typeof this.activePlaceholder = null;
+      let handleMessageAddedPromise: Promise<void> | null = null; // Для помилок/системних/fallback
+      let streamErrorOccurred: Error | null = null;
+      let finalPlaceholderRef: typeof this.activePlaceholder = null;
 
   try {
     // 1. Додаємо повідомлення користувача
@@ -4708,7 +4731,7 @@ async sendMessage(): Promise<void> {
     const assistantMessageElement = messageWrapperEl.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}` });
     const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
     assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text` });
-    assistantContentEl.empty();
+    assistantContentEl.empty(); // Починаємо з порожнього
 
     if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
               this.activePlaceholder = { timestamp: responseStartTimeMs, groupEl: assistantPlaceholderGroupEl, contentEl: assistantContentEl, messageWrapper: messageWrapperEl };
@@ -4725,7 +4748,7 @@ async sendMessage(): Promise<void> {
     this.plugin.logger.info("[OllamaView] Starting stream request...");
     const stream = this.plugin.ollamaService.generateChatResponseStream(activeChat, this.currentAbortController.signal);
 
-    // 4. Обробка потоку - оновлення .textContent
+    // 4. Обробка потоку - РЕНДЕРИНГ MARKDOWN НА ЛЬОТУ
     accumulatedResponse = "";
     for await (const chunk of stream) {
               // Обробка помилок chunk, кидаємо помилку
@@ -4733,9 +4756,21 @@ async sendMessage(): Promise<void> {
 
       if ("response" in chunk && chunk.response) {
         accumulatedResponse += chunk.response;
-                  // Оновлюємо тільки ЯКЩО це все ще активний плейсхолдер
+        // Оновлюємо плейсхолдер рендерингом Markdown
         if (this.activePlaceholder?.timestamp === responseStartTimeMs && this.activePlaceholder.contentEl) {
-          this.activePlaceholder.contentEl.textContent = accumulatedResponse;
+          try {
+                          // Викликаємо СТАТИЧНИЙ метод рендерингу
+                          await AssistantMessageRenderer.renderAssistantContent(
+                              this.activePlaceholder.contentEl, // Передаємо елемент контенту плейсхолдера
+                              accumulatedResponse,             // Передаємо накопичений текст
+                              this.app, this.plugin, this     // Передаємо контекст
+                          );
+          } catch (renderError) {
+                           this.plugin.logger.error("Error during streaming render:", renderError);
+                           if (this.activePlaceholder?.contentEl) {
+                               this.activePlaceholder.contentEl.setText(`[Render Error: ${renderError instanceof Error ? renderError.message : String(renderError)}]`);
+                           }
+                      }
         }
         this.guaranteedScrollToBottom(50, false);
       }
@@ -4747,10 +4782,9 @@ async sendMessage(): Promise<void> {
           // Ловимо помилки стрімінгу (включаючи abort)
     streamErrorOccurred = error;
           this.plugin.logger.error("[OllamaView] Error caught during stream processing loop:", streamErrorOccurred);
-          // Обробка відбудеться нижче
   }
 
-      // 5. Потік завершився (успішно або з помилкою)
+      // 5. Потік завершився
       this.plugin.logger.debug(`[OllamaView] Stream processing finished. Final length: ${accumulatedResponse.length}`);
 
       finalPlaceholderRef = this.activePlaceholder; // Зберігаємо посилання
@@ -4764,7 +4798,7 @@ async sendMessage(): Promise<void> {
               this.plugin.logger.error("sendMessage: Handling stream error.");
               if (placeholderStillValid && finalPlaceholderRef) {
                   this.plugin.logger.debug("sendMessage: Removing placeholder due to stream error.");
-                  finalPlaceholderRef.groupEl.remove(); // Видаляємо плейсхолдер
+                  finalPlaceholderRef.groupEl.remove();
               }
               // Додаємо повідомлення про помилку/зупинку стандартним шляхом (з Promise)
               let errorMsgContent = `Error: ${streamErrorOccurred.message || "Unknown streaming error."}`;
@@ -4773,48 +4807,48 @@ async sendMessage(): Promise<void> {
               if (streamErrorOccurred.message === "aborted by user") { errorMsgContent = "Generation stopped."; errorMsgRole = "system"; if (accumulatedResponse) savePartial = true;}
 
               let errorResolver: () => void; const errorMessagePromise = new Promise<void>((resolve) => { errorResolver = resolve; });
-              this.currentMessageAddedResolver = errorResolver!; // Встановлюємо resolver
+              this.currentMessageAddedResolver = errorResolver!;
               this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgContent, new Date());
-              await errorMessagePromise; // Чекаємо обробки в handleMessageAdded/addMessageStandard
+              await errorMessagePromise;
 
               if (savePartial) {
                    let partialResolver: () => void; const partialMessagePromise = new Promise<void>((resolve) => { partialResolver = resolve; });
                    this.currentMessageAddedResolver = partialResolver!;
                    this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
-                   await partialMessagePromise; // Чекаємо обробки
+                   await partialMessagePromise;
               }
+              handleMessageAddedPromise = null; // Немає чого чекати після обробки помилки
 
           } else if (!placeholderStillValid) {
               // --- Плейсхолдер зник/змінився - додаємо стандартно ---
               this.plugin.logger.warn("sendMessage: Placeholder invalid/missing after stream. Adding message normally.");
               if (accumulatedResponse.trim()) {
                   let resolver: () => void; handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
-                  this.currentMessageAddedResolver = resolver!; // Встановлюємо resolver
+                  this.currentMessageAddedResolver = resolver!;
                   this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime);
-                  await handleMessageAddedPromise; // Чекаємо обробки
+                  await handleMessageAddedPromise; // Чекаємо стандартної обробки
               }
-              // Якщо відповідь порожня і плейсхолдера немає - нічого не робимо
 
           } else if (!accumulatedResponse.trim()) {
               // --- Відповідь порожня, плейсхолдер є ---
               this.plugin.logger.warn("[OllamaView] Stream finished successfully but response empty. Removing placeholder.");
-              if (finalPlaceholderRef) { finalPlaceholderRef.groupEl.remove(); } // Безпечне видалення
+              if (finalPlaceholderRef) { finalPlaceholderRef.groupEl.remove(); }
               // Додаємо системне повідомлення стандартним чином (з Promise)
                let resolver: () => void; handleMessageAddedPromise = new Promise<void>((resolve) => { resolver = resolve; });
-               this.currentMessageAddedResolver = resolver!; // Встановлюємо resolver
+               this.currentMessageAddedResolver = resolver!;
                this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response.", new Date());
-               await handleMessageAddedPromise; // Чекаємо обробки
+               await handleMessageAddedPromise; // Чекаємо стандартної обробки
 
           } else {
               // --- УСПІХ: Плейсхолдер є, відповідь є ---
-              this.plugin.logger.debug("sendMessage: Stream successful, placeholder valid. Adding message to ChatManager...");
+              this.plugin.logger.debug("sendMessage: Stream successful, placeholder valid. Adding message to ChatManager (no await)...");
               // Додаємо повідомлення БЕЗ await. handleMessageAdded оновить плейсхолдер.
               this.plugin.chatManager.addMessageToActiveChat(
                   "assistant",
                   accumulatedResponse,
-                  responseStartTime // Передаємо ОРИГІНАЛЬНИЙ час для пошуку плейсхолдера
+                  responseStartTime
               );
-              // Не чекаємо Promise тут
+              handleMessageAddedPromise = null; // Немає чого чекати тут
           }
       } catch (error: any) {
            // Ловимо помилки, що могли виникнути ПІСЛЯ стрімінгу
@@ -4822,13 +4856,18 @@ async sendMessage(): Promise<void> {
             // Додаємо повідомлення про цю помилку (з Promise)
            try {
                let finalErrorResolver: () => void; const finalErrorPromise = new Promise<void>((resolve) => { finalErrorResolver = resolve; });
-               this.currentMessageAddedResolver = finalErrorResolver!; // Встановлюємо resolver
+               this.currentMessageAddedResolver = finalErrorResolver!;
                this.plugin.chatManager.addMessageToActiveChat("error", `Internal error after stream: ${error.message}`, new Date());
-               await finalErrorPromise; // Чекаємо обробки
+               await finalErrorPromise; // Чекаємо стандартної обробки
            } catch (finalErrorErr) { console.error("Failed to even add the final error message:", finalErrorErr); }
+            handleMessageAddedPromise = null; // Немає чого чекати після обробки помилки
       } finally {
            // --- Блок finally ---
-           this.currentMessageAddedResolver = null; // Завжди скидаємо resolver
+           // Резолвер тепер використовується тільки для помилок/fallback/системних
+           if (this.currentMessageAddedResolver) {
+               this.plugin.logger.warn("[sendMessage finally] Clearing potentially unused resolver.");
+               this.currentMessageAddedResolver = null;
+           }
            this.activePlaceholder = null; // Завжди скидаємо активний плейсхолдер
            this.plugin.logger.debug("[OllamaView] sendMessage finally block executing.");
            this.setLoadingState(false); // Відновлюємо UI
@@ -4839,7 +4878,7 @@ async sendMessage(): Promise<void> {
            this.focusInput();
            this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
       }
-}
+} // --- Кінець sendMessage ---
 
 // OllamaView.ts
 
@@ -4850,19 +4889,26 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
     this.plugin.logger.info(`[HMA] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
     if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) { console.error("[HMA] CRITICAL: Context missing!"); return; }
     if (data.chatId !== this.plugin.chatManager.getActiveChatId()) { this.plugin.logger.debug(`[HMA] Ignored: Different chat.`); return; }
-    if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime() && m.role === data.message.role)) { this.plugin.logger.warn(`[HMA] Ignored: Duplicate timestamp+role.`); return; }
+    // Перевірка на дублікат (час + роль)
+    if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime() && m.role === data.message.role)) {
+               this.plugin.logger.warn(`[HMA] Ignored: Duplicate timestamp AND role.`);
+               // Якщо є resolver, його треба резолвнути, щоб sendMessage не завис у випадку помилки/fallback
+               if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; }
+               return;
+          }
 
     this.plugin.logger.debug(`[HMA] Passed initial checks. Role: ${data.message.role}`);
-    this.currentMessages.push(data.message); // Додаємо в кеш
+    this.currentMessages.push(data.message); // Додаємо в кеш одразу
 
     // --- СПЕЦІАЛЬНА ОБРОБКА АСИСТЕНТА (ОНОВЛЕННЯ ПЛЕЙСХОЛДЕРА) ---
     if (data.message.role === 'assistant') {
-      const timestampMs = data.message.timestamp.getTime(); // Час, з яким повідомлення БУЛО ЗБЕРЕЖЕНО (і який був у плейсхолдера)
+      const timestampMs = data.message.timestamp.getTime(); // Час, з яким повідомлення збережено
       const placeholderSelector = `div.message-group.placeholder[data-placeholder-timestamp="${timestampMs}"]`;
       const placeholderGroupEl = this.chatContainer.querySelector(placeholderSelector) as HTMLElement | null;
 
-      if (placeholderGroupEl && placeholderGroupEl.isConnected) {
-        this.plugin.logger.debug(`[HMA] Found placeholder for assistant ts: ${timestampMs}. Updating in place.`);
+      if (placeholderGroupEl && placeholderGroupEl.isConnected) { // Перевіряємо, чи елемент ще в DOM
+        this.plugin.logger.debug(`[HMA] Found placeholder for assistant ts: ${timestampMs}. Updating in place with final render.`);
+        // Оновлюємо атрибути та класи
         placeholderGroupEl.classList.remove("placeholder");
         placeholderGroupEl.removeAttribute("data-placeholder-timestamp");
         placeholderGroupEl.setAttribute("data-timestamp", timestampMs.toString()); // Встановлюємо фінальний timestamp
@@ -4872,54 +4918,72 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
         const messageEl = placeholderGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
 
         if (contentEl && messageWrapper && messageEl) {
-           contentEl.classList.remove("streaming-text");
-           contentEl.empty(); // Очищуємо простий текст
+           contentEl.classList.remove("streaming-text"); // Прибираємо клас потокового тексту
+           // contentEl.empty(); // renderAssistantContent сам очистить
 
            try {
-             const tempRenderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
-             // Рендеримо Markdown та додаємо кнопки/час
-             await (tempRenderer as any).renderAssistantContentInternal(contentEl, data.message.content);
-                           if (!messageWrapper.querySelector(".message-actions-wrapper")) { (tempRenderer as any).addAssistantActionButtons(messageWrapper, contentEl); }
-                           if (!messageEl.querySelector(`.${CSS_CLASSES.TIMESTAMP}`)) { (tempRenderer as any).addTimestamp(messageEl); }
+             // --- ВИКЛИК СТАТИЧНИХ МЕТОДІВ ---
+             // 1. Фінальний рендеринг Markdown
+             this.plugin.logger.debug("[HMA] Calling static renderAssistantContent for final update...");
+             await AssistantMessageRenderer.renderAssistantContent(
+                               contentEl, data.message.content, this.app, this.plugin, this
+                           );
+                           this.plugin.logger.debug("[HMA] Final render finished. Adding buttons and timestamp...");
+                           // 2. Додавання/Оновлення кнопок
+             AssistantMessageRenderer.addAssistantActionButtons(
+                               messageWrapper, contentEl, data.message, this.plugin, this
+                           );
+                           // 3. Додавання/Оновлення мітки часу
+             BaseMessageRenderer.addTimestamp(
+                               messageEl, data.message.timestamp, this
+                           );
+                           // --- КІНЕЦЬ ВИКЛИКІВ ---
 
              this.lastMessageElement = placeholderGroupEl; // Оновлюємо останній елемент
              // Перевірка на згортання
              setTimeout(() => { if (messageEl.isConnected) this.checkMessageForCollapsing(messageEl) }, 50);
 
            } catch (renderError) {
-              this.plugin.logger.error("[HMA] Error rendering final content into placeholder:", renderError);
-              contentEl.setText(`[Error rendering content: ${renderError instanceof Error ? renderError.message : String(renderError)}]`);
+              this.plugin.logger.error("[HMA] Error during final render/update of placeholder:", renderError);
+              contentEl.setText(`[Error rendering final content: ${renderError instanceof Error ? renderError.message : String(renderError)}]`);
+                            // Якщо фінальний рендеринг не вдався, можливо, варто видалити плейсхолдер і додати помилку?
+                            placeholderGroupEl.remove();
+                            this.handleErrorMessage({ role: 'error', content: `Failed to finalize assistant message: ${renderError.message}`, timestamp: new Date() });
            }
         } else {
-           this.plugin.logger.error("[HMA] Could not find required elements inside placeholder! Removing & adding normally.");
+           // Якщо не знайшли внутрішні елементи плейсхолдера
+           this.plugin.logger.error("[HMA] Could not find required elements inside placeholder! Removing placeholder and adding normally.");
            placeholderGroupEl.remove();
            await this.addMessageStandard(data.message); // Fallback
         }
         // Виходимо, оскільки обробили асистента
-                  this.plugin.logger.info(`[HMA] <<< EXITED (updated placeholder) >>> Role: assistant, Ts: ${timestampMs}`);
-        return;
+        this.plugin.logger.info(`[HMA] <<< EXITED (updated placeholder) >>> Role: assistant, Ts: ${timestampMs}`);
+        // НЕ резолвимо Promise тут, бо sendMessage не чекає на нього в цьому випадку
+        return; // ВАЖЛИВО: Вийти з функції тут
       } else {
          // Плейсхолдер не знайдено
-         this.plugin.logger.warn(`[HMA] Placeholder not found for assistant ts: ${timestampMs}. Adding normally.`);
-         await this.addMessageStandard(data.message); // Fallback
-                   this.plugin.logger.info(`[HMA] <<< EXITED (added normally) >>> Role: assistant, Ts: ${timestampMs}`);
-         return;
+         this.plugin.logger.warn(`[HMA] Placeholder not found or disconnected for assistant ts: ${timestampMs}. Adding normally.`);
+         await this.addMessageStandard(data.message); // Fallback - ЦЕЙ ВИКЛИК МАЄ ОБРОБИТИ PROMISE!
+                   this.plugin.logger.info(`[HMA] <<< EXITED (added normally fallback) >>> Role: assistant, Ts: ${timestampMs}`);
+         return; // ВАЖЛИВО: Вийти з функції тут
       }
     }
     // --- КІНЕЦЬ СПЕЦІАЛЬНОЇ ОБРОБКИ АСИСТЕНТА ---
 
     // --- Стандартна обробка для інших ролей (User, System, Error) ---
-    await this.addMessageStandard(data.message);
+    await this.addMessageStandard(data.message); // Цей виклик обробить Promise, якщо він є
           this.plugin.logger.info(`[HMA] <<< EXITED (standard) >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
 
   } catch (outerError: any) {
      this.plugin.logger.error("[HMA] <<< CAUGHT OUTER ERROR >>>", outerError);
            // Обробляємо помилку через стандартний механізм
            this.handleErrorMessage({ role: 'error', content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
+           // Резолвимо Promise, якщо він є, щоб sendMessage не завис
+            if (this.currentMessageAddedResolver) { this.currentMessageAddedResolver(); this.currentMessageAddedResolver = null; }
   } finally {
-          // Блок finally більше не резолвить Promise, бо він не використовується для успішного шляху асистента
+          // Блок finally більше не потрібен для резолву в успішному випадку асистента
            this.plugin.logger.info(`[HMA] <<< EXITING finally block >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`);
   }
-}
+} // Кінець handleMessageAdded
 
 } // END OF OllamaView CLASS
