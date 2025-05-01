@@ -810,14 +810,11 @@ var CSS_CLASS_SETTINGS_OPTION = "settings-option";
 var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
 var CSS_CLASS_MESSAGE = "message";
 var CSS_CLASS_ERROR_TEXT2 = "error-message-text";
-var CSS_CLASS_THINKING_DOTS = "thinking-dots";
-var CSS_CLASS_THINKING_DOT = "thinking-dot";
 var CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
 var CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
 var CSS_CLASS_TRANSLATION_PENDING = "translation-pending";
 var CSS_CLASS_RECORDING = "recording";
 var CSS_CLASS_DISABLED = "disabled";
-var CSS_CLASS_MESSAGE_ARRIVING = "message-arriving";
 var CSS_CLASS_DATE_SEPARATOR = "chat-date-separator";
 var CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 var CSS_CLASS_VISIBLE = "visible";
@@ -3030,8 +3027,8 @@ This action cannot be undone.`,
       this.plugin.logger.debug("User message added to history successfully.");
       this.plugin.logger.debug("Creating streaming placeholder for assistant message...");
       assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-        // Використовуємо класи з constants.ts (мають бути імпортовані)
         cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`
+        // Використовуємо класи з constants.ts
       });
       renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
       const messageWrapper = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
@@ -3042,20 +3039,17 @@ This action cannot be undone.`,
       const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
       assistantContentEl = contentContainer.createDiv({
         cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE}`
-        // Додаємо клас для згортання
       });
-      const dots = assistantContentEl.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
+      const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
       for (let i = 0; i < 3; i++)
-        dots.createDiv({ cls: CSS_CLASS_THINKING_DOT });
-      assistantPlaceholderGroupEl.classList.add(CSS_CLASS_MESSAGE_ARRIVING);
-      setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASS_MESSAGE_ARRIVING), 500);
+        dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+      assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+      setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
       this.guaranteedScrollToBottom(50, true);
       this.plugin.logger.info("[OllamaView] Starting stream request...");
       const stream = this.plugin.ollamaService.generateChatResponseStream(
         activeChat,
-        // Передаємо поточний стан чату (з доданим повідомленням користувача)
         this.currentAbortController.signal
-        // Передаємо сигнал для можливості скасування
       );
       let firstChunk = true;
       for await (const chunk of stream) {
@@ -3076,15 +3070,11 @@ This action cannot be undone.`,
           accumulatedResponse += chunk.response;
           await renderAssistantContent(
             this.app,
-            // Контекст Obsidian App
             this,
-            // Контекст OllamaView (для registerDomEvent, налаштувань)
+            // <--- ЗМІНЕНО З this.view НА this
             this.plugin,
-            // Екземпляр плагіна (для логера, налаштувань)
             assistantContentEl,
-            // DOM елемент для оновлення
             accumulatedResponse
-            // Накопичений текст
           );
           this.guaranteedScrollToBottom(50, false);
           this.checkMessageForCollapsing(assistantMessageElement);
@@ -3106,11 +3096,8 @@ This action cannot be undone.`,
         await this.plugin.chatManager.addMessageToActiveChat(
           "assistant",
           accumulatedResponse,
-          // Повна відповідь
-          responseStartTime,
-          // Час початку генерації
-          false
-          // НЕ генерувати подію звідси, бо вона вже згенерована ChatManager'ом
+          responseStartTime
+          // false // Цей параметр може бути непотрібним, якщо ChatManager сам вирішує, коли генерувати подію
         );
       } else {
         this.plugin.logger.warn("[OllamaView] Stream finished but accumulated response is empty.");
@@ -3124,29 +3111,29 @@ This action cannot be undone.`,
       this.plugin.logger.error("[OllamaView] Error during streaming sendMessage:", error);
       assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.remove();
       assistantPlaceholderGroupEl = null;
-      if (error.name === "AbortError" || // Стандартна помилка AbortController
-      ((_d = error.message) == null ? void 0 : _d.includes("aborted")) || // Текст помилки Ollama при скасуванні
-      ((_e = error.message) == null ? void 0 : _e.includes("aborted by user"))) {
+      let errorMsgContent = `Error: ${error.message || "Unknown streaming error."}`;
+      let savePartialResponse = false;
+      if (error.name === "AbortError" || ((_d = error.message) == null ? void 0 : _d.includes("aborted")) || ((_e = error.message) == null ? void 0 : _e.includes("aborted by user"))) {
         this.plugin.logger.info("[OllamaView] Generation was cancelled by user.");
-        await this.plugin.chatManager.addMessageToActiveChat("system", "Generation stopped.", new Date());
+        errorMsgContent = "Generation stopped.";
         if (accumulatedResponse.trim()) {
-          this.plugin.logger.info(
-            `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
-          );
-          await this.plugin.chatManager.addMessageToActiveChat(
-            "assistant",
-            accumulatedResponse,
-            responseStartTime,
-            false
-            // Не генерувати подію звідси
-          );
+          savePartialResponse = true;
         }
-      } else {
+      }
+      await this.plugin.chatManager.addMessageToActiveChat(
+        savePartialResponse ? "system" : "error",
+        // Використовуємо 'system' для зупинки, 'error' для інших
+        errorMsgContent,
+        new Date()
+      );
+      if (savePartialResponse) {
+        this.plugin.logger.info(
+          `[OllamaView] Saving partial response after cancellation (length: ${accumulatedResponse.length})`
+        );
         await this.plugin.chatManager.addMessageToActiveChat(
-          "error",
-          // Використовуємо роль 'error'
-          `Error: ${error.message || "Unknown streaming error."}`,
-          new Date()
+          "assistant",
+          accumulatedResponse,
+          responseStartTime
         );
       }
     } finally {
