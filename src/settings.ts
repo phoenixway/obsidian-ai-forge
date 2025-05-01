@@ -244,7 +244,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   logFileMaxSizeMB: 5,
   fallbackSummarizationModelName: "http://localhost:11434",
   fixBrokenEmojis: true,
-  translationProvider: 'none', // За замовчуванням вимкнено
+  translationProvider: 'ollama', // За замовчуванням вимкнено
   ollamaTranslationModel: '',
 };
 
@@ -975,6 +975,7 @@ export class OllamaSettingTab extends PluginSettingTab {
     //   })
     // );
     // --- НОВЕ: Вибір Провайдера Перекладу ---
+    this.plugin.settings.enableTranslation = this.plugin.settings.translationProvider !== 'none'; 
     new Setting(containerEl)
       .setName("Translation Provider")
       .setDesc("Select the service for message and input translation.")

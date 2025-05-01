@@ -6077,7 +6077,7 @@ var DEFAULT_SETTINGS = {
   logFileMaxSizeMB: 5,
   fallbackSummarizationModelName: "http://localhost:11434",
   fixBrokenEmojis: true,
-  translationProvider: "none",
+  translationProvider: "ollama",
   // За замовчуванням вимкнено
   ollamaTranslationModel: ""
 };
@@ -6568,6 +6568,7 @@ var OllamaSettingTab = class extends import_obsidian13.PluginSettingTab {
       );
     }
     this.createSectionHeader("Speech & Translation");
+    this.plugin.settings.enableTranslation = this.plugin.settings.translationProvider !== "none";
     new import_obsidian13.Setting(containerEl).setName("Translation Provider").setDesc("Select the service for message and input translation.").addDropdown(
       (dropdown) => dropdown.addOption("none", "Disabled").addOption("google", "Google Translate API").addOption("ollama", "Ollama (Local Model)").setValue(this.plugin.settings.translationProvider).onChange(async (value) => {
         this.plugin.settings.translationProvider = value;
