@@ -1007,6 +1007,7 @@ var OllamaView = class extends import_obsidian10.ItemView {
     // Посилання на активний контейнер групи помилок
     this.isSummarizingErrors = false;
     // Прапорець, щоб уникнути одночасних сумаризацій
+    this.temporarilyDisableChatChangedReload = false;
     this.currentMessageAddedResolver = null;
     // Допоміжна функція для створення підменю (з попереднього коду)
     this.createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
@@ -2761,232 +2762,217 @@ This action cannot be undone.`,
   }
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    this.plugin.logger.error("[loadAndDisplayActiveChat] >>> \u0412\u0425\u0406\u0414: \u041F\u043E\u0447\u0438\u043D\u0430\u0454\u043C\u043E \u043F\u043E\u0432\u043D\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F/\u0432\u0456\u0434\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0442\u0443 <<<");
     this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
-    this.clearChatContainerInternal();
-    this.currentMessages = [];
-    this.lastRenderedMessageDate = null;
-    this.lastMessageElement = null;
-    this.consecutiveErrorMessages = [];
-    this.errorGroupElement = null;
-    let activeChat = null;
-    let availableModels = [];
-    let finalModelName = null;
-    let finalRolePath = void 0;
-    let finalRoleName = "None";
-    let finalTemperature = void 0;
-    let errorOccurred = false;
     try {
-      activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
-      this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${(_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.id) != null ? _c : "null"}`);
-      availableModels = await this.plugin.ollamaService.getModels();
-      this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(", ")}`);
-      finalRolePath = (_e = (_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.selectedRolePath) != null ? _e : this.plugin.settings.selectedRolePath;
-      finalRoleName = await this.findRoleNameByPath(finalRolePath);
-      this.plugin.logger.debug(
-        `[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || "None"}', Name='${finalRoleName}'`
-      );
-    } catch (error) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
-      new import_obsidian10.Notice("Error connecting to Ollama or loading chat data.", 5e3);
-      errorOccurred = true;
-      finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
-      finalTemperature = this.plugin.settings.temperature;
-      finalRolePath = this.plugin.settings.selectedRolePath;
-      finalRoleName = await this.findRoleNameByPath(finalRolePath);
-      activeChat = null;
-    }
-    if (!errorOccurred && activeChat) {
-      let preferredModel = ((_g = activeChat.metadata) == null ? void 0 : _g.modelName) || this.plugin.settings.modelName;
-      if (availableModels.length > 0) {
-        if (preferredModel && availableModels.includes(preferredModel)) {
-          finalModelName = preferredModel;
-        } else {
-          finalModelName = availableModels[0];
-          this.plugin.logger.warn(
-            `[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`
-          );
-        }
-      } else {
-        finalModelName = null;
-        this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
-      }
-      if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-        this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch((updateError) => {
-          this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
-        });
-      }
-      finalTemperature = (_i = (_h = activeChat.metadata) == null ? void 0 : _h.temperature) != null ? _i : this.plugin.settings.temperature;
-    } else if (!errorOccurred && !activeChat) {
-      finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_j = availableModels[0]) != null ? _j : null;
-      finalTemperature = this.plugin.settings.temperature;
-    }
-    if (activeChat !== null && !errorOccurred && ((_k = activeChat.messages) == null ? void 0 : _k.length) > 0) {
-      this.hideEmptyState();
-      this.currentMessages = [...activeChat.messages];
+      this.clearChatContainerInternal();
+      this.currentMessages = [];
       this.lastRenderedMessageDate = null;
-      for (const message of this.currentMessages) {
-        let messageGroupEl = null;
-        const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
-        const isFirstMessageInContainer = this.chatContainer.children.length === 0;
-        if (isNewDay || isFirstMessageInContainer) {
-          if (isNewDay) {
-            this.renderDateSeparator(message.timestamp);
+      this.lastMessageElement = null;
+      this.consecutiveErrorMessages = [];
+      this.errorGroupElement = null;
+      let activeChat = null;
+      let availableModels = [];
+      let finalModelName = null;
+      let finalRolePath = void 0;
+      let finalRoleName = "None";
+      let finalTemperature = void 0;
+      let errorOccurred = false;
+      try {
+        activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
+        this.plugin.logger.debug(`[loadAndDisplayActiveChat] Active chat fetched: ${(_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.id) != null ? _c : "null"}`);
+        availableModels = await this.plugin.ollamaService.getModels();
+        this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(", ")}`);
+        finalRolePath = (_e = (_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.selectedRolePath) != null ? _e : this.plugin.settings.selectedRolePath;
+        finalRoleName = await this.findRoleNameByPath(finalRolePath);
+        this.plugin.logger.debug(
+          `[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || "None"}', Name='${finalRoleName}'`
+        );
+      } catch (error) {
+        this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
+        new import_obsidian10.Notice("Error connecting to Ollama or loading chat data.", 5e3);
+        errorOccurred = true;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
+        finalTemperature = this.plugin.settings.temperature;
+        finalRolePath = this.plugin.settings.selectedRolePath;
+        finalRoleName = await this.findRoleNameByPath(finalRolePath);
+        activeChat = null;
+      }
+      if (!errorOccurred && activeChat) {
+        let preferredModel = ((_g = activeChat.metadata) == null ? void 0 : _g.modelName) || this.plugin.settings.modelName;
+        if (availableModels.length > 0) {
+          if (preferredModel && availableModels.includes(preferredModel)) {
+            finalModelName = preferredModel;
+          } else {
+            finalModelName = availableModels[0];
+            this.plugin.logger.warn(
+              `[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`
+            );
           }
-          this.lastRenderedMessageDate = message.timestamp;
+        } else {
+          finalModelName = null;
+          this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
         }
-        try {
-          let renderer = null;
-          switch (message.role) {
-            case "user":
-              renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
-              break;
-            case "assistant":
-              renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
-              break;
-            case "system":
-              renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
-              break;
-            case "error":
-              renderer = new ErrorMessageRenderer(this.app, this.plugin, message, this);
-              this.lastMessageElement = null;
-              this.errorGroupElement = null;
-              this.consecutiveErrorMessages = [];
-              break;
-            default:
-              this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role: ${message.role}`);
-          }
-          if (renderer) {
-            const result = renderer.render();
-            if (result instanceof Promise) {
-              messageGroupEl = await result;
-            } else {
-              messageGroupEl = result;
+        if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
+          this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch((updateError) => {
+            this.plugin.logger.error("[loadAndDisplayActiveChat] Background error updating chat model metadata:", updateError);
+          });
+        }
+        finalTemperature = (_i = (_h = activeChat.metadata) == null ? void 0 : _h.temperature) != null ? _i : this.plugin.settings.temperature;
+      } else if (!errorOccurred && !activeChat) {
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_j = availableModels[0]) != null ? _j : null;
+        finalTemperature = this.plugin.settings.temperature;
+      }
+      if (activeChat !== null && !errorOccurred && ((_k = activeChat.messages) == null ? void 0 : _k.length) > 0) {
+        this.hideEmptyState();
+        this.currentMessages = [...activeChat.messages];
+        this.lastRenderedMessageDate = null;
+        for (const message of this.currentMessages) {
+          let messageGroupEl = null;
+          const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+          const isFirstMessageInContainer = this.chatContainer.children.length === 0;
+          if (isNewDay || isFirstMessageInContainer) {
+            if (isNewDay) {
+              this.renderDateSeparator(message.timestamp);
             }
+            this.lastRenderedMessageDate = message.timestamp;
           }
-        } catch (renderError) {
-          this.plugin.logger.error("Error rendering message during load:", renderError, message);
-          const errorDiv = this.chatContainer.createDiv({ cls: "render-error" });
-          errorDiv.setText(`Error rendering message (role: ${message.role})`);
-          messageGroupEl = errorDiv;
+          try {
+            let renderer = null;
+            switch (message.role) {
+              case "user":
+                renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
+                break;
+              case "assistant":
+                renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
+                break;
+              case "system":
+                renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
+                break;
+              case "error":
+                renderer = new ErrorMessageRenderer(this.app, this.plugin, message, this);
+                this.lastMessageElement = null;
+                this.errorGroupElement = null;
+                this.consecutiveErrorMessages = [];
+                break;
+              default:
+                this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role: ${message.role}`);
+            }
+            if (renderer) {
+              const result = renderer.render();
+              if (result instanceof Promise) {
+                messageGroupEl = await result;
+              } else {
+                messageGroupEl = result;
+              }
+            }
+          } catch (renderError) {
+            this.plugin.logger.error("Error rendering message during load:", renderError, message);
+            const errorDiv = this.chatContainer.createDiv({ cls: "render-error" });
+            errorDiv.setText(`Error rendering message (role: ${message.role})`);
+            messageGroupEl = errorDiv;
+          }
+          if (messageGroupEl) {
+            this.chatContainer.appendChild(messageGroupEl);
+            this.lastMessageElement = messageGroupEl;
+          }
         }
-        if (messageGroupEl) {
-          this.chatContainer.appendChild(messageGroupEl);
-          this.lastMessageElement = messageGroupEl;
-        }
-      }
-      setTimeout(() => this.checkAllMessagesForCollapsing(), 100);
-      setTimeout(() => {
-        this.guaranteedScrollToBottom(100, false);
+        setTimeout(() => this.checkAllMessagesForCollapsing(), 100);
         setTimeout(() => {
-          this.updateScrollStateAndIndicators();
+          this.guaranteedScrollToBottom(100, false);
+          setTimeout(() => {
+            this.updateScrollStateAndIndicators();
+          }, 150);
         }, 150);
-      }, 150);
-    } else {
-      this.showEmptyState();
-      (_l = this.scrollToBottomButton) == null ? void 0 : _l.classList.remove(CSS_CLASSES.VISIBLE);
-    }
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
-    this.updateInputPlaceholder(finalRoleName);
-    this.updateRoleDisplay(finalRoleName);
-    this.updateModelDisplay(finalModelName);
-    this.updateTemperatureIndicator(finalTemperature);
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
-    const panelUpdatePromises = [];
-    if (this.isSidebarSectionVisible("chats")) {
-      panelUpdatePromises.push(
-        this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
-      );
-    }
-    if (this.isSidebarSectionVisible("roles")) {
-      panelUpdatePromises.push(
-        this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
-      );
-    }
-    if (panelUpdatePromises.length > 0) {
-      await Promise.all(panelUpdatePromises);
-    }
-    if (finalModelName === null) {
-      this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
-      if (this.inputEl) {
-        this.inputEl.disabled = true;
-        this.inputEl.placeholder = "No models available...";
+      } else {
+        this.showEmptyState();
+        (_l = this.scrollToBottomButton) == null ? void 0 : _l.classList.remove(CSS_CLASSES.VISIBLE);
       }
-      if (this.sendButton) {
-        this.sendButton.disabled = true;
-        this.sendButton.classList.add(CSS_CLASSES.DISABLED);
-      }
-      this.setLoadingState(false);
-    } else {
-      if (this.inputEl) {
-        this.inputEl.disabled = this.isProcessing;
-      }
-      this.updateSendButtonState();
-    }
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
-  }
-  // OllamaView.ts
-  async handleActiveChatChanged(data) {
-    var _a, _b, _c, _d, _e, _f;
-    this.plugin.logger.info(
-      `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Has Chat Data: ${!!data.chat}, Previous processed ID: ${this.lastProcessedChatId}`
-    );
-    const chatSwitched = data.chatId !== this.lastProcessedChatId;
-    const previousChatId = this.lastProcessedChatId;
-    this.plugin.logger.debug(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
-    if (chatSwitched || data.chatId !== null && data.chat === null) {
-      this.plugin.logger.warn(
-        `[handleActiveChatChanged] Entering RELOAD block (switched: ${chatSwitched}, data.chat is null: ${data.chat === null}). Calling loadAndDisplayActiveChat...`
-      );
-      if (chatSwitched) {
-        this.lastProcessedChatId = data.chatId;
-      }
-      await this.loadAndDisplayActiveChat();
-    } else if (data.chatId !== null && data.chat !== null) {
-      this.plugin.logger.info(
-        `[handleActiveChatChanged] Entering METADATA/PANEL update block (ID: ${data.chatId}).`
-      );
-      if (!chatSwitched) {
-        this.lastProcessedChatId = data.chatId;
-      }
-      const activeChat = data.chat;
-      const currentModelName = ((_a = activeChat.metadata) == null ? void 0 : _a.modelName) || this.plugin.settings.modelName;
-      const currentRolePath = (_c = (_b = activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
-      const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-      const currentTemperature = (_e = (_d = activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
-      this.updateModelDisplay(currentModelName);
-      this.updateRoleDisplay(currentRoleName);
-      this.updateInputPlaceholder(currentRoleName);
-      this.updateTemperatureIndicator(currentTemperature);
-      this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
-      const updatePromises = [];
+      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
+      this.updateInputPlaceholder(finalRoleName);
+      this.updateRoleDisplay(finalRoleName);
+      this.updateModelDisplay(finalModelName);
+      this.updateTemperatureIndicator(finalTemperature);
+      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels...");
+      const panelUpdatePromises = [];
       if (this.isSidebarSectionVisible("chats")) {
-        updatePromises.push(
+        panelUpdatePromises.push(
           this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
         );
       }
       if (this.isSidebarSectionVisible("roles")) {
-        updatePromises.push(
+        panelUpdatePromises.push(
           this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
         );
       }
-      if (updatePromises.length > 0) {
-        await Promise.all(updatePromises);
-        this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
+      if (panelUpdatePromises.length > 0) {
+        await Promise.all(panelUpdatePromises);
+      }
+      if (finalModelName === null) {
+        this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
+        if (this.inputEl) {
+          this.inputEl.disabled = true;
+          this.inputEl.placeholder = "No models available...";
+        }
+        if (this.sendButton) {
+          this.sendButton.disabled = true;
+          this.sendButton.classList.add(CSS_CLASSES.DISABLED);
+        }
+        this.setLoadingState(false);
+      } else {
+        if (this.inputEl) {
+          this.inputEl.disabled = this.isProcessing;
+        }
+        this.updateSendButtonState();
+      }
+    } catch (error) {
+      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX \u041F\u041E\u041C\u0418\u041B\u041A\u0410 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F XXX", error);
+    } finally {
+      this.plugin.logger.error("[loadAndDisplayActiveChat] <<< \u0412\u0418\u0425\u0406\u0414: \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E \u043F\u043E\u0432\u043D\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F/\u0432\u0456\u0434\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0442\u0443 >>>");
+    }
+    this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
+  }
+  // OllamaView.ts
+  // --- Оновлений handleActiveChatChanged з детальним логуванням ---
+  async handleActiveChatChanged(data) {
+    var _a;
+    this.plugin.logger.error(
+      `[handleActiveChatChanged] <<< \u041E\u0422\u0420\u0418\u041C\u0410\u041D\u041E \u041F\u041E\u0414\u0406\u042E >>> \u041D\u043E\u0432\u0438\u0439 ID: ${data.chatId}, \u0404 \u0434\u0430\u043D\u0456 \u0447\u0430\u0442\u0443: ${!!data.chat}, \u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0439 ID: ${this.lastProcessedChatId}`
+    );
+    const chatSwitched = data.chatId !== this.lastProcessedChatId;
+    this.plugin.logger.warn(`[handleActiveChatChanged] \u041E\u0431\u0447\u0438\u0441\u043B\u0435\u043D\u043E chatSwitched: ${chatSwitched}`);
+    if (this.temporarilyDisableChatChangedReload) {
+      this.plugin.logger.error("[handleActiveChatChanged] \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F \u0412\u0418\u041C\u041A\u041D\u0415\u041D\u041E \u0414\u041B\u042F \u0422\u0415\u0421\u0422\u0423. \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u0454\u043C\u043E \u043B\u043E\u0433\u0456\u043A\u0443 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F/\u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F.");
+      this.lastProcessedChatId = data.chatId;
+      return;
+    }
+    if (chatSwitched || data.chatId !== null && data.chat === null) {
+      this.plugin.logger.error(
+        `[handleActiveChatChanged] !!! \u0423\u041C\u041E\u0412\u0410 \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F \u0412\u0418\u041A\u041E\u041D\u0410\u041D\u0410 !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). \u0413\u043E\u0442\u0443\u0454\u043C\u043E\u0441\u044C \u0432\u0438\u043A\u043B\u0438\u043A\u0430\u0442\u0438 loadAndDisplayActiveChat...`
+      );
+      const currentStack = new Error().stack;
+      this.plugin.logger.error(`[handleActiveChatChanged] Stack trace \u0434\u043B\u044F \u0443\u043C\u043E\u0432\u0438 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F: ${currentStack}`);
+      if (chatSwitched) {
+        this.lastProcessedChatId = data.chatId;
+      }
+      this.plugin.logger.error("[handleActiveChatChanged] \u0412\u0418\u041A\u041B\u0418\u041A\u0410\u0404\u041C\u041E loadAndDisplayActiveChat \u0417\u0410\u0420\u0410\u0417!");
+      await this.loadAndDisplayActiveChat();
+    } else if (data.chatId !== null && data.chat !== null) {
+      this.plugin.logger.info(
+        `[handleActiveChatChanged] \u0412\u0445\u043E\u0434\u0438\u043C\u043E \u0432 \u0431\u043B\u043E\u043A \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u041C\u0415\u0422\u0410\u0414\u0410\u041D\u0418\u0425/\u041F\u0410\u041D\u0415\u041B\u0415\u0419 (ID: ${data.chatId}). \u0411\u0415\u0417 \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F.`
+      );
+      if (!chatSwitched) {
+        this.lastProcessedChatId = data.chatId;
       }
     } else {
       this.plugin.logger.warn(
-        `[handleActiveChatChanged] Entering UNHANDLED state block: chatId=${data.chatId}, chatSwitched=${chatSwitched}. Previous ID: ${previousChatId}`
+        `[handleActiveChatChanged] \u0412\u0445\u043E\u0434\u0438\u043C\u043E \u0432 \u0431\u043B\u043E\u043A \u041D\u0415\u041E\u0411\u0420\u041E\u0411\u041B\u0415\u041D\u041E\u0413\u041E \u0421\u0422\u0410\u041D\u0423: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
       );
       this.lastProcessedChatId = data.chatId;
     }
-    if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
-      this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
-      this.renderRoleList().catch((error) => {
-        this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
-      });
-    }
-    this.plugin.logger.info(
-      `[handleActiveChatChanged] Finished processing event for chat ID: ${(_f = data.chatId) != null ? _f : "null"}`
+    this.plugin.logger.error(
+      // Використовуємо ERROR для максимальної видимості
+      `[handleActiveChatChanged] <<< \u0417\u0410\u0412\u0415\u0420\u0428\u0415\u041D\u041E \u041E\u0411\u0420\u041E\u0411\u041A\u0423 \u041F\u041E\u0414\u0406\u0407 >>> \u0414\u043B\u044F ID: ${(_a = data.chatId) != null ? _a : "null"}`
     );
   }
   async sendMessage() {
@@ -4064,6 +4050,7 @@ This action cannot be undone.`,
     return this.chatContainer;
   }
   clearChatContainerInternal() {
+    this.plugin.logger.warn("[clearChatContainerInternal] --- \u041E\u0427\u0418\u0429\u0415\u041D\u041D\u042F \u041A\u041E\u041D\u0422\u0415\u0419\u041D\u0415\u0420\u0410 \u0427\u0410\u0422\u0423 \u0422\u0410 \u0421\u0422\u0410\u041D\u0423 ---");
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
     if (this.chatContainer)

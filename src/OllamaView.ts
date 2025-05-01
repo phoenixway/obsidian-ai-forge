@@ -348,6 +348,8 @@ export class OllamaView extends ItemView {
   private errorGroupElement: HTMLElement | null = null; // Посилання на активний контейнер групи помилок
   private isSummarizingErrors = false; // Прапорець, щоб уникнути одночасних сумаризацій
 
+  private temporarilyDisableChatChangedReload = false;
+
   private currentMessageAddedResolver: (() => void) | null = null;
 
   // private currentAssistantMessage: {
@@ -2150,8 +2152,9 @@ public setLoadingState(isLoading: boolean): void {
   async loadAndDisplayActiveChat(): Promise<void> {
 		// ... (початок методу: очищення, отримання даних чату, моделей, ролі, температури) ...
         // Ця частина залишається переважно такою ж
+        this.plugin.logger.error("[loadAndDisplayActiveChat] >>> ВХІД: Починаємо повне перезавантаження/відображення чату <<<"); // Помітний лог
         this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
-
+try {
         this.clearChatContainerInternal(); // Clear display and local state
         this.currentMessages = [];
         this.lastRenderedMessageDate = null;
@@ -2355,103 +2358,79 @@ public setLoadingState(isLoading: boolean): void {
              }
              this.updateSendButtonState();
         }
+      }
+    catch (error) {
+      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX ПОМИЛКА під час виконання XXX", error);
+  } finally {
+      this.plugin.logger.error("[loadAndDisplayActiveChat] <<< ВИХІД: Завершено повне перезавантаження/відображення чату >>>"); // Помітний лог
+  }
 
         this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
 	}
 
   // OllamaView.ts
 
- private async handleActiveChatChanged(data: { chatId: string | null; chat: Chat | null }): Promise<void> {
-  // --- ДОДАЄМО ЛОГУВАННЯ ---
-  this.plugin.logger.info(
-      `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Has Chat Data: ${!!data.chat}, Previous processed ID: ${this.lastProcessedChatId}`
+// --- Оновлений handleActiveChatChanged з детальним логуванням ---
+private async handleActiveChatChanged(data: { chatId: string | null; chat: Chat | null }): Promise<void> {
+  // Використовуємо ERROR для максимальної видимості в консолі
+  this.plugin.logger.error(
+      `[handleActiveChatChanged] <<< ОТРИМАНО ПОДІЮ >>> Новий ID: ${data.chatId}, Є дані чату: ${!!data.chat}, Попередній ID: ${this.lastProcessedChatId}`
   );
-  // --- КІНЕЦЬ ЛОГУВАННЯ ---
 
   const chatSwitched = data.chatId !== this.lastProcessedChatId;
-  const previousChatId = this.lastProcessedChatId;
+  this.plugin.logger.warn(`[handleActiveChatChanged] Обчислено chatSwitched: ${chatSwitched}`); // WARN теж помітний
 
-  // --- ДОДАЄМО ЛОГУВАННЯ ---
-  this.plugin.logger.debug(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
-  // --- КІНЕЦЬ ЛОГУВАННЯ ---
+  // --- Тимчасове вимкнення для тестування ---
+  if (this.temporarilyDisableChatChangedReload) {
+      this.plugin.logger.error("[handleActiveChatChanged] ПЕРЕЗАВАНТАЖЕННЯ ВИМКНЕНО ДЛЯ ТЕСТУ. Пропускаємо логіку оновлення/перезавантаження.");
+      // Оновлюємо ID для наступних перевірок
+      this.lastProcessedChatId = data.chatId;
+      return; // Виходимо раніше
+  }
+  // --- Кінець тимчасового вимкнення ---
+
 
   if (chatSwitched || (data.chatId !== null && data.chat === null)) {
-      // --- ДОДАЄМО ЛОГУВАННЯ ---
-      this.plugin.logger.warn(
-          `[handleActiveChatChanged] Entering RELOAD block (switched: ${chatSwitched}, data.chat is null: ${data.chat === null}). Calling loadAndDisplayActiveChat...`
+      // Логуємо умову перезавантаження як ERROR
+      this.plugin.logger.error(
+          `[handleActiveChatChanged] !!! УМОВА ПЕРЕЗАВАНТАЖЕННЯ ВИКОНАНА !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Готуємось викликати loadAndDisplayActiveChat...`
       );
-      // --- КІНЕЦЬ ЛОГУВАННЯ ---
+      // Логуємо stack trace, щоб побачити, хто викликав подію, що призвела до перезавантаження
+      const currentStack = new Error().stack;
+      this.plugin.logger.error(`[handleActiveChatChanged] Stack trace для умови перезавантаження: ${currentStack}`);
+
       if (chatSwitched) {
           this.lastProcessedChatId = data.chatId;
       }
+      this.plugin.logger.error("[handleActiveChatChanged] ВИКЛИКАЄМО loadAndDisplayActiveChat ЗАРАЗ!"); // Лог перед викликом
       await this.loadAndDisplayActiveChat(); // Повне перезавантаження
   } else if (data.chatId !== null && data.chat !== null) {
-      // --- ДОДАЄМО ЛОГУВАННЯ ---
+      // Лог для нормального оновлення метаданих
       this.plugin.logger.info(
-          `[handleActiveChatChanged] Entering METADATA/PANEL update block (ID: ${data.chatId}).`
+          `[handleActiveChatChanged] Входимо в блок оновлення МЕТАДАНИХ/ПАНЕЛЕЙ (ID: ${data.chatId}). БЕЗ ПЕРЕЗАВАНТАЖЕННЯ.`
       );
-      // --- КІНЕЦЬ ЛОГУВАННЯ ---
-      if (!chatSwitched) {
-          this.lastProcessedChatId = data.chatId; // Оновлюємо ID тут теж
+      if (!chatSwitched) { // Переконуємось, що ID оновлено, якщо це той самий чат
+          this.lastProcessedChatId = data.chatId;
       }
-
-      const activeChat = data.chat; // Використовуємо передані дані
-
-      // ... (оновлення model/role/temp display, як було) ...
-      const currentModelName = activeChat.metadata?.modelName || this.plugin.settings.modelName;
-      const currentRolePath = activeChat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-      const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-      const currentTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-      this.updateModelDisplay(currentModelName);
-      this.updateRoleDisplay(currentRoleName);
-      this.updateInputPlaceholder(currentRoleName);
-      this.updateTemperatureIndicator(currentTemperature);
-
-
-      // ... (оновлення видимих панелей, як було) ...
-       this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
-      const updatePromises = [];
-      if (this.isSidebarSectionVisible("chats")) {
-          updatePromises.push(
-              this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-          );
-      }
-      if (this.isSidebarSectionVisible("roles")) {
-          updatePromises.push(
-              this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-          );
-      }
-      if (updatePromises.length > 0) {
-          await Promise.all(updatePromises);
-          this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
-      }
+      // ... (код оновлення model/role/temp display та панелей) ...
+      // (тут НЕ МАЄ бути виклику loadAndDisplayActiveChat)
 
   } else {
-      // --- ДОДАЄМО ЛОГУВАННЯ ---
+      // Лог для непередбаченого стану
       this.plugin.logger.warn(
-          `[handleActiveChatChanged] Entering UNHANDLED state block: chatId=${data.chatId}, chatSwitched=${chatSwitched}. Previous ID: ${previousChatId}`
+          `[handleActiveChatChanged] Входимо в блок НЕОБРОБЛЕНОГО СТАНУ: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
       );
-      // --- КІНЕЦЬ ЛОГУВАННЯ ---
-      this.lastProcessedChatId = data.chatId; // Оновлюємо на всякий випадок
+      this.lastProcessedChatId = data.chatId; // Оновлюємо на випадок помилки
   }
 
-  // ... (Оновлення випадаючого меню ролей, як було) ...
-   if (
-       this.isMenuOpen() &&
-       this.roleSubmenuContent &&
-       !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN) // Використовуйте константу, якщо є
-   ) {
-       this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
-       this.renderRoleList().catch(error => {
-           this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
-       });
-   }
-  // --- ДОДАЄМО ЛОГУВАННЯ ---
-  this.plugin.logger.info(
-      `[handleActiveChatChanged] Finished processing event for chat ID: ${data.chatId ?? "null"}`
+  // ... (Оновлення випадаючого меню ролей) ...
+
+  this.plugin.logger.error( // Використовуємо ERROR для максимальної видимості
+      `[handleActiveChatChanged] <<< ЗАВЕРШЕНО ОБРОБКУ ПОДІЇ >>> Для ID: ${data.chatId ?? "null"}`
   );
-   // --- КІНЕЦЬ ЛОГУВАННЯ ---
 }
+
+
 
 
   private handleChatListUpdated = (): void => {
@@ -3837,19 +3816,17 @@ public async handleTranslateClick(
   }
 
   private clearChatContainerInternal(): void {
-    // Clears the visual display area and resets related state
+    // Використовуємо WARN або ERROR, щоб цей лог було видно
+    this.plugin.logger.warn("[clearChatContainerInternal] --- ОЧИЩЕННЯ КОНТЕЙНЕРА ЧАТУ ТА СТАНУ ---");
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
     if (this.chatContainer) this.chatContainer.empty();
-    this.hideEmptyState(); // Ensure empty state is managed correctly
-
-    // --- ДОДАНО: Скидання стану помилок ---
+    this.hideEmptyState();
     this.lastMessageElement = null;
     this.consecutiveErrorMessages = [];
     this.errorGroupElement = null;
     this.isSummarizingErrors = false;
-    // --------------------------------------
-  }
+}
 
   public clearDisplayAndState(): void {
     // Public method to completely clear the view
