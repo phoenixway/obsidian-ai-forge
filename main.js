@@ -227,7 +227,8 @@ var CSS_CLASSES = {
   DISABLED: "disabled",
   ERROR_TEXT: "error-message-text",
   // Додаємо відсутню константу
-  SHOW_MORE_BUTTON: "show-more-button"
+  SHOW_MORE_BUTTON: "show-more-button",
+  SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden"
 };
 
 // src/MessageRendererUtils.ts
@@ -806,7 +807,6 @@ var CSS_CLASS_MENU_OPTION = "menu-option";
 var CSS_CLASS_MENU_HEADER_ITEM = "menu-header-item";
 var CSS_CLASS_SUBMENU_ICON = "submenu-icon";
 var CSS_CLASS_SUBMENU_CONTENT = "submenu-content";
-var CSS_CLASS_SUBMENU_CONTENT_HIDDEN = "submenu-content-hidden";
 var CSS_CLASS_SETTINGS_OPTION = "settings-option";
 var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
 var CSS_CLASS_MESSAGE = "message";
@@ -1020,7 +1020,7 @@ var OllamaView = class extends import_obsidian10.ItemView {
       (0, import_obsidian10.setIcon)(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
       const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
       const content = section.createDiv({
-        cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}`
+        cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASSES.SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""}`
       });
       content.style.maxHeight = "0";
       content.style.overflow = "hidden";
@@ -1054,7 +1054,7 @@ var OllamaView = class extends import_obsidian10.ItemView {
     //     // --- Оновлюємо список у бічній панелі ---
     //     await this.updateRolePanelList();
     //     // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
-    //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+    //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
     //          this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
     //          await this.renderRoleList();
     //     }
@@ -1403,7 +1403,7 @@ var OllamaView = class extends import_obsidian10.ItemView {
             const success = await this.plugin.chatManager.renameChat(chatId, trimmedName);
             if (success) {
               noticeMessage = `Chat renamed to "${trimmedName}"`;
-              if (this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+              if (this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
                 this.plugin.logger.info("[handleRenameChatClick] Forcing chat list menu refresh after rename.");
                 await this.renderChatListMenu();
               }
@@ -1733,80 +1733,12 @@ This action cannot be undone.`,
         );
       });
     };
-    this.handleActiveChatChanged = async (data) => {
-      var _a, _b, _c, _d, _e, _f;
-      this.plugin.logger.debug(
-        `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`
-      );
-      const chatSwitched = data.chatId !== this.lastProcessedChatId;
-      const previousChatId = this.lastProcessedChatId;
-      if (chatSwitched || data.chatId === null) {
-        this.lastProcessedChatId = data.chatId;
-      }
-      if (chatSwitched || data.chatId !== null && data.chat === null) {
-        if (chatSwitched) {
-          this.plugin.logger.info(
-            `[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`
-          );
-        } else {
-          this.plugin.logger.warn(
-            `[handleActiveChatChanged] Received event for current chat ID ${data.chatId} but chat data is null. Reloading view.`
-          );
-        }
-        await this.loadAndDisplayActiveChat();
-      } else if (data.chatId !== null && data.chat !== null) {
-        this.plugin.logger.info(
-          `[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements (excluding messages).`
-        );
-        const activeChat = data.chat;
-        const currentModelName = ((_a = activeChat.metadata) == null ? void 0 : _a.modelName) || this.plugin.settings.modelName;
-        const currentRolePath = (_c = (_b = activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
-        const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-        const currentTemperature = (_e = (_d = activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
-        this.plugin.logger.debug(
-          `[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`
-        );
-        this.updateModelDisplay(currentModelName);
-        this.updateRoleDisplay(currentRoleName);
-        this.updateInputPlaceholder(currentRoleName);
-        this.updateTemperatureIndicator(currentTemperature);
-        this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
-        const updatePromises = [];
-        if (this.isSidebarSectionVisible("chats")) {
-          updatePromises.push(
-            this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
-          );
-        }
-        if (this.isSidebarSectionVisible("roles")) {
-          updatePromises.push(
-            this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
-          );
-        }
-        if (updatePromises.length > 0) {
-          await Promise.all(updatePromises);
-          this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
-        }
-      } else {
-        this.plugin.logger.warn(
-          `[handleActiveChatChanged] Unhandled state or no change detected: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
-        );
-      }
-      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-        this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
-        this.renderRoleList().catch((error) => {
-          this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
-        });
-      }
-      this.plugin.logger.debug(
-        `[handleActiveChatChanged] Finished processing event for chat ID: ${(_f = data.chatId) != null ? _f : "null"}`
-      );
-    };
     this.handleChatListUpdated = () => {
       this.plugin.logger.info("[handleChatListUpdated] Received 'chat-list-updated' event.");
       const menuOpen = this.isMenuOpen();
       this.plugin.logger.debug(`[handleChatListUpdated] Is dropdown menu open? ${menuOpen}`);
       if (menuOpen) {
-        const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+        const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
         this.plugin.logger.debug(`[handleChatListUpdated] Is chat submenu visible? ${isChatSubmenuVisible}`);
         if (isChatSubmenuVisible) {
           this.plugin.logger.info(
@@ -1850,7 +1782,7 @@ This action cannot be undone.`,
       } else {
         this.plugin.logger.debug("[handleSettingsUpdated] Roles panel is collapsed, skipping update.");
       }
-      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+      if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
         this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
         await this.renderRoleList().catch((e) => this.plugin.logger.error("Error updating role dropdown list:", e));
       }
@@ -2527,7 +2459,7 @@ This action cannot be undone.`,
     if (!headerEl || !contentEl)
       return;
     const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
-    const isHidden = contentEl.style.maxHeight === "0px" || contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+    const isHidden = contentEl.style.maxHeight === "0px" || contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
     if (isHidden) {
       this.collapseAllSubmenus(contentEl);
     }
@@ -2539,7 +2471,7 @@ This action cannot be undone.`,
         cls: "menu-loading",
         text: `Loading ${type}...`
       });
-      contentEl.classList.remove(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      contentEl.classList.remove(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
       contentEl.style.maxHeight = "40px";
       contentEl.style.paddingTop = "5px";
       contentEl.style.paddingBottom = "5px";
@@ -2557,7 +2489,7 @@ This action cannot be undone.`,
             break;
         }
         requestAnimationFrame(() => {
-          if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+          if (!contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
             if (type === "chats") {
               contentEl.style.maxHeight = CHAT_LIST_MAX_HEIGHT;
               contentEl.style.overflowY = "auto";
@@ -2578,7 +2510,7 @@ This action cannot be undone.`,
         contentEl.style.overflowY = "hidden";
       }
     } else {
-      contentEl.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      contentEl.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
       contentEl.style.maxHeight = "0";
       contentEl.style.paddingTop = "0";
       contentEl.style.paddingBottom = "0";
@@ -2605,8 +2537,8 @@ This action cannot be undone.`,
     ];
     submenus.forEach((submenu) => {
       if (submenu.content && submenu.header && submenu.content !== exceptContent) {
-        if (!submenu.content.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-          submenu.content.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+        if (!submenu.content.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
+          submenu.content.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
           submenu.content.style.maxHeight = "0";
           submenu.content.style.paddingTop = "0";
           submenu.content.style.paddingBottom = "0";
@@ -2714,7 +2646,7 @@ This action cannot be undone.`,
       this.renderOrUpdateErrorGroup(isContinuingError);
     }
     if (this.isMenuOpen()) {
-      const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
       if (isChatSubmenuVisible) {
         this.renderChatListMenu();
       }
@@ -2982,6 +2914,71 @@ This action cannot be undone.`,
       this.updateSendButtonState();
     }
     this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
+  }
+  // OllamaView.ts
+  async handleActiveChatChanged(data) {
+    var _a, _b, _c, _d, _e, _f;
+    this.plugin.logger.info(
+      `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Has Chat Data: ${!!data.chat}, Previous processed ID: ${this.lastProcessedChatId}`
+    );
+    const chatSwitched = data.chatId !== this.lastProcessedChatId;
+    const previousChatId = this.lastProcessedChatId;
+    this.plugin.logger.debug(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
+    if (chatSwitched || data.chatId !== null && data.chat === null) {
+      this.plugin.logger.warn(
+        `[handleActiveChatChanged] Entering RELOAD block (switched: ${chatSwitched}, data.chat is null: ${data.chat === null}). Calling loadAndDisplayActiveChat...`
+      );
+      if (chatSwitched) {
+        this.lastProcessedChatId = data.chatId;
+      }
+      await this.loadAndDisplayActiveChat();
+    } else if (data.chatId !== null && data.chat !== null) {
+      this.plugin.logger.info(
+        `[handleActiveChatChanged] Entering METADATA/PANEL update block (ID: ${data.chatId}).`
+      );
+      if (!chatSwitched) {
+        this.lastProcessedChatId = data.chatId;
+      }
+      const activeChat = data.chat;
+      const currentModelName = ((_a = activeChat.metadata) == null ? void 0 : _a.modelName) || this.plugin.settings.modelName;
+      const currentRolePath = (_c = (_b = activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
+      const currentRoleName = await this.findRoleNameByPath(currentRolePath);
+      const currentTemperature = (_e = (_d = activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
+      this.updateModelDisplay(currentModelName);
+      this.updateRoleDisplay(currentRoleName);
+      this.updateInputPlaceholder(currentRoleName);
+      this.updateTemperatureIndicator(currentTemperature);
+      this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
+      const updatePromises = [];
+      if (this.isSidebarSectionVisible("chats")) {
+        updatePromises.push(
+          this.updateChatPanelList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
+        );
+      }
+      if (this.isSidebarSectionVisible("roles")) {
+        updatePromises.push(
+          this.updateRolePanelList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
+        );
+      }
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+        this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
+      }
+    } else {
+      this.plugin.logger.warn(
+        `[handleActiveChatChanged] Entering UNHANDLED state block: chatId=${data.chatId}, chatSwitched=${chatSwitched}. Previous ID: ${previousChatId}`
+      );
+      this.lastProcessedChatId = data.chatId;
+    }
+    if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
+      this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
+      this.renderRoleList().catch((error) => {
+        this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
+      });
+    }
+    this.plugin.logger.info(
+      `[handleActiveChatChanged] Finished processing event for chat ID: ${(_f = data.chatId) != null ? _f : "null"}`
+    );
   }
   // OllamaView.ts (Повна версія методу sendMessage після рефакторингу)
   async sendMessage() {
@@ -3750,7 +3747,7 @@ This action cannot be undone.`,
     }
   }
   updateSubmenuHeight(contentEl) {
-    if (contentEl && !contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+    if (contentEl && !contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
       requestAnimationFrame(() => {
         contentEl.style.maxHeight = contentEl.scrollHeight + "px";
       });

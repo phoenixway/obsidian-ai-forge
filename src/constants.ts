@@ -24,4 +24,5 @@ export const CSS_CLASSES = {
     DISABLED: "disabled",
     ERROR_TEXT: "error-message-text", // Додаємо відсутню константу
     SHOW_MORE_BUTTON: "show-more-button",
+    SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden",
 };

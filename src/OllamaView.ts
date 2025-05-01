@@ -49,7 +49,6 @@ const CSS_CLASS_MENU_OPTION = "menu-option"; // Для всіх клікабел
 const CSS_CLASS_MENU_HEADER_ITEM = "menu-header-item"; // Клікабельний заголовок "підменю"
 const CSS_CLASS_SUBMENU_ICON = "submenu-icon"; // Іконка стрілки >/v
 const CSS_CLASS_SUBMENU_CONTENT = "submenu-content"; // Контейнер для списку "підменю"
-const CSS_CLASS_SUBMENU_CONTENT_HIDDEN = "submenu-content-hidden"; // Клас для прихованого контейнера
 const CSS_CLASS_SETTINGS_OPTION = "settings-option";
 const CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
 // export const CSS_CLASS_MESSAGE_GROUP = "message-group";
@@ -693,7 +692,7 @@ export class OllamaView extends ItemView {
     setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
     const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
     const content = section.createDiv({
-      cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASS_SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${
+      cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASSES.SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${
         isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""
       }`,
     });
@@ -918,7 +917,7 @@ export class OllamaView extends ItemView {
   //     // --- Оновлюємо список у бічній панелі ---
   //     await this.updateRolePanelList();
   //     // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
-  //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+  //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
   //          this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
   //          await this.renderRoleList();
   //     }
@@ -1322,7 +1321,7 @@ export class OllamaView extends ItemView {
     if (!headerEl || !contentEl) return;
     const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
     const isHidden =
-      contentEl.style.maxHeight === "0px" || contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      contentEl.style.maxHeight === "0px" || contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
 
     if (isHidden) {
       this.collapseAllSubmenus(contentEl);
@@ -1336,7 +1335,7 @@ export class OllamaView extends ItemView {
         cls: "menu-loading",
         text: `Loading ${type}...`,
       });
-      contentEl.classList.remove(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      contentEl.classList.remove(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
       // Тимчасова висота для індикатора завантаження
       contentEl.style.maxHeight = "40px";
       contentEl.style.paddingTop = "5px";
@@ -1359,7 +1358,7 @@ export class OllamaView extends ItemView {
 
         // Після рендерингу, обчислюємо потрібну висоту
         requestAnimationFrame(() => {
-          if (!contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+          if (!contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
             if (type === "chats") {
               // Для списку чатів: встановлюємо фіксовану max-height і дозволяємо скрол
               contentEl.style.maxHeight = CHAT_LIST_MAX_HEIGHT;
@@ -1383,7 +1382,7 @@ export class OllamaView extends ItemView {
       }
     } else {
       // --- Згортання ---
-      contentEl.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+      contentEl.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
       contentEl.style.maxHeight = "0";
       contentEl.style.paddingTop = "0";
       contentEl.style.paddingBottom = "0";
@@ -1411,8 +1410,8 @@ export class OllamaView extends ItemView {
     submenus.forEach(submenu => {
       // Check elements exist before manipulating
       if (submenu.content && submenu.header && submenu.content !== exceptContent) {
-        if (!submenu.content.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
-          submenu.content.classList.add(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+        if (!submenu.content.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
+          submenu.content.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
           submenu.content.style.maxHeight = "0";
           submenu.content.style.paddingTop = "0";
           submenu.content.style.paddingBottom = "0";
@@ -1494,7 +1493,7 @@ export class OllamaView extends ItemView {
             // Додаткове оновлення списку в меню, якщо воно видиме (перенесено з попередньої версії)
             if (
               this.chatSubmenuContent &&
-              !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)
+              !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)
             ) {
               this.plugin.logger.info("[handleRenameChatClick] Forcing chat list menu refresh after rename.");
               await this.renderChatListMenu();
@@ -1864,7 +1863,7 @@ export class OllamaView extends ItemView {
 
     // 11. Оновлюємо список чатів у випадаючому меню, якщо воно відкрите
     if (this.isMenuOpen()) {
-        const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+        const isChatSubmenuVisible = this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
         if (isChatSubmenuVisible) {
             this.renderChatListMenu();
         }
@@ -2349,101 +2348,100 @@ public setLoadingState(isLoading: boolean): void {
         this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
 	}
 
-  private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
-    this.plugin.logger.debug(
-      `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Previous processed ID: ${this.lastProcessedChatId}`
-    );
+  // OllamaView.ts
 
-    const chatSwitched = data.chatId !== this.lastProcessedChatId;
-    const previousChatId = this.lastProcessedChatId;
+ private async handleActiveChatChanged(data: { chatId: string | null; chat: Chat | null }): Promise<void> {
+  // --- ДОДАЄМО ЛОГУВАННЯ ---
+  this.plugin.logger.info(
+      `[handleActiveChatChanged] Event received. New ID: ${data.chatId}, Has Chat Data: ${!!data.chat}, Previous processed ID: ${this.lastProcessedChatId}`
+  );
+  // --- КІНЕЦЬ ЛОГУВАННЯ ---
 
-    if (chatSwitched || data.chatId === null) {
-      // Обробка зміни ID або переходу на null
-      this.lastProcessedChatId = data.chatId;
-    }
+  const chatSwitched = data.chatId !== this.lastProcessedChatId;
+  const previousChatId = this.lastProcessedChatId;
 
-    if (chatSwitched || (data.chatId !== null && data.chat === null)) {
-      // Перемикання чату, або отримання null даних для поточного ID
+  // --- ДОДАЄМО ЛОГУВАННЯ ---
+  this.plugin.logger.debug(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
+  // --- КІНЕЦЬ ЛОГУВАННЯ ---
+
+  if (chatSwitched || (data.chatId !== null && data.chat === null)) {
+      // --- ДОДАЄМО ЛОГУВАННЯ ---
+      this.plugin.logger.warn(
+          `[handleActiveChatChanged] Entering RELOAD block (switched: ${chatSwitched}, data.chat is null: ${data.chat === null}). Calling loadAndDisplayActiveChat...`
+      );
+      // --- КІНЕЦЬ ЛОГУВАННЯ ---
       if (chatSwitched) {
-        this.plugin.logger.info(
-          `[handleActiveChatChanged] Chat switched from ${previousChatId} to ${data.chatId}. Reloading view via loadAndDisplayActiveChat.`
-        );
-      } else {
-        this.plugin.logger.warn(
-          `[handleActiveChatChanged] Received event for current chat ID ${data.chatId} but chat data is null. Reloading view.`
-        );
+          this.lastProcessedChatId = data.chatId;
       }
       await this.loadAndDisplayActiveChat(); // Повне перезавантаження
-    } else if (data.chatId !== null && data.chat !== null) {
-      // --- ЧАТ НЕ ЗМІНИВСЯ (тільки метадані) ---
-      // ПОДІЯ ВИДАЛЕННЯ ОБРОБЛЯЄТЬСЯ В handleMessageDeleted
+  } else if (data.chatId !== null && data.chat !== null) {
+      // --- ДОДАЄМО ЛОГУВАННЯ ---
       this.plugin.logger.info(
-        `[handleActiveChatChanged] Active chat metadata changed (ID: ${data.chatId}). Updating UI elements (excluding messages).`
+          `[handleActiveChatChanged] Entering METADATA/PANEL update block (ID: ${data.chatId}).`
       );
+      // --- КІНЕЦЬ ЛОГУВАННЯ ---
+      if (!chatSwitched) {
+          this.lastProcessedChatId = data.chatId; // Оновлюємо ID тут теж
+      }
 
-      const activeChat = data.chat;
+      const activeChat = data.chat; // Використовуємо передані дані
 
-      // 1. Оновлюємо метадані UI (як було)
-      // ... (код оновлення model/role/temp display) ...
+      // ... (оновлення model/role/temp display, як було) ...
       const currentModelName = activeChat.metadata?.modelName || this.plugin.settings.modelName;
       const currentRolePath = activeChat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
       const currentRoleName = await this.findRoleNameByPath(currentRolePath);
       const currentTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-
-      this.plugin.logger.debug(
-        `[handleActiveChatChanged] Updating display: Model=${currentModelName}, Role=${currentRoleName}, Temp=${currentTemperature}`
-      );
       this.updateModelDisplay(currentModelName);
       this.updateRoleDisplay(currentRoleName);
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
 
-      // 2. Оновлюємо видимі панелі (як було)
-      // ... (код оновлення панелей) ...
-      this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
+
+      // ... (оновлення видимих панелей, як було) ...
+       this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels for metadata change...");
       const updatePromises = [];
       if (this.isSidebarSectionVisible("chats")) {
-        updatePromises.push(
-          this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-        );
+          updatePromises.push(
+              this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
+          );
       }
       if (this.isSidebarSectionVisible("roles")) {
-        updatePromises.push(
-          this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-        );
+          updatePromises.push(
+              this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
+          );
       }
       if (updatePromises.length > 0) {
-        await Promise.all(updatePromises);
-        this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
+          await Promise.all(updatePromises);
+          this.plugin.logger.debug("[handleActiveChatChanged] Visible sidebar panels updated for metadata change.");
       }
 
-      // --- 3. ВИДАЛЕНО блок перемальовування повідомлень ---
-      // this.renderMessages(...) БІЛЬШЕ НЕ ВИКЛИКАЄТЬСЯ ТУТ
-      // --- КІНЕЦЬ ВИДАЛЕННЯ ---
-    } else {
-      // Обробка випадку null -> null або інших непередбачених станів
+  } else {
+      // --- ДОДАЄМО ЛОГУВАННЯ ---
       this.plugin.logger.warn(
-        `[handleActiveChatChanged] Unhandled state or no change detected: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
+          `[handleActiveChatChanged] Entering UNHANDLED state block: chatId=${data.chatId}, chatSwitched=${chatSwitched}. Previous ID: ${previousChatId}`
       );
-      // Можливо, нічого не робити, або обережно оновити панелі?
-    }
+      // --- КІНЕЦЬ ЛОГУВАННЯ ---
+      this.lastProcessedChatId = data.chatId; // Оновлюємо на всякий випадок
+  }
 
-    // Оновлення випадаючого меню ролей (як було)
-    // ... (код оновлення меню) ...
-    if (
-      this.isMenuOpen() &&
-      this.roleSubmenuContent &&
-      !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)
-    ) {
-      this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
-      this.renderRoleList().catch(error => {
-        this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
-      });
-    }
-    this.plugin.logger.debug(
+  // ... (Оновлення випадаючого меню ролей, як було) ...
+   if (
+       this.isMenuOpen() &&
+       this.roleSubmenuContent &&
+       !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN) // Використовуйте константу, якщо є
+   ) {
+       this.plugin.logger.debug("[handleActiveChatChanged] Role submenu open, refreshing role list menu.");
+       this.renderRoleList().catch(error => {
+           this.plugin.logger.error("[handleActiveChatChanged] Error rendering role list menu:", error);
+       });
+   }
+  // --- ДОДАЄМО ЛОГУВАННЯ ---
+  this.plugin.logger.info(
       `[handleActiveChatChanged] Finished processing event for chat ID: ${data.chatId ?? "null"}`
-    );
-  };
+  );
+   // --- КІНЕЦЬ ЛОГУВАННЯ ---
+}
+
 
   private handleChatListUpdated = (): void => {
     this.plugin.logger.info("[handleChatListUpdated] Received 'chat-list-updated' event.");
@@ -2454,7 +2452,7 @@ public setLoadingState(isLoading: boolean): void {
     this.plugin.logger.debug(`[handleChatListUpdated] Is dropdown menu open? ${menuOpen}`);
     if (menuOpen) {
       const isChatSubmenuVisible =
-        this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN);
+        this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
       this.plugin.logger.debug(`[handleChatListUpdated] Is chat submenu visible? ${isChatSubmenuVisible}`);
       if (isChatSubmenuVisible) {
         this.plugin.logger.info(
@@ -2513,7 +2511,7 @@ public setLoadingState(isLoading: boolean): void {
     if (
       this.isMenuOpen() &&
       this.roleSubmenuContent &&
-      !this.roleSubmenuContent.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)
+      !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)
     ) {
       this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
       await this.renderRoleList().catch(e => this.plugin.logger.error("Error updating role dropdown list:", e));
@@ -3447,7 +3445,7 @@ public async handleTranslateClick(
     }
   }
   private updateSubmenuHeight(contentEl: HTMLElement | null): void {
-    if (contentEl && !contentEl.classList.contains(CSS_CLASS_SUBMENU_CONTENT_HIDDEN)) {
+    if (contentEl && !contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
       requestAnimationFrame(() => {
         contentEl.style.maxHeight = contentEl.scrollHeight + "px";
       });
