@@ -93,8 +93,6 @@ const CSS_CLASS_DATE_SEPARATOR = "chat-date-separator";
 // const CSS_CLASS_AVATAR = "message-group-avatar";
 const CSS_CLASS_AVATAR_USER = "user-avatar";
 // const CSS_CLASS_AVATAR_AI = "ai-avatar";
-const CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button";
-const CSS_CLASS_CODE_BLOCK_LANGUAGE = "code-block-language";
 const CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 const CSS_CLASS_VISIBLE = "visible";
 const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
@@ -281,7 +279,7 @@ const LANGUAGES: Record<string, string> = {
 
 export class OllamaView extends ItemView {
   // --- Properties ---
-  private readonly plugin: OllamaPlugin;
+  public readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
   private chatContainer!: HTMLElement;
@@ -1747,97 +1745,99 @@ export class OllamaView extends ItemView {
     }
   };
   
-  // OllamaView.ts
-
-// ЗАМІНІТЬ ваш поточний handleMessageAdded на ЦЮ ВЕРСІЮ для тестування
+  // --- Переконайтесь, що handleMessageAdded виглядає так: ---
 private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
-  const isAssistant = data?.message?.role === 'assistant';
-  const timestamp = data?.message?.timestamp?.getTime();
-
-  // Логуємо вхід максимально рано
-  this.plugin.logger.error(`[handleMessageAdded - TEST] <<< ENTERED >>> Role: ${data?.message?.role}, Ts: ${timestamp}`);
-
+  // --- Top-Level Try/Catch ---
   try {
-      // Мінімальні перевірки
-      if (!data || !data.message || !this.chatContainer) {
-          this.plugin.logger.error("[handleMessageAdded - TEST] Invalid data or chatContainer missing.");
+      // --- Very First Check ---
+      if (!data || !data.message) {
+          this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
+          if (this.currentMessageAddedResolver) { /* ... resolve promise ... */ }
           return;
       }
-      if (data.chatId !== this.plugin.chatManager?.getActiveChatId()) {
-          this.plugin.logger.debug("[handleMessageAdded - TEST] Ignoring message for different chat.");
-          return;
-      }
-      // Тимчасово ігноруємо перевірку дублікатів для простоти тесту
-      // if (this.currentMessages.some(m => m.timestamp.getTime() === timestamp)) { return; }
+      // --- End First Check ---
 
-      this.plugin.logger.debug(`[handleMessageAdded - TEST] Passed initial checks. Role: ${data.message.role}`);
+      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`); // LOG A
 
-      // Додаємо в кеш
+      // Initial checks (using 'this')
+      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) { /* ... log critical error and return ... */ return; }
+      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) { /* ... log ignored, resolve, return ... */ return; }
+      if (this.currentMessages.some(m => m.timestamp.getTime() === data.message.timestamp.getTime())) { /* ... log duplicate, resolve, return ... */ return; }
+
+      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`); // LOG B
+
       this.currentMessages.push(data.message);
-      this.hideEmptyState(); // Спробуємо залишити, раптом проблема тут?
+      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
+      if (isNewDay) { this.renderDateSeparator(data.message.timestamp); this.lastRenderedMessageDate = data.message.timestamp; }
+      else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) { this.lastRenderedMessageDate = data.message.timestamp; }
+      this.hideEmptyState();
 
-      // --- Спрощений рендеринг ТІЛЬКИ для асистента ---
-      if (isAssistant) {
-          this.plugin.logger.warn(`[handleMessageAdded - TEST] >>> Handling ASSISTANT message. Appending simple div.`);
-          let simpleDiv: HTMLDivElement | null = null;
-          try {
-               simpleDiv = this.chatContainer.createDiv({
-                  text: `ASSISTANT TEST - TS: ${timestamp} - Content: ${data.message.content.substring(0, 50)}...`,
-                  cls: 'assistant-test-message' // Додамо клас для легкого пошуку в інспекторі
-               });
+      let messageGroupEl: HTMLElement | null = null;
+      let rendererRan = false;
 
-               if (!simpleDiv || !simpleDiv.isConnected) {
-                  this.plugin.logger.error("[handleMessageAdded - TEST] Simple div NOT connected after createDiv!");
-               } else {
-                  this.plugin.logger.warn("[handleMessageAdded - TEST] Simple div appended successfully.");
-                  this.lastMessageElement = simpleDiv; // Оновлюємо останній елемент
-                  this.guaranteedScrollToBottom(100, true); // Прокручуємо до нього
-               }
-          } catch (e: any) {
-              this.plugin.logger.error("[handleMessageAdded - TEST] Error creating/appending simple div:", e);
-              // Спробуємо додати текстовий вузол як fallback
-               try {
-                  this.chatContainer.appendText(`[ERROR CREATING TEST DIV: ${e.message}]`);
-               } catch {}
+      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`); // LOG C
+      // --- Inner Try/Catch for Rendering Specifics ---
+      try {
+          let renderer: UserMessageRenderer | AssistantMessageRenderer | SystemMessageRenderer | null = null;
+
+          switch (data.message.role) {
+               case "user": renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
+               case "assistant": renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
+               case "system": renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this); rendererRan = true; break;
+               case "error":
+                   // --- ВИКЛИКАЄМО НОВИЙ МЕТОД ---
+                   this.handleErrorMessage(data.message);
+                   // --- КІНЕЦЬ ВИКЛИКУ ---
+                   break; // Error handling is separate
+               default: this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
           }
-      } else {
-           this.plugin.logger.debug(`[handleMessageAdded - TEST] Skipping rendering for role: ${data.message.role}`);
-           // Можна тимчасово не рендерити інші повідомлення, щоб сфокусуватися на асистенті
-           // Або залишити їх рендеринг, якщо він не заважає
-            /*
-            try {
-                // Оригінальна логіка рендерингу для інших ролей (user, system, error)
-                // ... (використовуйте відповідні renderers або handleErrorMessage)
-            } catch (e: any) {
-                 this.plugin.logger.error(`[handleMessageAdded - TEST] Error rendering other role ${data.message.role}:`, e);
-            }
-            */
-      }
-      // --- Кінець спрощеного рендерингу ---
 
-      this.plugin.logger.debug(`[handleMessageAdded - TEST] Main logic finished for Role: ${data.message.role}`);
+          // ... (решта коду рендерингу та додавання стандартних повідомлень) ...
+           if (renderer) {
+               const result = renderer.render();
+               messageGroupEl = result instanceof Promise ? await result : result;
+           }
+            if (rendererRan) {
+                this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? 'defined' : 'null'}. Role: ${data.message.role}`); // LOG D
+            }
+
+            // Append standard message element
+            if (rendererRan && messageGroupEl) {
+               if (this.chatContainer) { // Extra check
+                   this.chatContainer.appendChild(messageGroupEl);
+                   this.lastMessageElement = messageGroupEl;
+                   if (!messageGroupEl.isConnected) { /* ... log error ... */ }
+                   this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`); // LOG E
+
+                   // ... (Animation and scroll logic) ...
+               } else { /* ... log error ... */ }
+            } else if (rendererRan && !messageGroupEl) { /* ... log warning ... */ }
+
+
+      } catch (renderError: any) {
+           // Log errors from the rendering process itself
+           this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError); // LOG F
+           // --- ВИКЛИКАЄМО НОВИЙ МЕТОД ---
+           this.handleErrorMessage({ role: 'error', content: `Failed to display ${data.message.role} message. Error: ${renderError.message}`, timestamp: new Date() });
+           // --- КІНЕЦЬ ВИКЛИКУ ---
+      }
+      // --- End Inner Try/Catch ---
 
   } catch (outerError: any) {
-      // Ловимо помилки, що виникли до внутрішнього try або в базових операціях
-      this.plugin.logger.error("[handleMessageAdded - TEST] <<< CAUGHT OUTER ERROR >>>", outerError);
+       // Catch errors from the initial checks or other parts of the handler
+       this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
+       // Можливо, тут теж треба викликати handleErrorMessage
+        this.handleErrorMessage({ role: 'error', content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
   } finally {
-      // Резолвимо Promise, якщо він є, щоб розблокувати sendMessage
+      // Ensure promise is always resolved
       if (this.currentMessageAddedResolver) {
-          // Використовуємо WARN, щоб бачити, коли саме він резолвиться
-          this.plugin.logger.warn(`[handleMessageAdded - TEST] Resolving promise in finally. Role: ${data?.message?.role}.`);
-          try {
-               this.currentMessageAddedResolver();
-          } catch (resolveError) {
-               this.plugin.logger.error("[handleMessageAdded - TEST] Error calling resolver!", resolveError);
-          }
+          this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${data?.message?.role}. Might be premature if error occurred.`);
+          this.currentMessageAddedResolver();
           this.currentMessageAddedResolver = null;
-      } else {
-           this.plugin.logger.debug(`[handleMessageAdded - TEST] No resolver found in finally. Role: ${data?.message?.role}`);
       }
-      // Логуємо вихід з finally
-      this.plugin.logger.error(`[handleMessageAdded - TEST] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${timestamp}`);
+       this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`); // LOG H
   }
-} // Кінець тестового handleMessageAdded
+}
 
 
   private handleMessagesCleared = (chatId: string): void => {
@@ -1901,7 +1901,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
   };
 
   private handleScrollToBottomClick = (): void => {
-    this.plugin.logger.debug("Scroll to bottom button clicked.");
     if (this.chatContainer) {
       this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: "smooth" });
     }
@@ -1910,7 +1909,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
     this.userScrolledUp = false; // Оновлюємо стан
   };
 
-  // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
   // --- UI Update Methods ---
   private updateInputPlaceholder(roleName: string | null | undefined): void {
     if (this.inputEl) {
@@ -1927,50 +1925,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
   private autoResizeTextarea(): void {
     this.adjustTextareaHeight();
   }
-
-  // private adjustTextareaHeight = (): void => {
-  //   requestAnimationFrame(() => { // Кадр 1: Скидання
-  //     if (!this.inputEl) return;
-  //     const textarea = this.inputEl;
-  //     const originalMinHeightStyle = textarea.style.minHeight;
-
-  //     // Скидаємо height та inline min-height для коректного вимірювання
-  //     textarea.style.height = 'auto';
-  //     textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
-
-  //     requestAnimationFrame(() => { // Кадр 2: Вимірювання та встановлення
-  //       if (!this.inputEl) return;
-  //       const computedStyle = window.getComputedStyle(textarea);
-  //       // Читаємо базовий min-height (з CSS) та max-height
-  //       const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
-  //       const maxHeight = parseFloat(computedStyle.maxHeight);
-  //       // Вимірюємо scrollHeight ПІСЛЯ скидання
-  //       const scrollHeight = textarea.scrollHeight;
-
-  //       // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
-  //       let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
-
-  //       // Застосовуємо обмеження max-height
-  //       if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
-  //         targetMinHeight = maxHeight;
-  //         // Переконуємося, що overflow увімкнено при досягненні межі
-  //         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-  //           textarea.style.overflowY = 'auto';
-  //         }
-  //       } else {
-  //         // Вимикаємо overflow, якщо не досягли межі
-  //         if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
-  //           textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
-  //         }
-  //       }
-
-  //       // Встановлюємо обчислену min-height та height: auto
-  //       textarea.style.minHeight = `${targetMinHeight}px`;
-  //       textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
-  //     });
-  //   });
-  // }
-
   private adjustTextareaHeight = (): void => {
     requestAnimationFrame(() => {
       if (!this.inputEl) return;
@@ -1999,10 +1953,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       textarea.style.height = `${targetHeight}px`;
       textarea.style.overflowY = applyOverflow ? "auto" : "hidden";
       textarea.scrollTop = currentScrollTop; // Відновлюємо позицію скролу
-
-      this.plugin.logger.debug(
-        `[AdjustHeight] scrollH: ${scrollHeight}, baseMin: ${baseMinHeight}, targetH: ${targetHeight}, overflow: ${applyOverflow}`
-      );
     });
   };
 

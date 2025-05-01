@@ -173,6 +173,7 @@ export interface OllamaPluginSettings extends LoggerSettings {
   googleTranslationApiKey: string;
   summarizationModelName: string;
   fallbackSummarizationModelName: string;
+  fixBrokenEmojis: boolean; // Налаштування для виправлення емодзі
 }
 
 // --- Значення за замовчуванням ---
@@ -238,6 +239,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   logFilePath: "", // Logger сам підставить шлях до папки плагіна
   logFileMaxSizeMB: 5,
   fallbackSummarizationModelName: "http://localhost:11434",
+  fixBrokenEmojis: true,
 };
 
 // --- Клас вкладки налаштувань ---

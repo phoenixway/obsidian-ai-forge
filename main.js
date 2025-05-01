@@ -228,7 +228,9 @@ var CSS_CLASSES = {
   ERROR_TEXT: "error-message-text",
   // Додаємо відсутню константу
   SHOW_MORE_BUTTON: "show-more-button",
-  SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden"
+  SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden",
+  CODE_BLOCK_COPY_BUTTON: "code-block-copy-button",
+  CODE_BLOCK_LANGUAGE: "code-block-language"
 };
 
 // src/MessageRendererUtils.ts
@@ -252,7 +254,19 @@ function decodeHtmlEntities(text) {
   return ta.value;
 }
 function detectThinkingTags(content) {
-  return /<think>[\s\S]*?<\/think>/gi.test(content) ? { hasThinkingTags: true, format: "standard" } : { hasThinkingTags: false, format: "none" };
+  const thinkTagRegex = /<think>[\s\S]*?<\/think>/gi;
+  const hasThinkingTags = thinkTagRegex.test(content);
+  let processedContent = content;
+  if (hasThinkingTags) {
+    processedContent = content.replace(thinkTagRegex, "").trim();
+  }
+  const format = /<[a-z][\s\S]*>/i.test(processedContent) ? "html" : "text";
+  return {
+    hasThinkingTags,
+    contentWithoutTags: processedContent,
+    // Повертаємо оброблений (або оригінальний) контент
+    format
+  };
 }
 async function markdownToHtml(app, view, markdown) {
   var _a, _b;
@@ -365,30 +379,6 @@ function addCodeBlockEnhancements(view, contentEl) {
     });
   });
 }
-function fixBrokenTwemojiImages(containerElement) {
-  if (!containerElement || typeof containerElement.querySelectorAll !== "function") {
-    console.warn("[fixBrokenTwemojiImages] Invalid container element provided.");
-    return;
-  }
-  try {
-    const brokenImages = containerElement.querySelectorAll(
-      'img[src^="https://twemoji.maxcdn.com"]'
-    );
-    if (brokenImages.length > 0) {
-      brokenImages.forEach((img) => {
-        const originalEmoji = img.getAttribute("alt");
-        if (originalEmoji && img.parentNode) {
-          const textNode = document.createTextNode(originalEmoji);
-          img.parentNode.replaceChild(textNode, img);
-        } else {
-          img.remove();
-        }
-      });
-    }
-  } catch (error) {
-    console.error("[fixBrokenTwemojiImages] Error processing container:", error);
-  }
-}
 async function renderAssistantContent(app, view, plugin, containerEl, content) {
   try {
     const decodedContent = decodeHtmlEntities(content);
@@ -447,6 +437,80 @@ function renderAvatar(app, plugin, groupEl, isUser) {
     plugin.logger.warn(`Failed to render avatar (type: ${avatarType}, content: ${avatarContent}):`, e);
     avatarEl.textContent = isUser ? "U" : "AI";
     avatarEl.title = "Failed to load avatar";
+  }
+}
+function enhanceCodeBlocks(contentEl, view) {
+  if (!view || !view.plugin) {
+    console.error("enhanceCodeBlocks: Missing view or plugin context!");
+    return;
+  }
+  view.plugin.logger.debug("[enhanceCodeBlocks] Enhancing code blocks...");
+  try {
+    const codeBlocks = contentEl.querySelectorAll("pre > code");
+    codeBlocks.forEach((codeElement) => {
+      const preElement = codeElement.parentElement;
+      if (!preElement)
+        return;
+      if (preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON}`)) {
+        return;
+      }
+      const copyButton = preElement.createEl("button", {
+        cls: `${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON} clickable-icon`,
+        // Перевірте імена констант
+        attr: { "aria-label": "Copy code", title: "Copy code" }
+      });
+      (0, import_obsidian4.setIcon)(copyButton, "copy");
+      view.registerDomEvent(copyButton, "click", (event) => {
+        event.stopPropagation();
+        const codeToCopy = codeElement.textContent || "";
+        navigator.clipboard.writeText(codeToCopy).then(() => {
+          (0, import_obsidian4.setIcon)(copyButton, "check");
+          setTimeout(() => (0, import_obsidian4.setIcon)(copyButton, "copy"), 2e3);
+        }).catch((err) => {
+          view.plugin.logger.error("Failed to copy code block:", err);
+          new import_obsidian4.Notice("Failed to copy code to clipboard.");
+        });
+      });
+      const language = codeElement.className.replace("language-", "");
+      if (language && !preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_LANGUAGE}`)) {
+        preElement.createDiv({
+          cls: CSS_CLASSES.CODE_BLOCK_LANGUAGE,
+          // Перевірте ім'я константи
+          text: language
+        });
+      }
+      preElement.style.position = "relative";
+    });
+    view.plugin.logger.debug("[enhanceCodeBlocks] Finished enhancing code blocks.");
+  } catch (error) {
+    view.plugin.logger.error("[enhanceCodeBlocks] Error processing code blocks:", error);
+  }
+}
+function fixBrokenTwemojiImages(contentEl) {
+  console.debug("[fixBrokenTwemojiImages] Checking for broken Twemoji...");
+  try {
+    contentEl.querySelectorAll('img.emoji[alt][src*="twemoji.maxcdn.com"]').forEach((img) => {
+      var _a;
+      const alt = img.getAttribute("alt");
+      if (alt && !img.getAttribute("data-fixed")) {
+        const emojiHex = (_a = alt.codePointAt(0)) == null ? void 0 : _a.toString(16);
+        if (emojiHex) {
+          img.src = `https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/${emojiHex}.svg`;
+          img.setAttribute("data-fixed", "true");
+          img.onerror = () => {
+            console.warn(`Failed to load emoji from jsdelivr: ${alt}`);
+            if (img.parentNode) {
+              img.replaceWith(document.createTextNode(alt));
+            }
+          };
+        } else if (img.parentNode) {
+          img.replaceWith(document.createTextNode(alt));
+        }
+      }
+    });
+    console.debug("[fixBrokenTwemojiImages] Finished checking Twemoji.");
+  } catch (error) {
+    console.error("[fixBrokenTwemojiImages] Error fixing Twemoji:", error);
   }
 }
 
@@ -615,26 +679,91 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
     }
   }
-  /** Рендерить повну групу повідомлення */
   async render() {
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Starting render for ts: ${this.message.timestamp.getTime()}`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASS_OLLAMA_GROUP]);
     this.addAvatar(messageGroup, false);
     const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
     messageWrapper.style.order = "2";
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASS_OLLAMA_MESSAGE]);
     contentEl.addClass(CSS_CLASS_CONTENT_COLLAPSIBLE);
-    await renderAssistantContent(
-      this.app,
-      this.view,
-      this.plugin,
-      contentEl,
-      this.message.content
-      // Передаємо повний контент
-    );
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling renderAssistantContent...`);
+    try {
+      await this.renderAssistantContentInternal(contentEl, this.message.content);
+      this.plugin.logger.debug(`[AssistantMessageRenderer] renderAssistantContent finished.`);
+    } catch (error) {
+      this.plugin.logger.error(`[AssistantMessageRenderer] Error during renderAssistantContentInternal:`, error);
+      contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
+      throw error;
+    }
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Adding action buttons...`);
     this.addAssistantActionButtons(messageWrapper, contentEl);
     this.addTimestamp(messageEl);
-    setTimeout(() => this.view.checkMessageForCollapsing(messageEl), 50);
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Scheduling checkMessageForCollapsing...`);
+    setTimeout(() => {
+      if (messageEl.isConnected) {
+        this.view.checkMessageForCollapsing(messageEl);
+      } else {
+        this.plugin.logger.warn(`[AssistantMessageRenderer] messageEl not connected when trying to check collapsing.`);
+      }
+    }, 50);
+    this.plugin.logger.debug(`[AssistantMessageRenderer] Finished render for ts: ${this.message.timestamp.getTime()}`);
     return messageGroup;
+  }
+  // Переносимо логіку з RendererUtils сюди, щоб додати логування
+  async renderAssistantContentInternal(contentEl, markdownText) {
+    var _a, _b;
+    this.plugin.logger.debug("[renderAssistantContentInternal] Entering.");
+    contentEl.empty();
+    let processedMarkdown = markdownText;
+    try {
+      const decoded = decodeHtmlEntities(markdownText);
+      const thinkDetection = detectThinkingTags(decoded);
+      if (thinkDetection.hasThinkingTags) {
+        this.plugin.logger.debug("[renderAssistantContentInternal] Found <think> tags, removing them.");
+        processedMarkdown = thinkDetection.contentWithoutTags.trim();
+      } else {
+        processedMarkdown = decoded;
+      }
+      this.plugin.logger.debug("[renderAssistantContentInternal] HTML entities decoded and <think> tags processed.");
+    } catch (e) {
+      this.plugin.logger.error("[renderAssistantContentInternal] Error during decoding/tag removal:", e);
+      processedMarkdown = markdownText;
+    }
+    this.plugin.logger.debug("[renderAssistantContentInternal] Starting MarkdownRenderer.render...");
+    try {
+      await import_obsidian7.MarkdownRenderer.render(
+        this.app,
+        processedMarkdown,
+        contentEl,
+        (_b = (_a = this.plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "",
+        // Шлях для рендерингу відносних посилань
+        this.view
+        // Передаємо контекст View
+      );
+      this.plugin.logger.debug("[renderAssistantContentInternal] MarkdownRenderer.render finished.");
+    } catch (error) {
+      this.plugin.logger.error("[renderAssistantContentInternal] MarkdownRenderer.render FAILED:", error);
+      contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
+      throw error;
+    }
+    this.plugin.logger.debug("[renderAssistantContentInternal] Processing code blocks...");
+    try {
+      enhanceCodeBlocks(contentEl, this.view);
+      this.plugin.logger.debug("[renderAssistantContentInternal] Code blocks processed.");
+    } catch (error) {
+      this.plugin.logger.error("[renderAssistantContentInternal] Error processing code blocks:", error);
+    }
+    if (this.plugin.settings.fixBrokenEmojis) {
+      this.plugin.logger.debug("[renderAssistantContentInternal] Fixing Twemoji images...");
+      try {
+        fixBrokenTwemojiImages(contentEl);
+        this.plugin.logger.debug("[renderAssistantContentInternal] Twemoji fixed.");
+      } catch (error) {
+        this.plugin.logger.error("[renderAssistantContentInternal] Error fixing Twemoji:", error);
+      }
+    }
+    this.plugin.logger.debug("[renderAssistantContentInternal] Exiting.");
   }
   /** Додає кнопки дій (Copy, Translate, Summarize, Delete) */
   addAssistantActionButtons(messageWrapper, contentEl) {
@@ -652,6 +781,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     if (this.plugin.settings.enableTranslation && this.plugin.settings.googleTranslationApiKey && finalContent.trim()) {
       const translateBtn = buttonsWrapper.createEl("button", {
         cls: CSS_CLASS_TRANSLATE_BUTTON,
+        // Перевірте наявність у constants.ts
         attr: { "aria-label": "Translate", title: "Translate" }
       });
       (0, import_obsidian7.setIcon)(translateBtn, "languages");
@@ -660,7 +790,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         if (contentEl.isConnected) {
           this.view.handleTranslateClick(finalContent, contentEl, translateBtn);
         } else {
-          this.plugin.logger.warn("Translate button clicked, but contentEl is not connected to DOM.");
           new import_obsidian7.Notice("Cannot translate: message content element not found.");
         }
       });
@@ -668,6 +797,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     if (this.plugin.settings.summarizationModelName && finalContent.trim()) {
       const summarizeBtn = buttonsWrapper.createEl("button", {
         cls: CSS_CLASS_SUMMARIZE_BUTTON,
+        // Перевірте наявність у constants.ts
         attr: { title: "Summarize message" }
       });
       (0, import_obsidian7.setIcon)(summarizeBtn, "scroll-text");
@@ -1610,7 +1740,6 @@ This action cannot be undone.`,
         this.renderRoleList();
       }
     };
-    // Кінець тестового handleMessageAdded
     this.handleMessagesCleared = (chatId) => {
       var _a;
       if (chatId === ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
@@ -1666,7 +1795,6 @@ This action cannot be undone.`,
     };
     this.handleScrollToBottomClick = () => {
       var _a, _b;
-      this.plugin.logger.debug("Scroll to bottom button clicked.");
       if (this.chatContainer) {
         this.chatContainer.scrollTo({ top: this.chatContainer.scrollHeight, behavior: "smooth" });
       }
@@ -1674,43 +1802,6 @@ This action cannot be undone.`,
       (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
       this.userScrolledUp = false;
     };
-    // private adjustTextareaHeight = (): void => {
-    //   requestAnimationFrame(() => { // Кадр 1: Скидання
-    //     if (!this.inputEl) return;
-    //     const textarea = this.inputEl;
-    //     const originalMinHeightStyle = textarea.style.minHeight;
-    //     // Скидаємо height та inline min-height для коректного вимірювання
-    //     textarea.style.height = 'auto';
-    //     textarea.style.minHeight = '0'; // Повністю скидаємо inline min-height
-    //     requestAnimationFrame(() => { // Кадр 2: Вимірювання та встановлення
-    //       if (!this.inputEl) return;
-    //       const computedStyle = window.getComputedStyle(textarea);
-    //       // Читаємо базовий min-height (з CSS) та max-height
-    //       const baseMinHeight = parseFloat(computedStyle.minHeight) || 40;
-    //       const maxHeight = parseFloat(computedStyle.maxHeight);
-    //       // Вимірюємо scrollHeight ПІСЛЯ скидання
-    //       const scrollHeight = textarea.scrollHeight;
-    //       // Обчислюємо цільову min-height, використовуючи базовий min-height з CSS
-    //       let targetMinHeight = Math.max(baseMinHeight, scrollHeight);
-    //       // Застосовуємо обмеження max-height
-    //       if (!isNaN(maxHeight) && targetMinHeight > maxHeight) {
-    //         targetMinHeight = maxHeight;
-    //         // Переконуємося, що overflow увімкнено при досягненні межі
-    //         if (textarea.style.overflowY !== 'auto' && textarea.style.overflowY !== 'scroll') {
-    //           textarea.style.overflowY = 'auto';
-    //         }
-    //       } else {
-    //         // Вимикаємо overflow, якщо не досягли межі
-    //         if (textarea.style.overflowY === 'auto' || textarea.style.overflowY === 'scroll') {
-    //           textarea.style.overflowY = 'hidden'; // Або '' для повернення до CSS за замовчуванням
-    //         }
-    //       }
-    //       // Встановлюємо обчислену min-height та height: auto
-    //       textarea.style.minHeight = `${targetMinHeight}px`;
-    //       textarea.style.height = 'auto'; // Дозволяємо висоті слідувати за min-height
-    //     });
-    //   });
-    // }
     this.adjustTextareaHeight = () => {
       requestAnimationFrame(() => {
         if (!this.inputEl)
@@ -1731,9 +1822,6 @@ This action cannot be undone.`,
         textarea.style.height = `${targetHeight}px`;
         textarea.style.overflowY = applyOverflow ? "auto" : "hidden";
         textarea.scrollTop = currentScrollTop;
-        this.plugin.logger.debug(
-          `[AdjustHeight] scrollH: ${scrollHeight}, baseMin: ${baseMinHeight}, targetH: ${targetHeight}, overflow: ${applyOverflow}`
-        );
       });
     };
     this.handleChatListUpdated = () => {
@@ -2562,70 +2650,94 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
-  // OllamaView.ts
-  // ЗАМІНІТЬ ваш поточний handleMessageAdded на ЦЮ ВЕРСІЮ для тестування
+  // --- Переконайтесь, що handleMessageAdded виглядає так: ---
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    const isAssistant = ((_a = data == null ? void 0 : data.message) == null ? void 0 : _a.role) === "assistant";
-    const timestamp = (_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime();
-    this.plugin.logger.error(`[handleMessageAdded - TEST] <<< ENTERED >>> Role: ${(_d = data == null ? void 0 : data.message) == null ? void 0 : _d.role}, Ts: ${timestamp}`);
+    var _a, _b, _c, _d, _e;
     try {
-      if (!data || !data.message || !this.chatContainer) {
-        this.plugin.logger.error("[handleMessageAdded - TEST] Invalid data or chatContainer missing.");
-        return;
-      }
-      if (data.chatId !== ((_e = this.plugin.chatManager) == null ? void 0 : _e.getActiveChatId())) {
-        this.plugin.logger.debug("[handleMessageAdded - TEST] Ignoring message for different chat.");
-        return;
-      }
-      this.plugin.logger.debug(`[handleMessageAdded - TEST] Passed initial checks. Role: ${data.message.role}`);
-      this.currentMessages.push(data.message);
-      this.hideEmptyState();
-      if (isAssistant) {
-        this.plugin.logger.warn(`[handleMessageAdded - TEST] >>> Handling ASSISTANT message. Appending simple div.`);
-        let simpleDiv = null;
-        try {
-          simpleDiv = this.chatContainer.createDiv({
-            text: `ASSISTANT TEST - TS: ${timestamp} - Content: ${data.message.content.substring(0, 50)}...`,
-            cls: "assistant-test-message"
-            // Додамо клас для легкого пошуку в інспекторі
-          });
-          if (!simpleDiv || !simpleDiv.isConnected) {
-            this.plugin.logger.error("[handleMessageAdded - TEST] Simple div NOT connected after createDiv!");
-          } else {
-            this.plugin.logger.warn("[handleMessageAdded - TEST] Simple div appended successfully.");
-            this.lastMessageElement = simpleDiv;
-            this.guaranteedScrollToBottom(100, true);
-          }
-        } catch (e) {
-          this.plugin.logger.error("[handleMessageAdded - TEST] Error creating/appending simple div:", e);
-          try {
-            this.chatContainer.appendText(`[ERROR CREATING TEST DIV: ${e.message}]`);
-          } catch (e2) {
-          }
+      if (!data || !data.message) {
+        this.plugin.logger.error("[handleMessageAdded] <<< CRITICAL ERROR >>> Received invalid data object.", data);
+        if (this.currentMessageAddedResolver) {
         }
-      } else {
-        this.plugin.logger.debug(`[handleMessageAdded - TEST] Skipping rendering for role: ${data.message.role}`);
+        return;
       }
-      this.plugin.logger.debug(`[handleMessageAdded - TEST] Main logic finished for Role: ${data.message.role}`);
+      this.plugin.logger.info(`[handleMessageAdded] <<< ENTERED >>> Role: ${data.message.role}, Ts: ${data.message.timestamp.getTime()}`);
+      if (!this || !this.plugin || !this.chatContainer || !this.plugin.chatManager) {
+        return;
+      }
+      if (data.chatId !== this.plugin.chatManager.getActiveChatId()) {
+        return;
+      }
+      if (this.currentMessages.some((m) => m.timestamp.getTime() === data.message.timestamp.getTime())) {
+        return;
+      }
+      this.plugin.logger.debug(`[handleMessageAdded] Passed initial checks. Role: ${data.message.role}`);
+      this.currentMessages.push(data.message);
+      const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, data.message.timestamp);
+      if (isNewDay) {
+        this.renderDateSeparator(data.message.timestamp);
+        this.lastRenderedMessageDate = data.message.timestamp;
+      } else if (!this.lastRenderedMessageDate && ((_a = this.chatContainer) == null ? void 0 : _a.children.length) === 0) {
+        this.lastRenderedMessageDate = data.message.timestamp;
+      }
+      this.hideEmptyState();
+      let messageGroupEl = null;
+      let rendererRan = false;
+      this.plugin.logger.debug(`[handleMessageAdded] Entering TRY block for rendering. Role: ${data.message.role}`);
+      try {
+        let renderer = null;
+        switch (data.message.role) {
+          case "user":
+            renderer = new UserMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
+            break;
+          case "assistant":
+            renderer = new AssistantMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
+            break;
+          case "system":
+            renderer = new SystemMessageRenderer(this.app, this.plugin, data.message, this);
+            rendererRan = true;
+            break;
+          case "error":
+            this.handleErrorMessage(data.message);
+            break;
+          default:
+            this.plugin.logger.warn(`[handleMessageAdded] Unknown message role: ${data.message.role}`);
+        }
+        if (renderer) {
+          const result = renderer.render();
+          messageGroupEl = result instanceof Promise ? await result : result;
+        }
+        if (rendererRan) {
+          this.plugin.logger.debug(`[handleMessageAdded] Standard renderer finished. messageGroupEl is ${messageGroupEl ? "defined" : "null"}. Role: ${data.message.role}`);
+        }
+        if (rendererRan && messageGroupEl) {
+          if (this.chatContainer) {
+            this.chatContainer.appendChild(messageGroupEl);
+            this.lastMessageElement = messageGroupEl;
+            if (!messageGroupEl.isConnected) {
+            }
+            this.plugin.logger.debug(`[handleMessageAdded] Appended standard message. Role: ${data.message.role}`);
+          } else {
+          }
+        } else if (rendererRan && !messageGroupEl) {
+        }
+      } catch (renderError) {
+        this.plugin.logger.error(`[handleMessageAdded] <<< CAUGHT RENDER ERROR >>> Role: ${data.message.role}`, renderError);
+        this.handleErrorMessage({ role: "error", content: `Failed to display ${data.message.role} message. Error: ${renderError.message}`, timestamp: new Date() });
+      }
     } catch (outerError) {
-      this.plugin.logger.error("[handleMessageAdded - TEST] <<< CAUGHT OUTER ERROR >>>", outerError);
+      this.plugin.logger.error("[handleMessageAdded] <<< CAUGHT OUTER ERROR >>>", outerError);
+      this.handleErrorMessage({ role: "error", content: `Internal error in handleMessageAdded: ${outerError.message}`, timestamp: new Date() });
     } finally {
       if (this.currentMessageAddedResolver) {
-        this.plugin.logger.warn(`[handleMessageAdded - TEST] Resolving promise in finally. Role: ${(_f = data == null ? void 0 : data.message) == null ? void 0 : _f.role}.`);
-        try {
-          this.currentMessageAddedResolver();
-        } catch (resolveError) {
-          this.plugin.logger.error("[handleMessageAdded - TEST] Error calling resolver!", resolveError);
-        }
+        this.plugin.logger.warn(`[handleMessageAdded] Resolving promise in finally block. Role: ${(_b = data == null ? void 0 : data.message) == null ? void 0 : _b.role}. Might be premature if error occurred.`);
+        this.currentMessageAddedResolver();
         this.currentMessageAddedResolver = null;
-      } else {
-        this.plugin.logger.debug(`[handleMessageAdded - TEST] No resolver found in finally. Role: ${(_g = data == null ? void 0 : data.message) == null ? void 0 : _g.role}`);
       }
-      this.plugin.logger.error(`[handleMessageAdded - TEST] <<< EXITED (finally) >>> Role: ${(_h = data == null ? void 0 : data.message) == null ? void 0 : _h.role}, Ts: ${timestamp}`);
+      this.plugin.logger.info(`[handleMessageAdded] <<< EXITED (finally) >>> Role: ${(_c = data == null ? void 0 : data.message) == null ? void 0 : _c.role}, Ts: ${(_e = (_d = data == null ? void 0 : data.message) == null ? void 0 : _d.timestamp) == null ? void 0 : _e.getTime()}`);
     }
   }
-  // --- ДОДАНО: Обробник кліку на кнопку "Прокрутити вниз" ---
   // --- UI Update Methods ---
   updateInputPlaceholder(roleName) {
     if (this.inputEl) {
@@ -5167,7 +5279,8 @@ var DEFAULT_SETTINGS = {
   logFilePath: "",
   // Logger сам підставить шлях до папки плагіна
   logFileMaxSizeMB: 5,
-  fallbackSummarizationModelName: "http://localhost:11434"
+  fallbackSummarizationModelName: "http://localhost:11434",
+  fixBrokenEmojis: true
 };
 var OllamaSettingTab = class extends import_obsidian12.PluginSettingTab {
   constructor(app, plugin) {

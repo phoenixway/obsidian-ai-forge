@@ -25,4 +25,7 @@ export const CSS_CLASSES = {
     ERROR_TEXT: "error-message-text", // Додаємо відсутню константу
     SHOW_MORE_BUTTON: "show-more-button",
     SUBMENU_CONTENT_HIDDEN: "submenu-content-hidden",
+    CODE_BLOCK_COPY_BUTTON: "code-block-copy-button",
+    CODE_BLOCK_LANGUAGE: "code-block-language",
+
 };

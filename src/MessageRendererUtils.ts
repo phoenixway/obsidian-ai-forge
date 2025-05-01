@@ -17,6 +17,12 @@ const CSS_CLASS_AVATAR = "message-group-avatar";
 const CSS_CLASS_AVATAR_AI = "ai-avatar";
 const CSS_CLASS_AVATAR_USER = "user-avatar";
 
+export interface ThinkDetectionResult {
+    hasThinkingTags: boolean;
+    contentWithoutTags: string; // Додано: Контент БЕЗ тегів <think>
+    format: string;
+}
+
 /** Decodes HTML entities in a string */
 export function decodeHtmlEntities(text: string): string {
 	if (typeof document === "undefined") {
@@ -33,14 +39,24 @@ export function decodeHtmlEntities(text: string): string {
 	return ta.value;
 }
 
-/** Detects if <think> tags are present */
-export function detectThinkingTags(content: string): {
-	hasThinkingTags: boolean;
-	format: string;
-} {
-	return /<think>[\s\S]*?<\/think>/gi.test(content)
-		? { hasThinkingTags: true, format: "standard" }
-		: { hasThinkingTags: false, format: "none" };
+export function detectThinkingTags(content: string): ThinkDetectionResult {
+    const thinkTagRegex = /<think>[\s\S]*?<\/think>/gi; // g - global, i - case-insensitive
+    const hasThinkingTags = thinkTagRegex.test(content);
+    let processedContent = content; // За замовчуванням - оригінальний контент
+
+    if (hasThinkingTags) {
+        // Замінюємо всі входження тегу та його вмісту на порожній рядок і обрізаємо пробіли
+        processedContent = content.replace(thinkTagRegex, '').trim();
+    }
+
+    // Визначаємо формат (спрощено)
+    const format = /<[a-z][\s\S]*>/i.test(processedContent) ? 'html' : 'text';
+
+    return {
+        hasThinkingTags,
+        contentWithoutTags: processedContent, // Повертаємо оброблений (або оригінальний) контент
+        format
+    };
 }
 
 /** Renders Markdown to HTML */
@@ -190,31 +206,7 @@ export function addCodeBlockEnhancements(
 	});
 }
 
-/** Replaces broken Twemoji images with their alt text (emoji character) */
-export function fixBrokenTwemojiImages(containerElement: HTMLElement): void {
-	if (!containerElement || typeof containerElement.querySelectorAll !== "function") {
-		console.warn("[fixBrokenTwemojiImages] Invalid container element provided.");
-		return;
-	}
-	try {
-		const brokenImages = containerElement.querySelectorAll<HTMLImageElement>(
-			'img[src^="https://twemoji.maxcdn.com"]',
-		);
-		if (brokenImages.length > 0) {
-			brokenImages.forEach(img => {
-				const originalEmoji = img.getAttribute("alt");
-				if (originalEmoji && img.parentNode) {
-					const textNode = document.createTextNode(originalEmoji);
-					img.parentNode.replaceChild(textNode, img);
-				} else {
-					img.remove();
-				}
-			});
-		}
-	} catch (error) {
-		console.error("[fixBrokenTwemojiImages] Error processing container:", error);
-	}
-}
+
 
 /** Renders assistant message content (handling Markdown, thinking tags, etc.) */
 export async function renderAssistantContent(
@@ -304,4 +296,97 @@ export function renderAvatar(
 	  avatarEl.textContent = isUser ? "U" : "AI"; // Fallback
 	  avatarEl.title = "Failed to load avatar";
 	}
+
+
+	
   }
+
+  export function enhanceCodeBlocks(contentEl: HTMLElement, view: OllamaView): void {
+    // Додамо перевірку на view та view.plugin
+    if (!view || !view.plugin) {
+        console.error("enhanceCodeBlocks: Missing view or plugin context!");
+        return;
+    }
+    view.plugin.logger.debug("[enhanceCodeBlocks] Enhancing code blocks..."); // ЛОГ ВХОДУ
+    try {
+        const codeBlocks = contentEl.querySelectorAll<HTMLElement>("pre > code");
+        codeBlocks.forEach((codeElement) => {
+            const preElement = codeElement.parentElement as HTMLPreElement;
+            if (!preElement) return;
+
+             // Уникаємо повторного додавання кнопки
+             if (preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON}`)) { // Перевірте ім'я константи
+                return;
+             }
+
+            // --- Додавання кнопки копіювання ---
+            const copyButton = preElement.createEl("button", {
+                 cls: `${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON} clickable-icon`, // Перевірте імена констант
+                 attr: { "aria-label": "Copy code", title: "Copy code" },
+             });
+            setIcon(copyButton, "copy");
+
+            // Додаємо обробник через view.registerDomEvent для коректного очищення
+            view.registerDomEvent(copyButton, "click", (event) => {
+                 event.stopPropagation();
+                 const codeToCopy = codeElement.textContent || "";
+                 navigator.clipboard.writeText(codeToCopy).then(() => {
+                     setIcon(copyButton, "check");
+                     setTimeout(() => setIcon(copyButton, "copy"), 2000);
+                 }).catch(err => {
+                     view.plugin.logger.error("Failed to copy code block:", err);
+                     new Notice("Failed to copy code to clipboard.");
+                 });
+             });
+
+            // --- Додавання назви мови ---
+            const language = codeElement.className.replace("language-", "");
+            if (language && !preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_LANGUAGE}`)) { // Перевірте ім'я константи
+                preElement.createDiv({
+                    cls: CSS_CLASSES.CODE_BLOCK_LANGUAGE, // Перевірте ім'я константи
+                    text: language,
+                });
+            }
+
+             // Стилізація батьківського pre елемента для позиціонування
+             preElement.style.position = "relative"; // Потрібно для абсолютно позиціонованих дочірніх елементів
+        });
+        view.plugin.logger.debug("[enhanceCodeBlocks] Finished enhancing code blocks."); // ЛОГ ВИХОДУ
+    } catch (error) {
+         // Логуємо помилку, але не зупиняємо решту рендерингу
+         view.plugin.logger.error("[enhanceCodeBlocks] Error processing code blocks:", error);
+    }
+}
+
+// Додайте аналогічне логування та try/catch до fixBrokenTwemojiImages, якщо вона використовується
+export function fixBrokenTwemojiImages(contentEl: HTMLElement): void {
+     console.debug("[fixBrokenTwemojiImages] Checking for broken Twemoji...");
+     try {
+        contentEl.querySelectorAll('img.emoji[alt][src*="twemoji.maxcdn.com"]').forEach((img: HTMLImageElement) => {
+            const alt = img.getAttribute('alt');
+            if (alt && !img.getAttribute('data-fixed')) { // Перевіряємо, чи ще не виправлено
+                // Простий варіант: замінити на текст
+                // img.replaceWith(document.createTextNode(alt));
+
+                // Складніший варіант: спробувати завантажити з іншого CDN (наприклад, jsdelivr)
+                 const emojiHex = alt.codePointAt(0)?.toString(16);
+                 if (emojiHex) {
+                     img.src = `https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/${emojiHex}.svg`;
+                     img.setAttribute('data-fixed', 'true'); // Позначаємо як виправлене
+                     img.onerror = () => { // Якщо і це не спрацювало, замінюємо на текст
+                          console.warn(`Failed to load emoji from jsdelivr: ${alt}`);
+                         if (img.parentNode) { // Перевірка перед заміною
+                             img.replaceWith(document.createTextNode(alt));
+                         }
+                     };
+                 } else if (img.parentNode) {
+                    // Якщо не вдалося отримати hex, просто замінюємо на текст
+                    img.replaceWith(document.createTextNode(alt));
+                 }
+            }
+        });
+        console.debug("[fixBrokenTwemojiImages] Finished checking Twemoji.");
+     } catch (error) {
+          console.error("[fixBrokenTwemojiImages] Error fixing Twemoji:", error);
+     }
+}
