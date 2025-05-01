@@ -1009,7 +1009,30 @@ export class OllamaSettingTab extends PluginSettingTab {
             })
         );
     }
-
+    new Setting(containerEl)
+    .setName("Enable Translation Feature")
+    .setDesc("Show translate buttons.")
+    .addToggle(toggle =>
+      toggle.setValue(this.plugin.settings.enableTranslation).onChange(async value => {
+        this.plugin.settings.enableTranslation = value;
+        await this.plugin.saveSettings();
+        this.display(); // Перемалювати
+      })
+    );
+  if (this.plugin.settings.enableTranslation) {
+    new Setting(containerEl)
+      .setName("Target Translation Language")
+      .setDesc("Translate messages/input into this language.")
+      .addDropdown(dropdown => {
+        for (const code in LANGUAGES) {
+          dropdown.addOption(code, LANGUAGES[code]);
+        }
+        dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async value => {
+          this.plugin.settings.translationTargetLanguage = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    
     // --- Умовні налаштування для Ollama ---
     if (this.plugin.settings.translationProvider === 'ollama') {
         let ollamaTranslationModelDropdown: DropdownComponent | null = null;
@@ -1063,9 +1086,9 @@ export class OllamaSettingTab extends PluginSettingTab {
             });
             // TODO: Можливо, додати поле для "Source Language" для Ollama,
             // або реалізувати автодетектування (що складніше). Поки що припускаємо
-            // переклад з мови інтерфейсу або англійської.
+                  // переклад з мови інтерфейсу або англійської.
 
-    }
+    }}
 
     new Setting(containerEl)
       .setName("Google API Key (Speech-to-Text)")
@@ -1095,42 +1118,7 @@ export class OllamaSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
-    new Setting(containerEl)
-      .setName("Enable Translation Feature")
-      .setDesc("Show translate buttons (uses Google Translate API).")
-      .addToggle(toggle =>
-        toggle.setValue(this.plugin.settings.enableTranslation).onChange(async value => {
-          this.plugin.settings.enableTranslation = value;
-          await this.plugin.saveSettings();
-          this.display(); // Перемалювати
-        })
-      );
-    if (this.plugin.settings.enableTranslation) {
-      new Setting(containerEl)
-        .setName("Target Translation Language")
-        .setDesc("Translate messages/input into this language.")
-        .addDropdown(dropdown => {
-          for (const code in LANGUAGES) {
-            dropdown.addOption(code, LANGUAGES[code]);
-          }
-          dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async value => {
-            this.plugin.settings.translationTargetLanguage = value;
-            await this.plugin.saveSettings();
-          });
-        });
-      new Setting(containerEl)
-        .setName("Google Cloud Translation API Key")
-        .setDesc("Required for translation feature. Keep confidential.")
-        .addText(text =>
-          text
-            .setPlaceholder("Enter API Key")
-            .setValue(this.plugin.settings.googleTranslationApiKey)
-            .onChange(async value => {
-              this.plugin.settings.googleTranslationApiKey = value.trim();
-              await this.plugin.saveSettings();
-            })
-        );
-    }
+    
 
     // --- Секція: Logging ---
     this.createSectionHeader("Logging");
