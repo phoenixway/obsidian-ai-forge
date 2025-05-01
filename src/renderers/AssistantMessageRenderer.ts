@@ -61,10 +61,12 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
 		return messageGroup;
 	}
 
-    	/**
+    
+	/**
 	 * Статичний метод для рендерингу контенту асистента (Markdown, код, емодзі).
+	 * Тепер обережніше видаляє індикатор завантаження.
      * @param contentEl - DOM-елемент для рендерингу.
-     * @param markdownText - Текст у форматі Markdown.
+     * @param markdownText - Текст у форматі Markdown для рендерингу.
      * @param app - Екземпляр App.
      * @param plugin - Екземпляр OllamaPlugin.
      * @param view - Екземпляр OllamaView.
@@ -73,10 +75,28 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
         contentEl: HTMLElement, markdownText: string, app: App, plugin: OllamaPlugin, view: OllamaView
     ): Promise<void> {
 		plugin.logger.debug("[renderAssistantContent STAT] Entering.");
-		contentEl.empty();
-		let processedMarkdown = markdownText;
 
-		// 1. Decode/Remove Tags
+        // --- ЗМІНЕНО ЛОГІКУ ОЧИЩЕННЯ ---
+        const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+        // Перевіряємо, чи є новий текст і чи існують крапки
+        if (markdownText.trim().length > 0 && dotsEl) {
+             plugin.logger.debug("[renderAssistantContent STAT] First chunk received, removing thinking dots.");
+             dotsEl.remove(); // Видаляємо тільки крапки
+        } else if (!dotsEl && contentEl.hasChildNodes()) {
+             // Якщо крапок вже немає (наступні чанки), але є інший контент, очищуємо повністю
+             plugin.logger.debug("[renderAssistantContent STAT] Subsequent chunk, clearing contentEl.");
+             contentEl.empty();
+        } else if (!dotsEl && !contentEl.hasChildNodes()) {
+            // Якщо крапок немає і контенту немає (перший виклик, але крапки зникли з іншої причини?), нічого не робимо з очищенням
+            plugin.logger.debug("[renderAssistantContent STAT] No dots and no content, proceeding.");
+        } else {
+            // Якщо текст порожній (порожній чанк?), не чіпаємо крапки
+            plugin.logger.debug("[renderAssistantContent STAT] Empty markdown chunk received, dots untouched.");
+        }
+        // --- КІНЕЦЬ ЗМІНИ ---
+
+		let processedMarkdown = markdownText;
+		// 1. Decode/Remove Tags (залишаємо)
 		try {
 			const decoded = RendererUtils.decodeHtmlEntities(markdownText);
 			const thinkDetection = RendererUtils.detectThinkingTags(decoded);
@@ -84,40 +104,41 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
 			if (thinkDetection.hasThinkingTags) { plugin.logger.debug("[renderAssistantContent STAT] Removed <think> tags."); }
 		} catch (e) { plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e); }
 
+        // --- Додаємо перевірку, чи є що рендерити після обробки ---
+        if (processedMarkdown.trim().length === 0) {
+            plugin.logger.debug("[renderAssistantContent STAT] No content to render after processing.");
+            return; // Не викликаємо MarkdownRenderer для порожнього рядка
+        }
+        // --- Кінець перевірки ---
+
 		// 2. Render Markdown
 		plugin.logger.debug("[renderAssistantContent STAT] Starting MarkdownRenderer.render...");
 		try {
-			await MarkdownRenderer.render(
-				app, // Використовуємо переданий app
-				processedMarkdown,
-				contentEl,
-				plugin.app.vault.getRoot()?.path ?? "", // Використовуємо переданий plugin
-				view // Використовуємо переданий view
-			);
+            // Рендеримо оброблений markdown. Оскільки ми не робили empty() для першого чанка,
+            // а видалили тільки dotsEl, MarkdownRenderer додасть новий контент.
+            // Для наступних чанків ми робимо empty(), тому MarkdownRenderer перезапише все.
+			await MarkdownRenderer.render( app, processedMarkdown, contentEl, plugin.app.vault.getRoot()?.path ?? "", view );
 			 plugin.logger.debug("[renderAssistantContent STAT] MarkdownRenderer.render finished successfully.");
 		} catch (error) {
 			 plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
 			 contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
-			 throw error; // Кидаємо помилку далі
+			 throw error;
 		}
 
-		// 3. Enhance Code Blocks
+		// 3. Enhance Code Blocks (залишаємо)
 		plugin.logger.debug("[renderAssistantContent STAT] Processing code blocks...");
-		try {
-			RendererUtils.enhanceCodeBlocks(contentEl, view); // Передаємо view
-		} catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error processing code blocks:", error); }
+		try { RendererUtils.enhanceCodeBlocks(contentEl, view); }
+        catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error processing code blocks:", error); }
 
-		// 4. Fix Twemoji
-		if (plugin.settings.fixBrokenEmojis) { // Використовуємо переданий plugin
-			plugin.logger.debug("[renderAssistantContent STAT] Fixing Twemoji images...");
-			try {
-				RendererUtils.fixBrokenTwemojiImages(contentEl);
-			} catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error fixing Twemoji:", error); }
+		// 4. Fix Twemoji (залишаємо)
+		if (plugin.settings.fixBrokenEmojis) {
+            plugin.logger.debug("[renderAssistantContent STAT] Fixing Twemoji images...");
+			try { RendererUtils.fixBrokenTwemojiImages(contentEl); }
+            catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error fixing Twemoji:", error); }
 		}
 
 		 plugin.logger.debug("[renderAssistantContent STAT] Exiting.");
 	}
-
 
 	/**
 	 * Статичний метод для додавання кнопок дій асистента.
