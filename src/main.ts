@@ -66,6 +66,7 @@ export default class OllamaPlugin extends Plugin {
   private taskFileContentCache: string | null = null;
   private taskFileNeedsUpdate: boolean = false;
   private taskCheckInterval: NodeJS.Timeout | null = null;
+  
 
   // --- Event Emitter Methods (зроблено public) ---
   public on(event: string, callback: (data: any) => any): () => void {

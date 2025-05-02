@@ -16,7 +16,7 @@ import {
 import { ConfirmModal } from "./ConfirmModal";
 import { PromptModal } from "./PromptModal";
 import OllamaPlugin from "./main"; // Головний клас плагіна
-import { AvatarType } from "./settings"; // Типи налаштувань
+import { AvatarType, LANGUAGES } from "./settings"; // Типи налаштувань
 import { RoleInfo } from "./ChatManager"; // Тип RoleInfo
 import { Chat, ChatMetadata } from "./Chat"; // Клас Chat та типи
 import { SummaryModal } from "./SummaryModal";
@@ -163,120 +163,6 @@ export type MessageRole = "user" | "assistant" | "system" | "error";
 //   content: string;
 //   timestamp: Date;
 // }
-
-// --- Language List ---
-const LANGUAGES: Record<string, string> = {
-  af: "Afrikaans",
-  sq: "Albanian",
-  am: "Amharic",
-  ar: "Arabic",
-  hy: "Armenian",
-  az: "Azerbaijani",
-  eu: "Basque",
-  be: "Belarusian",
-  bn: "Bengali",
-  bs: "Bosnian",
-  bg: "Bulgarian",
-  ca: "Catalan",
-  ceb: "Cebuano",
-  ny: "Chichewa",
-  "zh-CN": "Chinese (Simplified)",
-  "zh-TW": "Chinese (Traditional)",
-  co: "Corsican",
-  hr: "Croatian",
-  cs: "Czech",
-  da: "Danish",
-  nl: "Dutch",
-  en: "English",
-  eo: "Esperanto",
-  et: "Estonian",
-  tl: "Filipino",
-  fi: "Finnish",
-  fr: "French",
-  fy: "Frisian",
-  gl: "Galician",
-  ka: "Georgian",
-  de: "German",
-  el: "Greek",
-  gu: "Gujarati",
-  ht: "Haitian Creole",
-  ha: "Hausa",
-  haw: "Hawaiian",
-  iw: "Hebrew",
-  he: "Hebrew",
-  hi: "Hindi",
-  hmn: "Hmong",
-  hu: "Hungarian",
-  is: "Icelandic",
-  ig: "Igbo",
-  id: "Indonesian",
-  ga: "Irish",
-  it: "Italian",
-  ja: "Japanese",
-  jw: "Javanese",
-  kn: "Kannada",
-  kk: "Kazakh",
-  km: "Khmer",
-  rw: "Kinyarwanda",
-  ko: "Korean",
-  ku: "Kurdish (Kurmanji)",
-  ky: "Kyrgyz",
-  lo: "Lao",
-  la: "Latin",
-  lv: "Latvian",
-  lt: "Lithuanian",
-  lb: "Luxembourgish",
-  mk: "Macedonian",
-  mg: "Malagasy",
-  ms: "Malay",
-  ml: "Malayalam",
-  mt: "Maltese",
-  mi: "Maori",
-  mr: "Marathi",
-  mn: "Mongolian",
-  my: "Myanmar (Burmese)",
-  ne: "Nepali",
-  no: "Norwegian",
-  or: "Odia (Oriya)",
-  ps: "Pashto",
-  fa: "Persian",
-  pl: "Polish",
-  pt: "Portuguese",
-  pa: "Punjabi",
-  ro: "Romanian",
-  ru: "Russian",
-  sm: "Samoan",
-  gd: "Scots Gaelic",
-  sr: "Serbian",
-  st: "Sesotho",
-  sn: "Shona",
-  sd: "Sindhi",
-  si: "Sinhala",
-  sk: "Slovak",
-  sl: "Slovenian",
-  so: "Somali",
-  es: "Spanish",
-  su: "Sundanese",
-  sw: "Swahili",
-  sv: "Swedish",
-  tg: "Tajik",
-  ta: "Tamil",
-  tt: "Tatar",
-  te: "Telugu",
-  th: "Thai",
-  tr: "Turkish",
-  tk: "Turkmen",
-  uk: "Ukrainian",
-  ur: "Urdu",
-  ug: "Uyghur",
-  uz: "Uzbek",
-  vi: "Vietnamese",
-  cy: "Welsh",
-  xh: "Xhosa",
-  yi: "Yiddish",
-  yo: "Yoruba",
-  zu: "Zulu",
-};
 
 export class OllamaView extends ItemView {
   private sidebarManager!: SidebarManager; // <--- Нова властивість
@@ -1219,47 +1105,67 @@ private createUIElements(): void {
   private handleVoiceClick = (): void => {
     this.toggleVoiceRecognition();
   };
-  private handleTranslateInputClick = async (): Promise<void> => {
-    const currentText = this.inputEl.value;
-    const targetLang = "en";
-    if (!currentText.trim()) {
-      new Notice("Input empty...");
+  // OllamaView.ts -> handleTranslateInputClick
+private handleTranslateInputClick = async (): Promise<void> => {
+  const currentText = this.inputEl.value;
+  // Використовуємо цільову мову з налаштувань
+  const targetLang = this.plugin.settings.translationTargetLanguage;
+
+  // Перевірка чи є текст для перекладу
+  if (!currentText.trim()) {
+      new Notice("Input is empty, nothing to translate.");
       return;
-    }
-    if (!this.plugin.settings.enableTranslation) {
-      new Notice("Translation disabled...");
+  }
+  // Перевірка чи ввімкнено переклад і чи вибрано провайдера
+  if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === 'none') {
+      new Notice("Translation disabled or provider not selected in settings.");
       return;
-    }
-    const apiKey = this.plugin.settings.googleTranslationApiKey;
-    if (!apiKey) {
-      new Notice("Translation API Key not set...");
+  }
+  // Перевірка чи встановлено цільову мову
+   if (!targetLang) {
+      new Notice("Target language for translation is not set in settings.");
       return;
-    }
-    setIcon(this.translateInputButton, "loader");
-    this.translateInputButton.disabled = true;
-    this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT);
-    this.translateInputButton.title = "Translating...";
-    try {
+  }
+
+  // Встановлюємо стан завантаження кнопки
+  setIcon(this.translateInputButton, "loader");
+  this.translateInputButton.disabled = true;
+  this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT); // Використовуємо константу
+  this.translateInputButton.title = "Translating...";
+
+  try {
+      this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for input...`);
+      // Викликаємо новий сервіс перекладу
       const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
-      if (translatedText !== null) {
-        this.inputEl.value = translatedText;
-        this.inputEl.dispatchEvent(new Event("input"));
-        this.inputEl.focus();
-        const end = translatedText.length;
-        this.inputEl.setSelectionRange(end, end);
+
+      if (translatedText !== null) { // Перевіряємо на null (означає помилку, про яку вже сповіщено)
+          this.plugin.logger.debug(`[OllamaView] Input translation received.`);
+          this.inputEl.value = translatedText; // Встановлюємо перекладений текст (може бути порожнім)
+          this.inputEl.dispatchEvent(new Event("input")); // Тригер для оновлення UI (висота, кнопка Send)
+          this.inputEl.focus(); // Повертаємо фокус
+          // Ставимо курсор в кінець, тільки якщо переклад не порожній
+          if (translatedText) {
+              const end = translatedText.length;
+              this.inputEl.setSelectionRange(end, end);
+          }
       } else {
-        console.warn("Input translation failed.");
+          // Повідомлення про помилку вже має бути показано сервісом
+          this.plugin.logger.warn("[OllamaView] Input translation failed (null returned from service).");
       }
-    } catch (error) {
-      console.error("Input translation error:", error);
-      new Notice("Input translation error.");
-    } finally {
-      setIcon(this.translateInputButton, "languages");
+  } catch (error) {
+      // Цей блок малоймовірний, оскільки сервіс має обробляти свої помилки, але для безпеки
+      this.plugin.logger.error("[OllamaView] Unexpected error during input translation call:", error);
+      new Notice("Input translation encountered an unexpected error.");
+  } finally {
+      // Завжди відновлюємо стан кнопки
+      setIcon(this.translateInputButton, "languages"); // Повертаємо іконку
+      // Кнопка має бути доступна, якщо немає іншого процесу (isProcessing)
       this.translateInputButton.disabled = this.isProcessing;
-      this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT);
-      this.translateInputButton.title = "Translate input to English";
-    }
-  };
+      this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT); // Видаляємо клас завантаження
+      // TODO: Оновити title відповідно до мови? Або залишити загальний?
+      this.translateInputButton.title = `Translate input to ${LANGUAGES[targetLang] || targetLang}`; // Оновлюємо title
+  }
+}
 
   // Menu Button Click (Toggles Custom Div)
   private handleMenuClick = (e: MouseEvent): void => {
@@ -2778,126 +2684,115 @@ public handleSettingsUpdated = async (): Promise<void> => {
       });
   }
 
-  // OllamaView.ts (Повна оновлена версія методу handleTranslateClick)
+  // OllamaView.ts -> handleTranslateClick (для повідомлень)
+public async handleTranslateClick(
+  originalContent: string, // Оригінальний, не декодований контент повідомлення
+  contentEl: HTMLElement,  // DOM-елемент ОРИГІНАЛЬНОГО контенту (.message-content)
+  buttonEl: HTMLButtonElement // Кнопка перекладу для оновлення її стану
+): Promise<void> {
+   const targetLang = this.plugin.settings.translationTargetLanguage;
 
-  public async handleTranslateClick(
-    originalContent: string, // Оригінальний текст повідомлення (необроблений)
-    contentEl: HTMLElement, // DOM-елемент ОРИГІНАЛЬНОГО контенту, куди додавати переклад
-    buttonEl: HTMLButtonElement // Кнопка перекладу для оновлення стану
-  ): Promise<void> {
-    // 1. Перевірка налаштувань
-    const targetLang = this.plugin.settings.translationTargetLanguage;
-    const apiKey = this.plugin.settings.googleTranslationApiKey; // Ключ для Google Translate API
-    if (!this.plugin.settings.enableTranslation || !targetLang || !apiKey) {
-      new Notice("Translation feature or API key/target language is not configured in settings.");
+   // Перевірка налаштувань enableTranslation та provider
+   if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === 'none') {
+       new Notice("Translation disabled or provider not selected in settings.");
+       return;
+   }
+    // Перевірка цільової мови
+    if (!targetLang) {
+      new Notice("Target language for translation is not set in settings.");
       return;
-    }
+  }
 
-    // 2. Підготовка тексту до перекладу
-    let textToTranslate = "";
-    try {
-      // Спочатку декодуємо HTML сутності, потім працюємо з тегами
+   // Підготовка тексту: декодування HTML та видалення тегів <think>
+   let textToTranslate = "";
+   try {
       const decodedContent = RendererUtils.decodeHtmlEntities(originalContent);
-
-      // Перевіряємо та видаляємо теги <think>, якщо вони є
       if (RendererUtils.detectThinkingTags(decodedContent).hasThinkingTags) {
-        textToTranslate = decodedContent
-          .replace(/<think>[\s\S]*?<\/think>/g, "") // Видаляємо теги та їх вміст
-          .trim(); // Прибираємо зайві пробіли по краях
+          textToTranslate = decodedContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
       } else {
-        textToTranslate = decodedContent.trim(); // Якщо тегів немає, просто обрізаємо пробіли
+           textToTranslate = decodedContent.trim();
       }
-
       // Перевірка, чи залишився текст після обробки
       if (!textToTranslate) {
-        this.plugin.logger.warn(
-          "[handleTranslateClick] Text to translate is empty after preprocessing (removing <think> tags?)."
-        );
-        new Notice("Nothing to translate (content might be empty after removing internal tags).");
-        return;
+           new Notice("Nothing to translate (content might be empty after removing internal tags).");
+           return;
       }
-    } catch (error) {
-      this.plugin.logger.error("[handleTranslateClick] Error during text preprocessing:", error);
-      new Notice("Failed to prepare text for translation.");
-      return;
-    }
+   } catch (error) {
+       this.plugin.logger.error("[handleTranslateClick] Error during text preprocessing:", error);
+       new Notice("Failed to prepare text for translation.");
+       return;
+   }
 
-    // 3. Видалення попереднього контейнера перекладу, якщо він існує
-    contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
+   // Видаляємо попередній контейнер перекладу, якщо він існує
+   contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
 
-    // 4. Встановлення стану завантаження для кнопки
-    const originalIcon = buttonEl.querySelector(".svg-icon")?.getAttribute("icon-name") || "languages"; // Зберегти оригінальну іконку
-    setIcon(buttonEl, "loader"); // Показати індикатор завантаження
-    buttonEl.disabled = true;
-    buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); // Додати клас для можливої стилізації
-    const originalTitle = buttonEl.title; // Зберегти оригінальний title
-    buttonEl.setAttribute("title", "Translating...");
+   // Встановлюємо стан завантаження для кнопки
+   const originalIcon = buttonEl.querySelector(".svg-icon")?.getAttribute("icon-name") || "languages";
+   setIcon(buttonEl, "loader");
+   buttonEl.disabled = true;
+   buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); // Використовуємо константу
+   const originalTitle = buttonEl.title;
+   buttonEl.setAttribute("title", "Translating...");
+   buttonEl.addClass("button-loading"); // Клас для можливої анімації
 
-    // 5. Виконання перекладу
-    try {
-      // Виклик сервісу перекладу
-      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+   try {
+      this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for message content...`);
+      // Викликаємо новий сервіс перекладу
+       const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
 
-      // Перевірка, чи елемент контенту все ще існує в DOM
-      if (!contentEl || !contentEl.isConnected) {
-        this.plugin.logger.error(
-          "[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived."
-        );
-        new Notice("Translation failed: message element not found.");
-        // Стан кнопки буде відновлено у finally
-        return;
+       // Перевіряємо, чи елемент контенту все ще існує в DOM
+       if (!contentEl || !contentEl.isConnected) {
+           this.plugin.logger.error("[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived.");
+           // Сервіс вже міг показати помилку, якщо вона була
+           // new Notice("Translation failed: message element not found.");
+           return; // Стан кнопки буде відновлено у finally
+       }
+
+       if (translatedText !== null) { // Перевіряємо на null (означає помилку)
+           this.plugin.logger.debug(`[OllamaView] Message translation received.`);
+          // Створення контейнера для відображення перекладу
+          const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+          // Елемент для самого перекладеного тексту (відрендереного як Markdown)
+          const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
+
+          // Рендеринг перекладеного тексту як Markdown
+          await MarkdownRenderer.render(
+              this.app,
+              translatedText, // Використовуємо отриманий переклад
+              translationContentEl,
+              this.plugin.app.vault.getRoot()?.path ?? "",
+              this // Контекст компонента (OllamaView)
+          );
+
+          // Виправлення емодзі після рендерингу
+          RendererUtils.fixBrokenTwemojiImages(translationContentEl);
+
+          // Додавання індикатора мови перекладу
+          const targetLangName = LANGUAGES[targetLang] || targetLang; // Отримуємо повну назву мови
+          translationContainer.createEl("div", {
+              cls: "translation-indicator",
+              text: `[Translated to ${targetLangName}]`,
+          });
+
+          // Прокрутка до низу, щоб переклад був видимим (якщо потрібно)
+          this.guaranteedScrollToBottom(50, false);
+       }
+       // Якщо translatedText === null, сервіс мав показати Notice про помилку
+   } catch (error) {
+      // Цей блок малоймовірний, оскільки сервіс має обробляти свої помилки
+      this.plugin.logger.error("[OllamaView] Unexpected error during message translation call:", error);
+      // new Notice("An unexpected error occurred during translation.");
+   } finally {
+      // Завжди відновлюємо стан кнопки, якщо вона ще існує
+      if (buttonEl?.isConnected) {
+          setIcon(buttonEl, originalIcon);
+          buttonEl.disabled = false;
+          buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+          buttonEl.setAttribute("title", originalTitle);
+          buttonEl.removeClass("button-loading");
       }
-
-      if (translatedText !== null) {
-        // Створення контейнера для відображення перекладу
-        const translationContainer = contentEl.createDiv({
-          cls: CSS_CLASS_TRANSLATION_CONTAINER, // Потрібно мати цей клас
-        });
-
-        // Елемент для самого перекладеного тексту (відрендереного як Markdown)
-        const translationContentEl = translationContainer.createDiv({
-          cls: CSS_CLASS_TRANSLATION_CONTENT, // Потрібно мати цей клас
-        });
-
-        // Рендеринг перекладеного тексту як Markdown
-        await MarkdownRenderer.render(
-          this.app,
-          translatedText,
-          translationContentEl, // Рендеримо всередину спеціального контейнера
-          this.plugin.app.vault.getRoot()?.path ?? "", // Шлях до файлу (не дуже важливий тут)
-          this // Контекст компонента (OllamaView)
-        );
-
-        // --- ВИКЛИК УТИЛІТИ для виправлення Twemoji ---
-        RendererUtils.fixBrokenTwemojiImages(translationContentEl);
-        // -----------------------------------------
-
-        // Додавання індикатора мови перекладу
-        const targetLangName = LANGUAGES[targetLang] || targetLang; // Отримуємо повну назву мови
-        translationContainer.createEl("div", {
-          cls: "translation-indicator", // Клас для стилізації
-          text: `[Translated to ${targetLangName}]`,
-        });
-
-        // Прокрутка до низу, щоб переклад був видимим (якщо потрібно)
-        this.guaranteedScrollToBottom(50, false);
-      }
-      // Якщо translatedText === null, TranslationService мав показати Notice
-    } catch (error) {
-      // Обробка неочікуваних помилок під час перекладу
-      this.plugin.logger.error("Error during translation click handling:", error);
-      new Notice("An unexpected error occurred during translation.");
-    } finally {
-      // 6. Завжди відновлюємо стан кнопки
-      // Перевіряємо, чи кнопка ще існує
-      if (buttonEl && buttonEl.isConnected) {
-        setIcon(buttonEl, originalIcon); // Відновлюємо іконку
-        buttonEl.disabled = false;
-        buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
-        buttonEl.setAttribute("title", originalTitle); // Відновлюємо title
-      }
-    }
-  }
+   }
+}
 
   // --- Rendering Helpers ---
   private renderDateSeparator(date: Date): void {

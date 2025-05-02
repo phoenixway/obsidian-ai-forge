@@ -17,7 +17,7 @@ import OllamaPlugin from "./main";
 import { LogLevel, LoggerSettings } from "./Logger"; // Імпортуємо LogLevel та LoggerSettings
 
 // --- Мови ---
-const LANGUAGES: Record<string, string> = {
+export const LANGUAGES: Record<string, string> = {
   af: "Afrikaans",
   sq: "Albanian",
   am: "Amharic",
