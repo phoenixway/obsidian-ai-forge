@@ -2876,7 +2876,11 @@ var OllamaView = class extends import_obsidian13.ItemView {
       this.translateInputButton.title = "Translating...";
       try {
         this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for input...`);
-        const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
+        const translatedText = await this.plugin.translationService.translate(
+          currentText,
+          "English"
+          /* targetLang */
+        );
         if (translatedText !== null) {
           this.plugin.logger.debug(`[OllamaView] Input translation received.`);
           this.inputEl.value = translatedText;

@@ -1136,7 +1136,8 @@ private handleTranslateInputClick = async (): Promise<void> => {
   try {
       this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for input...`);
       // Викликаємо новий сервіс перекладу
-      const translatedText = await this.plugin.translationService.translate(currentText, targetLang);
+      //FIXME: targetLang - це не те, що ми хочемо, але поки що залишимо так
+      const translatedText = await this.plugin.translationService.translate(currentText, 'English'/* targetLang */);
 
       if (translatedText !== null) { // Перевіряємо на null (означає помилку, про яку вже сповіщено)
           this.plugin.logger.debug(`[OllamaView] Input translation received.`);
