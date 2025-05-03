@@ -2459,27 +2459,16 @@ var SidebarManager = class {
 
 // src/DropdownMenuManager.ts
 var import_obsidian13 = require("obsidian");
-var CSS_CLASS_MENU_DROPDOWN = "menu-dropdown";
 var CSS_CLASS_MENU_OPTION2 = "menu-option";
 var CSS_CLASS_MENU_HEADER_ITEM = "menu-header-item";
 var CSS_CLASS_SUBMENU_ICON = "submenu-icon";
 var CSS_CLASS_SUBMENU_CONTENT = "submenu-content";
-var CSS_CLASS_SETTINGS_OPTION = "settings-option";
 var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
-var CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
-var CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option";
 var CSS_CLASS_MODEL_OPTION = "model-option";
-var CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
 var CSS_CLASS_ROLE_OPTION = "role-option";
-var CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 var CSS_CLASS_CHAT_OPTION = "chat-option";
 var CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 var CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
-var CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
-var CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
-var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
-var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
-var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CSS_CLASS_CHAT_LIST_ITEM2 = "ollama-chat-list-item";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var DropdownMenuManager = class {
@@ -2527,49 +2516,6 @@ var DropdownMenuManager = class {
   }
   createMenuUI() {
     this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
-    this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
-    this.menuDropdown.style.display = "none";
-    this.plugin.logger.debug("[DropdownMenuManager] Creating Model section...");
-    const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
-    this.modelSubmenuHeader = modelSection.header;
-    this.modelSubmenuContent = modelSection.content;
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.plugin.logger.debug("[DropdownMenuManager] Creating Role section...");
-    const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
-    this.roleSubmenuHeader = roleDropdownSection.header;
-    this.roleSubmenuContent = roleDropdownSection.content;
-    if (this.isSidebarLocation) {
-      this.plugin.logger.debug("[DropdownMenuManager] Creating chat-related elements...");
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-      const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER, "chat-submenu-section");
-      this.chatSubmenuHeader = chatDropdownSection.header;
-      this.chatSubmenuContent = chatDropdownSection.content;
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-      this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
-      this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
-      this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
-      this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-      this.clearChatOption = this.createActionItem("trash", "Clear Messages", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
-      this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [CSS_CLASS_DELETE_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-      this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION2} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
-      this.updateToggleViewLocationOption();
-    } else {
-      this.plugin.logger.debug("[DropdownMenuManager] Skipping chat-related elements for tab location.");
-      this.chatSubmenuHeader = null;
-      this.chatSubmenuContent = null;
-      this.newChatOption = null;
-      this.renameChatOption = null;
-      this.cloneChatOption = null;
-      this.exportChatOption = null;
-      this.clearChatOption = null;
-      this.deleteChatOption = null;
-      this.toggleViewLocationOption = null;
-    }
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-    this.plugin.logger.debug("[DropdownMenuManager] Creating Settings option...");
-    this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
     this.plugin.logger.debug("[DropdownMenuManager] Menu UI creation finished.");
   }
   attachEventListeners() {
