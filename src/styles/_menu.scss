@@ -234,12 +234,16 @@
           .hr-after-toggle { display: none; } // Роздільник після перемикача
       }
 
-      // 3. Правила для режиму БІЧНОЇ ПАНЕЛІ на десктопі
-      // &.is-sidebar-location {
-          // Моделі та Ролі вже приховані загальним правилом .is-desktop
-          // Роздільники .hr-after-model, .hr-after-role також приховані
-          // Інші елементи (Chat, Actions, Settings) та їх роздільники залишаються видимими за замовчуванням
-      // }
+      &.is-sidebar-location {
+        // Моделі та Ролі вже приховані правилом .is-desktop вище
+
+        // Приховуємо опцію "Show in Tab" (toggle) на Десктоп-Сайдбар, бо є кнопка
+        .toggle-view-location-option { display: none; }
+        // Також приховуємо роздільник ПІСЛЯ попередньої видимої групи (Danger Actions)
+        .hr-after-danger { display: none; }
+        // І роздільник ПІСЛЯ самого Toggle (який тепер прихований)
+        .hr-after-toggle { display: none; }
+    }
   }
 
   /* Правила для МОБІЛЬНИХ/ПЛАНШЕТІВ */
