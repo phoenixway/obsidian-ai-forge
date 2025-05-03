@@ -350,85 +350,84 @@ export class OllamaView extends ItemView {
     this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer);
     this.dropdownMenuManager.createMenuUI();
   }
-  // --- Event Listeners (ПОВНА ВЕРСІЯ) ---
+  
   private attachEventListeners(): void {
-    // Null Checks for Required Elements
+    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
+    // Null Checks for elements managed DIRECTLY by OllamaView
     if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
     if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
-    if (!this.stopGeneratingButton)
-      console.error("OllamaView: stopGeneratingButton missing during attachEventListeners!");
-    if (!this.voiceButton) console.error("OllamaView: voiceButton missing during attachEventListeners!");
-    if (!this.translateInputButton)
-      console.error("OllamaView: translateInputButton missing during attachEventListeners!");
-    if (!this.menuButton) console.error("OllamaView: menuButton missing during attachEventListeners!");
-    if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing during attachEventListeners!");
-    if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing during attachEventListeners!");
-    if (!this.temperatureIndicatorEl)
-      console.error("OllamaView: temperatureIndicatorEl missing during attachEventListeners!");
-    if (!this.toggleLocationButton)
-      console.error("OllamaView: toggleLocationButton missing during attachEventListeners!");
-    if (!this.chatContainer) console.error("OllamaView: chatContainer missing during attachEventListeners!");
-    if (!this.scrollToBottomButton)
-      console.error("OllamaView: scrollToBottomButton missing during attachEventListeners!");
-    if (!this.newMessagesIndicatorEl)
-      console.error("OllamaView: newMessagesIndicatorEl missing during attachEventListeners!");
-    if (!this.chatPanelHeaderEl) console.error("OllamaView: chatPanelHeaderEl missing during attachEventListeners!");
-    if (!this.rolePanelHeaderEl) console.error("OllamaView: rolePanelHeaderEl missing during attachEventListeners!");
-    if (!this.newChatSidebarButton)
-      console.error("OllamaView: newChatSidebarButton missing during attachEventListeners!");
+    if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing!");
+    if (!this.voiceButton) console.error("OllamaView: voiceButton missing!");
+    if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing!");
+    if (!this.menuButton) console.error("OllamaView: menuButton missing!"); // Listener for the button itself remains here
+    if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing!");
+    if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing!");
+    if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing!");
+    if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing!");
+    if (!this.chatContainer) console.error("OllamaView: chatContainer missing!");
+    if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing!");
+    if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing!");
+    // Removed null checks for elements now managed by DropdownMenuManager
 
     // Input Textarea Listeners
     if (this.inputEl) {
-      this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
-      this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
+        this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
+        this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
     }
 
     // Input Control Buttons Listeners
     if (this.sendButton) {
-      this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
+        this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
     }
     if (this.stopGeneratingButton) {
-      this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
-    } // cancelGeneration - стрілкова функція
+        this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
+    }
     if (this.voiceButton) {
-      this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
+        this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
     }
     if (this.translateInputButton) {
-      this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
+        this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
     }
     if (this.menuButton) {
-      this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick); // Use new handler
+        // Listener for the button itself remains here, calling the manager's toggle method
+        this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick);
     }
     if (this.toggleLocationButton) {
-      this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
+        this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
     }
 
     // Input Info Indicators Listeners
     if (this.modelDisplayEl) {
-      this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
+        this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
     }
     if (this.roleDisplayEl) {
-      this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
+        this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
     }
     if (this.temperatureIndicatorEl) {
-      this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
+        this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
     }
+
+    // --- Dropdown Menu Listeners (ДЕГЕЛОВАНО МЕНЕДЖЕРУ) ---
+    // Видалено весь код, що додавав слухачі до modelSubmenuHeader, roleSubmenuHeader, etc.
+    // Додаємо виклик менеджера для реєстрації ЙОГО слухачів
+    this.dropdownMenuManager?.attachEventListeners();
+    // -----------------------------------------------------
 
     // Chat Area Listeners
     if (this.chatContainer) {
-      this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
+        this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
     }
     if (this.newMessagesIndicatorEl) {
-      this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
+        this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
     }
     if (this.scrollToBottomButton) {
-      this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
+        this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
     }
 
     // Window/Workspace/Document Listeners
     this.registerDomEvent(window, "resize", this.handleWindowResize);
-    this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
-    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
+    // this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize)); // Duplicate? window resize enough?
+    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu); // This calls the manager's handler
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
 
@@ -436,27 +435,33 @@ export class OllamaView extends ItemView {
     this.register(this.plugin.on("model-changed", modelName => this.handleModelChange(modelName)));
     this.register(this.plugin.on("role-changed", roleName => this.handleRoleChange(roleName)));
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
-
-    // --- Listener, що викликає handleMessageAdded ---
     this.register(
-      this.plugin.on("message-added", data => {
-        this.plugin.logger.error(
-          `[OllamaView Listener] 'message-added' listener called. Role: ${
-            data?.message?.role
-          }. Timestamp: ${data?.message?.timestamp?.getTime()}`
-        );
-        this.handleMessageAdded(data); // Викликаємо обробник
-      })
-    );
-    // --- Кінець ---
-    this.register(this.plugin.on("active-chat-changed", data => this.handleActiveChatChanged(data)));
-    this.register(this.plugin.on("messages-cleared", chatId => this.handleMessagesCleared(chatId)));
-    this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
-    this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
-    this.register(this.plugin.on("message-deleted", data => this.handleMessageDeleted(data)));
+     this.plugin.on("message-added", data => {
+       this.plugin.logger.error( // Use error for visibility during debug
+         `[OllamaView Listener] 'message-added' listener called. Role: ${
+           data?.message?.role
+         }. Timestamp: ${data?.message?.timestamp?.getTime()}`
+       );
+       this.handleMessageAdded(data); // Викликаємо обробник
+     })
+   );
+   this.register(this.plugin.on("active-chat-changed", data => this.handleActiveChatChanged(data)));
+   this.register(this.plugin.on("messages-cleared", chatId => this.handleMessagesCleared(chatId)));
+   this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
+   this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
+   this.register(this.plugin.on("message-deleted", data => this.handleMessageDeleted(data)));
 
-    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
-  }
+   // --- SidebarManager Listeners (Якщо SidebarManager їх не реєструє сам) ---
+   // Якщо SidebarManager реєструє свої слухачі всередині createSidebarUI, то тут нічого не потрібно.
+   // Якщо ні, то потрібно додати їх тут, наприклад:
+   // if (this.chatPanelHeaderEl) this.registerDomEvent(this.chatPanelHeaderEl, 'click', () => this.sidebarManager.toggleSection('chats'));
+   // if (this.rolePanelHeaderEl) this.registerDomEvent(this.rolePanelHeaderEl, 'click', () => this.sidebarManager.toggleSection('roles'));
+   // if (this.newChatSidebarButton) this.registerDomEvent(this.newChatSidebarButton, 'click', this.handleNewChatClick);
+   // Переконайтесь, що SidebarManager обробляє реєстрацію своїх слухачів.
+
+   this.plugin.logger.debug("[OllamaView] All event listeners attached.");
+}
+
 
   private cancelGeneration = (): void => {
     if (this.currentAbortController) {

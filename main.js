@@ -4153,40 +4153,35 @@ This action cannot be undone.`,
     this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer);
     this.dropdownMenuManager.createMenuUI();
   }
-  // --- Event Listeners (ПОВНА ВЕРСІЯ) ---
   attachEventListeners() {
+    var _a;
+    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
     if (!this.inputEl)
       console.error("OllamaView: inputEl missing during attachEventListeners!");
     if (!this.sendButton)
       console.error("OllamaView: sendButton missing during attachEventListeners!");
     if (!this.stopGeneratingButton)
-      console.error("OllamaView: stopGeneratingButton missing during attachEventListeners!");
+      console.error("OllamaView: stopGeneratingButton missing!");
     if (!this.voiceButton)
-      console.error("OllamaView: voiceButton missing during attachEventListeners!");
+      console.error("OllamaView: voiceButton missing!");
     if (!this.translateInputButton)
-      console.error("OllamaView: translateInputButton missing during attachEventListeners!");
+      console.error("OllamaView: translateInputButton missing!");
     if (!this.menuButton)
-      console.error("OllamaView: menuButton missing during attachEventListeners!");
+      console.error("OllamaView: menuButton missing!");
     if (!this.modelDisplayEl)
-      console.error("OllamaView: modelDisplayEl missing during attachEventListeners!");
+      console.error("OllamaView: modelDisplayEl missing!");
     if (!this.roleDisplayEl)
-      console.error("OllamaView: roleDisplayEl missing during attachEventListeners!");
+      console.error("OllamaView: roleDisplayEl missing!");
     if (!this.temperatureIndicatorEl)
-      console.error("OllamaView: temperatureIndicatorEl missing during attachEventListeners!");
+      console.error("OllamaView: temperatureIndicatorEl missing!");
     if (!this.toggleLocationButton)
-      console.error("OllamaView: toggleLocationButton missing during attachEventListeners!");
+      console.error("OllamaView: toggleLocationButton missing!");
     if (!this.chatContainer)
-      console.error("OllamaView: chatContainer missing during attachEventListeners!");
+      console.error("OllamaView: chatContainer missing!");
     if (!this.scrollToBottomButton)
-      console.error("OllamaView: scrollToBottomButton missing during attachEventListeners!");
+      console.error("OllamaView: scrollToBottomButton missing!");
     if (!this.newMessagesIndicatorEl)
-      console.error("OllamaView: newMessagesIndicatorEl missing during attachEventListeners!");
-    if (!this.chatPanelHeaderEl)
-      console.error("OllamaView: chatPanelHeaderEl missing during attachEventListeners!");
-    if (!this.rolePanelHeaderEl)
-      console.error("OllamaView: rolePanelHeaderEl missing during attachEventListeners!");
-    if (!this.newChatSidebarButton)
-      console.error("OllamaView: newChatSidebarButton missing during attachEventListeners!");
+      console.error("OllamaView: newMessagesIndicatorEl missing!");
     if (this.inputEl) {
       this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
       this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
@@ -4218,6 +4213,7 @@ This action cannot be undone.`,
     if (this.temperatureIndicatorEl) {
       this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
     }
+    (_a = this.dropdownMenuManager) == null ? void 0 : _a.attachEventListeners();
     if (this.chatContainer) {
       this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
     }
@@ -4228,7 +4224,6 @@ This action cannot be undone.`,
       this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
     }
     this.registerDomEvent(window, "resize", this.handleWindowResize);
-    this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize));
     this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
@@ -4237,9 +4232,10 @@ This action cannot be undone.`,
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
     this.register(
       this.plugin.on("message-added", (data) => {
-        var _a, _b, _c;
+        var _a2, _b, _c;
         this.plugin.logger.error(
-          `[OllamaView Listener] 'message-added' listener called. Role: ${(_a = data == null ? void 0 : data.message) == null ? void 0 : _a.role}. Timestamp: ${(_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime()}`
+          // Use error for visibility during debug
+          `[OllamaView Listener] 'message-added' listener called. Role: ${(_a2 = data == null ? void 0 : data.message) == null ? void 0 : _a2.role}. Timestamp: ${(_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime()}`
         );
         this.handleMessageAdded(data);
       })
