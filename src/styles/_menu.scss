@@ -16,6 +16,49 @@
     display: flex;
     flex-direction: column;
 
+    &.is-desktop {
+
+      // 1. Приховуємо Моделі та Ролі ЗАВЖДИ на десктопі
+      .model-submenu-section,
+      .role-submenu-section { display: none; }
+      // Приховуємо роздільник ПІСЛЯ прихованої секції Ролей
+      .role-submenu-section + hr.menu-separator { display: none; }
+
+      // 2. Правила для режиму ВКЛАДКИ на десктопі
+      &.is-tab-location {
+          // Приховуємо секцію Чатів та роздільник ПІСЛЯ неї
+          .chat-submenu-section { display: none; }
+          .chat-submenu-section + hr.menu-separator { display: none; }
+
+          // Приховуємо ВСІ пункти дій Чатів та роздільники ПІСЛЯ них
+          .new-chat-option,
+          .rename-chat-option,
+          .clone-chat-option,
+          .export-chat-option { display: none; }
+          .export-chat-option + hr.menu-separator { display: none; } // Після останнього пункту дій
+
+          .clear-chat-option,
+          .delete-chat-option { display: none; }
+          .delete-chat-option + hr.menu-separator { display: none; } // Після останнього небезпечного пункту
+
+          // Приховуємо перемикач вигляду та роздільник ПІСЛЯ нього
+          .toggle-view-location-option { display: none; }
+          .toggle-view-location-option + hr.menu-separator { display: none; }
+      }
+
+      // 3. Правила для режиму БІЧНОЇ ПАНЕЛІ на десктопі
+      // &.is-sidebar-location {
+          // Моделі та Ролі вже приховані загальним правилом .is-desktop
+          // Чати та Дії залишаються видимими (немає правил display: none)
+          // Settings залишається видимим
+      // }
+  }
+
+  /* Правила для МОБІЛЬНИХ/ПЛАНШЕТІВ */
+  // &.is-mobile-tablet {
+      // За замовчуванням все видиме, тому спеціальних правил не потрібно
+  // }
+
     /* --- ВИДАЛЕНО ПРИХОВУВАННЯ СЕКЦІЇ РОЛЕЙ ЗА ЗАМОВЧУВАННЯМ --- */
     /*
     .role-submenu-section {

@@ -379,8 +379,7 @@ private createUIElements(): void {
   // --- Створення DropdownMenuManager ---
   // Передаємо isSidebarLocation та isDesktop
   this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation, isDesktop);
-  this.dropdownMenuManager.createMenuUI();
-
+  this.dropdownMenuManager.createMenuUI(); // <--- Тепер він сам додасть класи
   this.plugin.logger.debug("createUIElements: Finished UI creation.");
 }
 
