@@ -2484,8 +2484,17 @@ var CSS_CLASS_CHAT_LIST_ITEM2 = "ollama-chat-list-item";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var DropdownMenuManager = class {
   constructor(plugin, app, view, parentElement, isSidebarLocation) {
+    // Умовно існуючі секції/елементи (лише коли isSidebarLocation = true)
+    this.chatSubmenuHeader = null;
+    this.chatSubmenuContent = null;
+    this.newChatOption = null;
+    this.renameChatOption = null;
+    this.cloneChatOption = null;
+    this.clearChatOption = null;
+    this.exportChatOption = null;
+    this.deleteChatOption = null;
+    this.toggleViewLocationOption = null;
     this.hrSeparators = [];
-    // --- Event Listener References for explicit removal ---
     this.listeners = [];
     // --- Submenu Logic ---
     this.createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
@@ -2514,22 +2523,24 @@ var DropdownMenuManager = class {
     this.view = view;
     this.parentElement = parentElement;
     this.isSidebarLocation = isSidebarLocation;
+    this.plugin.logger.info(`[DropdownMenuManager] Initialized. Is in Sidebar Location: ${this.isSidebarLocation}`);
   }
   createMenuUI() {
     this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
     this.hrSeparators = [];
     this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
+    this.plugin.logger.debug("[DropdownMenuManager] Creating always visible sections (Model, Role)...");
+    const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
+    this.modelSubmenuHeader = modelSection.header;
+    this.modelSubmenuContent = modelSection.content;
+    this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
+    const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.roleSubmenuHeader = roleDropdownSection.header;
+    this.roleSubmenuContent = roleDropdownSection.content;
+    this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
     if (this.isSidebarLocation) {
-      this.plugin.logger.debug("[DropdownMenuManager] Creating FULL menu for sidebar location.");
-      const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
-      this.modelSubmenuHeader = modelSection.header;
-      this.modelSubmenuContent = modelSection.content;
-      this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
-      const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
-      this.roleSubmenuHeader = roleDropdownSection.header;
-      this.roleSubmenuContent = roleDropdownSection.content;
-      this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
+      this.plugin.logger.debug("[DropdownMenuManager] Creating chat-related sections and actions for sidebar location.");
       const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER, "chat-submenu-section");
       this.chatSubmenuHeader = chatDropdownSection.header;
       this.chatSubmenuContent = chatDropdownSection.content;
@@ -2546,11 +2557,7 @@ var DropdownMenuManager = class {
       this.updateToggleViewLocationOption();
       this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
     } else {
-      this.plugin.logger.debug("[DropdownMenuManager] Creating MINIMAL menu for tab location.");
-      this.modelSubmenuHeader = null;
-      this.modelSubmenuContent = null;
-      this.roleSubmenuHeader = null;
-      this.roleSubmenuContent = null;
+      this.plugin.logger.debug("[DropdownMenuManager] Skipping chat-related sections and actions for tab location.");
       this.chatSubmenuHeader = null;
       this.chatSubmenuContent = null;
       this.newChatOption = null;
@@ -2561,26 +2568,37 @@ var DropdownMenuManager = class {
       this.deleteChatOption = null;
       this.toggleViewLocationOption = null;
     }
-    if (!this.isSidebarLocation) {
-      this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
+    if (!this.hrSeparators.some((hr) => hr === this.menuDropdown.lastElementChild)) {
+      if (!this.isSidebarLocation) {
+        this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
+      }
     }
     this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
     this.plugin.logger.debug("[DropdownMenuManager] Menu UI created.");
   }
-  createActionItem(icon, text, cssClass) {
-    const itemEl = this.menuDropdown.createEl("div", {
-      cls: Array.isArray(cssClass) ? [CSS_CLASS_MENU_OPTION2, ...cssClass] : [CSS_CLASS_MENU_OPTION2, cssClass]
-    });
-    (0, import_obsidian13.setIcon)(itemEl.createSpan({ cls: "menu-option-icon" }), icon);
-    itemEl.createSpan({ cls: "menu-option-text", text });
-    return itemEl;
-  }
   attachEventListeners() {
     this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING EVENT LISTENERS (isSidebarLocation: ${this.isSidebarLocation}) !!!`);
+    if (!this.modelSubmenuHeader || !this.modelSubmenuContent)
+      console.error("DropdownMenuManager: Model submenu elements missing!");
+    if (!this.roleSubmenuHeader || !this.roleSubmenuContent)
+      console.error("DropdownMenuManager: Role submenu elements missing!");
     if (!this.settingsOption)
       console.error("DropdownMenuManager: settingsOption missing!");
     if (!this.menuDropdown)
       console.error("DropdownMenuManager: menuDropdown missing!");
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching always-present listeners (Model, Role, Settings)...");
+    if (this.modelSubmenuHeader) {
+      this.registerListener(this.modelSubmenuHeader, "click", () => {
+        this.plugin.logger.error("!!! Dropdown: Model Submenu Header FIRED !!!");
+        this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models");
+      });
+    }
+    if (this.roleSubmenuHeader) {
+      this.registerListener(this.roleSubmenuHeader, "click", () => {
+        this.plugin.logger.error("!!! Dropdown: Role Submenu Header FIRED !!!");
+        this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles");
+      });
+    }
     if (this.settingsOption) {
       this.registerListener(this.settingsOption, "click", (event) => {
         this.plugin.logger.error("!!! Dropdown: Settings Listener FIRED !!!");
@@ -2588,11 +2606,7 @@ var DropdownMenuManager = class {
       });
     }
     if (this.isSidebarLocation) {
-      this.plugin.logger.debug("[DropdownMenuManager] Attaching FULL menu listeners.");
-      if (!this.modelSubmenuHeader || !this.modelSubmenuContent)
-        console.error("DropdownMenuManager: Model submenu elements missing!");
-      if (!this.roleSubmenuHeader || !this.roleSubmenuContent)
-        console.error("DropdownMenuManager: Role submenu elements missing!");
+      this.plugin.logger.debug("[DropdownMenuManager] Attaching chat-related listeners for sidebar location.");
       if (!this.chatSubmenuHeader || !this.chatSubmenuContent)
         console.error("DropdownMenuManager: Chat submenu elements missing!");
       if (!this.newChatOption)
@@ -2609,18 +2623,6 @@ var DropdownMenuManager = class {
         console.error("DropdownMenuManager: deleteChatOption missing!");
       if (!this.toggleViewLocationOption)
         console.error("DropdownMenuManager: toggleViewLocationOption missing!");
-      if (this.modelSubmenuHeader) {
-        this.registerListener(this.modelSubmenuHeader, "click", () => {
-          this.plugin.logger.error("!!! Dropdown: Model Submenu Header FIRED !!!");
-          this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models");
-        });
-      }
-      if (this.roleSubmenuHeader) {
-        this.registerListener(this.roleSubmenuHeader, "click", () => {
-          this.plugin.logger.error("!!! Dropdown: Role Submenu Header FIRED !!!");
-          this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles");
-        });
-      }
       if (this.chatSubmenuHeader) {
         this.registerListener(this.chatSubmenuHeader, "click", () => {
           this.plugin.logger.error("!!! Dropdown: Chat Submenu Header FIRED !!!");
@@ -2669,8 +2671,18 @@ var DropdownMenuManager = class {
           this.view.handleToggleViewLocationClick();
         });
       }
+    } else {
+      this.plugin.logger.debug("[DropdownMenuManager] Skipping attachment of chat-related listeners for tab location.");
     }
     this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING EVENT LISTENERS !!!");
+  }
+  createActionItem(icon, text, cssClass) {
+    const itemEl = this.menuDropdown.createEl("div", {
+      cls: Array.isArray(cssClass) ? [CSS_CLASS_MENU_OPTION2, ...cssClass] : [CSS_CLASS_MENU_OPTION2, cssClass]
+    });
+    (0, import_obsidian13.setIcon)(itemEl.createSpan({ cls: "menu-option-icon" }), icon);
+    itemEl.createSpan({ cls: "menu-option-text", text });
+    return itemEl;
   }
   registerListener(element, type, handler) {
     const eventHandler = handler;
