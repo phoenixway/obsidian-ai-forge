@@ -2555,7 +2555,6 @@ var DropdownMenuManager = class {
       this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
       this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION2} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
       this.updateToggleViewLocationOption();
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     } else {
       this.plugin.logger.debug("[DropdownMenuManager] Skipping chat-related elements for tab location.");
       this.chatSubmenuHeader = null;
@@ -2567,8 +2566,8 @@ var DropdownMenuManager = class {
       this.clearChatOption = null;
       this.deleteChatOption = null;
       this.toggleViewLocationOption = null;
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     }
+    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     this.plugin.logger.debug("[DropdownMenuManager] Creating Settings option...");
     this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
     this.plugin.logger.debug("[DropdownMenuManager] Menu UI creation finished.");
