@@ -43,105 +43,93 @@ export class DropdownMenuManager {
 
     // --- UI Elements ---
     private menuDropdown!: HTMLElement;
-    private modelSubmenuHeader!: HTMLElement;
-    private modelSubmenuContent!: HTMLElement;
-    private roleSubmenuHeader!: HTMLElement;
-    private roleSubmenuContent!: HTMLElement;
-    private chatSubmenuHeader!: HTMLElement;
-    private chatSubmenuContent!: HTMLElement;
-    private newChatOption!: HTMLElement;
-    private renameChatOption!: HTMLElement;
-    private cloneChatOption!: HTMLElement;
-    private clearChatOption!: HTMLElement;
-    private exportChatOption!: HTMLElement;
-    private deleteChatOption!: HTMLElement;
-    private settingsOption!: HTMLElement;
-    private toggleViewLocationOption!: HTMLElement;
-    // private actionsHeader!: HTMLElement; // ВИДАЛЕНО
+    private modelSubmenuHeader!: HTMLElement | null; // Можуть бути null
+    private modelSubmenuContent!: HTMLElement | null;
+    private roleSubmenuHeader!: HTMLElement | null;
+    private roleSubmenuContent!: HTMLElement | null;
+    private chatSubmenuHeader!: HTMLElement | null;
+    private chatSubmenuContent!: HTMLElement | null;
+    private newChatOption!: HTMLElement | null;
+    private renameChatOption!: HTMLElement | null;
+    private cloneChatOption!: HTMLElement | null;
+    private clearChatOption!: HTMLElement | null;
+    private exportChatOption!: HTMLElement | null;
+    private deleteChatOption!: HTMLElement | null;
+    private settingsOption!: HTMLElement; // Завжди є
+    private toggleViewLocationOption!: HTMLElement | null;
+        private hrSeparators: HTMLElement[] = [];
 
     // --- Event Listener References for explicit removal ---
     private listeners: { element: HTMLElement | Document; type: string; handler: (e: any) => void }[] = [];
+    private isSidebarLocation: boolean;
 
-    constructor(plugin: OllamaPlugin, app: App, view: OllamaView, parentElement: HTMLElement) {
+    constructor(plugin: OllamaPlugin, app: App, view: OllamaView, parentElement: HTMLElement, isSidebarLocation: boolean    ) {
         this.plugin = plugin;
         this.app = app;
         this.view = view;
         this.parentElement = parentElement;
+        this.isSidebarLocation = isSidebarLocation; // Зберігаємо контекст
     }
 
     public createMenuUI(): void {
-        this.plugin.logger.debug("[DropdownMenuManager] Creating menu UI...");
+        this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
+        this.hrSeparators = []; // Очищуємо масив роздільників
         this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
         this.menuDropdown.style.display = "none";
 
-        // Model Section
-        const modelSection = this.createSubmenuSection(
-            "Select Model",
-            "list-collapse",
-            CSS_CLASS_MODEL_LIST_CONTAINER,
-            "model-submenu-section"
-        );
-        this.modelSubmenuHeader = modelSection.header;
-        this.modelSubmenuContent = modelSection.content;
+        // --- УМОВНЕ СТВОРЕННЯ ЕЛЕМЕНТІВ ---
+        if (this.isSidebarLocation) {
+            this.plugin.logger.debug("[DropdownMenuManager] Creating FULL menu for sidebar location.");
+            // Model Section
+            const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
+            this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR })); // Додаємо роздільник
 
-        // Role Section
-        const roleDropdownSection = this.createSubmenuSection(
-            "Select Role",
-            "users",
-            CSS_CLASS_ROLE_LIST_CONTAINER,
-            "role-submenu-section"
-        );
-        this.roleSubmenuHeader = roleDropdownSection.header;
-        this.roleSubmenuContent = roleDropdownSection.content;
+            // Role Section
+            const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+            this.roleSubmenuHeader = roleDropdownSection.header; this.roleSubmenuContent = roleDropdownSection.content;
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
 
-        // Chat Section
-        const chatDropdownSection = this.createSubmenuSection(
-            "Load Chat",
-            "messages-square",
-            CSS_CLASS_CHAT_LIST_CONTAINER,
-            "chat-submenu-section" // Клас додано
-        );
-        this.chatSubmenuHeader = chatDropdownSection.header;
-        this.chatSubmenuContent = chatDropdownSection.content;
+            // Chat Section
+            const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER, "chat-submenu-section");
+            this.chatSubmenuHeader = chatDropdownSection.header; this.chatSubmenuContent = chatDropdownSection.content;
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
 
-        // Separator (перед списком дій)
-        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+            // Actions
+            // Заголовок Actions НЕ створюємо
+            this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
+            this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
+            this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
+            this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
 
-        // --- ВИДАЛЕНО ЗАГОЛОВОК "Actions" ---
-        // this.actionsHeader = this.menuDropdown.createEl("div", { text: "Actions", cls: [CSS_CLASS_MENU_HEADER, "actions-header"] });
+            // Danger Actions
+            this.clearChatOption = this.createActionItem("trash", "Clear Messages", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
+            this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [CSS_CLASS_DELETE_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
 
-        // Пункти дій
-        this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
-        this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
-        this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
-        this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
+            // Toggle View Location (має сенс лише в бічній панелі?)
+            this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
+            this.updateToggleViewLocationOption();
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
 
-        // Separator
-        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+        } else {
+             this.plugin.logger.debug("[DropdownMenuManager] Creating MINIMAL menu for tab location.");
+             // Обнуляємо посилання на елементи, що не створюються
+             this.modelSubmenuHeader = null; this.modelSubmenuContent = null;
+             this.roleSubmenuHeader = null; this.roleSubmenuContent = null;
+             this.chatSubmenuHeader = null; this.chatSubmenuContent = null;
+             this.newChatOption = null; this.renameChatOption = null; this.cloneChatOption = null;
+             this.exportChatOption = null; this.clearChatOption = null; this.deleteChatOption = null;
+             this.toggleViewLocationOption = null;
+        }
 
-        // Небезпечні дії
-        this.clearChatOption = this.createActionItem("trash", "Clear Messages", [
-            CSS_CLASS_CLEAR_CHAT_OPTION,
-            CSS_CLASSES.DANGER_OPTION,
-        ]);
-        this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [
-            CSS_CLASS_DELETE_CHAT_OPTION,
-            CSS_CLASSES.DANGER_OPTION,
-        ]);
-
-        // Separator
-        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-
-        // Перемикання вигляду
-        this.toggleViewLocationOption = this.menuDropdown.createEl("div", {
-            cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}`,
-        });
-        this.updateToggleViewLocationOption(); // Initial setup
-
-        // Separator
-        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-
-        // Налаштування
+        // --- Елемент, що створюється ЗАВЖДИ ---
+        // Роздільник перед Settings (створюємо лише якщо не в бічній панелі, бо інакше він вже є)
+        if (!this.isSidebarLocation) {
+            this.hrSeparators.push(this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }));
+        }
+        // Settings
         this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
 
         this.plugin.logger.debug("[DropdownMenuManager] Menu UI created.");
@@ -157,111 +145,98 @@ export class DropdownMenuManager {
     }
 
     public attachEventListeners(): void {
-        this.plugin.logger.error("[DropdownMenuManager] !!! ATTACHING EVENT LISTENERS !!!");
+        this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING EVENT LISTENERS (isSidebarLocation: ${this.isSidebarLocation}) !!!`);
 
-        // --- Null Checks ---
-        if (!this.modelSubmenuHeader || !this.modelSubmenuContent) console.error("DropdownMenuManager: Model submenu elements missing!");
-        if (!this.roleSubmenuHeader || !this.roleSubmenuContent) console.error("DropdownMenuManager: Role submenu elements missing!");
-        if (!this.chatSubmenuHeader || !this.chatSubmenuContent) console.error("DropdownMenuManager: Chat submenu elements missing!");
-        if (!this.newChatOption) console.error("DropdownMenuManager: newChatOption missing!");
-        if (!this.renameChatOption) console.error("DropdownMenuManager: renameChatOption missing!");
-        if (!this.cloneChatOption) console.error("DropdownMenuManager: cloneChatOption missing!");
-        if (!this.exportChatOption) console.error("DropdownMenuManager: exportChatOption missing!");
-        if (!this.clearChatOption) console.error("DropdownMenuManager: clearChatOption missing!");
-        if (!this.deleteChatOption) console.error("DropdownMenuManager: deleteChatOption missing!");
-        if (!this.toggleViewLocationOption) console.error("DropdownMenuManager: toggleViewLocationOption missing!");
+        // Null checks ТІЛЬКИ для елементів, що створюються ЗАВЖДИ
         if (!this.settingsOption) console.error("DropdownMenuManager: settingsOption missing!");
-        // --- End Null Checks ---
+        if (!this.menuDropdown) console.error("DropdownMenuManager: menuDropdown missing!"); // Важливо для document click
 
-        // --- Submenu Toggles ---
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to modelSubmenuHeader");
-        if (this.modelSubmenuHeader) {
-            this.registerListener(this.modelSubmenuHeader, "click", () => {
-                this.plugin.logger.error("!!! Dropdown: Model Submenu Header FIRED !!!");
-                this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models");
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to roleSubmenuHeader");
-        if (this.roleSubmenuHeader) {
-            this.registerListener(this.roleSubmenuHeader, "click", () => {
-                this.plugin.logger.error("!!! Dropdown: Role Submenu Header FIRED !!!");
-                this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles");
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to chatSubmenuHeader");
-        if (this.chatSubmenuHeader) {
-            this.registerListener(this.chatSubmenuHeader, "click", () => {
-                this.plugin.logger.error("!!! Dropdown: Chat Submenu Header FIRED !!!");
-                this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats");
-            });
-        }
-
-
-        // --- Action Items (Calling View Handlers) ---
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to newChatOption:", this.newChatOption);
-        if (!this.newChatOption) { this.plugin.logger.error("newChatOption is NULL!"); } else {
-            this.registerListener(this.newChatOption, "click", (event) => {
-                this.plugin.logger.error("!!! Dropdown: New Chat Listener FIRED !!!");
-                this.view.handleNewChatClick();
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to renameChatOption:", this.renameChatOption);
-        if (!this.renameChatOption) { this.plugin.logger.error("renameChatOption is NULL!"); } else {
-             this.registerListener(this.renameChatOption, "click", (event) => {
-                 this.plugin.logger.error("!!! Dropdown: Rename Chat Listener FIRED !!!");
-                 this.view.handleRenameChatClick();
-             });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to cloneChatOption:", this.cloneChatOption);
-        if (!this.cloneChatOption) { this.plugin.logger.error("cloneChatOption is NULL!"); } else {
-            this.registerListener(this.cloneChatOption, "click", (event) => {
-                this.plugin.logger.error("!!! Dropdown: Clone Chat Listener FIRED !!!");
-                this.view.handleCloneChatClick();
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to exportChatOption:", this.exportChatOption);
-        if (!this.exportChatOption) { this.plugin.logger.error("exportChatOption is NULL!"); } else {
-            this.registerListener(this.exportChatOption, "click", (event) => {
-                this.plugin.logger.error("!!! Dropdown: Export Chat Listener FIRED !!!");
-                this.view.handleExportChatClick();
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to clearChatOption:", this.clearChatOption);
-         if (!this.clearChatOption) { this.plugin.logger.error("clearChatOption is NULL!"); } else {
-            this.registerListener(this.clearChatOption, "click", (event) => {
-                this.plugin.logger.error("!!! Dropdown: Clear Chat Listener FIRED !!!");
-                this.view.handleClearChatClick();
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to deleteChatOption:", this.deleteChatOption);
-        if (!this.deleteChatOption) { this.plugin.logger.error("deleteChatOption is NULL!"); } else {
-            this.registerListener(this.deleteChatOption, "click", (event) => {
-                this.plugin.logger.error("!!! Dropdown: Delete Chat Listener FIRED !!!");
-                this.view.handleDeleteChatClick();
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to toggleViewLocationOption:", this.toggleViewLocationOption);
-        if (!this.toggleViewLocationOption) { this.plugin.logger.error("toggleViewLocationOption is NULL!"); } else {
-            this.registerListener(this.toggleViewLocationOption, "click", (event) => {
-                this.plugin.logger.error("!!! Dropdown: Toggle View Location Listener FIRED !!!");
-                this.view.handleToggleViewLocationClick();
-            });
-        }
-
-        this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to settingsOption:", this.settingsOption);
-        if (!this.settingsOption) { this.plugin.logger.error("settingsOption is NULL!"); } else {
+        // --- Слухачі для ЗАВЖДИ існуючих елементів ---
+        if (this.settingsOption) {
             this.registerListener(this.settingsOption, "click", (event) => {
                 this.plugin.logger.error("!!! Dropdown: Settings Listener FIRED !!!");
                 this.view.handleSettingsClick();
             });
+        }
+
+        // --- УМОВНІ слухачі ---
+        if (this.isSidebarLocation) {
+            this.plugin.logger.debug("[DropdownMenuManager] Attaching FULL menu listeners.");
+            // Null Checks для умовно створених елементів
+             if (!this.modelSubmenuHeader || !this.modelSubmenuContent) console.error("DropdownMenuManager: Model submenu elements missing!");
+             if (!this.roleSubmenuHeader || !this.roleSubmenuContent) console.error("DropdownMenuManager: Role submenu elements missing!");
+             if (!this.chatSubmenuHeader || !this.chatSubmenuContent) console.error("DropdownMenuManager: Chat submenu elements missing!");
+             if (!this.newChatOption) console.error("DropdownMenuManager: newChatOption missing!");
+             if (!this.renameChatOption) console.error("DropdownMenuManager: renameChatOption missing!");
+             if (!this.cloneChatOption) console.error("DropdownMenuManager: cloneChatOption missing!");
+             if (!this.exportChatOption) console.error("DropdownMenuManager: exportChatOption missing!");
+             if (!this.clearChatOption) console.error("DropdownMenuManager: clearChatOption missing!");
+             if (!this.deleteChatOption) console.error("DropdownMenuManager: deleteChatOption missing!");
+             if (!this.toggleViewLocationOption) console.error("DropdownMenuManager: toggleViewLocationOption missing!");
+
+            // Submenu Toggles
+            if (this.modelSubmenuHeader) {
+                this.registerListener(this.modelSubmenuHeader, "click", () => {
+                    this.plugin.logger.error("!!! Dropdown: Model Submenu Header FIRED !!!");
+                    this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models");
+                });
+            }
+            if (this.roleSubmenuHeader) {
+                this.registerListener(this.roleSubmenuHeader, "click", () => {
+                    this.plugin.logger.error("!!! Dropdown: Role Submenu Header FIRED !!!");
+                    this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles");
+                });
+            }
+            if (this.chatSubmenuHeader) {
+                this.registerListener(this.chatSubmenuHeader, "click", () => {
+                    this.plugin.logger.error("!!! Dropdown: Chat Submenu Header FIRED !!!");
+                    this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats");
+                });
+            }
+
+            // Action Items
+            if (this.newChatOption) {
+                this.registerListener(this.newChatOption, "click", (event) => {
+                    this.plugin.logger.error("!!! Dropdown: New Chat Listener FIRED !!!");
+                    this.view.handleNewChatClick();
+                });
+            }
+             if (this.renameChatOption) {
+                 this.registerListener(this.renameChatOption, "click", (event) => {
+                     this.plugin.logger.error("!!! Dropdown: Rename Chat Listener FIRED !!!");
+                     this.view.handleRenameChatClick();
+                 });
+            }
+            if (this.cloneChatOption) {
+                this.registerListener(this.cloneChatOption, "click", (event) => {
+                    this.plugin.logger.error("!!! Dropdown: Clone Chat Listener FIRED !!!");
+                    this.view.handleCloneChatClick();
+                });
+            }
+             if (this.exportChatOption) {
+                this.registerListener(this.exportChatOption, "click", (event) => {
+                    this.plugin.logger.error("!!! Dropdown: Export Chat Listener FIRED !!!");
+                    this.view.handleExportChatClick();
+                });
+            }
+             if (this.clearChatOption) {
+                this.registerListener(this.clearChatOption, "click", (event) => {
+                    this.plugin.logger.error("!!! Dropdown: Clear Chat Listener FIRED !!!");
+                    this.view.handleClearChatClick();
+                });
+            }
+            if (this.deleteChatOption) {
+                this.registerListener(this.deleteChatOption, "click", (event) => {
+                    this.plugin.logger.error("!!! Dropdown: Delete Chat Listener FIRED !!!");
+                    this.view.handleDeleteChatClick();
+                });
+            }
+            if (this.toggleViewLocationOption) {
+                 this.registerListener(this.toggleViewLocationOption, "click", (event) => {
+                    this.plugin.logger.error("!!! Dropdown: Toggle View Location Listener FIRED !!!");
+                    this.view.handleToggleViewLocationClick();
+                 });
+            }
         }
 
         this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING EVENT LISTENERS !!!");

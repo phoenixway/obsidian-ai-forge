@@ -24,6 +24,12 @@
     height: 100%;
     min-width: 0; // Allows shrinking
     overflow: hidden; // Clips content overflowing this area
+    transition: width 0.3s ease-out; // Анімація ширини
+
+    // Клас, що додається, коли внутрішній сайдбар приховано
+    &.full-width {
+       // Не потрібно встановлювати width: 100%, flex-grow: 1 зробить свою справу
+    }
 }
 
 // Wrapper for message list (has .ollama-chat-area-content in TS)

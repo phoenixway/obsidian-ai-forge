@@ -111,13 +111,21 @@
     box-sizing: border-box;
     padding: 0 calc(var(--chat-spacing-unit) * 1.5); // Horizontal padding only when collapsed
     min-height: 0; // Allow shrinking to 0
+    padding-top: 0;
+    padding-bottom: 0;
 
     // Expanded state (when .is-expanded class is added via TS)
     &.is-expanded {
         max-height: 70vh; // Max height limit (adjust as needed) // Встановлюється JS
         overflow-y: auto; // Enable internal vertical scrolling // Встановлюється JS
-        padding-top: calc(var(--chat-spacing-unit) * 1);
-        padding-bottom: calc(var(--chat-spacing-unit) * 1);
+        // padding-top: calc(var(--chat-spacing-unit) * 1);
+        // padding-bottom: calc(var(--chat-spacing-unit) * 1);
+        padding-top: var(--size-4-1);
+        padding-bottom: var(--size-4-1);
+    }
+    &.ollama-chat-panel-list,
+    &.ollama-role-panel-list {
+        overflow-y: auto; // Дозволити скрол, якщо вміст більший за max-height
     }
 
     // Scrollbar styling for the content section (when visible)
@@ -349,4 +357,37 @@
 .menu-item[aria-label="Delete Chat"]:hover {
   background-color: var(--background-modifier-error-hover);
   color: var(--text-on-error) !important;
+}
+
+
+.ollama-sidebar-container {
+    // Стилі за замовчуванням (коли панель видима - у вкладці)
+    flex-shrink: 0; // Не стискати
+    width: var(--ai-forge-sidebar-width, 250px); // Використовуємо змінну або фіксоване значення
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto; // Дозволяємо скрол всередині панелі
+    border-right: 1px solid var(--background-modifier-border);
+    transition: width 0.3s ease-out, opacity 0.3s ease-out, margin-right 0.3s ease-out, padding 0.3s ease-out, border 0.3s ease-out;
+    background-color: var(--background-secondary); // Фон для видимості
+    padding: var(--size-4-2); // Невеликий відступ
+    margin-right: var(--size-4-2); // Відступ від чату
+  
+    // Стилі для прихованого стану (коли view у бічній панелі Obsidian)
+    &.internal-sidebar-hidden {
+      width: 0;
+      opacity: 0;
+      padding: 0;
+      margin-right: 0;
+      border-right: none;
+      overflow: hidden; // Важливо приховати контент
+      pointer-events: none; // Заборонити взаємодію
+    }
+  }
+  .ollama-sidebar-section-content-hidden {
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    overflow: hidden !important;
 }

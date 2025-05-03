@@ -158,7 +158,8 @@ export class OllamaView extends ItemView {
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
-    this.sidebarManager = new SidebarManager(this.plugin); // <--- Ініціалізуємо тут
+    this.app = plugin.app;
+    // this.sidebarManager = new SidebarManager(this.plugin); // <--- Ініціалізуємо тут
     this.initSpeechWorker();
     // Переконуємось, що handleScroll визначено ПЕРЕД цим рядком
     this.scrollListenerDebounced = debounce(this.handleScroll, 150, true);
@@ -267,18 +268,19 @@ export class OllamaView extends ItemView {
   // src/OllamaView.ts -> createUIElements
 
   private createUIElements(): void {
-    this.plugin.logger.debug("createUIElements: Starting UI creation.");
-    this.contentEl.empty();
+    this.contentEl.empty(); 
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER }); // Головний flex контейнер
-
-    // --- Створюємо бічну панель за допомогою SidebarManager ---
-    // SidebarManager сам створить свій головний div (колишній rolePanelEl)
-    // і додасть його до flexContainer.
-    this.sidebarManager.createSidebarUI(flexContainer); // <--- ВИКЛИК МЕНЕДЖЕРА
-
-    // --- Основна Область Чату (права частина) ---
-    // Створюємо обгортку для чату та поля вводу
-    this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA }); // <-- Створюємо цю обгортку тут
+    const isSidebarLocation = !this.plugin.settings.openChatInTab;
+    this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
+    const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
+    if (sidebarRootEl) {
+      sidebarRootEl.classList.toggle('internal-sidebar-hidden', isSidebarLocation);
+      this.plugin.logger.debug(`[OllamaView] Internal sidebar element visibility set (hidden: ${isSidebarLocation})`);
+ } else {
+      this.plugin.logger.warn("[OllamaView] Could not find sidebar root element to toggle visibility.");
+ }
+  this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA }); // <-- Створюємо цю обгортку тут
+  this.mainChatAreaEl.classList.toggle('full-width', isSidebarLocation);
 
     // Вміст основної області (чат + поле вводу) - БЕЗ ЗМІН, додається до mainChatAreaEl
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
@@ -347,8 +349,8 @@ export class OllamaView extends ItemView {
     setIcon(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
 
-    this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer);
-    this.dropdownMenuManager.createMenuUI();
+        this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation); // <--- Передаємо isSidebarLocation    
+        this.dropdownMenuManager.createMenuUI();
   }
   
   private attachEventListeners(): void {
