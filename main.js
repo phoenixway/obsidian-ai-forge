@@ -2488,7 +2488,6 @@ var CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 var CSS_CLASS_CHAT_OPTION = "chat-option";
 var CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 var CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
-var CSS_CLASS_MENU_HEADER = "menu-header";
 var CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
 var CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
 var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
@@ -2498,10 +2497,10 @@ var CSS_CLASS_CHAT_LIST_ITEM2 = "ollama-chat-list-item";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var DropdownMenuManager = class {
   constructor(plugin, app, view, parentElement) {
+    // private actionsHeader!: HTMLElement; // ВИДАЛЕНО
     // --- Event Listener References for explicit removal ---
     this.listeners = [];
     // --- Submenu Logic ---
-    // Copied directly from OllamaView, ensure `this` refers to DropdownMenuManager instance
     this.createSubmenuSection = (title, icon, listContainerClass, sectionClass) => {
       const section = this.menuDropdown.createDiv();
       if (sectionClass)
@@ -2553,11 +2552,11 @@ var DropdownMenuManager = class {
       "messages-square",
       CSS_CLASS_CHAT_LIST_CONTAINER,
       "chat-submenu-section"
+      // Клас додано
     );
     this.chatSubmenuHeader = chatDropdownSection.header;
     this.chatSubmenuContent = chatDropdownSection.content;
     this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR2 });
-    this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
     this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
     this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
     this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
@@ -2588,9 +2587,8 @@ var DropdownMenuManager = class {
     itemEl.createSpan({ cls: "menu-option-text", text });
     return itemEl;
   }
-  // Need to add event listeners
   attachEventListeners() {
-    this.plugin.logger.debug("[DropdownMenuManager] Attaching event listeners...");
+    this.plugin.logger.error("[DropdownMenuManager] !!! ATTACHING EVENT LISTENERS !!!");
     if (!this.modelSubmenuHeader || !this.modelSubmenuContent)
       console.error("DropdownMenuManager: Model submenu elements missing!");
     if (!this.roleSubmenuHeader || !this.roleSubmenuContent)
@@ -2613,30 +2611,100 @@ var DropdownMenuManager = class {
       console.error("DropdownMenuManager: toggleViewLocationOption missing!");
     if (!this.settingsOption)
       console.error("DropdownMenuManager: settingsOption missing!");
-    this.registerListener(
-      this.modelSubmenuHeader,
-      "click",
-      () => this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")
-    );
-    this.registerListener(
-      this.roleSubmenuHeader,
-      "click",
-      () => this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")
-    );
-    this.registerListener(
-      this.chatSubmenuHeader,
-      "click",
-      () => this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")
-    );
-    this.registerListener(this.newChatOption, "click", this.view.handleNewChatClick);
-    this.registerListener(this.renameChatOption, "click", () => this.view.handleRenameChatClick());
-    this.registerListener(this.cloneChatOption, "click", this.view.handleCloneChatClick);
-    this.registerListener(this.exportChatOption, "click", this.view.handleExportChatClick);
-    this.registerListener(this.clearChatOption, "click", this.view.handleClearChatClick);
-    this.registerListener(this.deleteChatOption, "click", this.view.handleDeleteChatClick);
-    this.registerListener(this.toggleViewLocationOption, "click", this.view.handleToggleViewLocationClick);
-    this.registerListener(this.settingsOption, "click", this.view.handleSettingsClick);
-    this.plugin.logger.debug("[DropdownMenuManager] Event listeners attached.");
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to modelSubmenuHeader");
+    if (this.modelSubmenuHeader) {
+      this.registerListener(this.modelSubmenuHeader, "click", () => {
+        this.plugin.logger.error("!!! Dropdown: Model Submenu Header FIRED !!!");
+        this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models");
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to roleSubmenuHeader");
+    if (this.roleSubmenuHeader) {
+      this.registerListener(this.roleSubmenuHeader, "click", () => {
+        this.plugin.logger.error("!!! Dropdown: Role Submenu Header FIRED !!!");
+        this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles");
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to chatSubmenuHeader");
+    if (this.chatSubmenuHeader) {
+      this.registerListener(this.chatSubmenuHeader, "click", () => {
+        this.plugin.logger.error("!!! Dropdown: Chat Submenu Header FIRED !!!");
+        this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats");
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to newChatOption:", this.newChatOption);
+    if (!this.newChatOption) {
+      this.plugin.logger.error("newChatOption is NULL!");
+    } else {
+      this.registerListener(this.newChatOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: New Chat Listener FIRED !!!");
+        this.view.handleNewChatClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to renameChatOption:", this.renameChatOption);
+    if (!this.renameChatOption) {
+      this.plugin.logger.error("renameChatOption is NULL!");
+    } else {
+      this.registerListener(this.renameChatOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Rename Chat Listener FIRED !!!");
+        this.view.handleRenameChatClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to cloneChatOption:", this.cloneChatOption);
+    if (!this.cloneChatOption) {
+      this.plugin.logger.error("cloneChatOption is NULL!");
+    } else {
+      this.registerListener(this.cloneChatOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Clone Chat Listener FIRED !!!");
+        this.view.handleCloneChatClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to exportChatOption:", this.exportChatOption);
+    if (!this.exportChatOption) {
+      this.plugin.logger.error("exportChatOption is NULL!");
+    } else {
+      this.registerListener(this.exportChatOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Export Chat Listener FIRED !!!");
+        this.view.handleExportChatClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to clearChatOption:", this.clearChatOption);
+    if (!this.clearChatOption) {
+      this.plugin.logger.error("clearChatOption is NULL!");
+    } else {
+      this.registerListener(this.clearChatOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Clear Chat Listener FIRED !!!");
+        this.view.handleClearChatClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to deleteChatOption:", this.deleteChatOption);
+    if (!this.deleteChatOption) {
+      this.plugin.logger.error("deleteChatOption is NULL!");
+    } else {
+      this.registerListener(this.deleteChatOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Delete Chat Listener FIRED !!!");
+        this.view.handleDeleteChatClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to toggleViewLocationOption:", this.toggleViewLocationOption);
+    if (!this.toggleViewLocationOption) {
+      this.plugin.logger.error("toggleViewLocationOption is NULL!");
+    } else {
+      this.registerListener(this.toggleViewLocationOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Toggle View Location Listener FIRED !!!");
+        this.view.handleToggleViewLocationClick();
+      });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Attaching listener to settingsOption:", this.settingsOption);
+    if (!this.settingsOption) {
+      this.plugin.logger.error("settingsOption is NULL!");
+    } else {
+      this.registerListener(this.settingsOption, "click", (event) => {
+        this.plugin.logger.error("!!! Dropdown: Settings Listener FIRED !!!");
+        this.view.handleSettingsClick();
+      });
+    }
+    this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING EVENT LISTENERS !!!");
   }
   registerListener(element, type, handler) {
     const eventHandler = handler;
@@ -2678,7 +2746,6 @@ var DropdownMenuManager = class {
       this.collapseAllSubmenus(null);
     }
   }
-  // Handles clicks outside the menu - Called by OllamaView's document click listener
   handleDocumentClick(event, menuButton) {
     var _a;
     if (this.isMenuOpen() && !(menuButton == null ? void 0 : menuButton.contains(event.target)) && !((_a = this.menuDropdown) == null ? void 0 : _a.contains(event.target))) {
@@ -2686,7 +2753,6 @@ var DropdownMenuManager = class {
       this.closeMenu();
     }
   }
-  // Copied directly from OllamaView, ensure `this` refers to DropdownMenuManager instance
   async toggleSubmenu(headerEl, contentEl, type) {
     if (!headerEl || !contentEl)
       return;
@@ -2736,10 +2802,7 @@ var DropdownMenuManager = class {
       } catch (error) {
         this.plugin.logger.error(`[DropdownMenuManager] Error rendering ${type} list:`, error);
         contentEl.empty();
-        contentEl.createDiv({
-          cls: "menu-error-text",
-          text: `Error loading ${type}.`
-        });
+        contentEl.createDiv({ cls: "menu-error-text", text: `Error loading ${type}.` });
         contentEl.style.maxHeight = "50px";
         contentEl.style.overflowY = "hidden";
       }
@@ -2754,7 +2817,6 @@ var DropdownMenuManager = class {
         (0, import_obsidian13.setIcon)(iconEl, "chevron-right");
     }
   }
-  // Copied directly from OllamaView, ensure `this` refers to DropdownMenuManager instance
   collapseAllSubmenus(exceptContent) {
     const submenus = [
       { header: this.modelSubmenuHeader, content: this.modelSubmenuContent },
@@ -2779,7 +2841,6 @@ var DropdownMenuManager = class {
     });
   }
   // --- List Rendering / Update ---
-  // Copied and adapted from OllamaView
   async renderModelList() {
     var _a, _b;
     const container = this.modelSubmenuContent;
@@ -2794,7 +2855,7 @@ var DropdownMenuManager = class {
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       if (models.length === 0) {
-        container.createEl("div", { cls: "menu-info-text", text: "No models." });
+        container.createEl("div", { cls: "menu-info-text", text: "No models available." });
         return;
       }
       models.forEach((modelName) => {
@@ -2844,7 +2905,6 @@ var DropdownMenuManager = class {
       container.createEl("div", { cls: "menu-error-text", text: "Error loading models." });
     }
   }
-  // Copied and adapted from OllamaView
   async renderRoleList() {
     var _a, _b, _c;
     const container = this.roleSubmenuContent;
@@ -2926,7 +2986,6 @@ var DropdownMenuManager = class {
       container.createEl("div", { cls: "menu-error-text", text: "Error loading roles." });
     }
   }
-  // Copied and adapted from OllamaView
   async renderChatListMenu() {
     var _a, _b;
     const container = this.chatSubmenuContent;
@@ -2947,7 +3006,6 @@ var DropdownMenuManager = class {
       this.plugin.logger.debug(`[DropdownMenuManager] Rendering ${chats.length} chats. Active ID: ${currentActiveId}`);
       chats.forEach((chatMeta) => {
         const chatOptionEl = container.createDiv({
-          // Ensure all necessary classes are here
           cls: [CSS_CLASS_MENU_OPTION2, CSS_CLASS_CHAT_LIST_ITEM2, CSS_CLASS_CHAT_OPTION]
         });
         const iconSpan = chatOptionEl.createEl("span", { cls: "menu-option-icon" });
@@ -2983,7 +3041,6 @@ var DropdownMenuManager = class {
     }
   }
   // --- UI Updates ---
-  // Copied directly from OllamaView
   updateToggleViewLocationOption() {
     if (!this.toggleViewLocationOption)
       return;
@@ -3022,7 +3079,6 @@ var DropdownMenuManager = class {
       await this.renderChatListMenu();
     }
   }
-  // Copied directly from OllamaView
   updateSubmenuHeight(contentEl) {
     if (contentEl && !contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
       requestAnimationFrame(() => {
