@@ -12,7 +12,7 @@
 // Center the entire chat column
 .ollama-chat-container {
   max-width: var(--chat-column-max-width); // Apply overall max width
-  width: 100%;      // Allow shrinking
+  width: 100%; // Allow shrinking
   margin-left: auto;
   margin-right: auto;
   // Keep existing padding, flex properties for vertical layout if needed
@@ -30,38 +30,39 @@
   // Group alignment dictates order and avatar margin side
   &.user-message-group {
     // justify-content: flex-end; // No longer needed if wrapper handles margin
-    .message-group-avatar { order: 2; } // Avatar on the right
+    .message-group-avatar {
+      order: 2;
+    } // Avatar on the right
     .message-wrapper {
-       order: 1; // Messages on the left
-       align-items: flex-end; // Align bubbles & actions to the right inside wrapper
-       margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
-       margin-left: auto; // Push wrapper away from left edge
+      order: 1; // Messages on the left
+      align-items: flex-end; // Align bubbles & actions to the right inside wrapper
+      margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+      margin-left: auto; // Push wrapper away from left edge
     }
   }
 
   &.ollama-message-group {
     // justify-content: flex-start; // No longer needed
-    .message-group-avatar { order: 1; } // Avatar on the left
-     .message-wrapper {
-       order: 2; // Messages on the right
-       align-items: flex-start; // Align bubbles & actions to the left inside wrapper
-       margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
-       margin-right: auto; // Push wrapper away from right edge
+    .message-group-avatar {
+      order: 1;
+    } // Avatar on the left
+    .message-wrapper {
+      order: 2; // Messages on the right
+      align-items: flex-start; // Align bubbles & actions to the left inside wrapper
+      margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+      margin-right: auto; // Push wrapper away from right edge
     }
   }
 }
 
 // Wrapper for one or more message bubbles + their action buttons below it
 .message-wrapper {
-   display: flex;
-   flex-direction: column;
-   max-width: var(--chat-message-max-width); // Apply the fixed PX max-width here
-   gap: calc(var(--chat-spacing-unit) * 0.75); // Vertical gap between message bubble and action buttons below it
-   // align-items (flex-start/flex-end) are set by the parent group rule
-
-
+  display: flex;
+  flex-direction: column;
+  max-width: var(--chat-message-max-width); // Apply the fixed PX max-width here
+  gap: calc(var(--chat-spacing-unit) * 0.75); // Vertical gap between message bubble and action buttons below it
+  // align-items (flex-start/flex-end) are set by the parent group rule
 }
-
 
 // Avatar Styles
 .message-group-avatar {
@@ -76,22 +77,25 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   z-index: 5; // Above potential background elements
   flex-shrink: 0;
 
-  overflow: hidden; 
-  
+  overflow: hidden;
+
   img.ollama-avatar-image {
     display: block; // Прибирає можливий нижній відступ
-    width: 100%;    // Заповнює всю ширину/висоту батьківського div
+    width: 100%; // Заповнює всю ширину/висоту батьківського div
     height: 100%;
     object-fit: cover; // Масштабує зображення, зберігаючи пропорції і обрізаючи зайве
-                       // Можна спробувати 'contain', якщо хочете бачити все зображення
+    // Можна спробувати 'contain', якщо хочете бачити все зображення
     object-position: center; // Центрує зображення
   }
 
-  .svg-icon { width: 60%; height: 60%; }
+  .svg-icon {
+    width: 60%;
+    height: 60%;
+  }
 
   .user-message-group & {
     background-color: var(--interactive-accent-translucent);
@@ -114,26 +118,49 @@
   line-height: 1.5;
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 
-  &.message-arriving { animation: message-appear 0.3s ease-out forwards; }
+  &.message-arriving {
+    animation: message-appear 0.3s ease-out forwards;
+  }
 }
 
 // Corner Radius logic for consecutive messages within the same wrapper
 // Applied to the .message elements
 .user-message-group .message-wrapper {
-  .message:not(:last-child) { border-bottom-right-radius: 5px; }
-  .message:last-child { border-bottom-right-radius: 18px; }
-  .message:not(:first-child) { border-top-right-radius: 5px; }
-  .message:first-child { border-top-right-radius: 18px; }
-   .message { border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
+  .message:not(:last-child) {
+    border-bottom-right-radius: 5px;
+  }
+  .message:last-child {
+    border-bottom-right-radius: 18px;
+  }
+  .message:not(:first-child) {
+    border-top-right-radius: 5px;
+  }
+  .message:first-child {
+    border-top-right-radius: 18px;
+  }
+  .message {
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
+  }
 }
 .ollama-message-group .message-wrapper {
-  .message:not(:last-child) { border-bottom-left-radius: 5px; }
-  .message:last-child { border-bottom-left-radius: 18px; }
-  .message:not(:first-child) { border-top-left-radius: 5px; }
-  .message:first-child { border-top-left-radius: 18px; }
-   .message { border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
+  .message:not(:last-child) {
+    border-bottom-left-radius: 5px;
+  }
+  .message:last-child {
+    border-bottom-left-radius: 18px;
+  }
+  .message:not(:first-child) {
+    border-top-left-radius: 5px;
+  }
+  .message:first-child {
+    border-top-left-radius: 18px;
+  }
+  .message {
+    border-top-right-radius: 18px;
+    border-bottom-right-radius: 18px;
+  }
 }
-
 
 // Role-specific message bubble styles
 .user-message {
@@ -141,15 +168,26 @@
   // background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
   color: var(--text-on-accent);
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-  &:hover { box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3); transform: translateY(-1px); }
-  .message-timestamp { color: var(--text-on-accent); opacity: 0.75; }
+  &:hover {
+    box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
+    transform: translateY(-1px);
+  }
+  .message-timestamp {
+    color: var(--text-on-accent);
+    opacity: 0.75;
+  }
 }
 .ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); transform: translateY(-1px); }
-   pre { background-color: var(--background-secondary) !important; }
+  &:hover {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  pre {
+    background-color: var(--background-secondary) !important;
+  }
 }
 
 // --- Action Buttons Styling & Positioning ---
@@ -183,76 +221,81 @@
     // padding: 2px;
     // color: var(--text-muted);
     cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.15s ease;
     // box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 
-    .svg-icon { width: 14px; height: 14px; }
+    .svg-icon {
+      width: 14px;
+      height: 14px;
+    }
 
     &:hover {
-        background: transparent !important; // Still transparent on hover
-        color: var(--text-normal); // Change only icon color on hover
-        transform: scale(1.05); // Keep scale effect if desired
+      background: transparent !important; // Still transparent on hover
+      color: var(--text-normal); // Change only icon color on hover
+      transform: scale(1.05); // Keep scale effect if desired
     }
-}
-
-.delete-message-button {
-  // Можна успадкувати базові стилі кнопки
-
-  &.danger-option { // Використовуємо клас небезпеки
-       color: var(--text-error); // Червонуватий колір іконки
-
-       &:hover {
-           color: var(--text-on-accent); // Білий або інший контрастний при наведенні
-           background-color: var(--background-modifier-error-hover); // Червонуватий фон при наведенні
-           border-color: transparent; // Можна прибрати рамку при наведенні
-       }
   }
-}
 
-// --- Специфічні стилі для кнопки видалення НА ПОВІДОМЛЕННЯХ КОРИСТУВАЧА ---
-// (щоб краще виглядало на синьому фоні)
-.user-message .delete-message-button {
-  &.danger-option {
+  .delete-message-button {
+    // Можна успадкувати базові стилі кнопки
+
+    &.danger-option {
+      // Використовуємо клас небезпеки
+      color: var(--text-error); // Червонуватий колір іконки
+
+      &:hover {
+        color: var(--text-on-accent); // Білий або інший контрастний при наведенні
+        background-color: var(--background-modifier-error-hover); // Червонуватий фон при наведенні
+        border-color: transparent; // Можна прибрати рамку при наведенні
+      }
+    }
+  }
+
+  // --- Специфічні стилі для кнопки видалення НА ПОВІДОМЛЕННЯХ КОРИСТУВАЧА ---
+  // (щоб краще виглядало на синьому фоні)
+  .user-message .delete-message-button {
+    &.danger-option {
       color: rgba(255, 150, 150, 0.8); // Світло-червоний для кращої видимості
 
       &:hover {
-          background-color: rgba(200, 50, 50, 0.5); // Темніший червоний фон при наведенні
-          color: white;
+        background-color: rgba(200, 50, 50, 0.5); // Темніший червоний фон при наведенні
+        color: white;
       }
+    }
   }
-}
 
-&.user-message-group & button { // Or .user-message + & button
-  color: rgba(255, 255, 255, 0.8); // Lighter icon color for user messages
-  background: transparent !important;
-  border: none;
-  box-shadow: none;
-   &:hover {
+  &.user-message-group & button {
+    // Or .user-message + & button
+    color: rgba(255, 255, 255, 0.8); // Lighter icon color for user messages
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    &:hover {
       background: transparent !important;
       color: white;
-   }
+    }
+  }
 }
-  }
-  // Style for Regenerate button (optional)
-  .regenerate-button {
-     // color: var(--text-warning); // Example accent
-  }
-  button.summarize-button {
-    // Можна додати специфічний колір або інші налаштування
-    // Наприклад:
-    // color: var(--text-accent);
-    // &:hover {
-    //   color: var(--text-accent-hover);
-    // }
-  }
-
+// Style for Regenerate button (optional)
+.regenerate-button {
+  // color: var(--text-warning); // Example accent
+}
+button.summarize-button {
+  // Можна додати специфічний колір або інші налаштування
+  // Наприклад:
+  // color: var(--text-accent);
+  // &:hover {
+  //   color: var(--text-accent-hover);
+  // }
+}
 
 // Стилі для модального вікна сумаризації (якщо потрібно)
 .summary-modal-content {
   // Стилі для контейнера з текстом сумаризації
 }
-
 
 // Show buttons on hover of the MESSAGE BUBBLE (as buttons are now siblings)
 // Or hover of the wrapper containing both? Let's try wrapper for larger target.
@@ -265,42 +308,47 @@
 .user-message-group .message-actions-wrapper {
   // --- ДОДАНО ЦЕ ПРАВИЛО ---
   align-self: flex-start; // Перевизначає align-items: flex-end батьківського .message-wrapper,
-                          // змушуючи САМЕ ЦЕЙ БЛОК КНОПОК вирівнятись по лівому краю.
+  // змушуючи САМЕ ЦЕЙ БЛОК КНОПОК вирівнятись по лівому краю.
   // --------------------------
 
   // Стилі самих кнопок (залишаються ті ж)
   button {
-     background: rgba(255, 255, 255, 0.1);
-     border-color: rgba(255, 255, 255, 0.2);
-     color: rgba(255, 255, 255, 0.8);
-     &:hover {
-        background-color: rgba(255, 255, 255, 0.25);
-        color: white;
-     }
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.25);
+      color: white;
+    }
   }
 }
 
-
 // Specific button styles for user messages (actions appear below user bubble)
 .user-message-group .message-actions-wrapper button {
-   background: rgba(255, 255, 255, 0.1);
-   border-color: rgba(255, 255, 255, 0.2);
-   color: rgba(255, 255, 255, 0.8);
-   &:hover {
-      background-color: rgba(255, 255, 255, 0.25);
-      color: white;
-   }
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
 }
 // --- End Action Buttons Styling ---
 
 // Message Content & Meta Containers
-.message-content-container { /* Probably no longer needed if actions are outside */ }
+.message-content-container {
+  /* Probably no longer needed if actions are outside */
+}
 .message-content {
   padding-bottom: calc(var(--chat-spacing-unit) * 1); // Smaller padding is okay now
   box-sizing: border-box;
   width: 100%;
-  p { margin-bottom: calc(var(--p-spacing) / 2); }
-  p:last-child { margin-bottom: 0; }
+  p {
+    margin-bottom: calc(var(--p-spacing) / 2);
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
 }
 
 // Timestamp - should be inside .message, maybe after content? Let's keep it simple for now.
@@ -313,7 +361,6 @@
   width: 100%;
   opacity: 0.9;
 }
-
 
 // --- Message Collapsing Styles ---
 .message-content-collapsible {
@@ -346,37 +393,45 @@
   z-index: 2; // Above masked content
 
   &:hover {
-      background-color: var(--background-modifier-hover);
-      color: var(--text-accent-hover);
-      border-color: var(--background-modifier-border-hover);
+    background-color: var(--background-modifier-hover);
+    color: var(--text-accent-hover);
+    border-color: var(--background-modifier-border-hover);
   }
 }
-.user-message .show-more-button { // Style button when inside user message
-    background-color: transparent;
-    border-color: transparent;
-    color: rgba(255, 255, 255, 0.7);
-    &:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
+.user-message .show-more-button {
+  // Style button when inside user message
+  background-color: transparent;
+  border-color: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
 }
 // --- End Message Collapsing Styles ---
 
 // --- Animation for arriving messages ---
 @keyframes message-appear {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 // --- Media Query for Large Screens ---
-@media screen and (min-width: 1600px) { // Порог ширини екрану (можна змінити: 1400px, 1800px, тощо)
+@media screen and (min-width: 1600px) {
+  // Порог ширини екрану (можна змінити: 1400px, 1800px, тощо)
 
   .ollama-chat-container {
     // Збільшуємо бокові відступи (padding) всередині контейнера чату
     // Це змусить контент бути вужчим і ближчим до центру
     // Експериментуйте зі значеннями (%, rem, px)
-    padding-left: 15%;   // Наприклад, 15% від ширини контейнера зліва
-    padding-right: 15%;  // Наприклад, 15% від ширини контейнера справа
+    padding-left: 15%; // Наприклад, 15% від ширини контейнера зліва
+    padding-right: 15%; // Наприклад, 15% від ширини контейнера справа
 
     // Опціонально: Можна також трохи збільшити максимальну ширину самої колонки чату,
     // якщо вона здається занадто вузькою на великому екрані після додавання паддінгів.
@@ -395,7 +450,6 @@
      margin-right: 0; // Прибираємо автоматичний відступ, що штовхав ліворуч
   }
   */
-
 } // --- Кінець медіа-запиту ---
 
 .scroll-to-bottom-button {
@@ -434,9 +488,9 @@
     transform: translateY(8px) scale(1.05); // Невеликий підйом при наведенні
   }
 
-   &:active {
-      transform: translateY(9px) scale(1); // Невелике "натискання"
-   }
+  &:active {
+    transform: translateY(9px) scale(1); // Невелике "натискання"
+  }
 
   // Клас для видимої кнопки
   &.visible {
@@ -445,16 +499,16 @@
     transform: translateY(0);
     transition: opacity 0.2s ease-out, visibility 0s linear 0s, transform 0.2s ease-out, background-color 0.15s ease;
 
-     &:hover {
-          opacity: 1; // Повна непрозорість при наведенні
-     }
+    &:hover {
+      opacity: 1; // Повна непрозорість при наведенні
+    }
   }
 }
 
 // Опціонально: Можна додати анімацію появи лічильника на індикаторі нових повідомлень,
 // коли з'являється і кнопка прокрутки вниз, якщо ви додаєте лічильник.
 .new-message-indicator.visible {
-   // Стилі для видимого індикатора
+  // Стилі для видимого індикатора
 }
 
 .summary-modal-content {
@@ -462,8 +516,12 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 // Універсальний клас для анімації завантаження іконки в кнопці
@@ -475,5 +533,28 @@
   // Головне - анімація для іконки всередині
   .svg-icon {
     animation: spin 1s linear infinite;
+  }
+
+  // styles.scss (або _messages.scss / _chat.scss)
+
+  // --- Стилі для роздільника дати в чаті ---
+  .chat-date-separator {
+    width: fit-content; // Ширина за вмістом
+    max-width: 80%; // Максимальна ширина, щоб не розтягуватись надто сильно
+    margin-left: auto; // Горизонтальне центрування блоку
+    margin-right: auto;
+    margin-top: calc(var(--chat-spacing-unit) * 6); // Відступ зверху (більший)
+    margin-bottom: calc(var(--chat-spacing-unit) * 4); // Відступ знизу (стандартний)
+    padding: calc(var(--chat-spacing-unit) * 0.75) calc(var(--chat-spacing-unit) * 2.5); // Внутрішні відступи
+    font-size: var(--font-ui-smaller); // Розмір шрифту - маленький
+    color: var(--text-muted); // Колір тексту - приглушений
+    background-color: var(--background-secondary); // Фон, як у другорядних елементів UI
+    border-radius: var(--radius-l); // Закруглені кути
+    text-align: center; // Центрування тексту всередині
+    user-select: none; // Заборонити виділення тексту
+    font-weight: 500; // Трохи жирніший шрифт (опціонально)
+
+    // Опціонально: Додаємо ледь помітну рамку
+    // border: 1px solid var(--background-modifier-border-hover);
   }
 }
