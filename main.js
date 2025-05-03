@@ -3065,10 +3065,6 @@ var SCROLL_THRESHOLD = 150;
 var CSS_CLASS_CONTAINER = "ollama-container";
 var CSS_CLASS_CHAT_CONTAINER = "ollama-chat-container";
 var CSS_CLASS_INPUT_CONTAINER = "chat-input-container";
-var CSS_CLASS_BUTTONS_CONTAINER = "buttons-container";
-var CSS_CLASS_SEND_BUTTON = "send-button";
-var CSS_CLASS_VOICE_BUTTON = "voice-button";
-var CSS_CLASS_TRANSLATE_INPUT_BUTTON = "translate-input-button";
 var CSS_CLASS_TRANSLATING_INPUT = "translating-input";
 var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
 var CSS_CLASS_MESSAGE = "message";
@@ -3083,13 +3079,8 @@ var CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 var CSS_CLASS_VISIBLE = "visible";
 var CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
 var CSS_CLASS_MENU_OPTION3 = "menu-option";
-var CSS_CLASS_MODEL_DISPLAY = "model-display";
-var CSS_CLASS_ROLE_DISPLAY = "role-display";
 var CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
 var CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
-var CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
-var CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
-var CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button";
 var CSS_ROLE_PANEL_ITEM2 = "ollama-role-panel-item";
 var CSS_ROLE_PANEL_ITEM_ICON2 = "ollama-role-panel-item-icon";
 var CSS_ROLE_PANEL_ITEM_TEXT2 = "ollama-role-panel-item-text";
@@ -3099,10 +3090,8 @@ var CSS_ROLE_PANEL_ITEM_NONE2 = "ollama-role-panel-item-none";
 var CSS_MAIN_CHAT_AREA = "ollama-main-chat-area";
 var CSS_SIDEBAR_SECTION_ICON2 = "ollama-sidebar-section-icon";
 var CSS_CHAT_ITEM_OPTIONS2 = "ollama-chat-item-options";
-var CSS_CLASS_STOP_BUTTON = "stop-generating-button";
 var CSS_CLASS_SCROLL_BOTTOM_BUTTON = "scroll-to-bottom-button";
 var CSS_CLASS_CHAT_LIST_ITEM3 = "ollama-chat-list-item";
-var CSS_CLASS_MENU_BUTTON = "menu-button";
 var OllamaView = class extends import_obsidian14.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -4103,22 +4092,28 @@ This action cannot be undone.`,
     (_a = this.sidebarManager) == null ? void 0 : _a.destroy();
     (_b = this.dropdownMenuManager) == null ? void 0 : _b.destroy();
   }
-  // OllamaView.ts
-  // src/OllamaView.ts -> createUIElements
   createUIElements() {
+    this.plugin.logger.debug("createUIElements: Starting UI creation.");
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
+    this.plugin.logger.error(`[OllamaView] createUIElements: isSidebarLocation = ${isSidebarLocation} (based on setting openChatInTab: ${this.plugin.settings.openChatInTab})`);
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
     const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
     if (sidebarRootEl) {
+      this.plugin.logger.debug(`[OllamaView] Toggling 'internal-sidebar-hidden' class. Should be hidden: ${isSidebarLocation}`);
       sidebarRootEl.classList.toggle("internal-sidebar-hidden", isSidebarLocation);
-      this.plugin.logger.debug(`[OllamaView] Internal sidebar element visibility set (hidden: ${isSidebarLocation})`);
+      this.plugin.logger.error(`[OllamaView] sidebarRootEl classes AFTER toggle: ${sidebarRootEl.className}`);
     } else {
-      this.plugin.logger.warn("[OllamaView] Could not find sidebar root element to toggle visibility.");
+      this.plugin.logger.error("[OllamaView] sidebarRootEl is missing! Cannot toggle class.");
     }
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-    this.mainChatAreaEl.classList.toggle("full-width", isSidebarLocation);
+    if (this.mainChatAreaEl) {
+      this.mainChatAreaEl.classList.toggle("full-width", isSidebarLocation);
+      this.plugin.logger.debug(`[OllamaView] Toggled 'full-width': ${isSidebarLocation}. Main area classes: ${this.mainChatAreaEl.className}`);
+    } else {
+      this.plugin.logger.error("[OllamaView] mainChatAreaEl is missing! Cannot toggle full-width class.");
+    }
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
@@ -4134,51 +4129,45 @@ This action cannot be undone.`,
     const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
     const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
     this.translateInputButton = leftControls.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { "aria-label": "Translate input to English" }
+      /* ... */
     });
     (0, import_obsidian14.setIcon)(this.translateInputButton, "languages");
-    this.translateInputButton.title = "Translate input to English";
-    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-    this.modelDisplayEl.setText("...");
-    this.modelDisplayEl.title = "Click to select model";
-    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
-    this.roleDisplayEl.setText("...");
-    this.roleDisplayEl.title = "Click to select role";
-    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
-    this.temperatureIndicatorEl.setText("?");
-    this.temperatureIndicatorEl.title = "Click to set temperature";
+    this.modelDisplayEl = leftControls.createDiv({
+      /* ... */
+    });
+    this.roleDisplayEl = leftControls.createDiv({
+      /* ... */
+    });
+    this.temperatureIndicatorEl = leftControls.createDiv({
+      /* ... */
+    });
     this.buttonsContainer = controlsContainer.createDiv({
-      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`
+      /* ... */
     });
     this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
-      cls: [CSS_CLASS_STOP_BUTTON, CSS_CLASSES.DANGER_OPTION],
-      attr: { "aria-label": "Stop Generation", title: "Stop Generation" }
+      /* ... */
     });
     (0, import_obsidian14.setIcon)(this.stopGeneratingButton, "square");
     this.stopGeneratingButton.hide();
     this.sendButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_SEND_BUTTON,
-      attr: { "aria-label": "Send" }
+      /* ... */
     });
     (0, import_obsidian14.setIcon)(this.sendButton, "send");
     this.voiceButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_VOICE_BUTTON,
-      attr: { "aria-label": "Voice Input" }
+      /* ... */
     });
     (0, import_obsidian14.setIcon)(this.voiceButton, "mic");
     this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      attr: { "aria-label": "Toggle View Location" }
+      /* ... */
     });
     this.menuButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_MENU_BUTTON,
-      attr: { "aria-label": "Menu" }
+      /* ... */
     });
     (0, import_obsidian14.setIcon)(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
     this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation);
     this.dropdownMenuManager.createMenuUI();
+    this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
   attachEventListeners() {
     var _a;

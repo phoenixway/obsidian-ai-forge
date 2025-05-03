@@ -264,94 +264,92 @@ export class OllamaView extends ItemView {
     this.dropdownMenuManager?.destroy();
   }
 
-  // OllamaView.ts
-  // src/OllamaView.ts -> createUIElements
+  
+private createUIElements(): void {
+  this.plugin.logger.debug("createUIElements: Starting UI creation.");
+  this.contentEl.empty();
+  const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
 
-  private createUIElements(): void {
-    this.contentEl.empty(); 
-    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER }); // Головний flex контейнер
-    const isSidebarLocation = !this.plugin.settings.openChatInTab;
-    this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
-    const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
-    if (sidebarRootEl) {
+  // --- ВИЗНАЧАЄМО МІСЦЕЗНАХОДЖЕННЯ ---
+  const isSidebarLocation = !this.plugin.settings.openChatInTab;
+  // Використовуємо ERROR для логування, щоб точно побачити в консолі
+  this.plugin.logger.error(`[OllamaView] createUIElements: isSidebarLocation = ${isSidebarLocation} (based on setting openChatInTab: ${this.plugin.settings.openChatInTab})`);
+
+
+  // --- Створюємо бічну панель через SidebarManager ---
+  this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
+  const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
+
+  // --- УМОВНО ХОВАЄМО/ПОКАЗУЄМО ВНУТРІШНІЙ САЙДБАР ---
+  if (sidebarRootEl) {
+      this.plugin.logger.debug(`[OllamaView] Toggling 'internal-sidebar-hidden' class. Should be hidden: ${isSidebarLocation}`);
       sidebarRootEl.classList.toggle('internal-sidebar-hidden', isSidebarLocation);
-      this.plugin.logger.debug(`[OllamaView] Internal sidebar element visibility set (hidden: ${isSidebarLocation})`);
- } else {
-      this.plugin.logger.warn("[OllamaView] Could not find sidebar root element to toggle visibility.");
- }
-  this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA }); // <-- Створюємо цю обгортку тут
-  this.mainChatAreaEl.classList.toggle('full-width', isSidebarLocation);
+      // Додамо лог для перевірки класів ПІСЛЯ toggle
+      this.plugin.logger.error(`[OllamaView] sidebarRootEl classes AFTER toggle: ${sidebarRootEl.className}`); // ERROR для видимості
+  } else {
+      this.plugin.logger.error("[OllamaView] sidebarRootEl is missing! Cannot toggle class.");
+  }
 
-    // Вміст основної області (чат + поле вводу) - БЕЗ ЗМІН, додається до mainChatAreaEl
-    this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
-    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
-    // ... (створення newMessagesIndicatorEl, scrollToBottomButton) ...
-    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
-    setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
-    this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
-    this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
+  // --- Основна Область Чату ---
+  this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
+  // --- ДОДАЄМО КЛАС ДЛЯ РОЗШИРЕННЯ ---
+   if (this.mainChatAreaEl) { // Додамо перевірку
+       this.mainChatAreaEl.classList.toggle('full-width', isSidebarLocation);
+       this.plugin.logger.debug(`[OllamaView] Toggled 'full-width': ${isSidebarLocation}. Main area classes: ${this.mainChatAreaEl.className}`);
+   } else {
+        this.plugin.logger.error("[OllamaView] mainChatAreaEl is missing! Cannot toggle full-width class.");
+   }
+
+
+  // --- Вміст основної області (чат + поле вводу) ---
+  this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
+  this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+  // ... (створення newMessagesIndicatorEl, scrollToBottomButton) ...
+  this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+  setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+  this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+
+  this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
       cls: [CSS_CLASS_SCROLL_BOTTOM_BUTTON, "clickable-icon"],
       attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" },
-    });
-    setIcon(this.scrollToBottomButton, "arrow-down");
+  });
+  setIcon(this.scrollToBottomButton, "arrow-down");
 
-    // Контейнер вводу - БЕЗ ЗМІН, додається до mainChatAreaEl
-    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
-    // ... (створення controlsContainer, leftControls, rightControls, кнопок, індикаторів, меню) ...
-    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
-    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-    this.translateInputButton = leftControls.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { "aria-label": "Translate input to English" },
-    });
-    setIcon(this.translateInputButton, "languages");
-    this.translateInputButton.title = "Translate input to English";
-    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-    this.modelDisplayEl.setText("...");
-    this.modelDisplayEl.title = "Click to select model";
-    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
-    this.roleDisplayEl.setText("...");
-    this.roleDisplayEl.title = "Click to select role";
-    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
-    this.temperatureIndicatorEl.setText("?");
-    this.temperatureIndicatorEl.title = "Click to set temperature";
 
-    this.buttonsContainer = controlsContainer.createDiv({
-      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`,
-    });
-    this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
-      cls: [CSS_CLASS_STOP_BUTTON, CSS_CLASSES.DANGER_OPTION],
-      attr: { "aria-label": "Stop Generation", title: "Stop Generation" },
-    });
-    setIcon(this.stopGeneratingButton, "square");
-    this.stopGeneratingButton.hide();
+  // --- Контейнер вводу ---
+  const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
+  this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+  // ... (створення controlsContainer, кнопок як було) ...
+  const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
+  const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+  this.translateInputButton = leftControls.createEl("button", { /* ... */ });
+  setIcon(this.translateInputButton, "languages");
+  this.modelDisplayEl = leftControls.createDiv({ /* ... */ });
+  this.roleDisplayEl = leftControls.createDiv({ /* ... */ });
+  this.temperatureIndicatorEl = leftControls.createDiv({ /* ... */ });
+  this.buttonsContainer = controlsContainer.createDiv({ /* ... */ });
+  this.stopGeneratingButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  setIcon(this.stopGeneratingButton, "square");
+  this.stopGeneratingButton.hide();
+  this.sendButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  setIcon(this.sendButton, "send");
+  this.voiceButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  setIcon(this.voiceButton, "mic");
+  this.toggleLocationButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  this.menuButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  setIcon(this.menuButton, "more-vertical");
+  this.updateToggleLocationButton(); // Оновлюємо іконку кнопки перемикання
 
-    this.sendButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_SEND_BUTTON,
-      attr: { "aria-label": "Send" },
-    });
-    setIcon(this.sendButton, "send");
-    this.voiceButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_VOICE_BUTTON,
-      attr: { "aria-label": "Voice Input" },
-    });
-    setIcon(this.voiceButton, "mic");
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      attr: { "aria-label": "Toggle View Location" },
-    });
-    this.menuButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_MENU_BUTTON,
-      attr: { "aria-label": "Menu" },
-    });
-    setIcon(this.menuButton, "more-vertical");
-    this.updateToggleLocationButton();
 
-        this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation); // <--- Передаємо isSidebarLocation    
-        this.dropdownMenuManager.createMenuUI();
-  }
+  // --- Створення DropdownMenuManager з урахуванням контексту ---
+  this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation);
+  this.dropdownMenuManager.createMenuUI();
+  // --- Кінець створення меню ---
+
+  this.plugin.logger.debug("createUIElements: Finished UI creation.");
+}
+
   
   private attachEventListeners(): void {
     this.plugin.logger.debug("[OllamaView] Attaching event listeners...");

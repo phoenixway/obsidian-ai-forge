@@ -24,33 +24,33 @@
     height: 100%;
     min-width: 0; // Allows shrinking
     overflow: hidden; // Clips content overflowing this area
-    transition: width 0.3s ease-out; // Анімація ширини
+    transition: width 0.3s ease-out; // Анімація ширини (не потрібна, якщо flex-grow)
 
     // Клас, що додається, коли внутрішній сайдбар приховано
     &.full-width {
-       // Не потрібно встановлювати width: 100%, flex-grow: 1 зробить свою справу
+       // Стилі не потрібні, flex-grow впорається
     }
 }
 
 // Wrapper for message list (has .ollama-chat-area-content in TS)
 .ollama-chat-area-content {
     flex-grow: 1; // Takes available vertical space
-    position: relative; // For potential absolute positioning inside (like new message indicator)
+    position: relative;
     display: flex;
     flex-direction: column;
-    min-height: 0; // Allows shrinking within flex parent
-    overflow: hidden; // Clips the message container itself if needed
+    min-height: 0;
+    overflow: hidden;
 }
 
 // The actual message list container
 .ollama-chat-container {
-    flex-grow: 1; // Stretches vertically inside .ollama-chat-area-content
-    max-width: none; // Takes full width of parent
+    flex-grow: 1;
+    max-width: none;
     margin-left: 0;
     margin-right: 0;
     padding: calc(var(--chat-spacing-unit) * 4);
-    overflow-y: auto; // Allows scrolling messages
-    min-height: 0; // Allows shrinking
+    overflow-y: auto;
+    min-height: 0;
 
     // Scrollbar styles for messages
     &::-webkit-scrollbar { width: 8px; }
@@ -61,34 +61,34 @@
 
 // Input area container
 .chat-input-container {
-    flex-shrink: 0; // Prevent vertical shrinking
-    // width: 100%; // Takes full width of parent
+    flex-shrink: 0;
     // Visual styles (padding, border, background etc.) should be in _input.scss
 }
 // --- End Main Chat Area ---
 
 
-// --- RESPONSIVE --- (Залишається тут)
+// --- RESPONSIVE ---
 @media screen and (max-width: 768px) { // Tablet and smaller
     .ollama-container {
         flex-direction: column; // Stack vertically
         overflow: visible; // Allow page scrolling if needed
     }
-    // Sidebar panel is hidden on mobile by default via display:none in its base rule
-    // This media query just confirms hiding and resets properties related to side-by-side layout
-    .ollama-role-panel {
-        display: none !important; // Force hide if base style didn't work
+    // --- ЗМІНЕНО СЕЛЕКТОР ---
+    .ollama-sidebar-container { // Приховуємо на мобільних
+        display: none !important; // Force hide
+        // Скидаємо стилі, що стосуються бічного розташування
         width: 100%;
         height: auto;
         border-right: none;
-        border-bottom: 1px solid var(--divider-color); // Optional border if shown above content
+        border-bottom: 1px solid var(--divider-color);
+        margin-right: 0;
     }
+    // --- КІНЕЦЬ ЗМІНИ ---
     .ollama-main-chat-area {
-        height: 100%; // Takes full height as sidebar is hidden
+        height: 100%;
         border-left: none;
-        overflow: visible; // Allow internal elements to control scroll
+        overflow: visible;
     }
-    // Adjust input container margin for mobile
     .chat-input-container {
          margin-top: 10px;
     }
@@ -96,7 +96,7 @@
 // --- END RESPONSIVE ---
 
 
-// --- User Select Fix --- (Залишається тут або переноситься в _messages.scss)
+// --- User Select Fix ---
 .ollama-container .message .message-content {
     user-select: text !important;
     pre, code {
