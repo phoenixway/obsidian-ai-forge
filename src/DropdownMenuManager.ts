@@ -76,67 +76,75 @@ export class DropdownMenuManager {
     public createMenuUI(): void {
         this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
         this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
-        this.menuDropdown.style.display = "none"; // Починаємо прихованим
+        this.menuDropdown.style.display = "none";
+        this.hrSeparators = []; // Очищуємо масив для зберігання роздільників (якщо потрібно)
 
-        // --- СЕКЦІЇ, ЩО СТВОРЮЮТЬСЯ ЗАВЖДИ ---
-        this.plugin.logger.debug("[DropdownMenuManager] Creating always visible sections (Model, Role)...");
+        let isFirstSection = true; // Прапорець для першого роздільника
+
+        // --- Model Section (Always) ---
+        this.plugin.logger.debug("[DropdownMenuManager] Creating Model section...");
         const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
         this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
-        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+        isFirstSection = false;
 
+        // --- Role Section (Always) ---
+        if (!isFirstSection) { // Додаємо роздільник перед цією секцією
+             this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+        }
+        this.plugin.logger.debug("[DropdownMenuManager] Creating Role section...");
         const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
         this.roleSubmenuHeader = roleDropdownSection.header; this.roleSubmenuContent = roleDropdownSection.content;
-        // Роздільник після ролей додамо ПЕРЕД діями, ЯКЩО isSidebarLocation=true
+        isFirstSection = false;
 
-        // --- УМОВНЕ СТВОРЕННЯ СЕКЦІЙ ТА ДІЙ ДЛЯ ЧАТІВ ---
+        // --- Conditional Elements (Only if in Sidebar) ---
         if (this.isSidebarLocation) {
-            this.plugin.logger.debug("[DropdownMenuManager] Creating chat-related sections and actions for sidebar location.");
-            this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); // Роздільник після ролей
+            this.plugin.logger.debug("[DropdownMenuManager] Creating chat-related elements...");
 
             // Chat Section
+            if (!isFirstSection) { this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); }
             const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER, "chat-submenu-section");
             this.chatSubmenuHeader = chatDropdownSection.header; this.chatSubmenuContent = chatDropdownSection.content;
-            this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+            isFirstSection = false;
 
-            // Chat Actions (No "Actions" header)
+            // Chat Actions Group (Розглядаємо як одну групу)
+            if (!isFirstSection) { this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); }
             this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
             this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
             this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
             this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
-            this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+            isFirstSection = false; // Позначили, що елементи були
 
-            // Danger Actions
+            // Danger Actions Group
+            if (!isFirstSection) { this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); }
             this.clearChatOption = this.createActionItem("trash", "Clear Messages", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
             this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [CSS_CLASS_DELETE_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
-            this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+            isFirstSection = false;
 
-            // Toggle View Location
-            this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
-            this.updateToggleViewLocationOption();
-            // Роздільник перед Settings додасться нижче
+             // Toggle View Location
+             if (!isFirstSection) { this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); }
+             this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
+             this.updateToggleViewLocationOption();
+             isFirstSection = false;
 
         } else {
-            this.plugin.logger.debug("[DropdownMenuManager] Skipping chat-related sections and actions for tab location.");
-            // Обнуляємо посилання
-            this.chatSubmenuHeader = null; this.chatSubmenuContent = null;
-            this.newChatOption = null; this.renameChatOption = null; this.cloneChatOption = null;
-            this.exportChatOption = null; this.clearChatOption = null; this.deleteChatOption = null;
-            this.toggleViewLocationOption = null;
+            // Reset conditional refs to null if not in sidebar
+             this.chatSubmenuHeader = null; this.chatSubmenuContent = null;
+             this.newChatOption = null; this.renameChatOption = null; this.cloneChatOption = null;
+             this.exportChatOption = null; this.clearChatOption = null; this.deleteChatOption = null;
+             this.toggleViewLocationOption = null;
         }
 
-        // --- Роздільник ПЕРЕД Settings (ЗАВЖДИ) ---
-         // Перевіряємо, чи останній елемент НЕ є роздільником, перш ніж додавати новий
-         if (!(this.menuDropdown.lastElementChild instanceof HTMLHRElement)) {
+        // --- Settings (Always) ---
+        // Додаємо роздільник перед Settings, якщо перед ним були якісь елементи
+        if (!isFirstSection) {
             this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-         }
-
-
-        // --- Елемент "Settings", ЩО СТВОРЮЄТЬСЯ ЗАВЖДИ ---
+        }
+        this.plugin.logger.debug("[DropdownMenuManager] Creating Settings option...");
         this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
+        // isFirstSection = false; // Не обов'язково для останнього елемента
 
         this.plugin.logger.debug("[DropdownMenuManager] Menu UI creation finished.");
     }
-
 
 
     public attachEventListeners(): void {

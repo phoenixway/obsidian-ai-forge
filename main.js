@@ -2529,33 +2529,51 @@ var DropdownMenuManager = class {
     this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
     this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
-    this.plugin.logger.debug("[DropdownMenuManager] Creating always visible sections (Model, Role)...");
+    this.hrSeparators = [];
+    let isFirstSection = true;
+    this.plugin.logger.debug("[DropdownMenuManager] Creating Model section...");
     const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
     this.modelSubmenuHeader = modelSection.header;
     this.modelSubmenuContent = modelSection.content;
-    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    isFirstSection = false;
+    if (!isFirstSection) {
+      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    }
+    this.plugin.logger.debug("[DropdownMenuManager] Creating Role section...");
     const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
     this.roleSubmenuHeader = roleDropdownSection.header;
     this.roleSubmenuContent = roleDropdownSection.content;
+    isFirstSection = false;
     if (this.isSidebarLocation) {
-      this.plugin.logger.debug("[DropdownMenuManager] Creating chat-related sections and actions for sidebar location.");
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      this.plugin.logger.debug("[DropdownMenuManager] Creating chat-related elements...");
+      if (!isFirstSection) {
+        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      }
       const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER, "chat-submenu-section");
       this.chatSubmenuHeader = chatDropdownSection.header;
       this.chatSubmenuContent = chatDropdownSection.content;
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      isFirstSection = false;
+      if (!isFirstSection) {
+        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      }
       this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
       this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
       this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
       this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      isFirstSection = false;
+      if (!isFirstSection) {
+        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      }
       this.clearChatOption = this.createActionItem("trash", "Clear Messages", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
       this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [CSS_CLASS_DELETE_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
-      this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      isFirstSection = false;
+      if (!isFirstSection) {
+        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+      }
       this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION2} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
       this.updateToggleViewLocationOption();
+      isFirstSection = false;
     } else {
-      this.plugin.logger.debug("[DropdownMenuManager] Skipping chat-related sections and actions for tab location.");
       this.chatSubmenuHeader = null;
       this.chatSubmenuContent = null;
       this.newChatOption = null;
@@ -2566,9 +2584,10 @@ var DropdownMenuManager = class {
       this.deleteChatOption = null;
       this.toggleViewLocationOption = null;
     }
-    if (!(this.menuDropdown.lastElementChild instanceof HTMLHRElement)) {
+    if (!isFirstSection) {
       this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
     }
+    this.plugin.logger.debug("[DropdownMenuManager] Creating Settings option...");
     this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
     this.plugin.logger.debug("[DropdownMenuManager] Menu UI creation finished.");
   }
