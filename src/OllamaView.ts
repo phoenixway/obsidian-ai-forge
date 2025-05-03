@@ -29,7 +29,8 @@ import { AssistantMessageRenderer } from "./renderers/AssistantMessageRenderer";
 import { SystemMessageRenderer } from "./renderers/SystemMessageRenderer";
 import { ErrorMessageRenderer } from "./renderers/ErrorMessageRenderer";
 import { BaseMessageRenderer } from "./renderers/BaseMessageRenderer";
-import { SidebarManager } from './SidebarManager'; // <--- Імпортуємо новий клас
+import { SidebarManager } from "./SidebarManager"; // <--- Імпортуємо новий клас
+import { DropdownMenuManager } from "./DropdownMenuManager"; // <-- Імпортуємо новий клас
 
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
@@ -44,96 +45,29 @@ const CSS_CLASS_SEND_BUTTON = "send-button";
 const CSS_CLASS_VOICE_BUTTON = "voice-button";
 const CSS_CLASS_TRANSLATE_INPUT_BUTTON = "translate-input-button";
 const CSS_CLASS_TRANSLATING_INPUT = "translating-input";
-const CSS_CLASS_MENU_BUTTON = "menu-button";
-const CSS_CLASS_MENU_DROPDOWN = "menu-dropdown"; // Основний контейнер меню
-const CSS_CLASS_MENU_OPTION = "menu-option"; // Для всіх клікабельних пунктів
-const CSS_CLASS_MENU_HEADER_ITEM = "menu-header-item"; // Клікабельний заголовок "підменю"
-const CSS_CLASS_SUBMENU_ICON = "submenu-icon"; // Іконка стрілки >/v
-const CSS_CLASS_SUBMENU_CONTENT = "submenu-content"; // Контейнер для списку "підменю"
-const CSS_CLASS_SETTINGS_OPTION = "settings-option";
 const CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
-// export const CSS_CLASS_MESSAGE_GROUP = "message-group";
-const CSS_CLASS_USER_GROUP = "user-message-group";
-
-const CSS_CLASS_OLLAMA_GROUP = "ollama-message-group";
-const CSS_CLASS_USER_MESSAGE = "user-message";
-const CSS_CLASS_ERROR_GROUP = "error-message-group";
-const CSS_CLASS_ERROR_MESSAGE = "error-message";
-const CSS_CLASS_COPY_BUTTON = "copy-button";
-const CSS_CLASS_TRANSLATE_BUTTON = "translate-button";
-const CSS_CLASS_DELETE_MESSAGE_BUTTON = "delete-message-button";
-
-// export const CSS_CLASS_SYSTEM_GROUP = "system-message-group";
 export const CSS_CLASS_MESSAGE = "message";
-// const CSS_CLASS_OLLAMA_MESSAGE = "ollama-message";
-// export const CSS_CLASS_SYSTEM_MESSAGE = "system-message";
-// export const CSS_CLASS_SYSTEM_ICON = "system-icon";
-const CSS_CLASS_ERROR_ICON = "error-icon";
-// export const CSS_CLASS_SYSTEM_TEXT = "system-message-text";
 const CSS_CLASS_ERROR_TEXT = "error-message-text";
-// export const CSS_CLASS_CONTENT_CONTAINER = "message-content-container";
-const CSS_CLASS_CONTENT = "message-content";
-const CSS_CLASS_THINKING_DOTS = "thinking-dots";
-const CSS_CLASS_THINKING_DOT = "thinking-dot";
-const CSS_CLASS_THINKING_BLOCK = "thinking-block";
-const CSS_CLASS_THINKING_HEADER = "thinking-header";
-const CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
-const CSS_CLASS_THINKING_TITLE = "thinking-title";
-const CSS_CLASS_THINKING_CONTENT = "thinking-content";
-// export const CSS_CLASS_TIMESTAMP = "message-timestamp";
-
 const CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
 const CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
 const CSS_CLASS_TRANSLATION_PENDING = "translation-pending";
-const CSS_CLASS_BUTTON_SPACER = "button-spacer";
-const CSS_CLASS_TEXTAREA_EXPANDED = "expanded";
 const CSS_CLASS_RECORDING = "recording";
 const CSS_CLASS_DISABLED = "disabled";
-const CSS_CLASS_MESSAGE_ARRIVING = "message-arriving";
 const CSS_CLASS_DATE_SEPARATOR = "chat-date-separator";
-// const CSS_CLASS_AVATAR = "message-group-avatar";
-const CSS_CLASS_AVATAR_USER = "user-avatar";
-// const CSS_CLASS_AVATAR_AI = "ai-avatar";
 const CSS_CLASS_NEW_MESSAGE_INDICATOR = "new-message-indicator";
 const CSS_CLASS_VISIBLE = "visible";
-const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
-const CSS_CLASS_CLEAR_CHAT_OPTION = "clear-chat-option";
-const CSS_CLASS_EXPORT_CHAT_OPTION = "export-chat-option"; // Назву класу залишаємо
-// const CSS_CLASS_CONTENT_COLLAPSIBLE = "message-content-collapsible";
 const CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
-const CSS_CLASS_MODEL_OPTION = "model-option"; // Стиль для елементів списку
-const CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container"; // Специфічний клас для контейнера
-const CSS_CLASS_ROLE_OPTION = "role-option";
-const CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
-const CSS_CLASS_CHAT_OPTION = "chat-option";
-const CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
-const CSS_CLASS_MENU_HEADER = "menu-header"; // НЕ клікабельний заголовок секції
-const CSS_CLASS_NEW_CHAT_OPTION = "new-chat-option";
-const CSS_CLASS_RENAME_CHAT_OPTION = "rename-chat-option";
-const CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
-const CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
-// const CSS_CLASS_DANGER_OPTION = "danger-option"; // Для небезпечних дій
-
-const CSS_CLASS_INPUT_AREA_LEFT = "input-area-left";
+const CSS_CLASS_MENU_OPTION = "menu-option";
 const CSS_CLASS_MODEL_DISPLAY = "model-display";
 const CSS_CLASS_ROLE_DISPLAY = "role-display";
 const CSS_CLASS_INPUT_CONTROLS_CONTAINER = "input-controls-container";
 const CSS_CLASS_INPUT_CONTROLS_LEFT = "input-controls-left";
 const CSS_CLASS_INPUT_CONTROLS_RIGHT = "input-controls-right";
 
-const CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
 const CSS_CLASS_TEMPERATURE_INDICATOR = "temperature-indicator";
 
-const CSS_CLASS_DESKTOP_TOGGLE_VIEW_BUTTON = "desktop-toggle-view-button"; // Новий клас для кнопки
 const CSS_CLASS_TOGGLE_LOCATION_BUTTON = "toggle-location-button"; // Для кнопки в панелі
-const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 
-const CHAT_LIST_MAX_HEIGHT = "250px";
-const CSS_CLASS_REGENERATE_BUTTON = "regenerate-button";
-
-const CSS_ROLE_PANEL = "ollama-role-panel";
-const CSS_ROLE_PANEL_HEADER = "ollama-role-panel-header";
-const CSS_ROLE_PANEL_LIST = "ollama-role-panel-list";
 const CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item"; // Можна використовувати спільно з menu-option
 const CSS_ROLE_PANEL_ITEM_ICON = "ollama-role-panel-item-icon";
 const CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
@@ -141,20 +75,12 @@ const CSS_ROLE_PANEL_ITEM_ACTIVE = "is-active";
 const CSS_ROLE_PANEL_ITEM_CUSTOM = "is-custom";
 const CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
 const CSS_MAIN_CHAT_AREA = "ollama-main-chat-area"; // Новий клас для обгортки чату+вводу
-
-const CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header"; // Клікабельний заголовок секції
-const CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content"; // Контейнер списку
-const CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden"; // Для прихованого стану
 const CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon"; // Іконка ►/▼
-
-const CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
-const CSS_CHAT_ITEM_MAIN = "ollama-chat-item-main"; // Обгортка для назви/дати
 const CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options"; // Кнопка "..."
 const CSS_CLASS_STOP_BUTTON = "stop-generating-button"; // Новий клас
 const CSS_CLASS_SCROLL_BOTTOM_BUTTON = "scroll-to-bottom-button"; // <--- Новий клас
 const CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
-
-// const CSS_CLASS_SUMMARIZE_BUTTON = "summarize-button";
+const CSS_CLASS_MENU_BUTTON = "menu-button";
 
 // --- Message Types ---
 export type MessageRole = "user" | "assistant" | "system" | "error";
@@ -166,6 +92,7 @@ export type MessageRole = "user" | "assistant" | "system" | "error";
 
 export class OllamaView extends ItemView {
   private sidebarManager!: SidebarManager; // <--- Нова властивість
+  private dropdownMenuManager!: DropdownMenuManager; // <-- НОВИЙ МЕНЕДЖЕР МЕНЮ
   // --- Properties ---
   public readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
@@ -180,23 +107,7 @@ export class OllamaView extends ItemView {
   private modelDisplayEl!: HTMLElement;
   private roleDisplayEl!: HTMLElement;
 
-  // Властивості для кастомного меню
-  private menuDropdown!: HTMLElement;
-  private modelSubmenuHeader!: HTMLElement;
-  private modelSubmenuContent!: HTMLElement;
-  private roleSubmenuHeader!: HTMLElement;
-  private roleSubmenuContent!: HTMLElement;
-  private chatSubmenuHeader!: HTMLElement;
-  private chatSubmenuContent!: HTMLElement;
-  private newChatOption!: HTMLElement;
-  private renameChatOption!: HTMLElement;
-  private cloneChatOption!: HTMLElement;
-  private clearChatOption!: HTMLElement;
-  private exportChatOption!: HTMLElement; // Назва змінної залишається та ж
-  private deleteChatOption!: HTMLElement;
-  private settingsOption!: HTMLElement;
   private temperatureIndicatorEl!: HTMLElement;
-  private toggleViewLocationOption!: HTMLElement;
   private toggleLocationButton!: HTMLButtonElement; // Кнопка в панелі (для десктопу)
   private newChatSidebarButton!: HTMLButtonElement;
 
@@ -244,14 +155,6 @@ export class OllamaView extends ItemView {
 
   private currentMessageAddedResolver: (() => void) | null = null;
 
-  // private currentAssistantMessage: {
-  //   // Для зберігання посилання на поточне повідомлення асистента
-  //   groupEl: HTMLElement | null;
-  //   contentEl: HTMLElement | null;
-  //   fullContent: string; // Для накопичення повної відповіді
-  //   timestamp: Date | null; // Зберігаємо час початку відповіді
-  // } | null = null;
-
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
@@ -259,17 +162,14 @@ export class OllamaView extends ItemView {
     this.initSpeechWorker();
     // Переконуємось, що handleScroll визначено ПЕРЕД цим рядком
     this.scrollListenerDebounced = debounce(this.handleScroll, 150, true);
-    this.register(this.plugin.on('focus-input-request', () => {
-      this.focusInput();
-  }));
+    this.register(
+      this.plugin.on("focus-input-request", () => {
+        this.focusInput();
+      })
+    );
   }
 
   // --- Getters ---
-  /** Checks if the custom menu dropdown is currently visible */
-  public isMenuOpen(): boolean {
-    return !!this.menuDropdown && this.menuDropdown.style.display === "block";
-  }
-
   // --- Obsidian View Methods ---
   getViewType(): string {
     return VIEW_TYPE_OLLAMA_PERSONAS;
@@ -342,234 +242,114 @@ export class OllamaView extends ItemView {
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
     }
-    this.plugin.logger.debug("[OllamaView] onOpen finished.");
   }
 
   async onClose(): Promise<void> {
     // ... (існуючий код очищення: speechWorker, mediaRecorder, etc.) ...
     if (this.speechWorker) {
-        this.speechWorker.terminate();
-        this.speechWorker = null;
+      this.speechWorker.terminate();
+      this.speechWorker = null;
     }
     this.stopVoiceRecording(false);
     if (this.audioStream) {
-        this.audioStream.getTracks().forEach(t => t.stop());
-        this.audioStream = null;
+      this.audioStream.getTracks().forEach(t => t.stop());
+      this.audioStream = null;
     }
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
 
-
     // --- Додано очищення SidebarManager ---
     this.sidebarManager?.destroy();
-    // ------------------------------------
-    this.plugin.logger.debug("[OllamaView] onClose finished."); // Додамо лог
-}
+    this.dropdownMenuManager?.destroy();
+  }
 
   // OllamaView.ts
-// src/OllamaView.ts -> createUIElements
+  // src/OllamaView.ts -> createUIElements
 
-private createUIElements(): void {
-  this.plugin.logger.debug("createUIElements: Starting UI creation.");
-  this.contentEl.empty();
-  const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER }); // Головний flex контейнер
+  private createUIElements(): void {
+    this.plugin.logger.debug("createUIElements: Starting UI creation.");
+    this.contentEl.empty();
+    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER }); // Головний flex контейнер
 
-  // --- Створюємо бічну панель за допомогою SidebarManager ---
-  // SidebarManager сам створить свій головний div (колишній rolePanelEl)
-  // і додасть його до flexContainer.
-  this.sidebarManager.createSidebarUI(flexContainer); // <--- ВИКЛИК МЕНЕДЖЕРА
+    // --- Створюємо бічну панель за допомогою SidebarManager ---
+    // SidebarManager сам створить свій головний div (колишній rolePanelEl)
+    // і додасть його до flexContainer.
+    this.sidebarManager.createSidebarUI(flexContainer); // <--- ВИКЛИК МЕНЕДЖЕРА
 
-  // --- Основна Область Чату (права частина) ---
-  // Створюємо обгортку для чату та поля вводу
-  this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA }); // <-- Створюємо цю обгортку тут
+    // --- Основна Область Чату (права частина) ---
+    // Створюємо обгортку для чату та поля вводу
+    this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA }); // <-- Створюємо цю обгортку тут
 
-  // Вміст основної області (чат + поле вводу) - БЕЗ ЗМІН, додається до mainChatAreaEl
-  this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
-  this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
-  // ... (створення newMessagesIndicatorEl, scrollToBottomButton) ...
-   this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
-  setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
-  this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
+    // Вміст основної області (чат + поле вводу) - БЕЗ ЗМІН, додається до mainChatAreaEl
+    this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
+    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
+    // ... (створення newMessagesIndicatorEl, scrollToBottomButton) ...
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+    setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+    this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
-  this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
+    this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
       cls: [CSS_CLASS_SCROLL_BOTTOM_BUTTON, "clickable-icon"],
       attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" },
-  });
-  setIcon(this.scrollToBottomButton, "arrow-down");
+    });
+    setIcon(this.scrollToBottomButton, "arrow-down");
 
-
-  // Контейнер вводу - БЕЗ ЗМІН, додається до mainChatAreaEl
-  const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-  this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
-  // ... (створення controlsContainer, leftControls, rightControls, кнопок, індикаторів, меню) ...
-   const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
-  const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-  this.translateInputButton = leftControls.createEl("button", {
+    // Контейнер вводу - БЕЗ ЗМІН, додається до mainChatAreaEl
+    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
+    // ... (створення controlsContainer, leftControls, rightControls, кнопок, індикаторів, меню) ...
+    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
+    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
+    this.translateInputButton = leftControls.createEl("button", {
       cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
       attr: { "aria-label": "Translate input to English" },
-  });
-  setIcon(this.translateInputButton, "languages");
-  this.translateInputButton.title = "Translate input to English";
-  this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-  this.modelDisplayEl.setText("...");
-  this.modelDisplayEl.title = "Click to select model";
-  this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
-  this.roleDisplayEl.setText("...");
-  this.roleDisplayEl.title = "Click to select role";
-  this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
-  this.temperatureIndicatorEl.setText("?");
-  this.temperatureIndicatorEl.title = "Click to set temperature";
+    });
+    setIcon(this.translateInputButton, "languages");
+    this.translateInputButton.title = "Translate input to English";
+    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+    this.modelDisplayEl.setText("...");
+    this.modelDisplayEl.title = "Click to select model";
+    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
+    this.roleDisplayEl.setText("...");
+    this.roleDisplayEl.title = "Click to select role";
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
+    this.temperatureIndicatorEl.setText("?");
+    this.temperatureIndicatorEl.title = "Click to set temperature";
 
-  this.buttonsContainer = controlsContainer.createDiv({
+    this.buttonsContainer = controlsContainer.createDiv({
       cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`,
-  });
-   this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
+    });
+    this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
       cls: [CSS_CLASS_STOP_BUTTON, CSS_CLASSES.DANGER_OPTION],
       attr: { "aria-label": "Stop Generation", title: "Stop Generation" },
-  });
-  setIcon(this.stopGeneratingButton, "square");
-  this.stopGeneratingButton.hide();
+    });
+    setIcon(this.stopGeneratingButton, "square");
+    this.stopGeneratingButton.hide();
 
-  this.sendButton = this.buttonsContainer.createEl("button", {
+    this.sendButton = this.buttonsContainer.createEl("button", {
       cls: CSS_CLASS_SEND_BUTTON,
       attr: { "aria-label": "Send" },
-  });
-  setIcon(this.sendButton, "send");
-  this.voiceButton = this.buttonsContainer.createEl("button", {
+    });
+    setIcon(this.sendButton, "send");
+    this.voiceButton = this.buttonsContainer.createEl("button", {
       cls: CSS_CLASS_VOICE_BUTTON,
       attr: { "aria-label": "Voice Input" },
-  });
-  setIcon(this.voiceButton, "mic");
-  this.toggleLocationButton = this.buttonsContainer.createEl("button", {
+    });
+    setIcon(this.voiceButton, "mic");
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
       cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
       attr: { "aria-label": "Toggle View Location" },
-  });
-  this.menuButton = this.buttonsContainer.createEl("button", {
+    });
+    this.menuButton = this.buttonsContainer.createEl("button", {
       cls: CSS_CLASS_MENU_BUTTON,
       attr: { "aria-label": "Menu" },
-  });
-  setIcon(this.menuButton, "more-vertical");
-  this.updateToggleLocationButton();
-
-  // Випадаюче меню (створюється як і раніше)
-  this.menuDropdown = inputContainer.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
-  this.menuDropdown.style.display = "none";
-   // ... (код створення секцій та пунктів меню як був) ...
-  // Секції випадаючого меню (моделі, ролі, чати)
-  const modelSection = this.createSubmenuSection(
-      "Select Model",
-      "list-collapse",
-      CSS_CLASS_MODEL_LIST_CONTAINER,
-      "model-submenu-section"
-  );
-  this.modelSubmenuHeader = modelSection.header;
-  this.modelSubmenuContent = modelSection.content;
-  const roleDropdownSection = this.createSubmenuSection(
-      "Select Role",
-      "users",
-      CSS_CLASS_ROLE_LIST_CONTAINER,
-      "role-submenu-section"
-  );
-  this.roleSubmenuHeader = roleDropdownSection.header;
-  this.roleSubmenuContent = roleDropdownSection.content;
-  const chatDropdownSection = this.createSubmenuSection(
-      "Load Chat",
-      "messages-square",
-      CSS_CLASS_CHAT_LIST_CONTAINER
-  );
-  this.chatSubmenuHeader = chatDropdownSection.header;
-  this.chatSubmenuContent = chatDropdownSection.content;
-
-  // Дії випадаючого меню
-  this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-  this.menuDropdown.createEl("div", { text: "Actions", cls: CSS_CLASS_MENU_HEADER });
-  // New Chat
-  this.newChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_NEW_CHAT_OPTION}`,
-  });
-  setIcon(this.newChatOption.createSpan({ cls: "menu-option-icon" }), "plus-circle");
-  this.newChatOption.createSpan({ cls: "menu-option-text", text: "New Chat" });
-  // Rename Chat
-  this.renameChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_RENAME_CHAT_OPTION}`,
-  });
-  setIcon(this.renameChatOption.createSpan({ cls: "menu-option-icon" }), "pencil");
-  this.renameChatOption.createSpan({ cls: "menu-option-text", text: "Rename Chat" });
-  // Clone Chat
-  this.cloneChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLONE_CHAT_OPTION}`,
-  });
-  setIcon(this.cloneChatOption.createSpan({ cls: "menu-option-icon" }), "copy-plus");
-  this.cloneChatOption.createSpan({ cls: "menu-option-text", text: "Clone Chat" });
-  // Export Chat
-  this.exportChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_EXPORT_CHAT_OPTION}`,
-  });
-  setIcon(this.exportChatOption.createSpan({ cls: "menu-option-icon" }), "download");
-  this.exportChatOption.createSpan({ cls: "menu-option-text", text: "Export Chat to Note" });
-  // Separator
-  this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-  // Clear Messages
-  this.clearChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CLEAR_CHAT_OPTION} ${CSS_CLASSES.DANGER_OPTION}`,
-  });
-  setIcon(this.clearChatOption.createSpan({ cls: "menu-option-icon" }), "trash");
-  this.clearChatOption.createSpan({ cls: "menu-option-text", text: "Clear Messages" });
-  // Delete Chat
-  this.deleteChatOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_DELETE_CHAT_OPTION} ${CSS_CLASSES.DANGER_OPTION}`,
-  });
-  setIcon(this.deleteChatOption.createSpan({ cls: "menu-option-icon" }), "trash-2");
-  this.deleteChatOption.createSpan({ cls: "menu-option-text", text: "Delete Chat" });
-  // Separator
-  this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-  // Toggle View Location
-  this.toggleViewLocationOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}`,
-  });
-  this.updateToggleViewLocationOption(); // Оновлюємо текст/іконку
-  // Separator
-  this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-  // Settings
-  this.settingsOption = this.menuDropdown.createEl("div", {
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_SETTINGS_OPTION}`,
-  });
-  setIcon(this.settingsOption.createSpan({ cls: "menu-option-icon" }), "settings");
-  this.settingsOption.createSpan({ cls: "menu-option-text", text: "Settings" });
-
-
-  this.plugin.logger.debug("createUIElements: Finished UI creation.");
-}
-
-  // Допоміжна функція для створення підменю (з попереднього коду)
-  private createSubmenuSection = (
-    title: string,
-    icon: string,
-    listContainerClass: string,
-    sectionClass?: string
-  ): { header: HTMLElement; content: HTMLElement; section: HTMLElement } => {
-    const section = this.menuDropdown.createDiv();
-    if (sectionClass) section.addClass(sectionClass);
-    const header = section.createDiv({
-      cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MENU_HEADER_ITEM}`,
     });
-    setIcon(header.createSpan({ cls: "menu-option-icon" }), icon);
-    header.createSpan({ cls: "menu-option-text", text: title });
-    setIcon(header.createSpan({ cls: CSS_CLASS_SUBMENU_ICON }), "chevron-right");
-    const isChatList = listContainerClass === CSS_CLASS_CHAT_LIST_CONTAINER;
-    const content = section.createDiv({
-      cls: `${CSS_CLASS_SUBMENU_CONTENT} ${CSS_CLASSES.SUBMENU_CONTENT_HIDDEN} ${listContainerClass} ${
-        isChatList ? CSS_CLASS_CHAT_LIST_SCROLLABLE : ""
-      }`,
-    });
-    content.style.maxHeight = "0";
-    content.style.overflow = "hidden";
-    content.style.transition = "max-height 0.3s ease-out, padding 0.3s ease-out";
-    content.style.paddingTop = "0";
-    content.style.paddingBottom = "0";
-    return { header, content, section };
-  };
+    setIcon(this.menuButton, "more-vertical");
+    this.updateToggleLocationButton();
 
+    this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer);
+    this.dropdownMenuManager.createMenuUI();
+  }
   // --- Event Listeners (ПОВНА ВЕРСІЯ) ---
   private attachEventListeners(): void {
     // Null Checks for Required Elements
@@ -596,18 +376,6 @@ private createUIElements(): void {
     if (!this.rolePanelHeaderEl) console.error("OllamaView: rolePanelHeaderEl missing during attachEventListeners!");
     if (!this.newChatSidebarButton)
       console.error("OllamaView: newChatSidebarButton missing during attachEventListeners!");
-    if (!this.modelSubmenuHeader) console.error("OllamaView: modelSubmenuHeader missing during attachEventListeners!");
-    if (!this.roleSubmenuHeader) console.error("OllamaView: roleSubmenuHeader missing during attachEventListeners!");
-    if (!this.chatSubmenuHeader) console.error("OllamaView: chatSubmenuHeader missing during attachEventListeners!");
-    if (!this.newChatOption) console.error("OllamaView: newChatOption missing during attachEventListeners!");
-    if (!this.renameChatOption) console.error("OllamaView: renameChatOption missing during attachEventListeners!");
-    if (!this.cloneChatOption) console.error("OllamaView: cloneChatOption missing during attachEventListeners!");
-    if (!this.exportChatOption) console.error("OllamaView: exportChatOption missing during attachEventListeners!");
-    if (!this.clearChatOption) console.error("OllamaView: clearChatOption missing during attachEventListeners!");
-    if (!this.deleteChatOption) console.error("OllamaView: deleteChatOption missing during attachEventListeners!");
-    if (!this.toggleViewLocationOption)
-      console.error("OllamaView: toggleViewLocationOption missing during attachEventListeners!");
-    if (!this.settingsOption) console.error("OllamaView: settingsOption missing during attachEventListeners!");
 
     // Input Textarea Listeners
     if (this.inputEl) {
@@ -629,7 +397,7 @@ private createUIElements(): void {
       this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
     }
     if (this.menuButton) {
-      this.registerDomEvent(this.menuButton, "click", this.handleMenuClick);
+      this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick); // Use new handler
     }
     if (this.toggleLocationButton) {
       this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
@@ -644,49 +412,6 @@ private createUIElements(): void {
     }
     if (this.temperatureIndicatorEl) {
       this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
-    }
-
-    // Dropdown Menu Listeners
-    if (this.modelSubmenuHeader && this.modelSubmenuContent) {
-      this.registerDomEvent(this.modelSubmenuHeader, "click", () =>
-        this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models")
-      );
-    }
-    if (this.roleSubmenuHeader && this.roleSubmenuContent) {
-      this.registerDomEvent(this.roleSubmenuHeader, "click", () =>
-        this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles")
-      );
-    }
-    if (this.chatSubmenuHeader && this.chatSubmenuContent) {
-      this.registerDomEvent(this.chatSubmenuHeader, "click", () =>
-        this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats")
-      );
-    }
-    if (this.newChatOption) {
-      this.registerDomEvent(this.newChatOption, "click", this.handleNewChatClick);
-    }
-    if (this.renameChatOption) {
-      this.registerDomEvent(this.renameChatOption, "click", () => {
-        this.handleRenameChatClick();
-      });
-    }
-    if (this.cloneChatOption) {
-      this.registerDomEvent(this.cloneChatOption, "click", this.handleCloneChatClick);
-    }
-    if (this.exportChatOption) {
-      this.registerDomEvent(this.exportChatOption, "click", this.handleExportChatClick);
-    }
-    if (this.clearChatOption) {
-      this.registerDomEvent(this.clearChatOption, "click", this.handleClearChatClick);
-    }
-    if (this.deleteChatOption) {
-      this.registerDomEvent(this.deleteChatOption, "click", this.handleDeleteChatClick);
-    }
-    if (this.toggleViewLocationOption) {
-      this.registerDomEvent(this.toggleViewLocationOption, "click", this.handleToggleViewLocationClick);
-    }
-    if (this.settingsOption) {
-      this.registerDomEvent(this.settingsOption, "click", this.handleSettingsClick);
     }
 
     // Chat Area Listeners
@@ -711,14 +436,7 @@ private createUIElements(): void {
     this.register(this.plugin.on("model-changed", modelName => this.handleModelChange(modelName)));
     this.register(this.plugin.on("role-changed", roleName => this.handleRoleChange(roleName)));
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
-    this.register(
-      this.plugin.on("roles-updated", () => {
-        if (this.rolePanelHeaderEl?.getAttribute("data-collapsed") === "false") {
-          this.updateRolePanelList();
-        }
-      })
-    );
-    this.register(this.plugin.on("active-chat-changed", data => this.handleActiveChatChanged(data)));
+
     // --- Listener, що викликає handleMessageAdded ---
     this.register(
       this.plugin.on("message-added", data => {
@@ -731,6 +449,7 @@ private createUIElements(): void {
       })
     );
     // --- Кінець ---
+    this.register(this.plugin.on("active-chat-changed", data => this.handleActiveChatChanged(data)));
     this.register(this.plugin.on("messages-cleared", chatId => this.handleMessagesCleared(chatId)));
     this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
     this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
@@ -749,37 +468,6 @@ private createUIElements(): void {
     }
   };
 
-  //   public handleSettingsUpdated = async (): Promise<void> => {
-  //     this.plugin.logger.debug("[OllamaView] handleSettingsUpdated called");
-  //     const activeChat = await this.plugin.chatManager?.getActiveChat();
-  //     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-  //     // Отримуємо ім'я поточної ролі (з чату або глобальних налаштувань)
-  //     const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-  //     const currentRoleName = await this.plugin.findRoleNameByPath(currentRolePath); // Використовуємо хелпер
-
-  //     const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
-
-  //     this.updateModelDisplay(currentModelName);
-  //     this.updateRoleDisplay(currentRoleName); // Оновлення маленького індикатора ролі
-  //     this.updateInputPlaceholder(currentRoleName);
-  //     this.updateTemperatureIndicator(currentTemperature);
-  //     this.updateToggleViewLocationOption();
-  //     this.updateToggleLocationButton();
-
-  //     // --- Оновлюємо список у бічній панелі ---
-  //     await this.updateRolePanelList();
-  //     // --- Оновлюємо список у випадаючому меню (якщо воно використовується) ---
-  //     if (this.isMenuOpen() && this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
-  //          this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
-  //          await this.renderRoleList();
-  //     }
-  // }
-
-  // OllamaView.ts
-
-  // OllamaView.ts
-
-  // --- НОВИЙ МЕТОД: Обробник події видалення повідомлення (з виправленням типів) ---
   private handleMessageDeleted = (data: { chatId: string; timestamp: Date }): void => {
     this.plugin.logger.debug(
       `handleMessageDeleted: Received event for chat ${data.chatId}, timestamp ${data.timestamp.toISOString()}`
@@ -1106,58 +794,59 @@ private createUIElements(): void {
     this.toggleVoiceRecognition();
   };
   // OllamaView.ts -> handleTranslateInputClick
-private handleTranslateInputClick = async (): Promise<void> => {
-  const currentText = this.inputEl.value;
-  // Використовуємо цільову мову з налаштувань
-  const targetLang = this.plugin.settings.translationTargetLanguage;
+  private handleTranslateInputClick = async (): Promise<void> => {
+    const currentText = this.inputEl.value;
+    // Використовуємо цільову мову з налаштувань
+    const targetLang = this.plugin.settings.translationTargetLanguage;
 
-  // Перевірка чи є текст для перекладу
-  if (!currentText.trim()) {
+    // Перевірка чи є текст для перекладу
+    if (!currentText.trim()) {
       new Notice("Input is empty, nothing to translate.");
       return;
-  }
-  // Перевірка чи ввімкнено переклад і чи вибрано провайдера
-  if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === 'none') {
+    }
+    // Перевірка чи ввімкнено переклад і чи вибрано провайдера
+    if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === "none") {
       new Notice("Translation disabled or provider not selected in settings.");
       return;
-  }
-  // Перевірка чи встановлено цільову мову
-   if (!targetLang) {
+    }
+    // Перевірка чи встановлено цільову мову
+    if (!targetLang) {
       new Notice("Target language for translation is not set in settings.");
       return;
-  }
+    }
 
-  // Встановлюємо стан завантаження кнопки
-  setIcon(this.translateInputButton, "loader");
-  this.translateInputButton.disabled = true;
-  this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT); // Використовуємо константу
-  this.translateInputButton.title = "Translating...";
+    // Встановлюємо стан завантаження кнопки
+    setIcon(this.translateInputButton, "loader");
+    this.translateInputButton.disabled = true;
+    this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT); // Використовуємо константу
+    this.translateInputButton.title = "Translating...";
 
-  try {
+    try {
       this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for input...`);
       // Викликаємо новий сервіс перекладу
       //FIXME: targetLang - це не те, що ми хочемо, але поки що залишимо так
-      const translatedText = await this.plugin.translationService.translate(currentText, 'English'/* targetLang */);
+      const translatedText = await this.plugin.translationService.translate(currentText, "English" /* targetLang */);
 
-      if (translatedText !== null) { // Перевіряємо на null (означає помилку, про яку вже сповіщено)
-          this.plugin.logger.debug(`[OllamaView] Input translation received.`);
-          this.inputEl.value = translatedText; // Встановлюємо перекладений текст (може бути порожнім)
-          this.inputEl.dispatchEvent(new Event("input")); // Тригер для оновлення UI (висота, кнопка Send)
-          this.inputEl.focus(); // Повертаємо фокус
-          // Ставимо курсор в кінець, тільки якщо переклад не порожній
-          if (translatedText) {
-              const end = translatedText.length;
-              this.inputEl.setSelectionRange(end, end);
-          }
+      if (translatedText !== null) {
+        // Перевіряємо на null (означає помилку, про яку вже сповіщено)
+        this.plugin.logger.debug(`[OllamaView] Input translation received.`);
+        this.inputEl.value = translatedText; // Встановлюємо перекладений текст (може бути порожнім)
+        this.inputEl.dispatchEvent(new Event("input")); // Тригер для оновлення UI (висота, кнопка Send)
+        this.inputEl.focus(); // Повертаємо фокус
+        // Ставимо курсор в кінець, тільки якщо переклад не порожній
+        if (translatedText) {
+          const end = translatedText.length;
+          this.inputEl.setSelectionRange(end, end);
+        }
       } else {
-          // Повідомлення про помилку вже має бути показано сервісом
-          this.plugin.logger.warn("[OllamaView] Input translation failed (null returned from service).");
+        // Повідомлення про помилку вже має бути показано сервісом
+        this.plugin.logger.warn("[OllamaView] Input translation failed (null returned from service).");
       }
-  } catch (error) {
+    } catch (error) {
       // Цей блок малоймовірний, оскільки сервіс має обробляти свої помилки, але для безпеки
       this.plugin.logger.error("[OllamaView] Unexpected error during input translation call:", error);
       new Notice("Input translation encountered an unexpected error.");
-  } finally {
+    } finally {
       // Завжди відновлюємо стан кнопки
       setIcon(this.translateInputButton, "languages"); // Повертаємо іконку
       // Кнопка має бути доступна, якщо немає іншого процесу (isProcessing)
@@ -1165,141 +854,14 @@ private handleTranslateInputClick = async (): Promise<void> => {
       this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT); // Видаляємо клас завантаження
       // TODO: Оновити title відповідно до мови? Або залишити загальний?
       this.translateInputButton.title = `Translate input to ${LANGUAGES[targetLang] || targetLang}`; // Оновлюємо title
-  }
-}
-
-  // Menu Button Click (Toggles Custom Div)
-  private handleMenuClick = (e: MouseEvent): void => {
-    e.stopPropagation();
-    if (!this.menuDropdown) {
-      console.error("menuDropdown missing!");
-      return;
-    } // Safety check
-    const isHidden = this.menuDropdown.style.display === "none";
-    if (isHidden) {
-      this.menuDropdown.style.display = "block";
-      this.collapseAllSubmenus(null); // Collapse all when opening main menu
-    } else {
-      this.closeMenu();
     }
   };
 
-  // Handles clicks on submenu headers (Model, Role, Chat)
-  // Змінено: Логіка розгортання підменю
-  private async toggleSubmenu(
-    headerEl: HTMLElement | null,
-    contentEl: HTMLElement | null,
-    type: "models" | "roles" | "chats"
-  ): Promise<void> {
-    if (!headerEl || !contentEl) return;
-    const iconEl = headerEl.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
-    const isHidden =
-      contentEl.style.maxHeight === "0px" || contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-
-    if (isHidden) {
-      this.collapseAllSubmenus(contentEl);
-    } // Згортаємо інші перед розгортанням
-
-    if (isHidden) {
-      // --- Розгортання ---
-      if (iconEl instanceof HTMLElement) setIcon(iconEl, "chevron-down");
-      contentEl.empty();
-      contentEl.createDiv({
-        cls: "menu-loading",
-        text: `Loading ${type}...`,
-      });
-      contentEl.classList.remove(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-      // Тимчасова висота для індикатора завантаження
-      contentEl.style.maxHeight = "40px";
-      contentEl.style.paddingTop = "5px";
-      contentEl.style.paddingBottom = "5px";
-      // Скидаємо overflow, поки завантажуємо
-      contentEl.style.overflowY = "hidden";
-
-      try {
-        switch (type) {
-          case "models":
-            await this.renderModelList();
-            break;
-          case "roles":
-            await this.renderRoleList();
-            break;
-          case "chats":
-            await this.renderChatListMenu();
-            break;
-        }
-
-        // Після рендерингу, обчислюємо потрібну висоту
-        requestAnimationFrame(() => {
-          if (!contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
-            if (type === "chats") {
-              // Для списку чатів: встановлюємо фіксовану max-height і дозволяємо скрол
-              contentEl.style.maxHeight = CHAT_LIST_MAX_HEIGHT;
-              contentEl.style.overflowY = "auto"; // Дозволяємо скрол
-            } else {
-              // Для інших списків: встановлюємо висоту за вмістом
-              contentEl.style.maxHeight = contentEl.scrollHeight + "px";
-              contentEl.style.overflowY = "hidden"; // Скрол не потрібен
-            }
-          }
-        });
-      } catch (error) {
-        this.plugin.logger.error(`Error rendering ${type} list:`, error);
-        contentEl.empty();
-        contentEl.createDiv({
-          cls: "menu-error-text",
-          text: `Error loading ${type}.`,
-        });
-        contentEl.style.maxHeight = "50px"; // Висота для повідомлення про помилку
-        contentEl.style.overflowY = "hidden";
-      }
-    } else {
-      // --- Згортання ---
-      contentEl.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-      contentEl.style.maxHeight = "0";
-      contentEl.style.paddingTop = "0";
-      contentEl.style.paddingBottom = "0";
-      contentEl.style.overflowY = "hidden"; // Приховуємо скрол при згортанні
-      if (iconEl instanceof HTMLElement) setIcon(iconEl, "chevron-right");
-    }
-  }
-
-  // Helper to collapse all submenus except the one potentially being opened
-  private collapseAllSubmenus(exceptContent?: HTMLElement | null): void {
-    const submenus = [
-      {
-        header: this.modelSubmenuHeader,
-        content: this.modelSubmenuContent,
-      },
-      {
-        header: this.roleSubmenuHeader,
-        content: this.roleSubmenuContent,
-      },
-      {
-        header: this.chatSubmenuHeader,
-        content: this.chatSubmenuContent,
-      },
-    ];
-    submenus.forEach(submenu => {
-      // Check elements exist before manipulating
-      if (submenu.content && submenu.header && submenu.content !== exceptContent) {
-        if (!submenu.content.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
-          submenu.content.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-          submenu.content.style.maxHeight = "0";
-          submenu.content.style.paddingTop = "0";
-          submenu.content.style.paddingBottom = "0";
-          const iconEl = submenu.header.querySelector(`.${CSS_CLASS_SUBMENU_ICON}`);
-          if (iconEl instanceof HTMLElement) {
-            setIcon(iconEl, "chevron-right");
-          }
-        }
-      }
-    });
-  }
+  // Menu Button Click (Toggles Custom Div)
 
   // --- Action Handlers (Must call closeMenu) ---
-  private handleNewChatClick = async (): Promise<void> => {
-    this.closeMenu();
+  public handleNewChatClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu(); // Use manager to close
     try {
       const newChat = await this.plugin.chatManager.createNewChat();
       if (newChat) {
@@ -1314,7 +876,7 @@ private handleTranslateInputClick = async (): Promise<void> => {
   };
   // У файлі src/OllamaView.ts
 
-  private handleRenameChatClick = async (chatIdToRename?: string, currentChatName?: string): Promise<void> => {
+  public handleRenameChatClick = async (chatIdToRename?: string, currentChatName?: string): Promise<void> => {
     let chatId: string | null = chatIdToRename ?? null;
     let currentName: string | null = currentChatName ?? null;
 
@@ -1333,7 +895,7 @@ private handleTranslateInputClick = async (): Promise<void> => {
       `[handleRenameChatClick] Initiating rename for chat ${chatId} (current name: "${currentName}")`
     );
     // Закриваємо головне меню, якщо воно було відкрито (для виклику з нього)
-    this.closeMenu();
+    this.dropdownMenuManager?.closeMenu();
 
     // Перевіряємо ще раз, чи отримали ми дані
     if (!chatId || currentName === null) {
@@ -1362,15 +924,6 @@ private handleTranslateInputClick = async (): Promise<void> => {
           // ----------------------------------------
           if (success) {
             noticeMessage = `Chat renamed to "${trimmedName}"`;
-            // UI оновиться через події 'chat-list-updated' та 'active-chat-changed' (якщо чат активний)
-            // Додаткове оновлення списку в меню, якщо воно видиме (перенесено з попередньої версії)
-            if (
-              this.chatSubmenuContent &&
-              !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)
-            ) {
-              this.plugin.logger.info("[handleRenameChatClick] Forcing chat list menu refresh after rename.");
-              await this.renderChatListMenu();
-            }
           } else {
             noticeMessage = "Failed to rename chat."; // Помилка оброблена в renameChat
           }
@@ -1392,8 +945,8 @@ private handleTranslateInputClick = async (): Promise<void> => {
     this.handleRenameChatClick(chatId, currentName);
   }
 
-  private handleCloneChatClick = async (): Promise<void> => {
-    this.closeMenu();
+  public handleCloneChatClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat) {
       new Notice("No active chat to clone.");
@@ -1414,8 +967,8 @@ private handleTranslateInputClick = async (): Promise<void> => {
       cloningNotice.hide();
     }
   };
-  private handleClearChatClick = async (): Promise<void> => {
-    this.closeMenu();
+  public handleClearChatClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (activeChat) {
       const chatName = activeChat.metadata.name;
@@ -1431,8 +984,8 @@ private handleTranslateInputClick = async (): Promise<void> => {
       new Notice("No active chat to clear.");
     }
   };
-  private handleDeleteChatClick = async (): Promise<void> => {
-    this.closeMenu();
+  public handleDeleteChatClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (activeChat) {
       const chatName = activeChat.metadata.name;
@@ -1455,8 +1008,8 @@ private handleTranslateInputClick = async (): Promise<void> => {
   };
 
   // Цей обробник події викликається при натисканні на "Export to Note"
-  private handleExportChatClick = async (): Promise<void> => {
-    this.closeMenu();
+  public handleExportChatClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat || activeChat.messages.length === 0) {
       new Notice("Chat empty, nothing to export.");
@@ -1533,19 +1086,13 @@ private handleTranslateInputClick = async (): Promise<void> => {
     }
   };
 
-  private handleSettingsClick = async (): Promise<void> => {
-    this.closeMenu();
+  public handleSettingsClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
     (this.app as any).setting?.open?.();
     (this.app as any).setting?.openTabById?.(this.plugin.manifest.id);
   };
   private handleDocumentClickForMenu = (e: MouseEvent): void => {
-    if (
-      this.isMenuOpen() &&
-      !this.menuButton?.contains(e.target as Node) &&
-      !this.menuDropdown?.contains(e.target as Node)
-    ) {
-      this.closeMenu();
-    }
+    this.dropdownMenuManager?.handleDocumentClick(e, this.menuButton);
   };
 
   private handleModelChange = async (modelName: string): Promise<void> => {
@@ -1607,23 +1154,20 @@ private handleTranslateInputClick = async (): Promise<void> => {
     this.plugin.promptService?.clearRoleCache(); // Очищуємо кеш ролей
 
     // Оновлюємо випадаюче меню (якщо відкрите)
-    if (this.isMenuOpen()) {
-         const isRoleSubmenuVisible =
-            this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-         if(isRoleSubmenuVisible) {
-            this.renderRoleList(); // Цей метод залишається в OllamaView для випадаючого меню
-         }
+    if (this.dropdownMenuManager) {
+      this.dropdownMenuManager
+        .updateRoleListIfVisible()
+        .catch(e => this.plugin.logger.error("Error updating role dropdown list:", e));
     }
 
     // Оновлюємо бічну панель через SidebarManager
-     if (this.sidebarManager?.isSectionVisible("roles")) {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Roles panel is visible, requesting update.");
-        this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list:", e));
+    if (this.sidebarManager?.isSectionVisible("roles")) {
+      this.plugin.logger.info("[OllamaView -> Sidebar] Roles panel is visible, requesting update.");
+      this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list:", e));
     } else {
-         this.plugin.logger.info("[OllamaView -> Sidebar] Roles panel is collapsed, skipping update.");
+      this.plugin.logger.info("[OllamaView -> Sidebar] Roles panel is collapsed, skipping update.");
     }
-};
-
+  };
 
   // OllamaView.ts
 
@@ -1804,14 +1348,8 @@ private handleTranslateInputClick = async (): Promise<void> => {
   // --- UI Update Methods ---
   private updateInputPlaceholder(roleName: string | null | undefined): void {
     if (this.inputEl) {
-      const displayRole = roleName || "Assistant"; // Запасний варіант
-      this.inputEl.placeholder = `Message ${displayRole}...`; // Новий формат
-    }
-  }
-  private closeMenu(): void {
-    if (this.menuDropdown) {
-      this.menuDropdown.style.display = "none";
-      this.collapseAllSubmenus(null);
+      // const displayRole = roleName || "Assistant"; // Запасний варіант
+      this.inputEl.placeholder = `Enter message text here...`;
     }
   }
   private autoResizeTextarea(): void {
@@ -2129,29 +1667,33 @@ private handleTranslateInputClick = async (): Promise<void> => {
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
 
-     // --- ОНОВЛЕНО: Update side panels via SidebarManager ---
-     this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels via SidebarManager...");
-     const panelUpdatePromises = [];
-     if (this.sidebarManager?.isSectionVisible("chats")) {
-         panelUpdatePromises.push(
-             this.sidebarManager.updateChatList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-         );
-     } else {
-         this.plugin.logger.debug("[loadAndDisplayActiveChat] Chat panel collapsed, skipping update.");
-     }
-     if (this.sidebarManager?.isSectionVisible("roles")) {
-         panelUpdatePromises.push(
-             this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-         );
-     } else {
-         this.plugin.logger.debug("[loadAndDisplayActiveChat] Role panel collapsed, skipping update.");
-     }
+      // --- ОНОВЛЕНО: Update side panels via SidebarManager ---
+      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels via SidebarManager...");
+      const panelUpdatePromises = [];
+      if (this.sidebarManager?.isSectionVisible("chats")) {
+        panelUpdatePromises.push(
+          this.sidebarManager
+            .updateChatList()
+            .catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
+        );
+      } else {
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Chat panel collapsed, skipping update.");
+      }
+      if (this.sidebarManager?.isSectionVisible("roles")) {
+        panelUpdatePromises.push(
+          this.sidebarManager
+            .updateRoleList()
+            .catch(e => this.plugin.logger.error("Error updating role panel list:", e))
+        );
+      } else {
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Role panel collapsed, skipping update.");
+      }
 
-     if (panelUpdatePromises.length > 0) {
-         await Promise.all(panelUpdatePromises);
-         this.plugin.logger.debug("[loadAndDisplayActiveChat] Sidebar panel updates finished.");
-     }
-     // --- КІНЕЦЬ ОНОВЛЕННЯ ---
+      if (panelUpdatePromises.length > 0) {
+        await Promise.all(panelUpdatePromises);
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Sidebar panel updates finished.");
+      }
+      // --- КІНЕЦЬ ОНОВЛЕННЯ ---
       // Set input state based on model availability
       if (finalModelName === null) {
         // ... (disable input if no model) ...
@@ -2232,9 +1774,9 @@ private handleTranslateInputClick = async (): Promise<void> => {
         // Переконуємось, що ID оновлено, якщо це той самий чат
         this.lastProcessedChatId = data.chatId;
       }
-       // Оновлюємо основні елементи UI (індикатори моделі, ролі, температури)
-       const chat = data.chat; // Вже отримали чат
-       const currentRolePath = chat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+      // Оновлюємо основні елементи UI (індикатори моделі, ролі, температури)
+      const chat = data.chat; // Вже отримали чат
+      const currentRolePath = chat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
       const currentRoleName = await this.findRoleNameByPath(currentRolePath);
       const currentModelName = chat.metadata?.modelName || this.plugin.settings.modelName;
       const currentTemperature = chat.metadata?.temperature ?? this.plugin.settings.temperature;
@@ -2244,25 +1786,29 @@ private handleTranslateInputClick = async (): Promise<void> => {
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
 
-       // --- ОНОВЛЕНО: Оновлюємо панелі через SidebarManager ---
+      // --- ОНОВЛЕНО: Оновлюємо панелі через SidebarManager ---
       this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels via SidebarManager...");
       const panelUpdatePromises = [];
       if (this.sidebarManager?.isSectionVisible("chats")) {
-          panelUpdatePromises.push(
-              this.sidebarManager.updateChatList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-          );
+        panelUpdatePromises.push(
+          this.sidebarManager
+            .updateChatList()
+            .catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
+        );
       }
       if (this.sidebarManager?.isSectionVisible("roles")) {
-          panelUpdatePromises.push(
-              this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-          );
+        panelUpdatePromises.push(
+          this.sidebarManager
+            .updateRoleList()
+            .catch(e => this.plugin.logger.error("Error updating role panel list:", e))
+        );
       }
       if (panelUpdatePromises.length > 0) {
-          await Promise.all(panelUpdatePromises);
-          this.plugin.logger.debug("[handleActiveChatChanged] Sidebar panel updates finished.");
+        await Promise.all(panelUpdatePromises);
+        this.plugin.logger.debug("[handleActiveChatChanged] Sidebar panel updates finished.");
       }
-      // --- КІНЕЦЬ ОНОВЛЕННЯ ---    
-      } else {
+      // --- КІНЕЦЬ ОНОВЛЕННЯ ---
+    } else {
       // Лог для непередбаченого стану
       this.plugin.logger.warn(
         `[handleActiveChatChanged] Входимо в блок НЕОБРОБЛЕНОГО СТАНУ: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
@@ -2278,92 +1824,76 @@ private handleTranslateInputClick = async (): Promise<void> => {
     );
   }
 
-  
-private handleChatListUpdated = (): void => {
-  this.plugin.logger.info("[OllamaView] Received 'chat-list-updated' event.");
+  private handleChatListUpdated = (): void => {
+    if (this.dropdownMenuManager) {
+      this.dropdownMenuManager
+        .updateChatListIfVisible()
+        .catch(e => this.plugin.logger.error("Error updating chat dropdown list:", e));
+    }
 
-  // Оновлюємо випадаюче меню (якщо відкрите) - ця логіка залишається тут
-  const menuOpen = this.isMenuOpen();
-  if (menuOpen) {
-      const isChatSubmenuVisible =
-          this.chatSubmenuContent && !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-      if (isChatSubmenuVisible) {
-          this.renderChatListMenu().catch(error => {
-               this.plugin.logger.error("[OllamaView] Error rendering chat list menu:", error);
-          });
-      }
-  }
-
-  // Оновлюємо бічну панель через SidebarManager
-  if (this.sidebarManager?.isSectionVisible("chats")) { // Перевірка видимості через менеджер
+    // Оновлюємо бічну панель через SidebarManager
+    if (this.sidebarManager?.isSectionVisible("chats")) {
+      // Перевірка видимості через менеджер
       this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is visible, requesting update.");
-      this.sidebarManager.updateChatList().catch(error => { // Виклик методу менеджера
-          this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
+      this.sidebarManager.updateChatList().catch(error => {
+        // Виклик методу менеджера
+        this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
       });
-  } else {
+    } else {
       this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is collapsed, skipping update.");
-  }
-};;
+    }
+  };
 
+  public handleSettingsUpdated = async (): Promise<void> => {
+    this.plugin.logger.debug("[OllamaView] Received 'settings-updated' event.");
+    // ... (отримання даних як було: activeChat, model, role, temp) ...
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
+    const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
+    const currentRoleName = await this.findRoleNameByPath(currentRolePath);
+    const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
 
-public handleSettingsUpdated = async (): Promise<void> => {
-  this.plugin.logger.debug("[OllamaView] Received 'settings-updated' event.");
-  // ... (отримання даних як було: activeChat, model, role, temp) ...
-   const activeChat = await this.plugin.chatManager?.getActiveChat();
-  const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-  const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-  const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-  const currentTemperature = activeChat?.metadata?.temperature ?? this.plugin.settings.temperature;
+    // Оновлення основних елементів UI
+    this.updateModelDisplay(currentModelName);
+    this.updateRoleDisplay(currentRoleName);
+    this.updateInputPlaceholder(currentRoleName);
+    this.updateTemperatureIndicator(currentTemperature);
+    this.updateToggleViewLocationOption();
+    this.updateToggleLocationButton();
 
-
-  // Оновлення основних елементів UI
-  this.updateModelDisplay(currentModelName);
-  this.updateRoleDisplay(currentRoleName);
-  this.updateInputPlaceholder(currentRoleName);
-  this.updateTemperatureIndicator(currentTemperature);
-  this.updateToggleViewLocationOption();
-  this.updateToggleLocationButton();
-
-  // Оновлення випадаючого меню (якщо відкрите)
-  if (this.isMenuOpen()) {
-      // Оновити список ролей у випадаючому меню
-      const isRoleSubmenuVisible =
-          this.roleSubmenuContent && !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-      if (isRoleSubmenuVisible) {
-          this.plugin.logger.debug("[handleSettingsUpdated] Role submenu open, refreshing role list menu.");
-          await this.renderRoleList().catch(e => this.plugin.logger.error("Error updating role dropdown list:", e));
-      }
-       // Оновити список моделей у випадаючому меню
-       const isModelSubmenuVisible =
-          this.modelSubmenuContent && !this.modelSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
-      if (isModelSubmenuVisible) {
-          this.plugin.logger.debug("[handleSettingsUpdated] Model submenu open, refreshing model list menu.");
-          await this.renderModelList().catch(e => this.plugin.logger.error("Error updating model dropdown list:", e));
-      }
-  }
-
-
-  // --- ОНОВЛЕНО: Оновлюємо панель ролей через SidebarManager (бо могла змінитися дефолтна роль) ---
-  if (this.sidebarManager?.isSectionVisible("roles")) {
+    if (this.dropdownMenuManager) {
+      this.dropdownMenuManager
+        .updateRoleListIfVisible()
+        .catch(e => this.plugin.logger.error("Error updating role dropdown list:", e));
+      this.dropdownMenuManager
+        .updateModelListIfVisible()
+        .catch(e => this.plugin.logger.error("Error updating model dropdown list:", e));
+      this.dropdownMenuManager.updateToggleViewLocationOption(); // Update the toggle option text/icon
+    }
+    // --- ОНОВЛЕНО: Оновлюємо панель ролей через SidebarManager (бо могла змінитися дефолтна роль) ---
+    if (this.sidebarManager?.isSectionVisible("roles")) {
       this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Roles panel is visible, updating it.");
-      await this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list:", e));
-  } else {
+      await this.sidebarManager
+        .updateRoleList()
+        .catch(e => this.plugin.logger.error("Error updating role panel list:", e));
+    } else {
       this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Roles panel is collapsed, skipping update.");
-  }
-  // --- КІНЕЦЬ ОНОВЛЕННЯ ---
+    }
+    // --- КІНЕЦЬ ОНОВЛЕННЯ ---
 
-   // --- ОНОВЛЕНО: Оновлюємо панель чатів через SidebarManager (бо могла змінитися папка експорту або щось інше) ---
-   if (this.sidebarManager?.isSectionVisible("chats")) {
+    // --- ОНОВЛЕНО: Оновлюємо панель чатів через SidebarManager (бо могла змінитися папка експорту або щось інше) ---
+    if (this.sidebarManager?.isSectionVisible("chats")) {
       this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is visible, updating it.");
-      await this.sidebarManager.updateChatList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e));
-  } else {
+      await this.sidebarManager
+        .updateChatList()
+        .catch(e => this.plugin.logger.error("Error updating chat panel list:", e));
+    } else {
       this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is collapsed, skipping update.");
-  }
-   // --- КІНЕЦЬ ОНОВЛЕННЯ ---
+    }
+    // --- КІНЕЦЬ ОНОВЛЕННЯ ---
 
-
-  this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
-};
+    this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
+  };
 
   public async handleDeleteMessageClick(messageToDelete: Message): Promise<void> {
     this.plugin.logger.debug(`Delete requested for message timestamp: ${messageToDelete.timestamp.toISOString()}`);
@@ -2686,114 +2216,117 @@ public handleSettingsUpdated = async (): Promise<void> => {
   }
 
   // OllamaView.ts -> handleTranslateClick (для повідомлень)
-public async handleTranslateClick(
-  originalContent: string, // Оригінальний, не декодований контент повідомлення
-  contentEl: HTMLElement,  // DOM-елемент ОРИГІНАЛЬНОГО контенту (.message-content)
-  buttonEl: HTMLButtonElement // Кнопка перекладу для оновлення її стану
-): Promise<void> {
-   const targetLang = this.plugin.settings.translationTargetLanguage;
+  public async handleTranslateClick(
+    originalContent: string, // Оригінальний, не декодований контент повідомлення
+    contentEl: HTMLElement, // DOM-елемент ОРИГІНАЛЬНОГО контенту (.message-content)
+    buttonEl: HTMLButtonElement // Кнопка перекладу для оновлення її стану
+  ): Promise<void> {
+    const targetLang = this.plugin.settings.translationTargetLanguage;
 
-   // Перевірка налаштувань enableTranslation та provider
-   if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === 'none') {
-       new Notice("Translation disabled or provider not selected in settings.");
-       return;
-   }
+    // Перевірка налаштувань enableTranslation та provider
+    if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === "none") {
+      new Notice("Translation disabled or provider not selected in settings.");
+      return;
+    }
     // Перевірка цільової мови
     if (!targetLang) {
       new Notice("Target language for translation is not set in settings.");
       return;
-  }
+    }
 
-   // Підготовка тексту: декодування HTML та видалення тегів <think>
-   let textToTranslate = "";
-   try {
+    // Підготовка тексту: декодування HTML та видалення тегів <think>
+    let textToTranslate = "";
+    try {
       const decodedContent = RendererUtils.decodeHtmlEntities(originalContent);
       if (RendererUtils.detectThinkingTags(decodedContent).hasThinkingTags) {
-          textToTranslate = decodedContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        textToTranslate = decodedContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
       } else {
-           textToTranslate = decodedContent.trim();
+        textToTranslate = decodedContent.trim();
       }
       // Перевірка, чи залишився текст після обробки
       if (!textToTranslate) {
-           new Notice("Nothing to translate (content might be empty after removing internal tags).");
-           return;
+        new Notice("Nothing to translate (content might be empty after removing internal tags).");
+        return;
       }
-   } catch (error) {
-       this.plugin.logger.error("[handleTranslateClick] Error during text preprocessing:", error);
-       new Notice("Failed to prepare text for translation.");
-       return;
-   }
+    } catch (error) {
+      this.plugin.logger.error("[handleTranslateClick] Error during text preprocessing:", error);
+      new Notice("Failed to prepare text for translation.");
+      return;
+    }
 
-   // Видаляємо попередній контейнер перекладу, якщо він існує
-   contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
+    // Видаляємо попередній контейнер перекладу, якщо він існує
+    contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
 
-   // Встановлюємо стан завантаження для кнопки
-   const originalIcon = buttonEl.querySelector(".svg-icon")?.getAttribute("icon-name") || "languages";
-   setIcon(buttonEl, "loader");
-   buttonEl.disabled = true;
-   buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); // Використовуємо константу
-   const originalTitle = buttonEl.title;
-   buttonEl.setAttribute("title", "Translating...");
-   buttonEl.addClass("button-loading"); // Клас для можливої анімації
+    // Встановлюємо стан завантаження для кнопки
+    const originalIcon = buttonEl.querySelector(".svg-icon")?.getAttribute("icon-name") || "languages";
+    setIcon(buttonEl, "loader");
+    buttonEl.disabled = true;
+    buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING); // Використовуємо константу
+    const originalTitle = buttonEl.title;
+    buttonEl.setAttribute("title", "Translating...");
+    buttonEl.addClass("button-loading"); // Клас для можливої анімації
 
-   try {
+    try {
       this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for message content...`);
       // Викликаємо новий сервіс перекладу
-       const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
+      const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
 
-       // Перевіряємо, чи елемент контенту все ще існує в DOM
-       if (!contentEl || !contentEl.isConnected) {
-           this.plugin.logger.error("[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived.");
-           // Сервіс вже міг показати помилку, якщо вона була
-           // new Notice("Translation failed: message element not found.");
-           return; // Стан кнопки буде відновлено у finally
-       }
+      // Перевіряємо, чи елемент контенту все ще існує в DOM
+      if (!contentEl || !contentEl.isConnected) {
+        this.plugin.logger.error(
+          "[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived."
+        );
+        // Сервіс вже міг показати помилку, якщо вона була
+        // new Notice("Translation failed: message element not found.");
+        return; // Стан кнопки буде відновлено у finally
+      }
 
-       if (translatedText !== null) { // Перевіряємо на null (означає помилку)
-           this.plugin.logger.debug(`[OllamaView] Message translation received.`);
-          // Створення контейнера для відображення перекладу
-          const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
-          // Елемент для самого перекладеного тексту (відрендереного як Markdown)
-          const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
+      if (translatedText !== null) {
+        // Перевіряємо на null (означає помилку)
+        this.plugin.logger.debug(`[OllamaView] Message translation received.`);
+        // Створення контейнера для відображення перекладу
+        const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
+        // Елемент для самого перекладеного тексту (відрендереного як Markdown)
+        const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
 
-          // Рендеринг перекладеного тексту як Markdown
-          await MarkdownRenderer.render(
-              this.app,
-              translatedText, // Використовуємо отриманий переклад
-              translationContentEl,
-              this.plugin.app.vault.getRoot()?.path ?? "",
-              this // Контекст компонента (OllamaView)
-          );
+        // Рендеринг перекладеного тексту як Markdown
+        await MarkdownRenderer.render(
+          this.app,
+          translatedText, // Використовуємо отриманий переклад
+          translationContentEl,
+          this.plugin.app.vault.getRoot()?.path ?? "",
+          this // Контекст компонента (OllamaView)
+        );
 
-          // Виправлення емодзі після рендерингу
-          RendererUtils.fixBrokenTwemojiImages(translationContentEl);
+        // Виправлення емодзі після рендерингу
+        RendererUtils.fixBrokenTwemojiImages(translationContentEl);
 
-          // Додавання індикатора мови перекладу
-          const targetLangName = LANGUAGES[targetLang] || targetLang; // Отримуємо повну назву мови
-          translationContainer.createEl("div", {
-              cls: "translation-indicator",
-              text: `[Translated to ${targetLangName}]`,
-          });
+        // Додавання індикатора мови перекладу
+        const targetLangName = LANGUAGES[targetLang] || targetLang; // Отримуємо повну назву мови
+        translationContainer.createEl("div", {
+          cls: "translation-indicator",
+          text: `[Translated to ${targetLangName}]`,
+        });
 
-          // Прокрутка до низу, щоб переклад був видимим (якщо потрібно)
-          this.guaranteedScrollToBottom(50, false);
-       }
-       // Якщо translatedText === null, сервіс мав показати Notice про помилку
-   } catch (error) {
+        // Прокрутка до низу, щоб переклад був видимим (якщо потрібно)
+        this.guaranteedScrollToBottom(50, false);
+      }
+      // Якщо translatedText === null, сервіс мав показати Notice про помилку
+    } catch (error) {
       // Цей блок малоймовірний, оскільки сервіс має обробляти свої помилки
       this.plugin.logger.error("[OllamaView] Unexpected error during message translation call:", error);
       // new Notice("An unexpected error occurred during translation.");
-   } finally {
+    } finally {
       // Завжди відновлюємо стан кнопки, якщо вона ще існує
       if (buttonEl?.isConnected) {
-          setIcon(buttonEl, originalIcon);
-          buttonEl.disabled = false;
-          buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
-          buttonEl.setAttribute("title", originalTitle);
-          buttonEl.removeClass("button-loading");
+        setIcon(buttonEl, originalIcon);
+        buttonEl.disabled = false;
+        buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
+        buttonEl.setAttribute("title", originalTitle);
+        buttonEl.removeClass("button-loading");
       }
-   }
-}
+    }
+  }
 
   // --- Rendering Helpers ---
   private renderDateSeparator(date: Date): void {
@@ -2803,272 +2336,7 @@ public async handleTranslateClick(
       text: this.formatDateSeparator(date),
     });
   }
-
-  // --- Menu List Rendering (Accordion Style) ---
-  private async renderModelList(): Promise<void> {
-    const container = this.modelSubmenuContent;
-    if (!container) return;
-    container.empty();
-    const modelIconMap: Record<string, string> = {
-      llama: "box-minimal",
-      mistral: "wind" /*...*/,
-    };
-    const defaultIcon = "box";
-    try {
-      const models = await this.plugin.ollamaService.getModels();
-      const activeChat = await this.plugin.chatManager?.getActiveChat();
-      const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
-      if (models.length === 0) {
-        container.createEl("div", {
-          cls: "menu-info-text",
-          text: "No models.",
-        });
-        return;
-      }
-      models.forEach(modelName => {
-        const optionEl = container.createDiv({
-          cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_MODEL_OPTION}`,
-        });
-        const iconSpan = optionEl.createEl("span", {
-          cls: "menu-option-icon",
-        });
-        let iconToUse = defaultIcon;
-        if (modelName === currentModelName) {
-          iconToUse = "check";
-          optionEl.addClass("is-selected");
-        } else {
-          const l = modelName.toLowerCase();
-          let f = false;
-          for (const k in modelIconMap) {
-            if (l.includes(k)) {
-              iconToUse = modelIconMap[k];
-              f = true;
-              break;
-            }
-          }
-          if (!f) iconToUse = defaultIcon;
-        }
-        try {
-          setIcon(iconSpan, iconToUse);
-        } catch (e) {
-          iconSpan.style.minWidth = "18px";
-        }
-        optionEl.createEl("span", {
-          cls: "menu-option-text",
-          text: modelName,
-        });
-        this.registerDomEvent(optionEl, "click", async () => {
-          if (modelName !== currentModelName) {
-            const chat = await this.plugin.chatManager?.getActiveChat();
-            if (chat)
-              await this.plugin.chatManager.updateActiveChatMetadata({
-                modelName: modelName,
-              });
-            else new Notice("No active chat.");
-          }
-          this.closeMenu();
-        });
-      });
-      this.updateSubmenuHeight(container);
-    } catch (error) {
-      container.empty();
-      container.createEl("div", {
-        cls: "menu-error-text",
-        text: "Error models.",
-      });
-      this.updateSubmenuHeight(container);
-    }
-  }
-  public async renderRoleList(): Promise<void> {
-    const container = this.roleSubmenuContent;
-    if (!container) return;
-    container.empty();
-    try {
-      const roles = await this.plugin.listRoleFiles(true);
-      const activeChat = await this.plugin.chatManager?.getActiveChat();
-      const currentChatRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
-      const noRoleOptionEl = container.createDiv({
-        cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}`,
-      });
-      const noRoleIconSpan = noRoleOptionEl.createEl("span", {
-        cls: "menu-option-icon",
-      });
-      if (!currentChatRolePath) {
-        setIcon(noRoleIconSpan, "check");
-        noRoleOptionEl.addClass("is-selected");
-      } else {
-        setIcon(noRoleIconSpan, "slash");
-        noRoleIconSpan.style.minWidth = "18px";
-      }
-      noRoleOptionEl.createEl("span", {
-        cls: "menu-option-text",
-        text: "None",
-      });
-      this.registerDomEvent(noRoleOptionEl, "click", async () => {
-        const nrp = "";
-        if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) {
-          this.plugin.settings.selectedRolePath = nrp;
-          await this.plugin.saveSettings();
-          const chat = await this.plugin.chatManager?.getActiveChat();
-          if (chat && chat.metadata.selectedRolePath !== nrp) {
-            await this.plugin.chatManager.updateActiveChatMetadata({
-              selectedRolePath: nrp,
-            });
-            this.plugin.promptService?.clearRoleCache?.();
-          }
-          this.plugin.emit("role-changed", "None");
-        }
-        this.closeMenu();
-      });
-      if (roles.length > 0) container.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-      roles.forEach(roleInfo => {
-        const roleOptionEl = container.createDiv({
-          cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_ROLE_OPTION}`,
-        });
-        if (roleInfo.isCustom) roleOptionEl.addClass("is-custom");
-        const iconSpan = roleOptionEl.createEl("span", {
-          cls: "menu-option-icon",
-        });
-        if (roleInfo.path === currentChatRolePath) {
-          setIcon(iconSpan, "check");
-          roleOptionEl.addClass("is-selected");
-        } else {
-          setIcon(iconSpan, roleInfo.isCustom ? "user" : "box");
-          iconSpan.style.minWidth = "18px";
-        }
-        roleOptionEl.createEl("span", {
-          cls: "menu-option-text",
-          text: roleInfo.name,
-        });
-        this.registerDomEvent(roleOptionEl, "click", async () => {
-          const nrp = roleInfo.path;
-          if (this.plugin.settings.selectedRolePath !== nrp || currentChatRolePath !== nrp) {
-            this.plugin.settings.selectedRolePath = nrp;
-            await this.plugin.saveSettings();
-            const chat = await this.plugin.chatManager?.getActiveChat();
-            if (chat && chat.metadata.selectedRolePath !== nrp) {
-              await this.plugin.chatManager.updateActiveChatMetadata({
-                selectedRolePath: nrp,
-              });
-              this.plugin.promptService?.clearRoleCache?.();
-            }
-            this.plugin.emit("role-changed", roleInfo.name);
-          }
-          this.closeMenu();
-        });
-      });
-      this.updateSubmenuHeight(container);
-    } catch (error) {
-      container.empty();
-      container.createEl("div", {
-        cls: "menu-error-text",
-        text: "Error roles.",
-      });
-      this.updateSubmenuHeight(container);
-    }
-  }
-  public async renderChatListMenu(): Promise<void> {
-    const container = this.chatSubmenuContent;
-    if (!container) {
-      this.plugin.logger.warn("[renderChatListMenu] Chat submenu container not found!"); // Log missing element
-      return;
-    }
-    container.empty();
-    try {
-      const chats = this.plugin.chatManager?.listAvailableChats() || [];
-      const currentActiveId = this.plugin.chatManager?.getActiveChatId();
-      if (chats.length === 0) {
-        container.createEl("div", {
-          cls: "menu-info-text",
-          text: "No saved chats.",
-        });
-        this.plugin.logger.debug("[renderChatListMenu] Rendered 'No saved chats.' message.");
-        return;
-      } else {
-        // TODO: check it
-        chats.forEach(chatMeta => {
-          const chatOptionEl = container.createDiv({
-            cls: [CSS_CLASS_MENU_OPTION, CSS_CLASS_CHAT_LIST_ITEM, CSS_CLASS_CHAT_OPTION],
-          });
-          // ... (іконка) ...
-          const textSpan = chatOptionEl.createEl("span", { cls: "menu-option-text" });
-          textSpan.createEl("div", { cls: "chat-option-name", text: chatMeta.name });
-
-          // --- ВИПРАВЛЕННЯ (аналогічне) ---
-          const lastModifiedDate = new Date(chatMeta.lastModified);
-          const dateText = !isNaN(lastModifiedDate.getTime())
-            ? this.formatRelativeDate(lastModifiedDate)
-            : "Invalid date";
-          if (dateText === "Invalid date") {
-            this.plugin.logger.warn(
-              `[renderChatListMenu] Invalid date parsed for chat ${chatMeta.id}, lastModified: ${chatMeta.lastModified}`
-            );
-          }
-          textSpan.createEl("div", { cls: "chat-option-date", text: dateText });
-          // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
-
-          this.registerDomEvent(chatOptionEl, "click", async () => {
-            if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
-              await this.plugin.chatManager.setActiveChat(chatMeta.id);
-            }
-            this.closeMenu();
-          });
-        });
-      }
-      chats.forEach(chatMeta => {
-        const chatOptionEl = container.createDiv({
-          cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_CHAT_OPTION}`,
-        });
-        const iconSpan = chatOptionEl.createEl("span", {
-          cls: "menu-option-icon",
-        });
-        if (chatMeta.id === currentActiveId) {
-          setIcon(iconSpan, "check");
-          chatOptionEl.addClass("is-selected");
-        } else {
-          setIcon(iconSpan, "message-square");
-        }
-        const textSpan = chatOptionEl.createEl("span", {
-          cls: "menu-option-text",
-        });
-        textSpan.createEl("div", {
-          cls: "chat-option-name",
-          text: chatMeta.name,
-        });
-        const dateText = this.formatRelativeDate(new Date(chatMeta.lastModified));
-        textSpan.createEl("div", {
-          cls: "chat-option-date",
-          text: dateText,
-        });
-        this.registerDomEvent(chatOptionEl, "click", async () => {
-          if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
-            await this.plugin.chatManager.setActiveChat(chatMeta.id);
-          }
-          this.closeMenu();
-        });
-      });
-      this.updateSubmenuHeight(container);
-      this.plugin.logger.debug("[renderChatListMenu] Finished rendering chat list successfully."); // Log success end
-    } catch (error) {
-      this.plugin.logger.error("[renderChatListMenu] Error rendering chat list:", error); // Log error
-      container.empty();
-      container.createEl("div", {
-        cls: "menu-error-text",
-        text: "Error chats.",
-      });
-      this.updateSubmenuHeight(container);
-    }
-  }
-  private updateSubmenuHeight(contentEl: HTMLElement | null): void {
-    if (contentEl && !contentEl.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)) {
-      requestAnimationFrame(() => {
-        contentEl.style.maxHeight = contentEl.scrollHeight + "px";
-      });
-    }
-  }
-
   // --- Speech Recognition Methods ---
-
   // --- Speech Recognition Placeholders ---
   private initSpeechWorker(): void {
     /* ... same as before ... */
@@ -3841,34 +3109,12 @@ public async handleTranslateClick(
   }
 
   private updateToggleViewLocationOption(): void {
-    if (!this.toggleViewLocationOption) return;
-    this.toggleViewLocationOption.empty(); // Очищуємо перед оновленням
-    const iconSpan = this.toggleViewLocationOption.createSpan({
-      cls: "menu-option-icon",
-    });
-    const textSpan = this.toggleViewLocationOption.createSpan({
-      cls: "menu-option-text",
-    });
-
-    if (this.plugin.settings.openChatInTab) {
-      // Якщо зараз налаштовано відкриття у Вкладці, дія - "Перемістити в Бічну Панель"
-      setIcon(iconSpan, "sidebar-right"); // Іконка бічної панелі
-      textSpan.setText("Show in Sidebar");
-      this.toggleViewLocationOption.title = "Close tab and reopen in sidebar";
-    } else {
-      // Якщо зараз налаштовано відкриття у Бічній Панелі, дія - "Перемістити у Вкладку"
-      setIcon(iconSpan, "layout-list"); // Іконка вкладки/списку
-      textSpan.setText("Show in Tab");
-      this.toggleViewLocationOption.title = "Close sidebar panel and reopen in tab";
-    }
-    // Прибираємо сірий колір - кнопка завжди активна для перемикання
-    // this.toggleViewLocationOption.removeClass(CSS_CLASS_INACTIVE_OPTION);
+    this.dropdownMenuManager?.updateToggleViewLocationOption();
   }
 
   // --- Новий обробник кліку для перемикання ---
-  private handleToggleViewLocationClick = async (): Promise<void> => {
-    this.closeMenu(); // Закриваємо меню
-
+  public handleToggleViewLocationClick = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
     const currentSetting = this.plugin.settings.openChatInTab;
     const newSetting = !currentSetting; // Інвертуємо налаштування
 
@@ -5141,4 +4387,8 @@ public async handleTranslateClick(
       );
     }
   } // Кінець handleMessageAdded
+
+  private handleMenuButtonClick = (e: MouseEvent): void => {
+    this.dropdownMenuManager?.toggleMenu(e);
+  };
 } // END OF OllamaView CLASS

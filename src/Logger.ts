@@ -7,6 +7,7 @@ export enum LogLevel {
     INFO = 2,
     WARN = 3,
     ERROR = 4,
+    TRACE = 6, // Для трасування
     NONE = 5 // Для повного вимкнення
 }
 
@@ -100,6 +101,7 @@ export class Logger {
     info(...args: any[]) { this.log(LogLevel.INFO, console.info, ...args); }
     warn(...args: any[]) { this.log(LogLevel.WARN, console.warn, ...args); }
     error(...args: any[]) { this.log(LogLevel.ERROR, console.error, ...args); }
+    trace(...args: any[]) { this.log(LogLevel.TRACE, console.error, ...args); }
 
     private log(level: LogLevel, consoleMethod: (...args: any[]) => void, ...args: any[]) {
         const caller = this.getCallerInfo();
