@@ -1,263 +1,250 @@
 // src/styles/_menu.scss
 
 .menu-dropdown.ollama-chat-menu {
-    position: absolute;
-    right: calc(var(--chat-spacing-unit) * 1);
-    bottom: calc(100% + var(--chat-spacing-unit)); /* Above controls */
-    background-color: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-    z-index: 100;
-    min-width: 220px; /* Slightly wider */
-    overflow: hidden; /* Clip content */
-    animation: menu-fade-in 0.15s ease-out;
-    padding: calc(var(--chat-spacing-unit) * 1) 0;
+  position: absolute;
+  right: calc(var(--chat-spacing-unit) * 1);
+  bottom: calc(100% + var(--chat-spacing-unit)); /* Above controls */
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 220px; /* Slightly wider */
+  overflow: hidden; /* Clip content */
+  animation: menu-fade-in 0.15s ease-out;
+  padding: calc(var(--chat-spacing-unit) * 1) 0;
+  display: flex;
+  flex-direction: column;
+
+  /* --- ВИДАЛЕНО ПРИХОВУВАННЯ СЕКЦІЇ РОЛЕЙ ЗА ЗАМОВЧУВАННЯМ --- */
+  /*
+  .role-submenu-section {
+    display: none;
+
+     + hr.menu-separator {
+        display: none;
+     }
+  }
+  */
+
+  .model-submenu-section {
+     /* Visibility controlled by responsive files */
+  }
+  /*
+  .model-submenu-section + hr {
+     display: none; // Default hidden, shown in responsive
+  }
+  */
+
+  /* General style for all menu options within this specific menu */
+  .menu-option {
     display: flex;
-    flex-direction: column;
-  
-    .role-submenu-section {
-      display: none; 
-       
-       + hr.menu-separator {
-          display: none;
-       }
+    align-items: center;
+    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
+    cursor: pointer;
+    transition: background-color 0.15s ease-out;
+    color: var(--text-normal);
+    margin: 0 calc(var(--chat-spacing-unit) * 1);
+    border-radius: 5px;
+    user-select: none; // Prevent text selection on options
+
+    &:hover {
+      background-color: var(--background-modifier-hover);
     }
 
-    .model-submenu-section {
-       // display: none; // Default hidden, shown in responsive
-    }
-    // .model-submenu-section + hr {
-    //    display: none; // Default hidden, shown in responsive
-    // }
-  
-    /* General style for all menu options within this specific menu */
-    .menu-option {
+    .menu-option-icon {
+      margin-right: 12px;
       display: flex;
       align-items: center;
-      padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
-      cursor: pointer;
-      transition: background-color 0.15s ease-out;
-      color: var(--text-normal);
-      margin: 0 calc(var(--chat-spacing-unit) * 1);
-      border-radius: 5px;
-      user-select: none; // Prevent text selection on options
-  
-      &:hover {
-        background-color: var(--background-modifier-hover);
-      }
-  
-      .menu-option-icon {
-        margin-right: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--text-muted);
-        flex-shrink: 0;
-        min-width: 18px;
-        font-size: 1em; // Ensure consistent icon size base
-  
-         .svg-icon { // Size of icons within the span
-           width: 16px;
-           height: 16px;
-         }
-      }
-  
-      .menu-option-text {
-        font-size: var(--font-ui-small);
-        line-height: 1.3;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex-grow: 1;
-      }
-  
-       // Style for selected item (model, role, chat)
-       &.is-selected {
-          // background-color: var(--background-modifier-hover); // Optional background
-          .menu-option-text {
-              font-weight: 600;
-              color: var(--text-normal);
-          }
-          .menu-option-icon {
-              color: var(--interactive-accent);
-          }
-       }
-  
-       // Style for custom role icon
-       &.role-option.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
-          color: var(--text-faint);
-       }
-  
-       // Danger options (Clear, Delete)
-       &.danger-option {
-          &:hover {
-              background-color: var(--background-modifier-error-hover);
-              color: var(--text-on-error);
-              .menu-option-icon {
-                  color: var(--text-on-error);
-              }
-          }
-       }
-    }
-  
-    /* Menu Separator */
-    .menu-separator {
-      height: 1px;
-      background-color: var(--background-modifier-border);
-      margin: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 1);
-    }
-  
-    /* Section Header in Menu (Non-clickable) */
-    .menu-header {
-      padding: 8px 12px 4px 12px;
-      font-size: 0.8em;
-      font-weight: 600;
+      justify-content: center;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-  
-    // Submenu / Accordion Styles
-    .menu-header-item { // Clickable header for submenu
-       // Inherits .menu-option styles
-       justify-content: space-between; // Push icon to the right
-  
-       .submenu-icon { // Arrow icon
-          margin-right: 0; // Remove margin if it was on .menu-option-icon
-          color: var(--text-muted);
-          transition: transform 0.2s ease-in-out;
-          font-size: 1.1em; // Slightly larger arrow
-       }
-  
-       // Rotate arrow when expanded
-       &[aria-expanded="true"] .submenu-icon {
-          transform: rotate(90deg);
-       }
-    }
-  
-    .submenu-content { // Content container for submenu items
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.3s ease-out, padding 0.3s ease-out, margin 0.3s ease-out, border-color 0.3s ease-out;
-      padding: 0 calc(var(--chat-spacing-unit) * 1);
-      margin: 0 calc(var(--chat-spacing-unit) * 1);
-      border-left: 2px solid transparent; // Hidden border initially
-      margin-left: calc(var(--chat-spacing-unit) * 3);
-      padding-left: calc(var(--chat-spacing-unit) * 2);
-      margin-bottom: 0; // No margin when collapsed
-  
-      // Specific list containers inside submenu content
-      &.model-list-container,
-      &.role-list-container,
-      &.chat-list-container {
-        max-height: 200px; // Max height before internal scroll
-        overflow-y: auto;
-        padding-right: 4px; // Space for scrollbar
-  
-          // Scrollbar styling for lists inside menu
-          &::-webkit-scrollbar { width: 6px; }
-          &::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
-          &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-          &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
-  
-          // Text for Loading/Error/Empty states in lists
-          .menu-loading, .menu-error-text, .menu-info-text {
-              display: block;
-              padding: 8px 12px;
-              font-size: var(--font-ui-small);
-              color: var(--text-muted);
-              font-style: italic;
-          }
-          .menu-error-text { color: var(--text-error); }
-      }
-  
-      // Items inside the submenu
-      .menu-option {
-        padding-left: calc(var(--chat-spacing-unit) * 2) !important; // Less indent for nested items
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        width: auto;
-      }
-  
-      // When submenu content is visible/expanded
-      &:not(.submenu-content-hidden) {
-        // max-height set by JS
-        padding-top: 5px;
-        padding-bottom: 5px;
-        border-left-color: var(--background-modifier-border-hover);
-        margin-bottom: calc(var(--chat-spacing-unit) * 1);
-      }
+      flex-shrink: 0;
+      min-width: 18px;
+      font-size: 1em; // Ensure consistent icon size base
 
-      &.chat-list-scrollable {
-        // max-height встановлюється динамічно через JS/стилі, але можна задати і тут
-        // max-height: 250px; // Наприклад
-        overflow-y: auto; // Дозволяє вертикальний скролбар при переповненні
-  
-        // --- Стилізація скролбару (опціонально, для кращого вигляду) ---
-  
-        // Для Firefox
-        scrollbar-width: thin;
-        // Можна використовувати змінні Obsidian або ваші SCSS змінні
-        scrollbar-color: var(--interactive-accent) var(--background-secondary);
-        // scrollbar-color: $interactive-accent $background-secondary; // Якщо є SCSS змінні
-  
-        // Для Webkit (Chrome, Edge, Safari, Brave)
-        &::-webkit-scrollbar {
-          width: 6px; // Вузький скролбар
-        }
-  
-        &::-webkit-scrollbar-track {
-          background: var(--background-secondary); // Фон треку
-          // background: $background-secondary; // Якщо є SCSS змінна
-          border-radius: 3px;
-        }
-  
-        &::-webkit-scrollbar-thumb {
-          background-color: var(--interactive-accent); // Колір повзунка
-          // background-color: $interactive-accent; // Якщо є SCSS змінна
-          border-radius: 3px;
-          border: 1px solid var(--background-secondary); // Рамка кольору треку для візуального відступу
-          // border: 1px solid $background-secondary; // Якщо є SCSS змінна
-  
-          &:hover {
-            background-color: var(--interactive-accent-hover); // Колір при наведенні
-            // background-color: $interactive-accent-hover; // Якщо є SCSS змінна
-          }
-        }}
+       .svg-icon { // Size of icons within the span
+         width: 16px;
+         height: 16px;
+       }
     }
-  
-    // Class to explicitly hide content (used by JS)
-    .submenu-content-hidden {
-      max-height: 0 !important;
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
-      border-left-color: transparent;
-      margin-bottom: 0;
+
+    .menu-option-text {
+      font-size: var(--font-ui-small);
+      line-height: 1.3;
+      white-space: nowrap;
       overflow: hidden;
+      text-overflow: ellipsis;
+      flex-grow: 1;
     }
-  
-  
-    // Chat Option Specifics
-    .chat-option {
-      .menu-option-text { // Override base text style for chat
-        display: flex;
-        flex-direction: column;
-        line-height: 1.2;
-        flex-grow: 1;
-        overflow: hidden;
-      }
-      .chat-option-name {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: var(--font-ui-small);
-        margin-bottom: 2px;
-      }
-      .chat-option-date {
-        font-size: 0.8em;
+
+     // Style for selected item (model, role, chat)
+     &.is-selected {
+        // background-color: var(--background-modifier-hover); // Optional background
+        .menu-option-text {
+            font-weight: 600;
+            color: var(--text-normal);
+        }
+        .menu-option-icon {
+            color: var(--interactive-accent);
+        }
+     }
+
+     // Style for custom role icon
+     &.role-option.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
         color: var(--text-faint);
-        white-space: nowrap;
+     }
+
+     // Danger options (Clear, Delete)
+     &.danger-option {
+        &:hover {
+            background-color: var(--background-modifier-error-hover);
+            color: var(--text-on-error);
+            .menu-option-icon {
+                color: var(--text-on-error);
+            }
+        }
+     }
+  }
+
+  /* Menu Separator */
+  .menu-separator {
+    height: 1px;
+    background-color: var(--background-modifier-border);
+    margin: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 1);
+  }
+
+  /* Section Header in Menu (Non-clickable) */
+  // Додаємо клас .actions-header до селектору, якщо він є
+  .menu-header.actions-header {
+    padding: 8px 12px 4px 12px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  // Submenu / Accordion Styles
+  .menu-header-item { // Clickable header for submenu
+     // Inherits .menu-option styles
+     justify-content: space-between; // Push icon to the right
+
+     .submenu-icon { // Arrow icon
+        margin-right: 0; // Remove margin if it was on .menu-option-icon
+        color: var(--text-muted);
+        transition: transform 0.2s ease-in-out;
+        font-size: 1.1em; // Slightly larger arrow
+     }
+
+     // Rotate arrow when expanded
+     &[aria-expanded="true"] .submenu-icon {
+        transform: rotate(90deg);
+     }
+  }
+
+  .submenu-content { // Content container for submenu items
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out, margin 0.3s ease-out, border-color 0.3s ease-out;
+    padding: 0 calc(var(--chat-spacing-unit) * 1);
+    margin: 0 calc(var(--chat-spacing-unit) * 1);
+    border-left: 2px solid transparent; // Hidden border initially
+    margin-left: calc(var(--chat-spacing-unit) * 3);
+    padding-left: calc(var(--chat-spacing-unit) * 2);
+    margin-bottom: 0; // No margin when collapsed
+
+    // Specific list containers inside submenu content
+    &.model-list-container,
+    &.role-list-container,
+    &.chat-list-container {
+      // Видаляємо max-height звідси, контролюємо в responsive
+      // max-height: 200px;
+      overflow-y: auto;
+      padding-right: 4px; // Space for scrollbar
+
+        // Scrollbar styling for lists inside menu
+        &::-webkit-scrollbar { width: 6px; }
+        &::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
+        &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+        &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+
+        // Text for Loading/Error/Empty states in lists
+        .menu-loading, .menu-error-text, .menu-info-text {
+            display: block;
+            padding: 8px 12px;
+            font-size: var(--font-ui-small);
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .menu-error-text { color: var(--text-error); }
+    }
+
+    // Items inside the submenu
+    .menu-option {
+      padding-left: calc(var(--chat-spacing-unit) * 2) !important; // Less indent for nested items
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      width: auto;
+    }
+
+    // When submenu content is visible/expanded
+    &:not(.submenu-content-hidden) {
+      // max-height set by JS
+      padding-top: 5px;
+      padding-bottom: 5px;
+      border-left-color: var(--background-modifier-border-hover);
+      margin-bottom: calc(var(--chat-spacing-unit) * 1);
+    }
+
+    &.chat-list-scrollable {
+      overflow-y: auto; // Дозволяє вертикальний скролбар при переповненні
+
+      // --- Стилізація скролбару ---
+      scrollbar-width: thin;
+      scrollbar-color: var(--interactive-accent) var(--background-secondary);
+
+      &::-webkit-scrollbar { width: 6px; }
+      &::-webkit-scrollbar-track { background: var(--background-secondary); border-radius: 3px; }
+      &::-webkit-scrollbar-thumb {
+        background-color: var(--interactive-accent);
+        border-radius: 3px;
+        border: 1px solid var(--background-secondary);
+        &:hover { background-color: var(--interactive-accent-hover); }
       }
     }
   }
+
+  // Class to explicitly hide content (used by JS)
+  .submenu-content-hidden {
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-left-color: transparent;
+    margin-bottom: 0;
+    overflow: hidden;
+  }
+
+
+  // Chat Option Specifics
+  .chat-option {
+    .menu-option-text { // Override base text style for chat
+      display: flex;
+      flex-direction: column;
+      line-height: 1.2;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+    .chat-option-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: var(--font-ui-small);
+      margin-bottom: 2px;
+    }
+    .chat-option-date {
+      font-size: 0.8em;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+  }
+}

@@ -84,6 +84,8 @@
   }
 
   // --- Приховування непотрібних елементів ---
+  // Прибираємо приховування, якщо вони потрібні на планшеті
+  /*
   .input-controls-right {
       .voice-button,
       .send-button {
@@ -92,9 +94,13 @@
   }
   .input-controls-left {
       .role-display {
-          // display: none; // Ховаємо роль
+           display: none; // Ховаємо роль
+      }
+      .translate-input-button {
+           display: none; // Ховаємо переклад
       }
   }
+  */
   // --- Кінець приховування ---
 
   // Розміри видимих елементів
@@ -103,35 +109,50 @@
            width: 30px; height: 30px;
            .svg-icon { width: 16px; height: 16px; }
       }
-      .model-display, .temperature-indicator {
+      .model-display, .role-display, .temperature-indicator { // Додано role-display
            padding: 3px 6px;
            font-size: calc(var(--font-ui-smaller) * 0.95);
+           display: inline-flex; // Переконаємось, що вони видимі
+           align-items: center;
       }
        .temperature-indicator {
           min-width: 24px;
           font-size: 1.1em;
       }
-      .model-display {
+      .model-display, .role-display { // Об'єднано
            max-width: 130px; // Обмеження ширини
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
       }
   }
   .input-controls-right {
-       button { // Кнопка меню
+       button { // Кнопка меню та інші можливі
           width: 30px; height: 30px;
           .svg-icon { width: 17px; height: 17px; }
+          display: flex; // Переконаємось, що вони видимі
+          align-items: center;
+          justify-content: center;
        }
   }
 }
 
 // Меню: Залишаємо секції Модель/Роль видимими
 .menu-dropdown.ollama-chat-menu {
+    // Переконуємось, що секції та їх роздільники видимі
     .model-submenu-section,
-    .role-submenu-section {
-        display: none; //block; // Або flex
-         + hr.menu-separator {
-            display: none; //block;
-         }
+    .role-submenu-section,
+    .chat-submenu-section, // Явно показуємо чати теж
+    .menu-header.actions-header, // Показуємо заголовок Actions
+    .menu-option, // Показуємо всі опції
+    hr.menu-separator // Показуємо всі роздільники
+    {
+        display: flex; // Або block для hr/header
     }
+    hr.menu-separator { display: block; }
+    .menu-header.actions-header { display: block; }
+
+
      // Обмеження висоти списків
     .submenu-content.model-list-container,
     .submenu-content.role-list-container,

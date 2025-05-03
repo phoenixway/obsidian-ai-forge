@@ -97,7 +97,8 @@ export class DropdownMenuManager {
     const chatDropdownSection = this.createSubmenuSection(
       "Load Chat",
       "messages-square",
-      CSS_CLASS_CHAT_LIST_CONTAINER
+      CSS_CLASS_CHAT_LIST_CONTAINER,
+      "chat-submenu-section"
     );
     this.chatSubmenuHeader = chatDropdownSection.header;
     this.chatSubmenuContent = chatDropdownSection.content;

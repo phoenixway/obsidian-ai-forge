@@ -6,7 +6,7 @@
     min-height: 300px; // Або інше значення, напр. 50vh
 }
 
-// Панель керування: Відновлюємо видимість прихованих елементів
+// Панель керування: Відновлюємо видимість прихованих елементів (якщо вони були приховані в _tablet)
 .chat-input-container {
     margin-bottom: calc(var(--chat-spacing-unit) * 2);
 
@@ -29,13 +29,13 @@
     }
 
     .input-controls-left {
-        .role-display {
-            display: inline-flex; // Явно показуємо роль
-        }
-
+        .role-display,
         .translate-input-button {
-            display: flex; // Явно показуємо переклад
+            display: inline-flex; // Явно показуємо роль та переклад
+            align-items: center;
         }
+        .translate-input-button { display: flex; } // flex краще для кнопки
+
     }
 }
 
@@ -70,34 +70,38 @@
 }
 
 
-// Меню: Приховуємо секції Моделі та Ролі на десктопі
+// Меню: Приховуємо майже все, залишаючи тільки Settings
 .menu-dropdown.ollama-chat-menu {
 
+    // 1. Приховуємо всі секції підменю
     .model-submenu-section,
-    .role-submenu-section {
-        display: none !important; // Використовуємо !important, щоб перебити display: block з _tablet
+    .role-submenu-section,
+    .chat-submenu-section { // Додано секцію чатів
+        display: none !important; // important для гарантії
     }
 
-    // Приховуємо також роздільники ПІСЛЯ цих секцій
-    .model-submenu-section+hr.menu-separator,
-    .role-submenu-section+hr.menu-separator {
+    // 2. Приховуємо заголовок "Actions"
+    .menu-header.actions-header {
+       display: none !important;
+    }
+
+    // 3. Приховуємо ВСІ опції меню за замовчуванням на десктопі
+    .menu-option {
         display: none !important;
     }
 
-    // Повертаємо більшу висоту для списку чатів на десктопі
-    .submenu-content.chat-list-container {
-        max-height: 300px; // Більше місця на десктопі
+    // 4. ПОКАЗУЄМО тільки опцію "Settings"
+    .settings-option { // Використовуємо клас, який ви додали для Settings
+        display: flex !important; // Використовуємо flex (як було в .menu-option)
     }
 
+    // 5. Приховуємо ВСІ роздільники на десктопі
+    hr.menu-separator {
+        display: none !important;
+    }
+
+    // 6. Приховуємо опцію перемикання вигляду (вже було, але для повноти)
     .toggle-view-location-option {
-        display: none;
-
-        +hr.menu-separator {
-            display: none;
-        }
+         display: none !important;
     }
-
-    
-
-
 }
