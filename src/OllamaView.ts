@@ -437,11 +437,6 @@ export class OllamaView extends ItemView {
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
     this.register(
      this.plugin.on("message-added", data => {
-       this.plugin.logger.error( // Use error for visibility during debug
-         `[OllamaView Listener] 'message-added' listener called. Role: ${
-           data?.message?.role
-         }. Timestamp: ${data?.message?.timestamp?.getTime()}`
-       );
        this.handleMessageAdded(data); // Викликаємо обробник
      })
    );
@@ -459,14 +454,11 @@ export class OllamaView extends ItemView {
    // if (this.newChatSidebarButton) this.registerDomEvent(this.newChatSidebarButton, 'click', this.handleNewChatClick);
    // Переконайтесь, що SidebarManager обробляє реєстрацію своїх слухачів.
 
-   this.plugin.logger.debug("[OllamaView] All event listeners attached.");
 }
 
 
   private cancelGeneration = (): void => {
     if (this.currentAbortController) {
-      // Тепер 'this.plugin' має бути доступним
-      this.plugin.logger.info("[OllamaView] User requested generation cancellation.");
       this.currentAbortController.abort();
     } else {
       this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
@@ -474,10 +466,6 @@ export class OllamaView extends ItemView {
   };
 
   private handleMessageDeleted = (data: { chatId: string; timestamp: Date }): void => {
-    this.plugin.logger.debug(
-      `handleMessageDeleted: Received event for chat ${data.chatId}, timestamp ${data.timestamp.toISOString()}`
-    );
-
     const currentActiveChatId = this.plugin.chatManager?.getActiveChatId();
     // Перевіряємо, чи це активний чат і чи існує контейнер
     if (data.chatId !== currentActiveChatId || !this.chatContainer) {

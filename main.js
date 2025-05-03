@@ -3112,7 +3112,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
     this.currentMessageAddedResolver = null;
     this.cancelGeneration = () => {
       if (this.currentAbortController) {
-        this.plugin.logger.info("[OllamaView] User requested generation cancellation.");
         this.currentAbortController.abort();
       } else {
         this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
@@ -3120,9 +3119,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
     };
     this.handleMessageDeleted = (data) => {
       var _a;
-      this.plugin.logger.debug(
-        `handleMessageDeleted: Received event for chat ${data.chatId}, timestamp ${data.timestamp.toISOString()}`
-      );
       const currentActiveChatId = (_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId();
       if (data.chatId !== currentActiveChatId || !this.chatContainer) {
         this.plugin.logger.debug(
@@ -4232,11 +4228,6 @@ This action cannot be undone.`,
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
     this.register(
       this.plugin.on("message-added", (data) => {
-        var _a2, _b, _c;
-        this.plugin.logger.error(
-          // Use error for visibility during debug
-          `[OllamaView Listener] 'message-added' listener called. Role: ${(_a2 = data == null ? void 0 : data.message) == null ? void 0 : _a2.role}. Timestamp: ${(_c = (_b = data == null ? void 0 : data.message) == null ? void 0 : _b.timestamp) == null ? void 0 : _c.getTime()}`
-        );
         this.handleMessageAdded(data);
       })
     );
@@ -4245,7 +4236,6 @@ This action cannot be undone.`,
     this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
     this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
     this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
-    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
   }
   // --- Додано: Метод для оновлення кнопки перемикання ---
   updateToggleLocationButton() {
