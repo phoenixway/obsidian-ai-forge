@@ -74,11 +74,11 @@
 .menu-dropdown.ollama-chat-menu {
 
     // 1. Приховуємо всі секції підменю
-    .model-submenu-section,
-    .role-submenu-section
-     { // Додано секцію чатів
-        display: none !important; // important для гарантії
-    }
+    // .model-submenu-section,
+    // .role-submenu-section
+    //  { // Додано секцію чатів
+    //     display: none !important; // important для гарантії
+    // }
 
     // 3. Приховуємо ВСІ опції меню за замовчуванням на десктопі
     // .menu-option {

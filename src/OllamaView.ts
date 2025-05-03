@@ -264,198 +264,227 @@ export class OllamaView extends ItemView {
     this.dropdownMenuManager?.destroy();
   }
 
-  
+// OllamaView.ts
+
 private createUIElements(): void {
   this.plugin.logger.debug("createUIElements: Starting UI creation.");
-  this.contentEl.empty();
+  this.contentEl.empty(); // Очищуємо контейнер перед створенням нових елементів
   const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
 
-  // --- ВИЗНАЧАЄМО МІСЦЕЗНАХОДЖЕННЯ ---
+  // --- Визначаємо контекст ---
   const isSidebarLocation = !this.plugin.settings.openChatInTab;
+  const isDesktop = Platform.isDesktop; // Використовуємо Platform API
   // Використовуємо ERROR для логування, щоб точно побачити в консолі
-  this.plugin.logger.error(`[OllamaView] createUIElements: isSidebarLocation = ${isSidebarLocation} (based on setting openChatInTab: ${this.plugin.settings.openChatInTab})`);
+  this.plugin.logger.error(`[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`);
 
-
-  // --- Створюємо бічну панель через SidebarManager ---
+  // --- Створюємо внутрішній сайдбар через SidebarManager ---
+  // Передаємо необхідні залежності, включаючи View
   this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
   const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
 
-  // --- УМОВНО ХОВАЄМО/ПОКАЗУЄМО ВНУТРІШНІЙ САЙДБАР ---
+  // --- Видимість внутрішнього сайдбара ---
+  // Показуємо тільки на Десктопі У ВКЛАДЦІ
+  const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
   if (sidebarRootEl) {
-      this.plugin.logger.debug(`[OllamaView] Toggling 'internal-sidebar-hidden' class. Should be hidden: ${isSidebarLocation}`);
-      sidebarRootEl.classList.toggle('internal-sidebar-hidden', isSidebarLocation);
-      // Додамо лог для перевірки класів ПІСЛЯ toggle
-      this.plugin.logger.error(`[OllamaView] sidebarRootEl classes AFTER toggle: ${sidebarRootEl.className}`); // ERROR для видимості
+      sidebarRootEl.classList.toggle('internal-sidebar-hidden', !shouldShowInternalSidebar);
+      this.plugin.logger.error(`[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${sidebarRootEl.className}`);
   } else {
       this.plugin.logger.error("[OllamaView] sidebarRootEl is missing! Cannot toggle class.");
   }
 
-
   // --- Основна Область Чату ---
   this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-  // --- ДОДАЄМО КЛАС ДЛЯ РОЗШИРЕННЯ ---
-   if (this.mainChatAreaEl) { // Додамо перевірку
-       this.mainChatAreaEl.classList.toggle('full-width', isSidebarLocation);
-       this.plugin.logger.debug(`[OllamaView] Toggled 'full-width': ${isSidebarLocation}. Main area classes: ${this.mainChatAreaEl.className}`);
-   } else {
-        this.plugin.logger.error("[OllamaView] mainChatAreaEl is missing! Cannot toggle full-width class.");
-   }
-
+  // Додаємо клас для розширення на всю ширину, якщо ВНУТРІШНІЙ сайдбар приховано
+  this.mainChatAreaEl.classList.toggle('full-width', !shouldShowInternalSidebar);
+  this.plugin.logger.debug(`[OllamaView] Main chat area class 'full-width' set: ${!shouldShowInternalSidebar}`);
 
   // --- Вміст основної області (чат + поле вводу) ---
   this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
   this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
-  // ... (створення newMessagesIndicatorEl, scrollToBottomButton) ...
+
+  // Індикатор нових повідомлень
   this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
   setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
   this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
 
+  // Кнопка прокрутки вниз
   this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
       cls: [CSS_CLASS_SCROLL_BOTTOM_BUTTON, "clickable-icon"],
       attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" },
   });
   setIcon(this.scrollToBottomButton, "arrow-down");
 
-
-  // --- Контейнер вводу ---
+  // --- Контейнер вводу та його елементи ---
   const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-  this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Text...`, rows: 1 } });
-  // ... (створення controlsContainer, кнопок як було) ...
+  this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Enter message text here...`, rows: 1 } });
+
   const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
   const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-  this.translateInputButton = leftControls.createEl("button", { /* ... */ });
+  this.translateInputButton = leftControls.createEl("button", {
+      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
+      attr: { "aria-label": "Translate input to English" },
+  });
   setIcon(this.translateInputButton, "languages");
-  this.modelDisplayEl = leftControls.createDiv({ /* ... */ });
-  this.roleDisplayEl = leftControls.createDiv({ /* ... */ });
-  this.temperatureIndicatorEl = leftControls.createDiv({ /* ... */ });
-  this.buttonsContainer = controlsContainer.createDiv({ /* ... */ });
-  this.stopGeneratingButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  this.translateInputButton.title = "Translate input to English"; // Потрібно оновити відповідно до мови?
+
+  this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
+  this.modelDisplayEl.setText("..."); // Оновиться пізніше
+  this.modelDisplayEl.title = "Click to select model";
+
+  this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
+  this.roleDisplayEl.setText("..."); // Оновиться пізніше
+  this.roleDisplayEl.title = "Click to select role";
+
+  this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
+  this.temperatureIndicatorEl.setText("?"); // Оновиться пізніше
+  this.temperatureIndicatorEl.title = "Click to set temperature";
+
+  this.buttonsContainer = controlsContainer.createDiv({
+      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`,
+  });
+
+  this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
+      cls: [CSS_CLASS_STOP_BUTTON, CSS_CLASSES.DANGER_OPTION],
+      attr: { "aria-label": "Stop Generation", title: "Stop Generation" },
+  });
   setIcon(this.stopGeneratingButton, "square");
-  this.stopGeneratingButton.hide();
-  this.sendButton = this.buttonsContainer.createEl("button", { /* ... */ });
+  this.stopGeneratingButton.hide(); // Починаємо прихованим
+
+  this.sendButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_SEND_BUTTON,
+      attr: { "aria-label": "Send" },
+  });
   setIcon(this.sendButton, "send");
-  this.voiceButton = this.buttonsContainer.createEl("button", { /* ... */ });
+
+  this.voiceButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_VOICE_BUTTON,
+      attr: { "aria-label": "Voice Input" },
+  });
   setIcon(this.voiceButton, "mic");
-  this.toggleLocationButton = this.buttonsContainer.createEl("button", { /* ... */ });
-  this.menuButton = this.buttonsContainer.createEl("button", { /* ... */ });
+
+  this.toggleLocationButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON, // Кнопка для перемикання таб/сайдбар
+      attr: { "aria-label": "Toggle View Location" }, // Оновиться в updateToggle...
+  });
+  // Іконка встановиться в updateToggleLocationButton
+
+  this.menuButton = this.buttonsContainer.createEl("button", {
+      cls: CSS_CLASS_MENU_BUTTON,
+      attr: { "aria-label": "Menu" },
+  });
   setIcon(this.menuButton, "more-vertical");
-  this.updateToggleLocationButton(); // Оновлюємо іконку кнопки перемикання
 
+  this.updateToggleLocationButton(); // Встановлюємо правильну іконку/tooltip для кнопки
 
-  // --- Створення DropdownMenuManager з урахуванням контексту ---
-  this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation);
+  // --- Створення DropdownMenuManager ---
+  // Передаємо isSidebarLocation та isDesktop
+  this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation, isDesktop);
   this.dropdownMenuManager.createMenuUI();
-  // --- Кінець створення меню ---
 
   this.plugin.logger.debug("createUIElements: Finished UI creation.");
 }
 
-  
-  private attachEventListeners(): void {
-    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
-    // Null Checks for elements managed DIRECTLY by OllamaView
-    if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
-    if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
-    if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing!");
-    if (!this.voiceButton) console.error("OllamaView: voiceButton missing!");
-    if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing!");
-    if (!this.menuButton) console.error("OllamaView: menuButton missing!"); // Listener for the button itself remains here
-    if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing!");
-    if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing!");
-    if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing!");
-    if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing!");
-    if (!this.chatContainer) console.error("OllamaView: chatContainer missing!");
-    if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing!");
-    if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing!");
-    // Removed null checks for elements now managed by DropdownMenuManager
+// OllamaView.ts
 
-    // Input Textarea Listeners
-    if (this.inputEl) {
-        this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
-        this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
-    }
+private attachEventListeners(): void {
+  this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
 
-    // Input Control Buttons Listeners
-    if (this.sendButton) {
-        this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
-    }
-    if (this.stopGeneratingButton) {
-        this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
-    }
-    if (this.voiceButton) {
-        this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
-    }
-    if (this.translateInputButton) {
-        this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
-    }
-    if (this.menuButton) {
-        // Listener for the button itself remains here, calling the manager's toggle method
-        this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick);
-    }
-    if (this.toggleLocationButton) {
-        this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
-    }
+  // Null Checks for elements managed DIRECTLY by OllamaView
+  if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
+  if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
+  if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing!");
+  if (!this.voiceButton) console.error("OllamaView: voiceButton missing!");
+  if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing!");
+  if (!this.menuButton) console.error("OllamaView: menuButton missing!");
+  if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing!");
+  if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing!");
+  if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing!");
+  if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing!");
+  if (!this.chatContainer) console.error("OllamaView: chatContainer missing!");
+  if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing!");
+  if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing!");
 
-    // Input Info Indicators Listeners
-    if (this.modelDisplayEl) {
-        this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
-    }
-    if (this.roleDisplayEl) {
-        this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
-    }
-    if (this.temperatureIndicatorEl) {
-        this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
-    }
+  // --- Listeners managed by OllamaView ---
 
-    // --- Dropdown Menu Listeners (ДЕГЕЛОВАНО МЕНЕДЖЕРУ) ---
-    // Видалено весь код, що додавав слухачі до modelSubmenuHeader, roleSubmenuHeader, etc.
-    // Додаємо виклик менеджера для реєстрації ЙОГО слухачів
-    this.dropdownMenuManager?.attachEventListeners();
-    // -----------------------------------------------------
+  // Input Textarea
+  if (this.inputEl) {
+      this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
+      this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
+  }
 
-    // Chat Area Listeners
-    if (this.chatContainer) {
-        this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
-    }
-    if (this.newMessagesIndicatorEl) {
-        this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
-    }
-    if (this.scrollToBottomButton) {
-        this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
-    }
+  // Input Control Buttons
+  if (this.sendButton) {
+      this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
+  }
+  if (this.stopGeneratingButton) {
+      this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
+  }
+  if (this.voiceButton) {
+      this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
+  }
+  if (this.translateInputButton) {
+      this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
+  }
+  if (this.menuButton) {
+      // Кнопка меню викликає метод менеджера
+      this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick);
+  }
+  if (this.toggleLocationButton) {
+      // Кнопка перемикання місця (в панелі кнопок)
+      this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
+  }
 
-    // Window/Workspace/Document Listeners
-    this.registerDomEvent(window, "resize", this.handleWindowResize);
-    // this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize)); // Duplicate? window resize enough?
-    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu); // This calls the manager's handler
-    this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
-    this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
+  // Input Info Indicators
+  if (this.modelDisplayEl) {
+      this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
+  }
+  if (this.roleDisplayEl) {
+      this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
+  }
+  if (this.temperatureIndicatorEl) {
+      this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
+  }
 
-    // Plugin Event Listeners (Using Arrow Functions for 'this' binding)
-    this.register(this.plugin.on("model-changed", modelName => this.handleModelChange(modelName)));
-    this.register(this.plugin.on("role-changed", roleName => this.handleRoleChange(roleName)));
-    this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
-    this.register(
-     this.plugin.on("message-added", data => {
-       this.handleMessageAdded(data); // Викликаємо обробник
-     })
-   );
-   this.register(this.plugin.on("active-chat-changed", data => this.handleActiveChatChanged(data)));
-   this.register(this.plugin.on("messages-cleared", chatId => this.handleMessagesCleared(chatId)));
-   this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
-   this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
-   this.register(this.plugin.on("message-deleted", data => this.handleMessageDeleted(data)));
+  // Chat Area
+  if (this.chatContainer) {
+      this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
+  }
+  if (this.newMessagesIndicatorEl) {
+      this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
+  }
+  if (this.scrollToBottomButton) {
+      this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
+  }
 
-   // --- SidebarManager Listeners (Якщо SidebarManager їх не реєструє сам) ---
-   // Якщо SidebarManager реєструє свої слухачі всередині createSidebarUI, то тут нічого не потрібно.
-   // Якщо ні, то потрібно додати їх тут, наприклад:
-   // if (this.chatPanelHeaderEl) this.registerDomEvent(this.chatPanelHeaderEl, 'click', () => this.sidebarManager.toggleSection('chats'));
-   // if (this.rolePanelHeaderEl) this.registerDomEvent(this.rolePanelHeaderEl, 'click', () => this.sidebarManager.toggleSection('roles'));
-   // if (this.newChatSidebarButton) this.registerDomEvent(this.newChatSidebarButton, 'click', this.handleNewChatClick);
-   // Переконайтесь, що SidebarManager обробляє реєстрацію своїх слухачів.
+  // Window/Workspace/Document
+  this.registerDomEvent(window, "resize", this.handleWindowResize);
+  // this.registerEvent(this.app.workspace.on("resize", this.handleWindowResize)); // Можливо, дублює window.resize
+  this.registerDomEvent(document, "click", this.handleDocumentClickForMenu); // Для закриття меню
+  this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
+  this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
 
+  // --- Delegate Listener Attachment to Managers ---
+  // SidebarManager має сам додавати слухачі до своїх елементів (заголовків секцій, кнопки New Chat)
+  // Виклик attachSidebarEventListeners всередині createSidebarUI в SidebarManager це робить.
+
+  // DropdownMenuManager додає слухачі до своїх елементів (підменю, пунктів)
+  this.dropdownMenuManager?.attachEventListeners();
+  this.plugin.logger.debug("[OllamaView] Delegated listener attachment to DropdownMenuManager.");
+
+  // --- Plugin Event Listeners ---
+  this.register(this.plugin.on("model-changed", modelName => this.handleModelChange(modelName)));
+  this.register(this.plugin.on("role-changed", roleName => this.handleRoleChange(roleName)));
+  this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
+  this.register(this.plugin.on("message-added", data => this.handleMessageAdded(data)));
+  this.register(this.plugin.on("active-chat-changed", data => this.handleActiveChatChanged(data)));
+  this.register(this.plugin.on("messages-cleared", chatId => this.handleMessagesCleared(chatId)));
+  this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
+  this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
+  this.register(this.plugin.on("message-deleted", data => this.handleMessageDeleted(data)));
+  this.register(this.plugin.on("ollama-connection-error", message => { /* Можливо, показати щось у View? */ }));
+
+  this.plugin.logger.debug("[OllamaView] All event listeners attached.");
 }
-
 
   private cancelGeneration = (): void => {
     if (this.currentAbortController) {
