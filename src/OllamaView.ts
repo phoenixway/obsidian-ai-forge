@@ -861,6 +861,7 @@ export class OllamaView extends ItemView {
 
   // --- Action Handlers (Must call closeMenu) ---
   public handleNewChatClick = async (): Promise<void> => {
+    this.plugin.logger.error("!!! OllamaView: handleNewChatClick ENTERED !!!"); // ERROR для видимості
     this.dropdownMenuManager?.closeMenu(); // Use manager to close
     try {
       const newChat = await this.plugin.chatManager.createNewChat();
@@ -877,6 +878,7 @@ export class OllamaView extends ItemView {
   // У файлі src/OllamaView.ts
 
   public handleRenameChatClick = async (chatIdToRename?: string, currentChatName?: string): Promise<void> => {
+    this.plugin.logger.error("!!! OllamaView: handleRenameChatClick ENTERED !!!"); // ERROR для видимості
     let chatId: string | null = chatIdToRename ?? null;
     let currentName: string | null = currentChatName ?? null;
 

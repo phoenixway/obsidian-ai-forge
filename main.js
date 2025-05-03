@@ -3401,6 +3401,7 @@ var OllamaView = class extends import_obsidian14.ItemView {
     // --- Action Handlers (Must call closeMenu) ---
     this.handleNewChatClick = async () => {
       var _a;
+      this.plugin.logger.error("!!! OllamaView: handleNewChatClick ENTERED !!!");
       (_a = this.dropdownMenuManager) == null ? void 0 : _a.closeMenu();
       try {
         const newChat = await this.plugin.chatManager.createNewChat();
@@ -3417,6 +3418,7 @@ var OllamaView = class extends import_obsidian14.ItemView {
     // У файлі src/OllamaView.ts
     this.handleRenameChatClick = async (chatIdToRename, currentChatName) => {
       var _a, _b;
+      this.plugin.logger.error("!!! OllamaView: handleRenameChatClick ENTERED !!!");
       let chatId = chatIdToRename != null ? chatIdToRename : null;
       let currentName = currentChatName != null ? currentChatName : null;
       if (!chatId || !currentName) {
