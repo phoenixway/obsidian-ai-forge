@@ -146,7 +146,6 @@ export class DropdownMenuManager {
         this.plugin.logger.debug("[DropdownMenuManager] Menu UI creation finished.");
     }
 
-
     public attachEventListeners(): void {
         this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING EVENT LISTENERS (isSidebarLocation: ${this.isSidebarLocation}) !!!`);
 
