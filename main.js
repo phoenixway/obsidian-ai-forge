@@ -2637,11 +2637,10 @@ var DropdownMenuManager = class {
     this.registerListener(this.settingsOption, "click", this.view.handleSettingsClick);
     this.plugin.logger.debug("[DropdownMenuManager] Event listeners attached.");
   }
-  // Helper to register listener and keep track for removal
   registerListener(element, type, handler) {
-    const boundHandler = handler.bind(this.view);
-    element.addEventListener(type, boundHandler);
-    this.listeners.push({ element, type, handler: boundHandler });
+    const eventHandler = handler;
+    element.addEventListener(type, eventHandler);
+    this.listeners.push({ element, type, handler: eventHandler });
   }
   destroy() {
     this.plugin.logger.debug("[DropdownMenuManager] Destroying listeners...");

@@ -201,15 +201,12 @@ export class DropdownMenuManager {
     this.plugin.logger.debug("[DropdownMenuManager] Event listeners attached.");
   }
 
-  // Helper to register listener and keep track for removal
   private registerListener(element: HTMLElement | Document, type: string, handler: (e: any) => void) {
-    // Bind handler to `this` context of the *view* if it's a view method being called back
-    // For handlers internal to this manager, `this` should already be correct if they are arrow functions or bound.
-    // We assume view handlers are correctly bound (e.g., arrow functions in the view).
-    const boundHandler = handler.bind(this.view); // Bind action handlers to the view instance
-    element.addEventListener(type, boundHandler);
-    this.listeners.push({ element, type, handler: boundHandler });
-  }
+    const eventHandler = handler; // Просто використовуємо переданий handler
+    element.addEventListener(type, eventHandler);
+    this.listeners.push({ element, type, handler: eventHandler }); // Зберігаємо для подальшого видалення
+}
+
 
   public destroy(): void {
     this.plugin.logger.debug("[DropdownMenuManager] Destroying listeners...");
