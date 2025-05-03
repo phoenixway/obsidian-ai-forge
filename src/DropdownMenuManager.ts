@@ -75,20 +75,20 @@ export class DropdownMenuManager {
 
     public createMenuUI(): void {
         this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
-        // this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
-        // this.menuDropdown.style.display = "none";
-        // // Не зберігаємо роздільники в масиві
+        this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
+        this.menuDropdown.style.display = "none";
+        // Не зберігаємо роздільники в масиві
 
-        // // --- Model Section (Always - перший, без роздільника перед ним) ---
-        // this.plugin.logger.debug("[DropdownMenuManager] Creating Model section...");
-        // const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
-        // this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
+        // --- Model Section (Always - перший, без роздільника перед ним) ---
+        this.plugin.logger.debug("[DropdownMenuManager] Creating Model section...");
+        const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
+        this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
 
-        // // --- Role Section (Always) ---
-        // this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); // Роздільник ПЕРЕД Role
-        // this.plugin.logger.debug("[DropdownMenuManager] Creating Role section...");
-        // const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
-        // this.roleSubmenuHeader = roleDropdownSection.header; this.roleSubmenuContent = roleDropdownSection.content;
+        // --- Role Section (Always) ---
+        this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR }); // Роздільник ПЕРЕД Role
+        this.plugin.logger.debug("[DropdownMenuManager] Creating Role section...");
+        const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+        this.roleSubmenuHeader = roleDropdownSection.header; this.roleSubmenuContent = roleDropdownSection.content;
 
         // // --- Conditional Elements (Only if in Sidebar) ---
         // if (this.isSidebarLocation) {

@@ -2459,13 +2459,16 @@ var SidebarManager = class {
 
 // src/DropdownMenuManager.ts
 var import_obsidian13 = require("obsidian");
+var CSS_CLASS_MENU_DROPDOWN = "menu-dropdown";
 var CSS_CLASS_MENU_OPTION2 = "menu-option";
 var CSS_CLASS_MENU_HEADER_ITEM = "menu-header-item";
 var CSS_CLASS_SUBMENU_ICON = "submenu-icon";
 var CSS_CLASS_SUBMENU_CONTENT = "submenu-content";
 var CSS_CLASS_MENU_SEPARATOR = "menu-separator";
 var CSS_CLASS_MODEL_OPTION = "model-option";
+var CSS_CLASS_MODEL_LIST_CONTAINER = "model-list-container";
 var CSS_CLASS_ROLE_OPTION = "role-option";
+var CSS_CLASS_ROLE_LIST_CONTAINER = "role-list-container";
 var CSS_CLASS_CHAT_OPTION = "chat-option";
 var CSS_CLASS_CHAT_LIST_CONTAINER = "chat-list-container";
 var CSS_CLASS_CHAT_LIST_SCROLLABLE = "chat-list-scrollable";
@@ -2516,6 +2519,17 @@ var DropdownMenuManager = class {
   }
   createMenuUI() {
     this.plugin.logger.debug(`[DropdownMenuManager] Creating menu UI (isSidebarLocation: ${this.isSidebarLocation})...`);
+    this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
+    this.menuDropdown.style.display = "none";
+    this.plugin.logger.debug("[DropdownMenuManager] Creating Model section...");
+    const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
+    this.modelSubmenuHeader = modelSection.header;
+    this.modelSubmenuContent = modelSection.content;
+    this.menuDropdown.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
+    this.plugin.logger.debug("[DropdownMenuManager] Creating Role section...");
+    const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
+    this.roleSubmenuHeader = roleDropdownSection.header;
+    this.roleSubmenuContent = roleDropdownSection.content;
     this.plugin.logger.debug("[DropdownMenuManager] Menu UI creation finished.");
   }
   attachEventListeners() {
