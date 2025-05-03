@@ -70,3 +70,33 @@
 }
 
 
+// Меню: Приховуємо майже все, залишаючи тільки Settings
+.menu-dropdown.ollama-chat-menu {
+
+    // 1. Приховуємо всі секції підменю
+    .model-submenu-section,
+    .role-submenu-section
+     { // Додано секцію чатів
+        display: none !important; // important для гарантії
+    }
+
+    // 3. Приховуємо ВСІ опції меню за замовчуванням на десктопі
+    // .menu-option {
+    //     display: none !important;
+    // }
+
+    // 4. ПОКАЗУЄМО тільки опцію "Settings"
+    .settings-option { // Використовуємо клас, який ви додали для Settings
+        display: flex !important; // Використовуємо flex (як було в .menu-option)
+    }
+
+    // 5. Приховуємо ВСІ роздільники на десктопі
+    hr.menu-separator {
+        display: none !important;
+    }
+
+    // 6. Приховуємо опцію перемикання вигляду (вже було, але для повноти)
+    .toggle-view-location-option {
+         display: none !important;
+    }
+}
