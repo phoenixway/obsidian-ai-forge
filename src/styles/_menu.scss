@@ -237,11 +237,13 @@
       &.is-sidebar-location {
         // Моделі та Ролі вже приховані правилом .is-desktop вище
 
-        // Приховуємо опцію "Show in Tab" (toggle) на Десктоп-Сайдбар, бо є кнопка
+        // Приховуємо опцію "Show in Tab" (toggle)
         .toggle-view-location-option { display: none; }
-        // Також приховуємо роздільник ПІСЛЯ попередньої видимої групи (Danger Actions)
-        .hr-after-danger { display: none; }
-        // І роздільник ПІСЛЯ самого Toggle (який тепер прихований)
+
+        // НЕ приховуємо .hr-after-danger (роздільник ПЕРЕД toggle),
+        // бо він тепер має відокремлювати Danger Actions від Settings.
+
+        // Приховуємо ТІЛЬКИ роздільник, що йде ПІСЛЯ (тепер прихованого) toggle
         .hr-after-toggle { display: none; }
     }
   }
