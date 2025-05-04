@@ -155,12 +155,12 @@
     margin: 1px 0; border-radius: var(--radius-s); cursor: pointer; position: relative;
 
     // Відступи рівнів - застосовуються до самого елемента
-    @for $i from 0 through 10 {
-      &.ollama-indent-level-#{$i} {
-        padding-left: $item-padding-horizontal + ($i * $indent-step);
-      }
-    }
-
+    // @for $i from 0 through 10 {
+    //   &.ollama-indent-level-#{$i} {
+    //     padding-left: $item-padding-horizontal + ($i * $indent-step);
+    //   }
+    // }
+    padding: left 30px;
     &:hover > .ollama-hierarchy-item-content { background-color: var(--background-modifier-hover); }
     &.ollama-folder-item.is-active-ancestor { > .ollama-hierarchy-item-content { .ollama-hierarchy-item-text { font-weight: 500; } } }
   }
