@@ -181,7 +181,19 @@ $icon-margin: 8px; // Gap
   }
 
   ////////////////////////
-
+  .ollama-hierarchy-item-content {
+    display: flex !important; // <--- Головне правило для тесту
+    align-items: center !important; // <--- Вирівнювання
+    width: 100%;
+    box-sizing: border-box;
+    // Мінімальний padding, БЕЗ лівого (він на батьку)
+    padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
+    gap: $icon-margin; // Проміжок між іконкою і текстом
+    min-height: 28px; // Мінімальна висота
+    border: 1px dotted blue; // DEBUG: Межі контенту
+    background-color: rgba(0, 0, 255, 0.05); // DEBUG: Легкий фон контенту
+  }
+  
   /////////////////////
   // Специфічно для чату (скидання зсуву іконки)
   &.ollama-chat-item {
@@ -247,18 +259,6 @@ $icon-margin: 8px; // Gap
 }
 
 // Внутрішній контейнер контенту
-.ollama-hierarchy-item-content {
-  display: flex !important; // <--- Головне правило для тесту
-  align-items: center !important; // <--- Вирівнювання
-  width: 100%;
-  box-sizing: border-box;
-  // Мінімальний padding, БЕЗ лівого (він на батьку)
-  padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
-  gap: $icon-margin; // Проміжок між іконкою і текстом
-  min-height: 28px; // Мінімальна висота
-  border: 1px dotted blue; // DEBUG: Межі контенту
-  background-color: rgba(0, 0, 255, 0.05); // DEBUG: Легкий фон контенту
-}
 
 // Іконка (спільний клас)
 .ollama-folder-icon {
