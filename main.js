@@ -1868,8 +1868,6 @@ var CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden"
 var CSS_EXPANDED_CLASS = "is-expanded";
 var CSS_CHAT_LIST_CONTAINER = "ollama-chat-list-container";
 var CSS_HIERARCHY_ITEM = "ollama-hierarchy-item";
-var CSS_FOLDER_ITEM = "ollama-folder-item";
-var CSS_CHAT_ITEM = "ollama-chat-item";
 var CSS_HIERARCHY_ITEM_CONTENT = "ollama-hierarchy-item-content";
 var CSS_HIERARCHY_ITEM_CHILDREN = "ollama-hierarchy-item-children";
 var CSS_HIERARCHY_ITEM_COLLAPSED = "is-collapsed";
@@ -1877,13 +1875,11 @@ var CSS_FOLDER_ICON = "ollama-folder-icon";
 var CSS_HIERARCHY_ITEM_TEXT = "ollama-hierarchy-item-text";
 var CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
 var CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
-var CSS_FOLDER_ACTIVE_ANCESTOR = "is-active-ancestor";
 var COLLAPSE_ICON_ROLE = "lucide-folder";
 var EXPAND_ICON_ROLE = "lucide-folder-open";
 var FOLDER_ICON_CLOSED = "lucide-folder";
 var FOLDER_ICON_OPEN = "lucide-folder-open";
 var CHAT_ICON = "lucide-message-square";
-var CHAT_ICON_ACTIVE = "lucide-check";
 var SidebarManager = class {
   constructor(plugin, app, view) {
     this.folderExpansionState = /* @__PURE__ */ new Map();
@@ -2182,55 +2178,31 @@ var SidebarManager = class {
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths) {
-    var _a, _b;
-    const itemEl = parentElement.createDiv({
-      cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
-    });
+    const itemEl = parentElement.createDiv({ cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`] });
     if (node.type === "folder") {
-      itemEl.addClass(CSS_FOLDER_ITEM);
-      itemEl.dataset.path = node.path;
-      if (activeAncestorPaths.has(node.path)) {
-        itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
-      }
-      const isExpanded = (_a = this.folderExpansionState.get(node.path)) != null ? _a : false;
-      if (!isExpanded) {
-        itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
-      }
     } else {
-      itemEl.addClass(CSS_CHAT_ITEM);
-      if (node.metadata.id === activeChatId) {
-        itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-      }
     }
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
-    const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-    if (node.type === "folder") {
-      const isExpanded = (_b = this.folderExpansionState.get(node.path)) != null ? _b : false;
-      (0, import_obsidian12.setIcon)(iconEl, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
-    } else {
-      const isActive = node.metadata.id === activeChatId;
-      (0, import_obsidian12.setIcon)(iconEl, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
-    }
-    itemContentEl.createSpan({
-      cls: CSS_HIERARCHY_ITEM_TEXT,
-      text: node.type === "folder" ? node.name : node.metadata.name
-    });
-    const optionsBtn = itemContentEl.createEl("button", {
-      cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-      // Використовуємо різні aria-label для доступності
-      attr: { "aria-label": node.type === "folder" ? "Folder options" : "Chat options", title: "More options" }
-    });
-    (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
-    if (node.type === "folder") {
-      this.view.registerDomEvent(optionsBtn, "click", (e) => {
-        e.stopPropagation();
-        this.showFolderContextMenu(e, node);
+    try {
+      console.log(`--- Rendering Node ---`);
+      console.log(`Level: ${level}, Type: ${node.type}`);
+      console.log("Item El:", itemEl);
+      console.log("Content El:", itemContentEl);
+      const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+      if (node.type === "folder") {
+        (0, import_obsidian12.setIcon)(iconEl, FOLDER_ICON_CLOSED);
+      } else {
+        (0, import_obsidian12.setIcon)(iconEl, CHAT_ICON);
+      }
+      const textEl = itemContentEl.createSpan({
+        cls: CSS_HIERARCHY_ITEM_TEXT,
+        text: node.type === "folder" ? node.name : node.metadata.name
       });
-    } else {
-      this.view.registerDomEvent(optionsBtn, "click", (e) => {
-        e.stopPropagation();
-        this.showChatContextMenu(e, node.metadata);
-      });
+      console.log("Direct children of Content El:", itemContentEl.children);
+      console.log("  Child 1 (Icon):", iconEl, iconEl.outerHTML);
+      console.log("  Child 2 (Text):", textEl, textEl.outerHTML);
+    } catch (e) {
+      console.error("Error during node rendering/logging:", e);
     }
     if (node.type === "folder") {
       this.view.registerDomEvent(itemContentEl, "click", () => {
