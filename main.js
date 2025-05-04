@@ -2183,7 +2183,6 @@ var SidebarManager = class {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
-  // --- Повна версія renderHierarchyNode ---
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths) {
     var _a;
     const itemEl = parentElement.createDiv({
@@ -2249,6 +2248,10 @@ var SidebarManager = class {
       }
       const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" } });
       (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
+      this.view.registerDomEvent(optionsBtn, "click", (e) => {
+        e.stopPropagation();
+        this.showChatContextMenu(e, chatMeta);
+      });
       this.view.registerDomEvent(itemContentEl, "click", async (e) => {
         if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
           return;
@@ -2257,17 +2260,12 @@ var SidebarManager = class {
           await this.plugin.chatManager.setActiveChat(chatMeta.id);
         }
       });
-      this.view.registerDomEvent(optionsBtn, "click", (e) => {
-        e.stopPropagation();
-        this.showChatContextMenu(e, chatMeta);
-      });
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
         e.preventDefault();
         this.showChatContextMenu(e, chatMeta);
       });
     }
   }
-  // --- КІНЕЦЬ ПОВНОЇ ВЕРСІЇ ---
   // --- handleToggleFolder без змін ---
   handleToggleFolder(folderPath) {
     var _a;
