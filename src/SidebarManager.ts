@@ -145,28 +145,34 @@ export class SidebarManager {
     } finally { requestAnimationFrame(() => { if (container?.isConnected) { container.scrollTop = currentScrollTop; } }); }
   };
 
-  
+  // --- Повна версія renderHierarchyNode ---
   private renderHierarchyNode(
     node: HierarchyNode,
     parentElement: HTMLElement,
     level: number,
     activeChatId: string | null,
-    activeAncestorPaths: Set<string>
+    activeAncestorPaths: Set<string> // Отримуємо сет предків
 ): void {
+    // Створюємо зовнішній div для елемента з класом рівня
     const itemEl = parentElement.createDiv({
         cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
     });
+    // Додаємо data-path для папок (для легкого доступу з handleToggleFolder)
     if (node.type === 'folder') {
-        itemEl.dataset.path = node.path; // Додаємо data-атрибут для пошуку в DOM
+        itemEl.dataset.path = node.path;
     }
 
-    // Внутрішній контейнер
+    // Створюємо внутрішній div для контенту (саме він буде flex-контейнером)
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
 
+    // --- РЕНДЕРИНГ ПАПКИ ---
     if (node.type === 'folder') {
-        itemEl.addClass(CSS_FOLDER_ITEM);
+        itemEl.addClass(CSS_FOLDER_ITEM); // Клас для папки
         const isExpanded = this.folderExpansionState.get(node.path) ?? false;
+        // Додаємо/видаляємо клас .is-collapsed для керування видимістю дітей через CSS
         if (!isExpanded) { itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED); }
+
+        // Додаємо клас, якщо папка є предком активного чату
         if (activeAncestorPaths.has(node.path)) { itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR); }
 
         // 1. Іконка Папки (змінюється)
@@ -182,43 +188,57 @@ export class SidebarManager {
             attr: { "aria-label": "Folder options", title: "More options" },
         });
         setIcon(optionsBtn, "lucide-more-horizontal");
+        // Обробники подій для кнопки та контекстного меню
         this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showFolderContextMenu(e, node); });
         this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); this.showFolderContextMenu(e, node); });
-        this.view.registerDomEvent(itemContentEl, 'click', () => { this.handleToggleFolder(node.path); }); // Клік розгортає
 
-        // 4. Контейнер для дітей + Рекурсія
+        // Клік на весь контент тепер розгортає/згортає
+        this.view.registerDomEvent(itemContentEl, 'click', () => { this.handleToggleFolder(node.path); });
+
+        // 4. Контейнер для Дочірніх Елементів + Рендеринг дітей
         const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
-        // Рендеримо дітей ЗАВЖДИ (CSS керує видимістю)
+        // Рендеримо дочірні елементи ЗАВЖДИ (CSS керує видимістю)
         if (node.children.length > 0) {
             node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths));
         }
 
+    // --- РЕНДЕРИНГ ЧАТУ ---
     } else if (node.type === 'chat') {
-        itemEl.addClass(CSS_CHAT_ITEM);
+        itemEl.addClass(CSS_CHAT_ITEM); // Клас для чату
         const chatMeta = node.metadata;
         const isActive = chatMeta.id === activeChatId;
-        if (isActive) { itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); } // Використовуємо спільний клас
+        if (isActive) { itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); } // Використовуємо спільний клас активності
 
         // 1. Іконка Чату
-        const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+        const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON }); // Спільний клас для вирівнювання
         setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
 
         // 2. Назва Чату
         itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
 
-        // 3. Деталі (Дата) - Повернули
+        // 3. Деталі (Дата) - Повернуто
         const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
-        try { const lastModifiedDate = new Date(chatMeta.lastModified); const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date"; if (dateText === "Invalid date") { this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`); } detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText }); }
-        catch(e) { this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e); detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" }); }
+         try {
+              const lastModifiedDate = new Date(chatMeta.lastModified);
+              const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
+              if (dateText === "Invalid date") { this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`); }
+              detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
+         } catch(e) {
+               this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
+               detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
+         }
 
-        // 4. Кнопка Опцій (...) - Повернули
+        // 4. Кнопка Опцій (...) - Повернуто
         const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" }, });
         setIcon(optionsBtn, "lucide-more-horizontal");
-        this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showChatContextMenu(e, chatMeta); });
+        // Обробники подій для чату
         this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => { if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; } if (chatMeta.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(chatMeta.id); } });
+        this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showChatContextMenu(e, chatMeta); });
         this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => { e.preventDefault(); this.showChatContextMenu(e, chatMeta); });
     }
 }
+// --- КІНЕЦЬ ПОВНОЇ ВЕРСІЇ ---
+  
 
   // --- handleToggleFolder без змін ---
   private handleToggleFolder(folderPath: string): void {
