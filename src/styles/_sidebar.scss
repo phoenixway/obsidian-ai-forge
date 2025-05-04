@@ -73,6 +73,7 @@
       cursor: pointer;
       position: relative;
       padding-left: 0; // Скидаємо базовий
+      display: flex !important; // Переконуємося, що це flex
 
       // Відступи рівнів (без !important)
       @for $i from 0 through 10 {
