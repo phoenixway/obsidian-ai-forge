@@ -37,6 +37,21 @@ $icon-margin: 8px; // Gap
     &.ollama-role-panel { flex-shrink: 0; }
 }
 
+
+.ollama-sidebar-section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
+  user-select: none; cursor: pointer; flex-shrink: 0; position: relative;
+  border-radius: var(--radius-s); margin: 1px 0; min-height: var(--nav-item-size);
+  &:hover { background-color: var(--background-modifier-hover); }
+  .ollama-sidebar-header-left { display: flex; align-items: center; overflow: hidden; margin-right: var(--size-4-2); gap: var(--size-4-3); }
+  .ollama-sidebar-section-icon { min-width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; .svg-icon { width: 18px; height: 18px; color: var(--text-faint); } }
+  &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
+  .menu-option-text { font-weight: var(--nav-item-font-weight); font-size: var(--nav-item-size); color: var(--text-normal); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
+  .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
+}
+
 .ollama-chat-list-container {
      // border: 1px solid magenta; // Рамка списку
 }
