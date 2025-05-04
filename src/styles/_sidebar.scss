@@ -160,7 +160,7 @@
     //     padding-left: $item-padding-horizontal + ($i * $indent-step);
     //   }
     // }
-    padding: left 30px;
+    padding-left: 30px !important;
     &:hover > .ollama-hierarchy-item-content { background-color: var(--background-modifier-hover); }
     &.ollama-folder-item.is-active-ancestor { > .ollama-hierarchy-item-content { .ollama-hierarchy-item-text { font-weight: 500; } } }
   }
