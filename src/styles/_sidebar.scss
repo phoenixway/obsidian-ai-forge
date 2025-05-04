@@ -170,6 +170,57 @@ $icon-margin: 8px; // Gap
         opacity: 0.7;
       }
     }
+
+    &.ollama-folder-item.is-active-ancestor {
+      > .ollama-hierarchy-item-content {
+        .ollama-hierarchy-item-text {
+          font-weight: 500;
+        }
+      }
+    }
+  }
+
+  ////////////////////////
+
+  /////////////////////
+  // Специфічно для чату (скидання зсуву іконки)
+  &.ollama-chat-item {
+    > .ollama-hierarchy-item-content > .ollama-folder-icon {
+      color: var(--text-muted);
+      // Використовуємо !important для гарантії
+      margin-left: 0 !important;
+    }
+  }
+
+  // --- ПОВЕРНУЛИ: Активний чат (без дати) ---
+  &.ollama-chat-item.is-active > .ollama-hierarchy-item-content {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    // Стилізуємо тільки іконку та текст
+    > .ollama-folder-icon,
+    > .ollama-hierarchy-item-text {
+      color: var(--text-on-accent);
+    }
+    &:hover {
+      background-color: var(--interactive-accent-hover);
+    }
+    > .ollama-hierarchy-item-options {
+      color: var(--text-on-accent);
+      &:hover {
+        background-color: rgba(var(--color-base-rgb), 0.1);
+      }
+    }
+  }
+  // ---
+
+  // Контейнер для дочірніх елементів
+  > .ollama-hierarchy-item-children {
+    display: block;
+    position: relative;
+    padding-left: 0;
+  }
+  &.is-collapsed > .ollama-hierarchy-item-children {
+    display: none !important;
   }
 }
 
