@@ -53,13 +53,14 @@ $icon-margin: 8px; // Gap
 }
 
 .ollama-sidebar-section-content {
-  // overflow: hidden; max-height: 0;
   transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
   box-sizing: border-box; 
   padding: 0 var(--size-4-2); 
   min-height: 0; 
   //FIXME: key place
-  opacity: 0;
+  // opacity: 0;
+  // overflow: hidden; 
+  max-height: 0;
  
 }
 
