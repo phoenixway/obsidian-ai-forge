@@ -214,7 +214,14 @@ $icon-margin: 8px; // Gap
       vertical-align: middle; // Спробуємо вирівняти по вертикалі
       min-width: 0; // Для ellipsis
     }
-    
+    .ollama-hierarchy-item-children {
+      display: block; // Повинен бути блоком
+      padding-left: 0; // Відступи контролюються дітьми
+      border: 1px dotted purple; // DEBUG: Межі контейнера дітей
+    }
+    .ollama-hierarchy-item.is-collapsed > .ollama-hierarchy-item-children {
+      display: none !important; // Приховуємо з !important
+    }
 
   }
   
@@ -281,22 +288,6 @@ $icon-margin: 8px; // Gap
     }
   }
 }
-
-// Внутрішній контейнер контенту
-
-// Іконка (спільний клас)
-
-// --- Приховування дочірніх елементів ---
-.ollama-hierarchy-item-children {
-  display: block; // Повинен бути блоком
-  padding-left: 0; // Відступи контролюються дітьми
-  border: 1px dotted purple; // DEBUG: Межі контейнера дітей
-}
-.ollama-hierarchy-item.is-collapsed > .ollama-hierarchy-item-children {
-  display: none !important; // Приховуємо з !important
-}
-
-// --- ВИДАЛЕНО ВСІ ІНШІ СТИЛІ (hover, active, options, details, roles, menu) ---
 
 // ..............................................................................
 
