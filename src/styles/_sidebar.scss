@@ -1,5 +1,6 @@
 // src/styles/_sidebar.scss
 // Styles for the Ollama sidebar panel and its accordion sections
+// ВЕРСІЯ ДЛЯ ДІАГНОСТИКИ з all: unset та !important
 
 // --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
@@ -85,67 +86,107 @@
         &:hover > .ollama-hierarchy-item-content { background-color: var(--background-modifier-hover); }
         &.ollama-folder-item.is-active-ancestor { > .ollama-hierarchy-item-content { .ollama-hierarchy-item-text { font-weight: 500; } } }
 
-        // --- Стилі для внутрішніх елементів ---
+        // --- Контейнер вмісту - Агресивний ресет ---
         > .ollama-hierarchy-item-content {
-            // Гарантуємо flex-поведінку
-            display: flex !important;
-            align-items: center !important;
-            width: 100% !important; // Гарантуємо ширину
-            box-sizing: border-box !important; // Включаємо padding в ширину
-
-            padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0; // Забираємо лівий padding звідси
-            position: relative;
+            all: unset; // <-- Скидаємо ВСІ успадковані/дефолтні стилі!
+            display: flex !important; // <-- Примусовий Flex
+            align-items: center !important; // <-- Примусове вирівнювання
+            width: 100% !important; // <-- Примусова ширина
+            box-sizing: border-box !important; // <-- Переконаємося в box-sizing
+            // Застосовуємо необхідні padding (правий, верхній, нижній)
+            padding-top: $item-padding-vertical;
+            padding-bottom: $item-padding-vertical;
+            padding-right: $item-padding-horizontal;
+            padding-left: 0; // Лівий відступ тепер на батьківському елементі
+            gap: $icon-margin; // Проміжок між елементами
+            position: relative; // Для кнопки опцій
             min-height: calc($icon-size + 2 * $item-padding-vertical);
-            gap: $icon-margin;
             border-radius: inherit;
             z-index: 1;
 
-            > .ollama-folder-icon { // Іконка (папка або чат)
-                flex-shrink: 0; width: $icon-size; height: $icon-size; color: var(--text-faint);
-                display: flex; align-items: center; justify-content: center;
-                margin-left: 0; // Базовий margin
+            // --- Скидання та відновлення стилів для ПРЯМИХ нащадків ---
+            > * { // Всі прямі нащадки (* може бути недостатньо специфічним, якщо є інші правила)
+                all: unset; // <-- Скидаємо стилі і для дітей!
+                // Повертаємо необхідне для flex-елементів
+                display: block; // Почнемо з блоку, перевизначимо де потрібно
+                box-sizing: border-box;
+                // Запобігаємо наслідуванню небажаних властивостей
+                margin: 0;
+                padding: 0;
+                flex-grow: 0; // Базове значення
+                flex-shrink: 1; // Базове значення
+                flex-basis: auto; // Базове значення
+                min-width: auto;  // Базове значення
+                 // Повертаємо колір тексту за замовчуванням (можливо, потрібно інше)
+                 color: var(--text-normal);
+            }
 
-                // Зсув іконки ПАПКИ з !important
-                .ollama-folder-item > & {
-                     margin-left: $folder-icon-extra-indent !important;
+            // --- Відновлюємо стилі для конкретних дітей ---
+
+            > .ollama-folder-icon {
+                display: flex !important; // Гарантуємо flex для центрування svg
+                align-items: center; justify-content: center;
+                flex-shrink: 0 !important; // Не стискати
+                width: $icon-size !important; height: $icon-size !important;
+                color: var(--text-faint) !important; // Встановлюємо колір
+                margin-left: 0 !important; // Скидаємо margin
+                // Додатковий margin для іконки папки
+                .ollama-folder-item > & { margin-left: $folder-icon-extra-indent !important; }
+            }
+
+            > .ollama-hierarchy-item-text {
+                 display: block !important; // Дозволяємо flex-grow працювати
+                 flex-grow: 1 !important; // Займати місце
+                 white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+                 font-size: var(--font-ui-small) !important; line-height: 1.3 !important; padding-left: 0 !important;
+                 min-width: 0 !important; // Для ellipsis
+                 // Переконаємося, що колір тексту правильний
+                 color: var(--text-normal) !important;
+            }
+
+            > .ollama-chat-item-details {
+                 display: block !important;
+                 margin-left: auto !important; // Притиснути праворуч
+                 padding-left: $icon-margin !important; // Відступ
+                 flex-shrink: 0 !important; // Не стискати
+                 white-space: nowrap !important;
+                 color: var(--text-faint) !important; // Колір для дати
+                .ollama-chat-item-date {
+                    all: unset; // Скидання для дати
+                    box-sizing: border-box;
+                    display: inline !important; // Дата може бути inline
+                    font-size: var(--font-ui-smaller) !important; color: var(--text-faint) !important; opacity: 0.9 !important;
                 }
             }
 
-            > .ollama-hierarchy-item-text { // Текст
-                 flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                 font-size: var(--font-ui-small); line-height: 1.3; padding-left: 0;
-                 min-width: 0; // Для правильної роботи ellipsis у flex
+            > .ollama-hierarchy-item-options {
+                display: flex !important; align-items: center; justify-content: center;
+                flex-shrink: 0 !important; margin-left: $icon-margin !important; opacity: 0 !important; transition: opacity 0.1s ease-in-out !important; padding: 2px !important; border-radius: var(--radius-s) !important; color: var(--text-muted) !important; background: none !important; border: none !important;
+                 &:hover { opacity: 1 !important; color: var(--text-normal) !important; background-color: var(--background-modifier-hover) !important; }
+                 .svg-icon { display: block !important; width: 18px !important; height: 18px !important; }
             }
-
-            > .ollama-chat-item-details { // Деталі чату
-                 margin-left: auto; padding-left: $icon-margin; flex-shrink: 0; white-space: nowrap;
-                .ollama-chat-item-date { font-size: var(--font-ui-smaller); color: var(--text-faint); opacity: 0.9; }
-            }
-
-            > .ollama-hierarchy-item-options { // Кнопка опцій
-                flex-shrink: 0; margin-left: $icon-margin; opacity: 0; transition: opacity 0.1s ease-in-out; padding: 2px; border-radius: var(--radius-s); color: var(--text-muted); background: none; border: none;
-                 &:hover { opacity: 1; color: var(--text-normal); background-color: var(--background-modifier-hover); }
-                 .svg-icon { width: 18px; height: 18px; }
-            }
-             // Показувати кнопку опцій при наведенні на контент
-             &:hover .ollama-hierarchy-item-options { opacity: 0.7; }
+             &:hover .ollama-hierarchy-item-options { opacity: 0.7 !important; } // Показувати кнопку опцій при наведенні
 
         } // Кінець .ollama-hierarchy-item-content
 
         // Специфічно для чату (скидання зсуву іконки)
         &.ollama-chat-item {
              > .ollama-hierarchy-item-content > .ollama-folder-icon {
-                  color: var(--text-muted);
-                  margin-left: 0 !important; // Гарантуємо відсутність зсуву
+                  color: var(--text-muted) !important;
+                  margin-left: 0 !important;
              }
         }
 
         // Активний чат
         &.ollama-chat-item.is-active > .ollama-hierarchy-item-content {
-            background-color: var(--interactive-accent); color: var(--text-on-accent);
-            .ollama-hierarchy-item-text, .ollama-chat-item-date, .ollama-folder-icon .lucide { color: var(--text-on-accent); }
-            &:hover { background-color: var(--interactive-accent-hover); }
-            .ollama-hierarchy-item-options { color: var(--text-on-accent); &:hover { background-color: rgba(var(--color-base-rgb), 0.1); } }
+            background-color: var(--interactive-accent) !important; color: var(--text-on-accent) !important;
+            // Відновлюємо кольори для дітей активного елемента
+            > .ollama-folder-icon,
+            > .ollama-hierarchy-item-text,
+            > .ollama-chat-item-details,
+            > .ollama-chat-item-details .ollama-chat-item-date { color: var(--text-on-accent) !important; }
+            &:hover { background-color: var(--interactive-accent-hover) !important; }
+            > .ollama-hierarchy-item-options { color: var(--text-on-accent) !important; &:hover { background-color: rgba(var(--color-base-rgb), 0.1) !important; } }
         }
 
          // Контейнер для дочірніх елементів
