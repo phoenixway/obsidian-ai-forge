@@ -238,131 +238,121 @@ export class SidebarManager {
     }
   };
 
+ // --- ЗМІНЕНО: Додано data-path ---
+ private renderHierarchyNode(
+  node: HierarchyNode,
+  parentElement: HTMLElement,
+  level: number,
+  activeChatId: string | null,
+  activeAncestorPaths: Set<string>
+): void {
+  const itemEl = parentElement.createDiv({
+      cls: ["ollama-hierarchy-item", `ollama-indent-level-${level}`]
+  });
+  // --- ДОДАНО data-path атрибут ---
+  if (node.type === 'folder') {
+      itemEl.dataset.path = node.path; // Додаємо шлях папки до data-атрибуту
+  }
+  // ---
 
-  private renderHierarchyNode(
-      node: HierarchyNode,
-      parentElement: HTMLElement,
-      level: number,
-      activeChatId: string | null,
-      activeAncestorPaths: Set<string>
-  ): void {
-      const itemEl = parentElement.createDiv({
-          cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
-      });
+  const itemContentEl = itemEl.createDiv({ cls: "ollama-hierarchy-item-content" });
 
-      const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
-
-      if (node.type === 'folder') {
-          itemEl.addClass(CSS_FOLDER_ITEM);
-          const isExpanded = this.folderExpansionState.get(node.path) ?? false;
-          if (!isExpanded) {
-              itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED); // Клас для стилізації дітей
-          }
-
-          // Іконка папки (змінюється при розгортанні)
-          const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-          setIcon(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
-
-          // Додаємо клас, якщо папка є предком активного чату
-          if (activeAncestorPaths.has(node.path)) {
-               itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
-          }
-
-          // Назва папки
-          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
-
-          // Кнопка "..." для опцій папки
-          const optionsBtn = itemContentEl.createEl("button", {
-              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-              attr: { "aria-label": "Folder options", title: "More options" },
-          });
-          setIcon(optionsBtn, "lucide-more-horizontal");
-          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
-              e.stopPropagation();
-              this.showFolderContextMenu(e, node);
-          });
-
-          // Клік на контент папки розгортає/згортає
-          this.view.registerDomEvent(itemContentEl, 'click', () => {
-               this.handleToggleFolder(node.path);
-          });
-
-          // Контекстне меню на контент папки
-          this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => {
-              e.preventDefault();
-              this.showFolderContextMenu(e, node);
-          });
-
-          // Контейнер для дочірніх елементів
-          const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
-          // Рендеримо дітей тільки якщо папка розгорнута
-          if (isExpanded && node.children.length > 0) {
-              node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths));
-          }
-          // Текст "Empty" більше не додається
-
-      } else if (node.type === 'chat') {
-          itemEl.addClass(CSS_CHAT_ITEM);
-          const chatMeta = node.metadata;
-          const isActive = chatMeta.id === activeChatId;
-
-          if (isActive) {
-              itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-          }
-
-          // Іконка чату (активна чи звичайна)
-          const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON }); // Використовуємо той самий клас для узгодження розміру/відступу
-          setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
-
-          // Назва чату
-          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
-
-          // Деталі чату (дата)
-          const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
-           try {
-                const lastModifiedDate = new Date(chatMeta.lastModified);
-                const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
-                if (dateText === "Invalid date") { this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`); }
-                detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
-           } catch(e) {
-                 this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
-                 detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
-           }
-
-          // Кнопка "..." для опцій чату
-          const optionsBtn = itemContentEl.createEl("button", {
-              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-              attr: { "aria-label": "Chat options", title: "More options" },
-          });
-          setIcon(optionsBtn, "lucide-more-horizontal");
-
-          // Клік на контент чату активує його
-          this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => {
-              // Ігноруємо клік на кнопку опцій
-              if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; }
-              // Активуємо чат, якщо він ще не активний
-              if (chatMeta.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(chatMeta.id); }
-          });
-
-          // Клік на кнопку опцій чату
-          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
-              e.stopPropagation(); this.showChatContextMenu(e, chatMeta);
-          });
-
-          // Контекстне меню на контент чату
-          this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => {
-              e.preventDefault(); this.showChatContextMenu(e, chatMeta);
-          });
+  if (node.type === 'folder') {
+      itemEl.addClass("ollama-folder-item");
+      const isExpanded = this.folderExpansionState.get(node.path) ?? false;
+      if (!isExpanded) {
+          itemEl.addClass("is-collapsed");
       }
+
+      // Основна іконка папки
+      const folderIcon = itemContentEl.createSpan({ cls: "ollama-folder-icon" });
+      setIcon(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
+
+      // Клас активного предка
+      if (activeAncestorPaths.has(node.path)) {
+           itemEl.addClass("is-active-ancestor");
+      }
+
+      itemContentEl.createSpan({ cls: "ollama-hierarchy-item-text", text: node.name });
+
+      const optionsBtn = itemContentEl.createEl("button", {
+          cls: ["ollama-hierarchy-item-options", "clickable-icon"],
+          attr: { "aria-label": "Folder options", title: "More options" },
+      });
+      setIcon(optionsBtn, "lucide-more-horizontal");
+      this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showFolderContextMenu(e, node); });
+
+      // Клік на контент розгортає/згортає
+      this.view.registerDomEvent(itemContentEl, 'click', () => {
+           this.handleToggleFolder(node.path); // Викликаємо новий обробник
+      });
+      this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); this.showFolderContextMenu(e, node); });
+
+      // Контейнер для дітей
+      const childrenContainer = itemEl.createDiv({ cls: "ollama-hierarchy-item-children" });
+      // Рендеримо дітей ОДРАЗУ, CSS подбає про їх видимість
+      if (node.children.length > 0) {
+          node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths));
+      }
+      // Текст "Empty" не додаємо
+
+  } else if (node.type === 'chat') {
+      itemEl.addClass("ollama-chat-item");
+      const chatMeta = node.metadata;
+      const isActive = chatMeta.id === activeChatId;
+      if (isActive) { itemEl.addClass("is-active"); } // Використовуємо is-active
+
+      // Іконка чату
+      const chatIcon = itemContentEl.createSpan({ cls: "ollama-folder-icon" }); // Спільний клас іконки
+      setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+
+      itemContentEl.createSpan({ cls: "ollama-hierarchy-item-text", text: chatMeta.name });
+
+      const detailsWrapper = itemContentEl.createDiv({cls: "ollama-chat-item-details"});
+      try {
+           const lastModifiedDate = new Date(chatMeta.lastModified);
+           const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
+           if (dateText === "Invalid date") { this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`); }
+           detailsWrapper.createDiv({ cls: "ollama-chat-item-date", text: dateText });
+      } catch(e) { this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e); detailsWrapper.createDiv({ cls: "ollama-chat-item-date", text: "Date error" }); }
+
+      const optionsBtn = itemContentEl.createEl("button", { cls: ["ollama-hierarchy-item-options", "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" }, });
+      setIcon(optionsBtn, "lucide-more-horizontal");
+
+      this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => { if (e.target instanceof Element && e.target.closest(`.ollama-hierarchy-item-options`)) { return; } if (chatMeta.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(chatMeta.id); } });
+      this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showChatContextMenu(e, chatMeta); });
+      this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => { e.preventDefault(); this.showChatContextMenu(e, chatMeta); });
+  }
+}
+
+// --- ЗМІНЕНО: handleToggleFolder тепер працює з DOM ---
+private handleToggleFolder(folderPath: string): void {
+  const currentState = this.folderExpansionState.get(folderPath) ?? false;
+  const newState = !currentState;
+  this.folderExpansionState.set(folderPath, newState);
+  this.plugin.logger.debug(`Toggled folder ${folderPath} to ${newState ? 'expanded' : 'collapsed'}`);
+
+  // Знаходимо елемент папки за data-атрибутом
+  const folderItemEl = this.chatPanelListContainerEl.querySelector<HTMLElement>(`.ollama-folder-item[data-path="${folderPath}"]`);
+  if (!folderItemEl) {
+       this.plugin.logger.warn(`Could not find folder element for path: ${folderPath}`);
+       // Якщо не знайшли елемент, перемальовуємо весь список (запасний варіант)
+       this.updateChatList();
+       return;
   }
 
+  // Оновлюємо клас для показу/приховування дітей через CSS
+  folderItemEl.classList.toggle("is-collapsed", !newState);
 
-  private handleToggleFolder(folderPath: string): void {
-      const currentState = this.folderExpansionState.get(folderPath) ?? false;
-      this.folderExpansionState.set(folderPath, !currentState);
-      this.plugin.logger.debug(`Toggled folder ${folderPath} to ${!currentState ? 'expanded' : 'collapsed'}`);
-      this.updateChatList(); // Перерендеримо список для оновлення іконки та дочірніх елементів
+  // Оновлюємо іконку папки
+  const folderIconEl = folderItemEl.querySelector<HTMLElement>('.ollama-folder-icon');
+  if (folderIconEl) {
+      setIcon(folderIconEl, newState ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
   }
+
+  // --- ВИДАЛЕНО: Повний перерендерінг ---
+  // this.updateChatList();
+}    
 
   private showFolderContextMenu(event: MouseEvent | PointerEvent, folderNode: FolderNode): void {
       event.preventDefault();
