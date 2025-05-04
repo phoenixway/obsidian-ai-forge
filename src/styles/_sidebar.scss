@@ -52,6 +52,14 @@ $icon-margin: 8px; // Gap
   .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
 }
 
+.ollama-sidebar-section-content {
+  overflow: hidden; max-height: 0;
+  transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
+  box-sizing: border-box; padding: 0 var(--size-4-2); min-height: 0; opacity: 0;
+
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 .ollama-chat-list-container {
      // border: 1px solid magenta; // Рамка списку
 }
@@ -121,3 +129,27 @@ $icon-margin: 8px; // Gap
 }
 
 // --- ВИДАЛЕНО ВСІ ІНШІ СТИЛІ (hover, active, options, details, roles, menu) ---
+
+
+// ..............................................................................
+
+.ollama-sidebar-section-content-hidden { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; opacity: 0 !important; overflow: hidden !important; visibility: hidden; }
+
+// --- Стилізація контекстного меню ---
+.menu {
+     .menu-item {
+         &[aria-label*="Delete Folder" i],
+         &[aria-label*="Delete Chat" i],
+         &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]) {
+             .menu-item-title { color: var(--text-error) !important; }
+             .menu-item-icon { color: var(--text-error) !important; }
+              &:hover { background-color: var(--background-modifier-error-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-error) !important; } }
+         }
+          &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]),
+          &:has(> .menu-item-title:contains("Clear Messages")) {
+              .menu-item-title { color: var(--text-warning) !important; }
+              .menu-item-icon { color: var(--text-warning) !important; }
+               &:hover { background-color: var(--background-modifier-warning-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-warning) !important; } }
+          }
+     }
+}
