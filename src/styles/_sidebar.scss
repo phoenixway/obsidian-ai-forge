@@ -53,39 +53,11 @@ $icon-margin: 8px; // Gap
 }
 
 .ollama-sidebar-section-content {
-  overflow: hidden; max-height: 0;
-  transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
-  box-sizing: border-box; padding: 0 var(--size-4-2); min-height: 0; opacity: 0;
+  // overflow: hidden; max-height: 0;
+  // transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
+  // box-sizing: border-box; padding: 0 var(--size-4-2); min-height: 0; opacity: 0;
 
-  .ollama-hierarchy-item {
-    margin: 1px 0;
-    position: relative; // Для дочірнього контейнера
-    border: 1px dashed rgba(0, 0, 0, 0.2); // DEBUG: Межі зовнішнього елемента
-    padding-left: 0; // Скидаємо тут, відступ буде на контенті
-
-    // Застосовуємо відступ до зовнішнього елемента з !important (бо це працювало)
-    @for $i from 0 through 10 {
-      &.ollama-indent-level-#{$i} {
-        padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
-      }
-    }
-}
-
-// Внутрішній контейнер контенту
-.ollama-hierarchy-item-content {
-    display: flex !important;       // <--- Головне правило для тесту
-    align-items: center !important; // <--- Вирівнювання
-    width: 100%;
-    box-sizing: border-box;
-    // Мінімальний padding, БЕЗ лівого (він на батьку)
-    padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
-    gap: $icon-margin;           // Проміжок між іконкою і текстом
-    min-height: 28px;             // Мінімальна висота
-    border: 1px dotted blue;      // DEBUG: Межі контенту
-    background-color: rgba(0,0,255, 0.05); // DEBUG: Легкий фон контенту
-}
-
-
+  
 }
 
 /////////////////////////////////////////////////////////////////////////////////
