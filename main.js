@@ -1868,18 +1868,24 @@ var CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden"
 var CSS_EXPANDED_CLASS = "is-expanded";
 var CSS_CHAT_LIST_CONTAINER = "ollama-chat-list-container";
 var CSS_HIERARCHY_ITEM = "ollama-hierarchy-item";
+var CSS_FOLDER_ITEM = "ollama-folder-item";
+var CSS_CHAT_ITEM = "ollama-chat-item";
 var CSS_HIERARCHY_ITEM_CONTENT = "ollama-hierarchy-item-content";
 var CSS_HIERARCHY_ITEM_CHILDREN = "ollama-hierarchy-item-children";
 var CSS_HIERARCHY_ITEM_COLLAPSED = "is-collapsed";
 var CSS_FOLDER_ICON = "ollama-folder-icon";
 var CSS_HIERARCHY_ITEM_TEXT = "ollama-hierarchy-item-text";
+var CSS_CHAT_ITEM_DETAILS = "ollama-chat-item-details";
+var CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
 var CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
 var CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
+var CSS_FOLDER_ACTIVE_ANCESTOR = "is-active-ancestor";
 var COLLAPSE_ICON_ROLE = "lucide-folder";
 var EXPAND_ICON_ROLE = "lucide-folder-open";
 var FOLDER_ICON_CLOSED = "lucide-folder";
 var FOLDER_ICON_OPEN = "lucide-folder-open";
 var CHAT_ICON = "lucide-message-square";
+var CHAT_ICON_ACTIVE = "lucide-check";
 var SidebarManager = class {
   constructor(plugin, app, view) {
     this.folderExpansionState = /* @__PURE__ */ new Map();
@@ -2178,53 +2184,85 @@ var SidebarManager = class {
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths) {
-    const itemEl = parentElement.createDiv({ cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`] });
+    var _a;
+    const itemEl = parentElement.createDiv({
+      cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
+    });
     if (node.type === "folder") {
-    } else {
+      itemEl.dataset.path = node.path;
     }
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
-    try {
-      console.log(`--- Rendering Node ---`);
-      console.log(`Level: ${level}, Type: ${node.type}`);
-      console.log("Item El:", itemEl);
-      console.log("Content El:", itemContentEl);
-      const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-      if (node.type === "folder") {
-        (0, import_obsidian12.setIcon)(iconEl, FOLDER_ICON_CLOSED);
-      } else {
-        (0, import_obsidian12.setIcon)(iconEl, CHAT_ICON);
-      }
-      const textEl = itemContentEl.createSpan({
-        cls: CSS_HIERARCHY_ITEM_TEXT,
-        text: node.type === "folder" ? node.name : node.metadata.name
-      });
-      console.log("Direct children of Content El:", itemContentEl.children);
-      console.log("  Child 1 (Icon):", iconEl, iconEl.outerHTML);
-      console.log("  Child 2 (Text):", textEl, textEl.outerHTML);
-    } catch (e) {
-      console.error("Error during node rendering/logging:", e);
-    }
     if (node.type === "folder") {
-      this.view.registerDomEvent(itemContentEl, "click", () => {
-        this.handleToggleFolder(node.path);
+      itemEl.addClass(CSS_FOLDER_ITEM);
+      const isExpanded = (_a = this.folderExpansionState.get(node.path)) != null ? _a : false;
+      if (!isExpanded) {
+        itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
+      }
+      if (activeAncestorPaths.has(node.path)) {
+        itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
+      }
+      const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+      (0, import_obsidian12.setIcon)(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
+      itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
+      const optionsBtn = itemContentEl.createEl("button", {
+        cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+        attr: { "aria-label": "Folder options", title: "More options" }
+      });
+      (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
+      this.view.registerDomEvent(optionsBtn, "click", (e) => {
+        e.stopPropagation();
+        this.showFolderContextMenu(e, node);
       });
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
         e.preventDefault();
         this.showFolderContextMenu(e, node);
       });
-      itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
-    } else {
+      this.view.registerDomEvent(itemContentEl, "click", () => {
+        this.handleToggleFolder(node.path);
+      });
+      const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
+      if (node.children.length > 0) {
+        node.children.forEach((childNode) => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths));
+      }
+    } else if (node.type === "chat") {
+      itemEl.addClass(CSS_CHAT_ITEM);
+      const chatMeta = node.metadata;
+      const isActive = chatMeta.id === activeChatId;
+      if (isActive) {
+        itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+      }
+      const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+      (0, import_obsidian12.setIcon)(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+      itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
+      const detailsWrapper = itemContentEl.createDiv({ cls: CSS_CHAT_ITEM_DETAILS });
+      try {
+        const lastModifiedDate = new Date(chatMeta.lastModified);
+        const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
+        if (dateText === "Invalid date") {
+          this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`);
+        }
+        detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
+      } catch (e) {
+        this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
+        detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
+      }
+      const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" } });
+      (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
+      this.view.registerDomEvent(optionsBtn, "click", (e) => {
+        e.stopPropagation();
+        this.showChatContextMenu(e, chatMeta);
+      });
       this.view.registerDomEvent(itemContentEl, "click", async (e) => {
         if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
           return;
         }
-        if (node.metadata.id !== activeChatId) {
-          await this.plugin.chatManager.setActiveChat(node.metadata.id);
+        if (chatMeta.id !== activeChatId) {
+          await this.plugin.chatManager.setActiveChat(chatMeta.id);
         }
       });
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
         e.preventDefault();
-        this.showChatContextMenu(e, node.metadata);
+        this.showChatContextMenu(e, chatMeta);
       });
     }
   }
