@@ -52,8 +52,9 @@
     overflow: hidden; max-height: 0;
     transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
     box-sizing: border-box; padding: 0 var(--size-4-2); min-height: 0; opacity: 0;
-display: flex !important; 
-    &.is-expanded { max-height: 75vh; overflow-y: auto; padding-top: var(--size-4-1); padding-bottom: var(--size-4-1); opacity: 1; }
+
+    // &.is-expanded { max-height: 75vh; overflow-y: auto; padding-top: var(--size-4-1); padding-bottom: var(--size-4-1); opacity: 1; }
+
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
     &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
@@ -69,6 +70,7 @@ display: flex !important;
 
     // Селектор з підвищеною специфічністю
     .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
+        display: flex !important; 
         margin: 1px 0;
         border-radius: var(--radius-s);
         cursor: pointer;
