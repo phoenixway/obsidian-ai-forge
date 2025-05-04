@@ -288,12 +288,11 @@
 
     // --- ЗМІНЕНО: Стилі для дочірніх елементів ---
     .ollama-hierarchy-item-children {
-       display: block;
-       position: relative; // Для можливого позиціонування ліній
-       // Застосовуємо відступ через margin, щоб візуально змістити всю гілку
-       margin-left: $indent-step; // Відступ на один крок ієрархії
-       padding-left: 0; // Внутрішні елементи самі матимуть свій padding-left
-    }
+        display: block;
+        position: relative; // Зберігаємо для можливих ліній
+        // padding-left: $indent-step; // Можна додати відступ тут, якщо потрібно змістити ВСІ дочірні елементи разом
+     }
+
     // ---
 
     .ollama-hierarchy-item.is-collapsed > .ollama-hierarchy-item-children {
@@ -301,14 +300,14 @@
     }
 
     // --- ЗМІНЕНО: Стилі для "Empty" ---
-    .ollama-empty-folder-text {
-       // Має успадкувати margin-left від .ollama-hierarchy-item-children
-       // Додаємо внутрішній відступ, як у звичайного елемента
-       padding: $item-padding-vertical $item-padding-horizontal;
-       color: var(--text-faint);
-       font-style: italic;
-       font-size: var(--font-ui-smaller);
-    }
+    // .ollama-empty-folder-text {
+    //    // Має успадкувати margin-left від .ollama-hierarchy-item-children
+    //    // Додаємо внутрішній відступ, як у звичайного елемента
+    //    padding: $item-padding-vertical $item-padding-horizontal;
+    //    color: var(--text-faint);
+    //    font-style: italic;
+    //    font-size: var(--font-ui-smaller);
+    // }
     // ---
 
     .ollama-chat-item.is-active > .ollama-hierarchy-item-content {
