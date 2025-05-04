@@ -149,7 +149,7 @@
       }
 
        // Контейнер для дочірніх елементів
-       > .ollama-hierarchy-item-children { display: block; position: relative; padding-left: 0; }
+      //  > .ollama-hierarchy-item-children { display: block; position: relative; padding-left: 0; }
        &.is-collapsed > .ollama-hierarchy-item-children { display: none; } // Приховуємо через CSS
 
   } // Кінець .ollama-sidebar-container ... .ollama-hierarchy-item
