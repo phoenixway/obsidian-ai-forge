@@ -62,6 +62,12 @@ $icon-margin: 8px; // Gap
   // overflow: hidden; 
   max-height: 0;
  
+  &.is-expanded { max-height: 75vh; overflow-y: auto; padding-top: var(--size-4-1); padding-bottom: var(--size-4-1); opacity: 1; }
+  &::-webkit-scrollbar { width: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
+  &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
+  &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////
