@@ -67,7 +67,7 @@
   $folder-icon-extra-indent: 5px;
 
   // Використовуємо селектор з підвищеною специфічністю
-  .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
+  .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item-content {
       margin: 1px 0;
       border-radius: var(--radius-s);
       cursor: pointer;
