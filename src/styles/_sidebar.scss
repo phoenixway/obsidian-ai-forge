@@ -109,7 +109,7 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
             position: relative; min-height: calc($icon-size + 2 * $item-padding-vertical); border-radius: inherit; z-index: 1;
 
             // Іконка (папка або чат)
-            > .ollama-folder-icon {
+             .ollama-folder-icon {
                 flex-shrink: 0; width: $icon-size; height: $icon-size; color: var(--text-faint);
                 display: flex; align-items: center; justify-content: center;
                 margin-left: 0; // Базовий margin
