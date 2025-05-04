@@ -142,7 +142,7 @@ export interface OllamaPluginSettings extends LoggerSettings {
   temperature: number;
   contextWindow: number;
   userRolesFolderPath: string;
-  selectedRolePath: string;
+  selectedRolePath?: string;
   saveMessageHistory: boolean;
   chatHistoryFolderPath: string;
   chatExportFolderPath: string;

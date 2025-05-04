@@ -1,18 +1,19 @@
 // src/SidebarManager.ts
-import { App, setIcon, Menu, Notice, TFolder, normalizePath, debounce, MenuItem } from "obsidian";
+import { App, setIcon, Menu, Notice, TFolder, normalizePath, debounce, MenuItem, TAbstractFile } from "obsidian";
 import OllamaPlugin from "./main";
 import { RoleInfo } from "./ChatManager";
-import { ChatMetadata } from "./Chat"; // Переконайтесь, що Message експортується з Chat.ts чи types.ts
+import { ChatMetadata } from "./Chat";
 import { ConfirmModal } from "./ConfirmModal";
 import { PromptModal } from "./PromptModal";
 import * as RendererUtils from "./MessageRendererUtils";
-import { Message } from "./types"; // Імпортуємо Message з types.ts
-import { OllamaView } from "./OllamaView"; // <-- Імпортуємо OllamaView
+import { Message } from "./types";
+import { OllamaView } from "./OllamaView";
+import { HierarchyNode, FolderNode, ChatNode } from "./ChatManager";
 
 // --- CSS Classes ---
-const CSS_SIDEBAR_CONTAINER = "ollama-sidebar-container"; // Клас для кореневого елемента
-const CSS_ROLE_PANEL = "ollama-role-panel"; // Можна залишити або змінити на ollama-sidebar-section
-const CSS_CHAT_PANEL = "ollama-chat-panel"; // Можна залишити або змінити на ollama-sidebar-section
+const CSS_SIDEBAR_CONTAINER = "ollama-sidebar-container";
+const CSS_ROLE_PANEL = "ollama-role-panel";
+const CSS_CHAT_PANEL = "ollama-chat-panel";
 const CSS_ROLE_PANEL_HEADER = "ollama-role-panel-header";
 const CSS_ROLE_PANEL_LIST = "ollama-role-panel-list";
 const CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item";
@@ -21,114 +22,136 @@ const CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
 const CSS_ROLE_PANEL_ITEM_ACTIVE = "is-active";
 const CSS_ROLE_PANEL_ITEM_CUSTOM = "is-custom";
 const CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
+
 const CSS_CLASS_MENU_OPTION = "menu-option";
 const CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header";
 const CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
 const CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
+const CSS_SIDEBAR_HEADER_ACTIONS = "ollama-sidebar-header-actions";
 const CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
-const CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
-const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
-const CSS_CLASSES_DANGER_OPTION = "danger-option";
-const CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
-const CSS_EXPANDED_CLASS = "is-expanded";
-const CSS_CHAT_PANEL_LIST = "ollama-chat-panel-list";
-const CSS_CHAT_PANEL_ITEM_NAME = "chat-panel-item-name";
-const CSS_CHAT_PANEL_ITEM_DATE = "chat-panel-item-date";
-const CSS_CHAT_ITEM_TEXT_WRAPPER = "ollama-chat-item-text-wrapper";
 const CSS_SIDEBAR_HEADER_LEFT = "ollama-sidebar-header-left";
-const CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden"; // Додано
+const CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden";
+const CSS_EXPANDED_CLASS = "is-expanded";
+
+// Класи для списку чатів/папок
+const CSS_CHAT_LIST_CONTAINER = "ollama-chat-list-container";
+const CSS_HIERARCHY_ITEM = "ollama-hierarchy-item";
+const CSS_FOLDER_ITEM = "ollama-folder-item";
+const CSS_CHAT_ITEM = "ollama-chat-item";
+const CSS_HIERARCHY_ITEM_CONTENT = "ollama-hierarchy-item-content";
+const CSS_HIERARCHY_ITEM_CHILDREN = "ollama-hierarchy-item-children";
+const CSS_HIERARCHY_ITEM_COLLAPSED = "is-collapsed";
+const CSS_FOLDER_TOGGLE_ICON = "ollama-folder-toggle-icon";
+const CSS_FOLDER_ICON = "ollama-folder-icon";
+const CSS_HIERARCHY_ITEM_TEXT = "ollama-hierarchy-item-text";
+const CSS_CHAT_ITEM_DETAILS = "ollama-chat-item-details";
+const CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
+const CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
+const CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
+
+// Меню та інше
+const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
+//const CSS_CLASSES_DANGER_OPTION = "mod-danger"; // Клас тепер не використовується програмно
 
 // Іконки
-const COLLAPSE_ICON = "lucide-folder";
-const EXPAND_ICON = "lucide-folder-open";
+const COLLAPSE_ICON_ROLE = "lucide-folder";
+const EXPAND_ICON_ROLE = "lucide-folder-open";
+const COLLAPSE_ICON_FOLDER = "lucide-chevron-right";
+const EXPAND_ICON_FOLDER = "lucide-chevron-down";
+const FOLDER_ICON = "lucide-folder";
+const CHAT_ICON = "lucide-message-square";
+const CHAT_ICON_ACTIVE = "lucide-check";
 
 export class SidebarManager {
   private plugin: OllamaPlugin;
   private app: App;
-  private view: OllamaView; // <-- Додано посилання на View
+  private view: OllamaView;
 
-  // UI Elements
-  private containerEl!: HTMLElement; // <-- Перейменовано для ясності
+  private containerEl!: HTMLElement;
   private chatPanelHeaderEl!: HTMLElement;
-  private chatPanelListEl!: HTMLElement;
-  private newChatSidebarButton!: HTMLButtonElement;
+  private chatPanelListContainerEl!: HTMLElement;
+  private newChatSidebarButton!: HTMLElement;
+  private newFolderSidebarButton!: HTMLElement;
   private rolePanelHeaderEl!: HTMLElement;
   private rolePanelListEl!: HTMLElement;
 
-  // ЗМІНЕНО КОНСТРУКТОР
+  private folderExpansionState: Map<string, boolean> = new Map();
+
   constructor(plugin: OllamaPlugin, app: App, view: OllamaView) {
     this.plugin = plugin;
     this.app = app;
-    this.view = view; // Зберігаємо посилання на View
+    this.view = view;
   }
 
-  // ЗМІНЕНО СИГНАТУРУ ТА ДОДАНО RETURN
   public createSidebarUI(parentElement: HTMLElement): HTMLElement {
     this.plugin.logger.debug("[SidebarManager] Creating UI...");
-    // Використовуємо CSS_SIDEBAR_CONTAINER для кореневого елемента
     this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
 
-    // --- Секція Чатів ---
-    const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL }); // Створюємо обгортку для секції
+    const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
     this.chatPanelHeaderEl = chatPanel.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-      attr: { "data-section-type": "chats", "data-collapsed": "false" }, // Починаємо розгорнуто
+      attr: { "data-section-type": "chats", "data-collapsed": "false" },
     });
     const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
-    setIcon(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), EXPAND_ICON);
+    setIcon(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), EXPAND_ICON_ROLE);
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
-    this.newChatSidebarButton = this.chatPanelHeaderEl.createEl("button", {
+
+    const headerActions = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
+
+    this.newFolderSidebarButton = headerActions.createDiv({
+      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
+      attr: { "aria-label": "New Folder", title: "New Folder" },
+    });
+    setIcon(this.newFolderSidebarButton, "lucide-folder-plus");
+
+    this.newChatSidebarButton = headerActions.createDiv({
       cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
       attr: { "aria-label": "New Chat", title: "New Chat" },
     });
     setIcon(this.newChatSidebarButton, "lucide-plus-circle");
 
-    this.chatPanelListEl = chatPanel.createDiv({
-      // Додаємо is-expanded одразу, бо починаємо розгорнуто
-      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS, CSS_CHAT_PANEL_LIST],
+    this.chatPanelListContainerEl = chatPanel.createDiv({
+      cls: [CSS_CHAT_LIST_CONTAINER, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS],
     });
 
-    // Роздільник (якщо потрібен між секціями)
-    // this.containerEl.createEl("hr", { cls: CSS_CLASS_MENU_SEPARATOR });
-
-    // --- Секція Ролей ---
-    const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL }); // Створюємо обгортку для секції
+    const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL });
     this.rolePanelHeaderEl = rolePanel.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
-      attr: { "data-section-type": "roles", "data-collapsed": "true" }, // Починаємо згорнуто
+      attr: { "data-section-type": "roles", "data-collapsed": "true" },
     });
     const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
-    setIcon(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), COLLAPSE_ICON);
+    setIcon(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), COLLAPSE_ICON_ROLE);
     roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
 
-    // Контейнер для списку ролей, починаємо прихованим (без is-expanded)
     this.rolePanelListEl = rolePanel.createDiv({
-      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT], // Додано CSS_SIDEBAR_SECTION_CONTENT_HIDDEN? Ні, керуємо через is-expanded
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT],
     });
 
     this.plugin.logger.debug("[SidebarManager] UI Created.");
-    this.attachSidebarEventListeners(); // Додаємо слухачі
+    this.attachSidebarEventListeners();
 
-    // Оновлюємо вміст початково видимих секцій
     if (this.isSectionVisible("chats")) {
       this.updateChatList();
     }
-    // Початково згорнуті секції оновлюються при першому розгортанні в toggleSection
 
-    return this.containerEl; // <-- ПОВЕРТАЄМО КОРЕНЕВИЙ ЕЛЕМЕНТ
+    return this.containerEl;
   }
 
   private attachSidebarEventListeners(): void {
-    if (!this.chatPanelHeaderEl || !this.rolePanelHeaderEl || !this.newChatSidebarButton) {
+    if (!this.chatPanelHeaderEl || !this.rolePanelHeaderEl || !this.newChatSidebarButton || !this.newFolderSidebarButton) {
       this.plugin.logger.error("[SidebarManager] Cannot attach listeners: UI elements missing.");
       return;
     }
-    // ЗМІНЕНО: Використовуємо this.view.registerDomEvent
     this.view.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSection(this.chatPanelHeaderEl));
     this.view.registerDomEvent(this.rolePanelHeaderEl, "click", () => this.toggleSection(this.rolePanelHeaderEl));
+
     this.view.registerDomEvent(this.newChatSidebarButton, "click", e => {
-      e.stopPropagation(); // Залишаємо, щоб клік по кнопці не згорнув секцію
-      this.handleNewChatClick(); // Викликаємо внутрішній обробник
+      e.stopPropagation();
+      this.handleNewChatClick(this.plugin.chatManager.chatsFolderPath);
+    });
+    this.view.registerDomEvent(this.newFolderSidebarButton, "click", e => {
+      e.stopPropagation();
+      this.handleNewFolderClick(this.plugin.chatManager.chatsFolderPath);
     });
     this.plugin.logger.debug("[SidebarManager] Event listeners attached.");
   }
@@ -139,74 +162,31 @@ export class SidebarManager {
   }
 
   public updateChatList = async (): Promise<void> => {
-    const container = this.chatPanelListEl;
+    const container = this.chatPanelListContainerEl;
     if (!container || !this.plugin.chatManager) {
         this.plugin.logger.debug("[SidebarManager.updateChatList] Skipping: Container/Manager missing.");
         return;
     }
 
-    // Завжди оновлюємо вміст, навіть якщо згорнуто, щоб дані були актуальні при розгортанні
     this.plugin.logger.debug(`[SidebarManager.updateChatList] Updating chat list content (visible: ${this.isSectionVisible("chats")})...`);
 
     const currentScrollTop = container.scrollTop;
     container.empty();
 
     try {
-        const chats: ChatMetadata[] = this.plugin.chatManager.listAvailableChats() || [];
-        const currentActiveId = this.plugin.chatManager.getActiveChatId();
+        const hierarchy = await this.plugin.chatManager.getChatHierarchy();
+        const currentActiveChatId = this.plugin.chatManager.getActiveChatId();
 
-        if (chats.length === 0) {
-            container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
+        if (hierarchy.length === 0) {
+            container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
         } else {
-            chats.forEach(chatMeta => {
-                const chatOptionEl = container.createDiv({
-                    cls: [CSS_ROLE_PANEL_ITEM, CSS_CLASS_MENU_OPTION, CSS_CLASS_CHAT_LIST_ITEM],
-                });
-                const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
-                setIcon(iconSpan, chatMeta.id === currentActiveId ? "check" : "message-square");
-                if (chatMeta.id === currentActiveId) chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-
-                const textWrapper = chatOptionEl.createDiv({ cls: CSS_CHAT_ITEM_TEXT_WRAPPER });
-                textWrapper.createDiv({ cls: CSS_CHAT_PANEL_ITEM_NAME, text: chatMeta.name });
-                const lastModifiedDate = new Date(chatMeta.lastModified);
-                const dateText = !isNaN(lastModifiedDate.getTime())
-                    ? this.formatRelativeDate(lastModifiedDate)
-                    : "Invalid date";
-                if (dateText === "Invalid date") {
-                    this.plugin.logger.warn(`[SidebarManager.updateChatList] Invalid date for chat ${chatMeta.id}`);
-                }
-                textWrapper.createDiv({ cls: CSS_CHAT_PANEL_ITEM_DATE, text: dateText });
-
-                const optionsBtn = chatOptionEl.createEl("button", {
-                    cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"],
-                    attr: { "aria-label": "Chat options", title: "More options" },
-                });
-                setIcon(optionsBtn, "lucide-more-horizontal");
-
-                // ЗМІНЕНО: Використовуємо this.view.registerDomEvent
-                this.view.registerDomEvent(chatOptionEl, "click", async (e: MouseEvent) => { // Додано тип MouseEvent
-                    if (!(e.target instanceof Element && e.target.closest(`.${CSS_CHAT_ITEM_OPTIONS}`))) {
-                        if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
-                            await this.plugin.chatManager.setActiveChat(chatMeta.id);
-                        }
-                    }
-                });
-                // ЗМІНЕНО: Використовуємо this.view.registerDomEvent
-                this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { // Додано тип MouseEvent
-                    e.stopPropagation();
-                    this.showChatContextMenu(e, chatMeta);
-                });
-                // ЗМІНЕНО: Використовуємо this.view.registerDomEvent
-                this.view.registerDomEvent(chatOptionEl, "contextmenu", (e: MouseEvent) => { // Додано тип MouseEvent
-                    this.showChatContextMenu(e, chatMeta);
-                });
-            });
+            hierarchy.forEach(node => this.renderHierarchyNode(node, container, 0, currentActiveChatId));
         }
-        this.plugin.logger.debug(`[SidebarManager.updateChatList] Finished rendering ${chats.length} chat items.`);
+        this.plugin.logger.debug(`[SidebarManager.updateChatList] Finished rendering hierarchy.`);
     } catch (error) {
-        this.plugin.logger.error("[SidebarManager.updateChatList] Error rendering:", error);
+        this.plugin.logger.error("[SidebarManager.updateChatList] Error rendering hierarchy:", error);
         container.empty();
-        container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
+        container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
     } finally {
         requestAnimationFrame(() => {
             if (container?.isConnected) {
@@ -214,7 +194,164 @@ export class SidebarManager {
             }
         });
     }
-};
+  };
+
+  private renderHierarchyNode(node: HierarchyNode, parentElement: HTMLElement, level: number, activeChatId: string | null): void {
+      const itemEl = parentElement.createDiv({
+          cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
+      });
+
+      const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+
+      if (node.type === 'folder') {
+          itemEl.addClass(CSS_FOLDER_ITEM);
+          const isExpanded = this.folderExpansionState.get(node.path) ?? false;
+          if (!isExpanded) {
+              itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
+          }
+
+          const toggleIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, "clickable-icon"] });
+          setIcon(toggleIcon, isExpanded ? EXPAND_ICON_FOLDER : COLLAPSE_ICON_FOLDER);
+          this.view.registerDomEvent(toggleIcon, 'click', (e) => {
+              e.stopPropagation();
+              this.handleToggleFolder(node.path);
+          });
+
+          const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+          setIcon(folderIcon, FOLDER_ICON);
+
+          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
+
+          const optionsBtn = itemContentEl.createEl("button", {
+              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+              attr: { "aria-label": "Folder options", title: "More options" },
+          });
+          setIcon(optionsBtn, "lucide-more-horizontal");
+          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
+              e.stopPropagation();
+              this.showFolderContextMenu(e, node);
+          });
+
+          this.view.registerDomEvent(itemContentEl, 'click', () => {
+               this.handleToggleFolder(node.path);
+          });
+
+          this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => {
+              e.preventDefault();
+              this.showFolderContextMenu(e, node);
+          });
+
+          const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
+          if (isExpanded && node.children.length > 0) {
+              node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId));
+          } else if (isExpanded && node.children.length === 0) {
+               childrenContainer.createDiv({ text: "Empty", cls: "menu-info-text ollama-empty-folder-text" });
+          }
+
+      } else if (node.type === 'chat') {
+          itemEl.addClass(CSS_CHAT_ITEM);
+          const chatMeta = node.metadata;
+          const isActive = chatMeta.id === activeChatId;
+
+          if (isActive) {
+              itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+          }
+
+          const chatIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_ICON] }); // Keep same class for alignment
+          setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+
+          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
+
+          const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
+           try {
+                const lastModifiedDate = new Date(chatMeta.lastModified);
+                const dateText = !isNaN(lastModifiedDate.getTime())
+                    ? this.formatRelativeDate(lastModifiedDate)
+                    : "Invalid date";
+                if (dateText === "Invalid date") {
+                    this.plugin.logger.warn(`[SidebarManager.renderNode] Invalid date for chat ${chatMeta.id}`);
+                }
+                detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
+           } catch(e) {
+                 this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
+                 detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
+           }
+
+          const optionsBtn = itemContentEl.createEl("button", {
+              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+              attr: { "aria-label": "Chat options", title: "More options" },
+          });
+          setIcon(optionsBtn, "lucide-more-horizontal");
+
+          this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => {
+              if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
+                  return;
+              }
+              if (chatMeta.id !== activeChatId) {
+                  await this.plugin.chatManager.setActiveChat(chatMeta.id);
+              }
+          });
+
+          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
+              e.stopPropagation();
+              this.showChatContextMenu(e, chatMeta);
+          });
+
+          this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => {
+              e.preventDefault();
+              this.showChatContextMenu(e, chatMeta);
+          });
+      }
+  }
+
+  private handleToggleFolder(folderPath: string): void {
+      const currentState = this.folderExpansionState.get(folderPath) ?? false;
+      this.folderExpansionState.set(folderPath, !currentState);
+      this.plugin.logger.debug(`Toggled folder ${folderPath} to ${!currentState ? 'expanded' : 'collapsed'}`);
+      this.updateChatList();
+  }
+
+  private showFolderContextMenu(event: MouseEvent | PointerEvent, folderNode: FolderNode): void {
+      event.preventDefault();
+      event.stopPropagation();
+      const menu = new Menu();
+
+      menu.addItem(item =>
+          item
+              .setTitle("New Chat Here")
+              .setIcon("lucide-plus-circle")
+              .onClick(() => this.handleNewChatClick(folderNode.path))
+      );
+
+      menu.addItem(item =>
+          item
+              .setTitle("New Folder Here")
+              .setIcon("lucide-folder-plus")
+              .onClick(() => this.handleNewFolderClick(folderNode.path))
+      );
+
+       menu.addSeparator();
+
+      menu.addItem(item =>
+          item
+              .setTitle("Rename Folder")
+              .setIcon("lucide-pencil")
+              .onClick(() => this.handleRenameFolder(folderNode))
+      );
+
+      menu.addItem(item => {
+          item
+              .setTitle("Delete Folder")
+              .setIcon("lucide-trash-2")
+              .onClick(() => this.handleDeleteFolder(folderNode));
+          // --- ВИДАЛЕНО: Спроба додати клас через DOM ---
+          // Стилізація має бути через CSS, якщо потрібно
+      });
+
+
+      menu.showAtMouseEvent(event);
+  }
+
 
   public updateRoleList = async (): Promise<void> => {
       const container = this.rolePanelListEl;
@@ -223,7 +360,6 @@ export class SidebarManager {
         return;
       }
 
-      // Завжди оновлюємо вміст
       this.plugin.logger.debug(`[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`);
 
       const currentScrollTop = container.scrollTop;
@@ -234,7 +370,6 @@ export class SidebarManager {
           const activeChat = await this.plugin.chatManager.getActiveChat();
           const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
 
-          // "None" Option
           const noneOptionEl = container.createDiv({
               cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION],
           });
@@ -242,10 +377,8 @@ export class SidebarManager {
           noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None" });
           setIcon(noneIconSpan, !currentRolePath ? "check" : "slash");
           if (!currentRolePath) noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-           // ЗМІНЕНО: Використовуємо this.view.registerDomEvent
           this.view.registerDomEvent(noneOptionEl, "click", () => this.handleRolePanelItemClick(null, currentRolePath));
 
-          // Other Roles
           roles.forEach(roleInfo => {
               const roleOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_CLASS_MENU_OPTION] });
               const iconSpan = roleOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
@@ -253,7 +386,6 @@ export class SidebarManager {
               if (roleInfo.isCustom) roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_CUSTOM);
               setIcon(iconSpan, roleInfo.path === currentRolePath ? "check" : roleInfo.isCustom ? "user" : "file-text");
               if (roleInfo.path === currentRolePath) roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-              // ЗМІНЕНО: Використовуємо this.view.registerDomEvent
               this.view.registerDomEvent(roleOptionEl, "click", () =>
                   this.handleRolePanelItemClick(roleInfo, currentRolePath)
               );
@@ -288,15 +420,15 @@ export class SidebarManager {
         this.plugin.logger.info(`Setting role to: ${roleNameForEvent}`);
         if (activeChat) {
             this.plugin.logger.debug(`Updating role for active chat ${activeChat.metadata.id}`);
-          await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath });
-          // Подія active-chat-changed оновить UI
+          await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath || undefined });
         } else {
             this.plugin.logger.debug(`Setting global default role.`);
-          this.plugin.settings.selectedRolePath = newRolePath;
-          await this.plugin.saveSettings(); // Це викличе settings-updated -> roles-updated
-          this.plugin.emit("role-changed", roleNameForEvent); // Додатково генеруємо подію зміни ролі
+          this.plugin.settings.selectedRolePath = newRolePath || undefined;
+          await this.plugin.saveSettings();
+          this.plugin.emit("role-changed", roleNameForEvent);
           this.plugin.promptService?.clearRoleCache?.();
         }
+         this.updateRoleList();
       } catch (error) {
         this.plugin.logger.error(`[SidebarManager] Error setting role to ${newRolePath}:`, error);
         new Notice("Failed to set the role.");
@@ -306,156 +438,242 @@ export class SidebarManager {
     }
   };
 
-  // Метод toggleSection ВИПРАВЛЕНИЙ вище
 
   private async toggleSection(clickedHeaderEl: HTMLElement): Promise<void> {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type") as "chats" | "roles";
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
     const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
+    const contentEl = sectionType === "chats" ? this.chatPanelListContainerEl : this.rolePanelListEl;
+    const headerActionsEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
 
-    let contentEl: HTMLElement | null = null;
-    let updateFunction: (() => Promise<void>) | null = null; // Функція оновлення вмісту
-    let otherHeaderEl: HTMLElement | null = null;
-    let otherContentEl: HTMLElement | null = null;
-    let otherSectionType: "chats" | "roles" | null = null;
-
-    if (sectionType === "chats") {
-      [contentEl, updateFunction, otherHeaderEl, otherContentEl, otherSectionType] = [
-        this.chatPanelListEl,
-        this.updateChatList, // Зв'язуємо функцію
-        this.rolePanelHeaderEl,
-        this.rolePanelListEl,
-        "roles",
-      ];
-    } else if (sectionType === "roles") {
-      [contentEl, updateFunction, otherHeaderEl, otherContentEl, otherSectionType] = [
-        this.rolePanelListEl,
-        this.updateRoleList, // Зв'язуємо функцію
-        this.chatPanelHeaderEl,
-        this.chatPanelListEl,
-        "chats",
-      ];
+    if (!contentEl || !iconEl) {
+        this.plugin.logger.error("Sidebar toggle elements missing:", sectionType);
+        return;
     }
 
-    if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-      this.plugin.logger.error("Sidebar toggle elements missing:", sectionType);
-      return;
-    }
-
-    // Прив'язуємо контекст this до updateFunction
+    const updateFunction = sectionType === "chats" ? this.updateChatList : this.updateRoleList;
     const boundUpdateFunction = updateFunction.bind(this);
 
     if (isCurrentlyCollapsed) {
-      // --- Розгортаємо поточну, згортаємо іншу ---
-      if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_SECTION_ICON}`);
-        otherHeaderEl.setAttribute("data-collapsed", "true");
-        if (otherIconEl) setIcon(otherIconEl, COLLAPSE_ICON);
-        otherContentEl.classList.remove(CSS_EXPANDED_CLASS);
-        otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Додаємо клас для приховування
-        if (otherSectionType === "chats" && this.newChatSidebarButton) this.newChatSidebarButton.hide();
-      }
+        clickedHeaderEl.setAttribute("data-collapsed", "false");
+        setIcon(iconEl, EXPAND_ICON_ROLE);
+        contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+        if (headerActionsEl) headerActionsEl.style.display = '';
 
-      clickedHeaderEl.setAttribute("data-collapsed", "false");
-      setIcon(iconEl, EXPAND_ICON);
-      contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Видаляємо клас приховування
-      if (sectionType === "chats" && this.newChatSidebarButton) this.newChatSidebarButton.show();
-
-      try {
-        // Оновлюємо вміст секції перед додаванням класу
-        await boundUpdateFunction(); // Викликаємо прив'язану функцію
-        // Додаємо клас is-expanded, CSS подбає про анімацію та стилі
-        requestAnimationFrame(() => {
-          if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
-            contentEl.classList.add(CSS_EXPANDED_CLASS);
-            this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
-          }
-        });
-      } catch (error) {
-        this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
-        contentEl.setText(`Error loading ${sectionType}.`);
-        requestAnimationFrame(() => {
-          if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
-            contentEl.classList.add(CSS_EXPANDED_CLASS);
-          }
-        });
-      }
+        try {
+            await boundUpdateFunction();
+            requestAnimationFrame(() => {
+                if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
+                    contentEl.classList.add(CSS_EXPANDED_CLASS);
+                    this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
+                }
+            });
+        } catch (error) {
+            this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+            contentEl.setText(`Error loading ${sectionType}.`);
+             requestAnimationFrame(() => {
+                if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
+                    contentEl.classList.add(CSS_EXPANDED_CLASS);
+                }
+            });
+        }
     } else {
-      // --- Згортаємо поточну ---
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
-      clickedHeaderEl.setAttribute("data-collapsed", "true");
-      setIcon(iconEl, COLLAPSE_ICON);
-      contentEl.classList.remove(CSS_EXPANDED_CLASS);
-      contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Додаємо клас для приховування
-      if (sectionType === "chats" && this.newChatSidebarButton) this.newChatSidebarButton.hide();
+        this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
+        clickedHeaderEl.setAttribute("data-collapsed", "true");
+        setIcon(iconEl, COLLAPSE_ICON_ROLE);
+        contentEl.classList.remove(CSS_EXPANDED_CLASS);
+        contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+        if (headerActionsEl) headerActionsEl.style.display = 'none';
     }
-}
+  }
 
 
-  private handleNewChatClick = async (): Promise<void> => {
-    this.plugin.logger.debug("[SidebarManager] New Chat button clicked.");
+  private handleNewChatClick = async (targetFolderPath?: string): Promise<void> => {
+    const folderPath: string = targetFolderPath ?? this.plugin.chatManager.chatsFolderPath ?? "/";
+    this.plugin.logger.debug(`[SidebarManager] New Chat button clicked. Target folder: ${folderPath}`);
     try {
-      const newChat = await this.plugin.chatManager.createNewChat();
+      // Виклик createNewChat(undefined, string) є типічно коректним, якщо сигнатура в ChatManager правильна
+      const newChat = await this.plugin.chatManager.createNewChat(undefined, folderPath);
       if (newChat) {
         new Notice(`Created new chat: ${newChat.metadata.name}`);
-        this.plugin.emit("focus-input-request"); // Посилаємо запит на фокус інпуту
-      } else {
-        new Notice("Failed to create new chat.");
-      }
+        this.plugin.emit("focus-input-request");
+        const parentPath = folderPath.substring(0, folderPath.lastIndexOf('/'));
+         // Розгортаємо батьківську папку, якщо вона є і не корінь
+         if (parentPath && parentPath !== '/') {
+             this.folderExpansionState.set(parentPath, true);
+         }
+         // Завжди оновлюємо список після створення
+         this.updateChatList();
+      } // Помилка обробляється в ChatManager
     } catch (error) {
       this.plugin.logger.error("[SidebarManager] Error creating new chat:", error);
-      new Notice("Error creating new chat.");
+      new Notice(`Error creating new chat: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   };
 
-      // --- ОСНОВНИЙ ВИПРАВЛЕНИЙ МЕТОД ---
-      private showChatContextMenu(event: MouseEvent | PointerEvent, chatMeta: ChatMetadata): void {
-        event.preventDefault();
-        const menu = new Menu();
+  private handleNewFolderClick = async (parentFolderPath?: string): Promise<void> => {
+        const targetParentPath: string = parentFolderPath ?? this.plugin.chatManager.chatsFolderPath ?? "/";
+        this.plugin.logger.debug(`[SidebarManager] New Folder button clicked. Target parent: ${targetParentPath}`);
 
-        menu.addItem(item =>
-            item
-                .setTitle("Clone Chat")
-                .setIcon("lucide-copy-plus")
-                .onClick(() => this.handleContextMenuClone(chatMeta.id))
-        );
+        new PromptModal(this.app, "Create New Folder", "Enter folder name:", "", async newName => {
+            const trimmedName = newName?.trim();
+            if (!trimmedName) {
+                new Notice("Folder name cannot be empty.");
+                return;
+            }
+            if (/[\\/?:*"<>|]/.test(trimmedName)) {
+                new Notice("Folder name contains invalid characters.");
+                return;
+            }
 
-        menu.addItem(item =>
-            item
-                .setTitle("Rename Chat")
-                .setIcon("lucide-pencil")
-                .onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
-        );
+            const newFolderPath = normalizePath(targetParentPath === '/' ? trimmedName : `${targetParentPath}/${trimmedName}`);
+            this.plugin.logger.info(`Attempting to create folder: ${newFolderPath}`);
 
-        menu.addItem(item =>
-            item
-                .setTitle("Export to Note")
-                .setIcon("lucide-download")
-                .onClick(() => this.exportSpecificChat(chatMeta.id))
-        );
+            try {
+                const success = await this.plugin.chatManager.createFolder(newFolderPath);
+                if (success) {
+                    new Notice(`Folder "${trimmedName}" created.`);
+                     // Розгортаємо батьківську папку, якщо вона є і не корінь
+                    if (targetParentPath && targetParentPath !== '/') {
+                         this.folderExpansionState.set(targetParentPath, true);
+                    }
+                    this.updateChatList();
+                } // Помилка в ChatManager
+            } catch (error) {
+                this.plugin.logger.error(`[SidebarManager] Error creating folder ${newFolderPath}:`, error);
+                new Notice(`Error creating folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+            }
+        }).open();
+  };
 
-        menu.addSeparator();
+  private handleRenameFolder = async (folderNode: FolderNode): Promise<void> => {
+      this.plugin.logger.debug(`[SidebarManager] Rename requested for folder: ${folderNode.path}`);
+      const currentName = folderNode.name;
+      const parentPath = folderNode.path.substring(0, folderNode.path.lastIndexOf('/')) || "/";
 
-        // Пункт "Clear Messages" - БЕЗ спроби додати клас
-        menu.addItem(item => {
-            item
-                .setTitle("Clear Messages") // Текст залишається
-                .setIcon("lucide-trash") // Іконка залишається
-                .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
-            // ВИДАЛЕНО спробу додати клас CSS_CLASSES_DANGER_OPTION
-        });
+      new PromptModal(this.app, "Rename Folder", `New name for "${currentName}":`, currentName, async newName => {
+          const trimmedName = newName?.trim();
+          if (!trimmedName || trimmedName === currentName) {
+              new Notice(trimmedName === currentName ? "Name unchanged." : "Rename cancelled.");
+              return;
+          }
+          if (/[\\/?:*"<>|]/.test(trimmedName)) {
+              new Notice("Folder name contains invalid characters.");
+              return;
+          }
 
-        // Пункт "Delete Chat" - БЕЗ спроби додати клас
-        menu.addItem(item => {
-            item
-                .setTitle("Delete Chat") // Текст залишається
-                .setIcon("lucide-trash-2") // Іконка залишається
-                .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
-            // ВИДАЛЕНО спробу додати клас CSS_CLASSES_DANGER_OPTION
-        });
+          const newFolderPath = normalizePath(parentPath === '/' ? trimmedName : `${parentPath}/${trimmedName}`);
+          this.plugin.logger.info(`Attempting to rename folder ${folderNode.path} to ${newFolderPath}`);
 
-        menu.showAtMouseEvent(event);
-    }
+           try {
+                const exists = await this.app.vault.adapter.exists(newFolderPath);
+                if (exists) {
+                     new Notice(`A folder or file named "${trimmedName}" already exists here.`);
+                     return;
+                }
+           } catch (e) {
+               this.plugin.logger.warn(`Could not check existence of target rename path ${newFolderPath}:`, e);
+           }
+
+          try {
+              const success = await this.plugin.chatManager.renameFolder(folderNode.path, newFolderPath);
+              if (success) {
+                  new Notice(`Folder renamed to "${trimmedName}".`);
+                  if (this.folderExpansionState.has(folderNode.path)) {
+                      const wasExpanded = this.folderExpansionState.get(folderNode.path);
+                      this.folderExpansionState.delete(folderNode.path);
+                      this.folderExpansionState.set(newFolderPath, wasExpanded!);
+                  }
+                  this.updateChatList();
+              } // Помилка в ChatManager
+          } catch (error) {
+              this.plugin.logger.error(`[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`, error);
+              new Notice(`Error renaming folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+          }
+      }).open();
+  };
+
+  private handleDeleteFolder = async (folderNode: FolderNode): Promise<void> => {
+      this.plugin.logger.debug(`[SidebarManager] Delete requested for folder: ${folderNode.path}`);
+      const folderName = folderNode.name;
+      const folderPath = folderNode.path;
+
+       if (folderPath === this.plugin.chatManager.chatsFolderPath) {
+            new Notice("Cannot delete the main chat history folder.");
+            return;
+       }
+
+      new ConfirmModal(
+          this.app,
+          "Delete Folder",
+          `Delete folder "${folderName}" and ALL its contents (subfolders and chats)? This cannot be undone.`,
+          async () => {
+              const notice = new Notice(`Deleting folder "${folderName}"...`, 0);
+              try {
+                  const success = await this.plugin.chatManager.deleteFolder(folderPath);
+                  if (success) {
+                      // Повідомлення про успіх показується в ChatManager
+                      const keysToDelete = Array.from(this.folderExpansionState.keys()).filter(key => key.startsWith(folderPath));
+                      keysToDelete.forEach(key => this.folderExpansionState.delete(key));
+                      this.updateChatList();
+                  } // Помилка в ChatManager
+              } catch (error) {
+                  this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
+                  new Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+              } finally {
+                  notice.hide();
+              }
+          }
+      ).open();
+  };
+
+
+  private showChatContextMenu(event: MouseEvent | PointerEvent, chatMeta: ChatMetadata): void {
+      event.preventDefault();
+      event.stopPropagation();
+      const menu = new Menu();
+
+      menu.addItem(item =>
+          item
+              .setTitle("Clone Chat")
+              .setIcon("lucide-copy-plus")
+              .onClick(() => this.handleContextMenuClone(chatMeta.id))
+      );
+
+      menu.addItem(item =>
+          item
+              .setTitle("Rename Chat")
+              .setIcon("lucide-pencil")
+              .onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
+      );
+
+      menu.addItem(item =>
+          item
+              .setTitle("Export to Note")
+              .setIcon("lucide-download")
+              .onClick(() => this.exportSpecificChat(chatMeta.id))
+      );
+
+      menu.addSeparator();
+
+      menu.addItem(item => {
+          item
+              .setTitle("Clear Messages")
+              .setIcon("lucide-trash")
+              .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
+           // --- ВИДАЛЕНО: Спроба додати клас через DOM ---
+      });
+
+      menu.addItem(item => {
+          item
+              .setTitle("Delete Chat")
+              .setIcon("lucide-trash-2")
+              .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
+          // --- ВИДАЛЕНО: Спроба додати клас через DOM ---
+      });
+
+      menu.showAtMouseEvent(event);
+  }
 
 
   private async handleContextMenuClone(chatId: string): Promise<void> {
@@ -465,12 +683,12 @@ export class SidebarManager {
       const c = await this.plugin.chatManager.cloneChat(chatId);
       if (c) {
         new Notice(`Chat cloned as "${c.metadata.name}"`);
+        // Просто оновлюємо список, щоб відобразити клон
+        this.updateChatList();
         this.plugin.emit("focus-input-request");
-      }
-      // Повідомлення про помилку показується в cloneChat
+      } // Помилка в cloneChat
     } catch (e) {
       this.plugin.logger.error(`Clone error:`, e);
-      // Додаткове повідомлення тут не потрібне
     } finally {
       notice.hide();
     }
@@ -478,107 +696,118 @@ export class SidebarManager {
 
   private async handleContextMenuRename(chatId: string, currentName: string): Promise<void> {
     this.plugin.logger.info(`[SidebarManager Context] Rename requested for chat ${chatId}`);
-    new PromptModal(this.app, "Rename Chat", `New name for "${currentName}":`, currentName, async n => {
-      const t = n?.trim();
-      if (t && t !== "" && t !== currentName) {
-        const s = await this.plugin.chatManager.renameChat(chatId, t);
-        // Повідомлення про успіх/невдачу показуються в renameChat
+    new PromptModal(this.app, "Rename Chat", `New name for "${currentName}":`, currentName, async newName => {
+      const trimmedName = newName?.trim();
+      if (!trimmedName || trimmedName === currentName) {
+           new Notice(trimmedName === currentName ? `Name unchanged.` : `Rename cancelled.`);
+      } else if (/[\\/?:*"<>|]/.test(trimmedName)) {
+           new Notice("Chat name contains invalid characters.");
       } else {
-        new Notice(t === currentName ? `Name unchanged.` : `Rename cancelled.`);
+           const success = await this.plugin.chatManager.renameChat(chatId, trimmedName);
+           if (success) {
+                this.updateChatList();
+           } // Помилка в renameChat
       }
-       this.plugin.emit("focus-input-request"); // Фокусуємо поле вводу після дії
+       this.plugin.emit("focus-input-request");
     }).open();
   }
 
-  private async exportSpecificChat(chatId: string): Promise<void> {
-    this.plugin.logger.info(`[SidebarManager Context] Export requested for chat ${chatId}`);
-    const notice = new Notice(`Exporting chat...`, 0);
-    try {
-      const chat = await this.plugin.chatManager.getChat(chatId);
-      if (!chat || chat.messages.length === 0) {
-        new Notice("Chat is empty or not found, nothing to export.");
-        return;
-      }
-      // Використовуємо метод форматування з this
-      const md = this.formatChatToMarkdown(chat.messages, chat.metadata);
-      const ts = new Date().toISOString().replace(/[:.]/g, "-");
-      const safeName = chat.metadata.name.replace(/[\\/?:*"<>|]/g, "-");
-      const filename = `ollama-chat-${safeName}-${ts}.md`;
+    private async exportSpecificChat(chatId: string): Promise<void> {
+        this.plugin.logger.info(`[SidebarManager Context] Export requested for chat ${chatId}`);
+        const notice = new Notice(`Exporting chat...`, 0);
+        try {
+            const chat = await this.plugin.chatManager.getChat(chatId);
+            if (!chat || chat.messages.length === 0) {
+                new Notice("Chat is empty or not found, nothing to export.");
+                notice.hide(); // Важливо сховати notice тут
+                return;
+            }
 
-      let fPath = this.plugin.settings.chatExportFolderPath?.trim();
-      let fFolder: TFolder | null = null;
-      // ... (логіка визначення папки як була) ...
-       if (fPath) {
-        fPath = normalizePath(fPath);
-        const af = this.app.vault.getAbstractFileByPath(fPath);
-        if (!af) {
-          try {
-            await this.app.vault.createFolder(fPath);
-            fFolder = this.app.vault.getAbstractFileByPath(fPath) as TFolder;
-            if (fFolder) new Notice(`Created export folder: ${fPath}`);
-          } catch (err) {
-            this.plugin.logger.error("Folder creation error:", err);
-            new Notice(`Folder error. Saving to root.`);
-            fFolder = this.app.vault.getRoot();
-          }
-        } else if (af instanceof TFolder) {
-          fFolder = af;
-        } else {
-          new Notice(`Path not folder. Saving to root.`);
-          fFolder = this.app.vault.getRoot();
+            const md = this.formatChatToMarkdown(chat.messages, chat.metadata);
+            const ts = new Date().toISOString().replace(/[:.]/g, "-");
+            const safeName = chat.metadata.name.replace(/[\\/?:*"<>|]/g, "-");
+            const filename = `ollama-chat-${safeName}-${ts}.md`;
+
+            let fPath = this.plugin.settings.chatExportFolderPath?.trim();
+            let fFolder: TFolder | null = null;
+
+            if (fPath) {
+                fPath = normalizePath(fPath);
+                const af = this.app.vault.getAbstractFileByPath(fPath);
+                if (!af) {
+                    try {
+                        await this.app.vault.createFolder(fPath);
+                        const newAf = this.app.vault.getAbstractFileByPath(fPath);
+                        if (newAf instanceof TFolder) {
+                            fFolder = newAf;
+                            new Notice(`Created export folder: ${fPath}`);
+                        } else {
+                             throw new Error("Failed to get created folder.");
+                        }
+                    } catch (err) {
+                        this.plugin.logger.error("Folder creation error during export:", err);
+                        new Notice(`Export folder error. Saving to vault root.`);
+                        fFolder = this.app.vault.getRoot();
+                    }
+                } else if (af instanceof TFolder) {
+                    fFolder = af;
+                } else {
+                    new Notice(`Export path is not a folder. Saving to vault root.`);
+                    fFolder = this.app.vault.getRoot();
+                }
+            } else {
+                fFolder = this.app.vault.getRoot();
+            }
+
+            if (!fFolder) {
+                this.plugin.logger.error("Target folder for export could not be determined.");
+                new Notice("Export folder error.");
+                // Не забуваємо сховати notice перед виходом
+                notice.hide();
+                return;
+            }
+
+            const filePath = normalizePath(`${fFolder.path}/${filename}`);
+            const file = await this.app.vault.create(filePath, md);
+            new Notice(`Chat exported to ${file.path}`);
+
+        } catch (e) {
+            this.plugin.logger.error(`Chat export error:`, e);
+            new Notice("Chat export failed.");
+        } finally {
+            notice.hide(); // Ховаємо notice у будь-якому випадку
         }
-      } else {
-        fFolder = this.app.vault.getRoot();
-      }
-      if (!fFolder) {
-        this.plugin.logger.error("Target folder error.");
-        new Notice("Export folder error.");
-        return;
-      }
-      const filePath = normalizePath(`${fFolder.path}/${filename}`);
-      const file = await this.app.vault.create(filePath, md);
-      new Notice(`Exported to ${file.path}`);
-    } catch (e) {
-      this.plugin.logger.error(`Export error:`, e);
-      new Notice("Export failed.");
-    } finally {
-      notice.hide();
     }
-  }
+
 
   private async handleContextMenuClear(chatId: string, chatName: string): Promise<void> {
     this.plugin.logger.debug(`[SidebarManager Context] Clear requested for chat ${chatId}`);
-    new ConfirmModal(this.app, "Clear Messages", `Clear messages in "${chatName}"?`, async () => {
-      const n = new Notice("Clearing...", 0);
+    new ConfirmModal(this.app, "Clear Messages", `Clear all messages in "${chatName}"?`, async () => {
+      const notice = new Notice("Clearing messages...", 0);
       try {
-        const s = await this.plugin.chatManager.clearChatMessagesById(chatId);
-         new Notice(s ? `Messages cleared for "${chatName}".` : `Failed to clear messages for "${chatName}".`);
-         // UI активного чату оновиться через подію, якщо він був активним
+        const success = await this.plugin.chatManager.clearChatMessagesById(chatId);
+        // Повідомлення в clearChatMessagesById
       } catch (e) {
-        this.plugin.logger.error(`Clear error:`, e);
-        new Notice("Clear failed.");
+        this.plugin.logger.error(`Clear messages error:`, e);
+        new Notice("Failed to clear messages.");
       } finally {
-        n.hide();
+        notice.hide();
       }
     }).open();
   }
 
   private async handleContextMenuDelete(chatId: string, chatName: string): Promise<void> {
     this.plugin.logger.debug(`[SidebarManager Context] Delete requested for chat ${chatId}`);
-    new ConfirmModal(this.app, "Delete Chat", `Delete chat "${chatName}"?`, async () => {
-      const n = new Notice("Deleting...", 0);
+    new ConfirmModal(this.app, "Delete Chat", `Delete chat "${chatName}"? This cannot be undone.`, async () => {
+      const notice = new Notice("Deleting chat...", 0);
       try {
-        const s = await this.plugin.chatManager.deleteChat(chatId);
-         // Повідомлення про успіх/невдачу показується в deleteChat
-         if (s) {
-             // Можна додати додаткове сповіщення, якщо потрібно
-             // new Notice(`Chat "${chatName}" deleted.`);
-         }
+        const success = await this.plugin.chatManager.deleteChat(chatId);
+        // Повідомлення в deleteChat
       } catch (e) {
-        this.plugin.logger.error(`Delete error:`, e);
-        new Notice("Delete failed.");
+        this.plugin.logger.error(`Delete chat error:`, e);
+        new Notice("Failed to delete chat.");
       } finally {
-        n.hide();
+        notice.hide();
       }
     }).open();
   }
@@ -599,17 +828,31 @@ export class SidebarManager {
     markdown += `***\n\n`;
 
     messagesToFormat.forEach(message => {
-      if (!message.content?.trim()) return;
-
-      // --- Date Separator Logic ---
-      if (localLastDate === null || !this.isSameDay(localLastDate, message.timestamp)) {
-        if (localLastDate !== null) markdown += `***\n\n`; // Add separator only *between* days
-        markdown += `**${this.formatDateSeparator(message.timestamp)}**\n***\n\n`;
-        localLastDate = message.timestamp; // Update last date
+      if (!message || !message.content?.trim() || !message.timestamp) {
+         this.plugin.logger.warn("[formatChatToMarkdown] Skipping invalid message:", message);
+         return;
       }
-      // --------------------------
+      let messageTimestamp: Date;
+      if (typeof message.timestamp === 'string') {
+           messageTimestamp = new Date(message.timestamp);
+      } else if (message.timestamp instanceof Date) {
+           messageTimestamp = message.timestamp;
+      } else {
+            this.plugin.logger.warn("[formatChatToMarkdown] Invalid timestamp type in message:", message);
+            return;
+      }
+       if (isNaN(messageTimestamp.getTime())) {
+            this.plugin.logger.warn("[formatChatToMarkdown] Invalid timestamp value in message:", message);
+            return;
+       }
 
-      const time = this.formatTime(message.timestamp);
+      if (localLastDate === null || !this.isSameDay(localLastDate, messageTimestamp)) {
+        if (localLastDate !== null) markdown += `***\n\n`;
+        markdown += `**${this.formatDateSeparator(messageTimestamp)}**\n***\n\n`;
+        localLastDate = messageTimestamp;
+      }
+
+      const time = this.formatTime(messageTimestamp);
       let prefix = "";
       let contentPrefix = "";
       let content = message.content.trim();
@@ -618,7 +861,8 @@ export class SidebarManager {
         try {
           content = RendererUtils.decodeHtmlEntities(content);
           if (RendererUtils.detectThinkingTags(content).hasThinkingTags) {
-            content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+            content = content.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim();
+             content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
           }
         } catch (e) {
           this.plugin.logger.warn("Error processing assistant content for export:", e);
@@ -637,16 +881,18 @@ export class SidebarManager {
           prefix = `> [!ERROR] Error (${time}):\n> `;
           contentPrefix = "> ";
           break;
+        default:
+            this.plugin.logger.warn(`[formatChatToMarkdown] Unknown message role: ${message.role}`);
+            prefix = `**${message.role} (${time}):**\n`;
+            break;
       }
       markdown += prefix;
       if (contentPrefix) {
         markdown += content.split("\n").map((line: string) => (line.trim() ? `${contentPrefix}${line}` : contentPrefix.trim())).join(`\n`) + "\n\n";
       } else if (content.includes("```")) {
-        // Ensure blank lines around code blocks
-        content = content.replace(/(\r?\n)*```/g, "\n\n```").replace(/```(\r?\n)*/g, "```\n\n");
-        markdown += content.trim() + "\n\n";
+        content = content.replace(/(\r?\n)*```/g, "\n\n```").replace(/```(\r?\n)*/g, "```\n\n").trim();
+        markdown += content + "\n\n";
       } else {
-        // Preserve line breaks within normal messages
         markdown += content.split("\n").map((line: string) => line.trim() ? line : "").join("\n") + "\n\n";
       }
     });
@@ -655,7 +901,7 @@ export class SidebarManager {
 
   private formatTime(date: Date): string {
     if (!(date instanceof Date) || isNaN(date.getTime())) return "??:??";
-    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", hour12: false });
   }
 
   private formatDateSeparator(date: Date): string {
@@ -667,37 +913,42 @@ export class SidebarManager {
     if (this.isSameDay(date, now)) return "Today";
     if (this.isSameDay(date, yesterday)) return "Yesterday";
 
-    // Check if the date was within the last week (excluding today and yesterday)
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfGivenDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diffDays = Math.floor((startOfToday.getTime() - startOfGivenDate.getTime()) / (1000 * 60 * 60 * 24));
+
     if (diffDays > 1 && diffDays < 7) {
-         return date.toLocaleDateString(undefined, { weekday: 'long' }); // e.g., "Monday"
+         return date.toLocaleDateString(undefined, { weekday: 'long' });
     }
 
-    // Older dates
     return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
 
   private formatRelativeDate(date: Date): string {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
-      this.plugin.logger.warn("[formatRelativeDate] Invalid Date");
+      this.plugin.logger.warn("[formatRelativeDate] Invalid Date received");
       return "Invalid date";
     }
     const now = new Date();
     const diffSeconds = Math.round((now.getTime() - date.getTime()) / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
 
     if (diffSeconds < 5) return "Just now";
     if (diffSeconds < 60) return `${diffSeconds}s ago`;
-    const diffMinutes = Math.floor(diffSeconds / 60);
     if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 2) return `1h ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays}d ago`;
 
-    // Use a more compact date format for older dates
-    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    return date.toLocaleDateString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+    });
   }
 
   private isSameDay(date1: Date, date2: Date): boolean {
@@ -711,8 +962,7 @@ export class SidebarManager {
 
   public destroy(): void {
     this.plugin.logger.debug("[SidebarManager] Destroying...");
-    // Видалення кореневого елемента, якщо він існує
     this.containerEl?.remove();
-     // Явне видалення слухачів не потрібне, якщо використовується this.view.registerDomEvent
+    this.folderExpansionState.clear();
   }
 }
