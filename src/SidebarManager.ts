@@ -153,56 +153,75 @@ export class SidebarManager {
     activeChatId: string | null,
     activeAncestorPaths: Set<string>
 ): void {
-    // Створюємо зовнішній div для елемента з класом рівня
+    // Зовнішній елемент з відступом
     const itemEl = parentElement.createDiv({
         cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
     });
-    // Додаємо data-path для папок
     if (node.type === 'folder') {
-        itemEl.dataset.path = node.path;
+         itemEl.addClass(CSS_FOLDER_ITEM);
+         itemEl.dataset.path = node.path;
+         if (activeAncestorPaths.has(node.path)) { itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR); }
+         const isExpanded = this.folderExpansionState.get(node.path) ?? false;
+         if (!isExpanded) { itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED); }
+    } else {
+         itemEl.addClass(CSS_CHAT_ITEM);
+         if (node.metadata.id === activeChatId) { itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); }
     }
 
-    // Внутрішній контейнер - ЦЕЙ МАЄ БУТИ FLEX
+    // Внутрішній контейнер - FLEX
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
 
-    // --- Створюємо ТІЛЬКИ ІКОНКУ І ТЕКСТ для тесту ---
+    // --- Елементи всередині itemContentEl ---
 
     // 1. Іконка
     const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
     if (node.type === 'folder') {
-        itemEl.addClass(CSS_FOLDER_ITEM); // Додаємо клас тут
         const isExpanded = this.folderExpansionState.get(node.path) ?? false;
-        if (!isExpanded) { itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED); }
-        if (activeAncestorPaths.has(node.path)) { itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR); }
         setIcon(iconEl, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
     } else {
-        itemEl.addClass(CSS_CHAT_ITEM); // Додаємо клас тут
         const isActive = node.metadata.id === activeChatId;
-        if (isActive) { itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); }
         setIcon(iconEl, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
     }
 
     // 2. Текст
     itemContentEl.createSpan({
          cls: CSS_HIERARCHY_ITEM_TEXT,
-         // --- ВИПРАВЛЕННЯ: Перевіряємо тип вузла ---
          text: node.type === 'folder' ? node.name : node.metadata.name
-         // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
     });
 
-    // --- КІНЕЦЬ СПРОЩЕННЯ ---
+    // 3. Деталі (Дата) - ПОКИ ЩО НЕ ДОДАЄМО
 
-    // Додаємо обробники подій (клік для розгортання/активації, контекстне меню)
+    // 4. Кнопка Опцій (...) - ПОВЕРТАЄМО
+    const optionsBtn = itemContentEl.createEl("button", {
+        cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+        // Використовуємо різні aria-label для доступності
+        attr: { "aria-label": node.type === 'folder' ? "Folder options" : "Chat options", title: "More options" },
+    });
+    setIcon(optionsBtn, "lucide-more-horizontal");
+    // Додаємо обробник кліку для кнопки опцій
+    if (node.type === 'folder') {
+         this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showFolderContextMenu(e, node); });
+    } else {
+         this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showChatContextMenu(e, node.metadata); });
+    }
+    // --- КІНЕЦЬ ПОВЕРНЕННЯ КНОПКИ ---
+
+
+    // --- КІНЕЦЬ Елементів всередині itemContentEl ---
+
+
+    // Додаємо обробники подій до itemContentEl
     if (node.type === 'folder') {
         this.view.registerDomEvent(itemContentEl, 'click', () => { this.handleToggleFolder(node.path); });
         this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); this.showFolderContextMenu(e, node); });
-        // Створюємо контейнер для дітей, але не заповнюємо його в спрощеній версії
+         // Створюємо контейнер для дітей, але не заповнюємо його поки що
          itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
     } else {
-        this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => { if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; } if (node.metadata.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(node.metadata.id); } });
-        this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => { e.preventDefault(); this.showChatContextMenu(e, node.metadata); });
+         this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => { if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; } if (node.metadata.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(node.metadata.id); } });
+         this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => { e.preventDefault(); this.showChatContextMenu(e, node.metadata); });
     }
 }
+
 
   // --- handleToggleFolder без змін ---
   private handleToggleFolder(folderPath: string): void {

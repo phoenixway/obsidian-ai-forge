@@ -2182,39 +2182,56 @@ var SidebarManager = class {
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths) {
-    var _a;
+    var _a, _b;
     const itemEl = parentElement.createDiv({
       cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
     });
     if (node.type === "folder") {
-      itemEl.dataset.path = node.path;
-    }
-    const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
-    const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-    if (node.type === "folder") {
       itemEl.addClass(CSS_FOLDER_ITEM);
+      itemEl.dataset.path = node.path;
+      if (activeAncestorPaths.has(node.path)) {
+        itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
+      }
       const isExpanded = (_a = this.folderExpansionState.get(node.path)) != null ? _a : false;
       if (!isExpanded) {
         itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
       }
-      if (activeAncestorPaths.has(node.path)) {
-        itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
-      }
-      (0, import_obsidian12.setIcon)(iconEl, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
     } else {
       itemEl.addClass(CSS_CHAT_ITEM);
-      const isActive = node.metadata.id === activeChatId;
-      if (isActive) {
+      if (node.metadata.id === activeChatId) {
         itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
       }
+    }
+    const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+    const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+    if (node.type === "folder") {
+      const isExpanded = (_b = this.folderExpansionState.get(node.path)) != null ? _b : false;
+      (0, import_obsidian12.setIcon)(iconEl, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
+    } else {
+      const isActive = node.metadata.id === activeChatId;
       (0, import_obsidian12.setIcon)(iconEl, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
     }
     itemContentEl.createSpan({
       cls: CSS_HIERARCHY_ITEM_TEXT,
-      // --- ВИПРАВЛЕННЯ: Перевіряємо тип вузла ---
       text: node.type === "folder" ? node.name : node.metadata.name
-      // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
     });
+    const optionsBtn = itemContentEl.createEl("button", {
+      cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+      // Використовуємо різні aria-label для доступності
+      attr: { "aria-label": node.type === "folder" ? "Folder options" : "Chat options", title: "More options" }
+    });
+    (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
+    if (node.type === "folder") {
+      this.view.registerDomEvent(optionsBtn, "click", (e) => {
+        e.stopPropagation();
+        this.showFolderContextMenu(e, node);
+      });
+    } else {
+      this.view.registerDomEvent(optionsBtn, "click", (e) => {
+        e.stopPropagation();
+        this.showChatContextMenu(e, node.metadata);
+      });
+    }
     if (node.type === "folder") {
       this.view.registerDomEvent(itemContentEl, "click", () => {
         this.handleToggleFolder(node.path);
