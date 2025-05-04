@@ -16,7 +16,7 @@
     box-sizing: border-box;
     padding: var(--size-4-2); // Невеликий відступ
     margin-right: var(--size-4-2); // Відступ від чату
-    transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin 0.25s ease-out, border 0.25s ease-out;
+    transition: width 0.24s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin 0.25s ease-out, border 0.25s ease-out;
 
     // Separator BETWEEN accordion sections (direct child)
     // Селектор > hr підійде, якщо hr додається напряму в containerEl
