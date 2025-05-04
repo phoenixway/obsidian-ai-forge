@@ -1879,6 +1879,7 @@ var CSS_HIERARCHY_ITEM_TEXT = "ollama-hierarchy-item-text";
 var CSS_CHAT_ITEM_DETAILS = "ollama-chat-item-details";
 var CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
 var CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
+var CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
 var CSS_PLACEHOLDER_ICON = "ollama-placeholder-icon";
 var COLLAPSE_ICON_ROLE = "lucide-folder";
 var EXPAND_ICON_ROLE = "lucide-folder-open";
@@ -2194,7 +2195,7 @@ var SidebarManager = class {
   renderHierarchyNode(node, parentElement, level, activeChatId) {
     var _a;
     const itemEl = parentElement.createDiv({
-      cls: [CSS_HIERARCHY_ITEM, `<span class="math-inline">{CSS_HIERARCHY_INDENT_PREFIX}</span>{level}`]
+      cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
     });
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
     if (node.type === "folder") {
@@ -2231,8 +2232,6 @@ var SidebarManager = class {
       const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
       if (isExpanded && node.children.length > 0) {
         node.children.forEach((childNode) => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId));
-      } else if (isExpanded && node.children.length === 0) {
-        childrenContainer.createDiv({ text: "Empty", cls: "menu-info-text ollama-empty-folder-text" });
       }
     } else if (node.type === "chat") {
       itemEl.addClass(CSS_CHAT_ITEM);

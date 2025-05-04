@@ -199,7 +199,7 @@ export class SidebarManager {
 
   private renderHierarchyNode(node: HierarchyNode, parentElement: HTMLElement, level: number, activeChatId: string | null): void {
     const itemEl = parentElement.createDiv({
-        cls: [CSS_HIERARCHY_ITEM, `<span class="math-inline">\{CSS\_HIERARCHY\_INDENT\_PREFIX\}</span>{level}`]
+        cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
     });
 
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
@@ -211,7 +211,6 @@ export class SidebarManager {
             itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
         }
 
-        // Іконка розгортання/згортання
         const toggleIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, "clickable-icon"] });
         setIcon(toggleIcon, isExpanded ? EXPAND_ICON_FOLDER : COLLAPSE_ICON_FOLDER);
         this.view.registerDomEvent(toggleIcon, 'click', (e) => {
@@ -219,14 +218,11 @@ export class SidebarManager {
             this.handleToggleFolder(node.path);
         });
 
-        // Іконка папки
         const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
         setIcon(folderIcon, FOLDER_ICON);
 
-        // Назва папки
         itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
 
-        // Кнопка "..." для опцій папки
         const optionsBtn = itemContentEl.createEl("button", {
             cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
             attr: { "aria-label": "Folder options", title: "More options" },
@@ -249,11 +245,15 @@ export class SidebarManager {
         const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
         if (isExpanded && node.children.length > 0) {
             node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId));
-        } else if (isExpanded && node.children.length === 0) {
-             childrenContainer.createDiv({ text: "Empty", cls: "menu-info-text ollama-empty-folder-text" });
         }
+        // --- ВИДАЛЕНО АБО ЗАКОМЕНТОВАНО БЛОК ДЛЯ "Empty" ---
+        // else if (isExpanded && node.children.length === 0) {
+        //      // childrenContainer.createDiv({ text: "Empty", cls: "menu-info-text ollama-empty-folder-text" });
+        // }
+        // ---
 
     } else if (node.type === 'chat') {
+        // ... (код для рендерингу чату без змін) ...
         itemEl.addClass(CSS_CHAT_ITEM);
         const chatMeta = node.metadata;
         const isActive = chatMeta.id === activeChatId;
@@ -261,20 +261,10 @@ export class SidebarManager {
         if (isActive) {
             itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
         }
-
-        // --- ДОДАНО: Іконка-розпірка для вирівнювання ---
-        // Додаємо порожній span з тими ж класами розміру/відступу, що й toggleIcon папки
         itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, CSS_PLACEHOLDER_ICON] });
-        // ---
-
-        // Іконка чату (активна чи звичайна)
-        const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON }); // Використовуємо той самий клас для вирівнювання
+        const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
         setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
-
-        // Назва чату
         itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
-
-        // Деталі чату (дата)
         const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
          try {
               const lastModifiedDate = new Date(chatMeta.lastModified);
@@ -289,34 +279,24 @@ export class SidebarManager {
                this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
                detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
          }
-
-        // Кнопка "..." для опцій чату
         const optionsBtn = itemContentEl.createEl("button", {
             cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
             attr: { "aria-label": "Chat options", title: "More options" },
         });
         setIcon(optionsBtn, "lucide-more-horizontal");
-
         this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => {
-            if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
-                return;
-            }
-            if (chatMeta.id !== activeChatId) {
-                await this.plugin.chatManager.setActiveChat(chatMeta.id);
-            }
+            if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; }
+            if (chatMeta.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(chatMeta.id); }
         });
-
         this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
-            e.stopPropagation();
-            this.showChatContextMenu(e, chatMeta);
+            e.stopPropagation(); this.showChatContextMenu(e, chatMeta);
         });
-
         this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => {
-            e.preventDefault();
-            this.showChatContextMenu(e, chatMeta);
+            e.preventDefault(); this.showChatContextMenu(e, chatMeta);
         });
     }
 }
+
 
   private handleToggleFolder(folderPath: string): void {
       const currentState = this.folderExpansionState.get(folderPath) ?? false;
