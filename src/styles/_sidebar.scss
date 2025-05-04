@@ -181,7 +181,7 @@ $icon-margin: 8px; // Gap
   }
 
   ////////////////////////
-  .ollama-hierarchy-item-content {
+  > .ollama-hierarchy-item-content {
     display: flex !important; // <--- Головне правило для тесту
     align-items: center !important; // <--- Вирівнювання
     width: 100%;
