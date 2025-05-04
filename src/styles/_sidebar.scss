@@ -162,8 +162,7 @@
     @for $i from 0 through 10 {
       &.ollama-indent-level-#{$i} {
         // Цей padding визначає позицію ПОЧАТКУ всього елемента (включаючи іконку)
-        padding-left: 30px;
-        // $item-padding-horizontal + ($i * $indent-step);
+        padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
       }
     }
 
