@@ -4,7 +4,11 @@
 // --- Змінні для тесту ---
 $indent-step: 18px;
 $item-padding-vertical: 4px;
-$item-padding-horizontal: 8px;
+// $item-padding-horizontal: 8px;
+
+// $item-padding-vertical: var(--size-4-1);
+$item-padding-horizontal: var(--size-4-2);
+
 $icon-size: 16px;
 $icon-margin: var(--size-4-2);
 $folder-icon-extra-indent: 5px; // На скільки іконка папки правіше іконки чату
