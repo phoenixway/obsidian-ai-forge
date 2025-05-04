@@ -68,6 +68,14 @@ $icon-margin: 8px; // Gap
   &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
   &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); }
 
+  .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
+    margin: 1px 0;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    position: relative;
+    padding-left: 0; // Базовий скидається
+  }
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////
