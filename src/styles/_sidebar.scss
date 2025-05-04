@@ -30,6 +30,13 @@ $icon-margin: 8px; // Gap
       overflow: hidden !important; pointer-events: none !important;
   }
 }
+
+.ollama-chat-panel,
+.ollama-role-panel {
+    display: flex; flex-direction: column;
+    &.ollama-role-panel { flex-shrink: 0; }
+}
+
 .ollama-chat-list-container {
      // border: 1px solid magenta; // Рамка списку
 }
