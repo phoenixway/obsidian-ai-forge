@@ -123,8 +123,8 @@ $icon-margin: 8px; // Gap
   padding: 0 var(--size-4-2);
   min-height: 0;
   //FIXME: key place
-  // opacity: 0;
-  // overflow: hidden;
+  opacity: 0;
+  overflow: hidden;
   max-height: 0;
 
   &.is-expanded {
