@@ -2,33 +2,30 @@
 // Styles for the Ollama sidebar panel and its accordion sections
 
 // --- Sidebar Panel (Hosts Accordion) ---
-// ЗМІНЕНО СЕЛЕКТОР
 .ollama-sidebar-container {
     display: flex;
-    flex-direction: column; // Vertical layout for headers and content sections
-    width: var(--ai-forge-sidebar-width, 250px); // Sidebar width
-    min-width: var(--ai-forge-sidebar-width, 250px); // Prevent shrinking below width
-    flex-shrink: 0; // Prevent shrinking
+    flex-direction: column;
+    width: var(--ai-forge-sidebar-width, 250px);
+    min-width: var(--ai-forge-sidebar-width, 250px);
+    flex-shrink: 0;
     background-color: var(--background-secondary);
     border-right: 1px solid var(--divider-color);
-    height: 100%; // Take full height of parent container
-    overflow: hidden; // Panel itself DOES NOT scroll
+    height: 100%;
+    overflow: hidden; // Панель сама не скролиться
     box-sizing: border-box;
-    padding: var(--size-4-2); // Невеликий відступ
-    margin-right: var(--size-4-2); // Відступ від чату
+    padding: var(--size-4-2);
+    margin-right: var(--size-4-2);
     transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin 0.25s ease-out, border 0.25s ease-out;
 
-    // Separator BETWEEN accordion sections (direct child)
-    // Селектор > hr підійде, якщо hr додається напряму в containerEl
-     > hr.menu-separator {
-         margin: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 1.5);
-         border: none;
-         border-top: 1px solid var(--divider-color);
-         height: 0;
-         flex-shrink: 0;
-    }
+    // Роздільник між секціями (якщо він потрібен як прямий нащадок)
+    // > hr.menu-separator {
+    //     margin: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 1.5);
+    //     border: none;
+    //     border-top: 1px solid var(--divider-color);
+    //     height: 0;
+    //     flex-shrink: 0;
+    // }
 
-    // --- ДОДАНО ПРАВИЛО ПРИХОВУВАННЯ ---
     // Стилі для прихованого стану (коли view у бічній панелі Obsidian)
     &.internal-sidebar-hidden {
         width: 0 !important;
@@ -40,35 +37,37 @@
         overflow: hidden !important;
         pointer-events: none !important;
     }
-    // --- КІНЕЦЬ ДОДАНОГО ПРАВИЛА ---
 }
 // --- End Sidebar Panel ---
 
 
 // --- Sidebar Accordion Sections ---
 
-// Обгортки секцій (якщо ви їх використовуєте, як у попередньому TS коді)
+// Обгортки секцій
 .ollama-chat-panel,
 .ollama-role-panel {
     display: flex;
     flex-direction: column;
+    // Додамо flex-shrink: 0 для секції ролей, щоб вона не стискалася при розгортанні чатів
+    &.ollama-role-panel {
+      flex-shrink: 0;
+    }
 }
 
 
-// Header for collapsible sections (Chats, Roles)
+// Заголовок секції, що згортається (Chats, Roles)
 .ollama-sidebar-section-header {
-    // Inherits .menu-option class from TS for base clickable style
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 1.5)
-               calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 2.5);
+    align-items: center; // Змінено на center для кращого вирівнювання іконок
+    padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3); // Змінено відступи для консистентності
     user-select: none;
     cursor: pointer;
     flex-shrink: 0;
     position: relative;
     border-radius: var(--radius-s);
-    margin: 1px calc(var(--chat-spacing-unit) * 1);
+    margin: 1px 0; // Змінено маржин
+    min-height: var(--nav-item-size); // Висота як у стандартних елементів Obsidian
 
     &:hover {
       background-color: var(--background-modifier-hover);
@@ -76,31 +75,33 @@
 
     .ollama-sidebar-header-left {
         display: flex;
-        align-items: baseline;
+        align-items: center; // Змінено на center
         overflow: hidden;
-        margin-right: var(--chat-spacing-unit);
+        margin-right: var(--size-4-2);
+        gap: var(--size-4-3); // Проміжок між іконкою та текстом
     }
 
     .ollama-sidebar-section-icon {
-        margin-right: 14px;
-        min-width: 18px;
+        //margin-right: 14px; // Замінено на gap
+        min-width: 18px; // Залишаємо для гарантії місця
         display: inline-flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
 
         .svg-icon {
-            width: 16px;
-            height: 16px;
-            color: var(--text-faint);
+            width: 18px; // Трохи більша іконка
+            height: 18px;
+            color: var(--text-faint); // Використовуємо faint за замовчуванням
         }
     }
     &:hover .ollama-sidebar-section-icon .svg-icon {
-        color: var(--text-muted);
+        color: var(--text-muted); // При наведенні - muted
     }
 
     .menu-option-text {
-        font-weight: 500;
+        font-weight: var(--nav-item-font-weight); // Використовуємо стандартну вагу
+        font-size: var(--nav-item-size); // Стандартний розмір
         color: var(--text-normal);
         line-height: 1.2;
         white-space: nowrap;
@@ -108,162 +109,312 @@
         text-overflow: ellipsis;
     }
 
-    .ollama-sidebar-header-button {
-        padding: 2px;
-        margin-left: auto;
+    // Контейнер для кнопок дій праворуч
+    .ollama-sidebar-header-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--size-4-1); // Невеликий проміжок між кнопками
+        margin-left: auto; // Притискає до правого краю
         flex-shrink: 0;
+    }
+
+    // Стилі для кнопок в заголовку (New Chat, New Folder)
+    .ollama-sidebar-header-button {
+        // Наслідуємо стилі clickable-icon
+        // Додаємо специфічні налаштування, якщо потрібно
+        padding: var(--size-4-1);
         color: var(--text-muted);
-        opacity: 0.7;
-        background: none; border: none; box-shadow: none;
+        border-radius: var(--radius-s);
+        display: flex; // Для вирівнювання іконки
+        align-items: center;
+        justify-content: center;
 
         &:hover {
             color: var(--text-normal);
-            opacity: 1;
             background-color: var(--background-modifier-hover);
         }
-        .svg-icon { width: 18px; height: 18px; }
+        .svg-icon {
+            width: 18px; // Розмір іконки кнопки
+            height: 18px;
+        }
     }
 }
 
-// Content area for collapsible sections (holds the lists)
+// Контейнер для вмісту секції (список чатів/ролей)
 .ollama-sidebar-section-content {
-    overflow: hidden;
-    max-height: 0; // Collapsed by default
+    overflow: hidden; // Приховує вміст при анімації
+    max-height: 0; // Згорнуто за замовчуванням
     transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
     box-sizing: border-box;
-    padding: 0 calc(var(--chat-spacing-unit) * 1.5);
+    padding: 0 var(--size-4-2); // Горизонтальний відступ як у заголовка
     min-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    opacity: 0; // Починаємо прозорим
+    opacity: 0;
 
-    // Expanded state
+    // Розгорнутий стан
     &.is-expanded {
-        max-height: 70vh; // Limit height
-        overflow-y: auto; // Enable scroll if needed
+        // Обмежуємо висоту, щоб уникнути надмірного розтягування
+        // Використання flex-grow: 1 для .ollama-chat-panel може бути кращим підходом,
+        // якщо .ollama-sidebar-container є flex-контейнером
+        max-height: 75vh; // Або інше значення, або flex-розрахунок
+        overflow-y: auto; // Вмикаємо скрол, якщо вміст не влазить
         padding-top: var(--size-4-1);
         padding-bottom: var(--size-4-1);
-        opacity: 1; // Make visible
+        opacity: 1;
+        // Додаємо flex-grow, якщо це можливо у вашій структурі
+        // flex-grow: 1;
     }
 
-    // Scrollbar styling
+    // Стилізація скролбару
     &::-webkit-scrollbar { width: 6px; }
     &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
     &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent-translucent); }
+    &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); } // Яскравіший колір при наведенні
 
-    // --- Styles for elements INSIDE the content lists ---
-    .ollama-role-panel-item,
-    .ollama-chat-list-item { // Використовуємо більш специфічний клас для чатів
-        &.menu-option {
-            display: flex;
-            align-items: center;
-            padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 1.5);
-            margin: 1px 0;
-            cursor: pointer;
-            border-radius: var(--radius-s);
-            position: relative; // Для позиціонування кнопки "..."
-
-            &:hover {
-                background-color: var(--background-modifier-hover);
-            }
-
-            .menu-option-icon {
-                margin-right: 10px;
-                min-width: 16px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                flex-shrink: 0;
-                .svg-icon { width: 15px; height: 15px; }
-            }
-
-            .menu-option-text { // Для ролей
-                font-size: calc(var(--font-ui-small) * 0.95);
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                flex-grow: 1;
-            }
-
-            &.is-active {
-                background-color: var(--interactive-accent-translucent);
-                .menu-option-icon { color: var(--interactive-accent); }
-                &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
-            }
-            &.is-custom .menu-option-icon:not(:has(.svg-icon[icon-name="check"])) {
-                color: var(--text-faint);
-            }
-
-            // Специфічно для елементів списку чатів
-            .ollama-chat-item-text-wrapper {
-                display: flex;
-                flex-direction: column;
-                flex-grow: 1;
-                overflow: hidden;
-                margin-right: 28px; // Збільшуємо відступ справа для кнопки "..."
-                line-height: 1.3;
-                gap: 1px;
-
-                 .chat-panel-item-name {
-                     font-size: calc(var(--font-ui-small) * 0.95);
-                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                 }
-                 .chat-panel-item-date {
-                     font-size: var(--font-ui-smaller);
-                     color: var(--text-faint);
-                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                     opacity: 0.9;
-                     margin-top: 2px;
-                 }
-            }
-            // Кнопка "..." в елементі чату
-            .ollama-chat-item-options {
-                position: absolute; // Позиціонуємо абсолютно
-                right: calc(var(--chat-spacing-unit) * 1); // Відступ справа
-                top: 50%;
-                transform: translateY(-50%); // Центруємо вертикально
-                padding: 3px; margin: 0; flex-shrink: 0; opacity: 0; // Починаємо невидимою
-                transition: opacity 0.15s ease-in-out; border-radius: var(--radius-s);
-                background: none; border: none; color: var(--text-muted);
-                &:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); }
-                .svg-icon { width: 18px; height: 18px; }
-            }
-            // Показуємо кнопку "..." при наведенні на елемент списку
-            &:hover .ollama-chat-item-options { opacity: 0.7; &:hover { opacity: 1; } }
-
-            // Active state text colors specific to chat item structure
-            &.is-active {
-                 .chat-panel-item-name { color: var(--text-accent-hover); font-weight: 500; }
-                 .chat-panel-item-date { color: var(--text-accent-hover); opacity: 0.8; }
-            }
-
-        }
+    // --- Стилі для елементів списку чатів/папок ---
+    // Застосовуються всередині .ollama-chat-list-container
+    .ollama-chat-list-container {
+      // Можна додати специфічні стилі для самого контейнера, якщо потрібно
     }
 
-    // Empty list message
+    // --- Стилі для ієрархії ---
+    $indent-size: 18px;
+    $item-padding-vertical: var(--size-4-1); // Вертикальний відступ
+    $item-padding-horizontal: var(--size-4-2); // Горизонтальний відступ
+    $icon-size: 16px;
+    $icon-margin: var(--size-4-2);
+
+    // Базовий елемент ієрархії (папка або чат)
+    .ollama-hierarchy-item {
+      margin: 1px 0;
+      border-radius: var(--radius-s);
+      cursor: pointer; // Курсор для всього елемента
+
+      // Відступи рівнів (застосовуємо до внутрішнього контенту)
+      @for $i from 0 through 10 {
+        &.ollama-indent-level-#{$i} > .ollama-hierarchy-item-content {
+          padding-left: $item-padding-horizontal + ($i * $indent-size);
+        }
+      }
+
+      // Ефект наведення
+      &:hover > .ollama-hierarchy-item-content {
+        background-color: var(--background-modifier-hover);
+      }
+    }
+
+    // Контейнер для контенту елемента (іконки, текст, кнопка)
+    .ollama-hierarchy-item-content {
+      display: flex;
+      align-items: center;
+      padding: $item-padding-vertical $item-padding-horizontal;
+      position: relative;
+      min-height: calc($icon-size + 2 * $item-padding-vertical); // Мінімальна висота
+      gap: $icon-margin; // Проміжок між елементами
+      border-radius: inherit; // Наслідує радіус батька
+    }
+
+    // Іконки в ієрархії (розгортання, папка, чат)
+    .ollama-folder-toggle-icon,
+    .ollama-folder-icon {
+      flex-shrink: 0;
+      width: $icon-size;
+      height: $icon-size;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      &.clickable-icon:hover { // Тільки для іконки розгортання
+        color: var(--text-muted);
+      }
+    }
+
+    // Текст імені
+    .ollama-hierarchy-item-text {
+      flex-grow: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: var(--font-ui-small);
+      line-height: 1.3; // Для кращого вигляду при переносі (хоча є ellipsis)
+    }
+
+    // --- Стилі специфічні для ЧАТУ ---
+    .ollama-chat-item {
+      // Додаткові стилі для чату, якщо відрізняються від папки
+      .ollama-folder-icon { // Перевизначаємо колір іконки чату
+         color: var(--text-muted);
+      }
+    }
+
+    // Деталі чату (дата)
+    .ollama-chat-item-details {
+      margin-left: auto; // Притискаємо праворуч
+      padding-left: var(--size-4-2);
+      flex-shrink: 0;
+    }
+
+    .ollama-chat-item-date {
+      font-size: var(--font-ui-smaller);
+      color: var(--text-faint);
+      white-space: nowrap;
+      opacity: 0.9;
+    }
+
+    // Кнопка опцій "..." в ієрархії
+    .ollama-hierarchy-item-options {
+      flex-shrink: 0;
+      margin-left: $icon-margin; // Відступ від тексту або дати
+      opacity: 0; // Прихована
+      transition: opacity 0.1s ease-in-out;
+      padding: 2px; // Маленькі відступи для клікабельності
+      border-radius: var(--radius-s);
+      color: var(--text-muted);
+      background: none; border: none;
+
+      .ollama-hierarchy-item-content:hover & { // Показувати при наведенні на контент
+         opacity: 0.7;
+      }
+       &:hover {
+           opacity: 1;
+           color: var(--text-normal);
+           background-color: var(--background-modifier-hover);
+       }
+       .svg-icon { width: 18px; height: 18px; }
+    }
+
+     // Контейнер для дочірніх елементів
+    .ollama-hierarchy-item-children {
+       display: block;
+       padding-left: 0; // Відступи керуються рівнями дочірніх елементів
+       // Можна додати візуальні лінії, якщо потрібно
+       // border-left: 1px solid var(--background-modifier-border);
+       // margin-left: calc($item-padding-horizontal + $icon-size / 2);
+    }
+
+    // Приховування дочірніх для згорнутих папок
+    .ollama-hierarchy-item.is-collapsed > .ollama-hierarchy-item-children {
+         display: none;
+    }
+
+    // Текст "Empty" в папках
+    .ollama-empty-folder-text {
+       // Використовуємо відступ наступного рівня для вирівнювання
+       padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical ($item-padding-horizontal + $indent-size);
+       color: var(--text-faint);
+       font-style: italic;
+       font-size: var(--font-ui-smaller);
+    }
+
+    // Активний елемент чату
+    .ollama-chat-item.is-active > .ollama-hierarchy-item-content {
+      background-color: var(--interactive-accent);
+      color: var(--text-on-accent);
+
+      .ollama-hierarchy-item-text,
+      .ollama-chat-item-date,
+      .ollama-folder-icon .lucide { // Іконка чату теж змінює колір
+         color: var(--text-on-accent);
+      }
+       &:hover {
+            background-color: var(--interactive-accent-hover);
+       }
+       // Кнопка "..." на активному елементі
+       .ollama-hierarchy-item-options {
+         color: var(--text-on-accent);
+         &:hover {
+            background-color: rgba(var(--color-base-rgb), 0.1); // Трохи темніший фон
+         }
+       }
+    }
+
+    // --- Стилі для списку ролей ---
+    .ollama-role-panel-list {
+      .ollama-role-panel-item {
+        // Наслідуємо базові стилі ієрархії для консистентності
+        @extend .ollama-hierarchy-item; // Використовуємо @extend або копіюємо стилі
+
+        > .ollama-role-panel-item-icon { // Адаптуємо старий клас до нової структури
+             @extend .ollama-folder-icon; // Використовуємо ті ж стилі, що й для іконок папок/чатів
+        }
+
+        > .ollama-role-panel-item-text { // Адаптуємо старий клас
+            @extend .ollama-hierarchy-item-text;
+            margin-right: 0; // Забираємо зайвий відступ, якщо є
+        }
+         // Активний стан для ролей
+         &.is-active {
+              background-color: var(--interactive-accent-translucent); // Інший стиль для активної ролі
+              .ollama-role-panel-item-icon { color: var(--interactive-accent); }
+              .ollama-role-panel-item-text { color: var(--text-accent); font-weight: 500;}
+              &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
+         }
+          // Стиль для кастомних ролей
+         &.is-custom .ollama-role-panel-item-icon:not(:has(.svg-icon[icon-name="check"])) {
+              color: var(--text-faint); // Іконка користувача блідіша
+         }
+          // Стиль для "None"
+          &.ollama-role-panel-item-none {
+              // Додаткові стилі, якщо потрібно
+          }
+      }
+    }
+
+
+    // Повідомлення "немає чатів/ролей"
      .menu-info-text {
-        padding: calc(var(--chat-spacing-unit) * 1.8) calc(var(--chat-spacing-unit) * 1);
+        padding: var(--size-4-2) var(--size-4-3);
         color: var(--text-faint);
         font-style: italic;
-        font-size: calc(var(--font-ui-small) * 0.9);
+        font-size: var(--font-ui-smaller);
     }
 }
-// --- End Sidebar Accordion Sections ---
+// --- End Sidebar Accordion Sections Content ---
 
-
-// --- ЗМІННІ ТА СТИЛІ DANGER ВИДАЛЕНІ ЗВІДСИ ---
-// Якщо вони потрібні для контекстного меню, краще додати їх
-// у загальні стилі меню або використовувати інший підхід.
-// :root { ... } -- ВИДАЛЕНО
-// .menu-item.danger-option { ... } -- ВИДАЛЕНО
-// .menu-item:has(...) { ... } -- ВИДАЛЕНО
-// .menu-item[aria-label=...] { ... } -- ВИДАЛЕНО
-
-
-// Клас для прихованого контенту (для JS)
+// Клас для прихованого контенту (використовується JS)
 .ollama-sidebar-section-content-hidden {
     max-height: 0 !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     opacity: 0 !important;
     overflow: hidden !important;
+    // Додамо visibility для надійності, хоча max-height має вистачити
+    visibility: hidden;
+}
+
+// --- Стилізація контекстного меню (додаємо стилі для небезпечних дій) ---
+// Потрібно застосовувати до .menu-item всередині .menu
+.menu { // Застосовуємо всередині меню, щоб не впливати на інші елементи
+     .menu-item {
+         // Шукаємо пункти меню за іконкою або текстом (надійніше за aria-label, якщо він додається)
+         &[aria-label*="Delete Folder" i],
+         &[aria-label*="Delete Chat" i],
+         &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]), // Якщо є іконка кошика
+         &:has(> .menu-item-title:contains("Delete Folder")), // Менш надійно
+         &:has(> .menu-item-title:contains("Delete Chat")) { // Менш надійно
+             .menu-item-title { // Змінюємо колір тексту
+                 color: var(--text-error) !important;
+             }
+             .menu-item-icon { // Змінюємо колір іконки
+                  color: var(--text-error) !important;
+             }
+
+              &:hover {
+                  background-color: var(--background-modifier-error-hover) !important;
+                  .menu-item-title, .menu-item-icon {
+                       color: var(--text-on-error) !important; // Колір тексту/іконки при наведенні
+                  }
+              }
+         }
+          // Додатково для "Clear Messages"
+          &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]), // Іконка меншого кошика
+          &:has(> .menu-item-title:contains("Clear Messages")) {
+              .menu-item-title { color: var(--text-warning) !important; } // Використовуємо колір попередження
+              .menu-item-icon { color: var(--text-warning) !important; }
+               &:hover {
+                   background-color: var(--background-modifier-warning-hover) !important;
+                   .menu-item-title, .menu-item-icon { color: var(--text-on-warning) !important; }
+               }
+          }
+     }
 }

@@ -10,7 +10,6 @@ import {
   ExtraButtonComponent,
   SliderComponent,
   Notice,
-  TextComponent,
   normalizePath, // <--- ДОДАНО ІМПОРТ
 } from "obsidian";
 import OllamaPlugin from "./main";
