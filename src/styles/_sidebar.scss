@@ -131,7 +131,7 @@
     &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); }
 
     // --- Стилі для ієрархії ---
-    $indent-step: 21px; // Зменшимо крок, щоб потомки були ближче до іконки парента
+    $indent-step: 51px; // Зменшимо крок, щоб потомки були ближче до іконки парента
     $item-padding-vertical: var(--size-4-1);
     $item-padding-horizontal: var(--size-4-2); // Базовий відступ зліва
     $icon-size: 16px;
