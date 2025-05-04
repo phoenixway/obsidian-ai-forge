@@ -22,51 +22,132 @@ $icon-margin: 8px; // Gap
   box-sizing: border-box;
   padding: var(--size-4-2);
   margin-right: var(--size-4-2);
-  transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin 0.25s ease-out, border 0.25s ease-out;
+  transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out,
+    margin 0.25s ease-out, border 0.25s ease-out;
 
   &.internal-sidebar-hidden {
-      width: 0 !important; min-width: 0 !important; opacity: 0 !important;
-      padding: 0 !important; margin: 0 !important; border: none !important;
-      overflow: hidden !important; pointer-events: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
   }
 }
 
 .ollama-chat-panel,
 .ollama-role-panel {
-    display: flex; flex-direction: column;
-    &.ollama-role-panel { flex-shrink: 0; }
+  display: flex;
+  flex-direction: column;
+  &.ollama-role-panel {
+    flex-shrink: 0;
+  }
 }
 
-
 .ollama-sidebar-section-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
-  user-select: none; cursor: pointer; flex-shrink: 0; position: relative;
-  border-radius: var(--radius-s); margin: 1px 0; min-height: var(--nav-item-size);
-  &:hover { background-color: var(--background-modifier-hover); }
-  .ollama-sidebar-header-left { display: flex; align-items: center; overflow: hidden; margin-right: var(--size-4-2); gap: var(--size-4-3); }
-  .ollama-sidebar-section-icon { min-width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; .svg-icon { width: 18px; height: 18px; color: var(--text-faint); } }
-  &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
-  .menu-option-text { font-weight: var(--nav-item-font-weight); font-size: var(--nav-item-size); color: var(--text-normal); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
-  .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
+  user-select: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  border-radius: var(--radius-s);
+  margin: 1px 0;
+  min-height: var(--nav-item-size);
+  &:hover {
+    background-color: var(--background-modifier-hover);
+  }
+  .ollama-sidebar-header-left {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    margin-right: var(--size-4-2);
+    gap: var(--size-4-3);
+  }
+  .ollama-sidebar-section-icon {
+    min-width: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    .svg-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--text-faint);
+    }
+  }
+  &:hover .ollama-sidebar-section-icon .svg-icon {
+    color: var(--text-muted);
+  }
+  .menu-option-text {
+    font-weight: var(--nav-item-font-weight);
+    font-size: var(--nav-item-size);
+    color: var(--text-normal);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ollama-sidebar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .ollama-sidebar-header-button {
+    padding: var(--size-4-1);
+    color: var(--text-muted);
+    border-radius: var(--radius-s);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    &:hover {
+      color: var(--text-normal);
+      background-color: var(--background-modifier-hover);
+    }
+    .svg-icon {
+      width: 18px;
+      height: 18px;
+    }
+  }
 }
 
 .ollama-sidebar-section-content {
   transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out;
-  box-sizing: border-box; 
-  padding: 0 var(--size-4-2); 
-  min-height: 0; 
+  box-sizing: border-box;
+  padding: 0 var(--size-4-2);
+  min-height: 0;
   //FIXME: key place
   // opacity: 0;
-  // overflow: hidden; 
+  // overflow: hidden;
   max-height: 0;
- 
-  &.is-expanded { max-height: 75vh; overflow-y: auto; padding-top: var(--size-4-1); padding-bottom: var(--size-4-1); opacity: 1; }
-  &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
-  &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-  &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); }
+
+  &.is-expanded {
+    max-height: 75vh;
+    overflow-y: auto;
+    padding-top: var(--size-4-1);
+    padding-bottom: var(--size-4-1);
+    opacity: 1;
+  }
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 2px 0;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--background-modifier-border);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--interactive-accent);
+  }
 
   .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
     margin: 1px 0;
@@ -78,104 +159,137 @@ $icon-margin: 8px; // Gap
     // Відступи рівнів (БЕЗ !important - ПЕРЕВІРТЕ, ЧИ ПРАЦЮЮТЬ!)
     @for $i from 0 through 10 {
       &.ollama-indent-level-#{$i} {
-          padding-left: $item-padding-horizontal + ($i * $indent-step);
+        padding-left: $item-padding-horizontal + ($i * $indent-step);
       }
-  }
-  }
+    }
 
+    &:hover > .ollama-hierarchy-item-content {
+      background-color: var(--background-modifier-hover);
+      // --- ПОВЕРНУЛИ: Показувати кнопку опцій при наведенні ---
+      .ollama-hierarchy-item-options {
+        opacity: 0.7;
+      }
+    }
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////
 .ollama-chat-list-container {
-     // border: 1px solid magenta; // Рамка списку
+  // border: 1px solid magenta; // Рамка списку
 }
 
 // --- Стилі для ієрархії (МІНІМУМ) ---
 
 // Зовнішній елемент рядка
 .ollama-hierarchy-item {
-    margin: 1px 0;
-    position: relative; // Для дочірнього контейнера
-    border: 1px dashed rgba(0, 0, 0, 0.2); // DEBUG: Межі зовнішнього елемента
-    padding-left: 0; // Скидаємо тут, відступ буде на контенті
+  margin: 1px 0;
+  position: relative; // Для дочірнього контейнера
+  border: 1px dashed rgba(0, 0, 0, 0.2); // DEBUG: Межі зовнішнього елемента
+  padding-left: 0; // Скидаємо тут, відступ буде на контенті
 
-    // Застосовуємо відступ до зовнішнього елемента з !important (бо це працювало)
-    @for $i from 0 through 10 {
-      &.ollama-indent-level-#{$i} {
-        padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
-      }
+  // Застосовуємо відступ до зовнішнього елемента з !important (бо це працювало)
+  @for $i from 0 through 10 {
+    &.ollama-indent-level-#{$i} {
+      padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
     }
+  }
 }
 
 // Внутрішній контейнер контенту
 .ollama-hierarchy-item-content {
-    display: flex !important;       // <--- Головне правило для тесту
-    align-items: center !important; // <--- Вирівнювання
-    width: 100%;
-    box-sizing: border-box;
-    // Мінімальний padding, БЕЗ лівого (він на батьку)
-    padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
-    gap: $icon-margin;           // Проміжок між іконкою і текстом
-    min-height: 28px;             // Мінімальна висота
-    border: 1px dotted blue;      // DEBUG: Межі контенту
-    background-color: rgba(0,0,255, 0.05); // DEBUG: Легкий фон контенту
+  display: flex !important; // <--- Головне правило для тесту
+  align-items: center !important; // <--- Вирівнювання
+  width: 100%;
+  box-sizing: border-box;
+  // Мінімальний padding, БЕЗ лівого (він на батьку)
+  padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
+  gap: $icon-margin; // Проміжок між іконкою і текстом
+  min-height: 28px; // Мінімальна висота
+  border: 1px dotted blue; // DEBUG: Межі контенту
+  background-color: rgba(0, 0, 255, 0.05); // DEBUG: Легкий фон контенту
 }
 
 // Іконка (спільний клас)
 .ollama-folder-icon {
-    display: inline-block !important; // Спробуємо inline-block для іконки
-    flex-shrink: 0;                 // Не стискати
-    width: $icon-size;
-    height: $icon-size;
-    margin: 0;                      // Без додаткових відступів
-    border: 1px solid lime;         // DEBUG: Межі іконки
-    vertical-align: middle;         // Спробуємо вирівняти по вертикалі
+  display: inline-block !important; // Спробуємо inline-block для іконки
+  flex-shrink: 0; // Не стискати
+  width: $icon-size;
+  height: $icon-size;
+  margin: 0; // Без додаткових відступів
+  border: 1px solid lime; // DEBUG: Межі іконки
+  vertical-align: middle; // Спробуємо вирівняти по вертикалі
 }
 
 // Текст
 .ollama-hierarchy-item-text {
-    display: inline !important;      // Спробуємо inline для тексту
-    flex-grow: 1;                  // Займати доступне місце
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    border: 1px solid orange;       // DEBUG: Межі тексту
-    vertical-align: middle;         // Спробуємо вирівняти по вертикалі
-    min-width: 0;                   // Для ellipsis
+  display: inline !important; // Спробуємо inline для тексту
+  flex-grow: 1; // Займати доступне місце
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid orange; // DEBUG: Межі тексту
+  vertical-align: middle; // Спробуємо вирівняти по вертикалі
+  min-width: 0; // Для ellipsis
 }
 
 // --- Приховування дочірніх елементів ---
 .ollama-hierarchy-item-children {
-   display: block; // Повинен бути блоком
-   padding-left: 0; // Відступи контролюються дітьми
-   border: 1px dotted purple; // DEBUG: Межі контейнера дітей
+  display: block; // Повинен бути блоком
+  padding-left: 0; // Відступи контролюються дітьми
+  border: 1px dotted purple; // DEBUG: Межі контейнера дітей
 }
 .ollama-hierarchy-item.is-collapsed > .ollama-hierarchy-item-children {
-    display: none !important; // Приховуємо з !important
+  display: none !important; // Приховуємо з !important
 }
 
 // --- ВИДАЛЕНО ВСІ ІНШІ СТИЛІ (hover, active, options, details, roles, menu) ---
 
-
 // ..............................................................................
 
-.ollama-sidebar-section-content-hidden { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; opacity: 0 !important; overflow: hidden !important; visibility: hidden; }
+.ollama-sidebar-section-content-hidden {
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden;
+}
 
 // --- Стилізація контекстного меню ---
 .menu {
-     .menu-item {
-         &[aria-label*="Delete Folder" i],
-         &[aria-label*="Delete Chat" i],
-         &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]) {
-             .menu-item-title { color: var(--text-error) !important; }
-             .menu-item-icon { color: var(--text-error) !important; }
-              &:hover { background-color: var(--background-modifier-error-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-error) !important; } }
-         }
-          &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]),
-          &:has(> .menu-item-title:contains("Clear Messages")) {
-              .menu-item-title { color: var(--text-warning) !important; }
-              .menu-item-icon { color: var(--text-warning) !important; }
-               &:hover { background-color: var(--background-modifier-warning-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-warning) !important; } }
-          }
-     }
+  .menu-item {
+    &[aria-label*="Delete Folder" i],
+    &[aria-label*="Delete Chat" i],
+    &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]) {
+      .menu-item-title {
+        color: var(--text-error) !important;
+      }
+      .menu-item-icon {
+        color: var(--text-error) !important;
+      }
+      &:hover {
+        background-color: var(--background-modifier-error-hover) !important;
+        .menu-item-title,
+        .menu-item-icon {
+          color: var(--text-on-error) !important;
+        }
+      }
+    }
+    &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]),
+    &:has(> .menu-item-title:contains("Clear Messages")) {
+      .menu-item-title {
+        color: var(--text-warning) !important;
+      }
+      .menu-item-icon {
+        color: var(--text-warning) !important;
+      }
+      &:hover {
+        background-color: var(--background-modifier-warning-hover) !important;
+        .menu-item-title,
+        .menu-item-icon {
+          color: var(--text-on-warning) !important;
+        }
+      }
+    }
+  }
 }
