@@ -181,7 +181,7 @@ $icon-margin: 8px; // Gap
   }
 
   ////////////////////////
-  > .ollama-hierarchy-item-content {
+  .ollama-hierarchy-item-content {
     display: flex !important; // <--- Головне правило для тесту
     align-items: center !important; // <--- Вирівнювання
     width: 100%;
@@ -192,6 +192,30 @@ $icon-margin: 8px; // Gap
     min-height: 28px; // Мінімальна висота
     border: 1px dotted blue; // DEBUG: Межі контенту
     background-color: rgba(0, 0, 255, 0.05); // DEBUG: Легкий фон контенту
+
+    .ollama-folder-icon {
+      display: inline-block !important; // Спробуємо inline-block для іконки
+      flex-shrink: 0; // Не стискати
+      width: $icon-size;
+      height: $icon-size;
+      margin: 0; // Без додаткових відступів
+      border: 1px solid lime; // DEBUG: Межі іконки
+      vertical-align: middle; // Спробуємо вирівняти по вертикалі
+    }
+    
+    // Текст
+    .ollama-hierarchy-item-text {
+      display: inline !important; // Спробуємо inline для тексту
+      flex-grow: 1; // Займати доступне місце
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border: 1px solid orange; // DEBUG: Межі тексту
+      vertical-align: middle; // Спробуємо вирівняти по вертикалі
+      min-width: 0; // Для ellipsis
+    }
+    
+
   }
   
   /////////////////////
@@ -261,27 +285,6 @@ $icon-margin: 8px; // Gap
 // Внутрішній контейнер контенту
 
 // Іконка (спільний клас)
-.ollama-folder-icon {
-  display: inline-block !important; // Спробуємо inline-block для іконки
-  flex-shrink: 0; // Не стискати
-  width: $icon-size;
-  height: $icon-size;
-  margin: 0; // Без додаткових відступів
-  border: 1px solid lime; // DEBUG: Межі іконки
-  vertical-align: middle; // Спробуємо вирівняти по вертикалі
-}
-
-// Текст
-.ollama-hierarchy-item-text {
-  display: inline !important; // Спробуємо inline для тексту
-  flex-grow: 1; // Займати доступне місце
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border: 1px solid orange; // DEBUG: Межі тексту
-  vertical-align: middle; // Спробуємо вирівняти по вертикалі
-  min-width: 0; // Для ellipsis
-}
 
 // --- Приховування дочірніх елементів ---
 .ollama-hierarchy-item-children {
