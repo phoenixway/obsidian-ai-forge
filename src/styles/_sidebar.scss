@@ -1,5 +1,5 @@
 // src/styles/_sidebar.scss
-// Чиста версія без !important діагностики
+// Чиста версія для використання з повною renderHierarchyNode
 
 // --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
@@ -64,7 +64,7 @@
   $item-padding-horizontal: var(--size-4-2);
   $icon-size: 16px;
   $icon-margin: var(--size-4-2);
-  $folder-icon-extra-indent: 5px;
+  $folder-icon-extra-indent: 5px; // Налаштуйте цей зсув
 
   // Використовуємо селектор з підвищеною специфічністю
   .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
@@ -72,8 +72,7 @@
       border-radius: var(--radius-s);
       cursor: pointer;
       position: relative;
-      padding-left: 0; // Скидаємо базовий
-      display: flex !important; // Переконуємося, що це flex
+      padding-left: 0; // Базовий скидається
 
       // Відступи рівнів (без !important)
       @for $i from 0 through 10 {
@@ -87,11 +86,11 @@
 
       // --- Стилі для внутрішніх елементів ---
       > .ollama-hierarchy-item-content {
-          display: flex; // Переконуємося, що це flex
+          display: flex; // <--- Ключовий стиль
           align-items: center;
-          width: 100%;
+          width: 100%; // <--- Важливо для flex
           box-sizing: border-box;
-          padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
+          padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0; // Забираємо лівий padding звідси
           gap: $icon-margin;
           position: relative; min-height: calc($icon-size + 2 * $item-padding-vertical); border-radius: inherit; z-index: 1;
 
@@ -131,7 +130,7 @@
       &.ollama-chat-item {
            > .ollama-hierarchy-item-content > .ollama-folder-icon {
                 color: var(--text-muted);
-                // Використовуємо !important для гарантії скидання
+                // Використовуємо !important для гарантії, якщо правило для папки має високу специфічність
                 margin-left: 0 !important;
            }
       }
@@ -139,11 +138,7 @@
       // Активний чат
       &.ollama-chat-item.is-active > .ollama-hierarchy-item-content {
           background-color: var(--interactive-accent); color: var(--text-on-accent);
-          // Зверніть увагу: селектори тут можуть потребувати !important, якщо базові стилі дуже специфічні
-          > .ollama-folder-icon,
-          > .ollama-hierarchy-item-text,
-          > .ollama-chat-item-details,
-          > .ollama-chat-item-details .ollama-chat-item-date { color: var(--text-on-accent); }
+          > .ollama-folder-icon, > .ollama-hierarchy-item-text, > .ollama-chat-item-details, > .ollama-chat-item-details .ollama-chat-item-date { color: var(--text-on-accent); }
           &:hover { background-color: var(--interactive-accent-hover); }
           > .ollama-hierarchy-item-options { color: var(--text-on-accent); &:hover { background-color: rgba(var(--color-base-rgb), 0.1); } }
       }
