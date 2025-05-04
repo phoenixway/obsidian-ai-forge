@@ -74,6 +74,13 @@ $icon-margin: 8px; // Gap
     cursor: pointer;
     position: relative;
     padding-left: 0; // Базовий скидається
+
+    // Відступи рівнів (БЕЗ !important - ПЕРЕВІРТЕ, ЧИ ПРАЦЮЮТЬ!)
+    @for $i from 0 through 10 {
+      &.ollama-indent-level-#{$i} {
+          padding-left: $item-padding-horizontal + ($i * $indent-step);
+      }
+  }
   }
 
 }
