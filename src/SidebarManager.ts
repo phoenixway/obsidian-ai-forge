@@ -48,6 +48,7 @@ const CSS_CHAT_ITEM_DETAILS = "ollama-chat-item-details";
 const CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
 const CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
 const CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
+const CSS_PLACEHOLDER_ICON = "ollama-placeholder-icon";
 
 // Меню та інше
 const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
@@ -197,112 +198,125 @@ export class SidebarManager {
   };
 
   private renderHierarchyNode(node: HierarchyNode, parentElement: HTMLElement, level: number, activeChatId: string | null): void {
-      const itemEl = parentElement.createDiv({
-          cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
-      });
+    const itemEl = parentElement.createDiv({
+        cls: [CSS_HIERARCHY_ITEM, `<span class="math-inline">\{CSS\_HIERARCHY\_INDENT\_PREFIX\}</span>{level}`]
+    });
 
-      const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+    const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
 
-      if (node.type === 'folder') {
-          itemEl.addClass(CSS_FOLDER_ITEM);
-          const isExpanded = this.folderExpansionState.get(node.path) ?? false;
-          if (!isExpanded) {
-              itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
-          }
+    if (node.type === 'folder') {
+        itemEl.addClass(CSS_FOLDER_ITEM);
+        const isExpanded = this.folderExpansionState.get(node.path) ?? false;
+        if (!isExpanded) {
+            itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
+        }
 
-          const toggleIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, "clickable-icon"] });
-          setIcon(toggleIcon, isExpanded ? EXPAND_ICON_FOLDER : COLLAPSE_ICON_FOLDER);
-          this.view.registerDomEvent(toggleIcon, 'click', (e) => {
-              e.stopPropagation();
-              this.handleToggleFolder(node.path);
-          });
+        // Іконка розгортання/згортання
+        const toggleIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, "clickable-icon"] });
+        setIcon(toggleIcon, isExpanded ? EXPAND_ICON_FOLDER : COLLAPSE_ICON_FOLDER);
+        this.view.registerDomEvent(toggleIcon, 'click', (e) => {
+            e.stopPropagation();
+            this.handleToggleFolder(node.path);
+        });
 
-          const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-          setIcon(folderIcon, FOLDER_ICON);
+        // Іконка папки
+        const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+        setIcon(folderIcon, FOLDER_ICON);
 
-          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
+        // Назва папки
+        itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
 
-          const optionsBtn = itemContentEl.createEl("button", {
-              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-              attr: { "aria-label": "Folder options", title: "More options" },
-          });
-          setIcon(optionsBtn, "lucide-more-horizontal");
-          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
-              e.stopPropagation();
-              this.showFolderContextMenu(e, node);
-          });
+        // Кнопка "..." для опцій папки
+        const optionsBtn = itemContentEl.createEl("button", {
+            cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+            attr: { "aria-label": "Folder options", title: "More options" },
+        });
+        setIcon(optionsBtn, "lucide-more-horizontal");
+        this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
+            e.stopPropagation();
+            this.showFolderContextMenu(e, node);
+        });
 
-          this.view.registerDomEvent(itemContentEl, 'click', () => {
-               this.handleToggleFolder(node.path);
-          });
+        this.view.registerDomEvent(itemContentEl, 'click', () => {
+             this.handleToggleFolder(node.path);
+        });
 
-          this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => {
-              e.preventDefault();
-              this.showFolderContextMenu(e, node);
-          });
+        this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => {
+            e.preventDefault();
+            this.showFolderContextMenu(e, node);
+        });
 
-          const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
-          if (isExpanded && node.children.length > 0) {
-              node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId));
-          } else if (isExpanded && node.children.length === 0) {
-               childrenContainer.createDiv({ text: "Empty", cls: "menu-info-text ollama-empty-folder-text" });
-          }
+        const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
+        if (isExpanded && node.children.length > 0) {
+            node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId));
+        } else if (isExpanded && node.children.length === 0) {
+             childrenContainer.createDiv({ text: "Empty", cls: "menu-info-text ollama-empty-folder-text" });
+        }
 
-      } else if (node.type === 'chat') {
-          itemEl.addClass(CSS_CHAT_ITEM);
-          const chatMeta = node.metadata;
-          const isActive = chatMeta.id === activeChatId;
+    } else if (node.type === 'chat') {
+        itemEl.addClass(CSS_CHAT_ITEM);
+        const chatMeta = node.metadata;
+        const isActive = chatMeta.id === activeChatId;
 
-          if (isActive) {
-              itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-          }
+        if (isActive) {
+            itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
+        }
 
-          const chatIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_ICON] }); // Keep same class for alignment
-          setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+        // --- ДОДАНО: Іконка-розпірка для вирівнювання ---
+        // Додаємо порожній span з тими ж класами розміру/відступу, що й toggleIcon папки
+        itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, CSS_PLACEHOLDER_ICON] });
+        // ---
 
-          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
+        // Іконка чату (активна чи звичайна)
+        const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON }); // Використовуємо той самий клас для вирівнювання
+        setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
 
-          const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
-           try {
-                const lastModifiedDate = new Date(chatMeta.lastModified);
-                const dateText = !isNaN(lastModifiedDate.getTime())
-                    ? this.formatRelativeDate(lastModifiedDate)
-                    : "Invalid date";
-                if (dateText === "Invalid date") {
-                    this.plugin.logger.warn(`[SidebarManager.renderNode] Invalid date for chat ${chatMeta.id}`);
-                }
-                detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
-           } catch(e) {
-                 this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
-                 detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
-           }
+        // Назва чату
+        itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
 
-          const optionsBtn = itemContentEl.createEl("button", {
-              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-              attr: { "aria-label": "Chat options", title: "More options" },
-          });
-          setIcon(optionsBtn, "lucide-more-horizontal");
-
-          this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => {
-              if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
-                  return;
+        // Деталі чату (дата)
+        const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
+         try {
+              const lastModifiedDate = new Date(chatMeta.lastModified);
+              const dateText = !isNaN(lastModifiedDate.getTime())
+                  ? this.formatRelativeDate(lastModifiedDate)
+                  : "Invalid date";
+              if (dateText === "Invalid date") {
+                  this.plugin.logger.warn(`[SidebarManager.renderNode] Invalid date for chat ${chatMeta.id}`);
               }
-              if (chatMeta.id !== activeChatId) {
-                  await this.plugin.chatManager.setActiveChat(chatMeta.id);
-              }
-          });
+              detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
+         } catch(e) {
+               this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
+               detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
+         }
 
-          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
-              e.stopPropagation();
-              this.showChatContextMenu(e, chatMeta);
-          });
+        // Кнопка "..." для опцій чату
+        const optionsBtn = itemContentEl.createEl("button", {
+            cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+            attr: { "aria-label": "Chat options", title: "More options" },
+        });
+        setIcon(optionsBtn, "lucide-more-horizontal");
 
-          this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => {
-              e.preventDefault();
-              this.showChatContextMenu(e, chatMeta);
-          });
-      }
-  }
+        this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => {
+            if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
+                return;
+            }
+            if (chatMeta.id !== activeChatId) {
+                await this.plugin.chatManager.setActiveChat(chatMeta.id);
+            }
+        });
+
+        this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => {
+            e.stopPropagation();
+            this.showChatContextMenu(e, chatMeta);
+        });
+
+        this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => {
+            e.preventDefault();
+            this.showChatContextMenu(e, chatMeta);
+        });
+    }
+}
 
   private handleToggleFolder(folderPath: string): void {
       const currentState = this.folderExpansionState.get(folderPath) ?? false;

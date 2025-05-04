@@ -1879,7 +1879,7 @@ var CSS_HIERARCHY_ITEM_TEXT = "ollama-hierarchy-item-text";
 var CSS_CHAT_ITEM_DETAILS = "ollama-chat-item-details";
 var CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
 var CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
-var CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
+var CSS_PLACEHOLDER_ICON = "ollama-placeholder-icon";
 var COLLAPSE_ICON_ROLE = "lucide-folder";
 var EXPAND_ICON_ROLE = "lucide-folder-open";
 var COLLAPSE_ICON_FOLDER = "lucide-chevron-right";
@@ -2194,7 +2194,7 @@ var SidebarManager = class {
   renderHierarchyNode(node, parentElement, level, activeChatId) {
     var _a;
     const itemEl = parentElement.createDiv({
-      cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
+      cls: [CSS_HIERARCHY_ITEM, `<span class="math-inline">{CSS_HIERARCHY_INDENT_PREFIX}</span>{level}`]
     });
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
     if (node.type === "folder") {
@@ -2241,7 +2241,8 @@ var SidebarManager = class {
       if (isActive) {
         itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
       }
-      const chatIcon = itemContentEl.createSpan({ cls: [CSS_FOLDER_ICON] });
+      itemContentEl.createSpan({ cls: [CSS_FOLDER_TOGGLE_ICON, CSS_PLACEHOLDER_ICON] });
+      const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
       (0, import_obsidian12.setIcon)(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
       itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
       const detailsWrapper = itemContentEl.createDiv({ cls: CSS_CHAT_ITEM_DETAILS });
