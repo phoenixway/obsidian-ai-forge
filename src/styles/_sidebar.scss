@@ -67,7 +67,7 @@
   $folder-icon-extra-indent: 5px;
 
   // Використовуємо селектор з підвищеною специфічністю
-  .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item-content {
+  .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
       margin: 1px 0;
       border-radius: var(--radius-s);
       cursor: pointer;
@@ -192,7 +192,3 @@
    }
 }
 
-// .ollama-hierarchy-item {
-//   color: aqua !important;
-//   display: flex !important; // Переконуємося, що це flex
-// }
