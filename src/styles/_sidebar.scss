@@ -169,29 +169,29 @@
            }
 
            // Відступ для контейнера дітей, щоб контент був правіше БАТЬКІВСЬКОГО контенту
-            > .ollama-hierarchy-item-children {
-                 // Відступ = поточний відступ батька + крок відступу
-                 // Ми не додаємо padding сюди, бо відступ вже є у дочірніх елементів .ollama-hierarchy-item
-                 // Натомість, забезпечимо візуальний зв'язок лінією або простором
-                 margin-left: calc(#{$toggle-icon-width} / 2 + #{$icon-margin}); // Зсув вліво відносно іконки батька
-                 padding-left: calc(#{$toggle-icon-width} / 2); // Додатковий відступ справа від лінії (якщо є)
-                 // Можна додати лінію:
-                 // border-left: 1px solid var(--background-modifier-border-hover);
-            }
+            // > .ollama-hierarchy-item-children {
+            //      // Відступ = поточний відступ батька + крок відступу
+            //      // Ми не додаємо padding сюди, бо відступ вже є у дочірніх елементів .ollama-hierarchy-item
+            //      // Натомість, забезпечимо візуальний зв'язок лінією або простором
+            //      margin-left: calc(#{$toggle-icon-width} / 2 + #{$icon-margin}); // Зсув вліво відносно іконки батька
+            //      padding-left: calc(#{$toggle-icon-width} / 2); // Додатковий відступ справа від лінії (якщо є)
+            //      // Можна додати лінію:
+            //      // border-left: 1px solid var(--background-modifier-border-hover);
+            // }
 
-            // Відступ для тексту "Empty" - такий же, як у дочірнього елемента рівня N+1
-             > .ollama-hierarchy-item-children > .ollama-empty-folder-text {
-                 padding-left: $item-padding-horizontal + (($i + 1) * $indent-step);
-                 // Коригуємо відступ, щоб він був відносно лівого краю батька, а не контейнера
-                 margin-left: calc((#{$toggle-icon-width} / 2 + #{$icon-margin}) * -1); // Компенсуємо margin контейнера
-                 padding-left: calc(#{$item-padding-horizontal} + (($i + 1) * $indent-step) - (#{$toggle-icon-width} / 2 + #{$icon-margin}));
+            // // Відступ для тексту "Empty" - такий же, як у дочірнього елемента рівня N+1
+            //  > .ollama-hierarchy-item-children > .ollama-empty-folder-text {
+            //      padding-left: $item-padding-horizontal + (($i + 1) * $indent-step);
+            //      // Коригуємо відступ, щоб він був відносно лівого краю батька, а не контейнера
+            //      margin-left: calc((#{$toggle-icon-width} / 2 + #{$icon-margin}) * -1); // Компенсуємо margin контейнера
+            //      padding-left: calc(#{$item-padding-horizontal} + (($i + 1) * $indent-step) - (#{$toggle-icon-width} / 2 + #{$icon-margin}));
 
-                 // -- СПРОЩЕНИЙ ВАРІАНТ для Empty --
-                 // Застосовуємо той самий відступ, що й для елементів рівня N+1, відносно краю секції
-                 padding-left: $item-padding-horizontal + (($i + 1) * $indent-step);
-                 margin-left: 0; // Скидаємо margin контейнера
+            //      // -- СПРОЩЕНИЙ ВАРІАНТ для Empty --
+            //      // Застосовуємо той самий відступ, що й для елементів рівня N+1, відносно краю секції
+            //      padding-left: $item-padding-horizontal + (($i + 1) * $indent-step);
+            //      margin-left: 0; // Скидаємо margin контейнера
 
-            }
+            // }
         }
       }
 
