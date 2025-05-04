@@ -6,7 +6,8 @@ $indent-step: 18px;
 $item-padding-vertical: 4px;
 $item-padding-horizontal: 8px;
 $icon-size: 16px;
-$icon-margin: 8px; // Gap
+$icon-margin: var(--size-4-2);
+$folder-icon-extra-indent: 5px; // На скільки іконка папки правіше іконки чату
 
 // --- Базові контейнери (лише для структури, якщо необхідно) ---
 .ollama-sidebar-container {
