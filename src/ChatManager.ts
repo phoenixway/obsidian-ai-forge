@@ -1443,5 +1443,105 @@ export class ChatManager {
       return false;
     }
   }
+
+     // --- ВИПРАВЛЕНИЙ МЕТОД: Переміщення чату ---
+    async moveChat(chatId: string, oldFilePath: string, newFolderPath: string): Promise<boolean> {
+      const normOldPath = normalizePath(oldFilePath);
+      const normNewFolderPath = normalizePath(newFolderPath);
+      this.logger.info(`Attempting to move chat ${chatId} from "${normOldPath}" to folder "${normNewFolderPath}"`);
+
+      // --- Оголошуємо newFilePath тут, поза try ---
+      let newFilePath: string | null = null;
+      // ----------------------------------------
+
+      // 1. Валідація
+      if (!chatId || !oldFilePath || !newFolderPath) {
+          this.logger.error("Move chat failed: Invalid arguments provided.");
+          new Notice("Move chat failed: Invalid data.");
+          return false;
+      }
+
+      try {
+          // Перевірка існування джерела
+          if (!(await this.adapter.exists(normOldPath))) {
+              this.logger.error(`Move chat failed: Source file does not exist: ${normOldPath}`);
+              new Notice("Move chat failed: Source file not found.");
+               await this.rebuildIndexFromFiles();
+               this.plugin.emit('chat-list-updated');
+              return false;
+          }
+           const oldStat = await this.adapter.stat(normOldPath);
+           if(oldStat?.type !== 'file'){
+                this.logger.error(`Move chat failed: Source path is not a file: ${normOldPath}`);
+                new Notice("Move chat failed: Source is not a file.");
+                return false;
+           }
+
+          // Перевірка існування цільової папки
+          if (!(await this.adapter.exists(normNewFolderPath))) {
+              this.logger.error(`Move chat failed: Target folder does not exist: ${normNewFolderPath}`);
+              new Notice("Move chat failed: Target folder not found.");
+              return false;
+          }
+           const newStat = await this.adapter.stat(normNewFolderPath);
+           if(newStat?.type !== 'folder'){
+                this.logger.error(`Move chat failed: Target path is not a folder: ${normNewFolderPath}`);
+                new Notice("Move chat failed: Target is not a folder.");
+                return false;
+           }
+
+          // 2. Визначення нового шляху
+          const fileName = oldFilePath.substring(oldFilePath.lastIndexOf('/') + 1);
+          // --- Присвоюємо значення оголошеній змінній ---
+          newFilePath = normalizePath(`${normNewFolderPath}/${fileName}`);
+          // ------------------------------------------
+
+          // Перевірка, чи файл вже в цільовій папці
+          if (normOldPath === newFilePath) {
+              this.logger.warn(`Move chat skipped: Source and target paths are the same: ${normOldPath}`);
+              return true;
+          }
+
+          // 3. Перевірка на конфлікт імен
+          if (await this.adapter.exists(newFilePath)) {
+              this.logger.error(`Move chat failed: File already exists at target path: ${newFilePath}`);
+              new Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
+              return false;
+          }
+
+          // 4. Переміщення файлу
+          this.logger.debug(`Executing adapter.rename from "${normOldPath}" to "${newFilePath}"`);
+          await this.adapter.rename(normOldPath, newFilePath);
+          this.logger.info(`Chat file moved successfully to ${newFilePath}`);
+
+          // 5. Оновлення кешу завантажених чатів
+          if (this.loadedChats[chatId] && newFilePath) { // Перевіряємо, що newFilePath не null
+              this.logger.debug(`Updating file path in loadedChats cache for ${chatId} to ${newFilePath}`);
+              this.loadedChats[chatId].filePath = newFilePath;
+          }
+
+          // 6. Оновлення UI (Індекс оновиться пізніше через Vault Event)
+          this.plugin.emit('chat-list-updated');
+
+          return true;
+
+      } catch (error: any) {
+           // --- Тепер newFilePath доступний тут (може бути null, якщо помилка сталася до присвоєння) ---
+           const targetPathDesc = newFilePath ?? normNewFolderPath; // Використовуємо папку, якщо шлях файлу ще не визначено
+           if (error.code === 'EPERM' || error.code === 'EACCES') {
+               this.logger.error(`Permission error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
+               new Notice(`Permission error moving chat file.`);
+           } else {
+               // Використовуємо targetPathDesc в логуванні
+               this.logger.error(`Error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
+               new Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
+           }
+           // ---
+           await this.rebuildIndexFromFiles();
+           this.plugin.emit('chat-list-updated');
+           return false;
+      }
+  }
+  // --- КІНЕЦЬ ВИПРАВЛЕНОГО МЕТОДУ ---
   // --- КІНЕЦЬ НОВИХ МЕТОДІВ ---
 } // End of ChatManager class

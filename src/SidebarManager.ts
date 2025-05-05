@@ -60,6 +60,9 @@ const FOLDER_ICON_OPEN = "lucide-folder-open"; // Іконка розгорну�
 const CHAT_ICON = "lucide-message-square"; // Іконка чату
 const CHAT_ICON_ACTIVE = "lucide-check"; // Іконка активного чату
 
+const CSS_DRAGGING_ITEM = "is-dragging";
+const CSS_DROP_TARGET_ACTIVE = "drop-target-active";
+
 export class SidebarManager {
   private plugin: OllamaPlugin;
   private app: App;
@@ -152,89 +155,147 @@ export class SidebarManager {
     } finally { requestAnimationFrame(() => { if (container?.isConnected) { container.scrollTop = currentScrollTop; } }); }
   };
 
-  // --- Повна версія renderHierarchyNode ---
   private renderHierarchyNode(
-      node: HierarchyNode,
-      parentElement: HTMLElement,
-      level: number,
-      activeChatId: string | null,
-      activeAncestorPaths: Set<string>,
-      updateId: number // Для логування
-  ): void {
-      const nodeName = node.type === 'folder' ? node.name : node.metadata.name;
-      // Логування можна закоментувати
-      // this.plugin.logger.debug(`[Update #${updateId}]   Lvl ${level}: Rendering ${node.type} "${nodeName}" inside`, parentElement);
+    node: HierarchyNode,
+    parentElement: HTMLElement,
+    level: number,
+    activeChatId: string | null,
+    activeAncestorPaths: Set<string>,
+    updateId: number
+): void {
+    const nodeName = node.type === 'folder' ? node.name : node.metadata.name;
+    // this.plugin.logger.debug(`[Update #${updateId}]   Lvl ${level}: Rendering ${node.type} "${nodeName}" inside`, parentElement);
 
-      const itemEl = parentElement.createDiv({
-          cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
-      });
-      if (node.type === 'folder') {
-          itemEl.dataset.path = node.path; // Додаємо data-атрибут
-      }
+    const itemEl = parentElement.createDiv({
+        cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
+    });
 
-      const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+    const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
 
-      if (node.type === 'folder') {
-          itemEl.addClass(CSS_FOLDER_ITEM);
-          const isExpanded = this.folderExpansionState.get(node.path) ?? false;
-          if (!isExpanded) { itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED); }
-          if (activeAncestorPaths.has(node.path)) { itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR); }
+    if (node.type === 'folder') {
+        itemEl.addClass(CSS_FOLDER_ITEM);
+        itemEl.dataset.path = node.path; // Зберігаємо шлях для drop та toggle
+        const isExpanded = this.folderExpansionState.get(node.path) ?? false;
+        if (!isExpanded) { itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED); }
+        if (activeAncestorPaths.has(node.path)) { itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR); }
 
-          // 1. Іконка Папки (змінюється)
-          const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-          setIcon(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
+        const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+        setIcon(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
 
-          // 2. Назва папки
-          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
+        itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
 
-          // 3. Кнопка Опцій (...)
-          const optionsBtn = itemContentEl.createEl("button", {
-              cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-              attr: { "aria-label": "Folder options", title: "More options" },
-          });
-          setIcon(optionsBtn, "lucide-more-horizontal");
-          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showFolderContextMenu(e, node); });
-          this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); this.showFolderContextMenu(e, node); });
-          this.view.registerDomEvent(itemContentEl, 'click', () => { this.handleToggleFolder(node.path); }); // Клік розгортає
+        const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Folder options", title: "More options" }, });
+        setIcon(optionsBtn, "lucide-more-horizontal");
+        this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showFolderContextMenu(e, node); });
+        this.view.registerDomEvent(itemContentEl, 'contextmenu', (e: MouseEvent) => { e.preventDefault(); this.showFolderContextMenu(e, node); });
+        this.view.registerDomEvent(itemContentEl, 'click', () => { this.handleToggleFolder(node.path); });
 
-          // 4. Контейнер для дітей + Рекурсія
-          const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
-          // Рендеримо дочірні елементи ЗАВЖДИ (CSS керує видимістю)
-          if (node.children && node.children.length > 0) {
-              // Логування можна закоментувати
-              // this.plugin.logger.debug(`[Update #${updateId}]   Lvl ${level}: Folder "${nodeName}" has ${node.children.length} children. Rendering recursively into:`, childrenContainer);
-              node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths, updateId));
-          } else {
-                // Логування можна закоментувати
-               // this.plugin.logger.debug(`[Update #${updateId}]   Lvl ${level}: Folder "${nodeName}" has no children.`);
-          }
+        // --- ДОДАНО: Обробники Drop для папки ---
+        // Застосовуємо до itemEl, щоб вся область реагувала
+        this.view.registerDomEvent(itemEl, 'dragenter', (e) => {
+            e.preventDefault();
+            itemEl.addClass(CSS_DROP_TARGET_ACTIVE);
+        });
+        this.view.registerDomEvent(itemEl, 'dragover', (e) => {
+            e.preventDefault(); // Необхідно для спрацювання drop
+            e.dataTransfer!.dropEffect = "move"; // Показуємо, що це переміщення
+        });
+        this.view.registerDomEvent(itemEl, 'dragleave', (e) => {
+            // Перевіряємо relatedTarget, щоб клас не зникав при вході в дочірній елемент
+            if (!itemEl.contains(e.relatedTarget as Node)) {
+                itemEl.removeClass(CSS_DROP_TARGET_ACTIVE);
+            }
+        });
+        this.view.registerDomEvent(itemEl, 'drop', async (e) => {
+            e.preventDefault();
+            itemEl.removeClass(CSS_DROP_TARGET_ACTIVE);
+            try {
+                const dataString = e.dataTransfer?.getData('text/plain');
+                if (!dataString) return;
 
-      } else if (node.type === 'chat') {
-          itemEl.addClass(CSS_CHAT_ITEM);
-          const chatMeta = node.metadata;
-          const isActive = chatMeta.id === activeChatId;
-          if (isActive) { itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); } // Використовуємо спільний клас активності
+                const draggedData = JSON.parse(dataString) as { chatId: string; filePath: string; type: 'chat' }; // Додаємо тип для перевірки
+                const targetFolderPath = node.path; // Шлях папки, куди кинули
 
-          // 1. Іконка Чату
-          const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-          setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+                // Перевіряємо, чи це дійсно чат і чи не кидаємо в ту ж папку
+                if (draggedData.type !== 'chat') return;
+                const originalFolderPath = draggedData.filePath.substring(0, draggedData.filePath.lastIndexOf('/')) || "/"; // Визначаємо батьківську папку
 
-          // 2. Назва Чату
-          itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
+                if (normalizePath(originalFolderPath) === normalizePath(targetFolderPath)) {
+                    this.plugin.logger.debug("Drop ignored: Item dropped into the same folder.");
+                    return; // Немає сенсу переміщувати в ту ж папку
+                }
 
-          // 3. Деталі (Дата)
-          const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
-           try { const lastModifiedDate = new Date(chatMeta.lastModified); const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date"; if (dateText === "Invalid date") { this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`); } detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText }); }
-           catch(e) { this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e); detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" }); }
+                this.plugin.logger.info(`Dropped chat ${draggedData.chatId} (from ${originalFolderPath}) onto folder ${targetFolderPath}`);
 
-          // 4. Кнопка Опцій (...)
-          const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" }, });
-          setIcon(optionsBtn, "lucide-more-horizontal");
-          this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showChatContextMenu(e, chatMeta); });
-          this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => { if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; } if (chatMeta.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(chatMeta.id); } });
-          this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => { e.preventDefault(); this.showChatContextMenu(e, chatMeta); });
-      }
-  }
+                // --- ВИКЛИК МЕТОДУ В ChatManager (ПОТРІБНО РЕАЛІЗУВАТИ!) ---
+                const success = await this.plugin.chatManager.moveChat(draggedData.chatId, draggedData.filePath, targetFolderPath);
+                // ---
+
+                if (success) {
+                    new Notice(`Chat moved to ${node.name}`);
+                    // Оновлюємо UI після успішного переміщення
+                    this.updateChatList();
+                } else {
+                    new Notice("Failed to move chat.");
+                }
+            } catch (err) {
+                this.plugin.logger.error("Error handling drop event:", err);
+                new Notice("Error processing drop.");
+            }
+        });
+        // --- КІНЕЦЬ ОБРОБНИКІВ Drop ---
+
+
+        const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
+        if (node.children && node.children.length > 0) {
+            node.children.forEach(childNode => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths, updateId));
+        }
+
+    } else if (node.type === 'chat') {
+        itemEl.addClass(CSS_CHAT_ITEM);
+        const chatMeta = node.metadata;
+        const isActive = chatMeta.id === activeChatId;
+        if (isActive) { itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE); }
+
+        // --- ДОДАНО: Атрибут draggable та обробники Drag для чату ---
+        itemEl.draggable = true; // Робимо елемент перетягуваним
+
+        this.view.registerDomEvent(itemEl, 'dragstart', (e) => {
+            if (!e.dataTransfer) return;
+            e.dataTransfer.effectAllowed = 'move';
+            const dragData = JSON.stringify({ chatId: chatMeta.id, filePath: node.filePath, type: 'chat' }); // Додаємо тип
+            e.dataTransfer.setData('text/plain', dragData);
+            itemEl.addClass(CSS_DRAGGING_ITEM); // Додаємо клас для стилізації
+            this.plugin.logger.trace("Drag start:", dragData);
+        });
+
+        this.view.registerDomEvent(itemEl, 'dragend', (e) => {
+            itemEl.removeClass(CSS_DRAGGING_ITEM); // Прибираємо клас після завершення
+            this.plugin.logger.trace("Drag end");
+             // Знімаємо підсвітку з усіх можливих цілей
+             this.chatPanelListContainerEl.querySelectorAll('.' + CSS_DROP_TARGET_ACTIVE).forEach(el => {
+                 el.removeClass(CSS_DROP_TARGET_ACTIVE);
+             });
+        });
+        // --- КІНЕЦЬ ОБРОБНИКІВ Drag ---
+
+        const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+        setIcon(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+
+        itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
+
+        const detailsWrapper = itemContentEl.createDiv({cls: CSS_CHAT_ITEM_DETAILS});
+        try { const lastModifiedDate = new Date(chatMeta.lastModified); const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date"; if (dateText === "Invalid date") { this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`); } detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText }); }
+        catch(e) { this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e); detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" }); }
+
+        const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" }, });
+        setIcon(optionsBtn, "lucide-more-horizontal");
+        this.view.registerDomEvent(optionsBtn, "click", (e: MouseEvent) => { e.stopPropagation(); this.showChatContextMenu(e, chatMeta); });
+        this.view.registerDomEvent(itemContentEl, "click", async (e: MouseEvent) => { if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) { return; } if (chatMeta.id !== activeChatId) { await this.plugin.chatManager.setActiveChat(chatMeta.id); } });
+        this.view.registerDomEvent(itemContentEl, "contextmenu", (e: MouseEvent) => { e.preventDefault(); this.showChatContextMenu(e, chatMeta); });
+    }
+}
+
   // --- КІНЕЦЬ ПОВНОЇ ВЕРСІЇ renderHierarchyNode ---
 
   // Обробник розгортання/згортання (оновлює DOM)

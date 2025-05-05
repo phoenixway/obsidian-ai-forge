@@ -624,4 +624,7 @@ export default class OllamaPlugin extends Plugin {
     try { const fileName = rolePath.substring(rolePath.lastIndexOf("/") + 1); const roleName = fileName.endsWith(".md") ? fileName.slice(0, -3) : fileName; return roleName || "Unknown Role"; }
     catch (e) { return "Unknown Role"; }
   }
+
+
+  
 } // END OF OllamaPlugin CLASS

@@ -1886,6 +1886,8 @@ var FOLDER_ICON_CLOSED = "lucide-folder";
 var FOLDER_ICON_OPEN = "lucide-folder-open";
 var CHAT_ICON = "lucide-message-square";
 var CHAT_ICON_ACTIVE = "lucide-check";
+var CSS_DRAGGING_ITEM = "is-dragging";
+var CSS_DROP_TARGET_ACTIVE = "drop-target-active";
 var SidebarManager = class {
   constructor(plugin, app, view) {
     this.folderExpansionState = /* @__PURE__ */ new Map();
@@ -2186,19 +2188,16 @@ var SidebarManager = class {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
-  // --- Повна версія renderHierarchyNode ---
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths, updateId) {
     var _a;
     const nodeName = node.type === "folder" ? node.name : node.metadata.name;
     const itemEl = parentElement.createDiv({
       cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
     });
-    if (node.type === "folder") {
-      itemEl.dataset.path = node.path;
-    }
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
     if (node.type === "folder") {
       itemEl.addClass(CSS_FOLDER_ITEM);
+      itemEl.dataset.path = node.path;
       const isExpanded = (_a = this.folderExpansionState.get(node.path)) != null ? _a : false;
       if (!isExpanded) {
         itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
@@ -2209,10 +2208,7 @@ var SidebarManager = class {
       const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
       (0, import_obsidian12.setIcon)(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
       itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
-      const optionsBtn = itemContentEl.createEl("button", {
-        cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-        attr: { "aria-label": "Folder options", title: "More options" }
-      });
+      const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Folder options", title: "More options" } });
       (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
       this.view.registerDomEvent(optionsBtn, "click", (e) => {
         e.stopPropagation();
@@ -2225,10 +2221,52 @@ var SidebarManager = class {
       this.view.registerDomEvent(itemContentEl, "click", () => {
         this.handleToggleFolder(node.path);
       });
+      this.view.registerDomEvent(itemEl, "dragenter", (e) => {
+        e.preventDefault();
+        itemEl.addClass(CSS_DROP_TARGET_ACTIVE);
+      });
+      this.view.registerDomEvent(itemEl, "dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      });
+      this.view.registerDomEvent(itemEl, "dragleave", (e) => {
+        if (!itemEl.contains(e.relatedTarget)) {
+          itemEl.removeClass(CSS_DROP_TARGET_ACTIVE);
+        }
+      });
+      this.view.registerDomEvent(itemEl, "drop", async (e) => {
+        var _a2;
+        e.preventDefault();
+        itemEl.removeClass(CSS_DROP_TARGET_ACTIVE);
+        try {
+          const dataString = (_a2 = e.dataTransfer) == null ? void 0 : _a2.getData("text/plain");
+          if (!dataString)
+            return;
+          const draggedData = JSON.parse(dataString);
+          const targetFolderPath = node.path;
+          if (draggedData.type !== "chat")
+            return;
+          const originalFolderPath = draggedData.filePath.substring(0, draggedData.filePath.lastIndexOf("/")) || "/";
+          if ((0, import_obsidian12.normalizePath)(originalFolderPath) === (0, import_obsidian12.normalizePath)(targetFolderPath)) {
+            this.plugin.logger.debug("Drop ignored: Item dropped into the same folder.");
+            return;
+          }
+          this.plugin.logger.info(`Dropped chat ${draggedData.chatId} (from ${originalFolderPath}) onto folder ${targetFolderPath}`);
+          const success = await this.plugin.chatManager.moveChat(draggedData.chatId, draggedData.filePath, targetFolderPath);
+          if (success) {
+            new import_obsidian12.Notice(`Chat moved to ${node.name}`);
+            this.updateChatList();
+          } else {
+            new import_obsidian12.Notice("Failed to move chat.");
+          }
+        } catch (err) {
+          this.plugin.logger.error("Error handling drop event:", err);
+          new import_obsidian12.Notice("Error processing drop.");
+        }
+      });
       const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
       if (node.children && node.children.length > 0) {
         node.children.forEach((childNode) => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths, updateId));
-      } else {
       }
     } else if (node.type === "chat") {
       itemEl.addClass(CSS_CHAT_ITEM);
@@ -2237,6 +2275,23 @@ var SidebarManager = class {
       if (isActive) {
         itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
       }
+      itemEl.draggable = true;
+      this.view.registerDomEvent(itemEl, "dragstart", (e) => {
+        if (!e.dataTransfer)
+          return;
+        e.dataTransfer.effectAllowed = "move";
+        const dragData = JSON.stringify({ chatId: chatMeta.id, filePath: node.filePath, type: "chat" });
+        e.dataTransfer.setData("text/plain", dragData);
+        itemEl.addClass(CSS_DRAGGING_ITEM);
+        this.plugin.logger.trace("Drag start:", dragData);
+      });
+      this.view.registerDomEvent(itemEl, "dragend", (e) => {
+        itemEl.removeClass(CSS_DRAGGING_ITEM);
+        this.plugin.logger.trace("Drag end");
+        this.chatPanelListContainerEl.querySelectorAll("." + CSS_DROP_TARGET_ACTIVE).forEach((el) => {
+          el.removeClass(CSS_DROP_TARGET_ACTIVE);
+        });
+      });
       const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
       (0, import_obsidian12.setIcon)(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
       itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
@@ -8949,6 +9004,77 @@ var ChatManager = class {
       return false;
     }
   }
+  // --- ВИПРАВЛЕНИЙ МЕТОД: Переміщення чату ---
+  async moveChat(chatId, oldFilePath, newFolderPath) {
+    const normOldPath = (0, import_obsidian18.normalizePath)(oldFilePath);
+    const normNewFolderPath = (0, import_obsidian18.normalizePath)(newFolderPath);
+    this.logger.info(`Attempting to move chat ${chatId} from "${normOldPath}" to folder "${normNewFolderPath}"`);
+    let newFilePath = null;
+    if (!chatId || !oldFilePath || !newFolderPath) {
+      this.logger.error("Move chat failed: Invalid arguments provided.");
+      new import_obsidian18.Notice("Move chat failed: Invalid data.");
+      return false;
+    }
+    try {
+      if (!await this.adapter.exists(normOldPath)) {
+        this.logger.error(`Move chat failed: Source file does not exist: ${normOldPath}`);
+        new import_obsidian18.Notice("Move chat failed: Source file not found.");
+        await this.rebuildIndexFromFiles();
+        this.plugin.emit("chat-list-updated");
+        return false;
+      }
+      const oldStat = await this.adapter.stat(normOldPath);
+      if ((oldStat == null ? void 0 : oldStat.type) !== "file") {
+        this.logger.error(`Move chat failed: Source path is not a file: ${normOldPath}`);
+        new import_obsidian18.Notice("Move chat failed: Source is not a file.");
+        return false;
+      }
+      if (!await this.adapter.exists(normNewFolderPath)) {
+        this.logger.error(`Move chat failed: Target folder does not exist: ${normNewFolderPath}`);
+        new import_obsidian18.Notice("Move chat failed: Target folder not found.");
+        return false;
+      }
+      const newStat = await this.adapter.stat(normNewFolderPath);
+      if ((newStat == null ? void 0 : newStat.type) !== "folder") {
+        this.logger.error(`Move chat failed: Target path is not a folder: ${normNewFolderPath}`);
+        new import_obsidian18.Notice("Move chat failed: Target is not a folder.");
+        return false;
+      }
+      const fileName = oldFilePath.substring(oldFilePath.lastIndexOf("/") + 1);
+      newFilePath = (0, import_obsidian18.normalizePath)(`${normNewFolderPath}/${fileName}`);
+      if (normOldPath === newFilePath) {
+        this.logger.warn(`Move chat skipped: Source and target paths are the same: ${normOldPath}`);
+        return true;
+      }
+      if (await this.adapter.exists(newFilePath)) {
+        this.logger.error(`Move chat failed: File already exists at target path: ${newFilePath}`);
+        new import_obsidian18.Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
+        return false;
+      }
+      this.logger.debug(`Executing adapter.rename from "${normOldPath}" to "${newFilePath}"`);
+      await this.adapter.rename(normOldPath, newFilePath);
+      this.logger.info(`Chat file moved successfully to ${newFilePath}`);
+      if (this.loadedChats[chatId] && newFilePath) {
+        this.logger.debug(`Updating file path in loadedChats cache for ${chatId} to ${newFilePath}`);
+        this.loadedChats[chatId].filePath = newFilePath;
+      }
+      this.plugin.emit("chat-list-updated");
+      return true;
+    } catch (error) {
+      const targetPathDesc = newFilePath != null ? newFilePath : normNewFolderPath;
+      if (error.code === "EPERM" || error.code === "EACCES") {
+        this.logger.error(`Permission error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
+        new import_obsidian18.Notice(`Permission error moving chat file.`);
+      } else {
+        this.logger.error(`Error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
+        new import_obsidian18.Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
+      }
+      await this.rebuildIndexFromFiles();
+      this.plugin.emit("chat-list-updated");
+      return false;
+    }
+  }
+  // --- КІНЕЦЬ ВИПРАВЛЕНОГО МЕТОДУ ---
   // --- КІНЕЦЬ НОВИХ МЕТОДІВ ---
 };
 
