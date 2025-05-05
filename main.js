@@ -3905,6 +3905,7 @@ This action cannot be undone.`,
     };
     this.handleSettingsUpdated = async () => {
       var _a, _b, _c, _d, _e, _f, _g, _h;
+      this.plugin.logger.error("[HANDLER] handleSettingsUpdated FIRED");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRolePath = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) != null ? _d : this.plugin.settings.selectedRolePath;
@@ -3926,9 +3927,12 @@ This action cannot be undone.`,
       } else {
       }
       if ((_h = this.sidebarManager) == null ? void 0 : _h.isSectionVisible("chats")) {
+        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is visible, updating it.");
         await this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e));
       } else {
+        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is collapsed, skipping update.");
       }
+      this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
     };
     this.handleRoleDisplayClick = async (event) => {
       var _a, _b, _c;

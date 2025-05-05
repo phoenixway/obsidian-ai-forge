@@ -1598,6 +1598,7 @@ export class OllamaView extends ItemView {
   };
 
   public handleSettingsUpdated = async (): Promise<void> => {
+    this.plugin.logger.error("[HANDLER] handleSettingsUpdated FIRED");
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
     const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
@@ -1629,11 +1630,14 @@ export class OllamaView extends ItemView {
     }
 
     if (this.sidebarManager?.isSectionVisible("chats")) {
+      this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is visible, updating it.");
       await this.sidebarManager
         .updateChatList()
         .catch(e => this.plugin.logger.error("Error updating chat panel list:", e));
     } else {
+      this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is collapsed, skipping update.");
     }
+    this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
   };
 
   public async handleDeleteMessageClick(messageToDelete: Message): Promise<void> {
