@@ -1294,10 +1294,6 @@ export class OllamaView extends ItemView {
   }
 
   async loadAndDisplayActiveChat(): Promise<void> {
-    this.plugin.logger.error(
-      "[loadAndDisplayActiveChat] >>> ВХІД: Починаємо повне перезавантаження/відображення чату <<<"
-    );
-
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -1498,9 +1494,6 @@ export class OllamaView extends ItemView {
     } catch (error) {
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX ПОМИЛКА під час виконання XXX", error);
     } finally {
-      this.plugin.logger.error(
-        "[loadAndDisplayActiveChat] <<< ВИХІД: Завершено повне перезавантаження/відображення чату >>>"
-      );
     }
   }
 

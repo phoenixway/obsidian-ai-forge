@@ -4566,9 +4566,6 @@ This action cannot be undone.`,
   }
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-    this.plugin.logger.error(
-      "[loadAndDisplayActiveChat] >>> \u0412\u0425\u0406\u0414: \u041F\u043E\u0447\u0438\u043D\u0430\u0454\u043C\u043E \u043F\u043E\u0432\u043D\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F/\u0432\u0456\u0434\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0442\u0443 <<<"
-    );
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -4734,9 +4731,6 @@ This action cannot be undone.`,
     } catch (error) {
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX \u041F\u041E\u041C\u0418\u041B\u041A\u0410 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F XXX", error);
     } finally {
-      this.plugin.logger.error(
-        "[loadAndDisplayActiveChat] <<< \u0412\u0418\u0425\u0406\u0414: \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E \u043F\u043E\u0432\u043D\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F/\u0432\u0456\u0434\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0442\u0443 >>>"
-      );
     }
   }
   async handleActiveChatChanged(data) {
