@@ -40,12 +40,6 @@ $folder-icon-extra-indent: 4px; // Невеликий зсув іконки па
 
 }
 
-.ollama-chat-panel,
-.ollama-role-panel {
-    display: flex; flex-direction: column;
-    &.ollama-role-panel { flex-shrink: 0; }
-}
-
 ollama-sidebar-section-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
@@ -143,6 +137,11 @@ ollama-sidebar-section-header {
 
 .ollama-sidebar-section-content-hidden { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; opacity: 0 !important; overflow: hidden !important; visibility: hidden; }
 
+.ollama-chat-panel,
+.ollama-role-panel {
+    display: flex; flex-direction: column;
+    &.ollama-role-panel { flex-shrink: 0; }
+}
 
 // --- Стилізація контекстного меню ---
 .menu {
