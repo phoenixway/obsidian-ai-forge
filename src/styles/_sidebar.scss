@@ -112,3 +112,22 @@ ollama-sidebar-section-header {
 
 // --- ВСІ ІНШІ СТИЛІ ВИДАЛЕНО ---
 // (hover, active, options, details, roles, menu, header, etc.)
+
+// --- Стилізація контекстного меню ---
+.menu {
+  .menu-item {
+      &[aria-label*="Delete Folder" i],
+      &[aria-label*="Delete Chat" i],
+      &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]) {
+          .menu-item-title { color: var(--text-error) !important; }
+          .menu-item-icon { color: var(--text-error) !important; }
+           &:hover { background-color: var(--background-modifier-error-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-error) !important; } }
+      }
+       &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]),
+       &:has(> .menu-item-title:contains("Clear Messages")) {
+           .menu-item-title { color: var(--text-warning) !important; }
+           .menu-item-icon { color: var(--text-warning) !important; }
+            &:hover { background-color: var(--background-modifier-warning-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-warning) !important; } }
+       }
+  }
+}
