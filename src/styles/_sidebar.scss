@@ -148,8 +148,7 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
   }
   &::-webkit-scrollbar-thumb:hover {
     background-color: var(--interactive-accent);
-
-  }  // --- Стилі для ієрархії ---
+  } // --- Стилі для ієрархії ---
   .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
     margin: 1px 0;
     border-radius: var(--radius-s);
@@ -160,13 +159,21 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
     // Відступи рівнів (БЕЗ !important - ПЕРЕВІРТЕ, ЧИ ПРАЦЮЮТЬ!)
     @for $i from 0 through 10 {
       &.ollama-indent-level-#{$i} {
-        padding-left: $item-padding-horizontal + ($i * $indent-step);
+        // padding-left: $item-padding-horizontal + ($i * $indent-step);
+        padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
       }
     }
 
     &:hover > .ollama-hierarchy-item-content {
       background-color: var(--background-modifier-hover);
       // --- ПОВЕРНУЛИ: Показувати кнопку опцій при наведенні ---
+      .ollama-hierarchy-item-options {
+        opacity: 0.7;
+      }
+    }
+
+    .ollama-hierarchy-item-content:hover {
+      background-color: var(--background-modifier-hover);
       .ollama-hierarchy-item-options {
         opacity: 0.7;
       }
@@ -203,7 +210,7 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
       border: 1px solid lime; // DEBUG: Межі іконки
       vertical-align: middle; // Спробуємо вирівняти по вертикалі
     }
-    
+
     // Текст
     .ollama-hierarchy-item-text {
       display: inline !important; // Спробуємо inline для тексту
@@ -223,9 +230,8 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
     .ollama-hierarchy-item.is-collapsed > .ollama-hierarchy-item-children {
       display: none !important; // Приховуємо з !important
     }
-
   }
-  
+
   /////////////////////
   // Специфічно для чату (скидання зсуву іконки)
   &.ollama-chat-item {
