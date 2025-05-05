@@ -113,6 +113,9 @@ ollama-sidebar-section-header {
 // --- ВСІ ІНШІ СТИЛІ ВИДАЛЕНО ---
 // (hover, active, options, details, roles, menu, header, etc.)
 
+.ollama-sidebar-section-content-hidden { max-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; opacity: 0 !important; overflow: hidden !important; visibility: hidden; }
+
+
 // --- Стилізація контекстного меню ---
 .menu {
   .menu-item {
