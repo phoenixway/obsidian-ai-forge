@@ -10,6 +10,7 @@ $icon-margin: 8px;
 
 $indent-step: 16px; // Зменшимо крок для меншого візуального зсуву іконок дітей
 $item-padding-vertical: var(--size-4-1);
+//FIXME: причина чому індент потомків не працював 
 // $item-padding-horizontal: var(--size-4-2); // Базовий горизонтальний відступ
 $icon-size: 16px;
 $icon-margin: var(--size-4-2); // Проміжок між іконкою та текстом
@@ -38,6 +39,14 @@ $folder-icon-extra-indent: 4px; // Невеликий зсув іконки па
   }
 
 }
+
+.ollama-chat-panel,
+.ollama-role-panel {
+    display: flex; flex-direction: column;
+    &.ollama-role-panel { flex-shrink: 0; }
+}
+
+
 .ollama-chat-list-container {}
 
 .ollama-hierarchy-item {
