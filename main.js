@@ -2778,7 +2778,6 @@ var DropdownMenuManager = class {
   }
   // attachEventListeners залишається таким, як у попередній відповіді (додає слухачі до всіх)
   attachEventListeners() {
-    this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING ALL POTENTIAL EVENT LISTENERS (Visibility controlled by CSS) !!!`);
     if (!this.modelSubmenuHeader)
       console.error("Model header missing");
     if (!this.roleSubmenuHeader)
@@ -2836,7 +2835,6 @@ var DropdownMenuManager = class {
       this.registerListener(this.toggleViewLocationOption, "click", this.view.handleToggleViewLocationClick);
     if (this.settingsOption)
       this.registerListener(this.settingsOption, "click", this.view.handleSettingsClick);
-    this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING ALL EVENT LISTENERS !!!");
   }
   createActionItem(icon, text, cssClass) {
     const itemEl = this.menuDropdown.createEl("div", {
@@ -3184,7 +3182,6 @@ var DropdownMenuManager = class {
   updateToggleViewLocationOption() {
     if (!this.toggleViewLocationOption)
       return;
-    this.plugin.logger.trace("[DropdownMenuManager] Updating toggle view location option.");
     this.toggleViewLocationOption.empty();
     const iconSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-icon" });
     const textSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-text" });
@@ -3886,6 +3883,42 @@ This action cannot be undone.`,
         textarea.scrollTop = currentScrollTop;
       });
     };
+    // Обробник події зміни активного чату
+    this.handleActiveChatChanged = async (data) => {
+      var _a, _b, _c, _d, _e, _f, _g;
+      this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${(_a = data.chatId) != null ? _a : "null"}`);
+      const chatSwitched = data.chatId !== this.lastProcessedChatId;
+      this.plugin.logger.warn(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
+      if (chatSwitched || data.chatId !== null && data.chat === null) {
+        this.plugin.logger.error(`[handleActiveChatChanged] !!! FULL CHAT RELOAD Condition Met !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Preparing to call loadAndDisplayActiveChat...`);
+        const currentStack = new Error().stack;
+        this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
+        this.lastProcessedChatId = data.chatId;
+        this.plugin.logger.error("[handleActiveChatChanged] CALLING loadAndDisplayActiveChat NOW!");
+        await this.loadAndDisplayActiveChat();
+      } else if (data.chatId !== null && data.chat !== null) {
+        this.plugin.logger.info(`[handleActiveChatChanged] Updating UI/Panels for existing chat ID: ${data.chatId}. NO FULL RELOAD.`);
+        this.lastProcessedChatId = data.chatId;
+        const chat = data.chat;
+        const currentRolePath = (_c = (_b = chat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
+        const currentRoleName = await this.findRoleNameByPath(currentRolePath);
+        const currentModelName = ((_d = chat.metadata) == null ? void 0 : _d.modelName) || this.plugin.settings.modelName;
+        const currentTemperature = (_f = (_e = chat.metadata) == null ? void 0 : _e.temperature) != null ? _f : this.plugin.settings.temperature;
+        this.updateModelDisplay(currentModelName);
+        this.updateRoleDisplay(currentRoleName);
+        this.updateInputPlaceholder(currentRoleName);
+        this.updateTemperatureIndicator(currentTemperature);
+        this.plugin.logger.info("[handleActiveChatChanged] SKIPPED explicit sidebar panel update call here. Relying on 'chat-list-updated' event.");
+      } else {
+        this.plugin.logger.warn(`[handleActiveChatChanged] Entering UNHANDLED STATE: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`);
+        this.lastProcessedChatId = data.chatId;
+      }
+      if (this.dropdownMenuManager) {
+        this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
+      }
+      this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FINISHED for chat ID: ${(_g = data.chatId) != null ? _g : "null"}`);
+    };
+    // Кінець handleActiveChatChanged
     this.handleChatListUpdated = () => {
       var _a;
       this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
@@ -4742,52 +4775,6 @@ This action cannot be undone.`,
     } finally {
     }
     this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
-  }
-  async handleActiveChatChanged(data) {
-    var _a, _b, _c, _d, _e, _f;
-    this.plugin.logger.error(
-      `[handleActiveChatChanged] <<< \u041E\u0422\u0420\u0418\u041C\u0410\u041D\u041E \u041F\u041E\u0414\u0406\u042E >>> \u041D\u043E\u0432\u0438\u0439 ID: ${data.chatId}, \u0404 \u0434\u0430\u043D\u0456 \u0447\u0430\u0442\u0443: ${!!data.chat}, \u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0439 ID: ${this.lastProcessedChatId}`
-    );
-    const chatSwitched = data.chatId !== this.lastProcessedChatId;
-    if (this.temporarilyDisableChatChangedReload) {
-      this.plugin.logger.error(
-        "[handleActiveChatChanged] \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F \u0412\u0418\u041C\u041A\u041D\u0415\u041D\u041E \u0414\u041B\u042F \u0422\u0415\u0421\u0422\u0423. \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u0454\u043C\u043E \u043B\u043E\u0433\u0456\u043A\u0443 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F/\u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F."
-      );
-      this.lastProcessedChatId = data.chatId;
-      return;
-    }
-    if (chatSwitched || data.chatId !== null && data.chat === null) {
-      this.plugin.logger.error(
-        `[handleActiveChatChanged] !!! \u0423\u041C\u041E\u0412\u0410 \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F \u0412\u0418\u041A\u041E\u041D\u0410\u041D\u0410 !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). \u0413\u043E\u0442\u0443\u0454\u043C\u043E\u0441\u044C \u0432\u0438\u043A\u043B\u0438\u043A\u0430\u0442\u0438 loadAndDisplayActiveChat...`
-      );
-      const currentStack = new Error().stack;
-      this.plugin.logger.error(`[handleActiveChatChanged] Stack trace \u0434\u043B\u044F \u0443\u043C\u043E\u0432\u0438 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F: ${currentStack}`);
-      if (chatSwitched) {
-        this.lastProcessedChatId = data.chatId;
-      }
-      this.plugin.logger.error("[handleActiveChatChanged] \u0412\u0418\u041A\u041B\u0418\u041A\u0410\u0404\u041C\u041E loadAndDisplayActiveChat \u0417\u0410\u0420\u0410\u0417!");
-      await this.loadAndDisplayActiveChat();
-    } else if (data.chatId !== null && data.chat !== null) {
-      this.plugin.logger.info(
-        `[handleActiveChatChanged] \u0412\u0445\u043E\u0434\u0438\u043C\u043E \u0432 \u0431\u043B\u043E\u043A \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F \u041C\u0415\u0422\u0410\u0414\u0410\u041D\u0418\u0425/\u041F\u0410\u041D\u0415\u041B\u0415\u0419 (ID: ${data.chatId}). \u0411\u0415\u0417 \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F.`
-      );
-      if (!chatSwitched) {
-        this.lastProcessedChatId = data.chatId;
-      }
-      const chat = data.chat;
-      const currentRolePath = (_b = (_a = chat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-      const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-      const currentModelName = ((_c = chat.metadata) == null ? void 0 : _c.modelName) || this.plugin.settings.modelName;
-      const currentTemperature = (_e = (_d = chat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
-      this.updateModelDisplay(currentModelName);
-      this.updateRoleDisplay(currentRoleName);
-      this.updateInputPlaceholder(currentRoleName);
-      this.updateTemperatureIndicator(currentTemperature);
-      this.lastProcessedChatId = data.chatId;
-    }
-    this.plugin.logger.error(
-      `[handleActiveChatChanged] <<< \u0417\u0410\u0412\u0415\u0420\u0428\u0415\u041D\u041E \u041E\u0411\u0420\u041E\u0411\u041A\u0423 \u041F\u041E\u0414\u0406\u0407 >>> \u0414\u043B\u044F ID: ${(_f = data.chatId) != null ? _f : "null"}`
-    );
   }
   async handleDeleteMessageClick(messageToDelete) {
     var _a;

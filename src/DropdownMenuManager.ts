@@ -138,7 +138,7 @@ export class DropdownMenuManager {
 
     // attachEventListeners залишається таким, як у попередній відповіді (додає слухачі до всіх)
     public attachEventListeners(): void {
-        this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING ALL POTENTIAL EVENT LISTENERS (Visibility controlled by CSS) !!!`);
+        // this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING ALL POTENTIAL EVENT LISTENERS (Visibility controlled by CSS) !!!`);
         // --- Null Checks ---
         if (!this.modelSubmenuHeader) console.error("Model header missing");
          if (!this.roleSubmenuHeader) console.error("Role header missing");
@@ -176,7 +176,7 @@ export class DropdownMenuManager {
         if (this.toggleViewLocationOption) this.registerListener(this.toggleViewLocationOption, "click", this.view.handleToggleViewLocationClick);
         if (this.settingsOption) this.registerListener(this.settingsOption, "click", this.view.handleSettingsClick);
 
-        this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING ALL EVENT LISTENERS !!!");
+        // this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING ALL EVENT LISTENERS !!!");
     }
 
 
@@ -570,7 +570,7 @@ export class DropdownMenuManager {
 
     public updateToggleViewLocationOption(): void {
         if (!this.toggleViewLocationOption) return;
-        this.plugin.logger.trace("[DropdownMenuManager] Updating toggle view location option.");
+        // this.plugin.logger.trace("[DropdownMenuManager] Updating toggle view location option.");
         this.toggleViewLocationOption.empty();
         const iconSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-icon" });
         const textSpan = this.toggleViewLocationOption.createSpan({ cls: "menu-option-text" });
