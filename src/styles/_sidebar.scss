@@ -406,42 +406,46 @@ $folder-icon-extra-indent: 4px; // Невеликий зсув іконки па
 
   // --- Стилі для контейнера списку чатів/папок ---
   .ollama-chat-list-container {
-    position: relative; // Потрібно для абсолютного позиціонування ::before
+    position: relative; // Потрібно для позиціонування ::after
 
     // Стиль під час завантаження/оновлення списку
     &.is-loading {
-      // Можна додати легке затемнення або зменшення прозорості основного контенту
-      // > *:not(.loading-indicator-element) { // Якщо використовуєте окремий елемент індикатора
-      //    opacity: 0.5;
-      //    pointer-events: none;
-      // }
+        // --- ДОДАЄМО transition до ::after ---
+        &::after {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; right: 0; bottom: 0;
+            background-color: rgba(var(--background-secondary-rgb), 0.6);
+            z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: var(--radius-m);
 
-      // Додаємо оверлей зі спіннером через псевдоелемент
-      &::after {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(var(--background-secondary-rgb), 0.6); // Напівпрозорий фон
-        z-index: 10; // Має бути над списком
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--radius-m); // Опціонально
+            // Стилі спіннера (як раніше)
+            width: 24px; height: 24px; margin: auto;
+            border: 3px solid rgba(var(--text-muted-rgb), 0.3);
+            border-top-color: var(--text-accent);
+            border-radius: 50%;
+            animation: ollama-spin 0.8s linear infinite;
 
-        // Створюємо спіннер
-        width: 24px; // Розмір спіннера
-        height: 24px;
-        margin: auto; // Центруємо спіннер
-        border: 3px solid rgba(var(--text-muted-rgb), 0.3); // Колір кільця
-        border-top-color: var(--text-accent); // Колір активної частини
-        border-radius: 50%;
-        animation: ollama-spin 0.8s linear infinite; // Анімація обертання
-      }
+            // Плавна поява/зникнення
+            opacity: 1; // Кінцевий стан - видимий
+            // Додаємо transition для властивості opacity
+            transition: opacity 0.2s ease-in-out; // З'являється/зникає за 0.2 сек
+        }
+        // --- КІНЕЦЬ ЗМІН В ::after ---
     }
-  }
+
+     // --- ДОДАНО: Початковий стан ::after (коли is-loading НЕМАЄ) ---
+     // Хоча псевдоелемент не існує без is-loading, це може допомогти
+     // браузеру краще зрозуміти анімацію зникнення при видаленні класу.
+     // Але зазвичай достатньо transition в правилі вище.
+     /*
+     &::after {
+         opacity: 0;
+         pointer-events: none; // Не реагувати на події, коли невидимий
+     }
+     */
+}
 
   // Анімація обертання (якщо ще не визначена)
   @keyframes ollama-spin {
