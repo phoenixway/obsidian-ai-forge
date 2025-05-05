@@ -179,13 +179,13 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
       }
     }
     // Активна папка-предок
-    &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content{
-        {
+    &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content 
+       .ollama-hierarchy-item-content {
         .ollama-hierarchy-item-text {
           font-weight: 500;
         }
       }
-    }
+    
   }
 
   ////////////////////////
