@@ -48,6 +48,7 @@ const CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
 const CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
 const CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
 const CSS_FOLDER_ACTIVE_ANCESTOR = "is-active-ancestor"; // Клас для папки, що містить активний чат
+const CSS_LIST_LOADING = "is-loading";
 
 // Меню та інше
 const CSS_CLASS_MENU_SEPARATOR = "menu-separator";
@@ -160,65 +161,8 @@ export class SidebarManager {
     return headerEl?.getAttribute("data-collapsed") === "false";
   }
 
-  public updateChatList = async (): Promise<void> => {
-    this.updateCounter++;
-    const currentUpdateId = this.updateCounter;
-    const container = this.chatPanelListContainerEl;
-    if (!container || !this.plugin.chatManager) {
-      this.plugin.logger.debug(`[Update #${currentUpdateId}] Skipping: Container/Manager missing.`);
-      return;
-    }
-    this.plugin.logger.info(
-      `[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`
-    );
-    const currentScrollTop = container.scrollTop;
-    container.empty();
-    try {
-      const hierarchy = await this.plugin.chatManager.getChatHierarchy();
-      const currentActiveChatId = this.plugin.chatManager.getActiveChatId();
-      const activeAncestorPaths = new Set<string>();
-      if (currentActiveChatId) {
-        const activeChat = await this.plugin.chatManager.getActiveChat();
-        if (activeChat?.filePath) {
-          let currentPath = activeChat.filePath;
-          while (currentPath.includes("/")) {
-            const parentPath = currentPath.substring(0, currentPath.lastIndexOf("/"));
-            if (parentPath === "") {
-              break;
-            } else {
-              const normalizedParentPath = normalizePath(parentPath);
-              activeAncestorPaths.add(normalizedParentPath);
-              currentPath = parentPath;
-            }
-          }
-        } else if (activeChat) {
-          this.plugin.logger.warn(`Active chat ${currentActiveChatId} has no filePath property.`);
-        }
-      }
-      // Логування можна закоментувати для чистоти
-      // const loggableHierarchy = hierarchy.map(node => ({ type: node.type, name: node.type === 'folder' ? node.name : node.metadata.name, path: node.type === 'folder' ? node.path : node.filePath }));
-      // this.plugin.logger.debug(`[Update #${currentUpdateId}] Hierarchy data received (${hierarchy.length} items):`, JSON.stringify(loggableHierarchy));
-
-      if (hierarchy.length === 0) {
-        container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
-      } else {
-        hierarchy.forEach(node =>
-          this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId)
-        );
-      }
-      this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList`);
-    } catch (error) {
-      this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
-      container.empty();
-      container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
-    } finally {
-      requestAnimationFrame(() => {
-        if (container?.isConnected) {
-          container.scrollTop = currentScrollTop;
-        }
-      });
-    }
-  };
+// Метод оновлення списку чатів/папок з індикатором завантаження
+; // Кінець updateChatList
 
   private renderHierarchyNode(
     node: HierarchyNode,
@@ -1027,4 +971,87 @@ export class SidebarManager {
     this.containerEl?.remove();
     this.folderExpansionState.clear();
   }
+
+  // Метод оновлення списку чатів/папок з індикатором завантаження
+  public updateChatList = async (): Promise<void> => {
+    // Лічильник викликів для логування
+    this.updateCounter++;
+    const currentUpdateId = this.updateCounter;
+
+    const container = this.chatPanelListContainerEl;
+    if (!container || !this.plugin.chatManager) {
+        this.plugin.logger.debug(`[Update #${currentUpdateId}] Skipping: Container/Manager missing.`);
+        return;
+    }
+
+    // Логуємо початок оновлення
+    this.plugin.logger.info(`[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`);
+
+    // --- ДОДАНО: Показуємо індикатор завантаження ---
+    container.classList.add("is-loading"); // Використовуємо константу CSS_LIST_LOADING, якщо визначена
+    // ---------------------------------------------
+
+    // Зберігаємо поточну позицію скролу
+    const currentScrollTop = container.scrollTop;
+    // Очищуємо контейнер ПІСЛЯ додавання класу завантаження
+    container.empty();
+
+    try {
+        // Отримуємо актуальну ієрархію
+        const hierarchy = await this.plugin.chatManager.getChatHierarchy();
+        const currentActiveChatId = this.plugin.chatManager.getActiveChatId();
+        const activeAncestorPaths = new Set<string>(); // Сет для шляхів активних предків
+
+        // Визначаємо шляхи предків активного чату
+        if (currentActiveChatId) {
+            const activeChat = await this.plugin.chatManager.getActiveChat();
+            if (activeChat?.filePath) {
+                let currentPath = activeChat.filePath;
+                while (currentPath.includes('/')) {
+                    const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+                    if (parentPath === "") { break; }
+                    else { const normalizedParentPath = normalizePath(parentPath); activeAncestorPaths.add(normalizedParentPath); currentPath = parentPath; }
+                }
+                this.plugin.logger.trace(`[Update #${currentUpdateId}] Active ancestor paths:`, Array.from(activeAncestorPaths));
+            } else if (activeChat) {
+                 this.plugin.logger.warn(`Active chat ${currentActiveChatId} has no filePath property.`);
+            }
+        }
+
+        // Логування отриманої ієрархії (опціонально, для відладки)
+        const loggableHierarchy = hierarchy.map(node => ({ type: node.type, name: node.type === 'folder' ? node.name : node.metadata.name, path: node.type === 'folder' ? node.path : node.filePath }));
+        this.plugin.logger.debug(`[Update #${currentUpdateId}] Hierarchy data received (${hierarchy.length} items):`, JSON.stringify(loggableHierarchy));
+
+
+        // Рендеримо ієрархію
+        if (hierarchy.length === 0) {
+            // Якщо ієрархія порожня, показуємо повідомлення
+            container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
+        } else {
+            // Викликаємо рекурсивний рендеринг для кожного вузла верхнього рівня
+            hierarchy.forEach(node => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId));
+        }
+        this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList (rendering done)`);
+    } catch (error) {
+        // Обробка помилок під час рендерингу
+        this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
+        container.empty(); // Переконуємося, що контейнер порожній у разі помилки
+        container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
+    } finally {
+         // --- ДОДАНО: Прибираємо індикатор завантаження ---
+         // Цей блок виконається завжди, навіть якщо була помилка в try
+         container.classList.remove("is-loading"); // Використовуємо константу CSS_LIST_LOADING, якщо визначена
+         // ----------------------------------------------
+
+         // Відновлюємо позицію скролу
+         requestAnimationFrame(() => {
+             // Перевіряємо, чи контейнер все ще існує перед встановленням scrollTop
+             if (container?.isConnected) {
+                 container.scrollTop = currentScrollTop;
+             }
+         });
+         this.plugin.logger.debug(`[Update #${currentUpdateId}] Finally block executed, loading class removed.`);
+    }
+  }; // Кінець updateChatList
+
 } // End of SidebarManager class

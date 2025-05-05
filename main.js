@@ -1893,61 +1893,6 @@ var SidebarManager = class {
     this.folderExpansionState = /* @__PURE__ */ new Map();
     // Лічильник для діагностики (можна прибрати пізніше)
     this.updateCounter = 0;
-    this.updateChatList = async () => {
-      this.updateCounter++;
-      const currentUpdateId = this.updateCounter;
-      const container = this.chatPanelListContainerEl;
-      if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug(`[Update #${currentUpdateId}] Skipping: Container/Manager missing.`);
-        return;
-      }
-      this.plugin.logger.info(
-        `[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`
-      );
-      const currentScrollTop = container.scrollTop;
-      container.empty();
-      try {
-        const hierarchy = await this.plugin.chatManager.getChatHierarchy();
-        const currentActiveChatId = this.plugin.chatManager.getActiveChatId();
-        const activeAncestorPaths = /* @__PURE__ */ new Set();
-        if (currentActiveChatId) {
-          const activeChat = await this.plugin.chatManager.getActiveChat();
-          if (activeChat == null ? void 0 : activeChat.filePath) {
-            let currentPath = activeChat.filePath;
-            while (currentPath.includes("/")) {
-              const parentPath = currentPath.substring(0, currentPath.lastIndexOf("/"));
-              if (parentPath === "") {
-                break;
-              } else {
-                const normalizedParentPath = (0, import_obsidian12.normalizePath)(parentPath);
-                activeAncestorPaths.add(normalizedParentPath);
-                currentPath = parentPath;
-              }
-            }
-          } else if (activeChat) {
-            this.plugin.logger.warn(`Active chat ${currentActiveChatId} has no filePath property.`);
-          }
-        }
-        if (hierarchy.length === 0) {
-          container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
-        } else {
-          hierarchy.forEach(
-            (node) => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId)
-          );
-        }
-        this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList`);
-      } catch (error) {
-        this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
-        container.empty();
-        container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
-      } finally {
-        requestAnimationFrame(() => {
-          if (container == null ? void 0 : container.isConnected) {
-            container.scrollTop = currentScrollTop;
-          }
-        });
-      }
-    };
     this.updateRoleList = async () => {
       var _a, _b;
       const container = this.rolePanelListEl;
@@ -2160,6 +2105,64 @@ var SidebarManager = class {
         }
       ).open();
     };
+    // Метод оновлення списку чатів/папок з індикатором завантаження
+    this.updateChatList = async () => {
+      this.updateCounter++;
+      const currentUpdateId = this.updateCounter;
+      const container = this.chatPanelListContainerEl;
+      if (!container || !this.plugin.chatManager) {
+        this.plugin.logger.debug(`[Update #${currentUpdateId}] Skipping: Container/Manager missing.`);
+        return;
+      }
+      this.plugin.logger.info(`[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`);
+      container.classList.add("is-loading");
+      const currentScrollTop = container.scrollTop;
+      container.empty();
+      try {
+        const hierarchy = await this.plugin.chatManager.getChatHierarchy();
+        const currentActiveChatId = this.plugin.chatManager.getActiveChatId();
+        const activeAncestorPaths = /* @__PURE__ */ new Set();
+        if (currentActiveChatId) {
+          const activeChat = await this.plugin.chatManager.getActiveChat();
+          if (activeChat == null ? void 0 : activeChat.filePath) {
+            let currentPath = activeChat.filePath;
+            while (currentPath.includes("/")) {
+              const parentPath = currentPath.substring(0, currentPath.lastIndexOf("/"));
+              if (parentPath === "") {
+                break;
+              } else {
+                const normalizedParentPath = (0, import_obsidian12.normalizePath)(parentPath);
+                activeAncestorPaths.add(normalizedParentPath);
+                currentPath = parentPath;
+              }
+            }
+            this.plugin.logger.trace(`[Update #${currentUpdateId}] Active ancestor paths:`, Array.from(activeAncestorPaths));
+          } else if (activeChat) {
+            this.plugin.logger.warn(`Active chat ${currentActiveChatId} has no filePath property.`);
+          }
+        }
+        const loggableHierarchy = hierarchy.map((node) => ({ type: node.type, name: node.type === "folder" ? node.name : node.metadata.name, path: node.type === "folder" ? node.path : node.filePath }));
+        this.plugin.logger.debug(`[Update #${currentUpdateId}] Hierarchy data received (${hierarchy.length} items):`, JSON.stringify(loggableHierarchy));
+        if (hierarchy.length === 0) {
+          container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
+        } else {
+          hierarchy.forEach((node) => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId));
+        }
+        this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList (rendering done)`);
+      } catch (error) {
+        this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
+        container.empty();
+        container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
+      } finally {
+        container.classList.remove("is-loading");
+        requestAnimationFrame(() => {
+          if (container == null ? void 0 : container.isConnected) {
+            container.scrollTop = currentScrollTop;
+          }
+        });
+        this.plugin.logger.debug(`[Update #${currentUpdateId}] Finally block executed, loading class removed.`);
+      }
+    };
     this.plugin = plugin;
     this.app = app;
     this.view = view;
@@ -2226,6 +2229,7 @@ var SidebarManager = class {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
+  // Кінець updateChatList
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths, updateId) {
     var _a;
     const nodeName = node.type === "folder" ? node.name : node.metadata.name;
@@ -2780,6 +2784,7 @@ var SidebarManager = class {
     (_a = this.containerEl) == null ? void 0 : _a.remove();
     this.folderExpansionState.clear();
   }
+  // Кінець updateChatList
 };
 
 // src/DropdownMenuManager.ts
