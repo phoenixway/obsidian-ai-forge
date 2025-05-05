@@ -9290,10 +9290,8 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       }
       const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
       if (savedActiveId && this.settings.saveMessageHistory) {
-        this.logger.info(`Restoring active chat ID: ${savedActiveId}`);
         await this.chatManager.setActiveChat(savedActiveId);
       } else {
-        this.logger.info("No saved active chat ID or history saving disabled. Ensuring default active chat.");
       }
     });
     const debouncedRoleClear = (0, import_obsidian20.debounce)(
@@ -9369,13 +9367,11 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     const fileName = (_b = this.settings.dailyTaskFileName) == null ? void 0 : _b.trim();
     const newPath = folderPath && fileName ? (0, import_obsidian20.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
-      this.logger.info(`Daily task file path changed from "${this.dailyTaskFilePath}" to "${newPath}"`);
       this.dailyTaskFilePath = newPath;
       this.taskFileContentCache = null;
       this.taskFileNeedsUpdate = true;
     } else if (!newPath) {
       if (this.dailyTaskFilePath !== null) {
-        this.logger.info("Daily task file path cleared.");
         this.dailyTaskFilePath = null;
         this.taskFileContentCache = null;
         (_c = this.chatManager) == null ? void 0 : _c.updateTaskState(null);
@@ -9386,7 +9382,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   handleTaskFileModify(file) {
     if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
       if (!this.taskFileNeedsUpdate) {
-        this.logger.trace(`Task file modified: ${file.path}. Marking for update.`);
         this.taskFileNeedsUpdate = true;
       }
     }
@@ -9395,31 +9390,25 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     var _a, _b, _c, _d;
     if (!this.settings.enableProductivityFeatures || !this.dailyTaskFilePath) {
       if (this.taskFileContentCache !== null) {
-        this.logger.info("Disabling productivity features or task file path removed. Clearing task state.");
         this.taskFileContentCache = null;
         (_a = this.chatManager) == null ? void 0 : _a.updateTaskState(null);
       }
       this.taskFileNeedsUpdate = false;
       return;
     }
-    this.logger.debug(`Attempting to load and process task file: ${this.dailyTaskFilePath}`);
     try {
       const fileExists = await this.app.vault.adapter.exists(this.dailyTaskFilePath);
       if (fileExists) {
         const content = await this.app.vault.adapter.read(this.dailyTaskFilePath);
         if (content !== this.taskFileContentCache || this.taskFileContentCache === null) {
-          this.logger.info(`Task file content changed or cache empty. Processing: ${this.dailyTaskFilePath}`);
           this.taskFileContentCache = content;
           const tasks = this.parseTasks(content);
-          this.logger.debug(`Parsed tasks: ${tasks.urgent.length} urgent, ${tasks.regular.length} regular.`);
           (_b = this.chatManager) == null ? void 0 : _b.updateTaskState(tasks);
           this.taskFileNeedsUpdate = false;
         } else {
-          this.logger.trace("Task file content unchanged. No update needed.");
           this.taskFileNeedsUpdate = false;
         }
       } else {
-        this.logger.warn(`Task file does not exist: ${this.dailyTaskFilePath}. Clearing task state.`);
         if (this.taskFileContentCache !== null) {
           this.taskFileContentCache = null;
           (_c = this.chatManager) == null ? void 0 : _c.updateTaskState(null);
@@ -9471,7 +9460,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   }
   async checkAndProcessTaskUpdate() {
     if (this.taskFileNeedsUpdate && this.settings.enableProductivityFeatures) {
-      this.logger.debug("Task file needs update, processing...");
       await this.loadAndProcessInitialTasks();
     } else {
     }
@@ -9480,7 +9468,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   // Обробник змін для ролей та RAG (без debounce)
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear, isDeletion = false) {
     const normPath = (0, import_obsidian20.normalizePath)(changedPath);
-    this.logger.trace(`File change detected: ${normPath}, isDeletion: ${isDeletion}`);
     const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian20.normalizePath)(this.settings.userRolesFolderPath) : null;
     const builtInRolesPath = this.manifest.dir ? (0, import_obsidian20.normalizePath)(`${this.manifest.dir}/roles`) : null;
     let isRoleFile = false;
@@ -9488,32 +9475,26 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/")) {
         if (normPath.substring(userRolesPath.length + 1).indexOf("/") === -1) {
           isRoleFile = true;
-          this.logger.debug(`Change detected in user role file: ${normPath}`);
         }
       } else if (builtInRolesPath && normPath.startsWith(builtInRolesPath + "/")) {
         if (normPath.substring(builtInRolesPath.length + 1).indexOf("/") === -1) {
           isRoleFile = true;
-          this.logger.debug(`Change detected in built-in role file: ${normPath}`);
         }
       }
     }
     if (isRoleFile) {
-      this.logger.info("Role file change detected, triggering debounced roles update.");
       debouncedRoleClear();
     }
     const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian20.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && normPath.startsWith(ragFolderPath + "/")) {
       if (normPath !== this.dailyTaskFilePath) {
-        this.logger.info(`RAG file change detected: ${normPath}. Debouncing index update.`);
         this.debounceIndexUpdate();
       } else {
-        this.logger.trace(`Ignoring RAG index update trigger for task file: ${normPath}`);
       }
     }
   }
   async onunload() {
     var _a, _b, _c, _d;
-    this.logger.info("Unloading OllamaPlugin...");
     this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS).forEach((l) => l.detach());
     this.view = null;
     if (this.indexUpdateTimeout)
@@ -9526,14 +9507,11 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       if (this.chatManager && this.settings.saveMessageHistory) {
         const lastActiveId = this.chatManager.getActiveChatId();
         if (lastActiveId !== void 0 && lastActiveId !== null) {
-          this.logger.debug(`Saving last active chat ID on unload: ${lastActiveId}`);
           await this.saveDataKey(ACTIVE_CHAT_ID_KEY, lastActiveId);
         } else {
-          this.logger.debug("No active chat ID to save on unload.");
           await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
         }
       } else {
-        this.logger.debug("History saving disabled or ChatManager not available, saving null active chat ID.");
         await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
       }
     } catch (error) {
@@ -9542,25 +9520,20 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     (_b = (_a = this.promptService) == null ? void 0 : _a.clearModelDetailsCache) == null ? void 0 : _b.call(_a);
     (_d = (_c = this.promptService) == null ? void 0 : _c.clearRoleCache) == null ? void 0 : _d.call(_c);
     this.roleListCache = null;
-    this.logger.info("OllamaPlugin unloaded.");
   }
   updateOllamaServiceConfig() {
     var _a;
     if (this.ollamaService) {
-      this.logger.debug("Updating OllamaService configuration.");
       (_a = this.promptService) == null ? void 0 : _a.clearModelDetailsCache();
     }
   }
   debounceIndexUpdate() {
     if (this.indexUpdateTimeout)
       clearTimeout(this.indexUpdateTimeout);
-    this.logger.debug("Debouncing RAG index update (30s)...");
     this.indexUpdateTimeout = setTimeout(async () => {
       if (this.settings.ragEnabled && this.ragService) {
-        this.logger.info("Executing debounced RAG index update.");
         await this.ragService.indexDocuments();
       } else {
-        this.logger.trace("Skipping debounced RAG index update (RAG disabled or service unavailable).");
       }
       this.indexUpdateTimeout = null;
     }, 3e4);
@@ -9576,25 +9549,18 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     );
     if (existingLeaves.length > 0) {
       leaf = existingLeaves[0];
-      this.logger.debug("Found existing view leaf. Revealing.");
     } else {
-      this.logger.debug("No existing view leaf found. Creating new one.");
       if (this.settings.openChatInTab) {
         leaf = workspace.getLeaf("tab");
-        this.logger.debug("Creating new leaf in tab.");
       } else {
         leaf = workspace.getRightLeaf(false);
-        this.logger.debug("Attempting to get right sidebar leaf.");
         if (!leaf) {
-          this.logger.debug("Right sidebar leaf not found. Creating new leaf in tab as fallback.");
           leaf = workspace.getLeaf("tab");
         } else {
-          this.logger.debug("Using existing right sidebar leaf.");
         }
       }
       if (leaf) {
         try {
-          this.logger.debug(`Setting view state for new leaf (type: ${viewType}).`);
           await leaf.setViewState({ type: viewType, active: true });
         } catch (e) {
           this.logger.error("Error setting view state:", e);
@@ -9608,12 +9574,10 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       }
     }
     if (leaf) {
-      this.logger.debug("Revealing target leaf.");
       workspace.revealLeaf(leaf);
       setTimeout(() => {
         if (leaf && leaf.view instanceof OllamaView) {
           this.view = leaf.view;
-          this.logger.debug("Assigned this.view reference.");
           this.emit("focus-input-request");
         } else {
           this.logger.error("Leaf revealed, but view is not an instance of OllamaView after timeout:", leaf == null ? void 0 : leaf.view);
@@ -9624,37 +9588,29 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   }
   // Завантаження та Міграція Налаштувань
   async loadSettingsAndMigrate() {
-    this.logger.debug("Loading settings...");
     const loadedData = await this.loadData();
     this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-    this.logger.debug("Settings loaded.");
     this.updateOllamaServiceConfig();
     this.updateDailyTaskFilePath();
   }
   async saveSettings() {
-    this.logger.debug("Saving settings...");
     await this.saveData(this.settings);
-    this.logger.debug("Settings saved. Emitting settings-updated event.");
     this.emit("settings-updated");
   }
   // Data Helpers
   async saveDataKey(key, value) {
     try {
-      this.logger.trace(`Saving data key: ${key}`);
       const data = await this.loadData() || {};
       data[key] = value;
       await this.saveData(data);
-      this.logger.trace(`Data key saved: ${key}`);
     } catch (error) {
       this.logger.error(`Error saving data key ${key}:`, error);
     }
   }
   async loadDataKey(key) {
     try {
-      this.logger.trace(`Loading data key: ${key}`);
       const data = await this.loadData() || {};
       const value = data[key];
-      this.logger.trace(`Data key loaded: ${key}, value found: ${value !== void 0}`);
       return value;
     } catch (error) {
       this.logger.error(`Error loading data key ${key}:`, error);
@@ -9671,25 +9627,20 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     const activeChat = await this.chatManager.getActiveChat();
     if (activeChat && activeChat.messages.length > 0) {
       new ConfirmModal(this.app, "Clear History", `Clear messages in "${activeChat.metadata.name}"?`, async () => {
-        this.logger.info(`User confirmed clearing history for chat: ${activeChat.metadata.id}`);
         await this.chatManager.clearActiveChatMessages();
         new import_obsidian20.Notice(`History cleared for "${activeChat.metadata.name}".`);
       }).open();
     } else if (activeChat) {
-      this.logger.debug("Attempted to clear history, but chat is already empty.");
       new import_obsidian20.Notice("Chat history is already empty.");
     } else {
-      this.logger.debug("Attempted to clear history, but no active chat.");
       new import_obsidian20.Notice("No active chat to clear.");
     }
   }
   // List Role Files Method (з виправленням path.basename)
   async listRoleFiles(forceRefresh = false) {
     if (this.roleListCache && !forceRefresh) {
-      this.logger.trace("Returning cached role list.");
       return this.roleListCache;
     }
-    this.logger.debug(`Listing role files (forceRefresh: ${forceRefresh})...`);
     const roles = [];
     const addedNamesLowerCase = /* @__PURE__ */ new Set();
     const adapter = this.app.vault.adapter;
@@ -9699,7 +9650,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     let builtInRolePath = null;
     if (pluginDir) {
       builtInRolePath = (0, import_obsidian20.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
-      this.logger.trace(`Checking for built-in role at: ${builtInRolePath}`);
       try {
         if (await adapter.exists(builtInRolePath)) {
           const stat = await adapter.stat(builtInRolePath);
@@ -9711,22 +9661,17 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
               // Позначаємо як не кастомну
             });
             addedNamesLowerCase.add(builtInRoleName.toLowerCase());
-            this.logger.debug(`Added built-in role: ${builtInRoleName}`);
           } else {
-            this.logger.warn(`Path exists but is not a file: ${builtInRolePath}`);
           }
         } else {
-          this.logger.trace(`Built-in role file not found at: ${builtInRolePath}`);
         }
       } catch (error) {
         this.logger.error(`Error checking/adding built-in role at ${builtInRolePath}:`, error);
       }
     } else {
-      this.logger.warn("Plugin directory not found, cannot locate built-in roles.");
     }
     const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian20.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
-      this.logger.debug(`Scanning user roles folder: ${userRolesFolderPath}`);
       try {
         const folderExists = await adapter.exists(userRolesFolderPath);
         const folderStat = folderExists ? await adapter.stat(userRolesFolderPath) : null;
@@ -9745,33 +9690,26 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
                   // Позначаємо як кастомну
                 });
                 addedNamesLowerCase.add(roleName.toLowerCase());
-                this.logger.trace(`Added user role: ${roleName} from ${filePath}`);
               } else {
-                this.logger.warn(`Skipping user role "${roleName}" from "${filePath}" due to name conflict.`);
               }
             } else {
             }
           }
         } else {
-          this.logger.warn(`User roles path not found or not a folder: ${userRolesFolderPath}`);
         }
       } catch (e) {
         this.logger.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
       }
     } else if (userRolesFolderPath === "/") {
-      this.logger.warn("User roles folder path is set to root '/', skipping scan for user roles.");
     }
     roles.sort((a, b) => a.name.localeCompare(b.name));
     this.roleListCache = roles;
-    this.logger.debug(`Finished listing roles. Total found: ${roles.length}`);
     return roles;
   }
   // Execute System Command Method
   async executeSystemCommand(command) {
     var _a;
-    this.logger.debug(`Executing system command: "${command}"`);
     if (!(command == null ? void 0 : command.trim())) {
-      this.logger.warn("Attempted to execute empty system command.");
       return {
         stdout: "",
         stderr: "Empty command.",
@@ -9792,19 +9730,16 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         if (error)
           this.logger.error(`Exec error for "${command}": ${error.message}`, error);
         if (stderr && stderr.trim())
-          this.logger.warn(`Exec stderr for "${command}": ${stderr.trim()}`);
-        this.logger.debug(`Exec stdout for "${command}" (length: ${stdout.length})`);
-        resolve({
-          stdout: stdout.toString(),
-          stderr: stderr.toString(),
-          error
-        });
+          resolve({
+            stdout: stdout.toString(),
+            stderr: stderr.toString(),
+            error
+          });
       });
     });
   }
   // --- Session Management Command Helpers ---
   async showChatSwitcher() {
-    this.logger.warn("showChatSwitcher: Not implemented yet.");
     new import_obsidian20.Notice("Switch Chat UI not implemented yet.");
   }
   async renameActiveChat() {
@@ -9815,27 +9750,22 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      this.logger.debug("Rename command: No active chat found.");
       new import_obsidian20.Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
     const chatId = activeChat.metadata.id;
-    this.logger.debug(`Initiating rename for active chat: ${chatId} (current name: "${currentName}")`);
     new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async (newName) => {
       const trimmedName = newName == null ? void 0 : newName.trim();
       if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-        this.logger.info(`Attempting to rename chat ${chatId} to "${trimmedName}"`);
         const success = await this.chatManager.renameChat(chatId, trimmedName);
         if (success) {
         } else {
           this.logger.error(`Rename failed for chat ${chatId} via renameChat method.`);
         }
       } else if (newName === null || trimmedName === "") {
-        this.logger.debug(`Rename cancelled or invalid name entered for chat ${chatId}.`);
         new import_obsidian20.Notice("Rename cancelled or invalid name entered.");
       } else {
-        this.logger.debug(`Rename skipped for chat ${chatId}, name unchanged.`);
         new import_obsidian20.Notice("Name unchanged.");
       }
     }).open();
@@ -9848,20 +9778,17 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      this.logger.debug("Delete command: No active chat found.");
       new import_obsidian20.Notice("No active chat to delete.");
       return;
     }
     const chatName = activeChat.metadata.name;
     const chatId = activeChat.metadata.id;
-    this.logger.debug(`Initiating deletion confirmation for active chat: ${chatId} ("${chatName}")`);
     new ConfirmModal(
       this.app,
       "Delete Chat",
       `Are you sure you want to delete chat "${chatName}"?
 This action cannot be undone.`,
       async () => {
-        this.logger.info(`User confirmed deletion for chat ${chatId}`);
         const success = await this.chatManager.deleteChat(chatId);
         if (success) {
         } else {
@@ -9873,10 +9800,8 @@ This action cannot be undone.`,
   // Обробник зміни активного чату (для збереження ID)
   async handleActiveChatChangedLocally(data) {
     if (this.settings.saveMessageHistory) {
-      this.logger.trace(`Saving active chat ID locally: ${data.chatId}`);
       await this.saveDataKey(ACTIVE_CHAT_ID_KEY, data.chatId);
     } else {
-      this.logger.trace("History saving disabled, not saving active chat ID.");
     }
   }
   // Пошук імені ролі (з виправленням path.basename)
@@ -9888,7 +9813,6 @@ This action cannot be undone.`,
     if (cachedRole) {
       return cachedRole.name;
     }
-    this.logger.warn(`Role name not found in cache for path: ${rolePath}. Deriving name from path.`);
     try {
       const fileName = rolePath.substring(rolePath.lastIndexOf("/") + 1);
       const roleName = fileName.endsWith(".md") ? fileName.slice(0, -3) : fileName;

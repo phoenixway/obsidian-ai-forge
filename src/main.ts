@@ -270,14 +270,14 @@ export default class OllamaPlugin extends Plugin {
       // --- Відновлення активного чату ---
       const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
       if (savedActiveId && this.settings.saveMessageHistory) {
-        this.logger.info(`Restoring active chat ID: ${savedActiveId}`);
+        
         // Встановлення активного чату викличе подію 'active-chat-changed',
         // на яку підписаний OllamaView для завантаження даних.
         await this.chatManager.setActiveChat(savedActiveId); // true - не генерувати подію, якщо вже активний
       } else {
         // Якщо немає збереженого ID або історія вимкнена, просто переконуємось, що активний чат встановлено (можливо, null)
         // await this.chatManager.ensureActiveChatSet();
-        this.logger.info("No saved active chat ID or history saving disabled. Ensuring default active chat.");
+        
       }
       // ---------------------------------
     });
@@ -368,13 +368,13 @@ export default class OllamaPlugin extends Plugin {
     const fileName = this.settings.dailyTaskFileName?.trim();
     const newPath = folderPath && fileName ? normalizePath(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
-      this.logger.info(`Daily task file path changed from "${this.dailyTaskFilePath}" to "${newPath}"`);
+      
       this.dailyTaskFilePath = newPath;
       this.taskFileContentCache = null; // Скидаємо кеш при зміні шляху
       this.taskFileNeedsUpdate = true; // Потрібно перечитати новий файл
     } else if (!newPath) {
       if (this.dailyTaskFilePath !== null) {
-        this.logger.info("Daily task file path cleared.");
+        
         this.dailyTaskFilePath = null;
         this.taskFileContentCache = null;
         this.chatManager?.updateTaskState(null); // Повідомляємо про відсутність завдань
@@ -386,7 +386,7 @@ export default class OllamaPlugin extends Plugin {
     if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
       // Позначаємо, що файл потребує оновлення, але обробка відбудеться в checkAndProcessTaskUpdate
       if (!this.taskFileNeedsUpdate) {
-        this.logger.trace(`Task file modified: ${file.path}. Marking for update.`);
+        
         this.taskFileNeedsUpdate = true;
       }
     }
@@ -395,34 +395,34 @@ export default class OllamaPlugin extends Plugin {
     if (!this.settings.enableProductivityFeatures || !this.dailyTaskFilePath) {
       if (this.taskFileContentCache !== null) {
         // Якщо кеш був не null, значить завдання були, тепер їх нема
-        this.logger.info("Disabling productivity features or task file path removed. Clearing task state.");
+        
         this.taskFileContentCache = null;
         this.chatManager?.updateTaskState(null); // Повідомити про відсутність завдань
       }
       this.taskFileNeedsUpdate = false;
       return;
     }
-    this.logger.debug(`Attempting to load and process task file: ${this.dailyTaskFilePath}`);
+    
     try {
       const fileExists = await this.app.vault.adapter.exists(this.dailyTaskFilePath);
       if (fileExists) {
         const content = await this.app.vault.adapter.read(this.dailyTaskFilePath);
         // Перевіряємо, чи контент змінився АБО чи кеш ще не ініціалізовано
         if (content !== this.taskFileContentCache || this.taskFileContentCache === null) {
-          this.logger.info(`Task file content changed or cache empty. Processing: ${this.dailyTaskFilePath}`);
+          
           this.taskFileContentCache = content; // Оновлюємо кеш
           const tasks = this.parseTasks(content);
-          this.logger.debug(`Parsed tasks: ${tasks.urgent.length} urgent, ${tasks.regular.length} regular.`);
+          
           this.chatManager?.updateTaskState(tasks); // Оновлюємо стан в менеджері чату
           this.taskFileNeedsUpdate = false; // Обробили, оновлення більше не потрібне
         } else {
           // Контент не змінився, нічого не робимо
-          this.logger.trace("Task file content unchanged. No update needed.");
+          
           this.taskFileNeedsUpdate = false; // Скидаємо прапорець на випадок, якщо він був встановлений помилково
         }
       } else {
         // Файл не існує
-        this.logger.warn(`Task file does not exist: ${this.dailyTaskFilePath}. Clearing task state.`);
+        
         if (this.taskFileContentCache !== null) {
           // Якщо кеш був, а файлу тепер нема
           this.taskFileContentCache = null;
@@ -496,10 +496,10 @@ export default class OllamaPlugin extends Plugin {
 
   async checkAndProcessTaskUpdate(): Promise<void> {
     if (this.taskFileNeedsUpdate && this.settings.enableProductivityFeatures) {
-      this.logger.debug("Task file needs update, processing...");
+      
       await this.loadAndProcessInitialTasks(); // Викличе оновлення стану в ChatManager
     } else {
-      // this.logger.trace("No task file update needed or productivity features disabled.");
+      // 
     }
   }
   // --- Кінець логіки файлу завдань ---
@@ -507,7 +507,7 @@ export default class OllamaPlugin extends Plugin {
   // Обробник змін для ролей та RAG (без debounce)
   private handleRoleOrRagFileChange(changedPath: string, debouncedRoleClear: () => void, isDeletion: boolean = false) {
     const normPath = normalizePath(changedPath);
-    this.logger.trace(`File change detected: ${normPath}, isDeletion: ${isDeletion}`);
+    
 
     // 1. Перевірка для Ролей
     const userRolesPath = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null;
@@ -518,17 +518,17 @@ export default class OllamaPlugin extends Plugin {
         // Перевірка, чи це безпосередньо файл у папці, а не в підпапці
         if (normPath.substring(userRolesPath.length + 1).indexOf("/") === -1) {
           isRoleFile = true;
-          this.logger.debug(`Change detected in user role file: ${normPath}`);
+          
         }
       } else if (builtInRolesPath && normPath.startsWith(builtInRolesPath + "/")) {
         if (normPath.substring(builtInRolesPath.length + 1).indexOf("/") === -1) {
           isRoleFile = true;
-          this.logger.debug(`Change detected in built-in role file: ${normPath}`);
+          
         }
       }
     }
     if (isRoleFile) {
-      this.logger.info("Role file change detected, triggering debounced roles update.");
+      
       debouncedRoleClear(); // Викликаємо debounced для ролей
     }
 
@@ -537,16 +537,16 @@ export default class OllamaPlugin extends Plugin {
     if (this.settings.ragEnabled && ragFolderPath && normPath.startsWith(ragFolderPath + "/")) {
       // Перевіряємо, що це не файл завдань, перш ніж запускати індексацію
       if (normPath !== this.dailyTaskFilePath) {
-        this.logger.info(`RAG file change detected: ${normPath}. Debouncing index update.`);
+        
         this.debounceIndexUpdate();
       } else {
-        this.logger.trace(`Ignoring RAG index update trigger for task file: ${normPath}`);
+        
       }
     }
   }
 
   async onunload() {
-    this.logger.info("Unloading OllamaPlugin...");
+    
     this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS).forEach(l => l.detach());
     this.view = null; // Скидаємо посилання на view
 
@@ -558,14 +558,14 @@ export default class OllamaPlugin extends Plugin {
       if (this.chatManager && this.settings.saveMessageHistory) {
         const lastActiveId = this.chatManager.getActiveChatId();
         if (lastActiveId !== undefined && lastActiveId !== null) {
-          this.logger.debug(`Saving last active chat ID on unload: ${lastActiveId}`);
+          
           await this.saveDataKey(ACTIVE_CHAT_ID_KEY, lastActiveId);
         } else {
-          this.logger.debug("No active chat ID to save on unload.");
+          
           await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null); // Явно зберігаємо null, якщо активного чату немає
         }
       } else {
-        this.logger.debug("History saving disabled or ChatManager not available, saving null active chat ID.");
+        
         await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null); // Зберігаємо null, якщо історія вимкнена
       }
     } catch (error) {
@@ -576,25 +576,25 @@ export default class OllamaPlugin extends Plugin {
     this.promptService?.clearModelDetailsCache?.();
     this.promptService?.clearRoleCache?.();
     this.roleListCache = null;
-    this.logger.info("OllamaPlugin unloaded.");
+    
   }
 
   updateOllamaServiceConfig() {
     if (this.ollamaService) {
-      this.logger.debug("Updating OllamaService configuration.");
+      
       this.promptService?.clearModelDetailsCache(); // Очистити кеш деталей, бо URL/модель могли змінитися
     }
   }
 
   private debounceIndexUpdate() {
     if (this.indexUpdateTimeout) clearTimeout(this.indexUpdateTimeout);
-    this.logger.debug("Debouncing RAG index update (30s)...");
+    
     this.indexUpdateTimeout = setTimeout(async () => {
       if (this.settings.ragEnabled && this.ragService) {
-        this.logger.info("Executing debounced RAG index update.");
+        
         await this.ragService.indexDocuments();
       } else {
-        this.logger.trace("Skipping debounced RAG index update (RAG disabled or service unavailable).");
+        
       }
       this.indexUpdateTimeout = null;
     }, 30000); // 30 секунд затримки
@@ -613,27 +613,27 @@ export default class OllamaPlugin extends Plugin {
 
     if (existingLeaves.length > 0) {
       leaf = existingLeaves[0];
-      this.logger.debug("Found existing view leaf. Revealing.");
+      
     } else {
-      this.logger.debug("No existing view leaf found. Creating new one.");
+      
       if (this.settings.openChatInTab) {
         leaf = workspace.getLeaf("tab"); // Створити нову вкладку
-        this.logger.debug("Creating new leaf in tab.");
+        
       } else {
         leaf = workspace.getRightLeaf(false); // Спробувати отримати існуючу праву бічну панель
-        this.logger.debug("Attempting to get right sidebar leaf.");
+        
         if (!leaf) {
-          this.logger.debug("Right sidebar leaf not found. Creating new leaf in tab as fallback.");
+          
           leaf = workspace.getLeaf("tab"); // Якщо бічної панелі немає, відкрити у вкладці
         } else {
-          this.logger.debug("Using existing right sidebar leaf.");
+          
         }
       }
 
       // Встановити стан, тільки якщо отримали або створили leaf
       if (leaf) {
         try {
-          this.logger.debug(`Setting view state for new leaf (type: ${viewType}).`);
+          
           await leaf.setViewState({ type: viewType, active: true });
         } catch (e) {
           this.logger.error("Error setting view state:", e);
@@ -649,7 +649,7 @@ export default class OllamaPlugin extends Plugin {
 
     // Показати leaf (існуючий або новий)
     if (leaf) {
-      this.logger.debug("Revealing target leaf.");
+      
       workspace.revealLeaf(leaf);
       // Призначити посилання this.view ПІСЛЯ revealLeaf,
       // щоб переконатись, що view вже ініціалізовано
@@ -657,7 +657,7 @@ export default class OllamaPlugin extends Plugin {
       setTimeout(() => {
         if (leaf && leaf.view instanceof OllamaView) {
           this.view = leaf.view;
-          this.logger.debug("Assigned this.view reference.");
+          
           // Можливо, потрібно фокусувати інпут після активації
           this.emit("focus-input-request");
         } else {
@@ -671,12 +671,12 @@ export default class OllamaPlugin extends Plugin {
 
   // Завантаження та Міграція Налаштувань
   async loadSettingsAndMigrate() {
-    this.logger.debug("Loading settings...");
+    
     const loadedData = await this.loadData();
     // Тут можна додати логіку міграції зі старих версій налаштувань
     // наприклад, перейменування ключів, зміна структури тощо.
     this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-    this.logger.debug("Settings loaded.");
+    
     // Після завантаження можемо оновити конфіг сервісів, якщо потрібно
     this.updateOllamaServiceConfig();
     // Перевіряємо шлях до файлу завдань, бо він залежить від налаштувань
@@ -684,30 +684,30 @@ export default class OllamaPlugin extends Plugin {
   }
 
   async saveSettings() {
-    this.logger.debug("Saving settings...");
+    
     await this.saveData(this.settings);
-    this.logger.debug("Settings saved. Emitting settings-updated event.");
+    
     this.emit("settings-updated"); // Повідомляємо інші частини плагіна про зміни
   }
 
   // Data Helpers
   async saveDataKey(key: string, value: any): Promise<void> {
     try {
-      this.logger.trace(`Saving data key: ${key}`);
+      
       const data = (await this.loadData()) || {};
       data[key] = value;
       await this.saveData(data);
-      this.logger.trace(`Data key saved: ${key}`);
+      
     } catch (error) {
       this.logger.error(`Error saving data key ${key}:`, error);
     }
   }
   async loadDataKey(key: string): Promise<any> {
     try {
-      this.logger.trace(`Loading data key: ${key}`);
+      
       const data = (await this.loadData()) || {};
       const value = data[key];
-      this.logger.trace(`Data key loaded: ${key}, value found: ${value !== undefined}`);
+      
       return value;
     } catch (error) {
       this.logger.error(`Error loading data key ${key}:`, error);
@@ -725,15 +725,15 @@ export default class OllamaPlugin extends Plugin {
     const activeChat = await this.chatManager.getActiveChat();
     if (activeChat && activeChat.messages.length > 0) {
       new ConfirmModal(this.app, "Clear History", `Clear messages in "${activeChat.metadata.name}"?`, async () => {
-        this.logger.info(`User confirmed clearing history for chat: ${activeChat.metadata.id}`);
+        
         await this.chatManager.clearActiveChatMessages();
         new Notice(`History cleared for "${activeChat.metadata.name}".`);
       }).open();
     } else if (activeChat) {
-      this.logger.debug("Attempted to clear history, but chat is already empty.");
+      
       new Notice("Chat history is already empty.");
     } else {
-      this.logger.debug("Attempted to clear history, but no active chat.");
+      
       new Notice("No active chat to clear.");
     }
   }
@@ -741,10 +741,10 @@ export default class OllamaPlugin extends Plugin {
   // List Role Files Method (з виправленням path.basename)
   async listRoleFiles(forceRefresh: boolean = false): Promise<RoleInfo[]> {
     if (this.roleListCache && !forceRefresh) {
-      this.logger.trace("Returning cached role list.");
+      
       return this.roleListCache;
     }
-    this.logger.debug(`Listing role files (forceRefresh: ${forceRefresh})...`);
+    
     const roles: RoleInfo[] = [];
     const addedNamesLowerCase = new Set<string>();
     const adapter = this.app.vault.adapter;
@@ -758,7 +758,7 @@ export default class OllamaPlugin extends Plugin {
     // Визначаємо шлях до папки ролей плагіна
     if (pluginDir) {
       builtInRolePath = normalizePath(`${pluginDir}/roles/${builtInRoleFileName}`);
-      this.logger.trace(`Checking for built-in role at: ${builtInRolePath}`);
+      
       try {
         if (await adapter.exists(builtInRolePath)) {
           const stat = await adapter.stat(builtInRolePath);
@@ -769,18 +769,18 @@ export default class OllamaPlugin extends Plugin {
               isCustom: false, // Позначаємо як не кастомну
             });
             addedNamesLowerCase.add(builtInRoleName.toLowerCase());
-            this.logger.debug(`Added built-in role: ${builtInRoleName}`);
+            
           } else {
-            this.logger.warn(`Path exists but is not a file: ${builtInRolePath}`);
+            
           }
         } else {
-          this.logger.trace(`Built-in role file not found at: ${builtInRolePath}`);
+          
         }
       } catch (error) {
         this.logger.error(`Error checking/adding built-in role at ${builtInRolePath}:`, error);
       }
     } else {
-      this.logger.warn("Plugin directory not found, cannot locate built-in roles.");
+      
     }
     // -------------------------------------------
 
@@ -790,7 +790,7 @@ export default class OllamaPlugin extends Plugin {
       : null;
 
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
-      this.logger.debug(`Scanning user roles folder: ${userRolesFolderPath}`);
+      
       try {
         const folderExists = await adapter.exists(userRolesFolderPath);
         const folderStat = folderExists ? await adapter.stat(userRolesFolderPath) : null;
@@ -817,29 +817,29 @@ export default class OllamaPlugin extends Plugin {
                   isCustom: true, // Позначаємо як кастомну
                 });
                 addedNamesLowerCase.add(roleName.toLowerCase());
-                this.logger.trace(`Added user role: ${roleName} from ${filePath}`);
+                
               } else {
-                this.logger.warn(`Skipping user role "${roleName}" from "${filePath}" due to name conflict.`);
+                
               }
             } else {
-              // this.logger.trace(`Skipping path (not MD file or in subfolder): ${filePath}`);
+              // 
             }
           }
         } else {
-          this.logger.warn(`User roles path not found or not a folder: ${userRolesFolderPath}`);
+          
         }
       } catch (e) {
         this.logger.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
       }
     } else if (userRolesFolderPath === "/") {
-      this.logger.warn("User roles folder path is set to root '/', skipping scan for user roles.");
+      
     }
     // ------------------------------------
 
     // Сортуємо ролі за іменем
     roles.sort((a, b) => a.name.localeCompare(b.name));
     this.roleListCache = roles; // Зберігаємо в кеш
-    this.logger.debug(`Finished listing roles. Total found: ${roles.length}`);
+    
     return roles;
   }
 
@@ -849,9 +849,9 @@ export default class OllamaPlugin extends Plugin {
     stderr: string;
     error: ExecException | null;
   }> {
-    this.logger.debug(`Executing system command: "${command}"`);
+    
     if (!command?.trim()) {
-      this.logger.warn("Attempted to execute empty system command.");
+      
       return {
         stdout: "",
         stderr: "Empty command.",
@@ -871,8 +871,8 @@ export default class OllamaPlugin extends Plugin {
     return new Promise(resolve => {
       exec(command, (error, stdout, stderr) => {
         if (error) this.logger.error(`Exec error for "${command}": ${error.message}`, error);
-        if (stderr && stderr.trim()) this.logger.warn(`Exec stderr for "${command}": ${stderr.trim()}`);
-        this.logger.debug(`Exec stdout for "${command}" (length: ${stdout.length})`);
+        if (stderr && stderr.trim()) 
+        
         resolve({
           stdout: stdout.toString(),
           stderr: stderr.toString(),
@@ -885,7 +885,7 @@ export default class OllamaPlugin extends Plugin {
   // --- Session Management Command Helpers ---
   async showChatSwitcher() {
     // Потрібно реалізувати модальне вікно для вибору чату
-    this.logger.warn("showChatSwitcher: Not implemented yet.");
+    
     new Notice("Switch Chat UI not implemented yet.");
     // Приклад з FuzzySuggestModal:
     // const chats = this.chatManager.listAvailableChats();
@@ -908,18 +908,18 @@ export default class OllamaPlugin extends Plugin {
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      this.logger.debug("Rename command: No active chat found.");
+      
       new Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
     const chatId = activeChat.metadata.id;
-    this.logger.debug(`Initiating rename for active chat: ${chatId} (current name: "${currentName}")`);
+    
 
     new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async newName => {
       const trimmedName = newName?.trim();
       if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-        this.logger.info(`Attempting to rename chat ${chatId} to "${trimmedName}"`);
+        
         // Використовуємо метод менеджера для перейменування
         const success = await this.chatManager.renameChat(chatId, trimmedName);
         if (success) {
@@ -930,10 +930,10 @@ export default class OllamaPlugin extends Plugin {
           this.logger.error(`Rename failed for chat ${chatId} via renameChat method.`);
         }
       } else if (newName === null || trimmedName === "") {
-        this.logger.debug(`Rename cancelled or invalid name entered for chat ${chatId}.`);
+        
         new Notice("Rename cancelled or invalid name entered.");
       } else {
-        this.logger.debug(`Rename skipped for chat ${chatId}, name unchanged.`);
+        
         new Notice("Name unchanged.");
       }
     }).open();
@@ -947,20 +947,20 @@ export default class OllamaPlugin extends Plugin {
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      this.logger.debug("Delete command: No active chat found.");
+      
       new Notice("No active chat to delete.");
       return;
     }
     const chatName = activeChat.metadata.name;
     const chatId = activeChat.metadata.id;
-    this.logger.debug(`Initiating deletion confirmation for active chat: ${chatId} ("${chatName}")`);
+    
 
     new ConfirmModal(
       this.app,
       "Delete Chat",
       `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`,
       async () => {
-        this.logger.info(`User confirmed deletion for chat ${chatId}`);
+        
         const success = await this.chatManager.deleteChat(chatId); // Використовуємо існуючий метод
         if (success) {
           // Повідомлення показується в deleteChat
@@ -978,12 +978,12 @@ export default class OllamaPlugin extends Plugin {
     // Цей обробник викликається ПІСЛЯ того, як ChatManager змінив активний чат
     // і згенерував подію "active-chat-changed", на яку підписаний View
     if (this.settings.saveMessageHistory) {
-      this.logger.trace(`Saving active chat ID locally: ${data.chatId}`);
+      
       await this.saveDataKey(ACTIVE_CHAT_ID_KEY, data.chatId);
     } else {
       // Якщо історія вимкнена, можливо, варто видалити збережений ID?
       // await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
-      this.logger.trace("History saving disabled, not saving active chat ID.");
+      
     }
   }
 
@@ -994,13 +994,13 @@ export default class OllamaPlugin extends Plugin {
     // Спочатку шукаємо в кеші
     const cachedRole = this.roleListCache?.find(rl => rl.path === rolePath);
     if (cachedRole) {
-      // this.logger.trace(`Found role name in cache for path ${rolePath}: ${cachedRole.name}`);
+      // 
       return cachedRole.name;
     }
 
     // Якщо в кеші немає, отримуємо ім'я з шляху як fallback
     // Це може статися, якщо кеш ще не заповнено або файл було видалено/перейменовано
-    this.logger.warn(`Role name not found in cache for path: ${rolePath}. Deriving name from path.`);
+    
     try {
       const fileName = rolePath.substring(rolePath.lastIndexOf("/") + 1);
       // Видаляємо ".md" надійніше
