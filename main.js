@@ -1875,8 +1875,6 @@ var CSS_HIERARCHY_ITEM_CHILDREN = "ollama-hierarchy-item-children";
 var CSS_HIERARCHY_ITEM_COLLAPSED = "is-collapsed";
 var CSS_FOLDER_ICON = "ollama-folder-icon";
 var CSS_HIERARCHY_ITEM_TEXT = "ollama-hierarchy-item-text";
-var CSS_CHAT_ITEM_DETAILS = "ollama-chat-item-details";
-var CSS_CHAT_ITEM_DATE = "ollama-chat-item-date";
 var CSS_HIERARCHY_ITEM_OPTIONS = "ollama-hierarchy-item-options";
 var CSS_HIERARCHY_INDENT_PREFIX = "ollama-indent-level-";
 var CSS_FOLDER_ACTIVE_ANCESTOR = "is-active-ancestor";
@@ -1888,47 +1886,47 @@ var CHAT_ICON = "lucide-message-square";
 var CHAT_ICON_ACTIVE = "lucide-check";
 var SidebarManager = class {
   constructor(plugin, app, view) {
+    this.updateCounter = 0;
     this.folderExpansionState = /* @__PURE__ */ new Map();
+    // --- ЗМІНЕНО: Додано логування для діагностики дублювання ---
     this.updateChatList = async () => {
+      this.updateCounter++;
+      const currentUpdateId = this.updateCounter;
       const container = this.chatPanelListContainerEl;
       if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[SidebarManager.updateChatList] Skipping: Container/Manager missing.");
+        this.plugin.logger.debug(`[Update #${currentUpdateId}] Skipping: Container/Manager missing.`);
         return;
       }
-      this.plugin.logger.debug(`[SidebarManager.updateChatList] Updating chat list content (visible: ${this.isSectionVisible("chats")})...`);
+      this.plugin.logger.info(
+        `[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`
+      );
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
         const hierarchy = await this.plugin.chatManager.getChatHierarchy();
         const currentActiveChatId = this.plugin.chatManager.getActiveChatId();
         const activeAncestorPaths = /* @__PURE__ */ new Set();
+        const loggableHierarchy = hierarchy.map((node) => ({
+          type: node.type,
+          name: node.type === "folder" ? node.name : node.metadata.name,
+          path: node.type === "folder" ? node.path : node.filePath
+        }));
+        this.plugin.logger.debug(
+          `[Update #${currentUpdateId}] Hierarchy data received (${hierarchy.length} items):`,
+          JSON.stringify(loggableHierarchy)
+        );
         if (currentActiveChatId) {
-          const activeChat = await this.plugin.chatManager.getActiveChat();
-          if (activeChat == null ? void 0 : activeChat.filePath) {
-            let currentPath = activeChat.filePath;
-            while (currentPath.includes("/")) {
-              const parentPath = currentPath.substring(0, currentPath.lastIndexOf("/"));
-              if (parentPath === "") {
-                break;
-              } else {
-                const normalizedParentPath = (0, import_obsidian12.normalizePath)(parentPath);
-                activeAncestorPaths.add(normalizedParentPath);
-                currentPath = parentPath;
-              }
-            }
-            this.plugin.logger.trace("Active ancestor paths:", Array.from(activeAncestorPaths));
-          } else if (activeChat) {
-            this.plugin.logger.warn(`Active chat ${currentActiveChatId} has no filePath property.`);
-          }
         }
         if (hierarchy.length === 0) {
           container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
         } else {
-          hierarchy.forEach((node) => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths));
+          hierarchy.forEach(
+            (node) => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId)
+          );
         }
-        this.plugin.logger.debug(`[SidebarManager.updateChatList] Finished rendering hierarchy.`);
+        this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList`);
       } catch (error) {
-        this.plugin.logger.error("[SidebarManager.updateChatList] Error rendering hierarchy:", error);
+        this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
         container.empty();
         container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
       } finally {
@@ -1946,14 +1944,18 @@ var SidebarManager = class {
         this.plugin.logger.debug("[SidebarManager.updateRoleList] Skipping: Container/Manager missing.");
         return;
       }
-      this.plugin.logger.debug(`[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`);
+      this.plugin.logger.debug(
+        `[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`
+      );
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
         const roles = await this.plugin.listRoleFiles(true);
         const activeChat = await this.plugin.chatManager.getActiveChat();
         const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        const noneOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION] });
+        const noneOptionEl = container.createDiv({
+          cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION]
+        });
         const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
         noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None" });
         (0, import_obsidian12.setIcon)(noneIconSpan, !currentRolePath ? "check" : "slash");
@@ -1969,7 +1971,11 @@ var SidebarManager = class {
           (0, import_obsidian12.setIcon)(iconSpan, roleInfo.path === currentRolePath ? "check" : roleInfo.isCustom ? "user" : "file-text");
           if (roleInfo.path === currentRolePath)
             roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-          this.view.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+          this.view.registerDomEvent(
+            roleOptionEl,
+            "click",
+            () => this.handleRolePanelItemClick(roleInfo, currentRolePath)
+          );
         });
         this.plugin.logger.debug(`[SidebarManager.updateRoleList] Finished rendering ${roles.length + 1} role items.`);
       } catch (error) {
@@ -1989,7 +1995,9 @@ var SidebarManager = class {
       const newRolePath = (_a = roleInfo == null ? void 0 : roleInfo.path) != null ? _a : "";
       const roleNameForEvent = (_b = roleInfo == null ? void 0 : roleInfo.name) != null ? _b : "None";
       const normalizedCurrentRolePath = currentRolePath != null ? currentRolePath : "";
-      this.plugin.logger.debug(`[SidebarManager] Role item clicked. New path: "${newRolePath}", Current path: "${normalizedCurrentRolePath}"`);
+      this.plugin.logger.debug(
+        `[SidebarManager] Role item clicked. New path: "${newRolePath}", Current path: "${normalizedCurrentRolePath}"`
+      );
       if (newRolePath !== normalizedCurrentRolePath) {
         const activeChat = await ((_c = this.plugin.chatManager) == null ? void 0 : _c.getActiveChat());
         try {
@@ -2047,7 +2055,9 @@ var SidebarManager = class {
           new import_obsidian12.Notice("Folder name contains invalid characters.");
           return;
         }
-        const newFolderPath = (0, import_obsidian12.normalizePath)(targetParentPath === "/" ? trimmedName : `${targetParentPath}/${trimmedName}`);
+        const newFolderPath = (0, import_obsidian12.normalizePath)(
+          targetParentPath === "/" ? trimmedName : `${targetParentPath}/${trimmedName}`
+        );
         this.plugin.logger.info(`Attempting to create folder: ${newFolderPath}`);
         try {
           const success = await this.plugin.chatManager.createFolder(newFolderPath);
@@ -2101,7 +2111,10 @@ var SidebarManager = class {
             this.updateChatList();
           }
         } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`, error);
+          this.plugin.logger.error(
+            `[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`,
+            error
+          );
           new import_obsidian12.Notice(`Error renaming folder: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       }).open();
@@ -2114,22 +2127,27 @@ var SidebarManager = class {
         new import_obsidian12.Notice("Cannot delete the main chat history folder.");
         return;
       }
-      new ConfirmModal(this.app, "Delete Folder", `Delete folder "${folderName}" and ALL its contents (subfolders and chats)? This cannot be undone.`, async () => {
-        const notice = new import_obsidian12.Notice(`Deleting folder "${folderName}"...`, 0);
-        try {
-          const success = await this.plugin.chatManager.deleteFolder(folderPath);
-          if (success) {
-            const keysToDelete = Array.from(this.folderExpansionState.keys()).filter((key) => key.startsWith(folderPath));
-            keysToDelete.forEach((key) => this.folderExpansionState.delete(key));
-            this.updateChatList();
+      new ConfirmModal(
+        this.app,
+        "Delete Folder",
+        `Delete folder "${folderName}" and ALL its contents (subfolders and chats)? This cannot be undone.`,
+        async () => {
+          const notice = new import_obsidian12.Notice(`Deleting folder "${folderName}"...`, 0);
+          try {
+            const success = await this.plugin.chatManager.deleteFolder(folderPath);
+            if (success) {
+              const keysToDelete = Array.from(this.folderExpansionState.keys()).filter((key) => key.startsWith(folderPath));
+              keysToDelete.forEach((key) => this.folderExpansionState.delete(key));
+              this.updateChatList();
+            }
+          } catch (error) {
+            this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
+            new import_obsidian12.Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+          } finally {
+            notice.hide();
           }
-        } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
-          new import_obsidian12.Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
-        } finally {
-          notice.hide();
         }
-      }).open();
+      ).open();
     };
     this.plugin = plugin;
     this.app = app;
@@ -2139,18 +2157,32 @@ var SidebarManager = class {
     this.plugin.logger.debug("[SidebarManager] Creating UI...");
     this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
     const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
-    this.chatPanelHeaderEl = chatPanel.createDiv({ cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION], attr: { "data-section-type": "chats", "data-collapsed": "false" } });
+    this.chatPanelHeaderEl = chatPanel.createDiv({
+      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+      attr: { "data-section-type": "chats", "data-collapsed": "false" }
+    });
     const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
     (0, import_obsidian12.setIcon)(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), EXPAND_ICON_ROLE);
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
     const headerActions = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
-    this.newFolderSidebarButton = headerActions.createDiv({ cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"], attr: { "aria-label": "New Folder", title: "New Folder" } });
+    this.newFolderSidebarButton = headerActions.createDiv({
+      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
+      attr: { "aria-label": "New Folder", title: "New Folder" }
+    });
     (0, import_obsidian12.setIcon)(this.newFolderSidebarButton, "lucide-folder-plus");
-    this.newChatSidebarButton = headerActions.createDiv({ cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"], attr: { "aria-label": "New Chat", title: "New Chat" } });
+    this.newChatSidebarButton = headerActions.createDiv({
+      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
+      attr: { "aria-label": "New Chat", title: "New Chat" }
+    });
     (0, import_obsidian12.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
-    this.chatPanelListContainerEl = chatPanel.createDiv({ cls: [CSS_CHAT_LIST_CONTAINER, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS] });
+    this.chatPanelListContainerEl = chatPanel.createDiv({
+      cls: [CSS_CHAT_LIST_CONTAINER, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS]
+    });
     const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL });
-    this.rolePanelHeaderEl = rolePanel.createDiv({ cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION], attr: { "data-section-type": "roles", "data-collapsed": "true" } });
+    this.rolePanelHeaderEl = rolePanel.createDiv({
+      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+      attr: { "data-section-type": "roles", "data-collapsed": "true" }
+    });
     const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
     (0, import_obsidian12.setIcon)(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), COLLAPSE_ICON_ROLE);
     roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
@@ -2183,86 +2215,61 @@ var SidebarManager = class {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
-  renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths) {
-    var _a;
-    const itemEl = parentElement.createDiv({
-      cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`]
-    });
-    if (node.type === "folder") {
-      itemEl.dataset.path = node.path;
-    }
-    const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+  // --- ЗМІНЕНО: Додано ID оновлення в логування, залишено спрощеним ---
+  renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths, updateId) {
+    var _a, _b;
+    const nodeName = node.type === "folder" ? node.name : node.metadata.name;
+    this.plugin.logger.debug(
+      `[Update #${updateId}]   Rendering node: ${nodeName} (Level ${level}, Type: ${node.type})`
+    );
+    const itemEl = parentElement.createDiv({ cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`] });
     if (node.type === "folder") {
       itemEl.addClass(CSS_FOLDER_ITEM);
+      itemEl.dataset.path = node.path;
+      if (activeAncestorPaths.has(node.path)) {
+        itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
+      }
       const isExpanded = (_a = this.folderExpansionState.get(node.path)) != null ? _a : false;
       if (!isExpanded) {
         itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
       }
-      if (activeAncestorPaths.has(node.path)) {
-        itemEl.addClass(CSS_FOLDER_ACTIVE_ANCESTOR);
+    } else {
+      itemEl.addClass(CSS_CHAT_ITEM);
+      if (node.metadata.id === activeChatId) {
+        itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
       }
-      const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-      (0, import_obsidian12.setIcon)(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
-      itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
-      const optionsBtn = itemContentEl.createEl("button", {
-        cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
-        attr: { "aria-label": "Folder options", title: "More options" }
-      });
-      (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
-      this.view.registerDomEvent(optionsBtn, "click", (e) => {
-        e.stopPropagation();
-        this.showFolderContextMenu(e, node);
+    }
+    const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+    const iconEl = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
+    if (node.type === "folder") {
+      const isExpanded = (_b = this.folderExpansionState.get(node.path)) != null ? _b : false;
+      (0, import_obsidian12.setIcon)(iconEl, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
+    } else {
+      const isActive = node.metadata.id === activeChatId;
+      (0, import_obsidian12.setIcon)(iconEl, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
+    }
+    itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: nodeName });
+    if (node.type === "folder") {
+      this.view.registerDomEvent(itemContentEl, "click", () => {
+        this.handleToggleFolder(node.path);
       });
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
         e.preventDefault();
         this.showFolderContextMenu(e, node);
       });
-      this.view.registerDomEvent(itemContentEl, "click", () => {
-        this.handleToggleFolder(node.path);
-      });
-      const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
-      if (node.children.length > 0) {
-        node.children.forEach((childNode) => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths));
-      }
-    } else if (node.type === "chat") {
-      itemEl.addClass(CSS_CHAT_ITEM);
-      const chatMeta = node.metadata;
-      const isActive = chatMeta.id === activeChatId;
-      if (isActive) {
-        itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-      }
-      const chatIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
-      (0, import_obsidian12.setIcon)(chatIcon, isActive ? CHAT_ICON_ACTIVE : CHAT_ICON);
-      itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: chatMeta.name });
-      const detailsWrapper = itemContentEl.createDiv({ cls: CSS_CHAT_ITEM_DETAILS });
-      try {
-        const lastModifiedDate = new Date(chatMeta.lastModified);
-        const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
-        if (dateText === "Invalid date") {
-          this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`);
-        }
-        detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
-      } catch (e) {
-        this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
-        detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
-      }
-      const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" } });
-      (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
-      this.view.registerDomEvent(optionsBtn, "click", (e) => {
-        e.stopPropagation();
-        this.showChatContextMenu(e, chatMeta);
-      });
+      itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
+    } else {
       this.view.registerDomEvent(itemContentEl, "click", async (e) => {
         if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
           return;
         }
-        if (chatMeta.id !== activeChatId) {
-          await this.plugin.chatManager.setActiveChat(chatMeta.id);
+        if (node.metadata.id !== activeChatId) {
+          await this.plugin.chatManager.setActiveChat(node.metadata.id);
         }
       });
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
         e.preventDefault();
-        this.showChatContextMenu(e, chatMeta);
+        this.showChatContextMenu(e, node.metadata);
       });
     }
   }
@@ -2273,7 +2280,9 @@ var SidebarManager = class {
     const newState = !currentState;
     this.folderExpansionState.set(folderPath, newState);
     this.plugin.logger.debug(`Toggled folder ${folderPath} to ${newState ? "expanded" : "collapsed"}`);
-    const folderItemEl = this.chatPanelListContainerEl.querySelector(`.ollama-folder-item[data-path="${folderPath}"]`);
+    const folderItemEl = this.chatPanelListContainerEl.querySelector(
+      `.ollama-folder-item[data-path="${folderPath}"]`
+    );
     if (!folderItemEl) {
       this.plugin.logger.warn(`Could not find folder element for path: ${folderPath}. Forcing full update.`);
       this.updateChatList();
@@ -2290,10 +2299,16 @@ var SidebarManager = class {
     event.preventDefault();
     event.stopPropagation();
     const menu = new import_obsidian12.Menu();
-    menu.addItem((item) => item.setTitle("New Chat Here").setIcon("lucide-plus-circle").onClick(() => this.handleNewChatClick(folderNode.path)));
-    menu.addItem((item) => item.setTitle("New Folder Here").setIcon("lucide-folder-plus").onClick(() => this.handleNewFolderClick(folderNode.path)));
+    menu.addItem(
+      (item) => item.setTitle("New Chat Here").setIcon("lucide-plus-circle").onClick(() => this.handleNewChatClick(folderNode.path))
+    );
+    menu.addItem(
+      (item) => item.setTitle("New Folder Here").setIcon("lucide-folder-plus").onClick(() => this.handleNewFolderClick(folderNode.path))
+    );
     menu.addSeparator();
-    menu.addItem((item) => item.setTitle("Rename Folder").setIcon("lucide-pencil").onClick(() => this.handleRenameFolder(folderNode)));
+    menu.addItem(
+      (item) => item.setTitle("Rename Folder").setIcon("lucide-pencil").onClick(() => this.handleRenameFolder(folderNode))
+    );
     menu.addItem((item) => {
       item.setTitle("Delete Folder").setIcon("lucide-trash-2").onClick(() => this.handleDeleteFolder(folderNode));
     });
@@ -2348,9 +2363,15 @@ var SidebarManager = class {
     event.preventDefault();
     event.stopPropagation();
     const menu = new import_obsidian12.Menu();
-    menu.addItem((item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id)));
-    menu.addItem((item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name)));
-    menu.addItem((item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id)));
+    menu.addItem(
+      (item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id))
+    );
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
@@ -2638,7 +2659,11 @@ var SidebarManager = class {
       return "Yesterday";
     if (diffDays < 7)
       return `${diffDays}d ago`;
-    return date.toLocaleDateString(void 0, { month: "short", day: "numeric", year: date.getFullYear() !== now.getFullYear() ? "numeric" : void 0 });
+    return date.toLocaleDateString(void 0, {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : void 0
+    });
   }
   isSameDay(date1, date2) {
     if (!(date1 instanceof Date) || !(date2 instanceof Date) || isNaN(date1.getTime()) || isNaN(date2.getTime()))
