@@ -1,4 +1,6 @@
 // OllamaView.ts
+//.*|/\*[\s\S]*?\*/
+
 import {
   ItemView,
   WorkspaceLeaf,
