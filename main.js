@@ -4573,6 +4573,7 @@ This action cannot be undone.`,
   }
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    this.plugin.logger.error("[LOAD_DISPLAY] >>>>> ENTERING loadAndDisplayActiveChat");
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -4703,12 +4704,14 @@ This action cannot be undone.`,
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
+      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels via SidebarManager...");
       const panelUpdatePromises = [];
       if ((_m = this.sidebarManager) == null ? void 0 : _m.isSectionVisible("chats")) {
         panelUpdatePromises.push(
           this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
         );
       } else {
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Chat panel collapsed, skipping update.");
       }
       if ((_n = this.sidebarManager) == null ? void 0 : _n.isSectionVisible("roles")) {
         panelUpdatePromises.push(
@@ -4718,6 +4721,7 @@ This action cannot be undone.`,
       }
       if (panelUpdatePromises.length > 0) {
         await Promise.all(panelUpdatePromises);
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Sidebar panel updates finished.");
       }
       if (finalModelName === null) {
         if (this.inputEl) {
@@ -4739,6 +4743,7 @@ This action cannot be undone.`,
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX \u041F\u041E\u041C\u0418\u041B\u041A\u0410 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F XXX", error);
     } finally {
     }
+    this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
   }
   async handleActiveChatChanged(data) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
@@ -7511,7 +7516,6 @@ var Chat = class {
     this.metadata = data.metadata;
     this.messages = data.messages.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
     this.logger = logger;
-    this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
     this.debouncedSave = (0, import_obsidian17.debounce)(this._saveToFile.bind(this), 1500, true);
   }
   // --- Message Management ---
@@ -7608,7 +7612,7 @@ var Chat = class {
           this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
           this.logger = logger; // Зберегти логер
   
-          this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
+          
           this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
       }
   
@@ -7677,7 +7681,6 @@ var Chat = class {
   static async loadFromFile(filePath, adapter, settings, logger) {
     var _a;
     const normPath = (0, import_obsidian17.normalizePath)(filePath);
-    logger.debug(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
     try {
       if (!await adapter.exists(normPath)) {
         logger.warn(`[Chat] File not found for loading: ${normPath}`);

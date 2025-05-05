@@ -68,7 +68,7 @@ export class Chat {
         this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
         this.logger = logger; // Зберегти логер
 
-        this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
+        
         this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
     }
 
@@ -179,7 +179,7 @@ export class Chat {
         this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
         this.logger = logger; // Зберегти логер
 
-        this.logger.debug(`[Chat ${this.metadata.id}] Initialized. Path: ${this.filePath}`);
+        
         this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
     }
 
@@ -272,7 +272,6 @@ export class Chat {
     ): Promise<Chat | null> {
         const normPath = normalizePath(filePath);
         // --- ВИПРАВЛЕННЯ: Використовуємо переданий logger ---
-        logger.debug(`[Chat] Static loadFromFile attempting for vault path: ${normPath}`);
         // --------------------------------------------------
         try {
             if (!(await adapter.exists(normPath))) {

@@ -1294,6 +1294,7 @@ export class OllamaView extends ItemView {
   }
 
   async loadAndDisplayActiveChat(): Promise<void> {
+    this.plugin.logger.error("[LOAD_DISPLAY] >>>>> ENTERING loadAndDisplayActiveChat");
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -1452,7 +1453,7 @@ export class OllamaView extends ItemView {
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
-
+      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels via SidebarManager...");
       const panelUpdatePromises = [];
       if (this.sidebarManager?.isSectionVisible("chats")) {
         panelUpdatePromises.push(
@@ -1461,6 +1462,7 @@ export class OllamaView extends ItemView {
             .catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
         );
       } else {
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Chat panel collapsed, skipping update.");
       }
       if (this.sidebarManager?.isSectionVisible("roles")) {
         panelUpdatePromises.push(
@@ -1473,6 +1475,7 @@ export class OllamaView extends ItemView {
 
       if (panelUpdatePromises.length > 0) {
         await Promise.all(panelUpdatePromises);
+        this.plugin.logger.debug("[loadAndDisplayActiveChat] Sidebar panel updates finished.");
       }
 
       if (finalModelName === null) {
@@ -1495,6 +1498,7 @@ export class OllamaView extends ItemView {
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX ПОМИЛКА під час виконання XXX", error);
     } finally {
     }
+    this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
   }
 
   private async handleActiveChatChanged(data: { chatId: string | null; chat: Chat | null }): Promise<void> {
