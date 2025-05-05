@@ -388,29 +388,98 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
   &.is-collapsed > .ollama-hierarchy-item-children {
     display: none;
   }
-}
+
+} // Кінець .ollama-sidebar-container ... .ollama-hierarchy-item
 
 /////////////////////////////////////////////////////////////////////////////////
-.ollama-chat-list-container {
-  // border: 1px solid magenta; // Рамка списку
+ // --- Стилі для списку ролей ---
+ .ollama-role-panel-list {
+  .ollama-role-panel-item {
+    margin: 1px 0;
+    border-radius: var(--radius-s);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    padding: $item-padding-vertical $item-padding-horizontal;
+    min-height: calc($icon-size + 2 * $item-padding-vertical);
+    &:hover {
+      background-color: var(--background-modifier-hover);
+    }
+    > .ollama-role-panel-item-icon {
+      flex-shrink: 0;
+      width: $icon-size;
+      height: $icon-size;
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: $icon-margin;
+      .svg-icon {
+        width: 15px;
+        height: 15px;
+      }
+    }
+    > .ollama-role-panel-item-text {
+      flex-grow: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: var(--font-ui-small);
+      line-height: 1.3;
+    }
+    &.is-active {
+      background-color: var(--interactive-accent-translucent);
+      .ollama-role-panel-item-icon {
+        color: var(--interactive-accent);
+      }
+      .ollama-role-panel-item-text {
+        color: var(--text-accent);
+        font-weight: 500;
+      }
+      &:hover {
+        background-color: var(--interactive-accent-translucent);
+        filter: brightness(1.1);
+      }
+    }
+    &.is-custom
+      .ollama-role-panel-item-icon:not(:has(.svg-icon[icon-name="check"])) {
+      color: var(--text-faint);
+    }
+    &.ollama-role-panel-item-none {
+    }
+  }
 }
+
+// Повідомлення "немає чатів/ролей"
+.menu-info-text {
+  padding: var(--size-4-2) var(--size-4-3);
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: var(--font-ui-smaller);
+}
+
+// --- End Sidebar Accordion Sections Content ---
+
+// .ollama-chat-list-container {
+//   // border: 1px solid magenta; // Рамка списку
+// }
 
 // --- Стилі для ієрархії (МІНІМУМ) ---
 
 // Зовнішній елемент рядка
-.ollama-hierarchy-item {
-  margin: 1px 0;
-  position: relative; // Для дочірнього контейнера
-  border: 1px dashed rgba(0, 0, 0, 0.2); // DEBUG: Межі зовнішнього елемента
-  padding-left: 0; // Скидаємо тут, відступ буде на контенті
+// .ollama-hierarchy-item {
+//   margin: 1px 0;
+//   position: relative; // Для дочірнього контейнера
+//   border: 1px dashed rgba(0, 0, 0, 0.2); // DEBUG: Межі зовнішнього елемента
+//   padding-left: 0; // Скидаємо тут, відступ буде на контенті
 
-  // Застосовуємо відступ до зовнішнього елемента з !important (бо це працювало)
-  @for $i from 0 through 10 {
-    &.ollama-indent-level-#{$i} {
-      padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
-    }
-  }
-}
+//   // Застосовуємо відступ до зовнішнього елемента з !important (бо це працювало)
+//   @for $i from 0 through 10 {
+//     &.ollama-indent-level-#{$i} {
+//       padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
+//     }
+//   }
+// }
 
 // ..............................................................................
 
