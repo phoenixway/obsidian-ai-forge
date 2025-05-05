@@ -146,7 +146,6 @@ var Logger = class {
     this.logFilePath = (0, import_obsidian3.normalizePath)(initialSettings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
     this.logFileMaxSizeMB = initialSettings.logFileMaxSizeMB || 5;
     this.updateSettings(initialSettings);
-    console.log(`[Logger] Initialized. Console Level: ${this.getLogLevelName(this.consoleLogLevel)}, File Logging: ${this.fileLoggingEnabled}, File Level: ${this.getLogLevelName(this.fileLogLevel)}, Log Caller: ${this.logCallerInfo}, Path: ${this.logFilePath}`);
     if (this.fileLoggingEnabled) {
       this.rotateLogFileIfNeeded().then(() => {
         this.info("Logger initialized & file rotation checked.");
@@ -189,7 +188,6 @@ var Logger = class {
     }
     if (settings.logFilePath !== void 0) {
       this.logFilePath = (0, import_obsidian3.normalizePath)(settings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
-      console.log(`[Logger] Log file path updated to: ${this.logFilePath}`);
     }
     if (settings.logFileMaxSizeMB !== void 0) {
       this.logFileMaxSizeMB = settings.logFileMaxSizeMB || 5;

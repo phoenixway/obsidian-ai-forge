@@ -43,7 +43,7 @@ export class Logger {
 
         this.updateSettings(initialSettings);
 
-        console.log(`[Logger] Initialized. Console Level: ${this.getLogLevelName(this.consoleLogLevel)}, File Logging: ${this.fileLoggingEnabled}, File Level: ${this.getLogLevelName(this.fileLogLevel)}, Log Caller: ${this.logCallerInfo}, Path: ${this.logFilePath}`);
+        // console.log(`[Logger] Initialized. Console Level: ${this.getLogLevelName(this.consoleLogLevel)}, File Logging: ${this.fileLoggingEnabled}, File Level: ${this.getLogLevelName(this.fileLogLevel)}, Log Caller: ${this.logCallerInfo}, Path: ${this.logFilePath}`);
 
         if (this.fileLoggingEnabled) {
             this.rotateLogFileIfNeeded().then(() => {
@@ -87,7 +87,7 @@ export class Logger {
          // Оновлення шляху та розміру, якщо вони передані
          if (settings.logFilePath !== undefined) {
              this.logFilePath = normalizePath(settings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
-             console.log(`[Logger] Log file path updated to: ${this.logFilePath}`);
+            //  console.log(`[Logger] Log file path updated to: ${this.logFilePaInitialized. Console Levelh}`);
          }
          if (settings.logFileMaxSizeMB !== undefined) {
              this.logFileMaxSizeMB = settings.logFileMaxSizeMB || 5;
