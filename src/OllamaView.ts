@@ -82,6 +82,9 @@ const CSS_CLASS_SCROLL_BOTTOM_BUTTON = "scroll-to-bottom-button";
 const CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
 const CSS_CLASS_MENU_BUTTON = "menu-button";
 
+const CSS_CLASS_RESIZER_HANDLE = "ollama-resizer-handle"; // Новий клас для роздільника
+const CSS_CLASS_RESIZING = "is-resizing"; // Клас для body під час перетягування
+
 export type MessageRole = "user" | "assistant" | "system" | "error";
 
 export class OllamaView extends ItemView {
@@ -148,6 +151,16 @@ export class OllamaView extends ItemView {
   } | null = null;
 
   private currentMessageAddedResolver: (() => void) | null = null;
+  // --- Нові властивості ---
+  private sidebarRootEl!: HTMLElement; // Посилання на кореневий div сайдбару
+  private resizerEl!: HTMLElement;     // Посилання на div роздільника
+  private isResizing = false;
+  private initialMouseX = 0;
+  private initialSidebarWidth = 0;
+  private boundOnDragMove: (event: MouseEvent) => void; // Обробник руху миші
+  private boundOnDragEnd: (event: MouseEvent) => void;   // Обробник відпускання миші
+  private saveWidthDebounced: () => void; // Debounced функція для збереження ширини
+  // --- Кінець нових властивостей ---
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -162,6 +175,21 @@ export class OllamaView extends ItemView {
         this.focusInput();
       })
     );
+    this.boundOnDragMove = this.onDragMove.bind(this);
+    this.boundOnDragEnd = this.onDragEnd.bind(this);
+
+    this.saveWidthDebounced = debounce(() => {
+        if (this.sidebarRootEl) {
+            const newWidth = this.sidebarRootEl.offsetWidth;
+            // Зберігаємо, тільки якщо ширина дійсна і змінилася
+            if (newWidth > 0 && newWidth !== this.plugin.settings.sidebarWidth) {
+                this.plugin.logger.debug(`Saving sidebar width: ${newWidth}`);
+                this.plugin.settings.sidebarWidth = newWidth;
+                // Не використовуємо await, debounce сам керує асинхронністю
+                this.plugin.saveSettings();
+            }
+        }
+    }, 800); // Затримка 800 мс після останньої зміни
   }
 
   getViewType(): string {
@@ -175,244 +203,211 @@ export class OllamaView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
+    this.plugin.logger.debug("[OllamaView] onOpen started.");
+    // Спочатку створюємо UI, включаючи роздільник
     this.createUIElements();
 
+    // --- Застосовуємо збережену/дефолтну ширину сайдбару ---
+    const savedWidth = this.plugin.settings.sidebarWidth;
+    // Перевіряємо наявність sidebarRootEl та валідність збереженої ширини
+    if (this.sidebarRootEl && savedWidth && typeof savedWidth === 'number' && savedWidth > 50) {
+         this.plugin.logger.debug(`Applying saved sidebar width: ${savedWidth}px`);
+         this.sidebarRootEl.style.width = `${savedWidth}px`;
+         this.sidebarRootEl.style.minWidth = `${savedWidth}px`; // Важливо для flex-shrink
+    } else if (this.sidebarRootEl) {
+         // Встановлюємо дефолтну ширину, якщо збереженої немає або вона невалідна
+         // Спробуємо прочитати з CSS змінної або встановити фіксоване значення
+         let defaultWidth = 250; // Значення за замовчуванням
+         try {
+             const cssVarWidth = getComputedStyle(this.sidebarRootEl).getPropertyValue('--ai-forge-sidebar-width').trim();
+             if (cssVarWidth && cssVarWidth.endsWith('px')) {
+                 const parsedWidth = parseInt(cssVarWidth, 10);
+                 if (!isNaN(parsedWidth) && parsedWidth > 50) {
+                     defaultWidth = parsedWidth;
+                 }
+             }
+         } catch (e) {
+             this.plugin.logger.warn("Could not read default width from CSS variable, using fallback.", e);
+         }
+         this.plugin.logger.debug(`Applying default sidebar width: ${defaultWidth}px`);
+         this.sidebarRootEl.style.width = `${defaultWidth}px`;
+         this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
+    }
+    // --- Кінець застосування ширини ---
+
+    // Оновлюємо початкові елементи UI (плейсхолдер, роль, модель...)
     try {
-      const initialRolePath = this.plugin.settings.selectedRolePath;
+        const initialRolePath = this.plugin.settings.selectedRolePath;
+        const initialRoleName = await this.findRoleNameByPath(initialRolePath);
+        this.updateInputPlaceholder(initialRoleName);
+        this.updateRoleDisplay(initialRoleName);
+        this.updateModelDisplay(this.plugin.settings.modelName);
+        this.updateTemperatureIndicator(this.plugin.settings.temperature);
+        this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
+    } catch (error) {
+         this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
+    }
 
-      const initialRoleName = await this.findRoleNameByPath(initialRolePath);
-      this.updateInputPlaceholder(initialRoleName);
-      this.updateRoleDisplay(initialRoleName);
-      this.updateModelDisplay(this.plugin.settings.modelName);
-      this.updateTemperatureIndicator(this.plugin.settings.temperature);
-    } catch (error) {}
-
-    this.attachEventListeners();
+    this.attachEventListeners(); // Тепер включає слухач для роздільника
     this.autoResizeTextarea();
     this.updateSendButtonState();
 
+    // Завантажуємо чат
     try {
-      await this.loadAndDisplayActiveChat();
+        this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
+        await this.loadAndDisplayActiveChat(); // Цей метод вже НЕ викликає update*List сам
+        this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
+        // ЯВНО оновлюємо списки ПІСЛЯ завантаження чату
+        this.sidebarManager?.updateChatList().catch(e => this.plugin.logger.error("Error updating chat list after initial load:", e));
+        this.sidebarManager?.updateRoleList().catch(e => this.plugin.logger.error("Error updating role list after initial load:", e));
+
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
-      this.showEmptyState();
-
-      const updatePromises = [];
-      if (this.isSidebarSectionVisible("chats")) {
-        updatePromises.push(
-          this.updateChatPanelList().catch(e => this.plugin.logger.error("Error updating chat panel list in catch:", e))
-        );
-      }
-      if (this.isSidebarSectionVisible("roles")) {
-        updatePromises.push(
-          this.updateRolePanelList().catch(e => this.plugin.logger.error("Error updating role panel list in catch:", e))
-        );
-      }
-      if (updatePromises.length > 0) {
-        await Promise.all(updatePromises);
-      }
+         this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
+         this.showEmptyState(); // Показуємо порожній стан при помилці
+          // Оновлюємо видимі панелі навіть при помилці
+         const updatePromises = [];
+         if (this.sidebarManager?.isSectionVisible("chats")) { updatePromises.push( this.sidebarManager.updateChatList().catch(e => this.plugin.logger.error("Error updating chat panel list in catch:", e)) ); }
+         if (this.sidebarManager?.isSectionVisible("roles")) { updatePromises.push( this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list in catch:", e)) ); }
+         if (updatePromises.length > 0) { await Promise.all(updatePromises); }
     }
 
-    setTimeout(() => {
-      this.inputEl?.focus();
-    }, 150);
+    // Фокус
+    setTimeout(() => { this.inputEl?.focus(); this.plugin.logger.debug("[OllamaView] Input focused in onOpen."); }, 150);
+    if (this.inputEl) { this.inputEl.dispatchEvent(new Event("input")); }
+ }
 
-    if (this.inputEl) {
-      this.inputEl.dispatchEvent(new Event("input"));
-    }
+ async onClose(): Promise<void> {
+  // --- Додано очищення слухачів перетягування ---
+  document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });
+  document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
+  // Перевіряємо, чи клас було додано перед видаленням
+  if (document.body.classList.contains(CSS_CLASS_RESIZING)) {
+       document.body.style.cursor = ""; // Повертаємо курсор
+       document.body.classList.remove(CSS_CLASS_RESIZING);
   }
+  this.isResizing = false; // Скидаємо стан про всяк випадок
+  // ---
 
-  async onClose(): Promise<void> {
-    if (this.speechWorker) {
-      this.speechWorker.terminate();
-      this.speechWorker = null;
-    }
-    this.stopVoiceRecording(false);
-    if (this.audioStream) {
-      this.audioStream.getTracks().forEach(t => t.stop());
-      this.audioStream = null;
-    }
-    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
-    if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-
-    this.sidebarManager?.destroy();
-    this.dropdownMenuManager?.destroy();
+  // --- Існуючий код очищення ---
+  if (this.speechWorker) {
+     this.speechWorker.terminate();
+     this.speechWorker = null;
   }
+  this.stopVoiceRecording(false); // Зупиняємо запис без обробки
+  if (this.audioStream) {
+     this.audioStream.getTracks().forEach(t => t.stop());
+     this.audioStream = null;
+  }
+  if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+  if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
+  this.sidebarManager?.destroy(); // Викликаємо destroy для менеджера сайдбару
+  this.dropdownMenuManager?.destroy(); // Викликаємо destroy для менеджера меню
+  this.plugin.logger.info("Ollama View closed and resources cleaned up.");
+}
 
   private createUIElements(): void {
-    this.contentEl.empty();
-    const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
-
+    this.plugin.logger.debug("createUIElements: Starting UI creation.");
+    this.contentEl.empty(); // Очищуємо основний контейнер View
+    // Створюємо головний flex-контейнер для сайдбару та області чату
+    const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" }); // Використовуємо CSS_CLASS_CONTAINER
+  
+    // Визначаємо, де має бути View і чи це десктоп
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
     const isDesktop = Platform.isDesktop;
-
+    this.plugin.logger.debug(`[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`);
+  
+    // 1. Створюємо Сайдбар і ЗБЕРІГАЄМО ПОСИЛАННЯ на кореневий елемент
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
-    const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
-
+    this.sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer); // Зберігаємо посилання
+  
+    // Встановлюємо видимість внутрішнього сайдбара
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
-    if (sidebarRootEl) {
-      sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
+    if (this.sidebarRootEl) {
+        // Додаємо або видаляємо клас для приховування/показу через CSS
+        this.sidebarRootEl.classList.toggle('internal-sidebar-hidden', !shouldShowInternalSidebar);
+        this.plugin.logger.debug(`[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${this.sidebarRootEl.className}`);
     } else {
-      this.plugin.logger.error("[OllamaView] sidebarRootEl is missing! Cannot toggle class.");
+        this.plugin.logger.error("[OllamaView] sidebarRootEl is missing after creation!");
     }
-
-    this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
-
-    this.mainChatAreaEl.classList.toggle("full-width", !shouldShowInternalSidebar);
-
+  
+    // --- ДОДАНО: Створюємо Роздільник між сайдбаром та чатом ---
+    this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
+    this.resizerEl.title = "Drag to resize sidebar";
+    // Приховуємо роздільник разом із сайдбаром
+    this.resizerEl.classList.toggle('internal-sidebar-hidden', !shouldShowInternalSidebar);
+    this.plugin.logger.debug(`[OllamaView] Resizer element created (hidden: ${!shouldShowInternalSidebar}).`);
+    // --- КІНЕЦЬ ДОДАНОГО ---
+  
+    // 2. Створюємо Основну Область Чату
+    this.mainChatAreaEl = flexContainer.createDiv({ cls: "ollama-main-chat-area" }); // Використовуємо CSS_MAIN_CHAT_AREA
+    // Додаємо клас, якщо сайдбар приховано, щоб область чату займала всю ширину
+    this.mainChatAreaEl.classList.toggle('full-width', !shouldShowInternalSidebar);
+    this.plugin.logger.debug(`[OllamaView] Main chat area class 'full-width' set: ${!shouldShowInternalSidebar}`);
+  
+    // --- Створення решти елементів UI всередині mainChatAreaEl ---
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
-    this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
-
-    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
+    this.chatContainer = this.chatContainerEl.createDiv({ cls: "ollama-chat-container"});
+    this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: "new-message-indicator" });
     setIcon(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
-
-    this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
-      cls: [CSS_CLASS_SCROLL_BOTTOM_BUTTON, "clickable-icon"],
-      attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" },
-    });
+    this.scrollToBottomButton = this.chatContainerEl.createEl("button", { cls: ["scroll-to-bottom-button", "clickable-icon"], attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" }, });
     setIcon(this.scrollToBottomButton, "arrow-down");
-
-    const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Enter message text here...`, rows: 1 },
-    });
-
-    const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
-    const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
-    this.translateInputButton = leftControls.createEl("button", {
-      cls: CSS_CLASS_TRANSLATE_INPUT_BUTTON,
-      attr: { "aria-label": "Translate input to English" },
-    });
+    const inputContainer = this.mainChatAreaEl.createDiv({ cls: "chat-input-container" });
+    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Enter message text here...`, rows: 1 } });
+    const controlsContainer = inputContainer.createDiv({ cls: "input-controls-container" });
+    const leftControls = controlsContainer.createDiv({ cls: "input-controls-left" });
+    this.translateInputButton = leftControls.createEl("button", { cls: "translate-input-button", attr: { "aria-label": "Translate input to English" }, });
     setIcon(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
-
-    this.modelDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_MODEL_DISPLAY });
-    this.modelDisplayEl.setText("...");
-    this.modelDisplayEl.title = "Click to select model";
-
-    this.roleDisplayEl = leftControls.createDiv({ cls: CSS_CLASS_ROLE_DISPLAY });
-    this.roleDisplayEl.setText("...");
-    this.roleDisplayEl.title = "Click to select role";
-
-    this.temperatureIndicatorEl = leftControls.createDiv({ cls: CSS_CLASS_TEMPERATURE_INDICATOR });
-    this.temperatureIndicatorEl.setText("?");
-    this.temperatureIndicatorEl.title = "Click to set temperature";
-
-    this.buttonsContainer = controlsContainer.createDiv({
-      cls: `${CSS_CLASS_BUTTONS_CONTAINER} ${CSS_CLASS_INPUT_CONTROLS_RIGHT}`,
-    });
-
-    this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
-      cls: [CSS_CLASS_STOP_BUTTON, CSS_CLASSES.DANGER_OPTION],
-      attr: { "aria-label": "Stop Generation", title: "Stop Generation" },
-    });
-    setIcon(this.stopGeneratingButton, "square");
-    this.stopGeneratingButton.hide();
-
-    this.sendButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_SEND_BUTTON,
-      attr: { "aria-label": "Send" },
-    });
-    setIcon(this.sendButton, "send");
-
-    this.voiceButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_VOICE_BUTTON,
-      attr: { "aria-label": "Voice Input" },
-    });
-    setIcon(this.voiceButton, "mic");
-
-    this.toggleLocationButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      attr: { "aria-label": "Toggle View Location" },
-    });
-
-    this.menuButton = this.buttonsContainer.createEl("button", {
-      cls: CSS_CLASS_MENU_BUTTON,
-      attr: { "aria-label": "Menu" },
-    });
-    setIcon(this.menuButton, "more-vertical");
-
-    this.updateToggleLocationButton();
-
-    this.dropdownMenuManager = new DropdownMenuManager(
-      this.plugin,
-      this.app,
-      this,
-      inputContainer,
-      isSidebarLocation,
-      isDesktop
-    );
+    this.modelDisplayEl = leftControls.createDiv({ cls: "model-display" }); this.modelDisplayEl.setText("..."); this.modelDisplayEl.title = "Click to select model";
+    this.roleDisplayEl = leftControls.createDiv({ cls: "role-display" }); this.roleDisplayEl.setText("..."); this.roleDisplayEl.title = "Click to select role";
+    this.temperatureIndicatorEl = leftControls.createDiv({ cls: "temperature-indicator" }); this.temperatureIndicatorEl.setText("?"); this.temperatureIndicatorEl.title = "Click to set temperature";
+    this.buttonsContainer = controlsContainer.createDiv({ cls: `buttons-container input-controls-right`});
+    this.stopGeneratingButton = this.buttonsContainer.createEl("button", { cls: ["stop-generating-button", "danger-option"], attr: { "aria-label": "Stop Generation", title: "Stop Generation" }, }); // Використовуємо константу CSS_CLASSES.DANGER_OPTION
+    setIcon(this.stopGeneratingButton, "square"); this.stopGeneratingButton.hide();
+    this.sendButton = this.buttonsContainer.createEl("button", { cls: "send-button", attr: { "aria-label": "Send" }, }); setIcon(this.sendButton, "send");
+    this.voiceButton = this.buttonsContainer.createEl("button", { cls: "voice-button", attr: { "aria-label": "Voice Input" }, }); setIcon(this.voiceButton, "mic");
+    this.toggleLocationButton = this.buttonsContainer.createEl("button", { cls: "toggle-location-button", attr: { "aria-label": "Toggle View Location" }, });
+    this.menuButton = this.buttonsContainer.createEl("button", { cls: "menu-button", attr: { "aria-label": "Menu" }, }); setIcon(this.menuButton, "more-vertical");
+    this.updateToggleLocationButton(); // Встановлює іконку/title
+    this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation, isDesktop);
     this.dropdownMenuManager.createMenuUI();
+    this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
 
   private attachEventListeners(): void {
-    if (!this.inputEl) console.error("OllamaView: inputEl missing during attachEventListeners!");
-    if (!this.sendButton) console.error("OllamaView: sendButton missing during attachEventListeners!");
-    if (!this.stopGeneratingButton) console.error("OllamaView: stopGeneratingButton missing!");
-    if (!this.voiceButton) console.error("OllamaView: voiceButton missing!");
-    if (!this.translateInputButton) console.error("OllamaView: translateInputButton missing!");
-    if (!this.menuButton) console.error("OllamaView: menuButton missing!");
-    if (!this.modelDisplayEl) console.error("OllamaView: modelDisplayEl missing!");
-    if (!this.roleDisplayEl) console.error("OllamaView: roleDisplayEl missing!");
-    if (!this.temperatureIndicatorEl) console.error("OllamaView: temperatureIndicatorEl missing!");
-    if (!this.toggleLocationButton) console.error("OllamaView: toggleLocationButton missing!");
-    if (!this.chatContainer) console.error("OllamaView: chatContainer missing!");
-    if (!this.scrollToBottomButton) console.error("OllamaView: scrollToBottomButton missing!");
-    if (!this.newMessagesIndicatorEl) console.error("OllamaView: newMessagesIndicatorEl missing!");
+    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
 
-    if (this.inputEl) {
-      this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
-      this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
+    // --- ДОДАНО: Слухач для роздільника ---
+    if (this.resizerEl) {
+        // Додаємо слухач mousedown до роздільника
+        this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
+        this.plugin.logger.debug("Added mousedown listener to resizer handle.");
+    } else {
+         this.plugin.logger.error("Resizer element (resizerEl) not found during listener attachment!");
     }
+    // ---
 
-    if (this.sendButton) {
-      this.registerDomEvent(this.sendButton, "click", this.handleSendClick);
-    }
-    if (this.stopGeneratingButton) {
-      this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration);
-    }
-    if (this.voiceButton) {
-      this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick);
-    }
-    if (this.translateInputButton) {
-      this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
-    }
-    if (this.menuButton) {
-      this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick);
-    }
-    if (this.toggleLocationButton) {
-      this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick);
-    }
-
-    if (this.modelDisplayEl) {
-      this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick);
-    }
-    if (this.roleDisplayEl) {
-      this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick);
-    }
-    if (this.temperatureIndicatorEl) {
-      this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick);
-    }
-
-    if (this.chatContainer) {
-      this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced);
-    }
-    if (this.newMessagesIndicatorEl) {
-      this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick);
-    }
-    if (this.scrollToBottomButton) {
-      this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
-    }
-
+    // --- Реєстрація всіх інших слухачів як раніше ---
+    if (this.inputEl) { this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown); this.registerDomEvent(this.inputEl, "input", this.handleInputForResize); }
+    if (this.sendButton) { this.registerDomEvent(this.sendButton, "click", this.handleSendClick); }
+    if (this.stopGeneratingButton) { this.registerDomEvent(this.stopGeneratingButton, "click", this.cancelGeneration); }
+    if (this.voiceButton) { this.registerDomEvent(this.voiceButton, "click", this.handleVoiceClick); }
+    if (this.translateInputButton) { this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick); }
+    if (this.menuButton) { this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick); }
+    if (this.toggleLocationButton) { this.registerDomEvent(this.toggleLocationButton, "click", this.handleToggleViewLocationClick); }
+    if (this.modelDisplayEl) { this.registerDomEvent(this.modelDisplayEl, "click", this.handleModelDisplayClick); }
+    if (this.roleDisplayEl) { this.registerDomEvent(this.roleDisplayEl, "click", this.handleRoleDisplayClick); }
+    if (this.temperatureIndicatorEl) { this.registerDomEvent(this.temperatureIndicatorEl, "click", this.handleTemperatureClick); }
+    if (this.chatContainer) { this.registerDomEvent(this.chatContainer, "scroll", this.scrollListenerDebounced); }
+    if (this.newMessagesIndicatorEl) { this.registerDomEvent(this.newMessagesIndicatorEl, "click", this.handleNewMessageIndicatorClick); }
+    if (this.scrollToBottomButton) { this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick); }
     this.registerDomEvent(window, "resize", this.handleWindowResize);
-
     this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
-
     this.dropdownMenuManager?.attachEventListeners();
-
+    this.plugin.logger.debug("[OllamaView] Delegated listener attachment to DropdownMenuManager.");
     this.register(this.plugin.on("model-changed", modelName => this.handleModelChange(modelName)));
     this.register(this.plugin.on("role-changed", roleName => this.handleRoleChange(roleName)));
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
@@ -422,7 +417,8 @@ export class OllamaView extends ItemView {
     this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
     this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
     this.register(this.plugin.on("message-deleted", data => this.handleMessageDeleted(data)));
-    this.register(this.plugin.on("ollama-connection-error", message => {}));
+    this.register(this.plugin.on("ollama-connection-error", message => { /* Можливо, показати щось у View? */ }));
+    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
   }
 
   private cancelGeneration = (): void => {
@@ -3746,4 +3742,75 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   private handleMenuButtonClick = (e: MouseEvent): void => {
     this.dropdownMenuManager?.toggleMenu(e);
   };
+
+    // --- ДОДАНО: Методи для перетягування ---
+    private onDragStart = (event: MouseEvent): void => {
+      if (event.button !== 0) return; // Реагуємо тільки на ліву кнопку
+
+      this.isResizing = true;
+      this.initialMouseX = event.clientX;
+      // Перевіряємо наявність sidebarRootEl перед доступом до offsetWidth
+      this.initialSidebarWidth = this.sidebarRootEl?.offsetWidth || 250; // Запасне значення
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Додаємо глобальні слухачі ДОКУМЕНТА
+      document.addEventListener("mousemove", this.boundOnDragMove, { capture: true }); // Використовуємо capture
+      document.addEventListener("mouseup", this.boundOnDragEnd, { capture: true });
+
+      document.body.style.cursor = "ew-resize";
+      document.body.classList.add(CSS_CLASS_RESIZING);
+      this.plugin.logger.debug(`Resizer drag started. Initial width: ${this.initialSidebarWidth}`);
+  };
+
+  private onDragMove = (event: MouseEvent): void => {
+      if (!this.isResizing || !this.sidebarRootEl) return;
+
+      // Використовуємо requestAnimationFrame для плавності
+      requestAnimationFrame(() => {
+          // Додаткова перевірка всередині rAF, оскільки стан міг змінитися
+          if (!this.isResizing || !this.sidebarRootEl) return;
+
+          const currentMouseX = event.clientX;
+          const deltaX = currentMouseX - this.initialMouseX;
+          let newWidth = this.initialSidebarWidth + deltaX;
+
+          // Обмеження ширини
+          const minWidth = 150; // Мінімальна ширина
+          const containerWidth = this.contentEl.offsetWidth;
+          // Максимальна ширина - 60% контейнера, але не менше ніж minWidth + 50px
+          const maxWidth = Math.max(minWidth + 50, containerWidth * 0.6);
+
+          if (newWidth < minWidth) newWidth = minWidth;
+          if (newWidth > maxWidth) newWidth = maxWidth;
+
+          // Застосовуємо стилі напряму
+          this.sidebarRootEl.style.width = `${newWidth}px`;
+          this.sidebarRootEl.style.minWidth = `${newWidth}px`; // Важливо для flex-shrink
+
+          // Оновлення CSS змінної (опціонально, якщо ви її використовуєте для ширини)
+          // this.contentEl.style.setProperty('--ai-forge-sidebar-width', `${newWidth}px`);
+      });
+  };
+
+  private onDragEnd = (event: MouseEvent): void => {
+      // Перевіряємо, чи ми дійсно перетягували
+      if (!this.isResizing) return;
+
+      this.isResizing = false;
+
+      // Видаляємо глобальні слухачі з документа
+      document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });
+      document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
+      document.body.style.cursor = ""; // Повертаємо курсор
+      document.body.classList.remove(CSS_CLASS_RESIZING);
+
+      this.plugin.logger.debug("Resizer drag ended.");
+
+      // Зберігаємо ширину з debounce
+      this.saveWidthDebounced();
+  };
+  // --- КІНЕЦЬ МЕТОДІВ ДЛЯ ПЕРЕТЯГУВАННЯ ---
+
 }

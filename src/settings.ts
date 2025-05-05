@@ -177,6 +177,7 @@ export interface OllamaPluginSettings extends LoggerSettings {
   fixBrokenEmojis: boolean; // Налаштування для виправлення емодзі
   translationProvider: TranslationProvider; // Вибір провайдера
   ollamaTranslationModel: string; // Модель Ollama для перекладу
+  sidebarWidth?: number; // Опціональна властивість для збереженої ширини сайдбару
 }
 
 // --- Значення за замовчуванням ---
@@ -245,6 +246,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   fixBrokenEmojis: true,
   translationProvider: 'ollama', // За замовчуванням вимкнено
   ollamaTranslationModel: '',
+  sidebarWidth: undefined, // Або null. Означає, що ширина не встановлена користувачем
 };
 
 // --- Клас вкладки налаштувань ---

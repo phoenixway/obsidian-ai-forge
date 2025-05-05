@@ -106,3 +106,73 @@
 .ollama-container .user-message .message-content {
      user-select: text !important;
 }
+
+.ollama-resizer-handle {
+    width: 4px; // Ширина смужки роздільника
+    background-color: var(--divider-color); // Колір як у стандартних роздільників
+    cursor: ew-resize; // Курсор для горизонтального перетягування
+    flex-shrink: 0; // Не стискати роздільник
+    transition: background-color 0.2s ease-out;
+    position: relative; // Для можливого додавання ::before/::after
+
+    // Зона кліку може бути ширшою для зручності
+    // &::before {
+    //     content: '';
+    //     position: absolute;
+    //     left: -3px;
+    //     right: -3px;
+    //     top: 0;
+    //     bottom: 0;
+    //     z-index: 1;
+    // }
+
+    &:hover {
+        background-color: var(--interactive-accent); // Змінюємо колір при наведенні
+    }
+
+    // Стиль приховування, якщо сайдбар приховано
+    &.internal-sidebar-hidden {
+        width: 0 !important;
+        min-width: 0 !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important; // Не реагувати на кліки
+    }
+}
+
+// Стиль для body під час перетягування (змінює курсор всюди)
+body.is-resizing {
+    cursor: ew-resize !important; // Примусово змінюємо курсор
+    user-select: none !important; // Забороняємо виділення тексту
+}
+// --- КІНЕЦЬ СТИЛІВ ДЛЯ РОЗДІЛЬНИКА ---
+
+
+// Основний контейнер View (переконайтесь, що він flex-row)
+.ollama-container {
+    display: flex;
+    flex-direction: row; // МАЄ БУТИ row
+    height: 100%;
+    background-color: var(--background-secondary-alt);
+    align-items: stretch;
+    gap: 0; // Без проміжку між сайдбаром, роздільником та чатом
+    overflow: hidden;
+}
+
+// Сайдбар плагіна
+.ollama-sidebar-container {
+    // ... існуючі стилі сайдбару (width, min-width, background, etc.) ...
+    flex-shrink: 0; // Важливо, щоб не стискався
+}
+
+// Основна область чату
+.ollama-main-chat-area {
+     // ... існуючі стилі області чату ...
+     display: flex; flex-direction: column;
+     flex-grow: 1; // Займає залишок місця
+     height: 100%;
+     min-width: 0; // Дозволяє стискатись
+     overflow: hidden;
+}
