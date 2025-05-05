@@ -3293,19 +3293,12 @@ var OllamaView = class extends import_obsidian14.ItemView {
     this.lastRenderedMessageDate = null;
     this.newMessagesIndicatorEl = null;
     this.userScrolledUp = false;
-    // Нова обгортка для чату та вводу
     this.lastProcessedChatId = null;
-    // Нова кнопка
     this.currentAbortController = null;
-    // Для переривання запиту
     this.lastMessageElement = null;
-    // Останній доданий елемент групи повідомлень
     this.consecutiveErrorMessages = [];
-    // Масив для накопичення послідовних помилок
     this.errorGroupElement = null;
-    // Посилання на активний контейнер групи помилок
     this.isSummarizingErrors = false;
-    // Прапорець, щоб уникнути одночасних сумаризацій
     this.temporarilyDisableChatChangedReload = false;
     this.activePlaceholder = null;
     this.currentMessageAddedResolver = null;
@@ -3313,7 +3306,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
       if (this.currentAbortController) {
         this.currentAbortController.abort();
       } else {
-        this.plugin.logger.warn("[OllamaView] Cancel generation called but no active AbortController found.");
       }
     };
     this.handleMessageDeleted = (data) => {
@@ -3376,20 +3368,15 @@ var OllamaView = class extends import_obsidian14.ItemView {
         this.loadAndDisplayActiveChat();
       }
     };
-    // --- Кінець нового методу ---
-    // --- Оновлений updateRolePanelList (БЕЗ ВСТАНОВЛЕННЯ max-height/overflow) ---
     this.updateRolePanelList = async () => {
       var _a, _b, _c;
       const container = this.rolePanelListEl;
       if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Container or ChatManager missing.");
         return;
       }
       if (((_a = this.rolePanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true") {
-        this.plugin.logger.debug("[updateRolePanelList] Skipping update: Roles panel is collapsed.");
         return;
       }
-      this.plugin.logger.debug("[updateRolePanelList] Updating role list content...");
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
@@ -3421,7 +3408,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
           }
           this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
         });
-        this.plugin.logger.debug(`[updateRolePanelList] Finished rendering ${roles.length + 1} role items.`);
       } catch (error) {
         this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
         container.empty();
@@ -3432,7 +3418,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
         });
       }
     };
-    // --- Новий обробник кліку для ПАНЕЛІ ролей ---
     this.handleRolePanelItemClick = async (roleInfo, currentRolePath) => {
       var _a, _b, _c, _d, _e;
       const newRolePath = (_a = roleInfo == null ? void 0 : roleInfo.path) != null ? _a : "";
@@ -3464,7 +3449,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
           new import_obsidian14.Notice("Failed to set the role.");
         }
       } else {
-        this.plugin.logger.debug(`[handleRolePanelItemClick] Clicked role is already active.`);
       }
     };
     this.handleModelDisplayClick = async (event) => {
@@ -3515,8 +3499,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
         }
       }
     };
-    // --- Event Handlers ---
-    // Input & Sending
     this.handleKeyDown = (e) => {
       var _a;
       if (e.key === "Enter" && !e.shiftKey && !this.isProcessing && !((_a = this.sendButton) == null ? void 0 : _a.disabled)) {
@@ -3539,11 +3521,9 @@ var OllamaView = class extends import_obsidian14.ItemView {
         this.updateSendButtonState();
       }, 75);
     };
-    // Input Area Buttons
     this.handleVoiceClick = () => {
       this.toggleVoiceRecognition();
     };
-    // OllamaView.ts -> handleTranslateInputClick
     this.handleTranslateInputClick = async () => {
       const currentText = this.inputEl.value;
       const targetLang = this.plugin.settings.translationTargetLanguage;
@@ -3564,14 +3544,8 @@ var OllamaView = class extends import_obsidian14.ItemView {
       this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT);
       this.translateInputButton.title = "Translating...";
       try {
-        this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for input...`);
-        const translatedText = await this.plugin.translationService.translate(
-          currentText,
-          "English"
-          /* targetLang */
-        );
+        const translatedText = await this.plugin.translationService.translate(currentText, "English");
         if (translatedText !== null) {
-          this.plugin.logger.debug(`[OllamaView] Input translation received.`);
           this.inputEl.value = translatedText;
           this.inputEl.dispatchEvent(new Event("input"));
           this.inputEl.focus();
@@ -3580,7 +3554,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
             this.inputEl.setSelectionRange(end, end);
           }
         } else {
-          this.plugin.logger.warn("[OllamaView] Input translation failed (null returned from service).");
         }
       } catch (error) {
         this.plugin.logger.error("[OllamaView] Unexpected error during input translation call:", error);
@@ -3592,8 +3565,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
         this.translateInputButton.title = `Translate input to ${LANGUAGES[targetLang] || targetLang}`;
       }
     };
-    // Menu Button Click (Toggles Custom Div)
-    // --- Action Handlers (Must call closeMenu) ---
     this.handleNewChatClick = async () => {
       var _a;
       this.plugin.logger.error("!!! OllamaView: handleNewChatClick ENTERED !!!");
@@ -3610,14 +3581,12 @@ var OllamaView = class extends import_obsidian14.ItemView {
         new import_obsidian14.Notice("Error creating new chat.");
       }
     };
-    // У файлі src/OllamaView.ts
     this.handleRenameChatClick = async (chatIdToRename, currentChatName) => {
       var _a, _b;
       this.plugin.logger.error("!!! OllamaView: handleRenameChatClick ENTERED !!!");
       let chatId = chatIdToRename != null ? chatIdToRename : null;
       let currentName = currentChatName != null ? currentChatName : null;
       if (!chatId || !currentName) {
-        this.plugin.logger.debug("[handleRenameChatClick] No chat ID provided, getting active chat...");
         const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
         if (!activeChat) {
           new import_obsidian14.Notice("No active chat to rename.");
@@ -3635,34 +3604,25 @@ var OllamaView = class extends import_obsidian14.ItemView {
         new import_obsidian14.Notice("Could not initiate rename process.");
         return;
       }
-      new PromptModal(
-        this.app,
-        "Rename Chat",
-        `Enter new name for "${currentName}":`,
-        currentName,
-        // Попередньо заповнене поле
-        async (newName) => {
-          let noticeMessage = "Rename cancelled or name unchanged.";
-          const trimmedName = newName == null ? void 0 : newName.trim();
-          if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-            this.plugin.logger.debug(
-              `Attempting rename for chat ${chatId} to "${trimmedName}" via ChatManager.renameChat`
-            );
-            const success = await this.plugin.chatManager.renameChat(chatId, trimmedName);
-            if (success) {
-              noticeMessage = `Chat renamed to "${trimmedName}"`;
-            } else {
-              noticeMessage = "Failed to rename chat.";
-            }
-          } else if (trimmedName && trimmedName === currentName) {
-            noticeMessage = "Name unchanged.";
-          } else if (newName === null || trimmedName === "") {
-            noticeMessage = "Rename cancelled or invalid name entered.";
+      new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async (newName) => {
+        let noticeMessage = "Rename cancelled or name unchanged.";
+        const trimmedName = newName == null ? void 0 : newName.trim();
+        if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
+          this.plugin.logger.debug(`Attempting rename for chat ${chatId} to "${trimmedName}" via ChatManager.renameChat`);
+          const success = await this.plugin.chatManager.renameChat(chatId, trimmedName);
+          if (success) {
+            noticeMessage = `Chat renamed to "${trimmedName}"`;
+          } else {
+            noticeMessage = "Failed to rename chat.";
           }
-          new import_obsidian14.Notice(noticeMessage);
-          this.focusInput();
+        } else if (trimmedName && trimmedName === currentName) {
+          noticeMessage = "Name unchanged.";
+        } else if (newName === null || trimmedName === "") {
+          noticeMessage = "Rename cancelled or invalid name entered.";
         }
-      ).open();
+        new import_obsidian14.Notice(noticeMessage);
+        this.focusInput();
+      }).open();
     };
     this.handleCloneChatClick = async () => {
       var _a, _b;
@@ -3730,7 +3690,6 @@ This action cannot be undone.`,
         new import_obsidian14.Notice("No active chat to delete.");
       }
     };
-    // Цей обробник події викликається при натисканні на "Export to Note"
     this.handleExportChatClick = async () => {
       var _a, _b, _c;
       (_a = this.dropdownMenuManager) == null ? void 0 : _a.closeMenu();
@@ -3812,11 +3771,7 @@ This action cannot be undone.`,
         const temp = (_c = (_b = chat == null ? void 0 : chat.metadata) == null ? void 0 : _b.temperature) != null ? _c : this.plugin.settings.temperature;
         this.updateTemperatureIndicator(temp);
         if (chat && this.currentMessages.length > 0) {
-          await ((_d = this.plugin.chatManager) == null ? void 0 : _d.addMessageToActiveChat(
-            "system",
-            `Model changed to: ${modelName}`,
-            new Date()
-          ));
+          await ((_d = this.plugin.chatManager) == null ? void 0 : _d.addMessageToActiveChat("system", `Model changed to: ${modelName}`, new Date()));
         }
       } catch (error) {
         this.plugin.logger.error("Error handling model change notification:", error);
@@ -3830,11 +3785,7 @@ This action cannot be undone.`,
       try {
         const chat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
         if (chat && this.currentMessages.length > 0) {
-          await ((_b = this.plugin.chatManager) == null ? void 0 : _b.addMessageToActiveChat(
-            "system",
-            `Role changed to: ${displayRole}`,
-            new Date()
-          ));
+          await ((_b = this.plugin.chatManager) == null ? void 0 : _b.addMessageToActiveChat("system", `Role changed to: ${displayRole}`, new Date()));
         } else {
           new import_obsidian14.Notice(`Role set to: ${displayRole}`);
         }
@@ -3845,19 +3796,15 @@ This action cannot be undone.`,
     };
     this.handleRolesUpdated = () => {
       var _a, _b;
-      this.plugin.logger.info("[OllamaView] Received 'roles-updated' event.");
       (_a = this.plugin.promptService) == null ? void 0 : _a.clearRoleCache();
       if (this.dropdownMenuManager) {
         this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list:", e));
       }
       if ((_b = this.sidebarManager) == null ? void 0 : _b.isSectionVisible("roles")) {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Roles panel is visible, requesting update.");
         this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e));
       } else {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Roles panel is collapsed, skipping update.");
       }
     };
-    // Кінець addMessageStandard
     this.handleMessagesCleared = (chatId) => {
       var _a;
       if (chatId === ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
@@ -3867,7 +3814,6 @@ This action cannot be undone.`,
         this.showEmptyState();
       }
     };
-    // --- Window/Workspace State Handlers ---
     this.handleVisibilityChange = () => {
       if (document.visibilityState === "visible" && this.leaf.view === this) {
         requestAnimationFrame(() => {
@@ -3948,17 +3894,14 @@ This action cannot be undone.`,
         this.dropdownMenuManager.updateChatListIfVisible().catch((e) => this.plugin.logger.error("Error updating chat dropdown list:", e));
       }
       if ((_a = this.sidebarManager) == null ? void 0 : _a.isSectionVisible("chats")) {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is visible, requesting update.");
         this.sidebarManager.updateChatList().catch((error) => {
           this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
         });
       } else {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is collapsed, skipping update.");
       }
     };
     this.handleSettingsUpdated = async () => {
       var _a, _b, _c, _d, _e, _f, _g, _h;
-      this.plugin.logger.debug("[OllamaView] Received 'settings-updated' event.");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRolePath = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) != null ? _d : this.plugin.settings.selectedRolePath;
@@ -3976,18 +3919,13 @@ This action cannot be undone.`,
         this.dropdownMenuManager.updateToggleViewLocationOption();
       }
       if ((_g = this.sidebarManager) == null ? void 0 : _g.isSectionVisible("roles")) {
-        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Roles panel is visible, updating it.");
         await this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e));
       } else {
-        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Roles panel is collapsed, skipping update.");
       }
       if ((_h = this.sidebarManager) == null ? void 0 : _h.isSectionVisible("chats")) {
-        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is visible, updating it.");
         await this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e));
       } else {
-        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is collapsed, skipping update.");
       }
-      this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
     };
     this.handleRoleDisplayClick = async (event) => {
       var _a, _b, _c;
@@ -4069,7 +4007,6 @@ This action cannot be undone.`,
         "Set Temperature",
         `Enter new temperature (e.g., 0.7). Higher values = more creative, lower = more focused.`,
         currentTempString,
-        // Попередньо заповнюємо поточним значенням
         async (newValue) => {
           if (newValue === null || newValue.trim() === "") {
             new import_obsidian14.Notice("Temperature change cancelled.");
@@ -4093,7 +4030,6 @@ This action cannot be undone.`,
         }
       ).open();
     };
-    // --- Новий обробник кліку для перемикання ---
     this.handleToggleViewLocationClick = async () => {
       var _a;
       (_a = this.dropdownMenuManager) == null ? void 0 : _a.closeMenu();
@@ -4103,31 +4039,23 @@ This action cannot be undone.`,
       await this.plugin.saveSettings();
       this.app.workspace.detachLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS);
       setTimeout(() => {
-        this.plugin.logger.debug("Re-activating view with new setting...");
         this.plugin.activateView();
       }, 50);
     };
-    // OllamaView.ts
-    // OllamaView.ts
-    // --- Оновлений updateChatPanelList (БЕЗ ВСТАНОВЛЕННЯ max-height/overflow) ---
     this.updateChatPanelList = async () => {
       var _a;
       const container = this.chatPanelListEl;
       if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Container or ChatManager missing.");
         return;
       }
       if (((_a = this.chatPanelHeaderEl) == null ? void 0 : _a.getAttribute("data-collapsed")) === "true") {
-        this.plugin.logger.debug("[updateChatPanelList] Skipping update: Chat panel is collapsed.");
         return;
       }
-      this.plugin.logger.debug("[updateChatPanelList] Updating chat list content...");
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
         const chats = this.plugin.chatManager.listAvailableChats() || [];
         const currentActiveId = this.plugin.chatManager.getActiveChatId();
-        this.plugin.logger.debug(`[updateChatPanelList] Rendering ${chats.length} chats. Active ID: ${currentActiveId}`);
         if (chats.length === 0) {
           container.createDiv({ cls: "menu-info-text", text: "No saved chats yet." });
         } else {
@@ -4174,7 +4102,6 @@ This action cannot be undone.`,
             });
           });
         }
-        this.plugin.logger.debug(`[updateChatPanelList] Finished rendering ${chats.length} chat items.`);
       } catch (error) {
         this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
         container.empty();
@@ -4187,7 +4114,6 @@ This action cannot be undone.`,
         });
       }
     };
-    // Кінець handleMessageAdded
     this.handleMenuButtonClick = (e) => {
       var _a;
       (_a = this.dropdownMenuManager) == null ? void 0 : _a.toggleMenu(e);
@@ -4202,8 +4128,6 @@ This action cannot be undone.`,
       })
     );
   }
-  // --- Getters ---
-  // --- Obsidian View Methods ---
   getViewType() {
     return VIEW_TYPE_OLLAMA_PERSONAS;
   }
@@ -4214,7 +4138,6 @@ This action cannot be undone.`,
     return "brain-circuit";
   }
   async onOpen() {
-    this.plugin.logger.debug("[OllamaView] onOpen started.");
     this.createUIElements();
     try {
       const initialRolePath = this.plugin.settings.selectedRolePath;
@@ -4223,17 +4146,13 @@ This action cannot be undone.`,
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(this.plugin.settings.modelName);
       this.updateTemperatureIndicator(this.plugin.settings.temperature);
-      this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
     }
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
-      this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
       await this.loadAndDisplayActiveChat();
-      this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
     } catch (error) {
       this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
       this.showEmptyState();
@@ -4255,7 +4174,6 @@ This action cannot be undone.`,
     setTimeout(() => {
       var _a;
       (_a = this.inputEl) == null ? void 0 : _a.focus();
-      this.plugin.logger.debug("[OllamaView] Input focused in onOpen.");
     }, 150);
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
@@ -4279,26 +4197,27 @@ This action cannot be undone.`,
     (_a = this.sidebarManager) == null ? void 0 : _a.destroy();
     (_b = this.dropdownMenuManager) == null ? void 0 : _b.destroy();
   }
-  // OllamaView.ts
   createUIElements() {
-    this.plugin.logger.debug("createUIElements: Starting UI creation.");
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
     const isDesktop = import_obsidian14.Platform.isDesktop;
-    this.plugin.logger.error(`[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`);
+    this.plugin.logger.error(
+      `[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`
+    );
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
     const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (sidebarRootEl) {
       sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-      this.plugin.logger.error(`[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${sidebarRootEl.className}`);
+      this.plugin.logger.error(
+        `[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${sidebarRootEl.className}`
+      );
     } else {
       this.plugin.logger.error("[OllamaView] sidebarRootEl is missing! Cannot toggle class.");
     }
     this.mainChatAreaEl = flexContainer.createDiv({ cls: CSS_MAIN_CHAT_AREA });
     this.mainChatAreaEl.classList.toggle("full-width", !shouldShowInternalSidebar);
-    this.plugin.logger.debug(`[OllamaView] Main chat area class 'full-width' set: ${!shouldShowInternalSidebar}`);
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: CSS_CLASS_CHAT_CONTAINER });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: CSS_CLASS_NEW_MESSAGE_INDICATOR });
@@ -4310,7 +4229,9 @@ This action cannot be undone.`,
     });
     (0, import_obsidian14.setIcon)(this.scrollToBottomButton, "arrow-down");
     const inputContainer = this.mainChatAreaEl.createDiv({ cls: CSS_CLASS_INPUT_CONTAINER });
-    this.inputEl = inputContainer.createEl("textarea", { attr: { placeholder: `Enter message text here...`, rows: 1 } });
+    this.inputEl = inputContainer.createEl("textarea", {
+      attr: { placeholder: `Enter message text here...`, rows: 1 }
+    });
     const controlsContainer = inputContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_CONTAINER });
     const leftControls = controlsContainer.createDiv({ cls: CSS_CLASS_INPUT_CONTROLS_LEFT });
     this.translateInputButton = leftControls.createEl("button", {
@@ -4349,9 +4270,7 @@ This action cannot be undone.`,
     (0, import_obsidian14.setIcon)(this.voiceButton, "mic");
     this.toggleLocationButton = this.buttonsContainer.createEl("button", {
       cls: CSS_CLASS_TOGGLE_LOCATION_BUTTON,
-      // Кнопка для перемикання таб/сайдбар
       attr: { "aria-label": "Toggle View Location" }
-      // Оновиться в updateToggle...
     });
     this.menuButton = this.buttonsContainer.createEl("button", {
       cls: CSS_CLASS_MENU_BUTTON,
@@ -4359,14 +4278,18 @@ This action cannot be undone.`,
     });
     (0, import_obsidian14.setIcon)(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
-    this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation, isDesktop);
+    this.dropdownMenuManager = new DropdownMenuManager(
+      this.plugin,
+      this.app,
+      this,
+      inputContainer,
+      isSidebarLocation,
+      isDesktop
+    );
     this.dropdownMenuManager.createMenuUI();
-    this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
-  // OllamaView.ts
   attachEventListeners() {
     var _a;
-    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
     if (!this.inputEl)
       console.error("OllamaView: inputEl missing during attachEventListeners!");
     if (!this.sendButton)
@@ -4438,7 +4361,6 @@ This action cannot be undone.`,
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
     (_a = this.dropdownMenuManager) == null ? void 0 : _a.attachEventListeners();
-    this.plugin.logger.debug("[OllamaView] Delegated listener attachment to DropdownMenuManager.");
     this.register(this.plugin.on("model-changed", (modelName) => this.handleModelChange(modelName)));
     this.register(this.plugin.on("role-changed", (roleName) => this.handleRoleChange(roleName)));
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
@@ -4450,9 +4372,7 @@ This action cannot be undone.`,
     this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
     this.register(this.plugin.on("ollama-connection-error", (message) => {
     }));
-    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
   }
-  // --- Додано: Метод для оновлення кнопки перемикання ---
   updateToggleLocationButton() {
     if (!this.toggleLocationButton)
       return;
@@ -4486,16 +4406,11 @@ This action cannot be undone.`,
       console.error("[OllamaView] modelDisplayEl is missing!");
     }
   }
-  // --- НОВИЙ обробник для контекстного меню ---
   handleContextMenuRename(chatId, currentName) {
-    this.plugin.logger.debug(`Context menu: Rename requested for chat ${chatId}`);
     this.handleRenameChatClick(chatId, currentName);
   }
-  // OllamaView.ts
-  // Допоміжний метод для стандартного додавання повідомлення (User, System, Error, Assistant-Fallback)
   async addMessageStandard(message) {
     var _a;
-    this.plugin.logger.debug(`[addMessageStandard] Adding message standardly. Role: ${message.role}`);
     const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
     if (isNewDay) {
       this.renderDateSeparator(message.timestamp);
@@ -4522,11 +4437,9 @@ This action cannot be undone.`,
           }
           return;
         case "assistant":
-          this.plugin.logger.warn(`[addMessageStandard] Rendering assistant message as fallback.`);
           renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
           break;
         default:
-          this.plugin.logger.warn(`[addMessageStandard] Unknown message role: ${message.role}`);
           return;
       }
       if (renderer) {
@@ -4539,7 +4452,6 @@ This action cannot be undone.`,
         if (!messageGroupEl.isConnected) {
           this.plugin.logger.error(`[addMessageStandard] Node not connected! Role: ${message.role}`);
         }
-        this.plugin.logger.debug(`[addMessageStandard] Appended message. Role: ${message.role}`);
         messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
         setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
         const isUserMessage = message.role === "user";
@@ -4550,10 +4462,8 @@ This action cannot be undone.`,
         }
         setTimeout(() => this.updateScrollStateAndIndicators(), 100);
       } else if (renderer) {
-        this.plugin.logger.warn(`[addMessageStandard] messageGroupEl null after render. Role: ${message.role}`);
       }
       if (this.currentMessageAddedResolver) {
-        this.plugin.logger.warn(`[addMessageStandard] Resolving promise after standard add. Role: ${message.role}.`);
         try {
           this.currentMessageAddedResolver();
         } catch (e) {
@@ -4572,7 +4482,6 @@ This action cannot be undone.`,
         timestamp: new Date()
       });
       if (this.currentMessageAddedResolver) {
-        this.plugin.logger.warn(`[addMessageStandard] Resolving promise after catching error. Role: ${message.role}.`);
         try {
           this.currentMessageAddedResolver();
         } catch (e) {
@@ -4582,7 +4491,6 @@ This action cannot be undone.`,
       }
     }
   }
-  // --- UI Update Methods ---
   updateInputPlaceholder(roleName) {
     if (this.inputEl) {
       this.inputEl.placeholder = `Enter message text here...`;
@@ -4631,7 +4539,6 @@ This action cannot be undone.`,
       this.emptyStateEl = null;
     }
   }
-  // --- State Management ---
   setLoadingState(isLoading) {
     this.isProcessing = isLoading;
     if (this.inputEl)
@@ -4654,21 +4561,11 @@ This action cannot be undone.`,
         this.chatContainer.querySelectorAll(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach((button) => {
           button.style.display = "none";
         });
-        this.plugin.logger.debug("[setLoadingState] Hid 'Show More' buttons.");
       } else {
-        this.plugin.logger.debug("[setLoadingState] Re-checking message collapsing after operation finished.");
         this.checkAllMessagesForCollapsing();
       }
     }
-    this.plugin.logger.debug(`[OllamaView Debug] isProcessing is now: ${this.isProcessing}`);
   }
-  // Load and Display Chat (Тепер оновлює і температуру)
-  // В src/OllamaView.ts
-  // --- ВАЖЛИВО: Переконайтесь, що цей метод також оновлений! ---
-  // (Перевірив ваш код, він вже містить виклик updateRolePanelList, це добре)
-  // OllamaView.ts
-  // OllamaView.ts
-  // Перевіряємо, чи видима секція бічної панелі
   isSidebarSectionVisible(type) {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
@@ -4678,7 +4575,6 @@ This action cannot be undone.`,
     this.plugin.logger.error(
       "[loadAndDisplayActiveChat] >>> \u0412\u0425\u0406\u0414: \u041F\u043E\u0447\u0438\u043D\u0430\u0454\u043C\u043E \u043F\u043E\u0432\u043D\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F/\u0432\u0456\u0434\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0442\u0443 <<<"
     );
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Start loading/displaying active chat...");
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -4699,7 +4595,6 @@ This action cannot be undone.`,
           `[loadAndDisplayActiveChat] Active chat fetched: ${(_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.id) != null ? _c : "null"}`
         );
         availableModels = await this.plugin.ollamaService.getModels();
-        this.plugin.logger.debug(`[loadAndDisplayActiveChat] Available models fetched: ${availableModels.join(", ")}`);
         finalRolePath = (_e = (_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.selectedRolePath) != null ? _e : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
         this.plugin.logger.debug(
@@ -4728,7 +4623,6 @@ This action cannot be undone.`,
           }
         } else {
           finalModelName = null;
-          this.plugin.logger.warn(`[loadAndDisplayActiveChat] No Ollama models detected.`);
         }
         if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
           this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch((updateError) => {
@@ -4776,7 +4670,6 @@ This action cannot be undone.`,
                 this.consecutiveErrorMessages = [];
                 break;
               default:
-                this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role: ${message.role}`);
             }
             if (renderer) {
               const result = renderer.render();
@@ -4808,33 +4701,27 @@ This action cannot be undone.`,
         this.showEmptyState();
         (_l = this.scrollToBottomButton) == null ? void 0 : _l.classList.remove(CSS_CLASSES.VISIBLE);
       }
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating final UI elements...");
       this.updateInputPlaceholder(finalRoleName);
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels via SidebarManager...");
       const panelUpdatePromises = [];
       if ((_m = this.sidebarManager) == null ? void 0 : _m.isSectionVisible("chats")) {
         panelUpdatePromises.push(
           this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
         );
       } else {
-        this.plugin.logger.debug("[loadAndDisplayActiveChat] Chat panel collapsed, skipping update.");
       }
       if ((_n = this.sidebarManager) == null ? void 0 : _n.isSectionVisible("roles")) {
         panelUpdatePromises.push(
           this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
         );
       } else {
-        this.plugin.logger.debug("[loadAndDisplayActiveChat] Role panel collapsed, skipping update.");
       }
       if (panelUpdatePromises.length > 0) {
         await Promise.all(panelUpdatePromises);
-        this.plugin.logger.debug("[loadAndDisplayActiveChat] Sidebar panel updates finished.");
       }
       if (finalModelName === null) {
-        this.plugin.logger.warn("[loadAndDisplayActiveChat] No model available. Disabling input.");
         if (this.inputEl) {
           this.inputEl.disabled = true;
           this.inputEl.placeholder = "No models available...";
@@ -4857,17 +4744,13 @@ This action cannot be undone.`,
         "[loadAndDisplayActiveChat] <<< \u0412\u0418\u0425\u0406\u0414: \u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u043E \u043F\u043E\u0432\u043D\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F/\u0432\u0456\u0434\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u043D\u044F \u0447\u0430\u0442\u0443 >>>"
       );
     }
-    this.plugin.logger.debug("[loadAndDisplayActiveChat] Finished.");
   }
-  // OllamaView.ts
-  // --- Оновлений handleActiveChatChanged з детальним логуванням ---
   async handleActiveChatChanged(data) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
     this.plugin.logger.error(
       `[handleActiveChatChanged] <<< \u041E\u0422\u0420\u0418\u041C\u0410\u041D\u041E \u041F\u041E\u0414\u0406\u042E >>> \u041D\u043E\u0432\u0438\u0439 ID: ${data.chatId}, \u0404 \u0434\u0430\u043D\u0456 \u0447\u0430\u0442\u0443: ${!!data.chat}, \u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0439 ID: ${this.lastProcessedChatId}`
     );
     const chatSwitched = data.chatId !== this.lastProcessedChatId;
-    this.plugin.logger.warn(`[handleActiveChatChanged] \u041E\u0431\u0447\u0438\u0441\u043B\u0435\u043D\u043E chatSwitched: ${chatSwitched}`);
     if (this.temporarilyDisableChatChangedReload) {
       this.plugin.logger.error(
         "[handleActiveChatChanged] \u041F\u0415\u0420\u0415\u0417\u0410\u0412\u0410\u041D\u0422\u0410\u0416\u0415\u041D\u041D\u042F \u0412\u0418\u041C\u041A\u041D\u0415\u041D\u041E \u0414\u041B\u042F \u0422\u0415\u0421\u0422\u0423. \u041F\u0440\u043E\u043F\u0443\u0441\u043A\u0430\u0454\u043C\u043E \u043B\u043E\u0433\u0456\u043A\u0443 \u043E\u043D\u043E\u0432\u043B\u0435\u043D\u043D\u044F/\u043F\u0435\u0440\u0435\u0437\u0430\u0432\u0430\u043D\u0442\u0430\u0436\u0435\u043D\u043D\u044F."
@@ -4902,7 +4785,6 @@ This action cannot be undone.`,
       this.updateRoleDisplay(currentRoleName);
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
-      this.plugin.logger.debug("[handleActiveChatChanged] Updating visible sidebar panels via SidebarManager...");
       const panelUpdatePromises = [];
       if ((_f = this.sidebarManager) == null ? void 0 : _f.isSectionVisible("chats")) {
         panelUpdatePromises.push(
@@ -4916,7 +4798,6 @@ This action cannot be undone.`,
       }
       if (panelUpdatePromises.length > 0) {
         await Promise.all(panelUpdatePromises);
-        this.plugin.logger.debug("[handleActiveChatChanged] Sidebar panel updates finished.");
       }
     } else {
       this.plugin.logger.warn(
@@ -4925,13 +4806,11 @@ This action cannot be undone.`,
       this.lastProcessedChatId = data.chatId;
     }
     this.plugin.logger.error(
-      // Використовуємо ERROR для максимальної видимості
       `[handleActiveChatChanged] <<< \u0417\u0410\u0412\u0415\u0420\u0428\u0415\u041D\u041E \u041E\u0411\u0420\u041E\u0411\u041A\u0423 \u041F\u041E\u0414\u0406\u0407 >>> \u0414\u043B\u044F ID: ${(_h = data.chatId) != null ? _h : "null"}`
     );
   }
   async handleDeleteMessageClick(messageToDelete) {
     var _a;
-    this.plugin.logger.debug(`Delete requested for message timestamp: ${messageToDelete.timestamp.toISOString()}`);
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
       new import_obsidian14.Notice("Cannot delete message: No active chat.");
@@ -4971,11 +4850,8 @@ This action cannot be undone.`,
       }
     ).open();
   }
-  // OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
-  // OllamaView.ts (Повна виправлена версія методу handleRegenerateClick)
   async handleRegenerateClick(userMessage) {
     var _a;
-    this.plugin.logger.info(`Regenerate requested for user message timestamp: ${userMessage.timestamp.toISOString()}`);
     if (this.currentAbortController) {
       this.plugin.logger.warn(
         "Cannot regenerate while another generation is in progress. Cancelling current one first."
@@ -4983,7 +4859,6 @@ This action cannot be undone.`,
       this.cancelGeneration();
       await new Promise((resolve) => setTimeout(resolve, 150));
       if (this.currentAbortController) {
-        this.plugin.logger.warn("Previous generation cancellation still processing. Please try again shortly.");
         new import_obsidian14.Notice("Please wait for the current generation to stop completely.");
         return;
       }
@@ -5015,7 +4890,6 @@ This action cannot be undone.`,
       "This will delete all messages after this prompt and generate a new response. Continue?",
       async () => {
         var _a2, _b, _c, _d, _e, _f;
-        this.plugin.logger.debug(`User confirmed regeneration for chat ${chatId} after index ${messageIndex}`);
         this.currentAbortController = new AbortController();
         let assistantPlaceholderGroupEl = null;
         let assistantContentEl = null;
@@ -5025,22 +4899,18 @@ This action cannot be undone.`,
         (_a2 = this.stopGeneratingButton) == null ? void 0 : _a2.show();
         (_b = this.sendButton) == null ? void 0 : _b.hide();
         try {
-          this.plugin.logger.debug(`Deleting messages after index ${messageIndex} in chat ${chatId}...`);
           const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
           if (!deleteSuccess) {
             throw new Error("Failed to delete subsequent messages.");
           }
-          this.plugin.logger.debug("Subsequent messages deleted successfully.");
           const updatedChat = await this.plugin.chatManager.getActiveChat();
           if (!updatedChat || updatedChat.metadata.id !== chatId) {
             throw new Error(
               "Failed to get updated chat state after deleting messages or active chat changed unexpectedly."
             );
           }
-          this.plugin.logger.debug("Reloading chat display after message deletion...");
           await this.loadAndDisplayActiveChat();
           this.scrollToBottom();
-          this.plugin.logger.debug("Creating placeholder for regenerated assistant message...");
           assistantPlaceholderGroupEl = this.chatContainer.createDiv({
             cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP}`
           });
@@ -5058,12 +4928,9 @@ This action cannot be undone.`,
           for (let i = 0; i < 3; i++)
             dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
           this.guaranteedScrollToBottom(50, true);
-          this.plugin.logger.info(`Starting regeneration stream request for chat ${chatId}...`);
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             updatedChat,
-            // Use the history *after* deletion
             this.currentAbortController.signal
-            // Pass cancellation signal
           );
           let firstChunk = true;
           for await (const chunk of stream) {
@@ -5102,11 +4969,8 @@ This action cannot be undone.`,
               accumulatedResponse,
               responseStartTime,
               false
-              // Event is triggered by ChatManager internally
             );
-            this.plugin.logger.debug("Saved final regenerated message to chat history.");
           } else {
-            this.plugin.logger.warn("[OllamaView] Regeneration stream finished but response empty.");
             await this.plugin.chatManager.addMessageToActiveChat(
               "system",
               "Assistant provided an empty response during regeneration.",
@@ -5118,17 +4982,13 @@ This action cannot be undone.`,
           assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.remove();
           assistantPlaceholderGroupEl = null;
           if (error.name === "AbortError" || ((_c = error.message) == null ? void 0 : _c.includes("aborted")) || ((_d = error.message) == null ? void 0 : _d.includes("aborted by user"))) {
-            this.plugin.logger.info("[OllamaView] Regeneration was cancelled by user.");
             await this.plugin.chatManager.addMessageToActiveChat("system", "Regeneration stopped.", new Date());
             if (accumulatedResponse.trim()) {
-              this.plugin.logger.info("Saving partial response after regeneration cancellation...");
               await this.plugin.chatManager.addMessageToActiveChat(
                 "assistant",
                 accumulatedResponse,
-                // The partial content
                 responseStartTime,
                 false
-                // Event triggered by manager
               );
             }
           } else {
@@ -5140,7 +5000,6 @@ This action cannot be undone.`,
             );
           }
         } finally {
-          this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block executing.");
           assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.remove();
           this.setLoadingState(false);
           (_e = this.stopGeneratingButton) == null ? void 0 : _e.hide();
@@ -5148,10 +5007,8 @@ This action cannot be undone.`,
           this.currentAbortController = null;
           this.updateSendButtonState();
           this.focusInput();
-          this.plugin.logger.debug("[OllamaView] handleRegenerateClick finally block finished.");
         }
       }
-      // End of ConfirmModal callback
     ).open();
   }
   handleCopyClick(content, buttonEl) {
@@ -5171,7 +5028,6 @@ This action cannot be undone.`,
       new import_obsidian14.Notice("Failed to copy text.");
     });
   }
-  // OllamaView.ts -> handleTranslateClick (для повідомлень)
   async handleTranslateClick(originalContent, contentEl, buttonEl) {
     var _a, _b, _c, _d;
     const targetLang = this.plugin.settings.translationTargetLanguage;
@@ -5209,7 +5065,6 @@ This action cannot be undone.`,
     buttonEl.setAttribute("title", "Translating...");
     buttonEl.addClass("button-loading");
     try {
-      this.plugin.logger.debug(`[OllamaView] Calling translationService.translate for message content...`);
       const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
       if (!contentEl || !contentEl.isConnected) {
         this.plugin.logger.error(
@@ -5218,17 +5073,14 @@ This action cannot be undone.`,
         return;
       }
       if (translatedText !== null) {
-        this.plugin.logger.debug(`[OllamaView] Message translation received.`);
         const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
         const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
         await import_obsidian14.MarkdownRenderer.render(
           this.app,
           translatedText,
-          // Використовуємо отриманий переклад
           translationContentEl,
           (_d = (_c = this.plugin.app.vault.getRoot()) == null ? void 0 : _c.path) != null ? _d : "",
           this
-          // Контекст компонента (OllamaView)
         );
         fixBrokenTwemojiImages(translationContentEl);
         const targetLangName = LANGUAGES[targetLang] || targetLang;
@@ -5250,7 +5102,6 @@ This action cannot be undone.`,
       }
     }
   }
-  // --- Rendering Helpers ---
   renderDateSeparator(date) {
     if (!this.chatContainer)
       return;
@@ -5259,8 +5110,6 @@ This action cannot be undone.`,
       text: this.formatDateSeparator(date)
     });
   }
-  // --- Speech Recognition Methods ---
-  // --- Speech Recognition Placeholders ---
   initSpeechWorker() {
     try {
       const bufferToBase64 = (buffer) => {
@@ -5273,7 +5122,7 @@ This action cannot be undone.`,
         return btoa(binary);
       };
       const workerCode = `
-             // Worker Scope
+             
              self.onmessage = async (event) => {
                  const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
 
@@ -5282,21 +5131,21 @@ This action cannot be undone.`,
                      return;
                  }
 
-                 const url = "https://speech.googleapis.com/v1/speech:recognize?key=" + apiKey;
+                 const url = "https:
 
                  try {
                      const arrayBuffer = await audioBlob.arrayBuffer();
 
-                     // Optimized Base64 Conversion (using helper if needed, or direct if worker supports TextDecoder efficiently)
-                     // Simpler approach: pass buffer directly if API allows, or use efficient base64:
+                     
+                     
                      let base64Audio;
-                     if (typeof TextDecoder !== 'undefined') { // Browser environment check
-                             // Modern approach (often faster if native)
+                     if (typeof TextDecoder !== 'undefined') { 
+                             
                              const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
                              base64Audio = base64String;
 
                      } else {
-                             // Fallback (similar to original, ensure correctness)
+                             
                              base64Audio = btoa(
                                  new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
                              );
@@ -5307,10 +5156,10 @@ This action cannot be undone.`,
                          method: 'POST',
                          body: JSON.stringify({
                              config: {
-                                 encoding: 'WEBM_OPUS', // Ensure this matches MediaRecorder output
-                                 sampleRateHertz: 48000, // Match sample rate if possible
+                                 encoding: 'WEBM_OPUS', 
+                                 sampleRateHertz: 48000, 
                                  languageCode: languageCode,
-                                 model: 'latest_long', // Consider other models if needed
+                                 model: 'latest_long', 
                                  enableAutomaticPunctuation: true,
                              },
                              audio: { content: base64Audio },
@@ -5321,7 +5170,7 @@ This action cannot be undone.`,
                      const responseData = await response.json();
 
                      if (!response.ok) {
-                         //console.error("Google Speech API Error:", responseData);
+                         
                          self.postMessage({
                              error: true,
                              message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
@@ -5334,13 +5183,13 @@ This action cannot be undone.`,
                              .map(result => result.alternatives[0].transcript)
                              .join(' ')
                              .trim();
-                         self.postMessage(transcript); // Send back only the transcript string
+                         self.postMessage(transcript); 
                      } else {
-                         // Handle cases where API returns ok but no results (e.g., silence)
+                         
                          self.postMessage({ error: true, message: 'No speech detected or recognized.' });
                      }
                  } catch (error) {
-                     //console.error("Error in speech worker processing:", error);
+                     
                      self.postMessage({
                          error: true,
                          message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
@@ -5457,7 +5306,6 @@ This action cannot be undone.`,
           this.inputEl.placeholder = "Processing speech...";
           this.speechWorker.postMessage({
             apiKey: speechApiKey,
-            // Використовуємо правильний ключ
             audioBlob,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA"
           });
@@ -5500,7 +5348,6 @@ This action cannot be undone.`,
   }
   checkAllMessagesForCollapsing() {
     var _a;
-    this.plugin.logger.debug("Running checkAllMessagesForCollapsing");
     (_a = this.chatContainer) == null ? void 0 : _a.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
       this.checkMessageForCollapsing(msgEl);
     });
@@ -5532,12 +5379,10 @@ This action cannot be undone.`,
       }
     }
   }
-  // --- Helpers & Utilities ---
   getChatContainer() {
     return this.chatContainer;
   }
   clearChatContainerInternal() {
-    this.plugin.logger.warn("[clearChatContainerInternal] --- \u041E\u0427\u0418\u0429\u0415\u041D\u041D\u042F \u041A\u041E\u041D\u0422\u0415\u0419\u041D\u0415\u0420\u0410 \u0427\u0410\u0422\u0423 \u0422\u0410 \u0421\u0422\u0410\u041D\u0423 ---");
     this.currentMessages = [];
     this.lastRenderedMessageDate = null;
     if (this.chatContainer)
@@ -5554,27 +5399,6 @@ This action cannot be undone.`,
     this.updateSendButtonState();
     setTimeout(() => this.focusInput(), 50);
   }
-  // public addLoadingIndicator(): HTMLElement {
-  //   // Adds the visual "thinking" dots indicator
-  //   this.hideEmptyState();
-  //   const group = this.chatContainer.createDiv({
-  //     cls: `${CSS_CLASS_MESSAGE_GROUP} ${CSS_CLASS_OLLAMA_GROUP}`,
-  //   });
-  //   this.renderAvatar(group, false); // Render AI avatar
-  //   const message = group.createDiv({
-  //     cls: `${CSS_CLASS_MESSAGE} ${CSS_CLASS_OLLAMA_MESSAGE}`,
-  //   });
-  //   const dots = message.createDiv({ cls: CSS_CLASS_THINKING_DOTS });
-  //   for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASS_THINKING_DOT });
-  //   this.guaranteedScrollToBottom(50, true); // Scroll to show it
-  //   return group; // Return the group element containing the indicator
-  // }
-  // public removeLoadingIndicator(loadingEl: HTMLElement | null): void {
-  //   // Removes the loading indicator element
-  //   if (loadingEl?.parentNode) {
-  //     loadingEl.remove();
-  //   }
-  // }
   scrollToBottom() {
     this.guaranteedScrollToBottom(50, true);
   }
@@ -5584,15 +5408,12 @@ This action cannot be undone.`,
       this.inputEl.dispatchEvent(new Event("input"));
     }
   }
-  // Trigger resize/button update
   focusInput() {
     setTimeout(() => {
       var _a;
       (_a = this.inputEl) == null ? void 0 : _a.focus();
     }, 0);
   }
-  // Use setTimeout to ensure focus happens after potential UI updates
-  /** Guarantees scroll to bottom after a delay, respecting user scroll position unless forced */
   guaranteedScrollToBottom(delay = 50, forceScroll = false) {
     if (this.scrollTimeout) {
       clearTimeout(this.scrollTimeout);
@@ -5626,14 +5447,12 @@ This action cannot be undone.`,
       this.scrollTimeout = null;
     }, delay);
   }
-  // Formatting Helpers
   formatTime(date) {
     return date.toLocaleTimeString(void 0, {
       hour: "numeric",
       minute: "2-digit"
     });
   }
-  // Use locale default time format
   formatDateSeparator(date) {
     const now = new Date();
     const yesterday = new Date(now);
@@ -5652,7 +5471,6 @@ This action cannot be undone.`,
   }
   formatRelativeDate(date) {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
-      this.plugin.logger.warn("[formatRelativeDate] Received Invalid Date object.");
       return "Invalid date";
     }
     const now = new Date();
@@ -5682,7 +5500,6 @@ This action cannot be undone.`,
   isSameDay(date1, date2) {
     return date1.getFullYear() === date2.getFullYear() && date1.getMonth() === date2.getMonth() && date1.getDate() === date2.getDate();
   }
-  // Formatting function used by export
   formatChatToMarkdown(messagesToFormat) {
     let localLastDate = null;
     const exportTimestamp = new Date();
@@ -5774,7 +5591,6 @@ This action cannot be undone.`,
     this.temperatureIndicatorEl.setText(emoji);
     this.temperatureIndicatorEl.title = `Temperature: ${tempValue.toFixed(1)}. Click to change.`;
   }
-  // --- Нова допоміжна функція для отримання емодзі температури ---
   getTemperatureEmoji(temperature) {
     if (temperature <= 0.4) {
       return "\u{1F9CA}";
@@ -5856,14 +5672,12 @@ This action cannot be undone.`,
       try {
         await updateFunction();
         contentEl.classList.add(expandedClass);
-        this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
       } catch (error) {
         this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
         contentEl.setText(`Error loading ${sectionType}.`);
         contentEl.classList.add(expandedClass);
       }
     } else {
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
       (0, import_obsidian14.setIcon)(iconEl, collapseIcon);
       contentEl.classList.remove(expandedClass);
@@ -5872,7 +5686,6 @@ This action cannot be undone.`,
       }
     }
   }
-  // --- Оновлений метод показу контекстного меню ---
   showChatContextMenu(event, chatMeta) {
     event.preventDefault();
     const menu = new import_obsidian14.Menu();
@@ -5881,7 +5694,6 @@ This action cannot be undone.`,
     );
     menu.addItem(
       (item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
-      // Викликаємо новий обробник
     );
     menu.addItem(
       (item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id))
@@ -5906,7 +5718,6 @@ This action cannot be undone.`,
     menu.showAtMouseEvent(event);
   }
   async handleContextMenuClone(chatId) {
-    this.plugin.logger.info(`Context menu: Clone requested for chat ${chatId}`);
     const cloningNotice = new import_obsidian14.Notice("Cloning chat...", 0);
     try {
       const clonedChat = await this.plugin.chatManager.cloneChat(chatId);
@@ -5921,10 +5732,8 @@ This action cannot be undone.`,
       cloningNotice.hide();
     }
   }
-  // Новий метод для експорту КОНКРЕТНОГО чату
   async exportSpecificChat(chatId) {
     var _a;
-    this.plugin.logger.info(`Context menu: Export requested for chat ${chatId}`);
     const exportingNotice = new import_obsidian14.Notice(`Exporting chat...`, 0);
     try {
       const chat = await this.plugin.chatManager.getChat(chatId);
@@ -5981,14 +5790,12 @@ This action cannot be undone.`,
     }
   }
   async handleContextMenuClear(chatId, chatName) {
-    this.plugin.logger.debug(`Context menu: Clear requested for chat ${chatId} (${chatName})`);
     new ConfirmModal(
       this.app,
       "Confirm Clear Messages",
       `Are you sure you want to clear all messages in chat "${chatName}"?
 This action cannot be undone.`,
       async () => {
-        this.plugin.logger.info(`User confirmed clearing messages for chat ${chatId}`);
         const clearingNotice = new import_obsidian14.Notice("Clearing messages...", 0);
         try {
           const success = await this.plugin.chatManager.clearChatMessagesById(chatId);
@@ -6007,14 +5814,12 @@ This action cannot be undone.`,
     ).open();
   }
   async handleContextMenuDelete(chatId, chatName) {
-    this.plugin.logger.debug(`Context menu: Delete requested for chat ${chatId} (${chatName})`);
     new ConfirmModal(
       this.app,
       "Confirm Delete Chat",
       `Are you sure you want to delete chat "${chatName}"?
 This action cannot be undone.`,
       async () => {
-        this.plugin.logger.info(`User confirmed deletion for chat ${chatId}`);
         const deletingNotice = new import_obsidian14.Notice("Deleting chat...", 0);
         try {
           const success = await this.plugin.chatManager.deleteChat(chatId);
@@ -6031,7 +5836,6 @@ This action cannot be undone.`,
       }
     ).open();
   }
-  /** Перевіряє, чи користувач прокрутив чат вгору */
   isChatScrolledUp() {
     if (!this.chatContainer)
       return false;
@@ -6041,7 +5845,6 @@ This action cannot be undone.`,
     const distanceFromBottom = scrollableDistance - this.chatContainer.scrollTop;
     return distanceFromBottom >= SCROLL_THRESHOLD;
   }
-  /** Оновлює стан userScrolledUp та видимість кнопок/індикаторів, пов'язаних зі скролом */
   updateScrollStateAndIndicators() {
     var _a, _b;
     if (!this.chatContainer)
@@ -6052,7 +5855,6 @@ This action cannot be undone.`,
     if (wasScrolledUp && !this.userScrolledUp) {
       (_b = this.newMessagesIndicatorEl) == null ? void 0 : _b.classList.remove(CSS_CLASS_VISIBLE);
     }
-    this.plugin.logger.debug(`[updateScrollStateAndIndicators] User scrolled up: ${this.userScrolledUp}`);
   }
   checkMessageForCollapsing(messageEl) {
     const contentCollapsible = messageEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
@@ -6102,11 +5904,8 @@ This action cannot be undone.`,
       }
     });
   }
-  // OllamaView.ts
-  // --- ОНОВЛЕНО: handleSummarizeClick з новим класом анімації ---
   async handleSummarizeClick(originalContent, buttonEl) {
     var _a;
-    this.plugin.logger.debug("Summarize button clicked.");
     const summarizationModel = this.plugin.settings.summarizationModelName;
     if (!summarizationModel) {
       new import_obsidian14.Notice("Please select a summarization model in AI Forge settings (Productivity section).");
@@ -6127,7 +5926,6 @@ This action cannot be undone.`,
     buttonEl.title = "Summarizing...";
     buttonEl.addClass(CSS_CLASS_DISABLED);
     buttonEl.addClass("button-loading");
-    this.plugin.logger.debug("Added 'button-loading' class to summarize button");
     try {
       const prompt = `Provide a concise summary of the following text:
 
@@ -6145,10 +5943,8 @@ Summary:`;
           num_ctx: this.plugin.settings.contextWindow > 2048 ? 2048 : this.plugin.settings.contextWindow
         }
       };
-      this.plugin.logger.info(`Requesting summarization using model: ${summarizationModel}`);
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && responseData.response) {
-        this.plugin.logger.debug(`Summarization successful. Length: ${responseData.response.length}`);
         new SummaryModal(this.plugin, "Message Summary", responseData.response.trim()).open();
       } else {
         throw new Error("Received empty response from summarization model.");
@@ -6176,7 +5972,6 @@ Summary:`;
       buttonEl.removeClass("button-loading");
     }
   }
-  // --- ОНОВЛЕНИЙ renderOrUpdateErrorGroup ---
   /**
    * Створює нову групу для відображення помилок або оновлює існуючу.
    * Тепер використовує ErrorMessageRenderer для створення візуального блоку.
@@ -6187,7 +5982,6 @@ Summary:`;
       return;
     const errorsToDisplay = [...this.consecutiveErrorMessages];
     if (errorsToDisplay.length === 0) {
-      this.plugin.logger.warn("[renderOrUpdateErrorGroup] Called with no errors in buffer.");
       return;
     }
     const errorCount = errorsToDisplay.length;
@@ -6195,7 +5989,6 @@ Summary:`;
     let groupEl;
     let contentContainer = null;
     if (isContinuing && this.errorGroupElement) {
-      this.plugin.logger.debug("[renderOrUpdateErrorGroup] Updating existing error group.");
       groupEl = this.errorGroupElement;
       contentContainer = groupEl.querySelector(`.${CSS_CLASS_ERROR_TEXT2}`);
       if (contentContainer) {
@@ -6206,7 +5999,6 @@ Summary:`;
       }
       this.updateErrorGroupTimestamp(groupEl, lastError.timestamp);
     } else {
-      this.plugin.logger.debug("[renderOrUpdateErrorGroup] Creating new error group using ErrorMessageRenderer.");
       this.hideEmptyState();
       this.isSummarizingErrors = false;
       const renderer = new ErrorMessageRenderer(this.app, this.plugin, lastError, this);
@@ -6230,7 +6022,6 @@ Summary:`;
     }
     this.guaranteedScrollToBottom(50, true);
   }
-  /** Оновлює атрибут та текст мітки часу для групи помилок */
   updateErrorGroupTimestamp(groupEl, timestamp) {
     groupEl.setAttribute("data-timestamp", timestamp.getTime().toString());
     const timestampEl = groupEl.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
@@ -6241,20 +6032,17 @@ Summary:`;
   async triggerErrorSummarization(targetGroupElement, errors) {
     const ENABLE_ERROR_SUMMARIZATION = false;
     if (!ENABLE_ERROR_SUMMARIZATION) {
-      this.plugin.logger.info("[triggerErrorSummarization] Error summarization is disabled. Displaying list fallback.");
       this.displayErrorListFallback(targetGroupElement, errors);
       return;
     }
     if (!this.plugin.settings.summarizationModelName || this.isSummarizingErrors) {
-      if (!this.plugin.settings.summarizationModelName)
-        this.plugin.logger.warn("[triggerErrorSummarization] Summarization model not set, cannot summarize errors.");
-      if (this.isSummarizingErrors)
-        this.plugin.logger.debug("[triggerErrorSummarization] Summarization already in progress, skipping.");
-      this.displayErrorListFallback(targetGroupElement, errors);
+      if (!this.plugin.settings.summarizationModelName) {
+        if (this.isSummarizingErrors)
+          this.displayErrorListFallback(targetGroupElement, errors);
+      }
       return;
     }
     this.isSummarizingErrors = true;
-    this.plugin.logger.info(`[triggerErrorSummarization] Starting summarization for ${errors.length} errors.`);
     try {
       const summary = await this.summarizeErrors(errors);
       const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`);
@@ -6279,25 +6067,20 @@ ${summary}`);
       this.displayErrorListFallback(targetGroupElement, errors);
     } finally {
       this.isSummarizingErrors = false;
-      this.plugin.logger.debug("[triggerErrorSummarization] Summarization process finished (or was bypassed).");
     }
   }
   displayErrorListFallback(targetGroupElement, errors) {
     const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`);
     if (!contentContainer || !contentContainer.isConnected) {
-      this.plugin.logger.warn("[displayErrorListFallback] Target content container not found or not connected.");
       if (!targetGroupElement.isConnected) {
-        this.plugin.logger.warn("[displayErrorListFallback] Target group element also not connected.");
       }
       return;
     }
     contentContainer.empty();
     const uniqueErrors = Array.from(new Set(errors.map((e) => e.content.trim())));
     contentContainer.createDiv({
-      // Додаємо кількість унікальних помилок для ясності
       text: `Multiple errors occurred (${errors.length} total, ${uniqueErrors.length} unique):`,
       cls: "error-summary-header"
-      // Додатковий клас для можливої стилізації
     });
     const listEl = contentContainer.createEl("ul");
     listEl.style.marginTop = "5px";
@@ -6333,12 +6116,8 @@ Summary:`;
       prompt,
       stream: false,
       temperature: 0.2,
-      // Низька температура для фактологічної сумаризації
       options: {
         num_ctx: this.plugin.settings.contextWindow > 1024 ? 1024 : this.plugin.settings.contextWindow
-        // Обмежуємо контекст для сумаризації
-        // Можна додати stop tokens, якщо модель схильна продовжувати занадто довго
-        // stop: ["Error"]
       },
       system: "You are an assistant that summarizes lists of technical error messages accurately and concisely."
     };
@@ -6348,10 +6127,8 @@ Summary:`;
       );
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && responseData.response) {
-        this.plugin.logger.debug(`[summarizeErrors] Summarization successful.`);
         return responseData.response.trim();
       } else {
-        this.plugin.logger.warn("[summarizeErrors] Received empty or invalid response from Ollama.");
         return null;
       }
     } catch (error) {
@@ -6359,10 +6136,8 @@ Summary:`;
       return null;
     }
   }
-  // --- Error Handling (ПОВНА ВЕРСІЯ) ---
   handleErrorMessage(errorMessage) {
     if (errorMessage.role !== "error") {
-      this.plugin.logger.warn(`handleErrorMessage called with non-error message role: ${errorMessage.role}`);
       return;
     }
     this.consecutiveErrorMessages.push(errorMessage);
@@ -6380,20 +6155,18 @@ Summary:`;
       }
     }
   }
-  // OllamaView.ts
   async sendMessage() {
     var _a, _b, _c, _d, _e, _f, _g, _h;
     const content = this.inputEl.value.trim();
     if (!content || this.isProcessing || this.sendButton.disabled || this.currentAbortController !== null) {
-      if (!content)
-        this.plugin.logger.debug("sendMessage prevented: input empty.");
-      if (this.isProcessing)
-        this.plugin.logger.debug("sendMessage prevented: already processing.");
-      if (this.sendButton.disabled)
-        this.plugin.logger.debug("sendMessage prevented: send button disabled.");
-      if (this.currentAbortController)
-        this.plugin.logger.debug("sendMessage prevented: generation already in progress (AbortController exists).");
-      return;
+      if (!content) {
+        if (this.isProcessing) {
+          if (this.sendButton.disabled) {
+            if (this.currentAbortController)
+              return;
+          }
+        }
+      }
     }
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
@@ -6417,13 +6190,10 @@ Summary:`;
     let streamErrorOccurred = null;
     let finalPlaceholderRef = null;
     try {
-      this.plugin.logger.debug("sendMessage: Adding user message to ChatManager...");
       const userMessage = await this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent);
       if (!userMessage) {
         throw new Error("Failed to add user message to history.");
       }
-      this.plugin.logger.debug("sendMessage: User message added successfully.");
-      this.plugin.logger.debug("sendMessage: Creating streaming placeholder...");
       assistantPlaceholderGroupEl = this.chatContainer.createDiv({
         cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
       });
@@ -6439,7 +6209,6 @@ Summary:`;
         cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`
       });
       assistantContentEl.empty();
-      this.plugin.logger.debug("sendMessage: Adding thinking indicator to placeholder.");
       const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
       for (let i = 0; i < 3; i++)
         dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
@@ -6457,7 +6226,6 @@ Summary:`;
       assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
       setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
       this.guaranteedScrollToBottom(50, true);
-      this.plugin.logger.info("[OllamaView] Starting stream request...");
       const stream = this.plugin.ollamaService.generateChatResponseStream(
         activeChat,
         this.currentAbortController.signal
@@ -6477,13 +6245,10 @@ Summary:`;
             try {
               await AssistantMessageRenderer.renderAssistantContent(
                 this.activePlaceholder.contentEl,
-                // Передаємо елемент контенту плейсхолдера
                 accumulatedResponse,
-                // Передаємо накопичений текст
                 this.app,
                 this.plugin,
                 this
-                // Передаємо контекст
               );
             } catch (renderError) {
               this.plugin.logger.error("Error during streaming render:", renderError);
@@ -6504,7 +6269,6 @@ Summary:`;
       streamErrorOccurred = error;
       this.plugin.logger.error("[OllamaView] Error caught during stream processing loop:", streamErrorOccurred);
     }
-    this.plugin.logger.debug(`[OllamaView] Stream processing finished. Final length: ${accumulatedResponse.length}`);
     finalPlaceholderRef = this.activePlaceholder;
     this.activePlaceholder = null;
     const placeholderStillValid = (finalPlaceholderRef == null ? void 0 : finalPlaceholderRef.timestamp) === responseStartTimeMs && ((_f = finalPlaceholderRef == null ? void 0 : finalPlaceholderRef.groupEl) == null ? void 0 : _f.isConnected);
@@ -6512,7 +6276,6 @@ Summary:`;
       if (streamErrorOccurred) {
         this.plugin.logger.error("sendMessage: Handling stream error.");
         if (placeholderStillValid && finalPlaceholderRef) {
-          this.plugin.logger.debug("sendMessage: Removing placeholder due to stream error.");
           finalPlaceholderRef.groupEl.remove();
         }
         let errorMsgContent = `Error: ${streamErrorOccurred.message || "Unknown streaming error."}`;
@@ -6542,7 +6305,6 @@ Summary:`;
         }
         handleMessageAddedPromise = null;
       } else if (!placeholderStillValid) {
-        this.plugin.logger.warn("sendMessage: Placeholder invalid/missing after stream. Adding message normally.");
         if (accumulatedResponse.trim()) {
           let resolver;
           handleMessageAddedPromise = new Promise((resolve) => {
@@ -6553,7 +6315,6 @@ Summary:`;
           await handleMessageAddedPromise;
         }
       } else if (!accumulatedResponse.trim()) {
-        this.plugin.logger.warn("[OllamaView] Stream finished successfully but response empty. Removing placeholder.");
         if (finalPlaceholderRef) {
           finalPlaceholderRef.groupEl.remove();
         }
@@ -6591,22 +6352,17 @@ Summary:`;
       handleMessageAddedPromise = null;
     } finally {
       if (this.currentMessageAddedResolver) {
-        this.plugin.logger.warn("[sendMessage finally] Clearing potentially unused resolver.");
         this.currentMessageAddedResolver = null;
       }
       this.activePlaceholder = null;
-      this.plugin.logger.debug("[OllamaView] sendMessage finally block executing.");
       this.setLoadingState(false);
       (_g = this.stopGeneratingButton) == null ? void 0 : _g.hide();
       (_h = this.sendButton) == null ? void 0 : _h.show();
       this.currentAbortController = null;
       this.updateSendButtonState();
       this.focusInput();
-      this.plugin.logger.debug("[OllamaView] sendMessage finally block finished.");
     }
   }
-  // --- Кінець sendMessage ---
-  // OllamaView.ts
   async handleMessageAdded(data) {
     var _a, _b, _c;
     try {
@@ -6622,20 +6378,17 @@ Summary:`;
         return;
       }
       if (data.chatId !== this.plugin.chatManager.getActiveChatId()) {
-        this.plugin.logger.debug(`[HMA] Ignored: Different chat.`);
         return;
       }
       if (this.currentMessages.some(
         (m) => m.timestamp.getTime() === data.message.timestamp.getTime() && m.role === data.message.role
       )) {
-        this.plugin.logger.warn(`[HMA] Ignored: Duplicate timestamp AND role.`);
         if (this.currentMessageAddedResolver) {
           this.currentMessageAddedResolver();
           this.currentMessageAddedResolver = null;
         }
         return;
       }
-      this.plugin.logger.debug(`[HMA] Passed initial checks. Role: ${data.message.role}`);
       this.currentMessages.push(data.message);
       if (data.message.role === "assistant") {
         const timestampMs = data.message.timestamp.getTime();
@@ -6654,7 +6407,6 @@ Summary:`;
           if (contentEl && messageWrapper && messageEl) {
             contentEl.classList.remove("streaming-text");
             try {
-              this.plugin.logger.debug("[HMA] Calling static renderAssistantContent for final update...");
               await AssistantMessageRenderer.renderAssistantContent(
                 contentEl,
                 data.message.content,
@@ -6662,7 +6414,6 @@ Summary:`;
                 this.plugin,
                 this
               );
-              this.plugin.logger.debug("[HMA] Final render finished. Adding buttons and timestamp...");
               AssistantMessageRenderer.addAssistantActionButtons(
                 messageWrapper,
                 contentEl,
@@ -6695,14 +6446,12 @@ Summary:`;
             placeholderGroupEl.remove();
             await this.addMessageStandard(data.message);
           }
-          this.plugin.logger.info(`[HMA] <<< EXITED (updated placeholder) >>> Role: assistant, Ts: ${timestampMs}`);
           return;
         } else {
           this.plugin.logger.warn(
             `[HMA] Placeholder not found or disconnected for assistant ts: ${timestampMs}. Adding normally.`
           );
           await this.addMessageStandard(data.message);
-          this.plugin.logger.info(`[HMA] <<< EXITED (added normally fallback) >>> Role: assistant, Ts: ${timestampMs}`);
           return;
         }
       }
