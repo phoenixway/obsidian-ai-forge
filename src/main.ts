@@ -1,3 +1,4 @@
+// src/main.ts
 import {
   Plugin,
   WorkspaceLeaf,
@@ -27,11 +28,9 @@ import { ConfirmModal } from "./ConfirmModal";
 import { Logger, LogLevel, LoggerSettings } from "./Logger";
 
 // --- КОНСТАНТИ ДЛЯ ЗБЕРЕЖЕННЯ ---
-// const SESSIONS_INDEX_KEY_V1 = "chatSessionsIndex_v1";
-// const ACTIVE_SESSION_ID_KEY_V1 = "activeChatSessionId_v1";
-export const SESSIONS_INDEX_KEY = "chatIndex_v2";
-export const ACTIVE_CHAT_ID_KEY = "activeChatId_v2";
-export const CHAT_INDEX_KEY = "chatIndex_v2";
+export const SESSIONS_INDEX_KEY = "chatIndex_v2"; // Використовуємо v2
+export const ACTIVE_CHAT_ID_KEY = "activeChatId_v2"; // Використовуємо v2
+export const CHAT_INDEX_KEY = "chatIndex_v2"; // Синонім для ясності
 // ----------------------------------
 
 interface RAGDocument {
@@ -60,14 +59,24 @@ export default class OllamaPlugin extends Plugin {
   private roleListCache: RoleInfo[] | null = null;
   private roleCacheClearTimeout: NodeJS.Timeout | null = null;
   private indexUpdateTimeout: NodeJS.Timeout | null = null;
-  private fileChangeHandlerDebounced: (file: TAbstractFile) => void; // Змінено тип
 
   private dailyTaskFilePath: string | null = null;
   private taskFileContentCache: string | null = null;
   private taskFileNeedsUpdate: boolean = false;
   private taskCheckInterval: NodeJS.Timeout | null = null;
 
-  // --- Event Emitter Methods (зроблено public) ---
+  // Debounced функція оновлення для Vault Events
+  private debouncedIndexAndUIRebuild = debounce(async () => {
+      this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
+      this.logger.info("Debounced Vault change detected, rebuilding index and updating UI...");
+      if (this.chatManager) {
+          await this.chatManager.rebuildIndexFromFiles();
+          this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
+          this.emit('chat-list-updated');
+      }
+  }, 1500, true);
+
+  // --- Event Emitter Methods ---
   public on(event: string, callback: (data: any) => any): () => void {
     if (!this.eventHandlers[event]) this.eventHandlers[event] = [];
     this.eventHandlers[event].push(callback);
@@ -80,15 +89,13 @@ export default class OllamaPlugin extends Plugin {
   }
 
   public emit(event: string, data?: any): void {
-    // Зроблено public
     const handlers = this.eventHandlers[event];
-    // --- ВИПРАВЛЕННЯ: Використовуємо handlers замість h ---
     if (handlers) {
       handlers.slice().forEach(handler => {
         try {
           handler(data);
         } catch (e) {
-          this.logger.error(`[OllamaPlugin] Error in event handler for ${event}:`, e); // Використовуємо логер
+          this.logger.error(`[OllamaPlugin] Error in event handler for ${event}:`, e);
         }
       });
     }
@@ -100,19 +107,20 @@ export default class OllamaPlugin extends Plugin {
   }
 
   async onload() {
-    const initialSettingsData = Object.assign({}, DEFAULT_SETTINGS, await this.loadData()); // Завантажуємо дані для логера
+    const initialSettingsData = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
-    // --- ТЕПЕР ініціалізуємо Логер ---
+    // --- Ініціалізація Логера ---
     const loggerSettings: LoggerSettings = {
-      consoleLogLevel: process.env.NODE_ENV === "production" ? initialSettingsData.consoleLogLevel || "INFO" : "DEBUG", // Використовуємо initialSettingsData
+      consoleLogLevel: process.env.NODE_ENV === "production" ? initialSettingsData.consoleLogLevel || "INFO" : "DEBUG",
       fileLoggingEnabled: initialSettingsData.fileLoggingEnabled,
       fileLogLevel: initialSettingsData.fileLogLevel,
       logCallerInfo: initialSettingsData.logCallerInfo,
       logFilePath: initialSettingsData.logFilePath,
       logFileMaxSizeMB: initialSettingsData.logFileMaxSizeMB,
     };
-    // Створюємо екземпляр логера
     this.logger = new Logger(this, loggerSettings);
+    this.logger.info("Loading AI Forge plugin...");
+    // ---
 
     await this.loadSettingsAndMigrate();
 
@@ -150,23 +158,14 @@ export default class OllamaPlugin extends Plugin {
           await this.chatManager.addMessageToActiveChat("error", message, new Date());
         } else {
           this.logger.error("Cannot display connection error: ChatManager not available.");
-          new Notice(`Ollama Connection Error: ${message}`); // Fallback notice
+          new Notice(`Ollama Connection Error: ${message}`);
         }
       })
     );
     this.register(this.on("active-chat-changed", this.handleActiveChatChangedLocally.bind(this)));
-    // --- ВИДАЛЕНО ПРЯМИЙ ВИКЛИК ЗВІДСИ ---
-    // this.register(
-    //   this.on("chat-list-updated", () => {
-    //     this.view?.renderChatListMenu?.(); // ЦЕ НЕПРАВИЛЬНО
-    //   })
-    // );
-    // OllamaView сам обробить "chat-list-updated"
-    // --------------------------------------
     this.register(
       this.on("settings-updated", () => {
         this.logger.updateSettings({
-          /* ... передаємо об'єкт LoggerSettings ... */
           consoleLogLevel: this.settings.consoleLogLevel,
           fileLoggingEnabled: this.settings.fileLoggingEnabled,
           fileLogLevel: this.settings.fileLogLevel,
@@ -175,185 +174,55 @@ export default class OllamaPlugin extends Plugin {
           logFileMaxSizeMB: this.settings.logFileMaxSizeMB,
         });
         this.updateDailyTaskFilePath();
-        this.loadAndProcessInitialTasks();
+        this.loadAndProcessInitialTasks(); // Потрібен await? Ні, хай працює у фоні
         this.updateOllamaServiceConfig();
         this.roleListCache = null;
         this.promptService?.clearRoleCache?.();
-        // ВИКЛИК this.view?.handleSettingsUpdated?.(); ВЖЕ Є НИЖЧЕ - він обробить все
-        this.emit("roles-updated"); // Генеруємо подію, OllamaView її зловить
-        // --- ВИДАЛЕНО ПРЯМИЙ ВИКЛИК ЗВІДСИ ---
-        // this.view?.renderRoleList?.(); // НЕ ПОТРІБНО, бо є emit("roles-updated") вище
-        // --------------------------------------
-        this.view?.handleSettingsUpdated?.(); // Цей обробник в OllamaView оновить все необхідне, включаючи меню якщо треба
+        this.emit("roles-updated"); // Повідомляємо про оновлення ролей
+        this.view?.handleSettingsUpdated?.(); // View сам оновить решту
       })
     );
     // -------------------------------------------------
 
     // --- Ribbon & Commands ---
-    this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => {
-      this.activateView();
-    });
-    this.addCommand({
-      id: "open-chat-view",
-      name: "Open AI Forge Chat",
-      callback: () => {
-        this.activateView();
-      },
-    });
-    this.addCommand({
-      id: "index-rag-documents",
-      name: "AI Forge: Index documents for RAG",
-      callback: async () => {
-        if (this.settings.ragEnabled) await this.ragService.indexDocuments();
-        else new Notice("RAG is disabled in settings.");
-      },
-    });
-    this.addCommand({
-      id: "clear-active-chat-history",
-      name: "AI Forge: Clear Active Chat History",
-      callback: async () => {
-        await this.clearMessageHistoryWithConfirmation();
-      },
-    });
-    this.addCommand({
-      id: "refresh-roles",
-      name: "AI Forge: Refresh Roles List",
-      callback: async () => {
-        await this.listRoleFiles(true); // Очистити кеш і перечитати
-        this.emit("roles-updated"); // Повідомити всіх (включаючи View)
-        new Notice("Role list refreshed.");
-      },
-    });
-    this.addCommand({
-      id: "new-chat",
-      name: "AI Forge: New Chat",
-      callback: async () => {
-        const newChat = await this.chatManager.createNewChat();
-        if (newChat) {
-          new Notice(`Created new chat: ${newChat.metadata.name}`);
-          // View оновиться через подію 'active-chat-changed'
-        }
-      },
-    });
-    this.addCommand({
-      id: "switch-chat",
-      name: "AI Forge: Switch Chat",
-      callback: async () => {
-        await this.showChatSwitcher();
-      },
-    });
-    this.addCommand({
-      id: "rename-active-chat",
-      name: "AI Forge: Rename Active Chat",
-      callback: async () => {
-        await this.renameActiveChat();
-      },
-    });
-    this.addCommand({
-      id: "delete-active-chat",
-      name: "AI Forge: Delete Active Chat",
-      callback: async () => {
-        await this.deleteActiveChatWithConfirmation();
-      },
-    });
+    this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => { this.activateView(); });
+    this.addCommand({ id: "open-chat-view", name: "Open AI Forge Chat", callback: () => { this.activateView(); }, });
+    this.addCommand({ id: "index-rag-documents", name: "AI Forge: Index documents for RAG", callback: async () => { if (this.settings.ragEnabled) await this.ragService.indexDocuments(); else new Notice("RAG is disabled in settings."); }, });
+    this.addCommand({ id: "clear-active-chat-history", name: "AI Forge: Clear Active Chat History", callback: async () => { await this.clearMessageHistoryWithConfirmation(); }, });
+    this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: async () => { await this.listRoleFiles(true); this.emit("roles-updated"); new Notice("Role list refreshed."); }, });
+    this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: async () => { const newChat = await this.chatManager.createNewChat(); if (newChat) { new Notice(`Created new chat: ${newChat.metadata.name}`); } }, });
+    this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: async () => { await this.showChatSwitcher(); }, });
+    this.addCommand({ id: "rename-active-chat", name: "AI Forge: Rename Active Chat", callback: async () => { await this.renameActiveChat(); }, });
+    this.addCommand({ id: "delete-active-chat", name: "AI Forge: Delete Active Chat", callback: async () => { await this.deleteActiveChatWithConfirmation(); }, });
     // --------------------------
 
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
 
     this.app.workspace.onLayoutReady(async () => {
-      if (this.settings.ragEnabled) {
-        setTimeout(() => {
-          this.ragService?.indexDocuments();
-        }, 5000);
-      }
-      // --- Відновлення активного чату ---
+      if (this.settings.ragEnabled) { setTimeout(() => { this.ragService?.indexDocuments(); }, 5000); }
       const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
       if (savedActiveId && this.settings.saveMessageHistory) {
-        
-        // Встановлення активного чату викличе подію 'active-chat-changed',
-        // на яку підписаний OllamaView для завантаження даних.
-        await this.chatManager.setActiveChat(savedActiveId); // true - не генерувати подію, якщо вже активний
-      } else {
-        // Якщо немає збереженого ID або історія вимкнена, просто переконуємось, що активний чат встановлено (можливо, null)
-        // await this.chatManager.ensureActiveChatSet();
-        
+        await this.chatManager.setActiveChat(savedActiveId);
       }
-      // ---------------------------------
     });
 
-    // --- File Watcher Setup ---
-    const debouncedRoleClear = debounce(
-      () => {
-        this.roleListCache = null;
-        this.promptService?.clearRoleCache?.();
-        this.emit("roles-updated"); // <-- ЗМІНА: Просто генеруємо подію
-        // this.view?.renderRoleList?.(); // <-- ВИДАЛЕНО ПРЯМИЙ ВИКЛИК
-      },
-      1500,
-      true
-    );
+    // --- Реєстрація слухачів Vault ---
+    this.registerVaultListeners();
+    // ---
 
-    // Debounced handler тільки для змін, що потребують затримки (ролі, RAG)
-    this.fileChangeHandlerDebounced = debounce(
-      (file: TAbstractFile) => {
-        if (!file) return;
-        this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
-      },
-      1000,
-      true
-    ); // Затримка 1 секунда
-
-    // --- Окремі обробники подій ---
-    const handleModifyEvent = (file: TAbstractFile) => {
-      if (file instanceof TFile) {
-        this.fileChangeHandlerDebounced(file); // Debounced Roles/RAG check
-        this.handleTaskFileModify(file); // Миттєва перевірка файлу завдань
-      }
-    };
-
-    const handleDeleteEvent = (file: TAbstractFile) => {
-      // Викликаємо обробник, який сам викличе debouncedRoleClear якщо треба
-      this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, true); // isDeletion = true
-      if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
-        this.dailyTaskFilePath = null;
-        this.taskFileContentCache = null;
-        this.taskFileNeedsUpdate = false;
-        this.chatManager?.updateTaskState(null);
-      }
-    };
-
-    const handleRenameEvent = (file: TAbstractFile, oldPath: string) => {
-      // Обробляємо і новий, і старий шлях
-      this.fileChangeHandlerDebounced(file); // Перевірка нового шляху
-      this.handleRoleOrRagFileChange(oldPath, debouncedRoleClear, true); // Перевірка старого як видалення
-      if (this.settings.enableProductivityFeatures) {
-        if (oldPath === this.dailyTaskFilePath) {
-          // Якщо перейменували наш файл завдань, оновлюємо шлях і перечитуємо
-          this.updateDailyTaskFilePath();
-          this.loadAndProcessInitialTasks();
-        } else if (file.path === this.dailyTaskFilePath) {
-          // Якщо якийсь інший файл перейменували НА НАШ шлях завдань
-          this.taskFileNeedsUpdate = true;
-          this.checkAndProcessTaskUpdate();
-        }
-      }
-    };
-
-    const handleCreateEvent = (file: TAbstractFile) => {
-      this.fileChangeHandlerDebounced(file); // Перевірка нового файлу
-      if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
-        // Якщо створили наш файл завдань
-        this.taskFileNeedsUpdate = true;
-        this.checkAndProcessTaskUpdate();
-      }
-    };
-
-    // Реєструємо слухачів з новими обробниками
+    // --- Реєстрація слухачів для ролей/RAG (ваш існуючий код) ---
+    // Важливо: Ці обробники НЕ ПОВИННІ викликати debouncedIndexAndUIRebuild, бо він для папки ЧАТІВ
+    const debouncedRoleClear = debounce(() => { this.roleListCache = null; this.promptService?.clearRoleCache?.(); this.emit("roles-updated"); }, 1500, true );
+    const handleModifyEvent = (file: TAbstractFile) => { if (file instanceof TFile) { this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false); this.handleTaskFileModify(file); } };
+    const handleDeleteEvent = (file: TAbstractFile) => { this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, true); if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) { this.dailyTaskFilePath = null; this.taskFileContentCache = null; this.taskFileNeedsUpdate = false; this.chatManager?.updateTaskState(null); } };
+    const handleRenameEvent = (file: TAbstractFile, oldPath: string) => { this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false); this.handleRoleOrRagFileChange(oldPath, debouncedRoleClear, true); if (this.settings.enableProductivityFeatures) { if (oldPath === this.dailyTaskFilePath) { this.updateDailyTaskFilePath(); this.loadAndProcessInitialTasks(); } else if (file.path === this.dailyTaskFilePath) { this.taskFileNeedsUpdate = true; this.checkAndProcessTaskUpdate(); } } };
+    const handleCreateEvent = (file: TAbstractFile) => { this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false); if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) { this.taskFileNeedsUpdate = true; this.checkAndProcessTaskUpdate(); } };
     this.registerEvent(this.app.vault.on("modify", handleModifyEvent));
     this.registerEvent(this.app.vault.on("delete", handleDeleteEvent));
     this.registerEvent(this.app.vault.on("rename", handleRenameEvent));
     this.registerEvent(this.app.vault.on("create", handleCreateEvent));
+    // ---
 
     this.updateDailyTaskFilePath();
     await this.loadAndProcessInitialTasks();
@@ -361,153 +230,150 @@ export default class OllamaPlugin extends Plugin {
       this.taskCheckInterval = setInterval(() => this.checkAndProcessTaskUpdate(), 5000);
       this.registerInterval(this.taskCheckInterval as any);
     }
+    this.logger.info("AI Forge plugin loaded.");
   }
+
+  // Метод для реєстрації слухачів Vault (для чатів)
+  registerVaultListeners(): void {
+       this.logger.debug("Registering Vault listeners specifically for chat history updates...");
+
+       // Обробник для create та delete
+       const handleFileCreateDelete = (file: TAbstractFile | null) => {
+           if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath) return;
+           const historyPath = normalizePath(this.settings.chatHistoryFolderPath);
+           // Перевіряємо, чи файл знаходиться всередині папки історії (не сама папка)
+           // і чи це JSON файл (для create) або будь-який файл/папка (для delete)
+           // ВАЖЛИВО: Перевірка на historyPath+'/' гарантує, що ми не реагуємо на саму папку історії
+           if (file.path.startsWith(historyPath + '/') && (file.path.toLowerCase().endsWith('.json') || file instanceof TFolder)) {
+                this.logger.error(`[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`);
+                this.debouncedIndexAndUIRebuild(); // Викликаємо debounced оновлення
+           }
+       };
+
+       // Обробник для rename
+       const handleFileRename = (file: TAbstractFile | null, oldPath: string) => {
+            if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath) return;
+            const historyPath = normalizePath(this.settings.chatHistoryFolderPath);
+            // Перевіряємо, чи старий АБО новий шлях знаходиться всередині папки історії
+            const isInHistoryNew = file.path.startsWith(historyPath + '/');
+            const isInHistoryOld = oldPath.startsWith(historyPath + '/');
+
+            // Реагуємо, тільки якщо зміна стосується файлів/папок ВСЕРЕДИНІ папки історії
+            if ((isInHistoryNew || isInHistoryOld) && (file.path !== historyPath && oldPath !== historyPath)) {
+                 this.logger.error(`[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`);
+                 this.debouncedIndexAndUIRebuild();
+            }
+       };
+
+       // Реєструємо події
+       this.registerEvent(this.app.vault.on('create', handleFileCreateDelete));
+       this.registerEvent(this.app.vault.on('delete', handleFileCreateDelete));
+       this.registerEvent(this.app.vault.on('rename', handleFileRename));
+  }
+
   // --- Логіка файлу завдань ---
   updateDailyTaskFilePath(): void {
-    const folderPath = this.settings.ragFolderPath?.trim(); // Завдання в папці RAG
+    const folderPath = this.settings.ragFolderPath?.trim();
     const fileName = this.settings.dailyTaskFileName?.trim();
     const newPath = folderPath && fileName ? normalizePath(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
-      
+      this.logger.info(`Daily task file path changed from "${this.dailyTaskFilePath}" to "${newPath}".`);
       this.dailyTaskFilePath = newPath;
-      this.taskFileContentCache = null; // Скидаємо кеш при зміні шляху
-      this.taskFileNeedsUpdate = true; // Потрібно перечитати новий файл
-    } else if (!newPath) {
-      if (this.dailyTaskFilePath !== null) {
-        
+      this.taskFileContentCache = null;
+      this.taskFileNeedsUpdate = true;
+    } else if (!newPath && this.dailyTaskFilePath !== null) {
+        this.logger.info(`Daily task file path cleared.`);
         this.dailyTaskFilePath = null;
         this.taskFileContentCache = null;
-        this.chatManager?.updateTaskState(null); // Повідомляємо про відсутність завдань
+        this.chatManager?.updateTaskState(null);
         this.taskFileNeedsUpdate = false;
-      }
     }
   }
+
   handleTaskFileModify(file: TFile): void {
     if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
-      // Позначаємо, що файл потребує оновлення, але обробка відбудеться в checkAndProcessTaskUpdate
       if (!this.taskFileNeedsUpdate) {
-        
+        this.logger.debug(`Task file modified: ${file.path}. Marking for update.`);
         this.taskFileNeedsUpdate = true;
       }
     }
   }
+
   async loadAndProcessInitialTasks(): Promise<void> {
     if (!this.settings.enableProductivityFeatures || !this.dailyTaskFilePath) {
       if (this.taskFileContentCache !== null) {
-        // Якщо кеш був не null, значить завдання були, тепер їх нема
-        
+        this.logger.info("Task features enabled but no valid path. Clearing task state.");
         this.taskFileContentCache = null;
-        this.chatManager?.updateTaskState(null); // Повідомити про відсутність завдань
+        this.chatManager?.updateTaskState(null);
       }
       this.taskFileNeedsUpdate = false;
       return;
     }
-    
+    this.logger.debug(`Loading initial tasks from: ${this.dailyTaskFilePath}`);
     try {
       const fileExists = await this.app.vault.adapter.exists(this.dailyTaskFilePath);
       if (fileExists) {
         const content = await this.app.vault.adapter.read(this.dailyTaskFilePath);
-        // Перевіряємо, чи контент змінився АБО чи кеш ще не ініціалізовано
         if (content !== this.taskFileContentCache || this.taskFileContentCache === null) {
-          
-          this.taskFileContentCache = content; // Оновлюємо кеш
+          this.logger.info(`Task file content changed or initializing. Processing...`);
+          this.taskFileContentCache = content;
           const tasks = this.parseTasks(content);
-          
-          this.chatManager?.updateTaskState(tasks); // Оновлюємо стан в менеджері чату
-          this.taskFileNeedsUpdate = false; // Обробили, оновлення більше не потрібне
+          this.logger.debug("Tasks parsed:", tasks);
+          this.chatManager?.updateTaskState(tasks);
+          this.taskFileNeedsUpdate = false;
         } else {
-          // Контент не змінився, нічого не робимо
-          
-          this.taskFileNeedsUpdate = false; // Скидаємо прапорець на випадок, якщо він був встановлений помилково
+          this.logger.debug("Task file content unchanged.");
+          this.taskFileNeedsUpdate = false;
         }
       } else {
-        // Файл не існує
-        
+        this.logger.warn(`Task file not found at: ${this.dailyTaskFilePath}`);
         if (this.taskFileContentCache !== null) {
-          // Якщо кеш був, а файлу тепер нема
           this.taskFileContentCache = null;
-          this.chatManager?.updateTaskState(null); // Повідомити про відсутність завдань
+          this.chatManager?.updateTaskState(null);
         }
         this.taskFileNeedsUpdate = false;
       }
     } catch (error) {
       this.logger.error(`Error loading/processing task file ${this.dailyTaskFilePath}:`, error);
-      if (this.taskFileContentCache !== null) {
-        // Скидаємо стан, якщо була помилка
-        this.taskFileContentCache = null;
-        this.chatManager?.updateTaskState(null);
-      }
-      this.taskFileNeedsUpdate = false; // Скидаємо прапорець і при помилці
+      if (this.taskFileContentCache !== null) { this.taskFileContentCache = null; this.chatManager?.updateTaskState(null); }
+      this.taskFileNeedsUpdate = false;
     }
   }
-  parseTasks(content: string): {
-    urgent: string[];
-    regular: string[];
-    hasContent: boolean; // Чи є взагалі якийсь контент (не лише порожні рядки/завершені завдання)
-  } {
+
+  parseTasks(content: string): { urgent: string[]; regular: string[]; hasContent: boolean; } {
     const lines = content.split("\n");
     const urgent: string[] = [];
     const regular: string[] = [];
-    let hasContent = false; // Чи є хоч один рядок, що не є порожнім
-
+    let hasContent = false;
     for (const line of lines) {
       const trimmedLine = line.trim();
-      if (!trimmedLine) continue; // Пропускаємо порожні рядки
-      hasContent = true; // Знайшли непорожній рядок
-
-      // Пропускаємо завершені завдання
+      if (!trimmedLine) continue;
+      hasContent = true;
       if (trimmedLine.startsWith("- [x]") || trimmedLine.startsWith("- [X]")) continue;
-
-      let taskText = trimmedLine;
-      let isUrgent = false;
-
-      // Перевірка на терміновість
-      if (taskText.startsWith("!") || taskText.toLowerCase().includes("[urgent]")) {
-        isUrgent = true;
-        taskText = taskText
-          .replace(/^!/, "")
-          .replace(/\[urgent\]/i, "")
-          .trim();
-      }
-
-      // Видаляємо маркер незавершеного завдання, якщо є
-      if (taskText.startsWith("- [ ]")) {
-        taskText = taskText.substring(taskText.indexOf("]") + 1).trim();
-      } else if (taskText.startsWith("- ")) {
-        // Видаляємо простий маркер списку
-        taskText = taskText.substring(1).trim();
-      }
-
-      // Додаємо лише якщо текст завдання не порожній після обробки
-      if (taskText.length > 0) {
-        if (isUrgent) {
-          urgent.push(taskText);
-        } else {
-          regular.push(taskText);
-        }
-      }
+      let taskText = trimmedLine; let isUrgent = false;
+      if (taskText.startsWith("!") || taskText.toLowerCase().includes("[urgent]")) { isUrgent = true; taskText = taskText.replace(/^!/, "").replace(/\[urgent\]/i, "").trim(); }
+      if (taskText.startsWith("- [ ]")) { taskText = taskText.substring(taskText.indexOf("]") + 1).trim(); }
+      else if (taskText.startsWith("- ")) { taskText = taskText.substring(1).trim(); }
+      if (taskText.length > 0) { if (isUrgent) { urgent.push(taskText); } else { regular.push(taskText); } }
     }
-
-    // Остаточна перевірка hasContent базується на тому, чи знайшли ми *незавершені* завдання
     const hasActualTasks = urgent.length > 0 || regular.length > 0;
-
     return { urgent: urgent, regular: regular, hasContent: hasActualTasks };
   }
 
   async checkAndProcessTaskUpdate(): Promise<void> {
     if (this.taskFileNeedsUpdate && this.settings.enableProductivityFeatures) {
-      
-      await this.loadAndProcessInitialTasks(); // Викличе оновлення стану в ChatManager
+      this.logger.debug("Checking for task updates due to file modification flag.");
+      await this.loadAndProcessInitialTasks();
     } else {
-      // 
+      // this.logger.trace("No task update needed.");
     }
   }
   // --- Кінець логіки файлу завдань ---
 
-  // Обробник змін для ролей та RAG (без debounce)
+  // Обробник змін для ролей та RAG
   private handleRoleOrRagFileChange(changedPath: string, debouncedRoleClear: () => void, isDeletion: boolean = false) {
     const normPath = normalizePath(changedPath);
-    
+    this.logger.trace(`Handling file change for Roles/RAG: ${normPath} (Deletion: ${isDeletion})`);
 
     // 1. Перевірка для Ролей
     const userRolesPath = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null;
@@ -515,38 +381,36 @@ export default class OllamaPlugin extends Plugin {
     let isRoleFile = false;
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/")) {
-        // Перевірка, чи це безпосередньо файл у папці, а не в підпапці
-        if (normPath.substring(userRolesPath.length + 1).indexOf("/") === -1) {
-          isRoleFile = true;
-          
-        }
+        if (normPath.substring(userRolesPath.length + 1).indexOf("/") === -1) { isRoleFile = true; this.logger.debug(`Change detected for user role file: ${normPath}`); }
       } else if (builtInRolesPath && normPath.startsWith(builtInRolesPath + "/")) {
-        if (normPath.substring(builtInRolesPath.length + 1).indexOf("/") === -1) {
-          isRoleFile = true;
-          
-        }
+        if (normPath.substring(builtInRolesPath.length + 1).indexOf("/") === -1) { isRoleFile = true; this.logger.debug(`Change detected for built-in role file: ${normPath}`); }
       }
     }
+    // Також реагуємо на зміну/видалення самої папки ролей
+     if (userRolesPath && normPath === userRolesPath) {
+        this.logger.debug(`Change detected for user roles folder itself: ${normPath}`);
+        isRoleFile = true; // Treat folder change as needing a role refresh
+     }
+
     if (isRoleFile) {
-      
-      debouncedRoleClear(); // Викликаємо debounced для ролей
+      this.logger.debug(`Triggering debounced role cache clear due to change at: ${normPath}`);
+      debouncedRoleClear();
     }
 
-    // 2. Перевірка для RAG (викликаємо debounce з основного обробника)
+    // 2. Перевірка для RAG
     const ragFolderPath = this.settings.ragFolderPath ? normalizePath(this.settings.ragFolderPath) : null;
-    if (this.settings.ragEnabled && ragFolderPath && normPath.startsWith(ragFolderPath + "/")) {
-      // Перевіряємо, що це не файл завдань, перш ніж запускати індексацію
-      if (normPath !== this.dailyTaskFilePath) {
-        
+    if (this.settings.ragEnabled && ragFolderPath && (normPath.startsWith(ragFolderPath + '/') || normPath === ragFolderPath)) {
+      if (normPath !== this.dailyTaskFilePath) { // Не індексуємо файл завдань автоматично
+        this.logger.debug(`Change detected within RAG folder: ${normPath}. Triggering debounced index update.`);
         this.debounceIndexUpdate();
       } else {
-        
+        this.logger.trace(`Change detected for task file ${normPath}, skipping RAG index update.`);
       }
     }
   }
 
   async onunload() {
-    
+    this.logger.info("Unloading AI Forge plugin...");
     this.app.workspace.getLeavesOfType(VIEW_TYPE_OLLAMA_PERSONAS).forEach(l => l.detach());
     this.view = null; // Скидаємо посилання на view
 
@@ -554,489 +418,210 @@ export default class OllamaPlugin extends Plugin {
     if (this.roleCacheClearTimeout) clearTimeout(this.roleCacheClearTimeout);
     if (this.taskCheckInterval) clearInterval(this.taskCheckInterval);
 
+    // Очищення обробників подій
+    this.eventHandlers = {};
+
     try {
       if (this.chatManager && this.settings.saveMessageHistory) {
         const lastActiveId = this.chatManager.getActiveChatId();
         if (lastActiveId !== undefined && lastActiveId !== null) {
-          
+          this.logger.debug(`Saving last active chat ID: ${lastActiveId}`);
           await this.saveDataKey(ACTIVE_CHAT_ID_KEY, lastActiveId);
         } else {
-          
-          await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null); // Явно зберігаємо null, якщо активного чату немає
+          this.logger.debug("No active chat ID to save, saving null.");
+          await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
         }
       } else {
-        
-        await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null); // Зберігаємо null, якщо історія вимкнена
+        this.logger.debug("History saving disabled or ChatManager missing, saving null for active chat ID.");
+        await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
       }
     } catch (error) {
       this.logger.error("Error saving active chat ID on unload:", error);
     }
-
-    // Очищення кешів
-    this.promptService?.clearModelDetailsCache?.();
-    this.promptService?.clearRoleCache?.();
-    this.roleListCache = null;
-    
+    this.logger.info("AI Forge plugin unloaded.");
   }
 
   updateOllamaServiceConfig() {
     if (this.ollamaService) {
-      
-      this.promptService?.clearModelDetailsCache(); // Очистити кеш деталей, бо URL/модель могли змінитися
+      this.logger.debug("Updating Ollama Service configuration (e.g., base URL)");
+      // Тут має бути логіка, що передає нові налаштування (наприклад, URL) в OllamaService
+      // this.ollamaService.updateConfig({ baseUrl: this.settings.ollamaUrl }); // Приклад
+      this.promptService?.clearModelDetailsCache();
     }
   }
 
   private debounceIndexUpdate() {
     if (this.indexUpdateTimeout) clearTimeout(this.indexUpdateTimeout);
-    
+    this.logger.debug("Debounce Index Update Timer started (30s).");
     this.indexUpdateTimeout = setTimeout(async () => {
       if (this.settings.ragEnabled && this.ragService) {
-        
+        this.logger.info("Executing debounced RAG index update...");
         await this.ragService.indexDocuments();
       } else {
-        
+        this.logger.debug("Debounced index update timer fired, but RAG disabled or service unavailable.");
       }
       this.indexUpdateTimeout = null;
     }, 30000); // 30 секунд затримки
   }
 
-  // Оновлений метод активації View
   async activateView() {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | null = null;
-    const viewType = VIEW_TYPE_OLLAMA_PERSONAS; // Use constant
+    const viewType = VIEW_TYPE_OLLAMA_PERSONAS;
     const existingLeaves = workspace.getLeavesOfType(viewType);
-
-    this.logger.debug(
-      `Activating view. Target location: ${this.settings.openChatInTab ? "Tab" : "Sidebar/Tab Fallback"}`
-    );
-
+    this.logger.debug(`Activating view. Target location: ${this.settings.openChatInTab ? "Tab" : "Sidebar/Tab Fallback"}`);
     if (existingLeaves.length > 0) {
       leaf = existingLeaves[0];
-      
+      this.logger.debug("Found existing view leaf.");
     } else {
-      
+      this.logger.debug("No existing view leaf found, creating new one.");
       if (this.settings.openChatInTab) {
-        leaf = workspace.getLeaf("tab"); // Створити нову вкладку
-        
+        leaf = workspace.getLeaf("tab");
+        this.logger.debug("Creating new leaf in tab.");
       } else {
-        leaf = workspace.getRightLeaf(false); // Спробувати отримати існуючу праву бічну панель
-        
+        leaf = workspace.getRightLeaf(false);
+        this.logger.debug(`getRightLeaf returned: ${leaf ? "leaf" : "null"}`);
         if (!leaf) {
-          
-          leaf = workspace.getLeaf("tab"); // Якщо бічної панелі немає, відкрити у вкладці
+          leaf = workspace.getLeaf("tab");
+          this.logger.debug("Right leaf not available, creating new leaf in tab as fallback.");
         } else {
-          
+          this.logger.debug("Using existing right leaf.");
         }
       }
-
-      // Встановити стан, тільки якщо отримали або створили leaf
       if (leaf) {
         try {
-          
+          this.logger.debug(`Setting view state for leaf. Type: ${viewType}`);
           await leaf.setViewState({ type: viewType, active: true });
-        } catch (e) {
-          this.logger.error("Error setting view state:", e);
-          new Notice("Error opening AI Forge view.");
-          return; // Вийти, якщо не вдалося встановити стан
-        }
-      } else {
-        this.logger.error("Failed to get or create leaf for AI Forge view.");
-        new Notice("Could not open AI Forge view.");
-        return; // Вийти, якщо leaf не визначено
-      }
+        } catch (e) { this.logger.error("Error setting view state:", e); new Notice("Error opening AI Forge view."); return; }
+      } else { this.logger.error("Failed to get or create leaf for AI Forge view."); new Notice("Could not open AI Forge view."); return; }
     }
-
-    // Показати leaf (існуючий або новий)
     if (leaf) {
-      
+      this.logger.debug("Revealing leaf.");
       workspace.revealLeaf(leaf);
-      // Призначити посилання this.view ПІСЛЯ revealLeaf,
-      // щоб переконатись, що view вже ініціалізовано
-      // Невелика затримка може допомогти, якщо view створюється асинхронно
       setTimeout(() => {
         if (leaf && leaf.view instanceof OllamaView) {
           this.view = leaf.view;
-          
-          // Можливо, потрібно фокусувати інпут після активації
+          this.logger.debug("View instance assigned successfully after reveal.");
           this.emit("focus-input-request");
-        } else {
-          this.logger.error("Leaf revealed, but view is not an instance of OllamaView after timeout:", leaf?.view);
-          // Скидаємо this.view, якщо щось пішло не так
-          this.view = null;
-        }
-      }, 50); // Невелика затримка
+        } else { this.logger.error("Leaf revealed, but view is not an instance of OllamaView after timeout:", leaf?.view); this.view = null; }
+      }, 50);
     }
   }
 
-  // Завантаження та Міграція Налаштувань
   async loadSettingsAndMigrate() {
-    
+    this.logger.debug("Loading settings...");
     const loadedData = await this.loadData();
-    // Тут можна додати логіку міграції зі старих версій налаштувань
-    // наприклад, перейменування ключів, зміна структури тощо.
     this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-    
-    // Після завантаження можемо оновити конфіг сервісів, якщо потрібно
+    this.logger.debug("Settings loaded and merged with defaults.");
     this.updateOllamaServiceConfig();
-    // Перевіряємо шлях до файлу завдань, бо він залежить від налаштувань
     this.updateDailyTaskFilePath();
   }
 
   async saveSettings() {
-    
+    this.logger.debug("Saving settings...");
     await this.saveData(this.settings);
-    
-    this.emit("settings-updated"); // Повідомляємо інші частини плагіна про зміни
+    this.logger.debug("Settings saved.");
+    this.emit("settings-updated");
   }
 
-  // Data Helpers
   async saveDataKey(key: string, value: any): Promise<void> {
     try {
-      
+      this.logger.trace(`Saving data key: ${key}`);
       const data = (await this.loadData()) || {};
       data[key] = value;
       await this.saveData(data);
-      
-    } catch (error) {
-      this.logger.error(`Error saving data key ${key}:`, error);
-    }
-  }
-  async loadDataKey(key: string): Promise<any> {
-    try {
-      
-      const data = (await this.loadData()) || {};
-      const value = data[key];
-      
-      return value;
-    } catch (error) {
-      this.logger.error(`Error loading data key ${key}:`, error);
-      return undefined;
-    }
+      this.logger.trace(`Data key ${key} saved successfully.`);
+    } catch (error) { this.logger.error(`Error saving data key ${key}:`, error); }
   }
 
-  // History Persistence
+  async loadDataKey(key: string): Promise<any> {
+    try {
+      this.logger.trace(`Loading data key: ${key}`);
+      const data = (await this.loadData()) || {};
+      const value = data[key];
+      this.logger.trace(`Data key ${key} loaded.`);
+      return value;
+    } catch (error) { this.logger.error(`Error loading data key ${key}:`, error); return undefined; }
+  }
+
   async clearMessageHistoryWithConfirmation() {
-    if (!this.chatManager) {
-      this.logger.error("ChatManager not ready for clearMessageHistory.");
-      new Notice("Error: Chat Manager not ready.");
-      return;
-    }
+    if (!this.chatManager) { this.logger.error("ChatManager not ready for clearMessageHistory."); new Notice("Error: Chat Manager not ready."); return; }
     const activeChat = await this.chatManager.getActiveChat();
     if (activeChat && activeChat.messages.length > 0) {
       new ConfirmModal(this.app, "Clear History", `Clear messages in "${activeChat.metadata.name}"?`, async () => {
-        
+        this.logger.info(`Clearing history for chat ${activeChat.metadata.id}`);
         await this.chatManager.clearActiveChatMessages();
         new Notice(`History cleared for "${activeChat.metadata.name}".`);
       }).open();
-    } else if (activeChat) {
-      
-      new Notice("Chat history is already empty.");
-    } else {
-      
-      new Notice("No active chat to clear.");
-    }
+    } else if (activeChat) { new Notice("Chat history is already empty."); }
+    else { new Notice("No active chat to clear."); }
   }
 
-  // List Role Files Method (з виправленням path.basename)
   async listRoleFiles(forceRefresh: boolean = false): Promise<RoleInfo[]> {
-    if (this.roleListCache && !forceRefresh) {
-      
-      return this.roleListCache;
-    }
-    
-    const roles: RoleInfo[] = [];
-    const addedNamesLowerCase = new Set<string>();
-    const adapter = this.app.vault.adapter;
-    const pluginDir = this.manifest.dir; // Шлях до папки плагіна
-
-    // --- Вбудована роль "Productivity Assistant" ---
-    const builtInRoleName = "Productivity Assistant";
-    const builtInRoleFileName = "Productivity_Assistant.md";
-    let builtInRolePath: string | null = null;
-
-    // Визначаємо шлях до папки ролей плагіна
+    if (this.roleListCache && !forceRefresh) { return this.roleListCache; }
+    this.logger.debug(`Listing role files. Force refresh: ${forceRefresh}`);
+    const roles: RoleInfo[] = []; const addedNamesLowerCase = new Set<string>(); const adapter = this.app.vault.adapter; const pluginDir = this.manifest.dir;
+    const builtInRoleName = "Productivity Assistant"; const builtInRoleFileName = "Productivity_Assistant.md"; let builtInRolePath: string | null = null;
     if (pluginDir) {
       builtInRolePath = normalizePath(`${pluginDir}/roles/${builtInRoleFileName}`);
-      
-      try {
-        if (await adapter.exists(builtInRolePath)) {
-          const stat = await adapter.stat(builtInRolePath);
-          if (stat?.type === "file") {
-            roles.push({
-              name: builtInRoleName,
-              path: builtInRolePath,
-              isCustom: false, // Позначаємо як не кастомну
-            });
-            addedNamesLowerCase.add(builtInRoleName.toLowerCase());
-            
-          } else {
-            
-          }
-        } else {
-          
-        }
-      } catch (error) {
-        this.logger.error(`Error checking/adding built-in role at ${builtInRolePath}:`, error);
-      }
-    } else {
-      
+      try { if (await adapter.exists(builtInRolePath)) { const stat = await adapter.stat(builtInRolePath); if (stat?.type === "file") { roles.push({ name: builtInRoleName, path: builtInRolePath, isCustom: false, }); addedNamesLowerCase.add(builtInRoleName.toLowerCase()); this.logger.trace(`Added built-in role: ${builtInRoleName}`); } } }
+      catch (error) { this.logger.error(`Error checking/adding built-in role at ${builtInRolePath}:`, error); }
     }
-    // -------------------------------------------
-
-    // --- Кастомні ролі користувача ---
-    const userRolesFolderPath = this.settings.userRolesFolderPath
-      ? normalizePath(this.settings.userRolesFolderPath)
-      : null;
-
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? normalizePath(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
-      
-      try {
-        const folderExists = await adapter.exists(userRolesFolderPath);
-        const folderStat = folderExists ? await adapter.stat(userRolesFolderPath) : null;
-
-        if (folderStat?.type === "folder") {
-          const listResult = await adapter.list(userRolesFolderPath);
-          for (const filePath of listResult.files) {
-            // Перевіряємо, що це MD файл безпосередньо в цій папці (не в підпапках)
-            if (
-              filePath.toLowerCase().endsWith(".md") &&
-              // Перевірка, що немає слешів після назви папки (+1 за слеш)
-              filePath.substring(userRolesFolderPath.length + 1).indexOf("/") === -1 &&
-              filePath !== builtInRolePath // Ігноруємо, якщо це шлях до вбудованої ролі (малоймовірно, але можливо)
-            ) {
-              const fileName = filePath.substring(filePath.lastIndexOf("/") + 1);
-              // Видаляємо ".md" для отримання імені
-              const roleName = fileName.slice(0, -3); // Більш надійний спосіб видалення розширення
-
-              // Перевірка на конфлікт імен (регістронезалежна)
-              if (!addedNamesLowerCase.has(roleName.toLowerCase())) {
-                roles.push({
-                  name: roleName,
-                  path: filePath,
-                  isCustom: true, // Позначаємо як кастомну
-                });
-                addedNamesLowerCase.add(roleName.toLowerCase());
-                
-              } else {
-                
-              }
-            } else {
-              // 
-            }
-          }
-        } else {
-          
-        }
-      } catch (e) {
-        this.logger.error(`Error listing user roles in ${userRolesFolderPath}:`, e);
-      }
-    } else if (userRolesFolderPath === "/") {
-      
+      try { const folderExists = await adapter.exists(userRolesFolderPath); const folderStat = folderExists ? await adapter.stat(userRolesFolderPath) : null; if (folderStat?.type === "folder") { const listResult = await adapter.list(userRolesFolderPath); for (const filePath of listResult.files) { if ( filePath.toLowerCase().endsWith(".md") && filePath.substring(userRolesFolderPath.length + 1).indexOf("/") === -1 && filePath !== builtInRolePath ) { const fileName = filePath.substring(filePath.lastIndexOf("/") + 1); const roleName = fileName.slice(0, -3); if (!addedNamesLowerCase.has(roleName.toLowerCase())) { roles.push({ name: roleName, path: filePath, isCustom: true, }); addedNamesLowerCase.add(roleName.toLowerCase()); this.logger.trace(`Added custom role: ${roleName}`); } else { this.logger.warn(`Skipping custom role due to name conflict (case-insensitive): ${filePath}`); } } } } }
+      catch (e) { this.logger.error(`Error listing user roles in ${userRolesFolderPath}:`, e); }
     }
-    // ------------------------------------
-
-    // Сортуємо ролі за іменем
-    roles.sort((a, b) => a.name.localeCompare(b.name));
-    this.roleListCache = roles; // Зберігаємо в кеш
-    
+    roles.sort((a, b) => a.name.localeCompare(b.name)); this.roleListCache = roles;
+    this.logger.debug(`Role list refreshed. Found ${roles.length} roles.`);
     return roles;
   }
 
-  // Execute System Command Method
-  async executeSystemCommand(command: string): Promise<{
-    stdout: string;
-    stderr: string;
-    error: ExecException | null;
-  }> {
-    
-    if (!command?.trim()) {
-      
-      return {
-        stdout: "",
-        stderr: "Empty command.",
-        error: new Error("Empty command.") as ExecException,
-      };
-    }
-    //@ts-ignore process is available in Obsidian desktop
-    if (typeof process === "undefined" || !process?.versions?.node) {
-      this.logger.error("Node.js environment not available. Cannot execute system command.");
-      new Notice("Cannot execute system command: Node.js environment is required.");
-      return {
-        stdout: "",
-        stderr: "Node.js required.",
-        error: new Error("Node.js required.") as ExecException,
-      };
-    }
-    return new Promise(resolve => {
-      exec(command, (error, stdout, stderr) => {
-        if (error) this.logger.error(`Exec error for "${command}": ${error.message}`, error);
-        if (stderr && stderr.trim()) 
-        
-        resolve({
-          stdout: stdout.toString(),
-          stderr: stderr.toString(),
-          error: error,
-        });
-      });
-    });
+  async executeSystemCommand(command: string): Promise<{ stdout: string; stderr: string; error: ExecException | null; }> {
+    this.logger.info(`Executing system command: ${command}`);
+    if (!command?.trim()) { this.logger.warn("Attempted to execute empty system command."); return { stdout: "", stderr: "Empty command.", error: new Error("Empty command.") as ExecException, }; }
+    //@ts-ignore
+    if (typeof process === "undefined" || !process?.versions?.node) { this.logger.error("Node.js environment not available for executeSystemCommand."); new Notice("Cannot execute system command: Node.js environment is required."); return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required.") as ExecException, }; }
+    return new Promise(resolve => { exec(command, (error, stdout, stderr) => { if (error) this.logger.error(`Exec error for "${command}": ${error.message}`, error); if (stderr && stderr.trim()) this.logger.warn(`Exec stderr for "${command}": ${stderr.trim()}`); this.logger.debug(`Exec stdout for "${command}": ${stdout.trim().substring(0, 100)}...`); resolve({ stdout: stdout.toString(), stderr: stderr.toString(), error: error, }); }); });
   }
 
-  // --- Session Management Command Helpers ---
   async showChatSwitcher() {
-    // Потрібно реалізувати модальне вікно для вибору чату
-    
+    this.logger.debug("showChatSwitcher called.");
     new Notice("Switch Chat UI not implemented yet.");
-    // Приклад з FuzzySuggestModal:
-    // const chats = this.chatManager.listAvailableChats();
-    // if (!chats || chats.length === 0) {
-    //   new Notice("No saved chats available.");
-    //   return;
-    // }
-    // new ChatSwitcherModal(this.app, chats, async (selectedChat) => {
-    //   if (selectedChat) {
-    //     await this.chatManager.setActiveChat(selectedChat.id);
-    //   }
-    // }).open();
   }
 
   async renameActiveChat() {
-    if (!this.chatManager) {
-      this.logger.error("Cannot rename chat: ChatManager not available.");
-      new Notice("Error: Chat manager is not ready.");
-      return;
-    }
+    this.logger.debug("renameActiveChat command triggered.");
+    if (!this.chatManager) { this.logger.error("Cannot rename chat: ChatManager not available."); new Notice("Error: Chat manager is not ready."); return; }
     const activeChat = await this.chatManager.getActiveChat();
-    if (!activeChat) {
-      
-      new Notice("No active chat to rename.");
-      return;
-    }
-    const currentName = activeChat.metadata.name;
-    const chatId = activeChat.metadata.id;
-    
-
-    new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async newName => {
-      const trimmedName = newName?.trim();
-      if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-        
-        // Використовуємо метод менеджера для перейменування
-        const success = await this.chatManager.renameChat(chatId, trimmedName);
-        if (success) {
-          // Повідомлення показується всередині renameChat
-          // new Notice(`Chat renamed to "${trimmedName}".`);
-        } else {
-          // Повідомлення про помилку також показується всередині renameChat
-          this.logger.error(`Rename failed for chat ${chatId} via renameChat method.`);
-        }
-      } else if (newName === null || trimmedName === "") {
-        
-        new Notice("Rename cancelled or invalid name entered.");
-      } else {
-        
-        new Notice("Name unchanged.");
-      }
-    }).open();
+    if (!activeChat) { new Notice("No active chat to rename."); return; }
+    const currentName = activeChat.metadata.name; const chatId = activeChat.metadata.id;
+    this.logger.debug(`Opening rename prompt for chat ${chatId} (current name: "${currentName}")`);
+    new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async newName => { const trimmedName = newName?.trim(); if (trimmedName && trimmedName !== "" && trimmedName !== currentName) { this.logger.info(`Attempting rename for chat ${chatId} to "${trimmedName}"`); const success = await this.chatManager.renameChat(chatId, trimmedName); if (!success) { this.logger.error(`Rename failed for chat ${chatId} via renameChat method.`); } } else if (newName === null || trimmedName === "") { new Notice("Rename cancelled or invalid name entered."); } else { new Notice("Name unchanged."); } }).open();
   }
 
   async deleteActiveChatWithConfirmation() {
-    if (!this.chatManager) {
-      this.logger.error("Cannot delete chat: ChatManager not available.");
-      new Notice("Error: Chat manager is not ready.");
-      return;
-    }
+    this.logger.debug("deleteActiveChatWithConfirmation command triggered.");
+    if (!this.chatManager) { this.logger.error("Cannot delete chat: ChatManager not available."); new Notice("Error: Chat manager is not ready."); return; }
     const activeChat = await this.chatManager.getActiveChat();
-    if (!activeChat) {
-      
-      new Notice("No active chat to delete.");
-      return;
-    }
-    const chatName = activeChat.metadata.name;
-    const chatId = activeChat.metadata.id;
-    
-
-    new ConfirmModal(
-      this.app,
-      "Delete Chat",
-      `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`,
-      async () => {
-        
-        const success = await this.chatManager.deleteChat(chatId); // Використовуємо існуючий метод
-        if (success) {
-          // Повідомлення показується в deleteChat
-          // new Notice(`Chat "${chatName}" deleted.`);
-        } else {
-          // Повідомлення про помилку показується в deleteChat
-          this.logger.error(`Deletion failed for chat ${chatId} via deleteChat method.`);
-        }
-      }
-    ).open();
+    if (!activeChat) { new Notice("No active chat to delete."); return; }
+    const chatName = activeChat.metadata.name; const chatId = activeChat.metadata.id;
+    this.logger.debug(`Opening delete confirmation for chat ${chatId} ("${chatName}")`);
+    new ConfirmModal( this.app, "Delete Chat", `Are you sure you want to delete chat "${chatName}"?\nThis action cannot be undone.`, async () => { this.logger.info(`User confirmed deletion for chat ${chatId}`); const success = await this.chatManager.deleteChat(chatId); if (!success) { this.logger.error(`Deletion failed for chat ${chatId} via deleteChat method.`); } } ).open();
   }
 
-  // Обробник зміни активного чату (для збереження ID)
   private async handleActiveChatChangedLocally(data: { chatId: string | null; chat: Chat | null }) {
-    // Цей обробник викликається ПІСЛЯ того, як ChatManager змінив активний чат
-    // і згенерував подію "active-chat-changed", на яку підписаний View
-    if (this.settings.saveMessageHistory) {
-      
-      await this.saveDataKey(ACTIVE_CHAT_ID_KEY, data.chatId);
-    } else {
-      // Якщо історія вимкнена, можливо, варто видалити збережений ID?
-      // await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
-      
-    }
+    this.logger.debug(`Handling local active chat change. New active ID: ${data.chatId ?? 'null'}`);
+    if (this.settings.saveMessageHistory) { await this.saveDataKey(ACTIVE_CHAT_ID_KEY, data.chatId); }
+    else { await this.saveDataKey(ACTIVE_CHAT_ID_KEY, null); }
   }
 
-  // Пошук імені ролі (з виправленням path.basename)
   findRoleNameByPath(rolePath: string | null | undefined): string {
     if (!rolePath) return "None";
-
-    // Спочатку шукаємо в кеші
     const cachedRole = this.roleListCache?.find(rl => rl.path === rolePath);
-    if (cachedRole) {
-      // 
-      return cachedRole.name;
-    }
-
-    // Якщо в кеші немає, отримуємо ім'я з шляху як fallback
-    // Це може статися, якщо кеш ще не заповнено або файл було видалено/перейменовано
-    
-    try {
-      const fileName = rolePath.substring(rolePath.lastIndexOf("/") + 1);
-      // Видаляємо ".md" надійніше
-      const roleName = fileName.endsWith(".md") ? fileName.slice(0, -3) : fileName;
-      return roleName || "Unknown Role"; // Повертаємо "Unknown Role", якщо ім'я порожнє
-    } catch (e) {
-      this.logger.error(`Could not determine role name for path: ${rolePath}`, e);
-      return "Unknown Role"; // Повертаємо заглушку при помилці
-    }
+    if (cachedRole) { return cachedRole.name; }
+    this.logger.warn(`Role path "${rolePath}" not found in cache. Deriving name from path.`);
+    try { const fileName = rolePath.substring(rolePath.lastIndexOf("/") + 1); const roleName = fileName.endsWith(".md") ? fileName.slice(0, -3) : fileName; return roleName || "Unknown Role"; }
+    catch (e) { this.logger.error(`Could not determine role name for path: ${rolePath}`, e); return "Unknown Role"; }
   }
 } // END OF OllamaPlugin CLASS
-
-// --- Допоміжне Модальне вікно для вибору чату (Приклад) ---
-// class ChatSwitcherModal extends FuzzySuggestModal<ChatMetadata> {
-//   plugin: OllamaPlugin;
-//   chats: ChatMetadata[];
-//   onChoose: (result: ChatMetadata | null) => void;
-
-//   constructor(app: App, chats: ChatMetadata[], onChoose: (result: ChatMetadata | null) => void) {
-//     super(app);
-//     this.chats = chats; // Вже відсортовані за датою
-//     this.onChoose = onChoose;
-//     this.setPlaceholder("Select a chat to switch to...");
-//   }
-
-//   getItems(): ChatMetadata[] {
-//     return this.chats;
-//   }
-
-//   getItemText(item: ChatMetadata): string {
-//      const date = new Date(item.lastModified);
-//      const dateString = !isNaN(date.getTime()) ? date.toLocaleString() : 'Invalid Date';
-//     return `${item.name} (Last modified: ${dateString})`;
-//   }
-
-//   onChooseItem(item: ChatMetadata, evt: MouseEvent | KeyboardEvent): void {
-//     this.onChoose(item);
-//   }
-// }

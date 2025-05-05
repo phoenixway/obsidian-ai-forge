@@ -193,7 +193,7 @@ export class ChatManager {
     }
   }
 
-  private async rebuildIndexFromFiles(): Promise<void> {
+  public async rebuildIndexFromFiles(): Promise<void> {
     const newIndex: ChatSessionIndex = {};
     let chatsLoaded = 0;
     let filesScanned = 0;
@@ -874,6 +874,7 @@ export class ChatManager {
       new Notice("No active chat to update metadata for.");
       return false;
     }
+    this.logger.debug(`Attempting to update metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
     if (Object.keys(metadataUpdate).length === 0) {
       return false;
     }
