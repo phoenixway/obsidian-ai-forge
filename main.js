@@ -8093,8 +8093,11 @@ var ChatManager = class {
       if (indexNeedsUpdate) {
         this.chatIndex[meta.id] = storedMeta;
         await this.saveChatIndex();
+        this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from saveChatAndUpdateIndex for ID: ${meta.id}`);
         this.plugin.emit("chat-list-updated");
+        this.logger.debug(`Chat index updated for ${meta.id} after save trigger.`);
       } else {
+        this.logger.trace(`Index for chat ${meta.id} unchanged after save trigger, skipping index save/event.`);
       }
       return true;
     } catch (error) {
@@ -8447,10 +8450,12 @@ var ChatManager = class {
     if (Object.keys(metadataUpdate).length === 0) {
       return false;
     }
+    this.logger.debug(`Attempting to update metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
     const oldRolePath = activeChat.metadata.selectedRolePath;
     const oldModelName = activeChat.metadata.modelName;
     const changed = activeChat.updateMetadata(metadataUpdate);
     if (changed) {
+      this.logger.debug(`Metadata updated in Chat object for ${activeChat.metadata.id}. Save scheduled by Chat.updateMetadata.`);
       await this.saveChatAndUpdateIndex(activeChat);
       const newMeta = activeChat.metadata;
       let roleChanged = false;
@@ -8475,6 +8480,7 @@ var ChatManager = class {
         this.plugin.emit("model-changed", newMeta.modelName || "");
         (_e = (_d = this.plugin.promptService) == null ? void 0 : _d.clearModelDetailsCache) == null ? void 0 : _e.call(_d);
       }
+      this.logger.error(`[ChatManager] >>> Emitting 'active-chat-changed' from updateActiveChatMetadata for ID: ${this.activeChatId}`);
       this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
       return true;
     } else {
