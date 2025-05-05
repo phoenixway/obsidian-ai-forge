@@ -3890,14 +3890,17 @@ This action cannot be undone.`,
     };
     this.handleChatListUpdated = () => {
       var _a;
+      this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
       if (this.dropdownMenuManager) {
         this.dropdownMenuManager.updateChatListIfVisible().catch((e) => this.plugin.logger.error("Error updating chat dropdown list:", e));
       }
       if ((_a = this.sidebarManager) == null ? void 0 : _a.isSectionVisible("chats")) {
+        this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is visible, requesting update from handleChatListUpdated.");
         this.sidebarManager.updateChatList().catch((error) => {
           this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
         });
       } else {
+        this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is collapsed, skipping update from handleChatListUpdated.");
       }
     };
     this.handleSettingsUpdated = async () => {

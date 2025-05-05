@@ -1580,6 +1580,7 @@ export class OllamaView extends ItemView {
   }
 
   private handleChatListUpdated = (): void => {
+    this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
     if (this.dropdownMenuManager) {
       this.dropdownMenuManager
         .updateChatListIfVisible()
@@ -1587,10 +1588,12 @@ export class OllamaView extends ItemView {
     }
 
     if (this.sidebarManager?.isSectionVisible("chats")) {
+      this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is visible, requesting update from handleChatListUpdated.");
       this.sidebarManager.updateChatList().catch(error => {
         this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
       });
     } else {
+      this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is collapsed, skipping update from handleChatListUpdated.");
     }
   };
 
