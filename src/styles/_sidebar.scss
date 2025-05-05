@@ -202,13 +202,13 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
     // border: 1px dotted blue; // DEBUG: Межі контенту
     // background-color: rgba(0, 0, 255, 0.05); // DEBUG: Легкий фон контенту
 
-    .ollama-folder-icon {
+    > .ollama-folder-icon {
       display: inline-block !important; // Спробуємо inline-block для іконки
       flex-shrink: 0; // Не стискати
       width: $icon-size;
       height: $icon-size;
       margin: 0; // Без додаткових відступів
-      border: 1px solid lime; // DEBUG: Межі іконки
+      // border: 1px solid lime; // DEBUG: Межі іконки
       vertical-align: middle; // Спробуємо вирівняти по вертикалі
     }
 
@@ -219,7 +219,7 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      border: 1px solid orange; // DEBUG: Межі тексту
+      // border: 1px solid orange; // DEBUG: Межі тексту
       vertical-align: middle; // Спробуємо вирівняти по вертикалі
       min-width: 0; // Для ellipsis
     }
