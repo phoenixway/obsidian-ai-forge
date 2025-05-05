@@ -178,9 +178,9 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
         opacity: 0.7;
       }
     }
-
-    &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content{
-      > .ollama-hierarchy-item-content {
+    // Активна папка-предок
+    &.ollama-folder-item.is-active-ancestor {
+       .ollama-hierarchy-item-content {
         .ollama-hierarchy-item-text {
           font-weight: 500;
         }
