@@ -1,20 +1,13 @@
 // src/styles/_sidebar.scss
-// МІНІМАЛЬНА ВЕРСІЯ ДЛЯ ДІАГНОСТИКИ МАКЕТУ
 
-// --- Змінні для тесту ---
 $indent-step: 18px;
-// $item-padding-vertical: 4px;
-
-// $item-padding-horizontal: 8px;
-
 $item-padding-vertical: var(--size-4-1);
 $item-padding-horizontal: var(--size-4-2);
-
 $icon-size: 16px;
 $icon-margin: var(--size-4-2);
 $folder-icon-extra-indent: 5px; // На скільки іконка папки правіше іконки чату
 
-// --- Базові контейнери (лише для структури, якщо необхідно) ---
+// --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
   display: flex;
   flex-direction: column;
@@ -42,7 +35,9 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
     pointer-events: none !important;
   }
 }
+// --- End Sidebar Panel ---
 
+// --- Sidebar Accordion Sections ---
 .ollama-chat-panel,
 .ollama-role-panel {
   display: flex;
@@ -153,8 +148,8 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
   }
   &::-webkit-scrollbar-thumb:hover {
     background-color: var(--interactive-accent);
-  }
 
+  }  // --- Стилі для ієрархії ---
   .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
     margin: 1px 0;
     border-radius: var(--radius-s);
