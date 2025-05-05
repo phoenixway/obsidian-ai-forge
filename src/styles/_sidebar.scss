@@ -55,54 +55,6 @@ ollama-sidebar-section-header {
 }
 
 .ollama-sidebar-section-content {
-  /* ... стилі секції та скролбару ... */
-  overflow: hidden; max-height: 0; transition: max-height 0.3s ease-out, padding 0.3s ease-out, opacity 0.3s ease-out; box-sizing: border-box; padding: 0 var(--size-4-2); min-height: 0; opacity: 0;
-  &.is-expanded { max-height: 75vh; overflow-y: auto; padding-top: var(--size-4-1); padding-bottom: var(--size-4-1); opacity: 1; }
-  &::-webkit-scrollbar { width: 6px; } &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; } &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; } &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); }
-
-  // --- Стилі для ієрархії ---
-  .ollama-sidebar-container .ollama-chat-list-container .ollama-hierarchy-item {
-      margin: 1px 0; border-radius: var(--radius-s); cursor: pointer; position: relative; padding-left: 0;
-
-      // Відступи рівнів (з !important)
-      @for $i from 0 through 10 { &.ollama-indent-level-#{$i} { padding-left: $item-padding-horizontal + ($i * $indent-step) !important; } }
-
-      // Hover на контент
-      .ollama-hierarchy-item-content:hover {
-           background-color: var(--background-modifier-hover);
-           .ollama-hierarchy-item-options { opacity: 0.7; } // Показуємо кнопку опцій (хоч її ще нема в DOM)
-      }
-
-      // Активна папка-предок
-      &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content { .ollama-hierarchy-item-text { font-weight: 500; } }
-
-     
-
-      // Специфічно для чату (скидання зсуву іконки)
-      &.ollama-chat-item {
-           .ollama-hierarchy-item-content > .ollama-folder-icon {
-                color: var(--text-muted);
-                margin-left: 0 !important; // Гарантуємо відсутність зсуву
-           }
-      }
-
-      // --- ПОВЕРНУЛИ: Активний чат (з датою) ---
-      &.ollama-chat-item.is-active {
-           .ollama-hierarchy-item-content {
-              background-color: var(--interactive-accent); color: var(--text-on-accent);
-              // Стилізуємо дітей всередині активного контенту
-              > .ollama-folder-icon, > .ollama-hierarchy-item-text, > .ollama-chat-item-details, > .ollama-chat-item-details .ollama-chat-item-date { color: var(--text-on-accent); }
-              &:hover { background-color: var(--interactive-accent-hover); }
-              > .ollama-hierarchy-item-options { color: var(--text-on-accent); &:hover { background-color: rgba(var(--color-base-rgb), 0.1); } }
-           }
-      }
-      // ---
-
-       // Контейнер для дочірніх елементів
-       > .ollama-hierarchy-item-children { display: block; position: relative; padding-left: 0; }
-       &.is-collapsed > .ollama-hierarchy-item-children { display: none; }
-
-  } // Кінець .ollama-sidebar-container ... .ollama-hierarchy-item
 
   // --- Стилі для списку ролей ---
   .ollama-role-panel-list { /* ... як раніше ... */ }
