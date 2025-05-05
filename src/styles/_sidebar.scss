@@ -504,3 +504,52 @@ $folder-icon-extra-indent: 4px; // Невеликий зсув іконки па
     }
   }
 }
+// src/styles/_sidebar.scss
+// ... (існуючі стилі) ...
+
+// --- Стилі для контейнера списку чатів/папок ---
+.ollama-chat-list-container {
+  position: relative; // Потрібно для абсолютного позиціонування ::before
+
+  // Стиль під час завантаження/оновлення списку
+  &.is-loading {
+      // Можна додати легке затемнення або зменшення прозорості основного контенту
+      // > *:not(.loading-indicator-element) { // Якщо використовуєте окремий елемент індикатора
+      //    opacity: 0.5;
+      //    pointer-events: none;
+      // }
+
+      // Додаємо оверлей зі спіннером через псевдоелемент
+      &::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(var(--background-secondary-rgb), 0.6); // Напівпрозорий фон
+          z-index: 10; // Має бути над списком
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: var(--radius-m); // Опціонально
+
+          // Створюємо спіннер
+          width: 24px; // Розмір спіннера
+          height: 24px;
+          margin: auto; // Центруємо спіннер
+          border: 3px solid rgba(var(--text-muted-rgb), 0.3); // Колір кільця
+          border-top-color: var(--text-accent); // Колір активної частини
+          border-radius: 50%;
+          animation: ollama-spin 0.8s linear infinite; // Анімація обертання
+      }
+  }
+}
+
+// Анімація обертання (якщо ще не визначена)
+@keyframes ollama-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+// ... (решта стилів) ...
