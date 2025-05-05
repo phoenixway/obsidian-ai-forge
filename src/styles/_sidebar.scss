@@ -231,16 +231,72 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
     }
 
     // Текст
-    .ollama-hierarchy-item-text {
-      display: inline !important; // Спробуємо inline для тексту
-      flex-grow: 1; // Займати доступне місце
+    // .ollama-hierarchy-item-text {
+    //   display: inline !important; // Спробуємо inline для тексту
+    //   flex-grow: 1; // Займати доступне місце
+    //   white-space: nowrap;
+    //   overflow: hidden;
+    //   text-overflow: ellipsis;
+    //   // border: 1px solid orange; // DEBUG: Межі тексту
+    //   vertical-align: middle; // Спробуємо вирівняти по вертикалі
+    //   min-width: 0; // Для ellipsis
+    // }
+
+    > .ollama-hierarchy-item-text {
+      display: block;
+      flex-grow: 1;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      // border: 1px solid orange; // DEBUG: Межі тексту
-      vertical-align: middle; // Спробуємо вирівняти по вертикалі
-      min-width: 0; // Для ellipsis
+      font-size: var(--font-ui-small);
+      line-height: 1.3;
+      padding-left: 0;
+      min-width: 0;
     }
+
+
+      // Деталі чату (прямий нащадок контенту)
+      > .ollama-chat-item-details {
+        display: block;
+        margin-left: auto;
+        padding-left: $icon-margin;
+        flex-shrink: 0;
+        white-space: nowrap;
+        .ollama-chat-item-date {
+          font-size: var(--font-ui-smaller);
+          color: var(--text-faint);
+          opacity: 0.9;
+          display: inline;
+        }
+      }
+
+      // Кнопка опцій (прямий нащадок контенту)
+      > .ollama-hierarchy-item-options {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-left: $icon-margin;
+        opacity: 0;
+        transition: opacity 0.1s ease-in-out;
+        padding: 2px;
+        border-radius: var(--radius-s);
+        color: var(--text-muted);
+        background: none;
+        border: none;
+        cursor: pointer;
+        &:hover {
+          opacity: 1;
+          color: var(--text-normal);
+          background-color: var(--background-modifier-hover);
+        }
+        .svg-icon {
+          width: 18px;
+          height: 18px;
+          display: block;
+        }
+      }
+
     .ollama-hierarchy-item-children {
       display: block; // Повинен бути блоком
       padding-left: 0; // Відступи контролюються дітьми
