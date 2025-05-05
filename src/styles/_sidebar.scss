@@ -179,13 +179,11 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
       }
     }
     // Активна папка-предок
-    &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content 
-       .ollama-hierarchy-item-content {
-        .ollama-hierarchy-item-text {
-          font-weight: 500;
-        }
+    &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content .ollama-hierarchy-item-content {
+      .ollama-hierarchy-item-text {
+        font-weight: 500;
       }
-    
+    }
   }
   ////////////////////////
   .ollama-hierarchy-item-content {
@@ -202,14 +200,34 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
     // border: 1px dotted blue; // DEBUG: Межі контенту
     // background-color: rgba(0, 0, 255, 0.05); // DEBUG: Легкий фон контенту
 
+    // .ollama-folder-icon {
+    //   display: inline-block !important; // Спробуємо inline-block для іконки
+    //   flex-shrink: 0; // Не стискати
+    //   width: $icon-size;
+    //   height: $icon-size;
+    //   margin: 0; // Без додаткових відступів
+    //   // border: 1px solid lime; // DEBUG: Межі іконки
+    //   vertical-align: middle; // Спробуємо вирівняти по вертикалі
+    // }
+
+    // Іконка (прямий нащадок контенту)
     > .ollama-folder-icon {
-      display: inline-block !important; // Спробуємо inline-block для іконки
-      flex-shrink: 0; // Не стискати
+      flex-shrink: 0;
       width: $icon-size;
       height: $icon-size;
-      margin: 0; // Без додаткових відступів
-      // border: 1px solid lime; // DEBUG: Межі іконки
-      vertical-align: middle; // Спробуємо вирівняти по вертикалі
+      color: var(--text-faint);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 0; // Базовий margin
+
+      // Зсув іконки ПАПКИ
+      // Націлюємось на іконку, якщо ПРЕДОК має клас .ollama-folder-item
+      .ollama-folder-item & {
+        margin-left: $folder-icon-extra-indent;
+        // Якщо не працює, спробуйте:
+        // margin-left: $folder-icon-extra-indent !important;
+      }
     }
 
     // Текст
