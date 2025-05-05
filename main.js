@@ -4746,7 +4746,7 @@ This action cannot be undone.`,
     this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
   }
   async handleActiveChatChanged(data) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f;
     this.plugin.logger.error(
       `[handleActiveChatChanged] <<< \u041E\u0422\u0420\u0418\u041C\u0410\u041D\u041E \u041F\u041E\u0414\u0406\u042E >>> \u041D\u043E\u0432\u0438\u0439 ID: ${data.chatId}, \u0404 \u0434\u0430\u043D\u0456 \u0447\u0430\u0442\u0443: ${!!data.chat}, \u041F\u043E\u043F\u0435\u0440\u0435\u0434\u043D\u0456\u0439 ID: ${this.lastProcessedChatId}`
     );
@@ -4785,28 +4785,10 @@ This action cannot be undone.`,
       this.updateRoleDisplay(currentRoleName);
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
-      const panelUpdatePromises = [];
-      if ((_f = this.sidebarManager) == null ? void 0 : _f.isSectionVisible("chats")) {
-        panelUpdatePromises.push(
-          this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
-        );
-      }
-      if ((_g = this.sidebarManager) == null ? void 0 : _g.isSectionVisible("roles")) {
-        panelUpdatePromises.push(
-          this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
-        );
-      }
-      if (panelUpdatePromises.length > 0) {
-        await Promise.all(panelUpdatePromises);
-      }
-    } else {
-      this.plugin.logger.warn(
-        `[handleActiveChatChanged] \u0412\u0445\u043E\u0434\u0438\u043C\u043E \u0432 \u0431\u043B\u043E\u043A \u041D\u0415\u041E\u0411\u0420\u041E\u0411\u041B\u0415\u041D\u041E\u0413\u041E \u0421\u0422\u0410\u041D\u0423: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
-      );
       this.lastProcessedChatId = data.chatId;
     }
     this.plugin.logger.error(
-      `[handleActiveChatChanged] <<< \u0417\u0410\u0412\u0415\u0420\u0428\u0415\u041D\u041E \u041E\u0411\u0420\u041E\u0411\u041A\u0423 \u041F\u041E\u0414\u0406\u0407 >>> \u0414\u043B\u044F ID: ${(_h = data.chatId) != null ? _h : "null"}`
+      `[handleActiveChatChanged] <<< \u0417\u0410\u0412\u0415\u0420\u0428\u0415\u041D\u041E \u041E\u0411\u0420\u041E\u0411\u041A\u0423 \u041F\u041E\u0414\u0406\u0407 >>> \u0414\u043B\u044F ID: ${(_f = data.chatId) != null ? _f : "null"}`
     );
   }
   async handleDeleteMessageClick(messageToDelete) {

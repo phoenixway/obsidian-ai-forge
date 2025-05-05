@@ -1553,28 +1553,28 @@ export class OllamaView extends ItemView {
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
 
-      const panelUpdatePromises = [];
-      if (this.sidebarManager?.isSectionVisible("chats")) {
-        panelUpdatePromises.push(
-          this.sidebarManager
-            .updateChatList()
-            .catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
-        );
-      }
-      if (this.sidebarManager?.isSectionVisible("roles")) {
-        panelUpdatePromises.push(
-          this.sidebarManager
-            .updateRoleList()
-            .catch(e => this.plugin.logger.error("Error updating role panel list:", e))
-        );
-      }
-      if (panelUpdatePromises.length > 0) {
-        await Promise.all(panelUpdatePromises);
-      }
-    } else {
-      this.plugin.logger.warn(
-        `[handleActiveChatChanged] Входимо в блок НЕОБРОБЛЕНОГО СТАНУ: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
-      );
+    //   const panelUpdatePromises = [];
+    //   if (this.sidebarManager?.isSectionVisible("chats")) {
+    //     panelUpdatePromises.push(
+    //       this.sidebarManager
+    //         .updateChatList()
+    //         .catch(e => this.plugin.logger.error("Error updating chat panel list:", e))
+    //     );
+    //   }
+    //   if (this.sidebarManager?.isSectionVisible("roles")) {
+    //     panelUpdatePromises.push(
+    //       this.sidebarManager
+    //         .updateRoleList()
+    //         .catch(e => this.plugin.logger.error("Error updating role panel list:", e))
+    //     );
+    //   }
+    //   if (panelUpdatePromises.length > 0) {
+    //     await Promise.all(panelUpdatePromises);
+    //   }
+    // } else {
+    //   this.plugin.logger.warn(
+    //     `[handleActiveChatChanged] Входимо в блок НЕОБРОБЛЕНОГО СТАНУ: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`
+    //   );
       this.lastProcessedChatId = data.chatId;
     }
 
