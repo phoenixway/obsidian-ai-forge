@@ -179,7 +179,7 @@ $folder-icon-extra-indent: 5px; // На скільки іконка папки �
       }
     }
 
-    &.ollama-folder-item.is-active-ancestor {
+    &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content{
       > .ollama-hierarchy-item-content {
         .ollama-hierarchy-item-text {
           font-weight: 500;
