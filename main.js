@@ -4202,17 +4202,11 @@ This action cannot be undone.`,
     const flexContainer = this.contentEl.createDiv({ cls: CSS_CLASS_CONTAINER });
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
     const isDesktop = import_obsidian14.Platform.isDesktop;
-    this.plugin.logger.error(
-      `[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`
-    );
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
     const sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (sidebarRootEl) {
       sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-      this.plugin.logger.error(
-        `[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${sidebarRootEl.className}`
-      );
     } else {
       this.plugin.logger.error("[OllamaView] sidebarRootEl is missing! Cannot toggle class.");
     }
