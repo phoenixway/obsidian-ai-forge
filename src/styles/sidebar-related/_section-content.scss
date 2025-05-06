@@ -4,7 +4,7 @@
 // --- Змінні (скопійовано з _sidebar.scss) ---
 $indent-step: 16px;
 $item-padding-vertical: var(--size-4-1);
-$item-padding-horizontal: var(--size-4-2, 8px);
+$item-padding-horizontal: 8px;
 $icon-size: 16px;
 $icon-margin: var(--size-4-2);
 $folder-icon-extra-indent: 4px;
@@ -173,6 +173,10 @@ $folder-icon-extra-indent: 4px;
     }
 
 } // --- Кінець .ollama-sidebar-section-content ---
+
+
+// ------------------------------------------------------------------------ //
+
 
 // Правило для прихованого стану контенту
 .ollama-sidebar-section-content-hidden {
