@@ -3145,6 +3145,8 @@ var OllamaView = class extends import_obsidian14.ItemView {
     this.errorGroupElement = null;
     this.isSummarizingErrors = false;
     this.temporarilyDisableChatChangedReload = false;
+    this.isRegenerating = false;
+    // Новий прапорець
     this.activePlaceholder = null;
     this.currentMessageAddedResolver = null;
     // Посилання на div роздільника
@@ -3737,10 +3739,15 @@ This action cannot be undone.`,
         textarea.scrollTop = currentScrollTop;
       });
     };
-    // Обробник події зміни активного чату
+    // Модифікуємо handleActiveChatChanged
     this.handleActiveChatChanged = async (data) => {
       var _a, _b, _c, _d, _e, _f, _g;
-      this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${(_a = data.chatId) != null ? _a : "null"}`);
+      this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${(_a = data.chatId) != null ? _a : "null"}. isRegenerating: ${this.isRegenerating}`);
+      if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
+        this.plugin.logger.warn(`[handleActiveChatChanged] Ignored active chat change for chat ID ${data.chatId} due to ongoing regeneration process for the same chat.`);
+        this.lastProcessedChatId = data.chatId;
+        return;
+      }
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       this.plugin.logger.warn(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
       if (chatSwitched || data.chatId !== null && data.chat === null) {
@@ -3772,7 +3779,6 @@ This action cannot be undone.`,
       }
       this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FINISHED for chat ID: ${(_g = data.chatId) != null ? _g : "null"}`);
     };
-    // Кінець handleActiveChatChanged
     this.handleChatListUpdated = () => {
       var _a;
       this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
@@ -4725,18 +4731,21 @@ This action cannot be undone.`,
       }
     ).open();
   }
-  // OllamaView.ts
   async handleRegenerateClick(userMessage) {
     var _a;
-    this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}`);
+    if (this.isRegenerating) {
+      new import_obsidian14.Notice("Regeneration is already in progress. Please wait.", 3e3);
+      this.plugin.logger.warn("[Regenerate] Attempted to start regeneration while another one is already in progress.");
+      return;
+    }
     if (this.currentAbortController) {
       this.plugin.logger.warn(
-        "Cannot regenerate while another generation is in progress. Cancelling current one first."
+        "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
       );
       this.cancelGeneration();
       await new Promise((resolve) => setTimeout(resolve, 250));
       if (this.currentAbortController) {
-        new import_obsidian14.Notice("Please wait for the current generation to stop completely.");
+        new import_obsidian14.Notice("Please wait for the current generation to stop completely before regenerating.");
         return;
       }
     }
@@ -4751,7 +4760,7 @@ This action cannot be undone.`,
     );
     if (messageIndex === -1) {
       this.plugin.logger.error(
-        "Could not find the user message in the active chat history for regeneration.",
+        "[Regenerate] Could not find the user message in the active chat history for regeneration.",
         userMessage
       );
       new import_obsidian14.Notice("Error: Could not find the message to regenerate from.");
@@ -4764,6 +4773,8 @@ This action cannot be undone.`,
       hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
       async () => {
         var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+        this.isRegenerating = true;
+        this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
         this.currentAbortController = new AbortController();
         let accumulatedResponse = "";
         const responseStartTime = new Date();
@@ -4827,7 +4838,6 @@ This action cannot be undone.`,
           this.plugin.logger.debug(`[Regenerate] Starting stream with ${chatForStreaming.messages.length} messages in context for chat ${chatId}.`);
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             chatForStreaming,
-            // Передаємо оновлений екземпляр Chat
             this.currentAbortController.signal
           );
           let firstChunk = true;
@@ -4893,7 +4903,7 @@ This action cannot be undone.`,
             if (((_h = this.activePlaceholder) == null ? void 0 : _h.timestamp) === responseStartTimeMs) {
               this.activePlaceholder = null;
             }
-            await this.plugin.chatManager.addMessageToActiveChat(
+            this.plugin.chatManager.addMessageToActiveChat(
               "system",
               "Assistant provided an empty response during regeneration.",
               new Date()
@@ -4934,9 +4944,9 @@ This action cannot be undone.`,
             );
           }
         } finally {
-          this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}.`);
+          this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}. Current isRegenerating: ${this.isRegenerating}`);
           if (((_l = this.activePlaceholder) == null ? void 0 : _l.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before  finally. Removing if connected.`);
+            this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before finally. Removing if connected.`);
             if ((_m = this.activePlaceholder.groupEl) == null ? void 0 : _m.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
@@ -4946,9 +4956,10 @@ This action cannot be undone.`,
           (_n = this.stopGeneratingButton) == null ? void 0 : _n.hide();
           (_o = this.sendButton) == null ? void 0 : _o.show();
           this.currentAbortController = null;
+          this.isRegenerating = false;
+          this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}. isRegenerating set to false.`);
           this.updateSendButtonState();
           this.focusInput();
-          this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}.`);
         }
       }
     ).open();

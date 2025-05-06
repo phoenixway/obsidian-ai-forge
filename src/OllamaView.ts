@@ -142,6 +142,8 @@ export class OllamaView extends ItemView {
   private isSummarizingErrors = false;
 
   private temporarilyDisableChatChangedReload = false;
+  private isRegenerating: boolean = false; // Новий прапорець
+
   private activePlaceholder: {
     timestamp: number;
     groupEl: HTMLElement;
@@ -1496,43 +1498,36 @@ export class OllamaView extends ItemView {
     this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
   }
 
-// Обробник події зміни активного чату
+// Модифікуємо handleActiveChatChanged
 private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
-  // Логування початку обробки (використовуємо ERROR для видимості)
-  this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${data.chatId ?? 'null'}`);
+  this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${data.chatId ?? 'null'}. isRegenerating: ${this.isRegenerating}`);
 
-  // Визначаємо, чи змінився ID чату порівняно з попереднім обробленим
+  // Якщо йде процес регенерації, ігноруємо обробку цієї події,
+  // щоб уникнути перезавантаження чату, яке може видалити плейсхолдер.
+  if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
+    this.plugin.logger.warn(`[handleActiveChatChanged] Ignored active chat change for chat ID ${data.chatId} due to ongoing regeneration process for the same chat.`);
+    // Важливо оновити lastProcessedChatId, щоб наступна "справжня" зміна чату
+    // (коли isRegenerating буде false) була оброблена коректно.
+    this.lastProcessedChatId = data.chatId;
+    return;
+  }
+
   const chatSwitched = data.chatId !== this.lastProcessedChatId;
   this.plugin.logger.warn(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
 
-  // --- Тимчасове вимкнення для тестування (можна видалити, якщо не використовується) ---
-  // if (this.temporarilyDisableChatChangedReload) {
-  //   this.plugin.logger.error("[handleActiveChatChanged] RELOAD DISABLED FOR TEST. Skipping logic.");
-  //   this.lastProcessedChatId = data.chatId; // Оновлюємо ID
-  //   return;
-  // }
-  // ---
-
-  // --- Основна логіка ---
   if (chatSwitched || (data.chatId !== null && data.chat === null)) {
-    // --- ВИПАДОК 1: Чат змінився (новий ID) АБО активний чат став null (наприклад, після видалення) ---
     this.plugin.logger.error(`[handleActiveChatChanged] !!! FULL CHAT RELOAD Condition Met !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Preparing to call loadAndDisplayActiveChat...`);
     const currentStack = new Error().stack;
     this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
 
-    // Оновлюємо ID останнього обробленого чату
     this.lastProcessedChatId = data.chatId;
-    // Викликаємо повне перезавантаження та відображення нового активного стану
     this.plugin.logger.error("[handleActiveChatChanged] CALLING loadAndDisplayActiveChat NOW!");
     await this.loadAndDisplayActiveChat();
 
   } else if (data.chatId !== null && data.chat !== null) {
-    // --- ВИПАДОК 2: Чат той самий (ID не змінився), але його дані (chat object) оновилися (наприклад, змінилися метадані) ---
     this.plugin.logger.info(`[handleActiveChatChanged] Updating UI/Panels for existing chat ID: ${data.chatId}. NO FULL RELOAD.`);
-    // Оновлюємо ID останнього обробленого чату (хоча він і не змінився, для консистентності)
     this.lastProcessedChatId = data.chatId;
 
-    // Оновлюємо UI елементи, що відображають метадані цього чату
     const chat = data.chat;
     const currentRolePath = chat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
     const currentRoleName = await this.findRoleNameByPath(currentRolePath);
@@ -1544,31 +1539,13 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
     this.updateInputPlaceholder(currentRoleName);
     this.updateTemperatureIndicator(currentTemperature);
 
-    // --- ВИДАЛЕНО ЯВНЕ ОНОВЛЕННЯ ПАНЕЛЕЙ ЗВІДСИ ---
-    // Тепер оновлення панелей має відбуватися у відповідь на подію 'chat-list-updated',
-    // яка генерується методом saveChatAndUpdateIndex в ChatManager після збереження метаданих.
     this.plugin.logger.info("[handleActiveChatChanged] SKIPPED explicit sidebar panel update call here. Relying on 'chat-list-updated' event.");
-    /*
-    const panelUpdatePromises = [];
-    if (this.sidebarManager?.isSectionVisible("chats")) {
-        panelUpdatePromises.push(this.sidebarManager.updateChatList().catch(e => this.plugin.logger.error("Error updating chat panel list:", e)));
-    }
-    if (this.sidebarManager?.isSectionVisible("roles")) {
-        panelUpdatePromises.push(this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list:", e)));
-    }
-    if (panelUpdatePromises.length > 0) { await Promise.all(panelUpdatePromises); }
-    this.plugin.logger.debug("[handleActiveChatChanged] Sidebar panel updates finished.");
-    */
-    // --- КІНЕЦЬ ВИДАЛЕНОГО БЛОКУ ---
-
+    
   } else {
-    // --- ВИПАДОК 3: Непередбачений стан (наприклад, chatId === null, але chat не null?) ---
     this.plugin.logger.warn(`[handleActiveChatChanged] Entering UNHANDLED STATE: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`);
-    // Оновлюємо ID на випадок помилки
     this.lastProcessedChatId = data.chatId;
   }
 
-  // Оновлення випадаючого меню ролей (не залежить від випадку)
   if (this.dropdownMenuManager) {
       this.dropdownMenuManager
           .updateRoleListIfVisible()
@@ -1577,7 +1554,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
 
 
   this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FINISHED for chat ID: ${data.chatId ?? 'null'}`);
-}; // Кінець handleActiveChatChanged
+};
 
   private handleChatListUpdated = (): void => {
     this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
@@ -1688,18 +1665,22 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
     ).open();
   }
 
-  // OllamaView.ts
+  
   public async handleRegenerateClick(userMessage: Message): Promise<void> {
+    if (this.isRegenerating) {
+        new Notice("Regeneration is already in progress. Please wait.", 3000);
+        this.plugin.logger.warn("[Regenerate] Attempted to start regeneration while another one is already in progress.");
+        return;
+    }
 
-    this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}`);
     if (this.currentAbortController) {
       this.plugin.logger.warn(
-        "Cannot regenerate while another generation is in progress. Cancelling current one first."
+        "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
       );
       this.cancelGeneration();
       await new Promise(resolve => setTimeout(resolve, 250)); 
       if (this.currentAbortController) { 
-        new Notice("Please wait for the current generation to stop completely.");
+        new Notice("Please wait for the current generation to stop completely before regenerating.");
         return;
       }
     }
@@ -1716,7 +1697,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
 
     if (messageIndex === -1) {
       this.plugin.logger.error(
-        "Could not find the user message in the active chat history for regeneration.",
+        "[Regenerate] Could not find the user message in the active chat history for regeneration.",
         userMessage
       );
       new Notice("Error: Could not find the message to regenerate from.");
@@ -1730,6 +1711,10 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
       "Confirm Regeneration",
       hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
       async () => {
+        this.isRegenerating = true; // Встановлюємо прапорець
+        this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
+
+
         this.currentAbortController = new AbortController();
         let accumulatedResponse = "";
         const responseStartTime = new Date();
@@ -1754,6 +1739,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
             this.plugin.logger.debug(`[Regenerate] Subsequent messages deleted.`);
           }
 
+          // Цей loadAndDisplayActiveChat потрібен, щоб очистити UI від видалених повідомлень
           await this.loadAndDisplayActiveChat(); 
           this.guaranteedScrollToBottom(50, true); 
           this.plugin.logger.debug(`[Regenerate] Chat reloaded to reflect deletions.`);
@@ -1796,21 +1782,15 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
           setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
           this.guaranteedScrollToBottom(50, true);
 
-          // Отримуємо екземпляр Chat ПІСЛЯ того, як повідомлення були видалені.
-          // Він повинен містити правильну (скорочену) історію.
           const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
           if (!chatForStreaming) {
             throw new Error("Failed to get updated chat context for streaming regeneration.");
           }
-          // Переконуємося, що chatForStreaming.messages справді відображає стан після видалення
-          // і містить повідомлення тільки до userMessage включно (або порожній масив, якщо userMessage був першим).
-          // Якщо deleteMessagesAfter видаляє повідомлення з індексу N+1, то chatForStreaming.messages 
-          // повинен мати довжину N+1.
-
+          
           this.plugin.logger.debug(`[Regenerate] Starting stream with ${chatForStreaming.messages.length} messages in context for chat ${chatId}.`);
           
           const stream = this.plugin.ollamaService.generateChatResponseStream(
-            chatForStreaming, // Передаємо оновлений екземпляр Chat
+            chatForStreaming, 
             this.currentAbortController.signal
           );
 
@@ -1879,7 +1859,8 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
             if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
                 this.activePlaceholder = null;
             }
-            await this.plugin.chatManager.addMessageToActiveChat(
+            // Додаємо системне повідомлення асинхронно, handleMessageAdded його відобразить
+             this.plugin.chatManager.addMessageToActiveChat(
               "system",
               "Assistant provided an empty response during regeneration.",
               new Date() 
@@ -1914,10 +1895,12 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
             new Notice(errorMsgForChat, 5000);
           }
 
+          // Додаємо повідомлення про помилку/скасування в чат асинхронно
           await this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
 
           if (savePartialResponseOnError) {
             this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
+            // Додаємо часткову відповідь асинхронно
             await this.plugin.chatManager.addMessageToActiveChat(
               "assistant",
               accumulatedResponse,
@@ -1927,10 +1910,10 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
           }
 
         } finally {
-          this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}.`);
+          this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}. Current isRegenerating: ${this.isRegenerating}`);
           
           if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-             this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before  finally. Removing if connected.`);
+             this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before finally. Removing if connected.`);
              if (this.activePlaceholder.groupEl?.isConnected) {
                 this.activePlaceholder.groupEl.remove();
              }
@@ -1941,9 +1924,11 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
           this.stopGeneratingButton?.hide();
           this.sendButton?.show();
           this.currentAbortController = null;
-          this.updateSendButtonState();
+          
+          this.isRegenerating = false; // Скидаємо прапорець
+          this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}. isRegenerating set to false.`);
+          this.updateSendButtonState(); // Оновлюємо стан кнопки Send після скидання isRegenerating
           this.focusInput();
-          this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}.`);
         }
       }
     ).open();
