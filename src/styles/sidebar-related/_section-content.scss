@@ -210,7 +210,8 @@ $folder-icon-extra-indent: 0px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      padding: $item-padding-vertical $item-padding-horizontal !important; // Використовуємо !important для перевизначення успадкованого padding-left від @extend .ollama-hierarchy-item (якщо @extend використовується)
+      padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0 !important; // Використовуємо !important для перевизначення успадкованого padding-left від @extend .ollama-hierarchy-item (якщо @extend використовується)
+      // padding: $item-padding-vertical $item-padding-horizontal !important; // Використовуємо !important для перевизначення успадкованого padding-left від @extend .ollama-hierarchy-item (якщо @extend використовується)
       min-height: calc($icon-size + 2 * $item-padding-vertical);
       gap: $icon-margin;
 
