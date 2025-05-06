@@ -1666,273 +1666,345 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   }
 
   
-  public async handleRegenerateClick(userMessage: Message): Promise<void> {
-    if (this.isRegenerating) {
-        new Notice("Regeneration is already in progress. Please wait.", 3000);
-        this.plugin.logger.warn("[Regenerate] Attempted to start regeneration while another one is already in progress.");
-        return;
-    }
+  // OllamaView.ts
 
-    if (this.currentAbortController) {
-      this.plugin.logger.warn(
-        "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
-      );
-      this.cancelGeneration();
-      await new Promise(resolve => setTimeout(resolve, 250)); 
-      if (this.currentAbortController) { 
-        new Notice("Please wait for the current generation to stop completely before regenerating.");
-        return;
-      }
-    }
+// ... (початок класу OllamaView та інші методи) ...
 
-    const activeChat = await this.plugin.chatManager?.getActiveChat();
-    if (!activeChat) {
-      new Notice("Cannot regenerate: No active chat found.");
+public async handleRegenerateClick(userMessage: Message): Promise<void> {
+  if (this.isRegenerating) {
+      new Notice("Regeneration is already in progress. Please wait.", 3000);
+      this.plugin.logger.warn("[Regenerate] Attempted to start regeneration while another one is already in progress.");
       return;
-    }
-    const chatId = activeChat.metadata.id;
-    const messageIndex = activeChat.messages.findIndex(
-      msg => msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.role === userMessage.role
+  }
+
+  if (this.currentAbortController) {
+    this.plugin.logger.warn(
+      "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
     );
-
-    if (messageIndex === -1) {
-      this.plugin.logger.error(
-        "[Regenerate] Could not find the user message in the active chat history for regeneration.",
-        userMessage
-      );
-      new Notice("Error: Could not find the message to regenerate from.");
+    this.cancelGeneration();
+    await new Promise(resolve => setTimeout(resolve, 250)); 
+    if (this.currentAbortController) { 
+      new Notice("Please wait for the current generation to stop completely before regenerating.");
       return;
     }
+  }
 
-    const hasMessagesAfter = activeChat.messages.length > messageIndex + 1;
+  const activeChat = await this.plugin.chatManager?.getActiveChat();
+  if (!activeChat) {
+    new Notice("Cannot regenerate: No active chat found.");
+    return;
+  }
+  const chatId = activeChat.metadata.id;
+  const messageIndex = activeChat.messages.findIndex(
+    msg => msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.role === userMessage.role
+  );
 
-    new ConfirmModal(
-      this.app,
-      "Confirm Regeneration",
-      hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
-      async () => {
-        this.isRegenerating = true; // Встановлюємо прапорець
-        this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
+  if (messageIndex === -1) {
+    this.plugin.logger.error(
+      "[Regenerate] Could not find the user message in the active chat history for regeneration.",
+      userMessage
+    );
+    new Notice("Error: Could not find the message to regenerate from.");
+    return;
+  }
 
+  const hasMessagesAfter = activeChat.messages.length > messageIndex + 1;
 
-        this.currentAbortController = new AbortController();
-        let accumulatedResponse = "";
-        const responseStartTime = new Date();
-        const responseStartTimeMs = responseStartTime.getTime();
+  new ConfirmModal(
+    this.app,
+    "Confirm Regeneration",
+    hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
+    async () => {
+      this.isRegenerating = true; 
+      this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
+
+      this.currentAbortController = new AbortController();
+      let accumulatedResponse = "";
+      const responseStartTime = new Date();
+      const responseStartTimeMs = responseStartTime.getTime();
+      
+      let currentLocalPlaceholderRef: typeof this.activePlaceholder = null;
+
+      this.setLoadingState(true);
+      this.stopGeneratingButton?.show();
+      this.sendButton?.hide();
+
+      let streamErrorOccurred: Error | null = null;
+      // Promise для очікування завершення handleMessageAdded для основного повідомлення асистента
+      let mainAssistantMessageProcessedPromise: Promise<void> | null = null; 
+
+      try {
+        this.plugin.logger.debug(`[Regenerate] Starting for message at index ${messageIndex} in chat ${chatId}. HasMessagesAfter: ${hasMessagesAfter}`);
+
+        if (hasMessagesAfter) {
+          const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
+          if (!deleteSuccess) {
+            throw new Error("Failed to delete subsequent messages for regeneration.");
+          }
+          this.plugin.logger.debug(`[Regenerate] Subsequent messages deleted.`);
+        }
+
+        await this.loadAndDisplayActiveChat(); 
+        this.guaranteedScrollToBottom(50, true); 
+        this.plugin.logger.debug(`[Regenerate] Chat reloaded to reflect deletions.`);
+
+        this.plugin.logger.debug(`[Regenerate] Creating placeholder for new assistant response (timestamp: ${responseStartTimeMs}).`);
+        const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
+          cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`,
+        });
+        assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", responseStartTimeMs.toString());
+        RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false); 
+        const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
+        messageWrapperEl.style.order = "2"; 
+        const assistantMessageElement = messageWrapperEl.createDiv({
+          cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
+        });
+        const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
+        const assistantContentEl = contentContainer.createDiv({
+          cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`,
+        });
+        assistantContentEl.empty(); 
+
+        const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+        for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+
+        if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
+          this.activePlaceholder = { 
+            timestamp: responseStartTimeMs,
+            groupEl: assistantPlaceholderGroupEl,
+            contentEl: assistantContentEl,
+            messageWrapper: messageWrapperEl,
+          };
+          currentLocalPlaceholderRef = this.activePlaceholder; 
+          this.plugin.logger.debug(`[Regenerate] Placeholder created and activePlaceholder set for ts: ${responseStartTimeMs}.`);
+        } else {
+          this.plugin.logger.error("[Regenerate] Failed to create all placeholder elements!");
+          throw new Error("Failed to create placeholder elements for regeneration.");
+        }
+
+        assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+        setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+        this.guaranteedScrollToBottom(50, true);
+
+        const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
+        if (!chatForStreaming) {
+          throw new Error("Failed to get updated chat context for streaming regeneration.");
+        }
         
-        let currentLocalPlaceholderRef: typeof this.activePlaceholder = null;
+        this.plugin.logger.debug(`[Regenerate] Starting stream with ${chatForStreaming.messages.length} messages in context for chat ${chatId}.`);
+        
+        const stream = this.plugin.ollamaService.generateChatResponseStream(
+          chatForStreaming, 
+          this.currentAbortController.signal
+        );
 
-        this.setLoadingState(true);
-        this.stopGeneratingButton?.show();
-        this.sendButton?.hide();
-
-        let streamErrorOccurred: Error | null = null;
-
-        try {
-          this.plugin.logger.debug(`[Regenerate] Starting for message at index ${messageIndex} in chat ${chatId}. HasMessagesAfter: ${hasMessagesAfter}`);
-
-          if (hasMessagesAfter) {
-            const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
-            if (!deleteSuccess) {
-              throw new Error("Failed to delete subsequent messages for regeneration.");
-            }
-            this.plugin.logger.debug(`[Regenerate] Subsequent messages deleted.`);
+        let firstChunk = true;
+        for await (const chunk of stream) {
+          if (this.currentAbortController.signal.aborted) {
+            this.plugin.logger.debug("[Regenerate] Stream aborted by user during iteration.");
+            throw new Error("aborted by user");
           }
 
-          // Цей loadAndDisplayActiveChat потрібен, щоб очистити UI від видалених повідомлень
-          await this.loadAndDisplayActiveChat(); 
-          this.guaranteedScrollToBottom(50, true); 
-          this.plugin.logger.debug(`[Regenerate] Chat reloaded to reflect deletions.`);
-
-          this.plugin.logger.debug(`[Regenerate] Creating placeholder for new assistant response (timestamp: ${responseStartTimeMs}).`);
-          const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`,
-          });
-          assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", responseStartTimeMs.toString());
-          RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false); 
-          const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-          messageWrapperEl.style.order = "2"; 
-          const assistantMessageElement = messageWrapperEl.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
-          });
-          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-          const assistantContentEl = contentContainer.createDiv({
-            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`,
-          });
-          assistantContentEl.empty(); 
-
-          const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-          for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-
-          if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
-            this.activePlaceholder = { 
-              timestamp: responseStartTimeMs,
-              groupEl: assistantPlaceholderGroupEl,
-              contentEl: assistantContentEl,
-              messageWrapper: messageWrapperEl,
-            };
-            currentLocalPlaceholderRef = this.activePlaceholder; 
-            this.plugin.logger.debug(`[Regenerate] Placeholder created and activePlaceholder set for ts: ${responseStartTimeMs}.`);
-          } else {
-            this.plugin.logger.error("[Regenerate] Failed to create all placeholder elements!");
-            throw new Error("Failed to create placeholder elements for regeneration.");
-          }
-
-          assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-          setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-          this.guaranteedScrollToBottom(50, true);
-
-          const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
-          if (!chatForStreaming) {
-            throw new Error("Failed to get updated chat context for streaming regeneration.");
-          }
-          
-          this.plugin.logger.debug(`[Regenerate] Starting stream with ${chatForStreaming.messages.length} messages in context for chat ${chatId}.`);
-          
-          const stream = this.plugin.ollamaService.generateChatResponseStream(
-            chatForStreaming, 
-            this.currentAbortController.signal
-          );
-
-          let firstChunk = true;
-          for await (const chunk of stream) {
-            if (this.currentAbortController.signal.aborted) {
-              this.plugin.logger.debug("[Regenerate] Stream aborted by user during iteration.");
+          if ("error" in chunk && chunk.error) {
+            if (!chunk.error.includes("aborted by user")) {
+              this.plugin.logger.error(`[Regenerate] Stream error: ${chunk.error}`);
+              throw new Error(chunk.error);
+            } else {
               throw new Error("aborted by user");
             }
+          }
 
-            if ("error" in chunk && chunk.error) {
-              if (!chunk.error.includes("aborted by user")) {
-                this.plugin.logger.error(`[Regenerate] Stream error: ${chunk.error}`);
-                throw new Error(chunk.error);
-              } else {
-                throw new Error("aborted by user");
+          if ("response" in chunk && chunk.response) {
+            if (this.activePlaceholder?.timestamp === responseStartTimeMs && this.activePlaceholder.contentEl) {
+              if (firstChunk) {
+                const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+                if (thinkingDots) thinkingDots.remove();
+                firstChunk = false;
               }
-            }
-
-            if ("response" in chunk && chunk.response) {
-              if (this.activePlaceholder?.timestamp === responseStartTimeMs && this.activePlaceholder.contentEl) {
-                if (firstChunk) {
-                  const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                  if (thinkingDots) thinkingDots.remove();
-                  firstChunk = false;
-                }
-                accumulatedResponse += chunk.response;
-                await AssistantMessageRenderer.renderAssistantContent(
-                  this.activePlaceholder.contentEl,
-                  accumulatedResponse,
-                  this.app,
-                  this.plugin,
-                  this
-                );
-                this.guaranteedScrollToBottom(50, true);
-                if (this.activePlaceholder.groupEl) { 
-                     this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
-                }
-              } else {
-                 this.plugin.logger.warn(`[Regenerate] activePlaceholder mismatch or contentEl missing during stream. Current ts: ${this.activePlaceholder?.timestamp}, expected: ${responseStartTimeMs}. Accumulated chunk anyway.`);
-                 accumulatedResponse += chunk.response;
+              accumulatedResponse += chunk.response;
+              await AssistantMessageRenderer.renderAssistantContent(
+                this.activePlaceholder.contentEl,
+                accumulatedResponse,
+                this.app,
+                this.plugin,
+                this
+              );
+              this.guaranteedScrollToBottom(50, true);
+              if (this.activePlaceholder.groupEl) { 
+                   this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
               }
-            }
-            if ("done" in chunk && chunk.done) {
-              this.plugin.logger.debug("[Regenerate] Stream finished (done chunk received).");
-              break;
+            } else {
+               this.plugin.logger.warn(`[Regenerate] activePlaceholder mismatch or contentEl missing during stream. Current ts: ${this.activePlaceholder?.timestamp}, expected: ${responseStartTimeMs}. Accumulated chunk anyway.`);
+               accumulatedResponse += chunk.response;
             }
           }
-          this.plugin.logger.debug(
-            `[Regenerate] Stream completed. Final response length: ${accumulatedResponse.length}. Placeholder still valid for this request: ${this.activePlaceholder?.timestamp === responseStartTimeMs}`
+          if ("done" in chunk && chunk.done) {
+            this.plugin.logger.debug("[Regenerate] Stream finished (done chunk received).");
+            break;
+          }
+        } // Кінець циклу for await
+
+        this.plugin.logger.debug(
+          `[Regenerate] Stream completed. Final response length: ${accumulatedResponse.length}. Placeholder still valid for this request: ${this.activePlaceholder?.timestamp === responseStartTimeMs}`
+        );
+
+        if (accumulatedResponse.trim()) {
+          this.plugin.logger.debug(`[Regenerate] Adding assistant message to ChatManager for ts ${responseStartTimeMs}: "${accumulatedResponse.substring(0,100)}..."`);
+          
+          let resolver: () => void;
+          mainAssistantMessageProcessedPromise = new Promise<void>(resolve => { resolver = resolve; });
+          this.currentMessageAddedResolver = resolver!; // Встановлюємо resolver ПЕРЕД викликом addMessageToActiveChat
+          
+          this.plugin.chatManager.addMessageToActiveChat(
+            "assistant",
+            accumulatedResponse,
+            responseStartTime, 
+            false 
           );
-
-          if (accumulatedResponse.trim()) {
-            this.plugin.logger.debug(`[Regenerate] Adding assistant message to ChatManager: "${accumulatedResponse.substring(0,100)}..."`);
-            this.plugin.chatManager.addMessageToActiveChat(
-              "assistant",
-              accumulatedResponse,
-              responseStartTime, 
-              false 
-            );
-          } else if (!this.currentAbortController.signal.aborted) {
-            this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
-            if (this.activePlaceholder?.timestamp === responseStartTimeMs && this.activePlaceholder.groupEl?.isConnected) {
-                this.activePlaceholder.groupEl.remove();
-            }
-            if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-                this.activePlaceholder = null;
-            }
-            // Додаємо системне повідомлення асинхронно, handleMessageAdded його відобразить
-             this.plugin.chatManager.addMessageToActiveChat(
-              "system",
-              "Assistant provided an empty response during regeneration.",
-              new Date() 
-            );
-          }
-
-        } catch (error: any) {
-          streamErrorOccurred = error; 
-          this.plugin.logger.error("[Regenerate] Error during regeneration process:", error);
-          
-          if (currentLocalPlaceholderRef?.groupEl?.isConnected && currentLocalPlaceholderRef.timestamp === responseStartTimeMs) {
-            this.plugin.logger.debug(`[Regenerate] Removing local placeholder (ts: ${responseStartTimeMs}) due to error: ${error.message}`);
-            currentLocalPlaceholderRef.groupEl.remove();
+          // Немає await для addMessageToActiveChat, очікуємо mainAssistantMessageProcessedPromise в finally
+        } else if (!this.currentAbortController.signal.aborted) {
+          this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
+          // Видаляємо плейсхолдер, оскільки відповіді немає
+          if (this.activePlaceholder?.timestamp === responseStartTimeMs && this.activePlaceholder.groupEl?.isConnected) {
+              this.activePlaceholder.groupEl.remove();
           }
           if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-            this.activePlaceholder = null;
+              this.activePlaceholder = null; 
           }
-
-          let errorMsgForChat: string;
-          let errorMsgRole: "system" | "error" = "error";
-          let savePartialResponseOnError = false;
-
-          if (error.name === "AbortError" || error.message?.includes("aborted by user")) {
-            this.plugin.logger.info("[Regenerate] Regeneration was stopped by user.");
-            errorMsgForChat = "Regeneration stopped.";
-            errorMsgRole = "system";
-            if (accumulatedResponse.trim()) { 
-              savePartialResponseOnError = true;
-            }
-          } else {
-            errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
-            new Notice(errorMsgForChat, 5000);
-          }
-
-          // Додаємо повідомлення про помилку/скасування в чат асинхронно
-          await this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
-
-          if (savePartialResponseOnError) {
-            this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
-            // Додаємо часткову відповідь асинхронно
-            await this.plugin.chatManager.addMessageToActiveChat(
-              "assistant",
-              accumulatedResponse,
-              responseStartTime, 
-              false
-            );
-          }
-
-        } finally {
-          this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}. Current isRegenerating: ${this.isRegenerating}`);
           
-          if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-             this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before finally. Removing if connected.`);
-             if (this.activePlaceholder.groupEl?.isConnected) {
-                this.activePlaceholder.groupEl.remove();
-             }
-             this.activePlaceholder = null;
-          }
-
-          this.setLoadingState(false);
-          this.stopGeneratingButton?.hide();
-          this.sendButton?.show();
-          this.currentAbortController = null;
+          let resolverForEmptySystem: () => void;
+          const emptySystemProcessedPromise = new Promise<void>(resolve => { resolverForEmptySystem = resolve; });
+          this.currentMessageAddedResolver = resolverForEmptySystem!;
           
-          this.isRegenerating = false; // Скидаємо прапорець
-          this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}. isRegenerating set to false.`);
-          this.updateSendButtonState(); // Оновлюємо стан кнопки Send після скидання isRegenerating
-          this.focusInput();
+          // Додаємо системне повідомлення
+          this.plugin.chatManager.addMessageToActiveChat(
+            "system",
+            "Assistant provided an empty response during regeneration.",
+            new Date() 
+          );
+          await emptySystemProcessedPromise; // Чекаємо, поки це системне повідомлення буде оброблено
         }
+        // Якщо було скасування і відповідь порожня, нічого не додаємо, помилка вже оброблена/буде оброблена
+
+      } catch (error: any) {
+        streamErrorOccurred = error; 
+        this.plugin.logger.error("[Regenerate] Error during regeneration process:", error);
+        
+        // Зберігаємо посилання на плейсхолдер цього запиту, якщо він ще існує
+        if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
+            currentLocalPlaceholderRef = this.activePlaceholder;
+        }
+
+        // Видаляємо плейсхолдер, якщо він належить цьому запиту і все ще існує
+        if (currentLocalPlaceholderRef?.groupEl?.isConnected) {
+          this.plugin.logger.debug(`[Regenerate] Removing local placeholder (ts: ${responseStartTimeMs}) due to error: ${error.message}`);
+          currentLocalPlaceholderRef.groupEl.remove();
+        }
+        // Скидаємо глобальний, якщо він стосувався цього запиту
+        if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
+          this.activePlaceholder = null;
+        }
+
+        let errorMsgForChat: string;
+        let errorMsgRole: "system" | "error" = "error";
+        let savePartialResponseOnError = false;
+
+        if (error.name === "AbortError" || error.message?.includes("aborted by user")) {
+          this.plugin.logger.info("[Regenerate] Regeneration was stopped by user.");
+          errorMsgForChat = "Regeneration stopped.";
+          errorMsgRole = "system";
+          if (accumulatedResponse.trim()) { 
+            savePartialResponseOnError = true;
+          }
+        } else {
+          errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
+          new Notice(errorMsgForChat, 5000);
+        }
+
+        // Додаємо повідомлення про помилку/скасування в чат і чекаємо його обробки
+        let errorResolver: () => void;
+        const errorMessageProcessedPromise = new Promise<void>(resolve => { errorResolver = resolve; });
+        this.currentMessageAddedResolver = errorResolver!;
+        this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
+        await errorMessageProcessedPromise;
+
+
+        if (savePartialResponseOnError) {
+          this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
+          let partialResolver: () => void;
+          const partialMessageProcessedPromise = new Promise<void>(resolve => { partialResolver = resolve; });
+          this.currentMessageAddedResolver = partialResolver!;
+          this.plugin.chatManager.addMessageToActiveChat(
+            "assistant",
+            accumulatedResponse,
+            responseStartTime, 
+            false
+          );
+          await partialMessageProcessedPromise;
+        }
+      } finally {
+        // Чекаємо на завершення обробки основного повідомлення асистента, ЯКЩО воно було ініційоване
+        // і не було помилки стріму (бо помилка вже оброблена вище)
+        if (mainAssistantMessageProcessedPromise && !streamErrorOccurred && accumulatedResponse.trim()) {
+            this.plugin.logger.debug(`[Regenerate] Waiting in finally for main assistant message (ts: ${responseStartTimeMs}) to be processed by handleMessageAdded.`);
+            try {
+                await mainAssistantMessageProcessedPromise;
+                this.plugin.logger.debug(`[Regenerate] Main assistant message (ts: ${responseStartTimeMs}) processed successfully.`);
+            } catch (e) {
+                this.plugin.logger.error(`[Regenerate] Error awaiting mainAssistantMessageProcessedPromise:`, e);
+            }
+        } else if (this.currentMessageAddedResolver && !streamErrorOccurred && accumulatedResponse.trim()) {
+            // Це може статися, якщо mainAssistantMessageProcessedPromise чомусь не було встановлено, але resolver є.
+            // Малоймовірно з поточним кодом.
+            this.plugin.logger.warn(`[Regenerate] Active resolver found in finally without mainAssistantMessageProcessedPromise. Clearing it. Error: ${!!streamErrorOccurred}, AccumResp: ${accumulatedResponse.trim()}`);
+            this.currentMessageAddedResolver = null; // Просто очищуємо, щоб не заважав.
+        }
+      
+        this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}. Current isRegenerating: ${this.isRegenerating}`);
+        
+        // Після очікування, this.activePlaceholder вже повинен бути null, якщо handleMessageAdded спрацював
+        if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
+           this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED after awaiting promise. This is highly unexpected. Removing if connected.`);
+           if (this.activePlaceholder.groupEl?.isConnected) {
+              this.activePlaceholder.groupEl.remove();
+           }
+           this.activePlaceholder = null;
+        }
+
+        this.setLoadingState(false);
+        this.stopGeneratingButton?.hide();
+        this.sendButton?.show();
+        this.currentAbortController = null;
+        
+        this.isRegenerating = false; 
+        this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}. isRegenerating set to false.`);
+        this.updateSendButtonState(); 
+        this.focusInput();
       }
-    ).open();
-  }
+    }
+  ).open();
+}
+
+// Переконайтеся, що handleMessageAdded очищує this.currentMessageAddedResolver НА ПОЧАТКУ
+// і викликає localResolver В КІНЦІ свого блоку try або в catch/finally.
+
+// Приклад структури handleMessageAdded (переконайтеся, що ваша версія схожа):
+// private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
+//   const localResolver = this.currentMessageAddedResolver;
+//   this.currentMessageAddedResolver = null; 
+
+//   try {
+//     // ... ваша основна логіка обробки повідомлення ...
+//     // ... якщо це оновлення плейсхолдера, this.activePlaceholder = null; всередині ...
+//   } catch (outerError: any) {
+//     // ... обробка помилок ...
+//   } finally {
+//     if (localResolver) {
+//       localResolver(); // Викликаємо resolver тут, щоб сигналізувати про завершення
+//     }
+//     // ... логування виходу ...
+//   }
+// }
 
   public handleCopyClick(content: string, buttonEl: HTMLElement): void {
     let textToCopy = content;
@@ -3701,162 +3773,189 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   }
 }
 
-  // OllamaView.ts
-  private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
-    // Зберігаємо resolver локально і очищуємо глобальний ВІДРАЗУ,
-    // щоб уникнути повторного використання одного й того ж resolver'а, якщо HMA викликається швидко.
-    const localResolver = this.currentMessageAddedResolver;
-    this.currentMessageAddedResolver = null; 
+private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
+  // 1. Зберігаємо resolver локально і очищуємо глобальний ВІДРАЗУ.
+  const localResolver = this.currentMessageAddedResolver;
+  this.currentMessageAddedResolver = null; 
 
-    try {
-      if (!data || !data.message) {
-        this.plugin.logger.error("[HMA] Invalid data received in handleMessageAdded.", data);
+  try {
+    if (!data || !data.message) {
+      this.plugin.logger.error("[HMA] Invalid data received in handleMessageAdded.", data);
+      // Немає чого обробляти, але resolver все одно треба викликати, якщо він був.
+      if (localResolver) localResolver(); 
+      return;
+    }
+    const { chatId: eventChatId, message } = data;
+    const messageTimestampMs = message.timestamp.getTime();
+
+    this.plugin.logger.info(
+      `[HMA] <<< ENTERED >>> Chat: ${eventChatId}, Role: ${message.role}, Ts: ${messageTimestampMs}, Content: "${message.content.substring(0,50)}..."`
+    );
+
+    if (!this.chatContainer || !this.plugin.chatManager) {
+      this.plugin.logger.error("[HMA] CRITICAL: Context (chatContainer or chatManager) missing!");
+      if (localResolver) localResolver();
+      return;
+    }
+
+    const activeChatId = this.plugin.chatManager.getActiveChatId();
+    if (eventChatId !== activeChatId) {
+      this.plugin.logger.debug(`[HMA] Event for non-active chat ${eventChatId} (current is ${activeChatId}). Ignoring UI update.`);
+      if (localResolver) localResolver();
+      return;
+    }
+
+    // Перевірка на дублікат в DOM (за фінальним data-timestamp, не плейсхолдером)
+    // Це може бути корисно, але основна логіка залежить від this.activePlaceholder та currentMessages
+    const existingMessageElInDom = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
+    if (existingMessageElInDom) {
+        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM and is NOT a placeholder. Skipping add.`);
         if (localResolver) localResolver();
         return;
-      }
-      const { chatId: eventChatId, message } = data;
-      const messageTimestampMs = message.timestamp.getTime();
+    }
+    
+    // Перевірка на дублікат в currentMessages
+    const alreadyInCache = this.currentMessages.some(
+      m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content 
+    );
+    if (alreadyInCache) {
+       this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) is already in currentMessages. Likely duplicate event or already handled. Content: "${message.content.substring(0,30)}"`);
+       if (localResolver) localResolver();
+       return;
+    }
 
-      this.plugin.logger.info(
-        `[HMA] <<< ENTERED >>> Chat: ${eventChatId}, Role: ${message.role}, Ts: ${messageTimestampMs}, Content: "${message.content.substring(0,50)}..."`
+    // Основна логіка: обробка плейсхолдера або стандартне додавання
+    if (message.role === "assistant" && this.activePlaceholder?.timestamp === messageTimestampMs) {
+      this.plugin.logger.debug(
+        `[HMA] Assistant message (ts: ${messageTimestampMs}) matches active placeholder. Updating placeholder in place.`
       );
+      const placeholderToUpdate = this.activePlaceholder; 
+      // ВАЖЛИВО: НЕ очищуйте this.activePlaceholder тут, доки не будете впевнені, що оновлення пройшло успішно.
+      // Очищення буде після успішного renderAssistantContent та додавання кнопок/timestamp.
 
-      if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.error("[HMA] CRITICAL: Context (chatContainer or chatManager) missing!");
-        if (localResolver) localResolver();
-        return;
-      }
+      if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
+        
+        // Видаляємо атрибути плейсхолдера та встановлюємо фінальні
+        placeholderToUpdate.groupEl.classList.remove("placeholder");
+        placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
+        placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString()); 
 
-      const activeChatId = this.plugin.chatManager.getActiveChatId();
-      if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[HMA] Event for non-active chat ${eventChatId} (current is ${activeChatId}). Ignoring UI update.`);
-        if (localResolver) localResolver();
-        return;
-      }
+        const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
 
-      // Перевірка на дублікат в DOM (за фінальним data-timestamp, не плейсхолдером)
-      const existingMessageElInDom = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
-      if (existingMessageElInDom) {
-          this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM and is NOT a placeholder. Skipping add.`);
-          if (localResolver) localResolver();
-          return;
-      }
-      
-      // Перевірка на дублікат в currentMessages (більш надійний спосіб уникнути подвійного рендерингу)
-      const alreadyInCache = this.currentMessages.some(
-        m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content // Порівнюємо і контент для більшої точності
-      );
-      if (alreadyInCache) {
-         this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) is already in currentMessages. Likely duplicate event or already handled. Content: "${message.content.substring(0,30)}"`);
-         if (localResolver) localResolver();
-         return;
-      }
+        if (!messageDomElement) {
+          this.plugin.logger.error("[HMA] Critical: Could not find .message element within placeholder group. Removing placeholder and adding normally.");
+          placeholderToUpdate.groupEl.remove(); 
+          this.activePlaceholder = null; // Очищуємо, бо плейсхолдер видалено
+          await this.addMessageStandard(message); // Додаємо як звичайне повідомлення
+          // localResolver буде викликано в finally
+          return; // Виходимо з try, щоб спрацював finally
+        }
 
-      // Головна логіка: обробка плейсхолдера або стандартне додавання
-      if (message.role === "assistant" && this.activePlaceholder?.timestamp === messageTimestampMs) {
-        this.plugin.logger.debug(
-          `[HMA] Assistant message (ts: ${messageTimestampMs}) matches active placeholder. Updating placeholder in place.`
-        );
-        const placeholderToUpdate = this.activePlaceholder; // Зберігаємо локально перед очищенням
-        this.activePlaceholder = null; // Очищуємо активний плейсхолдер, оскільки ми його зараз обробимо
+        placeholderToUpdate.contentEl.classList.remove("streaming-text");
+        const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+        if (dotsEl) dotsEl.remove();
 
-        if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
-          placeholderToUpdate.groupEl.classList.remove("placeholder");
-          placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
-          placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString()); 
-
-          const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
-
-          if (!messageDomElement) {
-            this.plugin.logger.error("[HMA] Critical: Could not find .message element within placeholder group. Removing placeholder and adding normally.");
-            placeholderToUpdate.groupEl.remove(); 
-            await this.addMessageStandard(message); 
-            if (localResolver) localResolver();
-            return;
-          }
-
-          placeholderToUpdate.contentEl.classList.remove("streaming-text");
-          const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-          if (dotsEl) dotsEl.remove();
-
-          try {
-            await AssistantMessageRenderer.renderAssistantContent(
-              placeholderToUpdate.contentEl,
-              message.content,
-              this.app,
-              this.plugin,
-              this
-            );
-            AssistantMessageRenderer.addAssistantActionButtons(
-              placeholderToUpdate.messageWrapper, 
-              placeholderToUpdate.contentEl,      
-              message,
-              this.plugin,
-              this
-            );
-            BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
-
-            this.lastMessageElement = placeholderToUpdate.groupEl; 
-            this.currentMessages.push(message); 
-            this.hideEmptyState();
-
-            setTimeout(() => {
-              if (placeholderToUpdate.groupEl.isConnected) {
-                this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
-              }
-            }, 50); // Даємо час DOM оновитися перед перевіркою
-             this.guaranteedScrollToBottom(100, false);
-
-          } catch (renderError: any) {
-            this.plugin.logger.error("[HMA] Error during final render/update of placeholder:", renderError);
-            if (placeholderToUpdate.groupEl.isConnected) { // Перевіряємо перед видаленням
-                placeholderToUpdate.groupEl.remove(); 
-            }
-            this.handleErrorMessage({
-              role: "error",
-              content: `Failed to finalize assistant message display: ${renderError.message}`,
-              timestamp: new Date(),
-            });
-          }
-        } else {
-          this.plugin.logger.error(
-            `[HMA] Active placeholder for ts ${messageTimestampMs} was matched, but its groupEl is not connected or contentEl/messageWrapper missing. groupEl connected: ${placeholderToUpdate.groupEl?.isConnected}. Adding message normally.`
+        try {
+          // Рендеримо фінальний контент
+          await AssistantMessageRenderer.renderAssistantContent(
+            placeholderToUpdate.contentEl,
+            message.content,
+            this.app,
+            this.plugin,
+            this
           );
-          // this.activePlaceholder вже null
-          await this.addMessageStandard(message);
-        }
-      } else if (message.role === "assistant" && this.activePlaceholder && this.activePlaceholder.timestamp !== messageTimestampMs) {
-        this.plugin.logger.warn(`[HMA] Received assistant message (ts: ${messageTimestampMs}) but active placeholder is for a DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding current message normally.`);
-        await this.addMessageStandard(message); // Додасть в currentMessages
-      }
-       else {
-        if (message.role === "assistant" && !this.activePlaceholder) {
-            this.plugin.logger.debug(`[HMA] No active placeholder for assistant message (ts: ${messageTimestampMs}). Adding normally.`);
-        } else if (message.role !== "assistant") {
-             this.plugin.logger.debug(`[HMA] Message is not from assistant (Role: ${message.role}, Ts: ${messageTimestampMs}). Adding normally.`);
-        }
-        await this.addMessageStandard(message); // Додасть в currentMessages
-      }
 
-      if (localResolver) {
-        localResolver();
-      }
-      this.plugin.logger.info(
-        `[HMA] <<< EXITED (successfully) >>> Role: ${message.role}, Ts: ${messageTimestampMs}`
-      );
+          // Додаємо кнопки дій та позначку часу
+          AssistantMessageRenderer.addAssistantActionButtons(
+            placeholderToUpdate.messageWrapper, 
+            placeholderToUpdate.contentEl,      
+            message,
+            this.plugin,
+            this
+          );
+          BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
 
-    } catch (outerError: any) {
-      this.plugin.logger.error("[HMA] <<< CAUGHT OUTER ERROR >>> in handleMessageAdded:", outerError, data);
-      // Не додаємо тут повідомлення про помилку напряму в DOM,
-      // бо це може призвести до рекурсії, якщо handleErrorMessage теж викличе HMA.
-      // Натомість, просто логуємо. Якщо потрібно, sendMessage/handleRegenerateClick повинні обробити це.
-      // Або, якщо це помилка рендерингу, то addMessageStandard сам її обробить.
-      if (localResolver) {
-        localResolver(); 
+          this.lastMessageElement = placeholderToUpdate.groupEl; 
+          this.currentMessages.push(message); // Додаємо в кеш ПІСЛЯ успішного рендерингу
+          this.hideEmptyState();
+
+          // Очищуємо activePlaceholder ПІСЛЯ успішного оновлення DOM
+          this.activePlaceholder = null; 
+          this.plugin.logger.debug(`[HMA] Placeholder for ts ${messageTimestampMs} successfully updated and activePlaceholder cleared.`);
+
+
+          // Перевірка на згортання
+          setTimeout(() => {
+            if (placeholderToUpdate.groupEl.isConnected) {
+              this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
+            }
+          }, 50); 
+           this.guaranteedScrollToBottom(100, false); // Прокрутка після оновлення
+
+        } catch (renderError: any) {
+          this.plugin.logger.error("[HMA] Error during final render/update of placeholder:", renderError);
+          if (placeholderToUpdate.groupEl.isConnected) { 
+              placeholderToUpdate.groupEl.remove(); 
+          }
+          // Оскільки плейсхолдер не вдалося оновити, очищуємо activePlaceholder
+          this.activePlaceholder = null;
+          
+          this.handleErrorMessage({ // Додаємо повідомлення про помилку рендерингу
+            role: "error",
+            content: `Failed to finalize assistant message display: ${renderError.message}`,
+            timestamp: new Date(),
+          });
+        }
+      } else {
+        this.plugin.logger.error(
+          `[HMA] Active placeholder for ts ${messageTimestampMs} was matched, but its groupEl is not connected or contentEl/messageWrapper missing. groupEl connected: ${placeholderToUpdate.groupEl?.isConnected}. Adding message normally.`
+        );
+        this.activePlaceholder = null; // Очищуємо, бо плейсхолдер невалідний
+        await this.addMessageStandard(message); // Додаємо як звичайне повідомлення
       }
-    } 
-    // `finally` тут не потрібен, бо localResolver обробляється на початку і в кінці try/catch.
+    } else if (message.role === "assistant" && this.activePlaceholder && this.activePlaceholder.timestamp !== messageTimestampMs) {
+      // Ситуація: прийшло повідомлення асистента, але активний плейсхолдер для ІНШОГО запиту.
+      // Це означає, що для поточного повідомлення плейсхолдера не було, або він вже оброблений/видалений.
+      this.plugin.logger.warn(`[HMA] Received assistant message (ts: ${messageTimestampMs}) but active placeholder is for a DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding current message normally.`);
+      await this.addMessageStandard(message); // Додасть в currentMessages всередині
+    }
+     else {
+      // Немає відповідного плейсхолдера (або це не асистент), додаємо повідомлення стандартним чином
+      if (message.role === "assistant" && !this.activePlaceholder) {
+          this.plugin.logger.debug(`[HMA] No active placeholder for assistant message (ts: ${messageTimestampMs}). Adding normally.`);
+      } else if (message.role !== "assistant") {
+           this.plugin.logger.debug(`[HMA] Message is not from assistant (Role: ${message.role}, Ts: ${messageTimestampMs}). Adding normally.`);
+      }
+      await this.addMessageStandard(message); // Додасть в currentMessages всередині
+    }
+
+    this.plugin.logger.info(
+      `[HMA] <<< Nearing end of try block >>> Role: ${message.role}, Ts: ${messageTimestampMs}`
+    );
+
+  } catch (outerError: any) {
+    this.plugin.logger.error("[HMA] <<< CAUGHT OUTER ERROR >>> in handleMessageAdded:", outerError, data);
+    // Спробуємо додати повідомлення про помилку, якщо це ще не було зроблено
+    // (наприклад, якщо помилка сталася до виклику handleErrorMessage всередині try)
+    this.handleErrorMessage({
+      role: "error",
+      content: `Internal error processing new message in handleMessageAdded: ${outerError.message}`,
+      timestamp: new Date(),
+    });
+  } finally {
+    // Викликаємо resolver, щоб сигналізувати про завершення обробки цього конкретного повідомлення.
+    if (localResolver) {
+      try {
+          localResolver();
+      } catch (resolverError) {
+          this.plugin.logger.error("[HMA] Error calling localResolver in finally:", resolverError);
+      }
+    }
+    this.plugin.logger.info(
+      `[HMA] <<< EXITED (finally block) >>> Role: ${data?.message?.role}, Ts: ${data?.message?.timestamp?.getTime()}`
+    );
   }
+}
 
   private handleMenuButtonClick = (e: MouseEvent): void => {
     this.dropdownMenuManager?.toggleMenu(e);
