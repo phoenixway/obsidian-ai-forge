@@ -67,7 +67,7 @@ $folder-icon-extra-indent: 0px;
       // Відступи рівнів (з !important)
       @for $i from 0 through 10 {
         &.ollama-indent-level-#{$i} {
-          padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
+          padding-left: calc(#{$item-padding-horizontal} + #{$i * $indent-step}) !important;
         }
       }
       .ollama-hierarchy-item-content:hover {
