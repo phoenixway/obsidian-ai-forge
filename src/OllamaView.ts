@@ -1928,7 +1928,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
           this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}.`);
           
           if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-             this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before finally. Removing if connected.`);
+             this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before  finally. Removing if connected.`);
              if (this.activePlaceholder.groupEl?.isConnected) {
                 this.activePlaceholder.groupEl.remove();
              }

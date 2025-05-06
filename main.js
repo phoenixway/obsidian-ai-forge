@@ -4935,7 +4935,7 @@ This action cannot be undone.`,
         } finally {
           this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}.`);
           if (((_l = this.activePlaceholder) == null ? void 0 : _l.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before finally. Removing if connected.`);
+            this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was not cleared before  finally. Removing if connected.`);
             if ((_m = this.activePlaceholder.groupEl) == null ? void 0 : _m.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
