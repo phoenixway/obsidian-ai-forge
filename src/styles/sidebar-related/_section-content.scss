@@ -6,7 +6,7 @@ $indent-step: 12px;
 $item-padding-vertical: var(--size-4-1);
 $item-padding-horizontal: 2px; // Базовий горизонтальний відступ з fallback
 $icon-size: 16px;
-$icon-margin: 3px;
+$icon-margin: 1px;
 $folder-icon-extra-indent: 0px;
 // ---
 
@@ -101,7 +101,7 @@ $folder-icon-extra-indent: 0px;
           align-items: center;
           justify-content: center;
           margin-left: 0;
-          margin-right: 4px;
+          margin-right: $icon-margin;
           .ollama-folder-item & {
             margin-left: $folder-icon-extra-indent;
           }
