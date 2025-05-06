@@ -102,7 +102,6 @@ export class PromptService {
                 return definition;
 
             } catch (error) {
-                this.plugin.logger.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
                 new Notice(`Error loading role: ${file.basename}. Check console.`);
                 this.currentSystemPrompt = null;
                 // Повертаємо об'єкт помилки або null, залежно від бажаної обробки
@@ -174,13 +173,11 @@ General Rules for BOTH Context Sections:
              finalSystemPrompt += ragInstructions + "\n\n";
              
         } else {
-            this.plugin.logger.debug("[PromptService] RAG instructions NOT added (RAG disabled or semantic search disabled).");
         }
 
         // Додаємо системний промпт ролі, якщо є
         if (roleSystemPrompt) {
             finalSystemPrompt += roleSystemPrompt.trim();
-            this.plugin.logger.debug(`[PromptService] Role system prompt added (Length: ${roleSystemPrompt.trim().length})`);
         } else {
              
         }
@@ -270,7 +267,6 @@ General Rules for BOTH Context Sections:
              return null;
         }
 
-        this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
         return finalPromptBody;
     }
 
@@ -291,7 +287,6 @@ General Rules for BOTH Context Sections:
                 context = formattedMessage + "\n\n" + context; // Додаємо на початок
                 currentTokens += messageTokens;
             } else {
-                this.plugin.logger.debug(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens). Stopping history inclusion.`);
                 break; // Досягли ліміту
             }
         }
@@ -344,7 +339,6 @@ General Rules for BOTH Context Sections:
                          olderContextTokens += messageTokens;
                          includedOlderCount++;
                      } else {
-                         this.plugin.logger.debug(`[PromptService] Token limit reached while including older messages directly (${currentTokens + olderContextTokens}/${maxTokens}). Included ${includedOlderCount}.`);
                          break;
                      }
                 }
@@ -358,9 +352,7 @@ General Rules for BOTH Context Sections:
              if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
                 processedParts.push(olderContextContent);
                 currentTokens += olderContextTokens;
-                this.plugin.logger.debug(`[PromptService] Added older context part (${olderContextTokens} tokens). Current total: ${currentTokens}`);
             } else if (olderContextContent) {
-                 this.plugin.logger.warn(`[PromptService] Older context part (${olderContextTokens} tokens) exceeds limit (${maxTokens - currentTokens} available). Skipping.`);
             }
         }
 
@@ -379,7 +371,6 @@ General Rules for BOTH Context Sections:
                 keptMessagesTokens += messageTokens;
                 includedKeptCount++;
              } else {
-                  this.plugin.logger.debug(`[PromptService] Token limit reached while including kept messages (${currentTokens + keptMessagesTokens}/${maxTokens}). Included ${includedKeptCount}.`);
                  break; // Досягли ліміту
              }
         }
@@ -388,7 +379,6 @@ General Rules for BOTH Context Sections:
          if (keptMessagesString) {
              processedParts.push(keptMessagesString.trim());
              currentTokens += keptMessagesTokens;
-             this.plugin.logger.debug(`[PromptService] Added kept messages part (${keptMessagesTokens} tokens). Final total: ${currentTokens}`);
          } else {
               
          }
@@ -438,7 +428,6 @@ General Rules for BOTH Context Sections:
 
         try {
             if (!this.plugin.ollamaService) {
-                this.plugin.logger.error("[PromptService] OllamaService is not available for summarization.");
                 return null;
             }
              
@@ -446,14 +435,12 @@ General Rules for BOTH Context Sections:
 
             if (responseData && typeof responseData.response === 'string') {
                 const summary = responseData.response.trim();
-                this.plugin.logger.info(`[PromptService] Summarization successful (${this._countTokens(summary)} tokens).`);
                 return summary;
             } else {
                 
                 return null;
             }
         } catch (error) {
-            this.plugin.logger.error("[PromptService] Error during summarization request:", error, "Request body (model/options):", {model: requestBody.model, options: requestBody.options});
             return null;
         }
     }
