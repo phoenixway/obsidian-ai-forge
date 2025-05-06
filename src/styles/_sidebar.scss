@@ -8,14 +8,14 @@
 // --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
     display: flex;
-    flex-direction: column; // Головний контейнер - колонка
+    flex-direction: column;
     width: var(--ai-forge-sidebar-width, 250px);
-    min-width: var(--ai-forge-sidebar-width, 250px); // Мінімальна ширина для ресайзера
+    min-width: var(--ai-forge-sidebar-width, 250px);
     flex-shrink: 0;
     background-color: var(--background-secondary);
     border-right: 1px solid var(--divider-color);
-    height: 100%; // Займає всю висоту
-    overflow: hidden; // Обрізає вміст, що виходить за межі
+    height: 100%;
+    overflow: hidden;
     box-sizing: border-box;
     padding: var(--size-4-2);
     margin-right: var(--size-4-2);
@@ -39,9 +39,9 @@
         flex-shrink: 0; // Секція ролей не стискається по висоті
     }
     &.ollama-chat-panel {
-        flex-grow: 1; // Секція чатів займає весь доступний простір
+        // flex-grow: 1; // Секція чатів займає весь доступний простір
         min-height: 0; // Дозволяє секції чатів стискатись
-        overflow: hidden; // <--- ВАЖЛИВО: Обрізає контент, що не влазить по висоті
+        // overflow: hidden; // <--- ВАЖЛИВО: Обрізає контент, що не влазить по висоті
     }
 }
 
@@ -52,10 +52,11 @@
     position: relative; border-radius: var(--radius-s); margin: 1px 0;
     min-height: var(--nav-item-size);
     &:hover { background-color: var(--background-modifier-hover); }
-    .ollama-sidebar-header-left { display: flex; align-items: center; overflow: hidden; margin-right: auto; } // Змінено margin-right
+        .ollama-sidebar-header-left { display: flex; align-items: center; overflow: hidden; margin-right: var(--size-4-2); gap: var(--size-4-3); }
+    .ollama-sidebar-section-icon { min-width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; .svg-icon { width: 18px; height: 18px; color: var(--text-faint); } }
+    &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
     .menu-option-text { font-weight: var(--nav-item-font-weight); font-size: var(--nav-item-size); color: var(--text-normal); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: var(--size-4-2); flex-shrink: 0; } // Змінено margin-left
-    .ollama-section-toggle-chevron { display: inline-flex; align-items: center; justify-content: center; color: var(--text-faint); flex-shrink: 0; padding: 2px; margin-left: 4px; border-radius: var(--radius-s); transition: transform 0.2s ease-in-out, color 0.2s ease-in-out; .svg-icon { width: 16px; height: 16px; } &:hover, .ollama-sidebar-section-header:hover & { color: var(--text-muted); background-color: var(--background-modifier-hover); } &:hover .svg-icon { transform: scale(1.1); } } // Стилі для шеврона
+    .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
     .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
 }
 
