@@ -3172,9 +3172,12 @@ var OllamaView = class extends import_obsidian14.ItemView {
     this.initialMouseX = 0;
     this.initialSidebarWidth = 0;
     this.cancelGeneration = () => {
+      this.plugin.logger.debug(`[OllamaView] cancelGeneration called. Current AbortController is ${this.currentAbortController ? "NOT null" : "null"}`);
       if (this.currentAbortController) {
         this.currentAbortController.abort();
+        this.plugin.logger.debug(`[OllamaView] Abort signal sent.`);
       } else {
+        this.plugin.logger.debug(`[OllamaView] No current AbortController to cancel.`);
       }
     };
     this.handleMessageDeleted = (data) => {
@@ -3804,12 +3807,10 @@ This action cannot be undone.`,
         this.dropdownMenuManager.updateChatListIfVisible().catch((e) => this.plugin.logger.error("Error updating chat dropdown list:", e));
       }
       if ((_a = this.sidebarManager) == null ? void 0 : _a.isSectionVisible("chats")) {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is visible, requesting update from handleChatListUpdated.");
         this.sidebarManager.updateChatList().catch((error) => {
           this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
         });
       } else {
-        this.plugin.logger.info("[OllamaView -> Sidebar] Chat panel is collapsed, skipping update from handleChatListUpdated.");
       }
     };
     this.handleSettingsUpdated = async () => {
@@ -3836,12 +3837,9 @@ This action cannot be undone.`,
       } else {
       }
       if ((_h = this.sidebarManager) == null ? void 0 : _h.isSectionVisible("chats")) {
-        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is visible, updating it.");
         await this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e));
       } else {
-        this.plugin.logger.debug("[handleSettingsUpdated -> Sidebar] Chat panel is collapsed, skipping update.");
       }
-      this.plugin.logger.debug("[handleSettingsUpdated] UI updates finished.");
     };
     this.handleRoleDisplayClick = async (event) => {
       var _a, _b, _c;
@@ -4048,7 +4046,6 @@ This action cannot be undone.`,
       document.addEventListener("mouseup", this.boundOnDragEnd, { capture: true });
       document.body.style.cursor = "ew-resize";
       document.body.classList.add(CSS_CLASS_RESIZING);
-      this.plugin.logger.debug(`Resizer drag started. Initial width: ${this.initialSidebarWidth}`);
     };
     this.onDragMove = (event) => {
       if (!this.isResizing || !this.sidebarRootEl)
@@ -4078,7 +4075,6 @@ This action cannot be undone.`,
       document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
       document.body.style.cursor = "";
       document.body.classList.remove(CSS_CLASS_RESIZING);
-      this.plugin.logger.debug("Resizer drag ended.");
       this.saveWidthDebounced();
     };
     this.plugin = plugin;
@@ -4323,7 +4319,6 @@ This action cannot be undone.`,
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
     (_a = this.dropdownMenuManager) == null ? void 0 : _a.attachEventListeners();
-    this.plugin.logger.debug("[OllamaView] Delegated listener attachment to DropdownMenuManager.");
     this.register(this.plugin.on("model-changed", (modelName) => this.handleModelChange(modelName)));
     this.register(this.plugin.on("role-changed", (roleName) => this.handleRoleChange(roleName)));
     this.register(this.plugin.on("roles-updated", () => this.handleRolesUpdated()));
@@ -4335,7 +4330,6 @@ This action cannot be undone.`,
     this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
     this.register(this.plugin.on("ollama-connection-error", (message) => {
     }));
-    this.plugin.logger.debug("[OllamaView] All event listeners attached.");
   }
   updateToggleLocationButton() {
     if (!this.toggleLocationButton)
@@ -6173,15 +6167,19 @@ Summary:`;
       this.plugin.logger.debug(`[sendMessage] Finished for request ${responseStartTimeMs}.`);
     }
   }
+  // OllamaView.ts
   async handleMessageAdded(data) {
     var _a, _b, _c, _d, _e;
     const localResolver = this.currentMessageAddedResolver;
     this.currentMessageAddedResolver = null;
+    const messageForLog = data == null ? void 0 : data.message;
     try {
       if (!data || !data.message) {
         this.plugin.logger.error("[HMA] Invalid data received in handleMessageAdded.", data);
-        if (localResolver)
+        if (localResolver) {
+          this.plugin.logger.debug("[HMA] Calling localResolver due to invalid data before return.");
           localResolver();
+        }
         return;
       }
       const { chatId: eventChatId, message } = data;
@@ -6191,31 +6189,39 @@ Summary:`;
       );
       if (!this.chatContainer || !this.plugin.chatManager) {
         this.plugin.logger.error("[HMA] CRITICAL: Context (chatContainer or chatManager) missing!");
-        if (localResolver)
+        if (localResolver) {
+          this.plugin.logger.debug("[HMA] Calling localResolver due to missing context before return.");
           localResolver();
+        }
         return;
       }
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
         this.plugin.logger.debug(`[HMA] Event for non-active chat ${eventChatId} (current is ${activeChatId}). Ignoring UI update.`);
-        if (localResolver)
+        if (localResolver) {
+          this.plugin.logger.debug("[HMA] Calling localResolver due to non-active chat before return.");
           localResolver();
+        }
         return;
       }
       const existingMessageElInDom = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
       if (existingMessageElInDom) {
         this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM and is NOT a placeholder. Skipping add.`);
-        if (localResolver)
+        if (localResolver) {
+          this.plugin.logger.debug("[HMA] Calling localResolver due to existing DOM element (not placeholder) before return.");
           localResolver();
+        }
         return;
       }
       const alreadyInCache = this.currentMessages.some(
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
       );
       if (alreadyInCache) {
-        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) is already in currentMessages. Likely duplicate event or already handled. Content: "${message.content.substring(0, 30)}"`);
-        if (localResolver)
+        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) is already in currentMessages. Likely duplicate event. Content: "${message.content.substring(0, 30)}"`);
+        if (localResolver) {
+          this.plugin.logger.debug("[HMA] Calling localResolver due to message already in cache before return.");
           localResolver();
+        }
         return;
       }
       if (message.role === "assistant" && ((_a = this.activePlaceholder) == null ? void 0 : _a.timestamp) === messageTimestampMs) {
@@ -6230,7 +6236,8 @@ Summary:`;
           const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
           if (!messageDomElement) {
             this.plugin.logger.error("[HMA] Critical: Could not find .message element within placeholder group. Removing placeholder and adding normally.");
-            placeholderToUpdate.groupEl.remove();
+            if (placeholderToUpdate.groupEl.isConnected)
+              placeholderToUpdate.groupEl.remove();
             this.activePlaceholder = null;
             await this.addMessageStandard(message);
             return;
@@ -6273,7 +6280,6 @@ Summary:`;
             }
             this.activePlaceholder = null;
             this.handleErrorMessage({
-              // Додаємо повідомлення про помилку рендерингу
               role: "error",
               content: `Failed to finalize assistant message display: ${renderError.message}`,
               timestamp: new Date()
@@ -6309,17 +6315,21 @@ Summary:`;
       });
     } finally {
       if (localResolver) {
+        this.plugin.logger.debug(`[HMA] FINALLY: Calling localResolver for message role ${messageForLog == null ? void 0 : messageForLog.role}, ts ${(_c = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _c.getTime()}`);
         try {
           localResolver();
         } catch (resolverError) {
           this.plugin.logger.error("[HMA] Error calling localResolver in finally:", resolverError);
         }
+      } else {
+        this.plugin.logger.debug(`[HMA] FINALLY: localResolver was null for message role ${messageForLog == null ? void 0 : messageForLog.role}, ts ${(_d = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _d.getTime()}`);
       }
       this.plugin.logger.info(
-        `[HMA] <<< EXITED (finally block) >>> Role: ${(_c = data == null ? void 0 : data.message) == null ? void 0 : _c.role}, Ts: ${(_e = (_d = data == null ? void 0 : data.message) == null ? void 0 : _d.timestamp) == null ? void 0 : _e.getTime()}`
+        `[HMA] <<< EXITED (finally block) >>> Role: ${messageForLog == null ? void 0 : messageForLog.role}, Ts: ${(_e = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _e.getTime()}`
       );
     }
   }
+  // OllamaView.ts
   async handleRegenerateClick(userMessage) {
     var _a;
     if (this.isRegenerating) {
@@ -6329,14 +6339,10 @@ Summary:`;
     }
     if (this.currentAbortController) {
       this.plugin.logger.warn(
-        "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
+        "[Regenerate] Attempted to start regeneration while currentAbortController is not null. Previous operation might be active."
       );
-      this.cancelGeneration();
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      if (this.currentAbortController) {
-        new import_obsidian14.Notice("Please wait for the current generation to stop completely before regenerating.");
-        return;
-      }
+      new import_obsidian14.Notice("Previous generation process is still active or finishing. Please wait.", 4e3);
+      return;
     }
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
@@ -6363,7 +6369,7 @@ Summary:`;
       async () => {
         var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
         this.isRegenerating = true;
-        this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
+        this.plugin.logger.error(`[HANDLER] handleRegenerateClick: isRegenerating set to true for ts ${userMessage.timestamp.toISOString()}.`);
         this.currentAbortController = new AbortController();
         let accumulatedResponse = "";
         const responseStartTime = new Date();
@@ -6430,6 +6436,7 @@ Summary:`;
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             chatForStreaming,
             this.currentAbortController.signal
+            // Використовуємо AbortController, встановлений на початку
           );
           let firstChunk = true;
           for await (const chunk of stream) {
@@ -6442,6 +6449,7 @@ Summary:`;
                 this.plugin.logger.error(`[Regenerate] Stream error: ${chunk.error}`);
                 throw new Error(chunk.error);
               } else {
+                this.plugin.logger.debug("[Regenerate] Stream reported 'aborted by user'.");
                 throw new Error("aborted by user");
               }
             }
@@ -6494,6 +6502,7 @@ Summary:`;
           } else if (!this.currentAbortController.signal.aborted) {
             this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
             if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
+              this.plugin.logger.debug(`[Regenerate] Removing placeholder for ts ${responseStartTimeMs} due to empty response.`);
               this.activePlaceholder.groupEl.remove();
             }
             if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
@@ -6527,7 +6536,7 @@ Summary:`;
           let errorMsgRole = "error";
           let savePartialResponseOnError = false;
           if (error.name === "AbortError" || ((_j = error.message) == null ? void 0 : _j.includes("aborted by user"))) {
-            this.plugin.logger.info("[Regenerate] Regeneration was stopped by user.");
+            this.plugin.logger.info("[Regenerate] Regeneration was stopped by user or aborted.");
             errorMsgForChat = "Regeneration stopped.";
             errorMsgRole = "system";
             if (accumulatedResponse.trim()) {
@@ -6558,7 +6567,7 @@ Summary:`;
             );
           }
         } finally {
-          this.plugin.logger.debug(`[Regenerate] FINALLY (START) for req ${responseStartTimeMs}.`);
+          this.plugin.logger.debug(`[Regenerate] FINALLY (START) for req ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
           const promisesToAwait = [];
           if (mainAssistantMessageProcessedPromise)
             promisesToAwait.push(mainAssistantMessageProcessedPromise);
@@ -6580,24 +6589,26 @@ Summary:`;
             this.plugin.logger.debug(`[Regenerate] FINALLY: No specific message promises to await for ts ${responseStartTimeMs}.`);
           }
           if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate] FINALLY: Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. Removing now.`);
+            this.plugin.logger.warn(`[Regenerate] FINALLY (after await): Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. This indicates an issue in handleMessageAdded or promise logic. Removing now.`);
             if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
             this.activePlaceholder = null;
           }
-          this.plugin.logger.debug(`[Regenerate] FINALLY: Setting currentAbortController to null for req ${responseStartTimeMs}. Was: ${this.currentAbortController ? "NOT null" : "null"}`);
+          const prevAbortCtrl = this.currentAbortController;
           this.currentAbortController = null;
-          this.plugin.logger.debug(`[Regenerate] FINALLY: Setting isRegenerating to false for req ${responseStartTimeMs}. Was: ${this.isRegenerating}`);
+          this.plugin.logger.debug(`[Regenerate] FINALLY: currentAbortController set to null for req ${responseStartTimeMs}. Was: ${prevAbortCtrl ? "active" : "null"}. Now: ${this.currentAbortController ? "active" : "null"}`);
+          const prevIsRegen = this.isRegenerating;
           this.isRegenerating = false;
+          this.plugin.logger.debug(`[Regenerate] FINALLY: isRegenerating set to false for req ${responseStartTimeMs}. Was: ${prevIsRegen}. Now: ${this.isRegenerating}`);
           this.plugin.logger.debug(`[Regenerate] FINALLY: Calling setLoadingState(false) for req ${responseStartTimeMs}.`);
           this.setLoadingState(false);
           requestAnimationFrame(() => {
-            this.plugin.logger.debug(`[Regenerate] FINALLY (requestAnimationFrame): Forcing updateSendButtonState for req ${responseStartTimeMs}. currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}, isProcessing: ${this.isProcessing}`);
+            this.plugin.logger.debug(`[Regenerate] FINALLY (requestAnimationFrame): Forcing updateSendButtonState for req ${responseStartTimeMs}. currentAbortController is ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
             this.updateSendButtonState();
             this.plugin.logger.debug(`[Regenerate] FINALLY (requestAnimationFrame): UI update attempt finished for req ${responseStartTimeMs}.`);
           });
-          this.plugin.logger.debug(`[Regenerate] FINALLY (END) for req ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}, isProcessing: ${this.isProcessing}`);
+          this.plugin.logger.debug(`[Regenerate] FINALLY (END) for req ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
           this.focusInput();
         }
       }
@@ -9320,10 +9331,8 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     // Debounced функція оновлення для Vault Events
     this.debouncedIndexAndUIRebuild = (0, import_obsidian20.debounce)(
       async () => {
-        this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
         if (this.chatManager) {
           await this.chatManager.rebuildIndexFromFiles();
-          this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
           this.emit("chat-list-updated");
         }
       },
@@ -9567,9 +9576,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         return;
       const historyPath = (0, import_obsidian20.normalizePath)(this.settings.chatHistoryFolderPath);
       if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian20.TFolder)) {
-        this.logger.error(
-          `[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`
-        );
         this.debouncedIndexAndUIRebuild();
       }
     };
@@ -9580,9 +9586,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       const isInHistoryNew = file.path.startsWith(historyPath + "/");
       const isInHistoryOld = oldPath.startsWith(historyPath + "/");
       if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
-        this.logger.error(
-          `[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`
-        );
         this.debouncedIndexAndUIRebuild();
       }
     };

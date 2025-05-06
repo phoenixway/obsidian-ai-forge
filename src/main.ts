@@ -68,11 +68,11 @@ export default class OllamaPlugin extends Plugin {
   // Debounced функція оновлення для Vault Events
   private debouncedIndexAndUIRebuild = debounce(
     async () => {
-      this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
+      // this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
 
       if (this.chatManager) {
         await this.chatManager.rebuildIndexFromFiles();
-        this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
+        // this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
         this.emit("chat-list-updated");
       }
     },
@@ -343,9 +343,9 @@ export default class OllamaPlugin extends Plugin {
         file.path.startsWith(historyPath + "/") &&
         (file.path.toLowerCase().endsWith(".json") || file instanceof TFolder)
       ) {
-        this.logger.error(
-          `[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`
-        );
+        // this.logger.error(
+        //   `[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`
+        // );
         this.debouncedIndexAndUIRebuild(); // Викликаємо debounced оновлення
       }
     };
@@ -360,9 +360,9 @@ export default class OllamaPlugin extends Plugin {
 
       // Реагуємо, тільки якщо зміна стосується файлів/папок ВСЕРЕДИНІ папки історії
       if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
-        this.logger.error(
-          `[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`
-        );
+        // this.logger.error(
+        //   `[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`
+        // );
         this.debouncedIndexAndUIRebuild();
       }
     };
