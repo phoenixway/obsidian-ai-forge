@@ -1,5 +1,4 @@
 // src/styles/_sidebar.scss
-// Фінальна версія з виправленнями акордеону та відступів
 
 // --- Змінні ---
 $indent-step: 16px;
@@ -23,16 +22,21 @@ $folder-icon-extra-indent: 4px;
   box-sizing: border-box;
   padding: var(--size-4-2);
   margin-right: var(--size-4-2);
-  transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin 0.25s ease-out, border 0.25s ease-out;
+  transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out,
+    margin 0.25s ease-out, border 0.25s ease-out;
 
   &.internal-sidebar-hidden {
-    width: 0 !important; min-width: 0 !important; opacity: 0 !important;
-    padding: 0 !important; margin: 0 !important; border: none !important;
-    overflow: hidden !important; pointer-events: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
   }
 }
 // --- End Sidebar Panel ---
-
 
 // --- Sidebar Accordion Sections ---
 .ollama-chat-panel,
@@ -40,34 +44,92 @@ $folder-icon-extra-indent: 4px;
   display: flex; // Внутрішні елементи теж flex
   flex-direction: column; // Колонка: Заголовок + Контент
   // Панель ролей не має рости, притискається до низу
-  &.ollama-role-panel { flex-shrink: 0; }
+  &.ollama-role-panel {
+    flex-shrink: 0;
+  }
   // Панель чатів має займати доступний простір
   &.ollama-chat-panel {
-      flex-grow: 1;
-      min-height: 0; // Дозволяє стискатись по висоті
-      overflow: hidden; // Приховує надлишковий контент панелі чатів
+    flex-grow: 1;
+    min-height: 0; // Дозволяє стискатись по висоті
+    overflow: hidden; // Приховує надлишковий контент панелі чатів
   }
 }
 
 .ollama-sidebar-section-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
-  user-select: none; cursor: pointer; flex-shrink: 0; // Заголовок не стискається
-  position: relative; border-radius: var(--radius-s); margin: 1px 0;
+  user-select: none;
+  cursor: pointer;
+  flex-shrink: 0; // Заголовок не стискається
+  position: relative;
+  border-radius: var(--radius-s);
+  margin: 1px 0;
   min-height: var(--nav-item-size); // Мінімальна висота заголовка
-  &:hover { background-color: var(--background-modifier-hover); }
-  .ollama-sidebar-header-left { display: flex; align-items: center; overflow: hidden; margin-right: var(--size-4-2); gap: var(--size-4-3); }
-  .ollama-sidebar-section-icon { min-width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; .svg-icon { width: 18px; height: 18px; color: var(--text-faint); } }
-  &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
-  .menu-option-text { font-weight: var(--nav-item-font-weight); font-size: var(--nav-item-size); color: var(--text-normal); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
-  .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
+  &:hover {
+    background-color: var(--background-modifier-hover);
+  }
+  .ollama-sidebar-header-left {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    margin-right: var(--size-4-2);
+    gap: var(--size-4-3);
+  }
+  .ollama-sidebar-section-icon {
+    min-width: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    .svg-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--text-faint);
+    }
+  }
+  &:hover .ollama-sidebar-section-icon .svg-icon {
+    color: var(--text-muted);
+  }
+  .menu-option-text {
+    font-weight: var(--nav-item-font-weight);
+    font-size: var(--nav-item-size);
+    color: var(--text-normal);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ollama-sidebar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .ollama-sidebar-header-button {
+    padding: var(--size-4-1);
+    color: var(--text-muted);
+    border-radius: var(--radius-s);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    &:hover {
+      color: var(--text-normal);
+      background-color: var(--background-modifier-hover);
+    }
+    .svg-icon {
+      width: 18px;
+      height: 18px;
+    }
+  }
 }
 
 // Контейнер вмісту секції (список чатів або ролей)
 .ollama-sidebar-section-content {
   overflow: hidden; // Ховаємо вміст, коли згорнуто
-  flex-shrink: 1;   // Дозволяємо стискатись, якщо обидві секції відкриті (хоча акордеон не має цього допустити)
+  flex-shrink: 1; // Дозволяємо стискатись, якщо обидві секції відкриті (хоча акордеон не має цього допустити)
   transition: opacity 0.2s ease-out, padding-top 0.2s ease-out, padding-bottom 0.2s ease-out; // Анімація для плавності
   box-sizing: border-box;
   padding: 0 var(--size-4-2); // Тільки горизонтальний padding за замовчуванням
@@ -88,10 +150,20 @@ $folder-icon-extra-indent: 4px;
   }
 
   // Стилі скролбару
-  &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-track { background: transparent; margin: 2px 0; }
-  &::-webkit-scrollbar-thumb { background-color: var(--background-modifier-border); border-radius: 3px; }
-  &::-webkit-scrollbar-thumb:hover { background-color: var(--interactive-accent); }
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 2px 0;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: var(--background-modifier-border);
+    border-radius: 3px;
+  }
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: var(--interactive-accent);
+  }
 
   // --- Стилі для ієрархії ---
   .ollama-hierarchy-item {
@@ -110,86 +182,152 @@ $folder-icon-extra-indent: 4px;
 
     // Hover на контент
     .ollama-hierarchy-item-content:hover {
-         background-color: var(--background-modifier-hover);
-         .ollama-hierarchy-item-options { opacity: 0.7; }
+      background-color: var(--background-modifier-hover);
+      .ollama-hierarchy-item-options {
+        opacity: 0.7;
+      }
     }
 
     // Активна папка-предок
     &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content .ollama-hierarchy-item-text {
-        font-weight: 500;
+      font-weight: 500;
     }
 
     // Контейнер вмісту
     .ollama-hierarchy-item-content {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+      padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
+      gap: $icon-margin;
+      position: relative;
+      min-height: calc($icon-size + 2 * $item-padding-vertical);
+      border-radius: inherit;
+      z-index: 1;
+
+      // Іконка (папка або чат)
+      > .ollama-folder-icon {
+        flex-shrink: 0;
+        width: $icon-size;
+        height: $icon-size;
+        color: var(--text-faint);
         display: flex;
         align-items: center;
-        width: 100%; box-sizing: border-box;
-        padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
-        gap: $icon-margin;
-        position: relative; min-height: calc($icon-size + 2 * $item-padding-vertical); border-radius: inherit; z-index: 1;
+        justify-content: center;
+        margin-left: 0;
+        margin-right: $icon-margin; // Використовуємо margin замість gap
 
-        // Іконка (папка або чат)
-        > .ollama-folder-icon {
-            flex-shrink: 0; width: $icon-size; height: $icon-size; color: var(--text-faint);
-            display: flex; align-items: center; justify-content: center;
-            margin-left: 0;
-            margin-right: $icon-margin; // Використовуємо margin замість gap
-
-            // Зсув іконки ПАПКИ
-             .ollama-folder-item & {
-                 margin-left: $folder-icon-extra-indent;
-             }
+        // Зсув іконки ПАПКИ
+        .ollama-folder-item & {
+          margin-left: $folder-icon-extra-indent;
         }
+      }
 
-        // Текст
-        > .ollama-hierarchy-item-text {
-             display: block; flex-grow: 1;
-             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-             font-size: var(--font-ui-small); line-height: 1.3; padding-left: 0;
-             min-width: 0;
-        }
+      // Текст
+      > .ollama-hierarchy-item-text {
+        display: block;
+        flex-grow: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: var(--font-ui-small);
+        line-height: 1.3;
+        padding-left: 0;
+        min-width: 0;
+      }
 
-        // Деталі чату
-        > .ollama-chat-item-details {
-             display: block; margin-left: auto; padding-left: $icon-margin; flex-shrink: 0; white-space: nowrap;
-            .ollama-chat-item-date { font-size: var(--font-ui-smaller); color: var(--text-faint); opacity: 0.9; display: inline;}
+      // Деталі чату
+      > .ollama-chat-item-details {
+        display: block;
+        margin-left: auto;
+        padding-left: $icon-margin;
+        flex-shrink: 0;
+        white-space: nowrap;
+        .ollama-chat-item-date {
+          font-size: var(--font-ui-smaller);
+          color: var(--text-faint);
+          opacity: 0.9;
+          display: inline;
         }
+      }
 
-        // Кнопка опцій
-        > .ollama-hierarchy-item-options {
-             display: flex; align-items: center; justify-content: center;
-             flex-shrink: 0; margin-left: $icon-margin; opacity: 0; transition: opacity 0.1s ease-in-out; padding: 2px; border-radius: var(--radius-s); color: var(--text-muted); background: none; border: none; cursor: pointer;
-             &:hover { opacity: 1; color: var(--text-normal); background-color: var(--background-modifier-hover); }
-             .svg-icon { width: 18px; height: 18px; display: block;}
+      // Кнопка опцій
+      > .ollama-hierarchy-item-options {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        margin-left: $icon-margin;
+        opacity: 0;
+        transition: opacity 0.1s ease-in-out;
+        padding: 2px;
+        border-radius: var(--radius-s);
+        color: var(--text-muted);
+        background: none;
+        border: none;
+        cursor: pointer;
+        &:hover {
+          opacity: 1;
+          color: var(--text-normal);
+          background-color: var(--background-modifier-hover);
         }
+        .svg-icon {
+          width: 18px;
+          height: 18px;
+          display: block;
+        }
+      }
     } // Кінець .ollama-hierarchy-item-content
 
     // Специфічно для чату
     &.ollama-chat-item {
-         .ollama-hierarchy-item-content > .ollama-folder-icon {
-              color: var(--text-muted);
-              margin-left: 0 !important;
-         }
+      .ollama-hierarchy-item-content > .ollama-folder-icon {
+        color: var(--text-muted);
+        margin-left: 0 !important;
+      }
     }
 
     // Активний чат
     &.ollama-chat-item.is-active {
-         .ollama-hierarchy-item-content {
-            background-color: var(--interactive-accent); color: var(--text-on-accent);
-            > .ollama-folder-icon, > .ollama-hierarchy-item-text, > .ollama-chat-item-details, > .ollama-chat-item-details .ollama-chat-item-date { color: var(--text-on-accent); }
-            &:hover { background-color: var(--interactive-accent-hover); }
-            > .ollama-hierarchy-item-options { color: var(--text-on-accent); &:hover { background-color: rgba(var(--color-base-rgb), 0.1); } }
-         }
+      .ollama-hierarchy-item-content {
+        background-color: var(--interactive-accent);
+        color: var(--text-on-accent);
+        > .ollama-folder-icon,
+        > .ollama-hierarchy-item-text,
+        > .ollama-chat-item-details,
+        > .ollama-chat-item-details .ollama-chat-item-date {
+          color: var(--text-on-accent);
+        }
+        &:hover {
+          background-color: var(--interactive-accent-hover);
+        }
+        > .ollama-hierarchy-item-options {
+          color: var(--text-on-accent);
+          &:hover {
+            background-color: rgba(var(--color-base-rgb), 0.1);
+          }
+        }
+      }
     }
 
-     // Контейнер для дочірніх елементів
-     > .ollama-hierarchy-item-children { display: block; position: relative; padding-left: 0; }
-     &.is-collapsed > .ollama-hierarchy-item-children { display: none; }
+    // Контейнер для дочірніх елементів
+    > .ollama-hierarchy-item-children {
+      display: block;
+      position: relative;
+      padding-left: 0;
+    }
+    &.is-collapsed > .ollama-hierarchy-item-children {
+      display: none;
+    }
 
-     // Стилі для візуального зворотного зв'язку Drag & Drop
-      &.is-dragging { opacity: 0.5; }
-      &.ollama-folder-item.drop-target-active > .ollama-hierarchy-item-content { background-color: var(--background-modifier-success); }
-
+    // Стилі для візуального зворотного зв'язку Drag & Drop
+    &.is-dragging {
+      opacity: 0.5;
+    }
+    &.ollama-folder-item.drop-target-active > .ollama-hierarchy-item-content {
+      background-color: var(--background-modifier-success);
+    }
   } // Кінець .ollama-hierarchy-item
 
   // --- Стилі для списку ролей ---
@@ -274,53 +412,36 @@ $folder-icon-extra-indent: 4px;
     }
   }
 
-  // src/styles/_sidebar.scss
-  // ... (існуючі стилі) ...
-
   // --- Стилі для контейнера списку чатів/папок ---
+  // Індикатор завантаження
   .ollama-chat-list-container {
-    position: relative; // Потрібно для позиціонування ::after
-
-    // Стиль під час завантаження/оновлення списку
+    position: relative;
     &.is-loading {
-        // --- ДОДАЄМО transition до ::after ---
-        &::after {
-            content: '';
-            position: absolute;
-            left: 0; top: 0; right: 0; bottom: 0;
-            background-color: rgba(var(--background-secondary-rgb), 0.6);
-            z-index: 10;
-            display: flex; align-items: center; justify-content: center;
-            border-radius: var(--radius-m);
-
-            // Стилі спіннера (як раніше)
-            width: 24px; height: 24px; margin: auto;
-            border: 3px solid rgba(var(--text-muted-rgb), 0.3);
-            border-top-color: var(--text-accent);
-            border-radius: 50%;
-            animation: ollama-spin 0.8s linear infinite;
-
-            // Плавна поява/зникнення
-            opacity: 1; // Кінцевий стан - видимий
-            // Додаємо transition для властивості opacity
-            transition: opacity 0.2s ease-in-out; // З'являється/зникає за 0.2 сек
-        }
-        // --- КІНЕЦЬ ЗМІН В ::after ---
+      &::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(var(--background-secondary-rgb), 0.6);
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--radius-m);
+        width: 24px;
+        height: 24px;
+        margin: auto;
+        border: 3px solid rgba(var(--text-muted-rgb), 0.3);
+        border-top-color: var(--text-accent);
+        border-radius: 50%;
+        animation: ollama-spin 0.8s linear infinite;
+        opacity: 1;
+        transition: opacity 0.2s ease-in-out;
+      }
     }
-
-     // --- ДОДАНО: Початковий стан ::after (коли is-loading НЕМАЄ) ---
-     // Хоча псевдоелемент не існує без is-loading, це може допомогти
-     // браузеру краще зрозуміти анімацію зникнення при видаленні класу.
-     // Але зазвичай достатньо transition в правилі вище.
-     /*
-     &::after {
-         opacity: 0;
-         pointer-events: none; // Не реагувати на події, коли невидимий
-     }
-     */
-}
-
-  // Анімація обертання (якщо ще не визначена)
+  }
   @keyframes ollama-spin {
     from {
       transform: rotate(0deg);
@@ -329,19 +450,8 @@ $folder-icon-extra-indent: 4px;
       transform: rotate(360deg);
     }
   }
-
-  // ... (решта стилів) ...
 }
 // --- End Sidebar Accordion Sections Content ---
-
-.ollama-sidebar-section-content-hidden {
-  max-height: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  opacity: 0 !important;
-  overflow: hidden !important;
-  visibility: hidden;
-}
 
 // --- Стилізація контекстного меню ---
 .menu {
@@ -381,52 +491,51 @@ $folder-icon-extra-indent: 4px;
     }
   }
 }
-// src/styles/_sidebar.scss
-// ... (існуючі стилі) ...
-
 // --- Стилі для контейнера списку чатів/папок ---
 .ollama-chat-list-container {
   position: relative; // Потрібно для абсолютного позиціонування ::before
 
   // Стиль під час завантаження/оновлення списку
   &.is-loading {
-      // Можна додати легке затемнення або зменшення прозорості основного контенту
-      // > *:not(.loading-indicator-element) { // Якщо використовуєте окремий елемент індикатора
-      //    opacity: 0.5;
-      //    pointer-events: none;
-      // }
+    // Можна додати легке затемнення або зменшення прозорості основного контенту
+    // > *:not(.loading-indicator-element) { // Якщо використовуєте окремий елемент індикатора
+    //    opacity: 0.5;
+    //    pointer-events: none;
+    // }
 
-      // Додаємо оверлей зі спіннером через псевдоелемент
-      &::after {
-          content: '';
-          position: absolute;
-          left: 0;
-          top: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(var(--background-secondary-rgb), 0.6); // Напівпрозорий фон
-          z-index: 10; // Має бути над списком
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: var(--radius-m); // Опціонально
+    // Додаємо оверлей зі спіннером через псевдоелемент
+    &::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(var(--background-secondary-rgb), 0.6); // Напівпрозорий фон
+      z-index: 10; // Має бути над списком
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-m); // Опціонально
 
-          // Створюємо спіннер
-          width: 24px; // Розмір спіннера
-          height: 24px;
-          margin: auto; // Центруємо спіннер
-          border: 3px solid rgba(var(--text-muted-rgb), 0.3); // Колір кільця
-          border-top-color: var(--text-accent); // Колір активної частини
-          border-radius: 50%;
-          animation: ollama-spin 0.8s linear infinite; // Анімація обертання
-      }
+      // Створюємо спіннер
+      width: 24px; // Розмір спіннера
+      height: 24px;
+      margin: auto; // Центруємо спіннер
+      border: 3px solid rgba(var(--text-muted-rgb), 0.3); // Колір кільця
+      border-top-color: var(--text-accent); // Колір активної частини
+      border-radius: 50%;
+      animation: ollama-spin 0.8s linear infinite; // Анімація обертання
+    }
   }
 }
 
 // Анімація обертання (якщо ще не визначена)
 @keyframes ollama-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
-
-// ... (решта стилів) ...

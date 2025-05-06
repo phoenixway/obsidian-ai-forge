@@ -2425,22 +2425,56 @@ var SidebarManager = class {
     });
     menu.showAtMouseEvent(event);
   }
+  // src/SidebarManager.ts
+  // Метод для розгортання/згортання секцій Chats/Roles (акордеон)
   async toggleSection(clickedHeaderEl) {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
     const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
-    const contentEl = sectionType === "chats" ? this.chatPanelListContainerEl : this.rolePanelListEl;
-    const headerActionsEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-    if (!contentEl || !iconEl) {
-      this.plugin.logger.error("Sidebar toggle elements missing:", sectionType);
+    let contentEl;
+    let updateFunction;
+    let otherHeaderEl;
+    let otherContentEl;
+    let otherSectionType = null;
+    const chatHeader = this.chatPanelHeaderEl;
+    const chatContent = this.chatPanelListContainerEl;
+    const roleHeader = this.rolePanelHeaderEl;
+    const roleContent = this.rolePanelListEl;
+    if (sectionType === "chats") {
+      contentEl = chatContent;
+      updateFunction = this.updateChatList;
+      otherHeaderEl = roleHeader;
+      otherContentEl = roleContent;
+      otherSectionType = "roles";
+    } else {
+      contentEl = roleContent;
+      updateFunction = this.updateRoleList;
+      otherHeaderEl = chatHeader;
+      otherContentEl = chatContent;
+      otherSectionType = "chats";
+    }
+    if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
       return;
     }
-    const updateFunction = sectionType === "chats" ? this.updateChatList : this.updateRoleList;
     const boundUpdateFunction = updateFunction.bind(this);
     if (isCurrentlyCollapsed) {
+      if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
+        this.plugin.logger.debug(`Collapsing other section: ${otherSectionType}`);
+        const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+        otherHeaderEl.setAttribute("data-collapsed", "true");
+        if (otherIconEl)
+          (0, import_obsidian12.setIcon)(otherIconEl, COLLAPSE_ICON_ROLE);
+        otherContentEl.classList.remove(CSS_EXPANDED_CLASS);
+        otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+        const otherHeaderActionsEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
+        if (otherHeaderActionsEl)
+          otherHeaderActionsEl.style.display = "none";
+      }
       clickedHeaderEl.setAttribute("data-collapsed", "false");
       (0, import_obsidian12.setIcon)(iconEl, EXPAND_ICON_ROLE);
       contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+      const headerActionsEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
       if (headerActionsEl)
         headerActionsEl.style.display = "";
       try {
@@ -2466,6 +2500,7 @@ var SidebarManager = class {
       (0, import_obsidian12.setIcon)(iconEl, COLLAPSE_ICON_ROLE);
       contentEl.classList.remove(CSS_EXPANDED_CLASS);
       contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+      const headerActionsEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
       if (headerActionsEl)
         headerActionsEl.style.display = "none";
     }
