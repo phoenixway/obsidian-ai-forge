@@ -1350,18 +1350,14 @@ private async addMessageStandard(message: Message): Promise<void> {
 
       try {
         activeChat = (await this.plugin.chatManager?.getActiveChat()) || null;
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`
-        );
+        // this.plugin.logger.debug(
+        //   `[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`
+        // );
         availableModels = await this.plugin.ollamaService.getModels();
 
         finalRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || "None"}', Name='${finalRoleName}'`
-        );
       } catch (error) {
-        this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
         new Notice("Error connecting to Ollama or loading chat data.", 5000);
         errorOccurred = true;
 
@@ -1381,9 +1377,6 @@ private async addMessageStandard(message: Message): Promise<void> {
             finalModelName = preferredModel;
           } else {
             finalModelName = availableModels[0];
-            this.plugin.logger.warn(
-              `[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`
-            );
           }
         } else {
           finalModelName = null;

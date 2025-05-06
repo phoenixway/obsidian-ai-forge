@@ -4440,7 +4440,7 @@ This action cannot be undone.`,
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -4457,35 +4457,25 @@ This action cannot be undone.`,
       let errorOccurred = false;
       try {
         activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Active chat fetched: ${(_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.id) != null ? _c : "null"}`
-        );
         availableModels = await this.plugin.ollamaService.getModels();
-        finalRolePath = (_e = (_d = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _d.selectedRolePath) != null ? _e : this.plugin.settings.selectedRolePath;
+        finalRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Determined role: Path='${finalRolePath || "None"}', Name='${finalRoleName}'`
-        );
       } catch (error) {
-        this.plugin.logger.error("[loadAndDisplayActiveChat] Error fetching initial data:", error);
         new import_obsidian14.Notice("Error connecting to Ollama or loading chat data.", 5e3);
         errorOccurred = true;
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_d = availableModels[0]) != null ? _d : null;
         finalTemperature = this.plugin.settings.temperature;
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
         activeChat = null;
       }
       if (!errorOccurred && activeChat) {
-        let preferredModel = ((_g = activeChat.metadata) == null ? void 0 : _g.modelName) || this.plugin.settings.modelName;
+        let preferredModel = ((_e = activeChat.metadata) == null ? void 0 : _e.modelName) || this.plugin.settings.modelName;
         if (availableModels.length > 0) {
           if (preferredModel && availableModels.includes(preferredModel)) {
             finalModelName = preferredModel;
           } else {
             finalModelName = availableModels[0];
-            this.plugin.logger.warn(
-              `[loadAndDisplayActiveChat] Preferred model '${preferredModel}' not available. Using first available: '${finalModelName}'.`
-            );
           }
         } else {
           finalModelName = null;
@@ -4498,12 +4488,12 @@ This action cannot be undone.`,
             );
           });
         }
-        finalTemperature = (_i = (_h = activeChat.metadata) == null ? void 0 : _h.temperature) != null ? _i : this.plugin.settings.temperature;
+        finalTemperature = (_g = (_f = activeChat.metadata) == null ? void 0 : _f.temperature) != null ? _g : this.plugin.settings.temperature;
       } else if (!errorOccurred && !activeChat) {
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_j = availableModels[0]) != null ? _j : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_h = availableModels[0]) != null ? _h : null;
         finalTemperature = this.plugin.settings.temperature;
       }
-      if (activeChat !== null && !errorOccurred && ((_k = activeChat.messages) == null ? void 0 : _k.length) > 0) {
+      if (activeChat !== null && !errorOccurred && ((_i = activeChat.messages) == null ? void 0 : _i.length) > 0) {
         this.hideEmptyState();
         this.currentMessages = [...activeChat.messages];
         this.lastRenderedMessageDate = null;
@@ -4565,20 +4555,20 @@ This action cannot be undone.`,
         }, 150);
       } else {
         this.showEmptyState();
-        (_l = this.scrollToBottomButton) == null ? void 0 : _l.classList.remove(CSS_CLASSES.VISIBLE);
+        (_j = this.scrollToBottomButton) == null ? void 0 : _j.classList.remove(CSS_CLASSES.VISIBLE);
       }
       this.updateInputPlaceholder(finalRoleName);
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
       const panelUpdatePromises = [];
-      if ((_m = this.sidebarManager) == null ? void 0 : _m.isSectionVisible("chats")) {
+      if ((_k = this.sidebarManager) == null ? void 0 : _k.isSectionVisible("chats")) {
         panelUpdatePromises.push(
           this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
         );
       } else {
       }
-      if ((_n = this.sidebarManager) == null ? void 0 : _n.isSectionVisible("roles")) {
+      if ((_l = this.sidebarManager) == null ? void 0 : _l.isSectionVisible("roles")) {
         panelUpdatePromises.push(
           this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
         );
