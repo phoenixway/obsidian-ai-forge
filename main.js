@@ -3113,12 +3113,9 @@ var OllamaView = class extends import_obsidian14.ItemView {
     this.initialMouseX = 0;
     this.initialSidebarWidth = 0;
     this.cancelGeneration = () => {
-      this.plugin.logger.debug(`[OllamaView] cancelGeneration called. Current AbortController is ${this.currentAbortController ? "NOT null" : "null"}`);
       if (this.currentAbortController) {
         this.currentAbortController.abort();
-        this.plugin.logger.debug(`[OllamaView] Abort signal sent.`);
       } else {
-        this.plugin.logger.debug(`[OllamaView] No current AbortController to cancel.`);
       }
     };
     this.handleMessageDeleted = (data) => {
@@ -3705,12 +3702,10 @@ This action cannot be undone.`,
       var _a, _b, _c, _d, _e, _f, _g;
       this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${(_a = data.chatId) != null ? _a : "null"}. isRegenerating: ${this.isRegenerating}`);
       if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
-        this.plugin.logger.warn(`[handleActiveChatChanged] Ignored active chat change for chat ID ${data.chatId} due to ongoing regeneration process for the same chat.`);
         this.lastProcessedChatId = data.chatId;
         return;
       }
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
-      this.plugin.logger.warn(`[handleActiveChatChanged] Calculated chatSwitched: ${chatSwitched}`);
       if (chatSwitched || data.chatId !== null && data.chat === null) {
         this.plugin.logger.error(`[handleActiveChatChanged] !!! FULL CHAT RELOAD Condition Met !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Preparing to call loadAndDisplayActiveChat...`);
         const currentStack = new Error().stack;
@@ -3719,7 +3714,6 @@ This action cannot be undone.`,
         this.plugin.logger.error("[handleActiveChatChanged] CALLING loadAndDisplayActiveChat NOW!");
         await this.loadAndDisplayActiveChat();
       } else if (data.chatId !== null && data.chat !== null) {
-        this.plugin.logger.info(`[handleActiveChatChanged] Updating UI/Panels for existing chat ID: ${data.chatId}. NO FULL RELOAD.`);
         this.lastProcessedChatId = data.chatId;
         const chat = data.chat;
         const currentRolePath = (_c = (_b = chat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
@@ -3730,9 +3724,7 @@ This action cannot be undone.`,
         this.updateRoleDisplay(currentRoleName);
         this.updateInputPlaceholder(currentRoleName);
         this.updateTemperatureIndicator(currentTemperature);
-        this.plugin.logger.info("[handleActiveChatChanged] SKIPPED explicit sidebar panel update call here. Relying on 'chat-list-updated' event.");
       } else {
-        this.plugin.logger.warn(`[handleActiveChatChanged] Entering UNHANDLED STATE: chatId=${data.chatId}, chatSwitched=${chatSwitched}.`);
         this.lastProcessedChatId = data.chatId;
       }
       if (this.dropdownMenuManager) {
@@ -4032,7 +4024,6 @@ This action cannot be undone.`,
       if (this.sidebarRootEl) {
         const newWidth = this.sidebarRootEl.offsetWidth;
         if (newWidth > 0 && newWidth !== this.plugin.settings.sidebarWidth) {
-          this.plugin.logger.debug(`Saving sidebar width: ${newWidth}`);
           this.plugin.settings.sidebarWidth = newWidth;
           this.plugin.saveSettings();
         }
@@ -4084,9 +4075,7 @@ This action cannot be undone.`,
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
-      this.plugin.logger.debug("[OllamaView] Calling loadAndDisplayActiveChat from onOpen...");
       await this.loadAndDisplayActiveChat();
-      this.plugin.logger.debug("[OllamaView] loadAndDisplayActiveChat completed successfully in onOpen.");
       (_a = this.sidebarManager) == null ? void 0 : _a.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat list after initial load:", e));
       (_b = this.sidebarManager) == null ? void 0 : _b.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role list after initial load:", e));
     } catch (error) {
@@ -4345,7 +4334,6 @@ This action cannot be undone.`,
         }
         setTimeout(() => this.updateScrollStateAndIndicators(), 100);
       } else if (renderer) {
-        this.plugin.logger.warn(`[addMessageStandard] Renderer created for role ${message.role} but no messageGroupEl or chatContainer.`);
       }
     } catch (error) {
       this.plugin.logger.error(
@@ -4387,27 +4375,21 @@ This action cannot be undone.`,
   // }
   updateSendButtonState() {
     if (!this.inputEl || !this.sendButton || !this.stopGeneratingButton) {
-      this.plugin.logger.warn(`[OllamaView] updateSendButtonState: Aborted, some UI elements missing. inputEl: ${!!this.inputEl}, sendButton: ${!!this.sendButton}, stopGenButton: ${!!this.stopGeneratingButton}`);
       return;
     }
     const generationInProgress = this.currentAbortController !== null;
     const isInputEmpty = this.inputEl.value.trim() === "";
-    this.plugin.logger.debug(`[OllamaView] updateSendButtonState: generationInProgress is ${generationInProgress}. isProcessing is ${this.isProcessing}. isInputEmpty is ${isInputEmpty}.`);
     if (generationInProgress) {
-      this.plugin.logger.debug(`[OllamaView] updateSendButtonState: Generation IN PROGRESS. Showing STOP, Hiding SEND.`);
       this.stopGeneratingButton.show();
       this.sendButton.hide();
       this.sendButton.disabled = true;
     } else {
-      this.plugin.logger.debug(`[OllamaView] updateSendButtonState: Generation NOT in progress. Hiding STOP, Showing SEND.`);
       this.stopGeneratingButton.hide();
       this.sendButton.show();
       const sendShouldBeDisabled = isInputEmpty || this.isProcessing;
       this.sendButton.disabled = sendShouldBeDisabled;
       this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, sendShouldBeDisabled);
-      this.plugin.logger.debug(`[OllamaView] updateSendButtonState: Send button disabled: ${sendShouldBeDisabled}.`);
     }
-    this.plugin.logger.debug(`[OllamaView] updateSendButtonState finished.`);
   }
   showEmptyState() {
     var _a, _b;
@@ -4439,7 +4421,6 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`[OllamaView] setLoadingState: isProcessing set to ${this.isProcessing} (was ${oldIsProcessing}). isLoading param: ${isLoading}. currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}`);
     if (this.inputEl)
       this.inputEl.disabled = isLoading;
-    this.plugin.logger.debug(`[OllamaView] setLoadingState: Calling updateSendButtonState.`);
     this.updateSendButtonState();
     if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
@@ -4462,7 +4443,6 @@ This action cannot be undone.`,
         this.checkAllMessagesForCollapsing();
       }
     }
-    this.plugin.logger.debug(`[OllamaView] setLoadingState finished.`);
   }
   isSidebarSectionVisible(type) {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
@@ -4601,14 +4581,12 @@ This action cannot be undone.`,
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
-      this.plugin.logger.debug("[loadAndDisplayActiveChat] Updating visible sidebar panels via SidebarManager...");
       const panelUpdatePromises = [];
       if ((_m = this.sidebarManager) == null ? void 0 : _m.isSectionVisible("chats")) {
         panelUpdatePromises.push(
           this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
         );
       } else {
-        this.plugin.logger.debug("[loadAndDisplayActiveChat] Chat panel collapsed, skipping update.");
       }
       if ((_n = this.sidebarManager) == null ? void 0 : _n.isSectionVisible("roles")) {
         panelUpdatePromises.push(
@@ -4618,7 +4596,6 @@ This action cannot be undone.`,
       }
       if (panelUpdatePromises.length > 0) {
         await Promise.all(panelUpdatePromises);
-        this.plugin.logger.debug("[loadAndDisplayActiveChat] Sidebar panel updates finished.");
       }
       if (finalModelName === null) {
         if (this.inputEl) {
@@ -5861,7 +5838,7 @@ Summary:`;
   }
   // OllamaView.ts
   async sendMessage() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const content = this.inputEl.value.trim();
     const requestTimestampId = new Date().getTime();
     this.plugin.logger.debug(`[sendMessage START id:${requestTimestampId}] Content: "${content.substring(0, 30)}...", isProcessing: ${this.isProcessing}, currentAbortController: ${this.currentAbortController ? "active" : "null"}`);
@@ -5882,7 +5859,6 @@ Summary:`;
     const userMessageTimestampMs = userMessageTimestamp.getTime();
     this.clearInputField();
     this.currentAbortController = new AbortController();
-    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] currentAbortController CREATED.`);
     this.setLoadingState(true);
     this.hideEmptyState();
     let accumulatedResponse = "";
@@ -5895,22 +5871,18 @@ Summary:`;
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Setting up resolver for UserMessage (ts: ${userMessageTimestampMs}).`);
       userMessageProcessedPromise = new Promise((resolve) => {
         this.messageAddedResolvers.set(userMessageTimestampMs, resolve);
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Resolver ADDED to map for UserMessage ts ${userMessageTimestampMs}. Map size: ${this.messageAddedResolvers.size}`);
       });
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Calling addMessageToActiveChat for UserMessage (ts: ${userMessageTimestampMs}).`);
       this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent, userMessageTimestamp, true);
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] TRY: Awaiting userMessageProcessedPromise for ts ${userMessageTimestampMs}`);
       const userMessageTimeout = 5e3;
       const userMessageTimeoutPromise = new Promise(
         (_, reject) => setTimeout(() => reject(new Error(`Timeout (${userMessageTimeout / 1e3}s) waiting for HMA for UserMessage ts ${userMessageTimestampMs}`)), userMessageTimeout)
       );
       try {
         await Promise.race([userMessageProcessedPromise, userMessageTimeoutPromise]);
-        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] TRY: userMessageProcessedPromise for ts ${userMessageTimestampMs} RESOLVED or raced successfully.`);
       } catch (userAwaitError) {
         this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] TRY: Error or Timeout awaiting HMA for UserMessage (ts: ${userMessageTimestampMs}): ${userAwaitError.message}`);
         if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
-          this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Timeout/Error for UserMessage HMA, removing resolver from map for ts ${userMessageTimestampMs}.`);
           this.messageAddedResolvers.delete(userMessageTimestampMs);
         }
       }
@@ -5936,7 +5908,6 @@ Summary:`;
           contentEl: assistantContentEl,
           messageWrapper: messageWrapperEl
         };
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Placeholder created. activePlaceholder.ts set to: ${this.activePlaceholder.timestamp}.`);
       } else {
         this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] Failed to create all placeholder elements!`);
         throw new Error("Failed to create placeholder elements for AI response.");
@@ -5949,7 +5920,6 @@ Summary:`;
         this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] CRITICAL: Active chat became null after adding user message.`);
         throw new Error("Active chat lost after user message.");
       }
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Starting stream. Context messages: ${updatedActiveChat.messages.length}.`);
       const stream = this.plugin.ollamaService.generateChatResponseStream(
         updatedActiveChat,
         this.currentAbortController.signal
@@ -5980,7 +5950,6 @@ Summary:`;
               this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
             }
           } else {
-            this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] activePlaceholder mismatch during stream. Current.ts: ${(_c = this.activePlaceholder) == null ? void 0 : _c.timestamp}, expected: ${responseStartTimeMs}.`);
             accumulatedResponse += chunk.response;
           }
         }
@@ -5990,35 +5959,31 @@ Summary:`;
         }
       }
       this.plugin.logger.debug(
-        `[sendMessage id:${requestTimestampId}] Stream completed. Final response length: ${accumulatedResponse.length}. Active placeholder.ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp} (expected ${responseStartTimeMs})`
+        `[sendMessage id:${requestTimestampId}] Stream completed. Final response length: ${accumulatedResponse.length}. Active placeholder.ts: ${(_c = this.activePlaceholder) == null ? void 0 : _c.timestamp} (expected ${responseStartTimeMs})`
       );
       if (accumulatedResponse.trim()) {
         this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Adding assistant message (expected ts: ${responseStartTimeMs}). Setting emitEvent to TRUE.`);
         assistantMessageProcessedPromise = new Promise((resolve) => {
           this.messageAddedResolvers.set(responseStartTimeMs, resolve);
-          this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Resolver ADDED to map for AssistantMessage ts ${responseStartTimeMs}. Map size: ${this.messageAddedResolvers.size}`);
         });
         this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] TRY: Awaiting assistantMessageProcessedPromise for ts ${responseStartTimeMs}`);
         const assistantTimeout = 1e4;
         const assistantTimeoutPromise = new Promise(
           (_, reject) => setTimeout(() => reject(new Error(`Timeout (${assistantTimeout / 1e3}s) waiting for HMA for AssistantMessage ts ${responseStartTimeMs}`)), assistantTimeout)
         );
         try {
           await Promise.race([assistantMessageProcessedPromise, assistantTimeoutPromise]);
-          this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] TRY: assistantMessageProcessedPromise for ts ${responseStartTimeMs} RESOLVED or raced.`);
         } catch (assistantAwaitError) {
           this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] TRY: Error or Timeout awaiting HMA for AssistantMessage: ${assistantAwaitError.message}`);
           streamErrorOccurred = streamErrorOccurred || assistantAwaitError;
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Timeout/Error for Assistant HMA, removing resolver from map for ts ${responseStartTimeMs}.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
         }
       } else if (!this.currentAbortController.signal.aborted) {
         this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Assistant provided empty response (not aborted).`);
-        if (((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === responseStartTimeMs) {
-          if ((_f = this.activePlaceholder.groupEl) == null ? void 0 : _f.isConnected)
+        if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs) {
+          if ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)
             this.activePlaceholder.groupEl.remove();
           this.activePlaceholder = null;
           this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Placeholder for ts ${responseStartTimeMs} removed (empty response).`);
@@ -6028,22 +5993,20 @@ Summary:`;
     } catch (error) {
       streamErrorOccurred = error;
       this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] CATCH: Error during sendMessage process:`, error);
-      if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
-        if ((_h = this.activePlaceholder.groupEl) == null ? void 0 : _h.isConnected)
+      if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
+        if ((_g = this.activePlaceholder.groupEl) == null ? void 0 : _g.isConnected)
           this.activePlaceholder.groupEl.remove();
         this.activePlaceholder = null;
       }
       if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
-        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] CATCH: Removing UserMessage resolver for ts ${userMessageTimestampMs} due to error.`);
         this.messageAddedResolvers.delete(userMessageTimestampMs);
       }
       if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] CATCH: Removing AssistantMessage resolver for ts ${responseStartTimeMs} due to error.`);
         this.messageAddedResolvers.delete(responseStartTimeMs);
       }
       let errorMsgForChat = "An unexpected error occurred while sending message.";
       let errorMsgRole = "error";
-      if (error.name === "AbortError" || ((_i = error.message) == null ? void 0 : _i.includes("aborted by user"))) {
+      if (error.name === "AbortError" || ((_h = error.message) == null ? void 0 : _h.includes("aborted by user"))) {
         errorMsgForChat = "Message generation stopped.";
         errorMsgRole = "system";
       } else {
@@ -6052,24 +6015,21 @@ Summary:`;
       }
       this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true);
     } finally {
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_j = this.activePlaceholder) == null ? void 0 : _j.timestamp}, Resolvers map size: ${this.messageAddedResolvers.size}`);
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_i = this.activePlaceholder) == null ? void 0 : _i.timestamp}, Resolvers map size: ${this.messageAddedResolvers.size}`);
       if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
-        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] FINALLY: UserMessage resolver for ts ${userMessageTimestampMs} still in map. Removing.`);
         this.messageAddedResolvers.delete(userMessageTimestampMs);
       }
       if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] FINALLY: AssistantMessage resolver for ts ${responseStartTimeMs} still in map. Removing.`);
         this.messageAddedResolvers.delete(responseStartTimeMs);
       }
-      if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
+      if (((_j = this.activePlaceholder) == null ? void 0 : _j.timestamp) === responseStartTimeMs) {
         this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] FINALLY: Active placeholder (ts: ${responseStartTimeMs}) was NOT CLEARED BY HMA. Removing now.`);
-        if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected)
+        if ((_k = this.activePlaceholder.groupEl) == null ? void 0 : _k.isConnected)
           this.activePlaceholder.groupEl.remove();
         this.activePlaceholder = null;
       }
       const prevAbortCtrl = this.currentAbortController;
       this.currentAbortController = null;
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY: currentAbortController set to null. Was: ${prevAbortCtrl ? "active" : "null"}. Now: ${this.currentAbortController ? "active" : "null"}`);
       this.setLoadingState(false);
       requestAnimationFrame(() => {
         this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (requestAnimationFrame): Forcing updateSendButtonState.`);
@@ -6081,7 +6041,7 @@ Summary:`;
   }
   // OllamaView.ts
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     const messageForLog = data == null ? void 0 : data.message;
     const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
     const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
@@ -6095,10 +6055,8 @@ Summary:`;
         this.messageAddedResolvers.delete(messageTimestampForLog);
         this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`);
       } else {
-        this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`);
       }
     } else {
-      this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map.`);
     }
     this.plugin.logger.error(`[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? "FOUND" : "NOT_FOUND"}. Active placeholder ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}`);
     try {
@@ -6142,7 +6100,6 @@ Summary:`;
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
       );
       const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInCurrentMessages=${alreadyInCurrentMessages}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
       if (alreadyInCurrentMessages && !isPotentiallyAssistantForPlaceholder) {
         this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): In currentMessages and NOT assistant for active placeholder. Role: ${message.role}.`);
         if (resolverForThisMessage) {
@@ -6152,20 +6109,17 @@ Summary:`;
         return;
       }
       if (alreadyInCurrentMessages && isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in currentMessages, BUT IS assistant for active placeholder. Proceeding to update placeholder's DOM.`);
       }
       if (!alreadyInCurrentMessages) {
         this.currentMessages.push(message);
         this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. Count: ${this.currentMessages.length}`);
       }
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}`);
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
         this.plugin.logger.error(
           `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating.`
         );
         const placeholderToUpdate = this.activePlaceholder;
         if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder DOM elements are valid for update.`);
           placeholderToUpdate.groupEl.classList.remove("placeholder");
           placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
           placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
@@ -6181,10 +6135,8 @@ Summary:`;
             const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
             if (dotsEl) {
               dotsEl.remove();
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);
             }
             try {
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering final assistant content into placeholder.`);
               await AssistantMessageRenderer.renderAssistantContent(placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this);
               AssistantMessageRenderer.addAssistantActionButtons(placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message, this.plugin, this);
               BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
@@ -6211,7 +6163,6 @@ Summary:`;
           await this.addMessageStandard(message);
         }
       } else {
-        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR non-assistant/non-matching. Role: ${message.role}. Active placeholder ts: ${(_e = this.activePlaceholder) == null ? void 0 : _e.timestamp}. Adding normally.`);
         await this.addMessageStandard(message);
       }
       this.plugin.logger.debug(
@@ -6235,7 +6186,6 @@ Summary:`;
         }
         this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`);
       } else {
-        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found for this message instance, or already used/deleted from map earlier.`);
       }
       this.plugin.logger.debug(
         `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}. Map size: ${this.messageAddedResolvers.size}`
@@ -6247,7 +6197,6 @@ Summary:`;
     var _a;
     if (this.isRegenerating) {
       new import_obsidian14.Notice("Regeneration is already in progress. Please wait.", 3e3);
-      this.plugin.logger.warn("[Regenerate] Attempted to start new regeneration while one is already in progress.");
       return;
     }
     if (this.currentAbortController) {
@@ -6260,7 +6209,6 @@ Summary:`;
     const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
     if (!activeChat) {
       new import_obsidian14.Notice("Cannot regenerate: No active chat found.");
-      this.plugin.logger.warn("[Regenerate] No active chat found.");
       return;
     }
     const chatId = activeChat.metadata.id;
@@ -6281,7 +6229,7 @@ Summary:`;
       "Confirm Regeneration",
       hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
       async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
         this.isRegenerating = true;
         const regenerationRequestTimestamp = new Date().getTime();
         this.plugin.logger.error(`[Regenerate START id:${regenerationRequestTimestamp}] For userMsg ts: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
@@ -6293,18 +6241,15 @@ Summary:`;
         let streamErrorOccurred = null;
         let mainAssistantMessageProcessedPromise;
         try {
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Starting logic. HasMessagesAfter: ${hasMessagesAfter}`);
           if (hasMessagesAfter) {
             const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
             if (!deleteSuccess) {
               this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to delete subsequent messages.`);
               throw new Error("Failed to delete subsequent messages for regeneration.");
             }
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Subsequent messages deleted.`);
           }
           await this.loadAndDisplayActiveChat();
           this.guaranteedScrollToBottom(50, true);
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Chat reloaded after deletions.`);
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Creating placeholder for new assistant response (expected ts: ${responseStartTimeMs}).`);
           const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
             cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
@@ -6322,7 +6267,6 @@ Summary:`;
             dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
           if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
             this.activePlaceholder = { timestamp: responseStartTimeMs, groupEl: assistantPlaceholderGroupEl, contentEl: assistantContentEl, messageWrapper: messageWrapperEl };
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Placeholder created. activePlaceholder.ts set to: ${this.activePlaceholder.timestamp}.`);
           } else {
             this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to create all placeholder elements!`);
             throw new Error("Failed to create placeholder elements for regeneration.");
@@ -6335,12 +6279,10 @@ Summary:`;
             this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to get chatForStreaming.`);
             throw new Error("Failed to get updated chat context for streaming regeneration.");
           }
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Starting stream. Context messages: ${chatForStreaming.messages.length}.`);
           const stream = this.plugin.ollamaService.generateChatResponseStream(chatForStreaming, this.currentAbortController.signal);
           let firstChunk = true;
           for await (const chunk of stream) {
             if (this.currentAbortController.signal.aborted) {
-              this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Stream aborted by user during iteration.`);
               throw new Error("aborted by user");
             }
             if ("error" in chunk && chunk.error) {
@@ -6348,7 +6290,6 @@ Summary:`;
                 this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Stream error: ${chunk.error}`);
                 throw new Error(chunk.error);
               } else {
-                this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Stream reported 'aborted by user'.`);
                 throw new Error("aborted by user");
               }
             }
@@ -6367,7 +6308,6 @@ Summary:`;
                   this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
                 }
               } else {
-                this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder mismatch during stream. Current.ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}, expected: ${responseStartTimeMs}.`);
                 accumulatedResponse += chunk.response;
               }
             }
@@ -6377,13 +6317,12 @@ Summary:`;
             }
           }
           this.plugin.logger.debug(
-            `[Regenerate id:${regenerationRequestTimestamp}] Stream completed. Final response length: ${accumulatedResponse.length}. Active placeholder.ts: ${(_c = this.activePlaceholder) == null ? void 0 : _c.timestamp} (expected ${responseStartTimeMs})`
+            `[Regenerate id:${regenerationRequestTimestamp}] Stream completed. Final response length: ${accumulatedResponse.length}. Active placeholder.ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp} (expected ${responseStartTimeMs})`
           );
           if (accumulatedResponse.trim()) {
             this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Adding assistant message to ChatManager (expected ts: ${responseStartTimeMs}). Setting emitEvent to TRUE.`);
             mainAssistantMessageProcessedPromise = new Promise((resolve) => {
               this.messageAddedResolvers.set(responseStartTimeMs, resolve);
-              this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Resolver ADDED to map for ts ${responseStartTimeMs}. Map size: ${this.messageAddedResolvers.size}`);
             });
             this.plugin.chatManager.addMessageToActiveChat(
               "assistant",
@@ -6399,22 +6338,18 @@ Summary:`;
             );
             try {
               await Promise.race([mainAssistantMessageProcessedPromise, timeoutPromise]);
-              this.plugin.logger.info(`[Regenerate id:${regenerationRequestTimestamp}] TRY: mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs} RESOLVED or raced successfully.`);
             } catch (awaitPromiseError) {
               this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] TRY: Error or Timeout awaiting mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs}: ${awaitPromiseError.message}`);
               streamErrorOccurred = streamErrorOccurred || awaitPromiseError;
               if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-                this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] Timeout/Error awaiting, removing resolver from map for ts ${responseStartTimeMs}.`);
                 this.messageAddedResolvers.delete(responseStartTimeMs);
               }
             }
           } else if (!this.currentAbortController.signal.aborted) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] Assistant provided an empty response, not due to cancellation.`);
-            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
-              this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Removing placeholder for ts ${responseStartTimeMs} due to empty response.`);
+            if (((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === responseStartTimeMs && ((_d = this.activePlaceholder.groupEl) == null ? void 0 : _d.isConnected)) {
               this.activePlaceholder.groupEl.remove();
             }
-            if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
+            if (((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === responseStartTimeMs) {
               this.activePlaceholder = null;
               this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder (ts: ${responseStartTimeMs}) cleared due to empty response.`);
             }
@@ -6423,21 +6358,19 @@ Summary:`;
         } catch (error) {
           streamErrorOccurred = error;
           this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error during regeneration process:`, error);
-          if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
+          if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
             this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Removing active placeholder (ts: ${responseStartTimeMs}) due to error.`);
-            if ((_h = this.activePlaceholder.groupEl) == null ? void 0 : _h.isConnected)
+            if ((_g = this.activePlaceholder.groupEl) == null ? void 0 : _g.isConnected)
               this.activePlaceholder.groupEl.remove();
             this.activePlaceholder = null;
           }
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error occurred, removing resolver from map for ts ${responseStartTimeMs} if it exists.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
           let errorMsgForChat = "An unexpected error occurred during regeneration.";
           let errorMsgRole = "error";
           let savePartialResponseOnError = false;
-          if (error.name === "AbortError" || ((_i = error.message) == null ? void 0 : _i.includes("aborted by user"))) {
-            this.plugin.logger.info(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Regeneration was stopped/aborted.`);
+          if (error.name === "AbortError" || ((_h = error.message) == null ? void 0 : _h.includes("aborted by user"))) {
             errorMsgForChat = "Regeneration stopped.";
             errorMsgRole = "system";
             if (accumulatedResponse.trim())
@@ -6446,31 +6379,26 @@ Summary:`;
             errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
             new import_obsidian14.Notice(errorMsgForChat, 5e3);
           }
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Adding error/system message to chat: "${errorMsgForChat}"`);
           this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true);
           if (savePartialResponseOnError) {
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Saving partial response after cancellation.`);
             this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
           }
         } finally {
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_j = this.activePlaceholder) == null ? void 0 : _j.timestamp}, messageAddedResolvers size: ${this.messageAddedResolvers.size}`);
+          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_i = this.activePlaceholder) == null ? void 0 : _i.timestamp}, messageAddedResolvers size: ${this.messageAddedResolvers.size}`);
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Resolver for ts ${responseStartTimeMs} still in map. Removing.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
-          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
+          if (((_j = this.activePlaceholder) == null ? void 0 : _j.timestamp) === responseStartTimeMs) {
             this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Active placeholder (ts: ${responseStartTimeMs}) was STILL NOT CLEARED by HMA. Removing now.`);
-            if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
+            if ((_k = this.activePlaceholder.groupEl) == null ? void 0 : _k.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
             this.activePlaceholder = null;
           }
           const prevAbortCtrl = this.currentAbortController;
           this.currentAbortController = null;
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: currentAbortController set to null. Was: ${prevAbortCtrl ? "active" : "null"}. Now: ${this.currentAbortController ? "active" : "null"}`);
           const prevIsRegen = this.isRegenerating;
           this.isRegenerating = false;
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: isRegenerating set to false. Was: ${prevIsRegen}. Now: ${this.isRegenerating}`);
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Calling setLoadingState(false).`);
           this.setLoadingState(false);
           requestAnimationFrame(() => {
