@@ -5,12 +5,13 @@
 @import 'sidebar-related/section-content'; // Переконайтесь, що шлях правильний
 // ---
 
+
 // --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
     display: flex;
     flex-direction: column; // Головний контейнер - колонка
     width: var(--ai-forge-sidebar-width, 250px);
-    min-width: var(--ai-forge-sidebar-width, 250px);
+    min-width: var(--ai-forge-sidebar-width, 250px); // Мінімальна ширина для ресайзера
     flex-shrink: 0;
     background-color: var(--background-secondary);
     border-right: 1px solid var(--divider-color);
@@ -34,9 +35,10 @@
 .ollama-chat-panel,
 .ollama-role-panel {
     display: flex; flex-direction: column; // Кожна секція - колонка (заголовок+контент)
-    // Налаштування росту/стискання для логіки акордеону
-    &.ollama-role-panel { flex-shrink: 0; } // Секція ролей не розтягується і не стискається
-    &.ollama-chat-panel { flex-grow: 1; min-height: 0; overflow: hidden; } // Секція чатів займає вільне місце і дозволяє внутрішній скрол контенту
+    // --- ВИДАЛЕНО: flex-grow та flex-shrink з панелей ---
+    // &.ollama-role-panel { flex-shrink: 0; }
+    // &.ollama-chat-panel { flex-grow: 1; min-height: 0; overflow: hidden; }
+    // Тепер розмір визначається вмістом (заголовком + контентом)
 }
 
 .ollama-sidebar-section-header {
@@ -53,7 +55,6 @@
     .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
     .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
 }
-
 // --- Стилі для контенту тепер імпортуються з _section-content.scss ---
 
 // --- Стилізація контекстного меню ---
