@@ -1847,10 +1847,6 @@ var ErrorMessageRenderer = class extends BaseMessageRenderer {
 
 // src/SidebarManager.ts
 var import_obsidian12 = require("obsidian");
-var CSS_SIDEBAR_CONTAINER = "ollama-sidebar-container";
-var CSS_ROLE_PANEL = "ollama-role-panel";
-var CSS_CHAT_PANEL = "ollama-chat-panel";
-var CSS_ROLE_PANEL_LIST = "ollama-role-panel-list";
 var CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item";
 var CSS_ROLE_PANEL_ITEM_ICON = "ollama-role-panel-item-icon";
 var CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
@@ -1858,15 +1854,10 @@ var CSS_ROLE_PANEL_ITEM_ACTIVE = "is-active";
 var CSS_ROLE_PANEL_ITEM_CUSTOM = "is-custom";
 var CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
 var CSS_CLASS_MENU_OPTION = "menu-option";
-var CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header";
-var CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
 var CSS_SECTION_TOGGLE_CHEVRON = "ollama-section-toggle-chevron";
-var CSS_SIDEBAR_HEADER_ACTIONS = "ollama-sidebar-header-actions";
 var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
-var CSS_SIDEBAR_HEADER_LEFT = "ollama-sidebar-header-left";
 var CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden";
 var CSS_EXPANDED_CLASS = "is-expanded";
-var CSS_CHAT_LIST_CONTAINER = "ollama-chat-list-container";
 var CSS_HIERARCHY_ITEM = "ollama-hierarchy-item";
 var CSS_FOLDER_ITEM = "ollama-folder-item";
 var CSS_CHAT_ITEM = "ollama-chat-item";
@@ -2142,35 +2133,33 @@ var SidebarManager = class {
   }
   createSidebarUI(parentElement) {
     this.plugin.logger.debug("[SidebarManager] Creating UI...");
-    this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
-    const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
+    this.containerEl = parentElement.createDiv({ cls: "ollama-sidebar-container" });
+    const chatPanel = this.containerEl.createDiv({ cls: "ollama-chat-panel" });
     this.chatPanelHeaderEl = chatPanel.createDiv({
-      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+      cls: ["ollama-sidebar-section-header", "menu-option"],
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
-      // Починаємо розгорнуто
     });
-    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
+    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
-    const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
-    const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
-    (0, import_obsidian12.setIcon)(chatChevron, EXPAND_ICON_ACCORDION);
-    this.newFolderSidebarButton = chatHeaderActions.createDiv({ cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"], attr: { "aria-label": "New Folder", title: "New Folder" } });
+    const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
+    this.newFolderSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Folder", title: "New Folder" } });
     (0, import_obsidian12.setIcon)(this.newFolderSidebarButton, "lucide-folder-plus");
-    this.newChatSidebarButton = chatHeaderActions.createDiv({ cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"], attr: { "aria-label": "New Chat", title: "New Chat" } });
+    this.newChatSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Chat", title: "New Chat" } });
     (0, import_obsidian12.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
-    this.chatPanelListContainerEl = chatPanel.createDiv({ cls: [CSS_CHAT_LIST_CONTAINER, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS] });
-    const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL });
+    const chatChevron = chatHeaderActions.createSpan({ cls: ["ollama-section-toggle-chevron", "clickable-icon"] });
+    (0, import_obsidian12.setIcon)(chatChevron, EXPAND_ICON_ACCORDION);
+    this.chatPanelListContainerEl = chatPanel.createDiv({ cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"] });
+    const rolePanel = this.containerEl.createDiv({ cls: "ollama-role-panel" });
     this.rolePanelHeaderEl = rolePanel.createDiv({
-      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+      cls: ["ollama-sidebar-section-header", "menu-option"],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
-      // Починаємо згорнуто
     });
-    const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
+    const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
     roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
-    const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
-    const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
+    const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
+    const roleChevron = roleHeaderActions.createSpan({ cls: ["ollama-section-toggle-chevron", "clickable-icon"] });
     (0, import_obsidian12.setIcon)(roleChevron, COLLAPSE_ICON_ACCORDION);
-    this.rolePanelListEl = rolePanel.createDiv({ cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT] });
+    this.rolePanelListEl = rolePanel.createDiv({ cls: ["ollama-role-panel-list", "ollama-sidebar-section-content"] });
     this.plugin.logger.debug("[SidebarManager] UI Created.");
     this.attachSidebarEventListeners();
     if (this.isSectionVisible("chats")) {
