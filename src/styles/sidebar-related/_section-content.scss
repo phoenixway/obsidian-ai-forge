@@ -22,6 +22,8 @@ $folder-icon-extra-indent: 4px;
   min-height: 0;
   flex-grow: 0; // За замовчуванням НЕ росте
   visibility: hidden;
+  background-color: bisque !important; // Для тестування
+  color: rgb(255, 0, 55) !important; // Для тестування
 
   &.is-expanded {
     flex-grow: 1; // <--- ПОВЕРНУЛИ: САМЕ КОНТЕНТ РОСТЕ
@@ -206,8 +208,6 @@ $folder-icon-extra-indent: 4px;
   .ollama-role-panel-list {
     // flex-grow: 1; // Прибрано в попередньому кроці для акордеону
     // min-height: 0;
-    background-color: bisque !important; // Для тестування
-    color: rgb(255, 0, 55) !important; // Для тестування
 
     .ollama-role-panel-item {
         margin: 1px 0; border-radius: var(--radius-s); cursor: pointer; display: flex; align-items: center;
