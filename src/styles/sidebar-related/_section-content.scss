@@ -6,7 +6,7 @@ $indent-step: 12px;
 $item-padding-vertical: var(--size-4-1);
 $item-padding-horizontal: 2px; // Базовий горизонтальний відступ з fallback
 $icon-size: 16px;
-$icon-margin: 4px;
+$icon-margin: 3px;
 $folder-icon-extra-indent: 0px;
 // ---
 
@@ -212,7 +212,7 @@ $folder-icon-extra-indent: 0px;
       align-items: center;
       padding: $item-padding-vertical $item-padding-horizontal !important; // Використовуємо !important для перевизначення успадкованого padding-left від @extend .ollama-hierarchy-item (якщо @extend використовується)
       min-height: calc($icon-size + 2 * $item-padding-vertical);
-      gap: 4px;
+      gap: $icon-margin;
 
       &:hover {
         background-color: var(--background-modifier-hover);
