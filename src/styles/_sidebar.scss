@@ -32,27 +32,35 @@
 
 
 // --- Sidebar Accordion Sections ---
-&.ollama-chat-panel {
-    overflow-y: auto;
-    min-height: 0; // Критично для flex-контейнерів
+.ollama-chat-panel,
+.ollama-role-panel {
+  display: flex;
+  flex-direction: column; // Кожна секція - колонка (заголовок+контент)
+  min-height: 0; // Критично для коректної поведінки в flex контейнерах
+  overflow-y: auto; // Додає скролінг, якщо контент не поміщається
+  
+  // --- ВИПРАВЛЕНО: Застосовано BEM та удосконалено flex властивості ---
+  &.ollama-role-panel {
+    flex: 0 0 auto; // Фіксована висота, не стискається і не розтягується
+    margin-bottom: 8px; // Відступ між панелями
   }
-
-
-&.ollama-role-panel {
-    overflow-y: auto;
-    min-height: 0; // Критично для flex-контейнерів
-    // display: flex; flex-direction: column; // Кожна секція - колонка (заголовок+контент)
-    // --- ВИПРАВЛЕНО: Додано flex властивості для акордеону ---
-    &.ollama-role-panel {
-        // flex-shrink: 0; // Секція ролей не стискається по висоті
+  
+  &.ollama-chat-panel {
+    flex: 1 1 0%; // Займає весь доступний простір, може стискатись
+    min-height: 0; // Забезпечує правильну поведінку скролінгу
+    overflow: hidden; // Запобігає виходу контенту за межі
+    
+    // Якщо всередині є список чатів, також забезпечуємо йому скролінг
+    .ollama-chat-list {
+      overflow-y: auto;
+      height: 100%;
     }
-    &.ollama-chat-panel {
-        // flex-grow: 1; // Секція чатів займає весь доступний простір
-        // min-height: 0; // Дозволяє секції чатів стискатись
-        // overflow: hidden; // <--- Важливо: Обрізає контент, якщо він виходить за її межі
-    }
-    // ---
-}
+  }
+  // ---
+  
+  // Заголовки панелей
+  .ollama-panel-header {
+    flex: 0 0 auto; // Фіксована висота за
 
 .ollama-sidebar-section-header {
     display: flex; justify-content: space-between; align-items: center;
