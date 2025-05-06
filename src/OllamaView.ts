@@ -2924,100 +2924,104 @@ public checkMessageForCollapsing(messageElOrGroupEl: HTMLElement): void {
   }
 
   const contentCollapsible = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-  const maxH = this.plugin.settings.maxMessageHeight;
+  
+  // Знаходимо сам елемент .message всередині групи
+  const messageEl = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE}`);
 
-  if (!contentCollapsible) {
-      this.plugin.logger.trace(`[checkMessageForCollapsing] No contentCollapsible found in message group (ts: ${messageGroupEl.dataset.timestamp || messageGroupEl.dataset.placeholderTimestamp}).`);
+  if (!contentCollapsible || !messageEl) { // Перевіряємо наявність і messageEl
+      this.plugin.logger.trace(`[checkMessageForCollapsing] No contentCollapsible or messageEl found in message group (ts: ${messageGroupEl.dataset.timestamp || messageGroupEl.dataset.placeholderTimestamp}).`);
       return;
   }
 
-  // Перевіряємо, чи це активний плейсхолдер, який стрімиться
-  // Умова: елемент має клас "placeholder", атрибут "data-placeholder-timestamp",
-  // а його контент має клас "streaming-text", І глобальний стан this.isProcessing === true.
+  const maxH = this.plugin.settings.maxMessageHeight;
+
   const isStreamingNow = 
-      this.isProcessing && // Чи йде якась обробка на рівні View
-      messageGroupEl.classList.contains("placeholder") && // Чи це елемент, позначений як плейсхолдер
-      messageGroupEl.hasAttribute("data-placeholder-timestamp") && // Чи має він timestamp плейсхолдера
-      contentCollapsible.classList.contains("streaming-text"); // Чи його контент позначений як стрімінговий
+      this.isProcessing && 
+      messageGroupEl.classList.contains("placeholder") &&
+      messageGroupEl.hasAttribute("data-placeholder-timestamp") && 
+      contentCollapsible.classList.contains("streaming-text"); 
 
   if (isStreamingNow) {
       this.plugin.logger.debug(`[checkMessageForCollapsing] Streaming placeholder (ts: ${messageGroupEl.dataset.placeholderTimestamp}). No 'Show More' button. Content expanded.`);
-      const existingButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
+      // Видаляємо кнопку, якщо вона раптом є (шукаємо всередині messageEl)
+      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton?.remove();
       contentCollapsible.style.maxHeight = ""; 
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-      return; // Виходимо, для стрімінгового плейсхолдера кнопка не потрібна
+      return; 
   }
 
-  // Якщо ліміт висоти вимкнено (<= 0), завжди розгортаємо і видаляємо кнопку
   if (maxH <= 0) {
       this.plugin.logger.trace(`[checkMessageForCollapsing] maxMessageHeight disabled. Removing button, expanding content for (ts: ${messageGroupEl.dataset.timestamp}).`);
-      const existingButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton?.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       return;
   }
 
-  // Для завершених повідомлень (або якщо isProcessing === false)
-  // Використовуємо requestAnimationFrame для отримання актуальної висоти після рендерингу DOM
   requestAnimationFrame(() => {
-      if (!contentCollapsible || !contentCollapsible.isConnected || !messageGroupEl.isConnected) return;
+      if (!contentCollapsible || !contentCollapsible.isConnected || !messageGroupEl.isConnected || !messageEl.isConnected) return;
 
-      let existingButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
+      // Шукаємо кнопку всередині messageEl
+      let existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       
-      const wasCollapsed = contentCollapsible.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
       const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
-
-      // Тимчасово знімаємо обмеження для вимірювання повної висоти контенту
       contentCollapsible.style.maxHeight = ""; 
       const scrollHeight = contentCollapsible.scrollHeight;
       
-      // Відновлюємо maxHeight, якщо воно було і ми не збираємося змінювати стан кнопки
-      // Це важливо, щоб уникнути "стрибка" контенту, якщо кнопка вже є і її стан не змінюється
-      if (existingButton && previousMaxHeightStyle) {
+      if (existingButton && previousMaxHeightStyle && !existingButton.classList.contains("explicitly-expanded")) { // Додамо клас, щоб керувати цим
            contentCollapsible.style.maxHeight = previousMaxHeightStyle;
       }
 
 
-      if (scrollHeight > maxH) { // Якщо контент перевищує ліміт
+      if (scrollHeight > maxH) { 
           if (!existingButton) {
-              // Кнопки немає, створюємо її
               this.plugin.logger.debug(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) > maxH (${maxH}). Adding 'Show More' button for (ts: ${messageGroupEl.dataset.timestamp}).`);
-              existingButton = messageGroupEl.createEl("button", {
+              // Додаємо кнопку як нащадка .message, ПІСЛЯ contentCollapsible
+              existingButton = messageEl.createEl("button", {
                 cls: CSS_CLASSES.SHOW_MORE_BUTTON,
               });
-              this.registerDomEvent(existingButton, "click", () =>
-                this.toggleMessageCollapse(contentCollapsible, existingButton!)
-              );
-              // Початковий стан для довгого повідомлення - згорнуто
+              // Переконуємося, що кнопка після контенту, але перед можливим timestamp
+              // Якщо timestamp додається в кінець messageEl, це має працювати.
+              // В іншому випадку, можна використовувати insertAdjacentElement:
+              // contentCollapsible.insertAdjacentElement('afterend', existingButton);
+              
+              this.registerDomEvent(existingButton, "click", () => {
+                  // Додамо/видалимо клас для відстеження явного розгортання користувачем
+                  if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
+                      existingButton!.classList.add("explicitly-expanded");
+                  } else {
+                      existingButton!.classList.remove("explicitly-expanded");
+                  }
+                  this.toggleMessageCollapse(contentCollapsible, existingButton!);
+              });
               contentCollapsible.style.maxHeight = `${maxH}px`;
-              contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+              contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
               existingButton.setText("Show More ▼");
-              existingButton.removeAttribute("data-initial-state"); // Забираємо, якщо був
           } else {
-              // Кнопка вже існує. Переконуємося, що текст кнопки відповідає стану.
-              // Це може бути не потрібно, якщо toggleMessageCollapse завжди встановлює правильний текст.
-              // Однак, якщо checkMessageForCollapsing викликається після інших змін DOM, це може бути корисно.
                this.plugin.logger.trace(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) > maxH (${maxH}). Button already exists for (ts: ${messageGroupEl.dataset.timestamp}). Updating text if needed.`);
-               if (contentCollapsible.classList.contains(CSS_CLASS_CONTENT_COLLAPSED)) {
+               if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
                   existingButton.setText("Show More ▼");
                } else {
                   existingButton.setText("Show Less ▲");
                }
           }
-      } else { // scrollHeight <= maxH - контент не перевищує ліміт
+      } else { 
           if (existingButton) {
-              // Кнопка є, але більше не потрібна
               this.plugin.logger.debug(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) <= maxH (${maxH}). Removing 'Show More' button for (ts: ${messageGroupEl.dataset.timestamp}).`);
               existingButton.remove();
           }
-          // Розгортаємо контент і знімаємо клас, якщо він був
           contentCollapsible.style.maxHeight = ""; 
-          contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+          contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
   });
 }
+
+// Метод toggleMessageCollapse залишається без змін з відповіді #2 (або вашої поточної версії)
+// public toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void {
+//   // ... (логіка згортання/розгортання)
+// }
 
   public async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
     const summarizationModel = this.plugin.settings.summarizationModelName;
