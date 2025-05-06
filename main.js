@@ -1233,7 +1233,6 @@ function enhanceCodeBlocks(contentEl, view) {
     console.error("enhanceCodeBlocks: Missing view or plugin context!");
     return;
   }
-  view.plugin.logger.debug("[enhanceCodeBlocks] Enhancing code blocks...");
   try {
     const codeBlocks = contentEl.querySelectorAll("pre > code");
     codeBlocks.forEach((codeElement) => {
@@ -1270,9 +1269,7 @@ function enhanceCodeBlocks(contentEl, view) {
       }
       preElement.style.position = "relative";
     });
-    view.plugin.logger.debug("[enhanceCodeBlocks] Finished enhancing code blocks.");
   } catch (error) {
-    view.plugin.logger.error("[enhanceCodeBlocks] Error processing code blocks:", error);
   }
 }
 function fixBrokenTwemojiImages(contentEl) {

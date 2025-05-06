@@ -307,7 +307,7 @@ export function renderAvatar(
         console.error("enhanceCodeBlocks: Missing view or plugin context!");
         return;
     }
-    view.plugin.logger.debug("[enhanceCodeBlocks] Enhancing code blocks..."); // ЛОГ ВХОДУ
+    // view.plugin.logger.debug("[enhanceCodeBlocks] Enhancing code blocks..."); // ЛОГ ВХОДУ
     try {
         const codeBlocks = contentEl.querySelectorAll<HTMLElement>("pre > code");
         codeBlocks.forEach((codeElement) => {
@@ -351,10 +351,10 @@ export function renderAvatar(
              // Стилізація батьківського pre елемента для позиціонування
              preElement.style.position = "relative"; // Потрібно для абсолютно позиціонованих дочірніх елементів
         });
-        view.plugin.logger.debug("[enhanceCodeBlocks] Finished enhancing code blocks."); // ЛОГ ВИХОДУ
+        // view.plugin.logger.debug("[enhanceCodeBlocks] Finished enhancing code blocks."); // ЛОГ ВИХОДУ
     } catch (error) {
          // Логуємо помилку, але не зупиняємо решту рендерингу
-         view.plugin.logger.error("[enhanceCodeBlocks] Error processing code blocks:", error);
+        //  view.plugin.logger.error("[enhanceCodeBlocks] Error processing code blocks:", error);
     }
 }
 
