@@ -57,7 +57,7 @@ $folder-icon-extra-indent: 0px;
   // --- Стилі для ієрархії чатів/папок ---
   // Ці стилі застосовуються ТІЛЬКИ до елементів всередині .ollama-chat-list-container
   &.ollama-chat-list-container {
-    margin-left: 3px !important; // Відступ для контейнера з чатом
+    margin-left: 6px !important; // Відступ для контейнера з чатом
     // <--- ДОДАНО цей клас для специфічності
     .ollama-hierarchy-item {
       margin: 1px 0;
