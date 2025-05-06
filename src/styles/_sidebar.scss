@@ -32,17 +32,19 @@
 
 
 // --- Sidebar Accordion Sections ---
-.ollama-chat-panel,
-.ollama-role-panel {
-    display: flex; flex-direction: column; // Кожна секція - колонка (заголовок+контент)
+&.ollama-chat-panel,
+&.ollama-role-panel {
+    overflow-y: auto;
+    min-height: 0; // Критично для flex-контейнерів
+    // display: flex; flex-direction: column; // Кожна секція - колонка (заголовок+контент)
     // --- ВИПРАВЛЕНО: Додано flex властивості для акордеону ---
     &.ollama-role-panel {
-        flex-shrink: 0; // Секція ролей не стискається по висоті
+        // flex-shrink: 0; // Секція ролей не стискається по висоті
     }
     &.ollama-chat-panel {
-        flex-grow: 1; // Секція чатів займає весь доступний простір
-        min-height: 0; // Дозволяє секції чатів стискатись
-        overflow: hidden; // <--- Важливо: Обрізає контент, якщо він виходить за її межі
+        // flex-grow: 1; // Секція чатів займає весь доступний простір
+        // min-height: 0; // Дозволяє секції чатів стискатись
+        // overflow: hidden; // <--- Важливо: Обрізає контент, якщо він виходить за її межі
     }
     // ---
 }
