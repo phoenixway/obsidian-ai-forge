@@ -211,7 +211,20 @@ $folder-icon-extra-indent: 4px;
     &.ollama-folder-item.drop-target-active > .ollama-hierarchy-item-content {
       background-color: var(--background-modifier-success);
     }
+
+    &.is-dragging {
+        opacity: 0.5; // Робимо напівпрозорим при перетягуванні
+    }
+
   } // Кінець .ollama-hierarchy-item
+
+  .ollama-folder-item {
+    // Стилізуємо папку, коли над нею перетягують
+    &.drop-target-active > .ollama-hierarchy-item-content {
+      // Стилізуємо контент папки-цілі
+      background-color: var(--background-modifier-success); // Підсвітка зеленим
+    }
+  }
 
   .ollama-role-panel-list {
     .ollama-role-panel-item {

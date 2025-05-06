@@ -327,22 +327,22 @@
   //   font-size: var(--font-ui-smaller);
   // }
 
-  .ollama-hierarchy-item {
+  // .ollama-hierarchy-item {
     // ... існуючі стилі ...
 
-    &.is-dragging {
-      opacity: 0.5; // Робимо напівпрозорим при перетягуванні
-      // Можна додати інші стилі, наприклад, легку тінь
-    }
-  }
+    // &.is-dragging {
+    //   opacity: 0.5; // Робимо напівпрозорим при перетягуванні
+    //   // Можна додати інші стилі, наприклад, легку тінь
+    // }
+  // }
 
-  .ollama-folder-item {
-    // Стилізуємо папку, коли над нею перетягують
-    &.drop-target-active > .ollama-hierarchy-item-content {
-      // Стилізуємо контент папки-цілі
-      background-color: var(--background-modifier-success); // Підсвітка зеленим
-    }
-  }
+  // .ollama-folder-item {
+  //   // Стилізуємо папку, коли над нею перетягують
+  //   &.drop-target-active > .ollama-hierarchy-item-content {
+  //     // Стилізуємо контент папки-цілі
+  //     background-color: var(--background-modifier-success); // Підсвітка зеленим
+  //   }
+  // }
 
   // --- Стилі для контейнера списку чатів/папок ---
   // Індикатор завантаження
