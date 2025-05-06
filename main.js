@@ -3456,7 +3456,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
         let noticeMessage = "Rename cancelled or name unchanged.";
         const trimmedName = newName == null ? void 0 : newName.trim();
         if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-          this.plugin.logger.debug(`Attempting rename for chat ${chatId} to "${trimmedName}" via ChatManager.renameChat`);
           const success = await this.plugin.chatManager.renameChat(chatId, trimmedName);
           if (success) {
             noticeMessage = `Chat renamed to "${trimmedName}"`;
@@ -4086,11 +4085,9 @@ This action cannot be undone.`,
   }
   async onOpen() {
     var _a, _b, _c, _d;
-    this.plugin.logger.debug("[OllamaView] onOpen started.");
     this.createUIElements();
     const savedWidth = this.plugin.settings.sidebarWidth;
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === "number" && savedWidth > 50) {
-      this.plugin.logger.debug(`Applying saved sidebar width: ${savedWidth}px`);
       this.sidebarRootEl.style.width = `${savedWidth}px`;
       this.sidebarRootEl.style.minWidth = `${savedWidth}px`;
     } else if (this.sidebarRootEl) {
@@ -4104,9 +4101,7 @@ This action cannot be undone.`,
           }
         }
       } catch (e) {
-        this.plugin.logger.warn("Could not read default width from CSS variable, using fallback.", e);
       }
-      this.plugin.logger.debug(`Applying default sidebar width: ${defaultWidth}px`);
       this.sidebarRootEl.style.width = `${defaultWidth}px`;
       this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
     }
@@ -4117,7 +4112,6 @@ This action cannot be undone.`,
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(this.plugin.settings.modelName);
       this.updateTemperatureIndicator(this.plugin.settings.temperature);
-      this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
     } catch (error) {
       this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
     }
@@ -4147,7 +4141,6 @@ This action cannot be undone.`,
     setTimeout(() => {
       var _a2;
       (_a2 = this.inputEl) == null ? void 0 : _a2.focus();
-      this.plugin.logger.debug("[OllamaView] Input focused in onOpen.");
     }, 150);
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
@@ -4177,15 +4170,12 @@ This action cannot be undone.`,
       clearTimeout(this.resizeTimeout);
     (_a = this.sidebarManager) == null ? void 0 : _a.destroy();
     (_b = this.dropdownMenuManager) == null ? void 0 : _b.destroy();
-    this.plugin.logger.info("Ollama View closed and resources cleaned up.");
   }
   createUIElements() {
-    this.plugin.logger.debug("createUIElements: Starting UI creation.");
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" });
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
     const isDesktop = import_obsidian14.Platform.isDesktop;
-    this.plugin.logger.debug(`[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`);
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
     this.sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
@@ -4201,7 +4191,6 @@ This action cannot be undone.`,
     this.plugin.logger.debug(`[OllamaView] Resizer element created (hidden: ${!shouldShowInternalSidebar}).`);
     this.mainChatAreaEl = flexContainer.createDiv({ cls: "ollama-main-chat-area" });
     this.mainChatAreaEl.classList.toggle("full-width", !shouldShowInternalSidebar);
-    this.plugin.logger.debug(`[OllamaView] Main chat area class 'full-width' set: ${!shouldShowInternalSidebar}`);
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: "ollama-chat-container" });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: "new-message-indicator" });
@@ -4239,14 +4228,11 @@ This action cannot be undone.`,
     this.updateToggleLocationButton();
     this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation, isDesktop);
     this.dropdownMenuManager.createMenuUI();
-    this.plugin.logger.debug("createUIElements: Finished UI creation.");
   }
   attachEventListeners() {
     var _a;
-    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
     if (this.resizerEl) {
       this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
-      this.plugin.logger.debug("Added mousedown listener to resizer handle.");
     } else {
       this.plugin.logger.error("Resizer element (resizerEl) not found during listener attachment!");
     }
@@ -6129,28 +6115,28 @@ Summary:`;
   }
   // OllamaView.ts
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c;
     const localResolver = this.currentMessageAddedResolver;
     this.currentMessageAddedResolver = null;
     const messageForLog = data == null ? void 0 : data.message;
+    const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
+    const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
+    this.plugin.logger.debug(`[HMA ENTRY] For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}. localResolver ${localResolver ? "EXISTS" : "is NULL"}.`);
     try {
       if (!data || !data.message) {
         this.plugin.logger.error("[HMA] Invalid data received in handleMessageAdded.", data);
         if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to invalid data before return.");
+          this.plugin.logger.debug(`[HMA INVALID DATA] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
         }
         return;
       }
       const { chatId: eventChatId, message } = data;
       const messageTimestampMs = message.timestamp.getTime();
-      this.plugin.logger.info(
-        `[HMA] <<< ENTERED >>> Chat: ${eventChatId}, Role: ${message.role}, Ts: ${messageTimestampMs}, Content: "${message.content.substring(0, 50)}..."`
-      );
       if (!this.chatContainer || !this.plugin.chatManager) {
         this.plugin.logger.error("[HMA] CRITICAL: Context (chatContainer or chatManager) missing!");
         if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to missing context before return.");
+          this.plugin.logger.debug(`[HMA MISSING CONTEXT] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
         }
         return;
@@ -6159,16 +6145,16 @@ Summary:`;
       if (eventChatId !== activeChatId) {
         this.plugin.logger.debug(`[HMA] Event for non-active chat ${eventChatId} (current is ${activeChatId}). Ignoring UI update.`);
         if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to non-active chat before return.");
+          this.plugin.logger.debug(`[HMA NON-ACTIVE CHAT] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
         }
         return;
       }
       const existingMessageElInDom = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
       if (existingMessageElInDom) {
-        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM and is NOT a placeholder. Skipping add.`);
+        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM (not placeholder). Skipping.`);
         if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to existing DOM element (not placeholder) before return.");
+          this.plugin.logger.debug(`[HMA EXISTING DOM MSG] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
         }
         return;
@@ -6177,16 +6163,16 @@ Summary:`;
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
       );
       if (alreadyInCache) {
-        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) is already in currentMessages. Likely duplicate event. Content: "${message.content.substring(0, 30)}"`);
+        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already in currentMessages cache. Skipping.`);
         if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to message already in cache before return.");
+          this.plugin.logger.debug(`[HMA MSG IN CACHE] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
         }
         return;
       }
-      if (message.role === "assistant" && ((_a = this.activePlaceholder) == null ? void 0 : _a.timestamp) === messageTimestampMs) {
+      if (message.role === "assistant" && ((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) === messageTimestampMs) {
         this.plugin.logger.debug(
-          `[HMA] Assistant message (ts: ${messageTimestampMs}) matches active placeholder. Updating placeholder in place.`
+          `[HMA] Assistant message (ts: ${messageTimestampMs}) MATCHES active placeholder (ts: ${this.activePlaceholder.timestamp}). Updating placeholder.`
         );
         const placeholderToUpdate = this.activePlaceholder;
         if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
@@ -6226,7 +6212,7 @@ Summary:`;
             this.currentMessages.push(message);
             this.hideEmptyState();
             this.activePlaceholder = null;
-            this.plugin.logger.debug(`[HMA] Placeholder for ts ${messageTimestampMs} successfully updated and activePlaceholder cleared.`);
+            this.plugin.logger.debug(`[HMA] Placeholder for ts ${messageTimestampMs} successfully updated and activePlaceholder set to NULL.`);
             setTimeout(() => {
               if (placeholderToUpdate.groupEl.isConnected) {
                 this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
@@ -6247,48 +6233,55 @@ Summary:`;
           }
         } else {
           this.plugin.logger.error(
-            `[HMA] Active placeholder for ts ${messageTimestampMs} was matched, but its groupEl is not connected or contentEl/messageWrapper missing. groupEl connected: ${(_b = placeholderToUpdate.groupEl) == null ? void 0 : _b.isConnected}. Adding message normally.`
+            `[HMA] Active placeholder for ts ${messageTimestampMs} was matched, but its DOM elements are invalid. groupEl connected: ${(_c = placeholderToUpdate.groupEl) == null ? void 0 : _c.isConnected}. Adding message normally.`
           );
           this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
-      } else if (message.role === "assistant" && this.activePlaceholder && this.activePlaceholder.timestamp !== messageTimestampMs) {
-        this.plugin.logger.warn(`[HMA] Received assistant message (ts: ${messageTimestampMs}) but active placeholder is for a DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding current message normally.`);
-        await this.addMessageStandard(message);
       } else {
-        if (message.role === "assistant" && !this.activePlaceholder) {
-          this.plugin.logger.debug(`[HMA] No active placeholder for assistant message (ts: ${messageTimestampMs}). Adding normally.`);
-        } else if (message.role !== "assistant") {
+        if (message.role === "assistant") {
+          if (this.activePlaceholder) {
+            this.plugin.logger.warn(`[HMA] Assistant message (ts: ${messageTimestampMs}) received, but active placeholder is for DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding current message normally.`);
+          } else {
+            this.plugin.logger.debug(`[HMA] No active placeholder for assistant message (ts: ${messageTimestampMs}). Adding normally.`);
+          }
+        } else {
           this.plugin.logger.debug(`[HMA] Message is not from assistant (Role: ${message.role}, Ts: ${messageTimestampMs}). Adding normally.`);
         }
         await this.addMessageStandard(message);
       }
       this.plugin.logger.info(
-        `[HMA] <<< Nearing end of try block >>> Role: ${message.role}, Ts: ${messageTimestampMs}`
+        `[HMA] <<< Nearing end of try block >>> For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`
       );
     } catch (outerError) {
-      this.plugin.logger.error("[HMA] <<< CAUGHT OUTER ERROR >>> in handleMessageAdded:", outerError, data);
+      this.plugin.logger.error(`[HMA CATCH] Outer error for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}:`, outerError, data);
       this.handleErrorMessage({
         role: "error",
-        content: `Internal error processing new message in handleMessageAdded: ${outerError.message}`,
+        content: `Internal error in HMA for ${messageRoleForLog} msg: ${outerError.message}`,
         timestamp: new Date()
       });
     } finally {
+      this.plugin.logger.debug(`[HMA FINALLY START] For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}. localResolver originally ${localResolver ? "EXISTED" : "was NULL"}.`);
       if (localResolver) {
-        this.plugin.logger.debug(`[HMA] FINALLY: Calling localResolver for message role ${messageForLog == null ? void 0 : messageForLog.role}, ts ${(_c = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _c.getTime()}`);
+        this.plugin.logger.info(`[HMA FINALLY EXEC] >>> Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog} <<<`);
         try {
           localResolver();
         } catch (resolverError) {
-          this.plugin.logger.error("[HMA] Error calling localResolver in finally:", resolverError);
+          this.plugin.logger.error(`[HMA FINALLY] Error calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}:`, resolverError);
         }
+        this.plugin.logger.info(`[HMA FINALLY EXEC] <<< Called localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog} <<<`);
       } else {
-        this.plugin.logger.debug(`[HMA] FINALLY: localResolver was null for message role ${messageForLog == null ? void 0 : messageForLog.role}, ts ${(_d = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _d.getTime()}`);
+        this.plugin.logger.warn(`[HMA FINALLY SKIP] localResolver was originally null, not calling. For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
       }
       this.plugin.logger.info(
-        `[HMA] <<< EXITED (finally block) >>> Role: ${messageForLog == null ? void 0 : messageForLog.role}, Ts: ${(_e = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _e.getTime()}`
+        `[HMA EXIT] <<< FINALLY END >>> For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}`
       );
     }
   }
+  // `handleRegenerateClick` залишається таким, як у попередній відповіді,
+  // оскільки він вже використовує `Promise` (`mainAssistantMessageProcessedPromise`),
+  // який має вирішуватися викликом `localResolver()` з `handleMessageAdded`.
+  // Важливо, щоб `addMessageStandard` більше не намагався викликати `this.currentMessageAddedResolver`.
   // OllamaView.ts
   async handleRegenerateClick(userMessage) {
     var _a;

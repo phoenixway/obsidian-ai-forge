@@ -204,7 +204,7 @@ export class OllamaView extends ItemView {
   }
 
   async onOpen(): Promise<void> {
-    this.plugin.logger.debug("[OllamaView] onOpen started.");
+    
     // Спочатку створюємо UI, включаючи роздільник
     this.createUIElements();
 
@@ -212,7 +212,7 @@ export class OllamaView extends ItemView {
     const savedWidth = this.plugin.settings.sidebarWidth;
     // Перевіряємо наявність sidebarRootEl та валідність збереженої ширини
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === 'number' && savedWidth > 50) {
-         this.plugin.logger.debug(`Applying saved sidebar width: ${savedWidth}px`);
+         
          this.sidebarRootEl.style.width = `${savedWidth}px`;
          this.sidebarRootEl.style.minWidth = `${savedWidth}px`; // Важливо для flex-shrink
     } else if (this.sidebarRootEl) {
@@ -228,9 +228,9 @@ export class OllamaView extends ItemView {
                  }
              }
          } catch (e) {
-             this.plugin.logger.warn("Could not read default width from CSS variable, using fallback.", e);
+             
          }
-         this.plugin.logger.debug(`Applying default sidebar width: ${defaultWidth}px`);
+         
          this.sidebarRootEl.style.width = `${defaultWidth}px`;
          this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
     }
@@ -244,7 +244,7 @@ export class OllamaView extends ItemView {
         this.updateRoleDisplay(initialRoleName);
         this.updateModelDisplay(this.plugin.settings.modelName);
         this.updateTemperatureIndicator(this.plugin.settings.temperature);
-        this.plugin.logger.debug("[OllamaView] Initial UI elements updated based on settings.");
+        
     } catch (error) {
          this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
     }
@@ -273,7 +273,7 @@ export class OllamaView extends ItemView {
     }
 
     // Фокус
-    setTimeout(() => { this.inputEl?.focus(); this.plugin.logger.debug("[OllamaView] Input focused in onOpen."); }, 150);
+    setTimeout(() => { this.inputEl?.focus();  }, 150);
     if (this.inputEl) { this.inputEl.dispatchEvent(new Event("input")); }
  }
 
@@ -303,11 +303,11 @@ export class OllamaView extends ItemView {
   if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
   this.sidebarManager?.destroy(); // Викликаємо destroy для менеджера сайдбару
   this.dropdownMenuManager?.destroy(); // Викликаємо destroy для менеджера меню
-  this.plugin.logger.info("Ollama View closed and resources cleaned up.");
+  
 }
 
   private createUIElements(): void {
-    this.plugin.logger.debug("createUIElements: Starting UI creation.");
+    
     this.contentEl.empty(); // Очищуємо основний контейнер View
     // Створюємо головний flex-контейнер для сайдбару та області чату
     const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" }); // Використовуємо CSS_CLASS_CONTAINER
@@ -315,7 +315,7 @@ export class OllamaView extends ItemView {
     // Визначаємо, де має бути View і чи це десктоп
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
     const isDesktop = Platform.isDesktop;
-    this.plugin.logger.debug(`[OllamaView] createUIElements Context: isDesktop=${isDesktop}, isSidebarLocation=${isSidebarLocation}`);
+    
   
     // 1. Створюємо Сайдбар і ЗБЕРІГАЄМО ПОСИЛАННЯ на кореневий елемент
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
@@ -343,7 +343,7 @@ export class OllamaView extends ItemView {
     this.mainChatAreaEl = flexContainer.createDiv({ cls: "ollama-main-chat-area" }); // Використовуємо CSS_MAIN_CHAT_AREA
     // Додаємо клас, якщо сайдбар приховано, щоб область чату займала всю ширину
     this.mainChatAreaEl.classList.toggle('full-width', !shouldShowInternalSidebar);
-    this.plugin.logger.debug(`[OllamaView] Main chat area class 'full-width' set: ${!shouldShowInternalSidebar}`);
+    
   
     // --- Створення решти елементів UI всередині mainChatAreaEl ---
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
@@ -373,17 +373,17 @@ export class OllamaView extends ItemView {
     this.updateToggleLocationButton(); // Встановлює іконку/title
     this.dropdownMenuManager = new DropdownMenuManager(this.plugin, this.app, this, inputContainer, isSidebarLocation, isDesktop);
     this.dropdownMenuManager.createMenuUI();
-    this.plugin.logger.debug("createUIElements: Finished UI creation.");
+    
   }
 
   private attachEventListeners(): void {
-    this.plugin.logger.debug("[OllamaView] Attaching event listeners...");
+    
 
     // --- ДОДАНО: Слухач для роздільника ---
     if (this.resizerEl) {
         // Додаємо слухач mousedown до роздільника
         this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
-        this.plugin.logger.debug("Added mousedown listener to resizer handle.");
+        
     } else {
          this.plugin.logger.error("Resizer element (resizerEl) not found during listener attachment!");
     }
@@ -816,7 +816,7 @@ export class OllamaView extends ItemView {
       const trimmedName = newName?.trim();
 
       if (trimmedName && trimmedName !== "" && trimmedName !== currentName) {
-        this.plugin.logger.debug(`Attempting rename for chat ${chatId} to "${trimmedName}" via ChatManager.renameChat`);
+        
 
         const success = await this.plugin.chatManager.renameChat(chatId!, trimmedName);
 
@@ -3579,74 +3579,88 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   // OllamaView.ts
 
 private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
+  // 1. Зберігаємо resolver, переданий з викликаючої сторони (sendMessage або handleRegenerateClick)
   const localResolver = this.currentMessageAddedResolver;
+  // 2. Негайно очищуємо глобальний resolver, щоб він не був випадково використаний повторно або іншим потоком.
   this.currentMessageAddedResolver = null; 
+  
   const messageForLog = data?.message; 
+  const messageTimestampForLog = messageForLog?.timestamp?.getTime();
+  const messageRoleForLog = messageForLog?.role;
+
+  this.plugin.logger.debug(`[HMA ENTRY] For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}. localResolver ${localResolver ? 'EXISTS' : 'is NULL'}.`);
 
   try {
+    // ----- Початкові перевірки з раннім виходом -----
     if (!data || !data.message) {
       this.plugin.logger.error("[HMA] Invalid data received in handleMessageAdded.", data);
+      // Якщо localResolver існував, викликаємо його перед виходом
       if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to invalid data before return.");
+          this.plugin.logger.debug(`[HMA INVALID DATA] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
       }
-      return;
+      return; // Ранній вихід
     }
+
     const { chatId: eventChatId, message } = data;
-    const messageTimestampMs = message.timestamp.getTime();
+    const messageTimestampMs = message.timestamp.getTime(); // Використовуємо цей timestamp для порівнянь
 
-    this.plugin.logger.info(
-      `[HMA] <<< ENTERED >>> Chat: ${eventChatId}, Role: ${message.role}, Ts: ${messageTimestampMs}, Content: "${message.content.substring(0,50)}..."`
-    );
-
+    // Перевірка, чи компонент все ще існує і чи є ChatManager
     if (!this.chatContainer || !this.plugin.chatManager) {
       this.plugin.logger.error("[HMA] CRITICAL: Context (chatContainer or chatManager) missing!");
       if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to missing context before return.");
+          this.plugin.logger.debug(`[HMA MISSING CONTEXT] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
       }
-      return;
+      return; // Ранній вихід
     }
 
+    // Перевірка, чи подія для активного чату
     const activeChatId = this.plugin.chatManager.getActiveChatId();
     if (eventChatId !== activeChatId) {
       this.plugin.logger.debug(`[HMA] Event for non-active chat ${eventChatId} (current is ${activeChatId}). Ignoring UI update.`);
       if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to non-active chat before return.");
+          this.plugin.logger.debug(`[HMA NON-ACTIVE CHAT] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
       }
-      return;
+      return; // Ранній вихід
     }
 
+    // Перевірка на дублікат в DOM (повідомлення, а не плейсхолдера)
     const existingMessageElInDom = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
     if (existingMessageElInDom) {
-        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM and is NOT a placeholder. Skipping add.`);
+        this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already exists in DOM (not placeholder). Skipping.`);
         if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to existing DOM element (not placeholder) before return.");
+          this.plugin.logger.debug(`[HMA EXISTING DOM MSG] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
         }
-        return;
+        return; // Ранній вихід
     }
     
+    // Перевірка на дублікат в кеші currentMessages
     const alreadyInCache = this.currentMessages.some(
       m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content 
     );
     if (alreadyInCache) {
-       this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) is already in currentMessages. Likely duplicate event. Content: "${message.content.substring(0,30)}"`);
+       this.plugin.logger.warn(`[HMA] Message with ts ${messageTimestampMs} (Role: ${message.role}) already in currentMessages cache. Skipping.`);
        if (localResolver) {
-          this.plugin.logger.debug("[HMA] Calling localResolver due to message already in cache before return.");
+          this.plugin.logger.debug(`[HMA MSG IN CACHE] Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
           localResolver();
        }
-       return;
+       return; // Ранній вихід
     }
 
+    // ----- Основна логіка обробки -----
     if (message.role === "assistant" && this.activePlaceholder?.timestamp === messageTimestampMs) {
+      // Знайдено відповідний плейсхолдер для повідомлення асистента
       this.plugin.logger.debug(
-        `[HMA] Assistant message (ts: ${messageTimestampMs}) matches active placeholder. Updating placeholder in place.`
+        `[HMA] Assistant message (ts: ${messageTimestampMs}) MATCHES active placeholder (ts: ${this.activePlaceholder.timestamp}). Updating placeholder.`
       );
       const placeholderToUpdate = this.activePlaceholder; 
+      // НЕ очищуємо this.activePlaceholder тут, а тільки після успішного оновлення або при помилці
 
       if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
+        // Плейсхолдер валідний, оновлюємо його
         placeholderToUpdate.groupEl.classList.remove("placeholder");
         placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
         placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString()); 
@@ -3654,40 +3668,36 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
         const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
 
         if (!messageDomElement) {
+          // Критична помилка: структура плейсхолдера несподівана
           this.plugin.logger.error("[HMA] Critical: Could not find .message element within placeholder group. Removing placeholder and adding normally.");
           if(placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove(); 
-          this.activePlaceholder = null; 
+          this.activePlaceholder = null; // Очищуємо, бо плейсхолдер був дефектним
           await this.addMessageStandard(message); 
           // localResolver буде викликаний в finally
-          return; 
+          return; // Важливо вийти, щоб не продовжувати з дефектним плейсхолдером
         }
 
+        // Очищення від "крапок думання" та оновлення контенту
         placeholderToUpdate.contentEl.classList.remove("streaming-text");
         const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
         if (dotsEl) dotsEl.remove();
 
         try {
           await AssistantMessageRenderer.renderAssistantContent(
-            placeholderToUpdate.contentEl,
-            message.content,
-            this.app,
-            this.plugin,
-            this
+            placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this
           );
           AssistantMessageRenderer.addAssistantActionButtons(
-            placeholderToUpdate.messageWrapper, 
-            placeholderToUpdate.contentEl,      
-            message,
-            this.plugin,
-            this
+            placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message, this.plugin, this
           );
           BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
 
           this.lastMessageElement = placeholderToUpdate.groupEl; 
           this.currentMessages.push(message); 
           this.hideEmptyState();
+          
+          // ВАЖЛИВО: Очищуємо activePlaceholder ПІСЛЯ успішного оновлення DOM
           this.activePlaceholder = null; 
-          this.plugin.logger.debug(`[HMA] Placeholder for ts ${messageTimestampMs} successfully updated and activePlaceholder cleared.`);
+          this.plugin.logger.debug(`[HMA] Placeholder for ts ${messageTimestampMs} successfully updated and activePlaceholder set to NULL.`);
 
           setTimeout(() => {
             if (placeholderToUpdate.groupEl.isConnected) {
@@ -3701,7 +3711,7 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
           if (placeholderToUpdate.groupEl.isConnected) { 
               placeholderToUpdate.groupEl.remove(); 
           }
-          this.activePlaceholder = null; 
+          this.activePlaceholder = null; // Очищуємо, бо сталася помилка
           this.handleErrorMessage({ 
             role: "error",
             content: `Failed to finalize assistant message display: ${renderError.message}`,
@@ -3709,50 +3719,63 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
           });
         }
       } else {
+        // Плейсхолдер знайдено за timestamp, але його DOM елементи невалідні
         this.plugin.logger.error(
-          `[HMA] Active placeholder for ts ${messageTimestampMs} was matched, but its groupEl is not connected or contentEl/messageWrapper missing. groupEl connected: ${placeholderToUpdate.groupEl?.isConnected}. Adding message normally.`
+          `[HMA] Active placeholder for ts ${messageTimestampMs} was matched, but its DOM elements are invalid. groupEl connected: ${placeholderToUpdate.groupEl?.isConnected}. Adding message normally.`
         );
-        this.activePlaceholder = null; 
+        this.activePlaceholder = null; // Очищуємо, бо плейсхолдер невалідний
         await this.addMessageStandard(message); 
       }
-    } else if (message.role === "assistant" && this.activePlaceholder && this.activePlaceholder.timestamp !== messageTimestampMs) {
-      this.plugin.logger.warn(`[HMA] Received assistant message (ts: ${messageTimestampMs}) but active placeholder is for a DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding current message normally.`);
-      await this.addMessageStandard(message); 
-    }
-     else {
-      if (message.role === "assistant" && !this.activePlaceholder) {
-          this.plugin.logger.debug(`[HMA] No active placeholder for assistant message (ts: ${messageTimestampMs}). Adding normally.`);
-      } else if (message.role !== "assistant") {
+    } else {
+      // Немає відповідного плейсхолдера, або це повідомлення не від асистента,
+      // або timestamp плейсхолдера не збігається (тобто плейсхолдер для іншого запиту)
+      if (message.role === "assistant") {
+          if (this.activePlaceholder) {
+              this.plugin.logger.warn(`[HMA] Assistant message (ts: ${messageTimestampMs}) received, but active placeholder is for DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding current message normally.`);
+          } else {
+              this.plugin.logger.debug(`[HMA] No active placeholder for assistant message (ts: ${messageTimestampMs}). Adding normally.`);
+          }
+      } else {
            this.plugin.logger.debug(`[HMA] Message is not from assistant (Role: ${message.role}, Ts: ${messageTimestampMs}). Adding normally.`);
       }
       await this.addMessageStandard(message); 
     }
     this.plugin.logger.info(
-      `[HMA] <<< Nearing end of try block >>> Role: ${message.role}, Ts: ${messageTimestampMs}`
+      `[HMA] <<< Nearing end of try block >>> For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`
     );
   } catch (outerError: any) {
-    this.plugin.logger.error("[HMA] <<< CAUGHT OUTER ERROR >>> in handleMessageAdded:", outerError, data);
+    this.plugin.logger.error(`[HMA CATCH] Outer error for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}:`, outerError, data);
     this.handleErrorMessage({
       role: "error",
-      content: `Internal error processing new message in handleMessageAdded: ${outerError.message}`,
+      content: `Internal error in HMA for ${messageRoleForLog} msg: ${outerError.message}`,
       timestamp: new Date(),
     });
   } finally {
+    // Цей блок викликається ЗАВЖДИ після try або catch
+    this.plugin.logger.debug(`[HMA FINALLY START] For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}. localResolver originally ${localResolver ? 'EXISTED' : 'was NULL'}.`);
     if (localResolver) {
-      this.plugin.logger.debug(`[HMA] FINALLY: Calling localResolver for message role ${messageForLog?.role}, ts ${messageForLog?.timestamp?.getTime()}`);
+      this.plugin.logger.info(`[HMA FINALLY EXEC] >>> Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog} <<<`);
       try {
-          localResolver();
+          localResolver(); // Викликаємо збережений resolver
       } catch (resolverError) {
-          this.plugin.logger.error("[HMA] Error calling localResolver in finally:", resolverError);
+          this.plugin.logger.error(`[HMA FINALLY] Error calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}:`, resolverError);
       }
+      this.plugin.logger.info(`[HMA FINALLY EXEC] <<< Called localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog} <<<`);
     } else {
-      this.plugin.logger.debug(`[HMA] FINALLY: localResolver was null for message role ${messageForLog?.role}, ts ${messageForLog?.timestamp?.getTime()}`);
+      // Якщо localResolver був null з самого початку (тобто викликаюча сторона не передала resolver),
+      // це нормально, нічого не робимо.
+      this.plugin.logger.warn(`[HMA FINALLY SKIP] localResolver was originally null, not calling. For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
     }
     this.plugin.logger.info(
-      `[HMA] <<< EXITED (finally block) >>> Role: ${messageForLog?.role}, Ts: ${messageForLog?.timestamp?.getTime()}`
+      `[HMA EXIT] <<< FINALLY END >>> For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}`
     );
   }
 }
+
+// `handleRegenerateClick` залишається таким, як у попередній відповіді,
+// оскільки він вже використовує `Promise` (`mainAssistantMessageProcessedPromise`),
+// який має вирішуватися викликом `localResolver()` з `handleMessageAdded`.
+// Важливо, щоб `addMessageStandard` більше не намагався викликати `this.currentMessageAddedResolver`.
 
 // OllamaView.ts
 
