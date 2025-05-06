@@ -1556,7 +1556,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   
 
   if (chatSwitched || (data.chatId !== null && data.chat === null)) {
-    this.plugin.logger.error(`[handleActiveChatChanged] !!! FULL CHAT RELOAD Condition Met !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Preparing to call loadAndDisplayActiveChat...`);
+    // this.plugin.logger.error(`[handleActiveChatChanged] !!! FULL CHAT RELOAD Condition Met !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Preparing to call loadAndDisplayActiveChat...`);
     const currentStack = new Error().stack;
     this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
 

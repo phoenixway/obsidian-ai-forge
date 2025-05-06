@@ -3704,7 +3704,6 @@ This action cannot be undone.`,
       }
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       if (chatSwitched || data.chatId !== null && data.chat === null) {
-        this.plugin.logger.error(`[handleActiveChatChanged] !!! FULL CHAT RELOAD Condition Met !!! (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}). Preparing to call loadAndDisplayActiveChat...`);
         const currentStack = new Error().stack;
         this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
         this.lastProcessedChatId = data.chatId;
