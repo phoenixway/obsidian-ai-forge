@@ -1276,7 +1276,6 @@ function enhanceCodeBlocks(contentEl, view) {
   }
 }
 function fixBrokenTwemojiImages(contentEl) {
-  console.debug("[fixBrokenTwemojiImages] Checking for broken Twemoji...");
   try {
     contentEl.querySelectorAll('img.emoji[alt][src*="twemoji.maxcdn.com"]').forEach((img) => {
       var _a;
@@ -1297,9 +1296,7 @@ function fixBrokenTwemojiImages(contentEl) {
         }
       }
     });
-    console.debug("[fixBrokenTwemojiImages] Finished checking Twemoji.");
   } catch (error) {
-    console.error("[fixBrokenTwemojiImages] Error fixing Twemoji:", error);
   }
 }
 

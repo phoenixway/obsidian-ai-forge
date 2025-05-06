@@ -360,7 +360,7 @@ export function renderAvatar(
 
 // Додайте аналогічне логування та try/catch до fixBrokenTwemojiImages, якщо вона використовується
 export function fixBrokenTwemojiImages(contentEl: HTMLElement): void {
-     console.debug("[fixBrokenTwemojiImages] Checking for broken Twemoji...");
+    //  console.debug("[fixBrokenTwemojiImages] Checking for broken Twemoji...");
      try {
         contentEl.querySelectorAll('img.emoji[alt][src*="twemoji.maxcdn.com"]').forEach((img: HTMLImageElement) => {
             const alt = img.getAttribute('alt');
@@ -385,8 +385,8 @@ export function fixBrokenTwemojiImages(contentEl: HTMLElement): void {
                  }
             }
         });
-        console.debug("[fixBrokenTwemojiImages] Finished checking Twemoji.");
+        // console.debug("[fixBrokenTwemojiImages] Finished checking Twemoji.");
      } catch (error) {
-          console.error("[fixBrokenTwemojiImages] Error fixing Twemoji:", error);
+        //   console.error("[fixBrokenTwemojiImages] Error fixing Twemoji:", error);
      }
 }
