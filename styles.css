@@ -1,11 +1,11 @@
-/* Error: Top-level selectors may not contain the parent selector "&".
- *    ,
- * 35 | &ollama-chat-panel {
- *    | ^^^^^^^^^^^^^^^^^^
- *    '
- *   src/styles/_sidebar.scss 35:1  @import
- *   src/styles/_layout.scss 5:9    @import
- *   src/styles/main.scss 9:9       root stylesheet */
+/* Error: expected "}".
+ *     ,
+ * 120 |  }
+ *     |   ^
+ *     '
+ *   src/styles/_sidebar.scss 120:3  @import
+ *   src/styles/_layout.scss 5:9     @import
+ *   src/styles/main.scss 9:9        root stylesheet */
 
 body::before {
   font-family: "Source Code Pro", "SF Mono", Monaco, Inconsolata, "Fira Mono",
@@ -15,5 +15,5 @@ body::before {
   padding: 1em;
   margin-bottom: 1em;
   border-bottom: 2px solid black;
-  content: 'Error: Top-level selectors may not contain the parent selector "&".\a    \2577 \a 35 \2502  &ollama-chat-panel {\a    \2502  ^^^^^^^^^^^^^^^^^^\a    \2575 \a   src/styles/_sidebar.scss 35:1  @import\a   src/styles/_layout.scss 5:9    @import\a   src/styles/main.scss 9:9       root stylesheet';
+  content: 'Error: expected "}".\a     \2577 \a 120 \2502   }\a     \2502    ^\a     \2575 \a   src/styles/_sidebar.scss 120:3  @import\a   src/styles/_layout.scss 5:9     @import\a   src/styles/main.scss 9:9        root stylesheet';
 }
