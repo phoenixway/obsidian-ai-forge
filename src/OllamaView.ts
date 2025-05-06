@@ -3252,7 +3252,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
 
 async sendMessage(): Promise<void> {
   const content = this.inputEl.value.trim();
-  const requestTimestampId = new Date().getTime(); // Унікальний ID для логування цього запиту
+  const requestTimestampId = new Date().getTime(); 
 
   this.plugin.logger.debug(`[sendMessage START id:${requestTimestampId}] Content: "${content.substring(0,30)}...", isProcessing: ${this.isProcessing}, currentAbortController: ${this.currentAbortController ? 'active' : 'null'}`);
 
@@ -3271,7 +3271,7 @@ async sendMessage(): Promise<void> {
   }
 
   const userMessageContent = this.inputEl.value;
-  const userMessageTimestamp = new Date(); // Окремий, фіксований timestamp для повідомлення користувача
+  const userMessageTimestamp = new Date(); 
   const userMessageTimestampMs = userMessageTimestamp.getTime();
   this.clearInputField();
   
@@ -3279,13 +3279,13 @@ async sendMessage(): Promise<void> {
   this.currentAbortController = new AbortController();
   this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] currentAbortController CREATED.`);
 
-  // 2. Тепер викликаємо setLoadingState. Він оновить кнопки, використовуючи новий currentAbortController.
+  // 2. Тепер викликаємо setLoadingState
   this.setLoadingState(true); 
   this.hideEmptyState();
 
   let accumulatedResponse = "";
-  const responseStartTime = new Date(); // Час початку генерації відповіді ШІ
-  const responseStartTimeMs = responseStartTime.getTime(); // Цей timestamp буде ключем для resolver'а відповіді асистента
+  const responseStartTime = new Date(); 
+  const responseStartTimeMs = responseStartTime.getTime();
 
   let streamErrorOccurred: Error | null = null;
   let userMessageProcessedPromise: Promise<void> | undefined;
@@ -3293,16 +3293,18 @@ async sendMessage(): Promise<void> {
 
   try {
     // 3. Додаємо повідомлення користувача та чекаємо його обробки в handleMessageAdded
-    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Adding user message to ChatManager (ts: ${userMessageTimestampMs}).`);
+    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Setting up resolver for UserMessage (ts: ${userMessageTimestampMs}).`);
     userMessageProcessedPromise = new Promise<void>((resolve) => {
       this.messageAddedResolvers.set(userMessageTimestampMs, resolve);
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Resolver ADDED to map for UserMessage ts ${userMessageTimestampMs}. Map size: ${this.messageAddedResolvers.size}`);
     });
     
-    this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent, userMessageTimestamp, true); // emitEvent: true
+    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Calling addMessageToActiveChat for UserMessage (ts: ${userMessageTimestampMs}).`);
+    // Важливо: передаємо userMessageTimestamp, а не new Date()
+    this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent, userMessageTimestamp, true); 
     
     this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] TRY: Awaiting userMessageProcessedPromise for ts ${userMessageTimestampMs}`);
-    const userMessageTimeout = 5000; // 5 секунд на обробку повідомлення користувача
+    const userMessageTimeout = 5000; 
     const userMessageTimeoutPromise = new Promise<void>((_, reject) => 
         setTimeout(() => reject(new Error(`Timeout (${userMessageTimeout/1000}s) waiting for HMA for UserMessage ts ${userMessageTimestampMs}`)), userMessageTimeout)
     );
@@ -3311,12 +3313,12 @@ async sendMessage(): Promise<void> {
         this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] TRY: userMessageProcessedPromise for ts ${userMessageTimestampMs} RESOLVED or raced successfully.`);
     } catch (userAwaitError: any) {
         this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] TRY: Error or Timeout awaiting HMA for UserMessage (ts: ${userMessageTimestampMs}): ${userAwaitError.message}`);
-        // Якщо повідомлення користувача не відобразилося, це проблема, але ми можемо спробувати продовжити
-        // streamErrorOccurred = streamErrorOccurred || userAwaitError; // Не встановлюємо як streamError, щоб не перервати повністю
         if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
             this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Timeout/Error for UserMessage HMA, removing resolver from map for ts ${userMessageTimestampMs}.`);
             this.messageAddedResolvers.delete(userMessageTimestampMs);
         }
+        // Якщо повідомлення користувача не обробилося, це проблема, але можемо спробувати продовжити
+        // або кинути помилку тут, щоб не продовжувати з неповним станом. Поки що продовжуємо.
     }
 
     // 4. Створюємо плейсхолдер для відповіді асистента
@@ -3332,7 +3334,7 @@ async sendMessage(): Promise<void> {
     const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
     const assistantContentEl = contentContainer.createDiv({ cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text` });
     assistantContentEl.empty();
-    const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS }); // Тут з'являються крапки
+    const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS }); 
     for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
 
     if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
@@ -3351,7 +3353,6 @@ async sendMessage(): Promise<void> {
     setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
     this.guaranteedScrollToBottom(50, true);
 
-    // 5. Отримуємо оновлений чат (має містити повідомлення користувача)
     const updatedActiveChat = await this.plugin.chatManager.getActiveChat();
     if (!updatedActiveChat) {
         this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] CRITICAL: Active chat became null after adding user message.`);
@@ -3361,7 +3362,7 @@ async sendMessage(): Promise<void> {
     this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Starting stream. Context messages: ${updatedActiveChat.messages.length}.`);
     const stream = this.plugin.ollamaService.generateChatResponseStream(
       updatedActiveChat, 
-      this.currentAbortController.signal // Використовуємо AbortController, створений на початку
+      this.currentAbortController.signal
     );
 
     let firstChunk = true;
@@ -3373,7 +3374,7 @@ async sendMessage(): Promise<void> {
           }
           if ("response" in chunk && chunk.response) {
             if (this.activePlaceholder?.timestamp === responseStartTimeMs && this.activePlaceholder.contentEl) {
-              if (firstChunk) { // Видаляємо крапки при першому фрагменті
+              if (firstChunk) { 
                 const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
                 if (thinkingDots) thinkingDots.remove();
                 firstChunk = false;
@@ -3400,7 +3401,7 @@ async sendMessage(): Promise<void> {
           this.messageAddedResolvers.set(responseStartTimeMs, resolve);
           this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Resolver ADDED to map for AssistantMessage ts ${responseStartTimeMs}. Map size: ${this.messageAddedResolvers.size}`);
       });
-      this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true); // emitEvent: true
+      this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true); 
 
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] TRY: Awaiting assistantMessageProcessedPromise for ts ${responseStartTimeMs}`);
       const assistantTimeout = 10000;
@@ -3425,23 +3426,22 @@ async sendMessage(): Promise<void> {
           this.activePlaceholder = null;
           this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Placeholder for ts ${responseStartTimeMs} removed (empty response).`);
       }
-      this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response.", new Date(), true); // emitEvent: true
+      this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response.", new Date(), true);
     }
 
   } catch (error: any) {
     streamErrorOccurred = error;
     this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] CATCH: Error during sendMessage process:`, error);
     
-    if (this.activePlaceholder?.timestamp === responseStartTimeMs) { // Очищення плейсхолдера, якщо він стосувався цього запиту
+    if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
         if(this.activePlaceholder.groupEl?.isConnected) this.activePlaceholder.groupEl.remove();
         this.activePlaceholder = null;
     }
-    // Очищення resolver'ів, які могли бути встановлені
     if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
          this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] CATCH: Removing UserMessage resolver for ts ${userMessageTimestampMs} due to error.`);
          this.messageAddedResolvers.delete(userMessageTimestampMs);
     }
-    if (this.messageAddedResolvers.has(responseStartTimeMs)) { // Для відповіді асистента
+    if (this.messageAddedResolvers.has(responseStartTimeMs)) { 
          this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] CATCH: Removing AssistantMessage resolver for ts ${responseStartTimeMs} due to error.`);
          this.messageAddedResolvers.delete(responseStartTimeMs);
     }
@@ -3455,7 +3455,7 @@ async sendMessage(): Promise<void> {
         errorMsgForChat = `Message generation failed: ${error.message || "Unknown error"}`; 
         new Notice(errorMsgForChat, 5000);
     }
-    this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true); // emitEvent: true
+    this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true); 
 
   } finally {
     this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? 'active' : 'null'}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${this.activePlaceholder?.timestamp}, Resolvers map size: ${this.messageAddedResolvers.size}`);
@@ -3469,21 +3469,20 @@ async sendMessage(): Promise<void> {
         this.messageAddedResolvers.delete(responseStartTimeMs);
     }
 
-    if (this.activePlaceholder?.timestamp === responseStartTimeMs) { // Якщо плейсхолдер для ЦЬОГО запиту ще існує
+    if (this.activePlaceholder?.timestamp === responseStartTimeMs) { 
        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] FINALLY: Active placeholder (ts: ${responseStartTimeMs}) was NOT CLEARED BY HMA. Removing now.`);
        if (this.activePlaceholder.groupEl?.isConnected) this.activePlaceholder.groupEl.remove();
        this.activePlaceholder = null;
     }
     
     const prevAbortCtrl = this.currentAbortController;
-    this.currentAbortController = null; // Скидаємо AbortController
+    this.currentAbortController = null;
     this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY: currentAbortController set to null. Was: ${prevAbortCtrl ? 'active' : 'null'}. Now: ${this.currentAbortController ? 'active' : 'null'}`);
     
-    // isRegenerating тут не використовується, але isProcessing скидається через setLoadingState
     this.setLoadingState(false); 
     
     requestAnimationFrame(() => {
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (requestAnimationFrame): Forcing updateSendButtonState. AbortCtrl: ${this.currentAbortController ? 'active' : 'null'}, isProcessing: ${this.isProcessing}`);
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (requestAnimationFrame): Forcing updateSendButtonState.`);
       this.updateSendButtonState();
     });
     

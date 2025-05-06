@@ -5892,11 +5892,12 @@ Summary:`;
     let userMessageProcessedPromise;
     let assistantMessageProcessedPromise;
     try {
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Adding user message to ChatManager (ts: ${userMessageTimestampMs}).`);
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Setting up resolver for UserMessage (ts: ${userMessageTimestampMs}).`);
       userMessageProcessedPromise = new Promise((resolve) => {
         this.messageAddedResolvers.set(userMessageTimestampMs, resolve);
         this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Resolver ADDED to map for UserMessage ts ${userMessageTimestampMs}. Map size: ${this.messageAddedResolvers.size}`);
       });
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Calling addMessageToActiveChat for UserMessage (ts: ${userMessageTimestampMs}).`);
       this.plugin.chatManager.addMessageToActiveChat("user", userMessageContent, userMessageTimestamp, true);
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] TRY: Awaiting userMessageProcessedPromise for ts ${userMessageTimestampMs}`);
       const userMessageTimeout = 5e3;
@@ -5952,7 +5953,6 @@ Summary:`;
       const stream = this.plugin.ollamaService.generateChatResponseStream(
         updatedActiveChat,
         this.currentAbortController.signal
-        // Використовуємо AbortController, створений на початку
       );
       let firstChunk = true;
       for await (const chunk of stream) {
@@ -6072,7 +6072,7 @@ Summary:`;
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY: currentAbortController set to null. Was: ${prevAbortCtrl ? "active" : "null"}. Now: ${this.currentAbortController ? "active" : "null"}`);
       this.setLoadingState(false);
       requestAnimationFrame(() => {
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (requestAnimationFrame): Forcing updateSendButtonState. AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
+        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (requestAnimationFrame): Forcing updateSendButtonState.`);
         this.updateSendButtonState();
       });
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY (END).`);
