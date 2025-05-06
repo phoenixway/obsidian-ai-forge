@@ -7199,7 +7199,6 @@ var PromptService = class {
     return Math.ceil(text.length / 4);
   }
   clearRoleCache() {
-    this.plugin.logger.debug("[PromptService] Clearing role definition cache.");
     this.roleCache = {};
     this.currentRolePath = null;
     this.currentSystemPrompt = null;

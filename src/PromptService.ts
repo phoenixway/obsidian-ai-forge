@@ -25,7 +25,7 @@ export class PromptService {
 
     clearRoleCache(): void {
         // ... (без змін) ...
-        this.plugin.logger.debug("[PromptService] Clearing role definition cache.");
+        // this.plugin.logger.debug("[PromptService] Clearing role definition cache.");
         this.roleCache = {};
         this.currentRolePath = null; // Скидаємо кешований шлях
         this.currentSystemPrompt = null;
