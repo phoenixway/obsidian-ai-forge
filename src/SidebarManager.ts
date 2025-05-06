@@ -578,7 +578,7 @@ export class SidebarManager {
              });
         } catch (error) {
              // Обробка помилки під час оновлення вмісту
-             this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+             this.plugin.logger.error(`Error updating sidebar  section ${sectionType}:`, error);
              contentEl.setText(`Error loading ${sectionType}.`); // Показуємо повідомлення про помилку
              // Все одно додаємо клас, щоб показати помилку
               requestAnimationFrame(() => {

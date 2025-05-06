@@ -2486,7 +2486,7 @@ var SidebarManager = class {
           }
         });
       } catch (error) {
-        this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+        this.plugin.logger.error(`Error updating sidebar  section ${sectionType}:`, error);
         contentEl.setText(`Error loading ${sectionType}.`);
         requestAnimationFrame(() => {
           if ((contentEl == null ? void 0 : contentEl.isConnected) && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
