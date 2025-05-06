@@ -5520,19 +5520,16 @@ This action cannot be undone.`,
   checkMessageForCollapsing(messageElOrGroupEl) {
     const messageGroupEl = messageElOrGroupEl.classList.contains(CSS_CLASSES.MESSAGE_GROUP) ? messageElOrGroupEl : messageElOrGroupEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`);
     if (!messageGroupEl) {
-      this.plugin.logger.trace("[checkMessageForCollapsing] Could not find messageGroupEl.");
       return;
     }
     const contentCollapsible = messageGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
     const messageEl = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
     if (!contentCollapsible || !messageEl) {
-      this.plugin.logger.trace(`[checkMessageForCollapsing] No contentCollapsible or messageEl found in message group (ts: ${messageGroupEl.dataset.timestamp || messageGroupEl.dataset.placeholderTimestamp}).`);
       return;
     }
     const maxH = this.plugin.settings.maxMessageHeight;
     const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && messageGroupEl.hasAttribute("data-placeholder-timestamp") && contentCollapsible.classList.contains("streaming-text");
     if (isStreamingNow) {
-      this.plugin.logger.debug(`[checkMessageForCollapsing] Streaming placeholder (ts: ${messageGroupEl.dataset.placeholderTimestamp}). No 'Show More' button. Content expanded.`);
       const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       contentCollapsible.style.maxHeight = "";
@@ -5540,7 +5537,6 @@ This action cannot be undone.`,
       return;
     }
     if (maxH <= 0) {
-      this.plugin.logger.trace(`[checkMessageForCollapsing] maxMessageHeight disabled. Removing button, expanding content for (ts: ${messageGroupEl.dataset.timestamp}).`);
       const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       contentCollapsible.style.maxHeight = "";
@@ -5559,7 +5555,6 @@ This action cannot be undone.`,
       }
       if (scrollHeight > maxH) {
         if (!existingButton) {
-          this.plugin.logger.debug(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) > maxH (${maxH}). Adding 'Show More' button for (ts: ${messageGroupEl.dataset.timestamp}).`);
           existingButton = messageEl.createEl("button", {
             cls: CSS_CLASSES.SHOW_MORE_BUTTON
           });
@@ -5575,7 +5570,6 @@ This action cannot be undone.`,
           contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
           existingButton.setText("Show More \u25BC");
         } else {
-          this.plugin.logger.trace(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) > maxH (${maxH}). Button already exists for (ts: ${messageGroupEl.dataset.timestamp}). Updating text if needed.`);
           if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
             existingButton.setText("Show More \u25BC");
           } else {
@@ -5584,7 +5578,6 @@ This action cannot be undone.`,
         }
       } else {
         if (existingButton) {
-          this.plugin.logger.debug(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) <= maxH (${maxH}). Removing 'Show More' button for (ts: ${messageGroupEl.dataset.timestamp}).`);
           existingButton.remove();
         }
         contentCollapsible.style.maxHeight = "";
