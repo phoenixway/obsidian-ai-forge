@@ -1690,6 +1690,8 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
 
   // OllamaView.ts
   public async handleRegenerateClick(userMessage: Message): Promise<void> {
+
+    this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}`);
     if (this.currentAbortController) {
       this.plugin.logger.warn(
         "Cannot regenerate while another generation is in progress. Cancelling current one first."

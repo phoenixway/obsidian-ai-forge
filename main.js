@@ -4728,6 +4728,7 @@ This action cannot be undone.`,
   // OllamaView.ts
   async handleRegenerateClick(userMessage) {
     var _a;
+    this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}`);
     if (this.currentAbortController) {
       this.plugin.logger.warn(
         "Cannot regenerate while another generation is in progress. Cancelling current one first."
