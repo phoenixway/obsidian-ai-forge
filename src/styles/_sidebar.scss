@@ -2,8 +2,7 @@
 // Головний файл стилів сайдбару
 
 // --- Імпорт ---
-// Переконайтесь, що шлях правильний відносно цього файлу
-@import 'sidebar-related/section-content';
+@import 'sidebar-related/section-content'; // Перевірте шлях!
 // ---
 
 // --- Sidebar Panel (Hosts Accordion) ---
@@ -35,7 +34,10 @@
 .ollama-chat-panel,
 .ollama-role-panel {
     display: flex; flex-direction: column; // Кожна секція - колонка (заголовок+контент)
-    // Прибираємо flex-grow/shrink звідси, вони тепер на контенті
+    // Налаштування росту/стискання для логіки акордеону
+    &.ollama-role-panel { flex-shrink: 0; } // Секція ролей не стискається по висоті
+    // Закоментовано, бо контент сам керує ростом
+    // &.ollama-chat-panel { flex-grow: 1; min-height: 0; overflow: hidden; }
 }
 
 .ollama-sidebar-section-header {
