@@ -204,68 +204,56 @@ $folder-icon-extra-indent: 4px;
   } // Кінець .ollama-hierarchy-item
 
   .ollama-role-panel-list {
-    flex-grow: 1; // Для акордеону
-    min-height: 0;
+    // flex-grow: 1; // Прибрано в попередньому кроці для акордеону
+    // min-height: 0;
 
     .ollama-role-panel-item {
-        margin: 1px 0; // Відступ між рядками
-        border-radius: var(--radius-s); // Радіус рамки
-        cursor: pointer;
-        display: flex; // Горизонтальне розташування
-        align-items: center; // Вертикальне вирівнювання по центру
-        // Відступи: верх/низ як у ієрархії, горизонтальні симетричні
-        padding: $item-padding-vertical $item-padding-horizontal;
-        min-height: calc($icon-size + 2 * $item-padding-vertical); // Мінімальна висота як у ієрархії
-        gap: $icon-margin; // Проміжок між іконкою та текстом
+        margin: 1px 0; border-radius: var(--radius-s); cursor: pointer; display: flex; align-items: center;
+        padding: $item-padding-vertical $item-padding-horizontal; // Симетричний padding
+        min-height: calc($icon-size + 2 * $item-padding-vertical);
+        gap: $icon-margin; // Використовуємо gap
 
-        &:hover {
-            background-color: var(--background-modifier-hover); // Ефект наведення
-        }
+        &:hover { background-color: var(--background-modifier-hover); }
 
         > .ollama-role-panel-item-icon {
-            flex-shrink: 0;
-            width: $icon-size; // Розмір контейнера іконки як у ієрархії
-            height: $icon-size;
-            color: var(--text-faint); // Колір іконки як у ієрархії
+            flex-shrink: 0; width: $icon-size; height: $icon-size; color: var(--text-faint);
             display: flex; align-items: center; justify-content: center;
-            margin: 0; // Без додаткових відступів (використовуємо gap)
-            .svg-icon {
-                width: 15px; // Трохи менша іконка ролі
-                height: 15px;
-            }
+            margin: 0; // Без margin, бо є gap
+            .svg-icon { width: 15px; height: 15px; }
         }
 
-        .ollama-role-panel-item-text {
-            flex-grow: 1;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-            // --- Явно вказуємо стилі шрифту як у ієрархії ---
-            font-size: var(--font-ui-small);
-            line-height: 1.3;
-            color: var(--text-normal);
-            font-weight: inherit; // Наслідуємо стандартну вагу
-            // ------------------------------------------------
-            padding-left: 0;
-            min-width: 0;
+        // --- ЗМІНА: Більш специфічний селектор + !important ---
+        // Націлюємось на текст всередині елемента ролі в списку ролей
+        &.ollama-role-panel-item > .ollama-role-panel-item-text {
+             flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+             // Встановлюємо потрібні стилі з !important
+             font-size: var(--font-ui-small) !important;
+             line-height: 1.3 !important;
+             color: var(--text-normal) !important;
+             font-weight: inherit !important; // Скидаємо можливий жирний шрифт від .menu-option-text
+             padding-left: 0; min-width: 0;
         }
+        // --- КІНЕЦЬ ЗМІН ---
 
-        // Стилі для активного стану (залишаємо)
+        // Активний стан (також може потребувати !important)
         &.is-active {
             background-color: var(--interactive-accent-translucent);
-            > .ollama-role-panel-item-icon { color: var(--interactive-accent); }
-            > .ollama-role-panel-item-text {
-                color: var(--text-accent);
-                font-weight: 500; // Робимо жирнішим
-                font-size: var(--font-ui-small); // Переконуємось, що розмір той самий
-            }
-            &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
+             > .ollama-role-panel-item-icon { color: var(--interactive-accent) !important; }
+             > .ollama-role-panel-item-text { // Застосовуємо і тут
+                 color: var(--text-accent) !important;
+                 font-weight: 500 !important;
+                 font-size: var(--font-ui-small) !important; // Переконуємось
+             }
+             &:hover { background-color: var(--interactive-accent-translucent); filter: brightness(1.1); }
         }
-        // Стилі для кастомних ролей (залишаємо)
+        // Кастомні та "None"
         &.is-custom > .ollama-role-panel-item-icon:not(:has(.svg-icon[icon-name="check"])) { color: var(--text-faint); }
-        // Стилі для "None" (залишаємо)
-        &.ollama-role-panel-item-none { /* Можна додати стилі */ }
+        &.ollama-role-panel-item-none { /* Стилі для "None", якщо потрібні */ }
 
     } // Кінець .ollama-role-panel-item
-} // Кінець .ollama-role-panel-list// Кінець .ollama-role-panel-list
+} // Кінець .ollama-role-panel-list
+
+
   // Повідомлення "немає чатів/ролей"
   .menu-info-text {
     padding: var(--size-4-2) var(--size-4-3);
