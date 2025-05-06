@@ -8,9 +8,22 @@ $item-padding-horizontal: var(--size-4-2, 8px);
 $icon-size: 16px;
 $icon-margin: var(--size-4-2);
 $folder-icon-extra-indent: 4px;
-// ---
+
+
+// --- Змінні для стилізації секцій сайдбару ---
 // Контейнер вмісту секції (список чатів або ролей)
 
+.ollama-sidebar-section-content {
+    overflow: hidden; // Ховаємо вміст, коли згорнуто
+    flex-shrink: 1; // Дозволяємо стискатись, якщо обидві секції відкриті (хоча акордеон не має цього допустити)
+    transition: opacity 0.2s ease-out, padding-top 0.2s ease-out, padding-bottom 0.2s ease-out; // Анімація для плавності
+    box-sizing: border-box;
+    padding: 0 var(--size-4-2); // Тільки горизонтальний padding за замовчуванням
+    opacity: 0; // Приховано
+    max-height: 0; // Згорнуто
+    min-height: 0; // Дозволяє згортатись до нуля
+
+} //.ollama-sidebar-section-content ENDING
 
 // ------------------------------------------------------------------------ //
 

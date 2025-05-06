@@ -60,14 +60,14 @@
     .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
 }
 .ollama-sidebar-section-content {
-  overflow: hidden; // Ховаємо вміст, коли згорнуто
-  flex-shrink: 1; // Дозволяємо стискатись, якщо обидві секції відкриті (хоча акордеон не має цього допустити)
-  transition: opacity 0.2s ease-out, padding-top 0.2s ease-out, padding-bottom 0.2s ease-out; // Анімація для плавності
-  box-sizing: border-box;
-  padding: 0 var(--size-4-2); // Тільки горизонтальний padding за замовчуванням
-  opacity: 0; // Приховано
-  max-height: 0; // Згорнуто
-  min-height: 0; // Дозволяє згортатись до нуля
+  // overflow: hidden; // Ховаємо вміст, коли згорнуто
+  // flex-shrink: 1; // Дозволяємо стискатись, якщо обидві секції відкриті (хоча акордеон не має цього допустити)
+  // transition: opacity 0.2s ease-out, padding-top 0.2s ease-out, padding-bottom 0.2s ease-out; // Анімація для плавності
+  // box-sizing: border-box;
+  // padding: 0 var(--size-4-2); // Тільки горизонтальний padding за замовчуванням
+  // opacity: 0; // Приховано
+  // max-height: 0; // Згорнуто
+  // min-height: 0; // Дозволяє згортатись до нуля
 
   // Стан розгорнутої секції
   &.is-expanded {
