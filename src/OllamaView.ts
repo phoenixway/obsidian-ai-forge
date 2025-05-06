@@ -3595,26 +3595,28 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       resolverForThisMessage = this.messageAddedResolvers.get(messageTimestampForLog);
       if (resolverForThisMessage) {
           resolverFoundInMap = true;
-          // НЕ видаляємо з мапи тут, а тільки в finally ПІСЛЯ виклику, або якщо точно не буде викликаний.
-          this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map. Will attempt to call in finally.`);
+          // Видаляємо resolver з мапи ВІДРАЗУ, щоб уникнути його повторного використання,
+          // якщо подія message-added з якихось причин прийде двічі для одного й того ж повідомлення.
+          // resolverForThisMessage тепер містить посилання на функцію, і ми викличемо її в finally.
+          this.messageAddedResolvers.delete(messageTimestampForLog); 
+          this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`);
       } else {
-          this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp.`);
+          this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`);
       }
   } else {
       this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map.`);
   }
   
-  this.plugin.logger.error(`[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? 'potentially_exists' : 'NOT_found_or_undefined_ts'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
+  this.plugin.logger.error(`[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? 'FOUND' : 'NOT_FOUND'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
 
   try {
     if (!data || !data.message) {
       this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received.`, data);
-      // Якщо resolver був знайдений, але ми виходимо, його треба викликати, щоб розблокувати очікування
-      // і видалити з мапи, бо він більше не буде використаний для цього повідомлення.
-      if (resolverForThisMessage && resolverFoundInMap) { // Перевіряємо, чи він дійсно був для цього TS
-          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage due to invalid data (EXIT).`);
+      // Якщо був resolver для цього (малоймовірно, якщо data.message немає), викликаємо його
+      // Оскільки resolver вже видалено з мапи, якщо знайдено, тут просто викликаємо збережене посилання
+      if (resolverForThisMessage) { 
+          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage (invalid data).`);
           resolverForThisMessage();
-          if (messageTimestampForLog) this.messageAddedResolvers.delete(messageTimestampForLog);
       }
       return;
     }
@@ -3624,10 +3626,9 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
 
     if (!this.chatContainer || !this.plugin.chatManager) {
       this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing!`);
-      if (resolverForThisMessage && resolverFoundInMap) {
-          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context - EXIT).`);
+      if (resolverForThisMessage) {
+          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context).`);
           resolverForThisMessage();
-          this.messageAddedResolvers.delete(messageTimestampMs);
       }
       return;
     }
@@ -3635,10 +3636,9 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
     const activeChatId = this.plugin.chatManager.getActiveChatId();
     if (eventChatId !== activeChatId) {
       this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId}.`);
-      if (resolverForThisMessage && resolverFoundInMap) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat - EXIT).`);
+      if (resolverForThisMessage) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat).`);
           resolverForThisMessage();
-          this.messageAddedResolvers.delete(messageTimestampMs);
       }
       return;
     }
@@ -3646,34 +3646,41 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
     const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
     if (existingRenderedMessage) {
         this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message already rendered (not placeholder). Role: ${message.role}.`);
-        if (resolverForThisMessage && resolverFoundInMap) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered - EXIT).`);
+        if (resolverForThisMessage) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered).`);
           resolverForThisMessage();
-          this.messageAddedResolvers.delete(messageTimestampMs);
         }
         return;
     }
     
-    const alreadyInLogicCache = this.currentMessages.some(
+    // Перевіряємо, чи повідомлення вже додано в this.currentMessages.
+    // Це важливо, щоб не додавати його двічі, якщо подія дублюється або логіка спрацьовує несподівано.
+    const alreadyInCurrentMessages = this.currentMessages.some(
       m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role 
     );
     const isPotentiallyAssistantForPlaceholder = 
         message.role === 'assistant' && 
         this.activePlaceholder?.timestamp === messageTimestampMs;
     
-    this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
+    this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInCurrentMessages=${alreadyInCurrentMessages}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
 
-    if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-      this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): In cache and NOT assistant for active placeholder. Role: ${message.role}.`);
-      if (resolverForThisMessage && resolverFoundInMap) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match - EXIT).`);
+    if (alreadyInCurrentMessages && !isPotentiallyAssistantForPlaceholder) {
+      this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): In currentMessages and NOT assistant for active placeholder. Role: ${message.role}.`);
+      if (resolverForThisMessage) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match).`);
           resolverForThisMessage();
-          this.messageAddedResolvers.delete(messageTimestampMs);
       }
       return; 
     }
-    if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
-      this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS assistant for active placeholder. Proceeding.`);
+    if (alreadyInCurrentMessages && isPotentiallyAssistantForPlaceholder) {
+      this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in currentMessages, BUT IS assistant for active placeholder. Proceeding to update placeholder's DOM.`);
+    }
+    
+    // Додаємо повідомлення в кеш this.currentMessages, ЯКЩО його там ще немає.
+    // Робимо це перед рендерингом, щоб уникнути стану гонитви, якщо рендеринг асинхронний.
+    if (!alreadyInCurrentMessages) {
+        this.currentMessages.push(message);
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. Count: ${this.currentMessages.length}`);
     }
     
     this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
@@ -3686,7 +3693,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       
       if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
         this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder DOM elements are valid for update.`);
-        // ... (логіка оновлення плейсхолдера як в #15, включаючи this.activePlaceholder = null; після успіху)
         placeholderToUpdate.groupEl.classList.remove("placeholder");
         placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
         placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString()); 
@@ -3696,8 +3702,7 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
           this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
           if(placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove(); 
           this.activePlaceholder = null; 
-          await this.addMessageStandard(message); 
-          if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) { this.currentMessages.push(message); }
+          await this.addMessageStandard(message); // addMessageStandard не додає в currentMessages
         } else {
           placeholderToUpdate.contentEl.classList.remove("streaming-text");
           const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
@@ -3708,12 +3713,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
             AssistantMessageRenderer.addAssistantActionButtons( placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message, this.plugin, this );
             BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
             this.lastMessageElement = placeholderToUpdate.groupEl; 
-            if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
-                 this.currentMessages.push(message);
-                 this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message pushed to currentMessages after placeholder update.`);
-            } else {
-                 this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message already in currentMessages after placeholder update.`);
-            }
             this.hideEmptyState();
             this.activePlaceholder = null; 
             this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`); 
@@ -3730,15 +3729,10 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
         this.plugin.logger.error( `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. Adding normally.` );
         this.activePlaceholder = null; 
         await this.addMessageStandard(message); 
-        if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) { this.currentMessages.push(message); }
       }
     } else {
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR non-assistant/non-matching. Adding normally.`);
+      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR non-assistant/non-matching. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}. Adding normally.`);
       await this.addMessageStandard(message); 
-      if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
-          this.currentMessages.push(message);
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) pushed to currentMessages after addMessageStandard.`);
-      }
     }
     this.plugin.logger.debug(
       `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
@@ -3751,24 +3745,17 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       timestamp: new Date(),
     });
   } finally {
-    this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage was ${resolverFoundInMap ? 'FOUND and available' : (resolverForThisMessage ? 'available but not from map?' : 'NOT available')}.`);
-    if (resolverForThisMessage) { // Викликаємо, якщо він існує (був знайдений в мапі для цього TS)
+    this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? 'EXISTS' : 'is NULL (or was not found for this specific ts)'}.`);
+    if (resolverForThisMessage) { // Викликаємо, якщо він був знайдений для цього timestamp на початку
       this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`); 
       try {
           resolverForThisMessage(); 
-          // Видалення з мапи тепер тут, ПІСЛЯ виклику (якщо він не був видалений раніше)
-          // Але ми видаляємо на початку, коли знаходимо, щоб уникнути подвійного виклику.
-          // Тому тут перевірка вже не потрібна, якщо логіка get/delete на початку правильна.
-          // if (messageTimestampForLog && this.messageAddedResolvers.has(messageTimestampForLog)) {
-          //     this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Resolver was called, but still in map. Removing now.`);
-          //     this.messageAddedResolvers.delete(messageTimestampForLog);
-          // }
       } catch (resolverError) {
           this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
       }
       this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`); 
     } else {
-      this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found for this message instance or already used/deleted.`);
+      this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found for this message instance, or already used/deleted from map earlier.`);
     }
     this.plugin.logger.debug(
       `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}. Map size: ${this.messageAddedResolvers.size}`
@@ -3927,14 +3914,19 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
         );
 
         if (accumulatedResponse.trim()) {
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Adding assistant message to ChatManager (expected ts: ${responseStartTimeMs}).`);
+          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Adding assistant message to ChatManager (expected ts: ${responseStartTimeMs}). Setting emitEvent to TRUE.`);
           
           mainAssistantMessageProcessedPromise = new Promise<void>((resolve) => {
               this.messageAddedResolvers.set(responseStartTimeMs, resolve); 
               this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Resolver ADDED to map for ts ${responseStartTimeMs}. Map size: ${this.messageAddedResolvers.size}`);
           });
           
-          this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false );
+          this.plugin.chatManager.addMessageToActiveChat(
+            "assistant", 
+            accumulatedResponse, 
+            responseStartTime, 
+            true // Встановлюємо emitEvent: true
+          ); 
           
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] TRY: Awaiting mainAssistantMessageProcessedPromise (via map) for ts ${responseStartTimeMs}`);
           
@@ -3963,7 +3955,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
               this.activePlaceholder = null; 
               this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder (ts: ${responseStartTimeMs}) cleared due to empty response.`);
           }
-          this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response during regeneration.", new Date() );
+          this.plugin.chatManager.addMessageToActiveChat("system", "Assistant provided an empty response during regeneration.", new Date(), true ); // emitEvent: true для системних повідомлень, якщо для них потрібна обробка
         }
 
       } catch (error: any) {
@@ -3995,16 +3987,19 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
         }
         
         this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Adding error/system message to chat: "${errorMsgForChat}"`);
-        this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
+        // Для повідомлень про помилки/системних, які додаються тут, ми не створюємо Promise/resolver,
+        // оскільки основний потік вже в стані помилки або завершення.
+        this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true); 
 
         if (savePartialResponseOnError) {
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Saving partial response after cancellation.`);
-          this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false);
+          this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true); 
         }
 
       } finally {
         this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? 'active' : 'null'}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${this.activePlaceholder?.timestamp}, messageAddedResolvers size: ${this.messageAddedResolvers.size}`);
         
+        // Остаточне очищення resolver'а з мапи, якщо він там залишився
         if (this.messageAddedResolvers.has(responseStartTimeMs)) {
             this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Resolver for ts ${responseStartTimeMs} still in map. Removing.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
