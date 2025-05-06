@@ -55,9 +55,20 @@ $folder-icon-extra-indent: 4px;
             }
         }
 
-       
+        // Hover на контент
+        .ollama-hierarchy-item-content:hover {
+             background-color: var(--background-modifier-hover);
+             // Показувати кнопку опцій при наведенні на контент
+              .ollama-hierarchy-item-options { opacity: 0.7; }
+        }
 
-        } // Кінець .ollama-hierarchy-item-content
+        // Активна папка-предок
+        &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content .ollama-hierarchy-item-text {
+            font-weight: 500;
+        }
+
+        // --- Контейнер вмісту (використовуємо descendant selector ' ') ---
+
 
         // Специфічно для чату (скидання зсуву іконки)
         &.ollama-chat-item {
