@@ -77,12 +77,12 @@ export class DropdownMenuManager {
         this.parentElement = parentElement;
         this.isSidebarLocation = isSidebarLocation;
         this.isDesktop = isDesktop;
-        this.plugin.logger.info(`[DropdownMenuManager] Initialized. isSidebarLocation: ${isSidebarLocation}, isDesktop: ${isDesktop}`);
+        
     }
 
     // --- ОСНОВНИЙ МЕТОД СТВОРЕННЯ МЕНЮ З КЛАСАМИ ДЛЯ РОЗДІЛЬНИКІВ ---
     public createMenuUI(): void {
-        this.plugin.logger.debug(`[DropdownMenuManager] Creating FULL menu structure for CSS control...`);
+        
         this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
         this.menuDropdown.style.display = "none";
 
@@ -91,7 +91,7 @@ export class DropdownMenuManager {
         this.menuDropdown.classList.toggle('is-mobile-tablet', !this.isDesktop);
         this.menuDropdown.classList.toggle('is-sidebar-location', this.isSidebarLocation);
         this.menuDropdown.classList.toggle('is-tab-location', !this.isSidebarLocation);
-        this.plugin.logger.debug(`[DropdownMenuManager] Added classes: ${this.menuDropdown.className}`);
+        
 
         // --- Створюємо ВСІ секції та елементи ЗАВЖДИ ---
 
@@ -133,7 +133,7 @@ export class DropdownMenuManager {
         this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
         // Роздільник після Settings не потрібен
 
-        this.plugin.logger.debug("[DropdownMenuManager] FULL Menu UI DOM created with HR classes.");
+        
     }
 
     // attachEventListeners залишається таким, як у попередній відповіді (додає слухачі до всіх)
@@ -197,12 +197,12 @@ export class DropdownMenuManager {
 
 
     public destroy(): void {
-        this.plugin.logger.debug("[DropdownMenuManager] Destroying listeners...");
+        
         this.listeners.forEach(({ element, type, handler }) => {
             element.removeEventListener(type, handler);
         });
         this.listeners = [];
-        this.plugin.logger.debug("[DropdownMenuManager] Listeners destroyed.");
+        
     }
 
     // --- Menu Visibility and State ---
@@ -219,18 +219,18 @@ export class DropdownMenuManager {
         }
         const isHidden = this.menuDropdown.style.display === "none";
         if (isHidden) {
-            this.plugin.logger.debug("[DropdownMenuManager] Opening menu.");
+            
             this.menuDropdown.style.display = "block";
             this.collapseAllSubmenus(null);
         } else {
-            this.plugin.logger.debug("[DropdownMenuManager] Closing menu via toggle.");
+            
             this.closeMenu();
         }
     }
 
     public closeMenu(): void {
         if (this.menuDropdown) {
-            this.plugin.logger.debug("[DropdownMenuManager] Closing menu.");
+            
             this.menuDropdown.style.display = "none";
             this.collapseAllSubmenus(null);
         }
@@ -242,7 +242,7 @@ export class DropdownMenuManager {
             !menuButton?.contains(event.target as Node) &&
             !this.menuDropdown?.contains(event.target as Node)
         ) {
-            this.plugin.logger.debug("[DropdownMenuManager] Closing menu due to outside click.");
+            
             this.closeMenu();
         }
     }
@@ -305,7 +305,7 @@ export class DropdownMenuManager {
             contentEl.style.overflowY = "hidden";
 
             try {
-                this.plugin.logger.debug(`[DropdownMenuManager] Toggling submenu open: ${type}`);
+                
                 switch (type) {
                     case "models": await this.renderModelList(); break;
                     case "roles": await this.renderRoleList(); break;
@@ -332,7 +332,7 @@ export class DropdownMenuManager {
                 contentEl.style.overflowY = "hidden";
             }
         } else {
-            this.plugin.logger.debug(`[DropdownMenuManager] Toggling submenu closed: ${type}`);
+            
             contentEl.classList.add(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN);
             contentEl.style.maxHeight = "0";
             contentEl.style.paddingTop = "0";
@@ -371,7 +371,7 @@ export class DropdownMenuManager {
     public async renderModelList(): Promise<void> {
         const container = this.modelSubmenuContent;
         if (!container) return;
-        this.plugin.logger.debug("[DropdownMenuManager] Rendering model list...");
+        
         container.empty();
         const modelIconMap: Record<string, string> = { llama: "box-minimal", mistral: "wind" };
         const defaultIcon = "box";
@@ -403,7 +403,7 @@ export class DropdownMenuManager {
                 optionEl.createEl("span", { cls: "menu-option-text", text: modelName });
 
                 this.registerListener(optionEl, "click", async () => {
-                    this.plugin.logger.debug(`[DropdownMenuManager] Model selected: ${modelName}`);
+                    
                     const latestChat = await this.plugin.chatManager?.getActiveChat();
                     const latestModel = latestChat?.metadata?.modelName || this.plugin.settings.modelName;
                     if (modelName !== latestModel) {
@@ -426,7 +426,7 @@ export class DropdownMenuManager {
     public async renderRoleList(): Promise<void> {
         const container = this.roleSubmenuContent;
         if (!container) return;
-        this.plugin.logger.debug("[DropdownMenuManager] Rendering role list...");
+        
         container.empty();
         try {
             const roles = await this.plugin.listRoleFiles(true);
@@ -445,7 +445,7 @@ export class DropdownMenuManager {
             noRoleOptionEl.createEl("span", { cls: "menu-option-text", text: "None" });
 
             this.registerListener(noRoleOptionEl, "click", async () => {
-                this.plugin.logger.debug(`[DropdownMenuManager] Role selected: None`);
+                
                 const newRolePath = "";
                 const latestChat = await this.plugin.chatManager?.getActiveChat();
                 const latestRolePath = latestChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
@@ -509,10 +509,10 @@ export class DropdownMenuManager {
     public async renderChatListMenu(): Promise<void> {
         const container = this.chatSubmenuContent;
         if (!container) {
-            this.plugin.logger.warn("[DropdownMenuManager] Chat submenu container not found!");
+            
             return;
         }
-        this.plugin.logger.debug("[DropdownMenuManager] Rendering chat list...");
+        
         container.empty();
         try {
             const chats = this.plugin.chatManager?.listAvailableChats() || [];
@@ -520,11 +520,11 @@ export class DropdownMenuManager {
 
             if (chats.length === 0) {
                 container.createEl("div", { cls: "menu-info-text", text: "No saved chats." });
-                this.plugin.logger.debug("[DropdownMenuManager] Rendered 'No saved chats.' message.");
+                
                 return;
             }
 
-            this.plugin.logger.debug(`[DropdownMenuManager] Rendering ${chats.length} chats. Active ID: ${currentActiveId}`);
+            
             chats.forEach(chatMeta => {
                 const chatOptionEl = container.createDiv({
                     cls: [CSS_CLASS_MENU_OPTION, CSS_CLASS_CHAT_LIST_ITEM, CSS_CLASS_CHAT_OPTION],
@@ -545,7 +545,7 @@ export class DropdownMenuManager {
                     ? this.view.formatRelativeDate(lastModifiedDate)
                     : "Invalid date";
                 if (dateText === "Invalid date") {
-                    this.plugin.logger.warn(`[DropdownMenuManager] Invalid date parsed for chat ${chatMeta.id}`);
+                    
                 }
                 textSpan.createEl("div", { cls: "chat-option-date", text: dateText });
 
@@ -558,7 +558,7 @@ export class DropdownMenuManager {
                     this.closeMenu();
                 });
             });
-            this.plugin.logger.debug("[DropdownMenuManager] Finished rendering chat list successfully.");
+            
         } catch (error) {
             this.plugin.logger.error("[DropdownMenuManager] Error rendering chat list:", error);
             container.empty();
@@ -594,7 +594,7 @@ export class DropdownMenuManager {
             this.modelSubmenuContent &&
             !this.modelSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)
         ) {
-            this.plugin.logger.debug("[DropdownMenuManager] Model submenu open, refreshing model list.");
+            
             await this.renderModelList();
             this.updateSubmenuHeight(this.modelSubmenuContent);
         }
@@ -606,7 +606,7 @@ export class DropdownMenuManager {
             this.roleSubmenuContent &&
             !this.roleSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)
         ) {
-            this.plugin.logger.debug("[DropdownMenuManager] Role submenu open, refreshing role list.");
+            
             await this.renderRoleList();
             this.updateSubmenuHeight(this.roleSubmenuContent);
         }
@@ -618,7 +618,7 @@ export class DropdownMenuManager {
             this.chatSubmenuContent &&
             !this.chatSubmenuContent.classList.contains(CSS_CLASSES.SUBMENU_CONTENT_HIDDEN)
         ) {
-            this.plugin.logger.debug("[DropdownMenuManager] Chat submenu open, refreshing chat list.");
+            
             await this.renderChatListMenu();
         }
     }
