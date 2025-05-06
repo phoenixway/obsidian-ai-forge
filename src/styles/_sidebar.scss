@@ -60,7 +60,16 @@
   
   // Заголовки панелей
   .ollama-panel-header {
-    flex: 0 0 auto; // Фіксована висота за
+    flex: 0 0 auto; // Фіксована висота заголовка
+  }
+  
+  // Контент панелей
+  .ollama-panel-content {
+    flex: 1 1 auto;
+    min-height: 0; // Критично для скролінгу
+    overflow-y: auto;
+  }
+}
 
 .ollama-sidebar-section-header {
     display: flex; justify-content: space-between; align-items: center;
