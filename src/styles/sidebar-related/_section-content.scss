@@ -206,6 +206,7 @@ $folder-icon-extra-indent: 4px;
   .ollama-role-panel-list {
     // flex-grow: 1; // Прибрано в попередньому кроці для акордеону
     // min-height: 0;
+    background-color: bisque !important; // Для тестування
     color: rgb(255, 0, 55) !important; // Для тестування
 
     .ollama-role-panel-item {
