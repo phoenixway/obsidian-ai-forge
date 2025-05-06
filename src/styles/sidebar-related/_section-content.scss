@@ -4,7 +4,7 @@
 // --- Змінні ---
 $indent-step: 16px;
 $item-padding-vertical: var(--size-4-1);
-$item-padding-horizontal: 16px; //var(--size-4-2, 8px);
+$item-padding-horizontal: var(--size-4-2, 8px);
 $icon-size: 16px;
 $icon-margin: var(--size-4-2);
 $folder-icon-extra-indent: 4px;
@@ -60,11 +60,12 @@ $folder-icon-extra-indent: 4px;
     padding-left: 0;
 
     // Відступи рівнів (з !important)
-    // @for $i from 0 through 10 {
-    //   &.ollama-indent-level-#{$i} {
-    //     padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
-    //   }
-    // }
+// --- ЗМІНЕНО: Відступи рівнів знову на ЗОВНІШНЬОМУ елементі з !important ---
+@for $i from 0 through 10 {
+  &.ollama-indent-level-#{$i} {
+    padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
+  }
+}
 
     // Hover на контент
     .ollama-hierarchy-item-content:hover {
@@ -91,22 +92,6 @@ $folder-icon-extra-indent: 4px;
       min-height: calc($icon-size + 2 * $item-padding-vertical);
       border-radius: inherit;
       z-index: 1;
-
-        // --- ДОДАНО: Динамічний padding-left ТУТ ---
-        @for $i from 0 through 10 {
-          // Застосовуємо до контенту, якщо його батько має клас рівня
-          .ollama-hierarchy-item.ollama-indent-level-#{$i} > & {
-              // Встановлюємо padding-left (БЕЗ !important спочатку)
-              padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
-
-              // Додатковий зсув для контенту ПАПКИ
-              &.ollama-folder-item .ollama-hierarchy-item-content > .ollama-folder-icon {
-                   // Це правило для margin іконки, воно залишається нижче
-              }
-              // Якщо звичайний padding-left не працює, можна спробувати з !important:
-              // padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
-          }
-      }
 
       > .ollama-folder-icon {
         flex-shrink: 0;
