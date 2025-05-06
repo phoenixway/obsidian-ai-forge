@@ -3377,7 +3377,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
     };
     this.handleNewChatClick = async () => {
       var _a;
-      this.plugin.logger.error("!!! OllamaView: handleNewChatClick ENTERED !!!");
       (_a = this.dropdownMenuManager) == null ? void 0 : _a.closeMenu();
       try {
         const newChat = await this.plugin.chatManager.createNewChat();
@@ -3393,7 +3392,6 @@ var OllamaView = class extends import_obsidian14.ItemView {
     };
     this.handleRenameChatClick = async (chatIdToRename, currentChatName) => {
       var _a, _b;
-      this.plugin.logger.error("!!! OllamaView: handleRenameChatClick ENTERED !!!");
       let chatId = chatIdToRename != null ? chatIdToRename : null;
       let currentName = currentChatName != null ? currentChatName : null;
       if (!chatId || !currentName) {
@@ -3699,8 +3697,7 @@ This action cannot be undone.`,
     };
     // Модифікуємо handleActiveChatChanged
     this.handleActiveChatChanged = async (data) => {
-      var _a, _b, _c, _d, _e, _f, _g;
-      this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${(_a = data.chatId) != null ? _a : "null"}. isRegenerating: ${this.isRegenerating}`);
+      var _a, _b, _c, _d, _e;
       if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
         this.lastProcessedChatId = data.chatId;
         return;
@@ -3711,15 +3708,14 @@ This action cannot be undone.`,
         const currentStack = new Error().stack;
         this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
         this.lastProcessedChatId = data.chatId;
-        this.plugin.logger.error("[handleActiveChatChanged] CALLING loadAndDisplayActiveChat NOW!");
         await this.loadAndDisplayActiveChat();
       } else if (data.chatId !== null && data.chat !== null) {
         this.lastProcessedChatId = data.chatId;
         const chat = data.chat;
-        const currentRolePath = (_c = (_b = chat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
+        const currentRolePath = (_b = (_a = chat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
         const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-        const currentModelName = ((_d = chat.metadata) == null ? void 0 : _d.modelName) || this.plugin.settings.modelName;
-        const currentTemperature = (_f = (_e = chat.metadata) == null ? void 0 : _e.temperature) != null ? _f : this.plugin.settings.temperature;
+        const currentModelName = ((_c = chat.metadata) == null ? void 0 : _c.modelName) || this.plugin.settings.modelName;
+        const currentTemperature = (_e = (_d = chat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
         this.updateModelDisplay(currentModelName);
         this.updateRoleDisplay(currentRoleName);
         this.updateInputPlaceholder(currentRoleName);
@@ -3730,11 +3726,9 @@ This action cannot be undone.`,
       if (this.dropdownMenuManager) {
         this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
       }
-      this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FINISHED for chat ID: ${(_g = data.chatId) != null ? _g : "null"}`);
     };
     this.handleChatListUpdated = () => {
       var _a;
-      this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
       if (this.dropdownMenuManager) {
         this.dropdownMenuManager.updateChatListIfVisible().catch((e) => this.plugin.logger.error("Error updating chat dropdown list:", e));
       }
@@ -3747,7 +3741,6 @@ This action cannot be undone.`,
     };
     this.handleSettingsUpdated = async () => {
       var _a, _b, _c, _d, _e, _f, _g, _h;
-      this.plugin.logger.error("[HANDLER] handleSettingsUpdated FIRED");
       const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
       const currentModelName = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.modelName) || this.plugin.settings.modelName;
       const currentRolePath = (_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) != null ? _d : this.plugin.settings.selectedRolePath;
@@ -4137,7 +4130,6 @@ This action cannot be undone.`,
       this.sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
       this.plugin.logger.debug(`[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${this.sidebarRootEl.className}`);
     } else {
-      this.plugin.logger.error("[OllamaView] sidebarRootEl is missing after creation!");
     }
     this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
     this.resizerEl.title = "Drag to resize sidebar";
@@ -4450,7 +4442,6 @@ This action cannot be undone.`,
   }
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
-    this.plugin.logger.error("[LOAD_DISPLAY] >>>>> ENTERING loadAndDisplayActiveChat");
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -4617,7 +4608,6 @@ This action cannot be undone.`,
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX \u041F\u041E\u041C\u0418\u041B\u041A\u0410 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F XXX", error);
     } finally {
     }
-    this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
   }
   async handleDeleteMessageClick(messageToDelete) {
     var _a;
@@ -6041,7 +6031,7 @@ Summary:`;
   }
   // OllamaView.ts
   async handleMessageAdded(data) {
-    var _a, _b, _c;
+    var _a, _b;
     const messageForLog = data == null ? void 0 : data.message;
     const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
     const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
@@ -6053,12 +6043,10 @@ Summary:`;
       if (resolverForThisMessage) {
         resolverFoundInMap = true;
         this.messageAddedResolvers.delete(messageTimestampForLog);
-        this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`);
       } else {
       }
     } else {
     }
-    this.plugin.logger.error(`[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? "FOUND" : "NOT_FOUND"}. Active placeholder ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}`);
     try {
       if (!data || !data.message) {
         this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received.`, data);
@@ -6099,7 +6087,7 @@ Summary:`;
       const alreadyInCurrentMessages = this.currentMessages.some(
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
       );
-      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
+      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) === messageTimestampMs;
       if (alreadyInCurrentMessages && !isPotentiallyAssistantForPlaceholder) {
         this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): In currentMessages and NOT assistant for active placeholder. Role: ${message.role}.`);
         if (resolverForThisMessage) {
@@ -6125,7 +6113,6 @@ Summary:`;
           placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
           const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
           if (!messageDomElement) {
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
             this.activePlaceholder = null;
@@ -6143,14 +6130,12 @@ Summary:`;
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               this.activePlaceholder = null;
-              this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`);
               setTimeout(() => {
                 if (placeholderToUpdate.groupEl.isConnected)
                   this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
               }, 50);
               this.guaranteedScrollToBottom(100, false);
             } catch (renderError) {
-              this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
               if (placeholderToUpdate.groupEl.isConnected)
                 placeholderToUpdate.groupEl.remove();
               this.activePlaceholder = null;
@@ -6158,7 +6143,6 @@ Summary:`;
             }
           }
         } else {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. Adding normally.`);
           this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
@@ -6169,7 +6153,6 @@ Summary:`;
         `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
       );
     } catch (outerError) {
-      this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
       this.handleErrorMessage({
         role: "error",
         content: `Internal error in HMA for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
@@ -6178,13 +6161,10 @@ Summary:`;
     } finally {
       this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? "EXISTS" : "is NULL (or was not found for this specific ts)"}.`);
       if (resolverForThisMessage) {
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`);
         try {
           resolverForThisMessage();
         } catch (resolverError) {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
         }
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`);
       } else {
       }
       this.plugin.logger.debug(
@@ -6244,7 +6224,6 @@ Summary:`;
           if (hasMessagesAfter) {
             const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
             if (!deleteSuccess) {
-              this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to delete subsequent messages.`);
               throw new Error("Failed to delete subsequent messages for regeneration.");
             }
           }
@@ -6268,7 +6247,6 @@ Summary:`;
           if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
             this.activePlaceholder = { timestamp: responseStartTimeMs, groupEl: assistantPlaceholderGroupEl, contentEl: assistantContentEl, messageWrapper: messageWrapperEl };
           } else {
-            this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to create all placeholder elements!`);
             throw new Error("Failed to create placeholder elements for regeneration.");
           }
           assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
@@ -6276,7 +6254,6 @@ Summary:`;
           this.guaranteedScrollToBottom(50, true);
           const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
           if (!chatForStreaming) {
-            this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to get chatForStreaming.`);
             throw new Error("Failed to get updated chat context for streaming regeneration.");
           }
           const stream = this.plugin.ollamaService.generateChatResponseStream(chatForStreaming, this.currentAbortController.signal);
@@ -6287,7 +6264,6 @@ Summary:`;
             }
             if ("error" in chunk && chunk.error) {
               if (!chunk.error.includes("aborted by user")) {
-                this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Stream error: ${chunk.error}`);
                 throw new Error(chunk.error);
               } else {
                 throw new Error("aborted by user");
@@ -6339,7 +6315,6 @@ Summary:`;
             try {
               await Promise.race([mainAssistantMessageProcessedPromise, timeoutPromise]);
             } catch (awaitPromiseError) {
-              this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] TRY: Error or Timeout awaiting mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs}: ${awaitPromiseError.message}`);
               streamErrorOccurred = streamErrorOccurred || awaitPromiseError;
               if (this.messageAddedResolvers.has(responseStartTimeMs)) {
                 this.messageAddedResolvers.delete(responseStartTimeMs);
@@ -6357,7 +6332,6 @@ Summary:`;
           }
         } catch (error) {
           streamErrorOccurred = error;
-          this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error during regeneration process:`, error);
           if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
             this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Removing active placeholder (ts: ${responseStartTimeMs}) due to error.`);
             if ((_g = this.activePlaceholder.groupEl) == null ? void 0 : _g.isConnected)

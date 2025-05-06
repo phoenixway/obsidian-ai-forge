@@ -329,7 +329,7 @@ export class OllamaView extends ItemView {
         this.sidebarRootEl.classList.toggle('internal-sidebar-hidden', !shouldShowInternalSidebar);
         this.plugin.logger.debug(`[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${this.sidebarRootEl.className}`);
     } else {
-        this.plugin.logger.error("[OllamaView] sidebarRootEl is missing after creation!");
+        
     }
   
     // --- ДОДАНО: Створюємо Роздільник між сайдбаром та чатом ---
@@ -771,7 +771,7 @@ export class OllamaView extends ItemView {
   };
 
   public handleNewChatClick = async (): Promise<void> => {
-    this.plugin.logger.error("!!! OllamaView: handleNewChatClick ENTERED !!!");
+    
     this.dropdownMenuManager?.closeMenu();
     try {
       const newChat = await this.plugin.chatManager.createNewChat();
@@ -787,7 +787,7 @@ export class OllamaView extends ItemView {
   };
 
   public handleRenameChatClick = async (chatIdToRename?: string, currentChatName?: string): Promise<void> => {
-    this.plugin.logger.error("!!! OllamaView: handleRenameChatClick ENTERED !!!");
+    
     let chatId: string | null = chatIdToRename ?? null;
     let currentName: string | null = currentChatName ?? null;
 
@@ -1331,7 +1331,7 @@ private async addMessageStandard(message: Message): Promise<void> {
   }
 
   async loadAndDisplayActiveChat(): Promise<void> {
-    this.plugin.logger.error("[LOAD_DISPLAY] >>>>> ENTERING loadAndDisplayActiveChat");
+    
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -1535,12 +1535,12 @@ private async addMessageStandard(message: Message): Promise<void> {
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX ПОМИЛКА під час виконання XXX", error);
     } finally {
     }
-    this.plugin.logger.error("[LOAD_DISPLAY] <<<<< EXITING loadAndDisplayActiveChat");
+    
   }
 
 // Модифікуємо handleActiveChatChanged
 private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
-  this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FIRED for chat ID: ${data.chatId ?? 'null'}. isRegenerating: ${this.isRegenerating}`);
+  
 
   // Якщо йде процес регенерації, ігноруємо обробку цієї події,
   // щоб уникнути перезавантаження чату, яке може видалити плейсхолдер.
@@ -1561,7 +1561,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
     this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
 
     this.lastProcessedChatId = data.chatId;
-    this.plugin.logger.error("[handleActiveChatChanged] CALLING loadAndDisplayActiveChat NOW!");
+    
     await this.loadAndDisplayActiveChat();
 
   } else if (data.chatId !== null && data.chat !== null) {
@@ -1593,11 +1593,11 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   }
 
 
-  this.plugin.logger.error(`[HANDLER] handleActiveChatChanged FINISHED for chat ID: ${data.chatId ?? 'null'}`);
+  
 };
 
   private handleChatListUpdated = (): void => {
-    this.plugin.logger.error("[HANDLER] handleChatListUpdated FIRED");
+    
     if (this.dropdownMenuManager) {
       this.dropdownMenuManager
         .updateChatListIfVisible()
@@ -1613,7 +1613,7 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
   };
 
   public handleSettingsUpdated = async (): Promise<void> => {
-    this.plugin.logger.error("[HANDLER] handleSettingsUpdated FIRED");
+    
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     const currentModelName = activeChat?.metadata?.modelName || this.plugin.settings.modelName;
     const currentRolePath = activeChat?.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
@@ -3581,7 +3581,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
           // якщо подія message-added з якихось причин прийде двічі для одного й того ж повідомлення.
           // resolverForThisMessage тепер містить посилання на функцію, і ми викличемо її в finally.
           this.messageAddedResolvers.delete(messageTimestampForLog); 
-          this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`);
       } else {
           
       }
@@ -3589,7 +3588,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       
   }
   
-  this.plugin.logger.error(`[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? 'FOUND' : 'NOT_FOUND'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
 
   try {
     if (!data || !data.message) {
@@ -3681,7 +3679,6 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
         const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
 
         if (!messageDomElement) {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
           if(placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove(); 
           this.activePlaceholder = null; 
           await this.addMessageStandard(message); // addMessageStandard не додає в currentMessages
@@ -3697,18 +3694,16 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
             this.lastMessageElement = placeholderToUpdate.groupEl; 
             this.hideEmptyState();
             this.activePlaceholder = null; 
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`); 
             setTimeout(() => { if(placeholderToUpdate.groupEl.isConnected) this.checkMessageForCollapsing(placeholderToUpdate.groupEl);}, 50); 
             this.guaranteedScrollToBottom(100, false); 
           } catch (renderError: any) {
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
             if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove(); 
             this.activePlaceholder = null; 
             this.handleErrorMessage({ role: "error", content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
           }
         }
       } else {
-        this.plugin.logger.error( `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. Adding normally.` );
+        
         this.activePlaceholder = null; 
         await this.addMessageStandard(message); 
       }
@@ -3720,7 +3715,7 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
       `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
     );
   } catch (outerError: any) { 
-    this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
+    
     this.handleErrorMessage({ 
       role: "error",
       content: `Internal error in HMA for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
@@ -3729,13 +3724,13 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
   } finally {
     this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? 'EXISTS' : 'is NULL (or was not found for this specific ts)'}.`);
     if (resolverForThisMessage) { // Викликаємо, якщо він був знайдений для цього timestamp на початку
-      this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`); 
+       
       try {
           resolverForThisMessage(); 
       } catch (resolverError) {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
+          
       }
-      this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`); 
+       
     } else {
       
     }
@@ -3808,7 +3803,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
         if (hasMessagesAfter) {
           const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
           if (!deleteSuccess) {
-              this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to delete subsequent messages.`);
+              
               throw new Error("Failed to delete subsequent messages for regeneration.");
           }
           
@@ -3837,7 +3832,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
           this.activePlaceholder = { timestamp: responseStartTimeMs, groupEl: assistantPlaceholderGroupEl, contentEl: assistantContentEl, messageWrapper: messageWrapperEl };
           
         } else {
-          this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to create all placeholder elements!`);
+          
           throw new Error("Failed to create placeholder elements for regeneration.");
         }
         assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
@@ -3846,7 +3841,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
 
         const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
         if (!chatForStreaming) {
-          this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to get chatForStreaming.`);
+          
           throw new Error("Failed to get updated chat context for streaming regeneration.");
         }
         
@@ -3862,7 +3857,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
           }
           if ("error" in chunk && chunk.error) {
             if (!chunk.error.includes("aborted by user")) {
-              this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Stream error: ${chunk.error}`);
+              
               throw new Error(chunk.error);
             } else {
               
@@ -3920,7 +3915,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
               await Promise.race([mainAssistantMessageProcessedPromise, timeoutPromise]);
               
           } catch (awaitPromiseError: any) {
-              this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] TRY: Error or Timeout awaiting mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs}: ${awaitPromiseError.message}`);
+              
               streamErrorOccurred = streamErrorOccurred || awaitPromiseError; 
               if (this.messageAddedResolvers.has(responseStartTimeMs)) {
                   
@@ -3942,7 +3937,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
 
       } catch (error: any) {
         streamErrorOccurred = error; 
-        this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error during regeneration process:`, error);
+        
         
         if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
             this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Removing active placeholder (ts: ${responseStartTimeMs}) due to error.`);
