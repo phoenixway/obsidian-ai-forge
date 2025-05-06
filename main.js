@@ -2295,6 +2295,7 @@ var SidebarManager = class {
       (0, import_obsidian12.setIcon)(folderIconEl, newState ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
     }
   }
+  // Метод для розгортання/згортання секцій Chats/Roles (акордеон)
   async toggleSection(clickedHeaderEl) {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
@@ -2335,20 +2336,14 @@ var SidebarManager = class {
           (0, import_obsidian12.setIcon)(otherIconEl, COLLAPSE_ICON_ACCORDION);
         otherContentEl.classList.remove(CSS_EXPANDED_CLASS);
         otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-        const otherHeaderActionsEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-        if (otherHeaderActionsEl && otherIconEl)
-          otherHeaderActionsEl.insertBefore(otherIconEl, otherHeaderActionsEl.firstChild);
-        if (otherHeaderActionsEl)
-          otherHeaderActionsEl.style.display = "none";
+        const otherHeaderButtons = otherHeaderEl.querySelectorAll(`.${CSS_SIDEBAR_HEADER_BUTTON}`);
+        otherHeaderButtons.forEach((btn) => btn.style.display = "none");
       }
       clickedHeaderEl.setAttribute("data-collapsed", "false");
       (0, import_obsidian12.setIcon)(iconEl, EXPAND_ICON_ACCORDION);
       contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-      const headerActionsEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-      if (headerActionsEl && iconEl)
-        headerActionsEl.insertBefore(iconEl, headerActionsEl.firstChild);
-      if (headerActionsEl)
-        headerActionsEl.style.display = "";
+      const headerButtons = clickedHeaderEl.querySelectorAll(`.${CSS_SIDEBAR_HEADER_BUTTON}`);
+      headerButtons.forEach((btn) => btn.style.display = "");
       try {
         await boundUpdateFunction();
         requestAnimationFrame(() => {
@@ -2372,11 +2367,11 @@ var SidebarManager = class {
       (0, import_obsidian12.setIcon)(iconEl, COLLAPSE_ICON_ACCORDION);
       contentEl.classList.remove(CSS_EXPANDED_CLASS);
       contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-      const headerActionsEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-      if (headerActionsEl)
-        headerActionsEl.style.display = "none";
+      const headerButtons = clickedHeaderEl.querySelectorAll(`.${CSS_SIDEBAR_HEADER_BUTTON}`);
+      headerButtons.forEach((btn) => btn.style.display = "none");
     }
   }
+  // --- Кінець методу toggleSection ---
   // --- Решта методів без змін ---
   showFolderContextMenu(event, folderNode) {
     event.preventDefault();

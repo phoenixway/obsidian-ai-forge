@@ -222,76 +222,116 @@ export class SidebarManager {
       if (folderIconEl) { setIcon(folderIconEl, newState ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED); }
   }
 
-  private async toggleSection(clickedHeaderEl: HTMLElement): Promise<void> {
-    const sectionType = clickedHeaderEl.getAttribute("data-section-type") as "chats" | "roles";
-    const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
-    // Знаходимо новий шеврон
-    const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SECTION_TOGGLE_CHEVRON}`);
+// Метод для розгортання/згортання секцій Chats/Roles (акордеон)
+private async toggleSection(clickedHeaderEl: HTMLElement): Promise<void> {
+  // Визначаємо тип секції, на яку клікнули ('chats' або 'roles')
+  const sectionType = clickedHeaderEl.getAttribute("data-section-type") as "chats" | "roles";
+  // Перевіряємо поточний стан (true, якщо секція зараз згорнута)
+  const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
+  // Знаходимо елемент іконки-шеврона в клікнутому заголовку
+  const iconEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SECTION_TOGGLE_CHEVRON}`);
 
-    let contentEl: HTMLElement | null;
-    let updateFunction: (() => Promise<void>) | null;
-    let otherHeaderEl: HTMLElement | null;
-    let otherContentEl: HTMLElement | null;
-    let otherSectionType: "chats" | "roles" | null = null;
+  // Визначаємо елементи DOM для поточної та іншої секції
+  let contentEl: HTMLElement | null;
+  let updateFunction: (() => Promise<void>) | null; // Функція для оновлення вмісту (updateChatList або updateRoleList)
+  let otherHeaderEl: HTMLElement | null;
+  let otherContentEl: HTMLElement | null;
+  let otherSectionType: "chats" | "roles" | null = null;
 
-    const chatHeader = this.chatPanelHeaderEl;
-    const chatContent = this.chatPanelListContainerEl;
-    const roleHeader = this.rolePanelHeaderEl;
-    const roleContent = this.rolePanelListEl;
+  // Отримуємо посилання на основні елементи панелей
+  const chatHeader = this.chatPanelHeaderEl;
+  const chatContent = this.chatPanelListContainerEl;
+  const roleHeader = this.rolePanelHeaderEl;
+  const roleContent = this.rolePanelListEl;
 
-    if (sectionType === "chats") {
-        contentEl = chatContent; updateFunction = this.updateChatList;
-        otherHeaderEl = roleHeader; otherContentEl = roleContent; otherSectionType = "roles";
-    } else {
-        contentEl = roleContent; updateFunction = this.updateRoleList;
-        otherHeaderEl = chatHeader; otherContentEl = chatContent; otherSectionType = "chats";
-    }
-
-    if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-        this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType); return;
-    }
-    const boundUpdateFunction = updateFunction.bind(this);
-
-    if (isCurrentlyCollapsed) { // Розгортаємо поточну
-        // 1. Згортаємо ІНШУ
-        if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-            this.plugin.logger.debug(`Collapsing other section: ${otherSectionType}`);
-            const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SECTION_TOGGLE_CHEVRON}`);
-            otherHeaderEl.setAttribute("data-collapsed", "true");
-            if (otherIconEl) setIcon(otherIconEl, COLLAPSE_ICON_ACCORDION); // Згорнута іконка
-            otherContentEl.classList.remove(CSS_EXPANDED_CLASS);
-            otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Швидко приховуємо
-            const otherHeaderActionsEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-            if(otherHeaderActionsEl && otherIconEl) otherHeaderActionsEl.insertBefore(otherIconEl, otherHeaderActionsEl.firstChild); // Переміщаємо шеврон перед кнопками
-            if(otherHeaderActionsEl) otherHeaderActionsEl.style.display = 'none'; // Ховаємо дії іншої секції
-        }
-        // 2. Розгортаємо поточну
-        clickedHeaderEl.setAttribute("data-collapsed", "false");
-        setIcon(iconEl, EXPAND_ICON_ACCORDION); // Розгорнута іконка
-        contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-        const headerActionsEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-        if(headerActionsEl && iconEl) headerActionsEl.insertBefore(iconEl, headerActionsEl.firstChild); // Переміщаємо шеврон
-        if(headerActionsEl) headerActionsEl.style.display = ''; // Показуємо дії
-
-        try {
-            await boundUpdateFunction();
-             requestAnimationFrame(() => { if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") { contentEl.classList.add(CSS_EXPANDED_CLASS); this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`); } });
-        } catch (error) {
-             this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
-             contentEl.setText(`Error loading ${sectionType}.`);
-             requestAnimationFrame(() => { if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") { contentEl.classList.add(CSS_EXPANDED_CLASS); } });
-        }
-
-    } else { // Згортаємо поточну
-        this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
-        clickedHeaderEl.setAttribute("data-collapsed", "true");
-        setIcon(iconEl, COLLAPSE_ICON_ACCORDION); // Згорнута іконка
-        contentEl.classList.remove(CSS_EXPANDED_CLASS);
-        contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
-        const headerActionsEl = clickedHeaderEl.querySelector<HTMLElement>(`.${CSS_SIDEBAR_HEADER_ACTIONS}`);
-        if(headerActionsEl) headerActionsEl.style.display = 'none';
-    }
+  // Призначаємо змінні залежно від типу секції, на яку клікнули
+  if (sectionType === "chats") {
+      contentEl = chatContent;
+      updateFunction = this.updateChatList;
+      otherHeaderEl = roleHeader;
+      otherContentEl = roleContent;
+      otherSectionType = "roles";
+  } else { // sectionType === "roles"
+      contentEl = roleContent;
+      updateFunction = this.updateRoleList;
+      otherHeaderEl = chatHeader;
+      otherContentEl = chatContent;
+      otherSectionType = "chats";
   }
+
+  // Перевірка, чи всі необхідні елементи знайдено
+  if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
+      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
+      return; // Виходимо, якщо щось не знайдено
+  }
+
+  // Прив'язуємо контекст 'this' до функції оновлення для подальшого виклику
+  const boundUpdateFunction = updateFunction.bind(this);
+
+  // --- Логіка розгортання/згортання ---
+  if (isCurrentlyCollapsed) {
+      // === РОЗГОРТАЄМО ПОТОЧНУ СЕКЦІЮ ===
+
+      // 1. Згортаємо ІНШУ секцію (якщо вона зараз розгорнута)
+      if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
+          this.plugin.logger.debug(`Collapsing other section: ${otherSectionType}`);
+          const otherIconEl = otherHeaderEl.querySelector<HTMLElement>(`.${CSS_SECTION_TOGGLE_CHEVRON}`);
+          otherHeaderEl.setAttribute("data-collapsed", "true"); // Позначаємо іншу як згорнуту
+          if (otherIconEl) setIcon(otherIconEl, COLLAPSE_ICON_ACCORDION); // Встановлюємо іконку згортання для іншої
+          otherContentEl.classList.remove(CSS_EXPANDED_CLASS); // Видаляємо клас розгорнутого стану
+          otherContentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Додаємо клас для миттєвого приховування (через CSS)
+
+          // Ховаємо ТІЛЬКИ кнопки дій в іншій секції (шеврон залишається видимим)
+          const otherHeaderButtons = otherHeaderEl.querySelectorAll<HTMLElement>(`.${CSS_SIDEBAR_HEADER_BUTTON}`);
+          otherHeaderButtons.forEach(btn => btn.style.display = 'none');
+      }
+
+      // 2. Розгортаємо ПОТОЧНУ секцію
+      clickedHeaderEl.setAttribute("data-collapsed", "false"); // Позначаємо поточну як розгорнуту
+      setIcon(iconEl, EXPAND_ICON_ACCORDION); // Встановлюємо іконку розгортання
+      contentEl.classList.remove(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Видаляємо клас швидкого приховування
+
+      // Показуємо кнопки дій в поточній секції
+       const headerButtons = clickedHeaderEl.querySelectorAll<HTMLElement>(`.${CSS_SIDEBAR_HEADER_BUTTON}`);
+       headerButtons.forEach(btn => btn.style.display = ''); // Повертаємо стандартний display
+
+      try {
+          // Спочатку оновлюємо вміст секції (завантажуємо дані, рендеримо)
+          await boundUpdateFunction();
+           // Потім, у наступному кадрі анімації, додаємо клас 'is-expanded'.
+           // CSS подбає про плавну анімацію розгортання.
+           requestAnimationFrame(() => {
+              if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
+                  contentEl.classList.add(CSS_EXPANDED_CLASS);
+                  this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
+              }
+           });
+      } catch (error) {
+           // Обробка помилки під час оновлення вмісту
+           this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
+           contentEl.setText(`Error loading ${sectionType}.`); // Показуємо повідомлення про помилку
+           // Все одно додаємо клас, щоб показати помилку
+            requestAnimationFrame(() => {
+               if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
+                   contentEl.classList.add(CSS_EXPANDED_CLASS);
+               }
+            });
+      }
+
+  } else {
+      // === ЗГОРТАЄМО ПОТОЧНУ СЕКЦІЮ ===
+      // Якщо клікнули на вже розгорнуту секцію
+      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
+      clickedHeaderEl.setAttribute("data-collapsed", "true"); // Позначаємо як згорнуту
+      setIcon(iconEl, COLLAPSE_ICON_ACCORDION); // Встановлюємо іконку згортання
+      contentEl.classList.remove(CSS_EXPANDED_CLASS); // Видаляємо клас розгорнутого стану
+      contentEl.classList.add(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN); // Додаємо клас для миттєвого приховування
+
+      // Ховаємо кнопки дій в поточній секції
+      const headerButtons = clickedHeaderEl.querySelectorAll<HTMLElement>(`.${CSS_SIDEBAR_HEADER_BUTTON}`);
+      headerButtons.forEach(btn => btn.style.display = 'none');
+  }
+} // --- Кінець методу toggleSection ---
 
   // --- Решта методів без змін ---
   private showFolderContextMenu(event: MouseEvent | PointerEvent, folderNode: FolderNode): void { event.preventDefault(); event.stopPropagation(); const menu = new Menu(); menu.addItem(item => item.setTitle("New Chat Here").setIcon("lucide-plus-circle").onClick(() => this.handleNewChatClick(folderNode.path))); menu.addItem(item => item.setTitle("New Folder Here").setIcon("lucide-folder-plus").onClick(() => this.handleNewFolderClick(folderNode.path))); menu.addSeparator(); menu.addItem(item => item.setTitle("Rename Folder").setIcon("lucide-pencil").onClick(() => this.handleRenameFolder(folderNode))); menu.addItem(item => { item.setTitle("Delete Folder").setIcon("lucide-trash-2").onClick(() => this.handleDeleteFolder(folderNode)); /* Styling via CSS */ }); menu.showAtMouseEvent(event); }
