@@ -63,7 +63,7 @@ $folder-icon-extra-indent: 4px;
         > .ollama-hierarchy-item-options { display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: $icon-margin; opacity: 0; transition: opacity 0.1s ease-in-out; padding: 2px; border-radius: var(--radius-s); color: var(--text-muted); background: none; border: none; cursor: pointer; &:hover { opacity: 1; color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; display: block;} }
     }
 
-    // &.ollama-chat-item { .ollama-hierarchy-item-content > .ollama-folder-icon { color: var(--text-muted); margin-left: 0 !important; } }
+    &.ollama-chat-item { .ollama-hierarchy-item-content > .ollama-folder-icon { color: var(--text-muted); margin-left: 0 !important; } }
     &.ollama-chat-item.is-active { .ollama-hierarchy-item-content { background-color: var(--interactive-accent); color: var(--text-on-accent); > .ollama-folder-icon, > .ollama-hierarchy-item-text, > .ollama-chat-item-details, > .ollama-chat-item-details .ollama-chat-item-date { color: var(--text-on-accent); } &:hover { background-color: var(--interactive-accent-hover); } > .ollama-hierarchy-item-options { color: var(--text-on-accent); &:hover { background-color: rgba(var(--color-base-rgb), 0.1); } } } }
     > .ollama-hierarchy-item-children { display: block; position: relative; padding-left: 0; }
     &.is-collapsed > .ollama-hierarchy-item-children { display: none; }
