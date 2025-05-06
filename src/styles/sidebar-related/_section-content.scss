@@ -46,9 +46,11 @@ $folder-icon-extra-indent: 4px;
   .ollama-hierarchy-item {
     margin: 1px 0; border-radius: var(--radius-s); cursor: pointer; position: relative; padding-left: 0;
     @for $i from 0 through 10 { &.ollama-indent-level-#{$i} { padding-left: $item-padding-horizontal + ($i * $indent-step) !important; } }
+
     .ollama-hierarchy-item-content:hover { background-color: var(--background-modifier-hover); 
         .ollama-hierarchy-item-options { opacity: 0.7; } 
     }
+
     &.ollama-folder-item.is-active-ancestor .ollama-hierarchy-item-content .ollama-hierarchy-item-text { font-weight: 500; }
 
     .ollama-hierarchy-item-content {
