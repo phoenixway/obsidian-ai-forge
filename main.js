@@ -1743,10 +1743,11 @@ var SidebarManager = class {
       const currentUpdateId = this.updateCounter;
       const container = this.chatPanelListContainerEl;
       if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug(`[Update #${currentUpdateId}] Skipping: Container/Manager missing.`);
         return;
       }
-      this.plugin.logger.info(`[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`);
+      this.plugin.logger.info(
+        `[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`
+      );
       container.classList.add("is-loading");
       const currentScrollTop = container.scrollTop;
       container.empty();
@@ -1769,13 +1770,14 @@ var SidebarManager = class {
               }
             }
           } else if (activeChat) {
-            this.plugin.logger.warn(`Active chat ${currentActiveChatId} has no filePath property.`);
           }
         }
         if (hierarchy.length === 0) {
           container.createDiv({ cls: "menu-info-text", text: "No saved chats or folders yet." });
         } else {
-          hierarchy.forEach((node) => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId));
+          hierarchy.forEach(
+            (node) => this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId)
+          );
         }
         this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList (rendering done)`);
       } catch (error) {
@@ -1789,24 +1791,26 @@ var SidebarManager = class {
             container.scrollTop = currentScrollTop;
           }
         });
-        this.plugin.logger.debug(`[Update #${currentUpdateId}] Finally block executed, loading class removed.`);
       }
     };
     this.updateRoleList = async () => {
       var _a, _b;
       const container = this.rolePanelListEl;
       if (!container || !this.plugin.chatManager) {
-        this.plugin.logger.debug("[SidebarManager.updateRoleList] Skipping: Container/Manager missing.");
         return;
       }
-      this.plugin.logger.debug(`[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`);
+      this.plugin.logger.debug(
+        `[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`
+      );
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
         const roles = await this.plugin.listRoleFiles(true);
         const activeChat = await this.plugin.chatManager.getActiveChat();
         const currentRolePath = (_b = (_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        const noneOptionEl = container.createDiv({ cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION] });
+        const noneOptionEl = container.createDiv({
+          cls: [CSS_ROLE_PANEL_ITEM, CSS_ROLE_PANEL_ITEM_NONE, CSS_CLASS_MENU_OPTION]
+        });
         const noneIconSpan = noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON, "menu-option-icon"] });
         noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT, "menu-option-text"], text: "None" });
         (0, import_obsidian12.setIcon)(noneIconSpan, !currentRolePath ? "check" : "slash");
@@ -1822,9 +1826,12 @@ var SidebarManager = class {
           (0, import_obsidian12.setIcon)(iconSpan, roleInfo.path === currentRolePath ? "check" : roleInfo.isCustom ? "user" : "file-text");
           if (roleInfo.path === currentRolePath)
             roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
-          this.view.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
+          this.view.registerDomEvent(
+            roleOptionEl,
+            "click",
+            () => this.handleRolePanelItemClick(roleInfo, currentRolePath)
+          );
         });
-        this.plugin.logger.debug(`[SidebarManager.updateRoleList] Finished rendering ${roles.length + 1} role items.`);
       } catch (error) {
         this.plugin.logger.error("[SidebarManager.updateRoleList] Error rendering:", error);
         container.empty();
@@ -1842,16 +1849,12 @@ var SidebarManager = class {
       const newRolePath = (_a = roleInfo == null ? void 0 : roleInfo.path) != null ? _a : "";
       const roleNameForEvent = (_b = roleInfo == null ? void 0 : roleInfo.name) != null ? _b : "None";
       const normalizedCurrentRolePath = currentRolePath != null ? currentRolePath : "";
-      this.plugin.logger.debug(`[SidebarManager] Role item clicked. New path: "${newRolePath}", Current path: "${normalizedCurrentRolePath}"`);
       if (newRolePath !== normalizedCurrentRolePath) {
         const activeChat = await ((_c = this.plugin.chatManager) == null ? void 0 : _c.getActiveChat());
         try {
-          this.plugin.logger.info(`Setting role to: ${roleNameForEvent}`);
           if (activeChat) {
-            this.plugin.logger.debug(`Updating role for active chat ${activeChat.metadata.id}`);
             await this.plugin.chatManager.updateActiveChatMetadata({ selectedRolePath: newRolePath || void 0 });
           } else {
-            this.plugin.logger.debug(`Setting global default role.`);
             this.plugin.settings.selectedRolePath = newRolePath || void 0;
             await this.plugin.saveSettings();
             this.plugin.emit("role-changed", roleNameForEvent);
@@ -1863,13 +1866,11 @@ var SidebarManager = class {
           new import_obsidian12.Notice("Failed to set the role.");
         }
       } else {
-        this.plugin.logger.debug(`[SidebarManager] Clicked role is already active.`);
       }
     };
     this.handleNewChatClick = async (targetFolderPath) => {
       var _a;
       const folderPath = (_a = targetFolderPath != null ? targetFolderPath : this.plugin.chatManager.chatsFolderPath) != null ? _a : "/";
-      this.plugin.logger.debug(`[SidebarManager] New Chat button clicked. Target folder: ${folderPath}`);
       try {
         const newChat = await this.plugin.chatManager.createNewChat(void 0, folderPath);
         if (newChat) {
@@ -1889,7 +1890,6 @@ var SidebarManager = class {
     this.handleNewFolderClick = async (parentFolderPath) => {
       var _a;
       const targetParentPath = (_a = parentFolderPath != null ? parentFolderPath : this.plugin.chatManager.chatsFolderPath) != null ? _a : "/";
-      this.plugin.logger.debug(`[SidebarManager] New Folder button clicked. Target parent: ${targetParentPath}`);
       new PromptModal(this.app, "Create New Folder", "Enter folder name:", "", async (newName) => {
         const trimmedName = newName == null ? void 0 : newName.trim();
         if (!trimmedName) {
@@ -1900,8 +1900,9 @@ var SidebarManager = class {
           new import_obsidian12.Notice("Folder name contains invalid characters.");
           return;
         }
-        const newFolderPath = (0, import_obsidian12.normalizePath)(targetParentPath === "/" ? trimmedName : `${targetParentPath}/${trimmedName}`);
-        this.plugin.logger.info(`Attempting to create folder: ${newFolderPath}`);
+        const newFolderPath = (0, import_obsidian12.normalizePath)(
+          targetParentPath === "/" ? trimmedName : `${targetParentPath}/${trimmedName}`
+        );
         try {
           const success = await this.plugin.chatManager.createFolder(newFolderPath);
           if (success) {
@@ -1918,7 +1919,6 @@ var SidebarManager = class {
       }).open();
     };
     this.handleRenameFolder = async (folderNode) => {
-      this.plugin.logger.debug(`[SidebarManager] Rename requested for folder: ${folderNode.path}`);
       const currentName = folderNode.name;
       const parentPath = folderNode.path.substring(0, folderNode.path.lastIndexOf("/")) || "/";
       new PromptModal(this.app, "Rename Folder", `New name for "${currentName}":`, currentName, async (newName) => {
@@ -1932,7 +1932,6 @@ var SidebarManager = class {
           return;
         }
         const newFolderPath = (0, import_obsidian12.normalizePath)(parentPath === "/" ? trimmedName : `${parentPath}/${trimmedName}`);
-        this.plugin.logger.info(`Attempting to rename folder ${folderNode.path} to ${newFolderPath}`);
         try {
           const exists = await this.app.vault.adapter.exists(newFolderPath);
           if (exists) {
@@ -1940,7 +1939,6 @@ var SidebarManager = class {
             return;
           }
         } catch (e) {
-          this.plugin.logger.warn(`Could not check existence of target rename path ${newFolderPath}:`, e);
         }
         try {
           const success = await this.plugin.chatManager.renameFolder(folderNode.path, newFolderPath);
@@ -1954,42 +1952,48 @@ var SidebarManager = class {
             this.updateChatList();
           }
         } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`, error);
+          this.plugin.logger.error(
+            `[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`,
+            error
+          );
           new import_obsidian12.Notice(`Error renaming folder: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       }).open();
     };
     this.handleDeleteFolder = async (folderNode) => {
-      this.plugin.logger.debug(`[SidebarManager] Delete requested for folder: ${folderNode.path}`);
       const folderName = folderNode.name;
       const folderPath = folderNode.path;
       if (folderPath === this.plugin.chatManager.chatsFolderPath) {
         new import_obsidian12.Notice("Cannot delete the main chat history folder.");
         return;
       }
-      new ConfirmModal(this.app, "Delete Folder", `Delete folder "${folderName}" and ALL its contents (subfolders and chats)? This cannot be undone.`, async () => {
-        const notice = new import_obsidian12.Notice(`Deleting folder "${folderName}"...`, 0);
-        try {
-          const success = await this.plugin.chatManager.deleteFolder(folderPath);
-          if (success) {
-            const keysToDelete = Array.from(this.folderExpansionState.keys()).filter((key) => key.startsWith(folderPath));
-            keysToDelete.forEach((key) => this.folderExpansionState.delete(key));
-            this.updateChatList();
+      new ConfirmModal(
+        this.app,
+        "Delete Folder",
+        `Delete folder "${folderName}" and ALL its contents (subfolders and chats)? This cannot be undone.`,
+        async () => {
+          const notice = new import_obsidian12.Notice(`Deleting folder "${folderName}"...`, 0);
+          try {
+            const success = await this.plugin.chatManager.deleteFolder(folderPath);
+            if (success) {
+              const keysToDelete = Array.from(this.folderExpansionState.keys()).filter((key) => key.startsWith(folderPath));
+              keysToDelete.forEach((key) => this.folderExpansionState.delete(key));
+              this.updateChatList();
+            }
+          } catch (error) {
+            this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
+            new import_obsidian12.Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+          } finally {
+            notice.hide();
           }
-        } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
-          new import_obsidian12.Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
-        } finally {
-          notice.hide();
         }
-      }).open();
+      ).open();
     };
     this.plugin = plugin;
     this.app = app;
     this.view = view;
   }
   createSidebarUI(parentElement) {
-    this.plugin.logger.debug("[SidebarManager] Creating UI...");
     this.containerEl = parentElement.createDiv({ cls: "ollama-sidebar-container" });
     const chatPanel = this.containerEl.createDiv({ cls: "ollama-chat-panel" });
     this.chatPanelHeaderEl = chatPanel.createDiv({
@@ -2000,13 +2004,21 @@ var SidebarManager = class {
     (0, import_obsidian12.setIcon)(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), CHATS_SECTION_ICON);
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
     const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
-    this.newFolderSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Folder", title: "New Folder" } });
+    this.newFolderSidebarButton = chatHeaderActions.createDiv({
+      cls: ["ollama-sidebar-header-button", "clickable-icon"],
+      attr: { "aria-label": "New Folder", title: "New Folder" }
+    });
     (0, import_obsidian12.setIcon)(this.newFolderSidebarButton, "lucide-folder-plus");
-    this.newChatSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Chat", title: "New Chat" } });
+    this.newChatSidebarButton = chatHeaderActions.createDiv({
+      cls: ["ollama-sidebar-header-button", "clickable-icon"],
+      attr: { "aria-label": "New Chat", title: "New Chat" }
+    });
     (0, import_obsidian12.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
     const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
     (0, import_obsidian12.setIcon)(chatChevron, EXPAND_ICON_ACCORDION);
-    this.chatPanelListContainerEl = chatPanel.createDiv({ cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"] });
+    this.chatPanelListContainerEl = chatPanel.createDiv({
+      cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"]
+    });
     const rolePanel = this.containerEl.createDiv({ cls: "ollama-role-panel" });
     this.rolePanelHeaderEl = rolePanel.createDiv({
       cls: ["ollama-sidebar-section-header", "menu-option"],
@@ -2019,7 +2031,6 @@ var SidebarManager = class {
     const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
     (0, import_obsidian12.setIcon)(roleChevron, COLLAPSE_ICON_ACCORDION);
     this.rolePanelListEl = rolePanel.createDiv({ cls: ["ollama-role-panel-list", "ollama-sidebar-section-content"] });
-    this.plugin.logger.debug("[SidebarManager] UI Created.");
     this.attachSidebarEventListeners();
     if (this.isSectionVisible("chats")) {
       this.updateChatList();
@@ -2041,7 +2052,6 @@ var SidebarManager = class {
       e.stopPropagation();
       this.handleNewFolderClick(this.plugin.chatManager.chatsFolderPath);
     });
-    this.plugin.logger.debug("[SidebarManager] Event listeners attached.");
   }
   isSectionVisible(type) {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
@@ -2066,7 +2076,10 @@ var SidebarManager = class {
       const folderIcon = itemContentEl.createSpan({ cls: CSS_FOLDER_ICON });
       (0, import_obsidian12.setIcon)(folderIcon, isExpanded ? FOLDER_ICON_OPEN : FOLDER_ICON_CLOSED);
       itemContentEl.createSpan({ cls: CSS_HIERARCHY_ITEM_TEXT, text: node.name });
-      const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Folder options", title: "More options" } });
+      const optionsBtn = itemContentEl.createEl("button", {
+        cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+        attr: { "aria-label": "Folder options", title: "More options" }
+      });
       (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
       this.view.registerDomEvent(optionsBtn, "click", (e) => {
         e.stopPropagation();
@@ -2081,7 +2094,9 @@ var SidebarManager = class {
       });
       const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
       if (node.children && node.children.length > 0) {
-        node.children.forEach((childNode) => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths, updateId));
+        node.children.forEach(
+          (childNode) => this.renderHierarchyNode(childNode, childrenContainer, level + 1, activeChatId, activeAncestorPaths, updateId)
+        );
       }
     } else if (node.type === "chat") {
       itemEl.addClass(CSS_CHAT_ITEM);
@@ -2098,14 +2113,16 @@ var SidebarManager = class {
         const lastModifiedDate = new Date(chatMeta.lastModified);
         const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
         if (dateText === "Invalid date") {
-          this.plugin.logger.warn(`Invalid date for chat ${chatMeta.id}`);
         }
         detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
       } catch (e) {
         this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
         detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
       }
-      const optionsBtn = itemContentEl.createEl("button", { cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"], attr: { "aria-label": "Chat options", title: "More options" } });
+      const optionsBtn = itemContentEl.createEl("button", {
+        cls: [CSS_HIERARCHY_ITEM_OPTIONS, "clickable-icon"],
+        attr: { "aria-label": "Chat options", title: "More options" }
+      });
       (0, import_obsidian12.setIcon)(optionsBtn, "lucide-more-horizontal");
       this.view.registerDomEvent(optionsBtn, "click", (e) => {
         e.stopPropagation();
@@ -2130,10 +2147,10 @@ var SidebarManager = class {
     const currentState = (_a = this.folderExpansionState.get(folderPath)) != null ? _a : false;
     const newState = !currentState;
     this.folderExpansionState.set(folderPath, newState);
-    this.plugin.logger.debug(`Toggled folder ${folderPath} to ${newState ? "expanded" : "collapsed"}`);
-    const folderItemEl = this.chatPanelListContainerEl.querySelector(`.ollama-folder-item[data-path="${folderPath}"]`);
+    const folderItemEl = this.chatPanelListContainerEl.querySelector(
+      `.ollama-folder-item[data-path="${folderPath}"]`
+    );
     if (!folderItemEl) {
-      this.plugin.logger.warn(`Could not find folder element for path: ${folderPath}. Forcing full update.`);
       this.updateChatList();
       return;
     }
@@ -2177,7 +2194,6 @@ var SidebarManager = class {
     const boundUpdateFunction = updateFunction.bind(this);
     if (isCurrentlyCollapsed) {
       if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        this.plugin.logger.debug(`Collapsing other section: ${otherSectionType}`);
         const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SECTION_TOGGLE_CHEVRON}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
@@ -2197,7 +2213,6 @@ var SidebarManager = class {
         requestAnimationFrame(() => {
           if ((contentEl == null ? void 0 : contentEl.isConnected) && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
             contentEl.classList.add(CSS_EXPANDED_CLASS);
-            this.plugin.logger.debug(`Expanding sidebar section: ${sectionType}`);
           }
         });
       } catch (error) {
@@ -2210,7 +2225,6 @@ var SidebarManager = class {
         });
       }
     } else {
-      this.plugin.logger.debug(`Collapsing sidebar section: ${sectionType}`);
       clickedHeaderEl.setAttribute("data-collapsed", "true");
       (0, import_obsidian12.setIcon)(iconEl, COLLAPSE_ICON_ACCORDION);
       contentEl.classList.remove(CSS_EXPANDED_CLASS);
@@ -2225,10 +2239,16 @@ var SidebarManager = class {
     event.preventDefault();
     event.stopPropagation();
     const menu = new import_obsidian12.Menu();
-    menu.addItem((item) => item.setTitle("New Chat Here").setIcon("lucide-plus-circle").onClick(() => this.handleNewChatClick(folderNode.path)));
-    menu.addItem((item) => item.setTitle("New Folder Here").setIcon("lucide-folder-plus").onClick(() => this.handleNewFolderClick(folderNode.path)));
+    menu.addItem(
+      (item) => item.setTitle("New Chat Here").setIcon("lucide-plus-circle").onClick(() => this.handleNewChatClick(folderNode.path))
+    );
+    menu.addItem(
+      (item) => item.setTitle("New Folder Here").setIcon("lucide-folder-plus").onClick(() => this.handleNewFolderClick(folderNode.path))
+    );
     menu.addSeparator();
-    menu.addItem((item) => item.setTitle("Rename Folder").setIcon("lucide-pencil").onClick(() => this.handleRenameFolder(folderNode)));
+    menu.addItem(
+      (item) => item.setTitle("Rename Folder").setIcon("lucide-pencil").onClick(() => this.handleRenameFolder(folderNode))
+    );
     menu.addItem((item) => {
       item.setTitle("Delete Folder").setIcon("lucide-trash-2").onClick(() => this.handleDeleteFolder(folderNode));
     });
@@ -2238,9 +2258,15 @@ var SidebarManager = class {
     event.preventDefault();
     event.stopPropagation();
     const menu = new import_obsidian12.Menu();
-    menu.addItem((item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id)));
-    menu.addItem((item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name)));
-    menu.addItem((item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id)));
+    menu.addItem(
+      (item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Rename Chat").setIcon("lucide-pencil").onClick(() => this.handleContextMenuRename(chatMeta.id, chatMeta.name))
+    );
+    menu.addItem(
+      (item) => item.setTitle("Export to Note").setIcon("lucide-download").onClick(() => this.exportSpecificChat(chatMeta.id))
+    );
     menu.addSeparator();
     menu.addItem((item) => {
       item.setTitle("Clear Messages").setIcon("lucide-trash").onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
@@ -2251,7 +2277,6 @@ var SidebarManager = class {
     menu.showAtMouseEvent(event);
   }
   async handleContextMenuClone(chatId) {
-    this.plugin.logger.info(`[SidebarManager Context] Clone requested for chat ${chatId}`);
     const notice = new import_obsidian12.Notice("Cloning chat...", 0);
     try {
       const c = await this.plugin.chatManager.cloneChat(chatId);
@@ -2267,7 +2292,6 @@ var SidebarManager = class {
     }
   }
   async handleContextMenuRename(chatId, currentName) {
-    this.plugin.logger.info(`[SidebarManager Context] Rename requested for chat ${chatId}`);
     new PromptModal(this.app, "Rename Chat", `New name for "${currentName}":`, currentName, async (newName) => {
       const trimmedName = newName == null ? void 0 : newName.trim();
       if (!trimmedName || trimmedName === currentName) {
@@ -2283,7 +2307,6 @@ var SidebarManager = class {
   // Видалено явний updateChatList
   async exportSpecificChat(chatId) {
     var _a;
-    this.plugin.logger.info(`[SidebarManager Context] Export requested for chat ${chatId}`);
     const notice = new import_obsidian12.Notice(`Exporting chat...`, 0);
     try {
       const chat = await this.plugin.chatManager.getChat(chatId);
@@ -2342,7 +2365,6 @@ var SidebarManager = class {
     }
   }
   async handleContextMenuClear(chatId, chatName) {
-    this.plugin.logger.debug(`[SidebarManager Context] Clear requested for chat ${chatId}`);
     new ConfirmModal(this.app, "Clear Messages", `Clear all messages in "${chatName}"?`, async () => {
       const notice = new import_obsidian12.Notice("Clearing messages...", 0);
       try {
@@ -2356,7 +2378,6 @@ var SidebarManager = class {
     }).open();
   }
   async handleContextMenuDelete(chatId, chatName) {
-    this.plugin.logger.debug(`[SidebarManager Context] Delete requested for chat ${chatId}`);
     new ConfirmModal(this.app, "Delete Chat", `Delete chat "${chatName}"? This cannot be undone.`, async () => {
       const notice = new import_obsidian12.Notice("Deleting chat...", 0);
       try {
@@ -2397,7 +2418,6 @@ var SidebarManager = class {
     messagesToFormat.forEach((message) => {
       var _a2;
       if (!message || !((_a2 = message.content) == null ? void 0 : _a2.trim()) || !message.timestamp) {
-        this.plugin.logger.warn("[formatChatToMarkdown] Skipping invalid message:", message);
         return;
       }
       let messageTimestamp;
@@ -2406,11 +2426,9 @@ var SidebarManager = class {
       } else if (message.timestamp instanceof Date) {
         messageTimestamp = message.timestamp;
       } else {
-        this.plugin.logger.warn("[formatChatToMarkdown] Invalid timestamp type in message:", message);
         return;
       }
       if (isNaN(messageTimestamp.getTime())) {
-        this.plugin.logger.warn("[formatChatToMarkdown] Invalid timestamp value in message:", message);
         return;
       }
       if (localLastDate === null || !this.isSameDay(localLastDate, messageTimestamp)) {
@@ -2436,7 +2454,6 @@ var SidebarManager = class {
             content = content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
           }
         } catch (e) {
-          this.plugin.logger.warn("Error processing assistant content for export:", e);
         }
         if (!content)
           return;
@@ -2461,7 +2478,6 @@ var SidebarManager = class {
           contentPrefix = "> ";
           break;
         default:
-          this.plugin.logger.warn(`[formatChatToMarkdown] Unknown message role: ${message.role}`);
           prefix = `**${message.role} (${time}):**
 `;
           break;
@@ -2504,7 +2520,6 @@ var SidebarManager = class {
   }
   formatRelativeDate(date) {
     if (!(date instanceof Date) || isNaN(date.getTime())) {
-      this.plugin.logger.warn("[formatRelativeDate] Invalid Date received");
       return "Invalid date";
     }
     const now = new Date();
@@ -2526,7 +2541,11 @@ var SidebarManager = class {
       return "Yesterday";
     if (diffDays < 7)
       return `${diffDays}d ago`;
-    return date.toLocaleDateString(void 0, { month: "short", day: "numeric", year: date.getFullYear() !== now.getFullYear() ? "numeric" : void 0 });
+    return date.toLocaleDateString(void 0, {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : void 0
+    });
   }
   isSameDay(date1, date2) {
     if (!(date1 instanceof Date) || !(date2 instanceof Date) || isNaN(date1.getTime()) || isNaN(date2.getTime()))
@@ -2535,7 +2554,6 @@ var SidebarManager = class {
   }
   destroy() {
     var _a;
-    this.plugin.logger.debug("[SidebarManager] Destroying...");
     (_a = this.containerEl) == null ? void 0 : _a.remove();
     this.folderExpansionState.clear();
   }
@@ -4460,14 +4478,28 @@ This action cannot be undone.`,
   //   this.stopGeneratingButton?.toggle(this.currentAbortController !== null);
   // }
   updateSendButtonState() {
-    if (!this.inputEl || !this.sendButton || !this.stopGeneratingButton)
+    if (!this.inputEl || !this.sendButton || !this.stopGeneratingButton) {
+      this.plugin.logger.warn(`[OllamaView] updateSendButtonState: Aborted, some UI elements missing. inputEl: ${!!this.inputEl}, sendButton: ${!!this.sendButton}, stopGenButton: ${!!this.stopGeneratingButton}`);
       return;
+    }
     const generationInProgress = this.currentAbortController !== null;
-    const isSendDisabled = this.inputEl.value.trim() === "" || this.isProcessing || generationInProgress;
-    this.sendButton.disabled = isSendDisabled;
-    this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, isSendDisabled);
-    this.stopGeneratingButton.toggle(generationInProgress);
-    this.sendButton.toggle(!generationInProgress);
+    const isInputEmpty = this.inputEl.value.trim() === "";
+    this.plugin.logger.debug(`[OllamaView] updateSendButtonState: generationInProgress is ${generationInProgress}. isProcessing is ${this.isProcessing}. isInputEmpty is ${isInputEmpty}.`);
+    if (generationInProgress) {
+      this.plugin.logger.debug(`[OllamaView] updateSendButtonState: Generation IN PROGRESS. Showing STOP, Hiding SEND.`);
+      this.stopGeneratingButton.show();
+      this.sendButton.hide();
+      this.sendButton.disabled = true;
+    } else {
+      this.plugin.logger.debug(`[OllamaView] updateSendButtonState: Generation NOT in progress. Hiding STOP, Showing SEND.`);
+      this.stopGeneratingButton.hide();
+      this.sendButton.show();
+      const sendShouldBeDisabled = isInputEmpty || this.isProcessing;
+      this.sendButton.disabled = sendShouldBeDisabled;
+      this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, sendShouldBeDisabled);
+      this.plugin.logger.debug(`[OllamaView] updateSendButtonState: Send button disabled: ${sendShouldBeDisabled}.`);
+    }
+    this.plugin.logger.debug(`[OllamaView] updateSendButtonState finished.`);
   }
   showEmptyState() {
     var _a, _b;
@@ -4494,9 +4526,12 @@ This action cannot be undone.`,
     }
   }
   setLoadingState(isLoading) {
+    const oldIsProcessing = this.isProcessing;
     this.isProcessing = isLoading;
+    this.plugin.logger.debug(`[OllamaView] setLoadingState: isProcessing set to ${this.isProcessing} (was ${oldIsProcessing}). isLoading param: ${isLoading}. currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}`);
     if (this.inputEl)
       this.inputEl.disabled = isLoading;
+    this.plugin.logger.debug(`[OllamaView] setLoadingState: Calling updateSendButtonState.`);
     this.updateSendButtonState();
     if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
@@ -4519,6 +4554,7 @@ This action cannot be undone.`,
         this.checkAllMessagesForCollapsing();
       }
     }
+    this.plugin.logger.debug(`[OllamaView] setLoadingState finished.`);
   }
   isSidebarSectionVisible(type) {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
@@ -4735,283 +4771,6 @@ This action cannot be undone.`,
             error
           );
           new import_obsidian14.Notice("An error occurred while deleting the message.");
-        }
-      }
-    ).open();
-  }
-  // OllamaView.ts
-  // ... (початок класу OllamaView та інші методи) ...
-  async handleRegenerateClick(userMessage) {
-    var _a;
-    if (this.isRegenerating) {
-      new import_obsidian14.Notice("Regeneration is already in progress. Please wait.", 3e3);
-      this.plugin.logger.warn("[Regenerate] Attempted to start regeneration while another one is already in progress.");
-      return;
-    }
-    if (this.currentAbortController) {
-      this.plugin.logger.warn(
-        "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
-      );
-      this.cancelGeneration();
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      if (this.currentAbortController) {
-        new import_obsidian14.Notice("Please wait for the current generation to stop completely before regenerating.");
-        return;
-      }
-    }
-    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-    if (!activeChat) {
-      new import_obsidian14.Notice("Cannot regenerate: No active chat found.");
-      return;
-    }
-    const chatId = activeChat.metadata.id;
-    const messageIndex = activeChat.messages.findIndex(
-      (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.role === userMessage.role
-    );
-    if (messageIndex === -1) {
-      this.plugin.logger.error(
-        "[Regenerate] Could not find the user message in the active chat history for regeneration.",
-        userMessage
-      );
-      new import_obsidian14.Notice("Error: Could not find the message to regenerate from.");
-      return;
-    }
-    const hasMessagesAfter = activeChat.messages.length > messageIndex + 1;
-    new ConfirmModal(
-      this.app,
-      "Confirm Regeneration",
-      hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
-      async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
-        this.isRegenerating = true;
-        this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
-        this.currentAbortController = new AbortController();
-        let accumulatedResponse = "";
-        const responseStartTime = new Date();
-        const responseStartTimeMs = responseStartTime.getTime();
-        let currentLocalPlaceholderRef = null;
-        this.setLoadingState(true);
-        let streamErrorOccurred = null;
-        let mainAssistantMessageProcessedPromise = null;
-        let emptySystemMessageProcessedPromise = null;
-        let errorMessageProcessedPromise = null;
-        let partialMessageProcessedPromise = null;
-        try {
-          this.plugin.logger.debug(`[Regenerate] Starting for message at index ${messageIndex} in chat ${chatId}. HasMessagesAfter: ${hasMessagesAfter}`);
-          if (hasMessagesAfter) {
-            const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
-            if (!deleteSuccess) {
-              throw new Error("Failed to delete subsequent messages for regeneration.");
-            }
-            this.plugin.logger.debug(`[Regenerate] Subsequent messages deleted.`);
-          }
-          await this.loadAndDisplayActiveChat();
-          this.guaranteedScrollToBottom(50, true);
-          this.plugin.logger.debug(`[Regenerate] Chat reloaded to reflect deletions.`);
-          this.plugin.logger.debug(`[Regenerate] Creating placeholder for new assistant response (timestamp: ${responseStartTimeMs}).`);
-          const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
-          });
-          assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", responseStartTimeMs.toString());
-          renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
-          const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-          messageWrapperEl.style.order = "2";
-          const assistantMessageElement = messageWrapperEl.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`
-          });
-          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-          const assistantContentEl = contentContainer.createDiv({
-            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`
-          });
-          assistantContentEl.empty();
-          const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-          for (let i = 0; i < 3; i++)
-            dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-          if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
-            this.activePlaceholder = {
-              timestamp: responseStartTimeMs,
-              groupEl: assistantPlaceholderGroupEl,
-              contentEl: assistantContentEl,
-              messageWrapper: messageWrapperEl
-            };
-            currentLocalPlaceholderRef = this.activePlaceholder;
-            this.plugin.logger.debug(`[Regenerate] Placeholder created and activePlaceholder set for ts: ${responseStartTimeMs}.`);
-          } else {
-            this.plugin.logger.error("[Regenerate] Failed to create all placeholder elements!");
-            throw new Error("Failed to create placeholder elements for regeneration.");
-          }
-          assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-          setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-          this.guaranteedScrollToBottom(50, true);
-          const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
-          if (!chatForStreaming) {
-            throw new Error("Failed to get updated chat context for streaming regeneration.");
-          }
-          this.plugin.logger.debug(`[Regenerate] Starting stream with ${chatForStreaming.messages.length} messages in context for chat ${chatId}.`);
-          const stream = this.plugin.ollamaService.generateChatResponseStream(
-            chatForStreaming,
-            this.currentAbortController.signal
-          );
-          let firstChunk = true;
-          for await (const chunk of stream) {
-            if (this.currentAbortController.signal.aborted) {
-              this.plugin.logger.debug("[Regenerate] Stream aborted by user during iteration.");
-              throw new Error("aborted by user");
-            }
-            if ("error" in chunk && chunk.error) {
-              if (!chunk.error.includes("aborted by user")) {
-                this.plugin.logger.error(`[Regenerate] Stream error: ${chunk.error}`);
-                throw new Error(chunk.error);
-              } else {
-                throw new Error("aborted by user");
-              }
-            }
-            if ("response" in chunk && chunk.response) {
-              if (((_a2 = this.activePlaceholder) == null ? void 0 : _a2.timestamp) === responseStartTimeMs && this.activePlaceholder.contentEl) {
-                if (firstChunk) {
-                  const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                  if (thinkingDots)
-                    thinkingDots.remove();
-                  firstChunk = false;
-                }
-                accumulatedResponse += chunk.response;
-                await AssistantMessageRenderer.renderAssistantContent(
-                  this.activePlaceholder.contentEl,
-                  accumulatedResponse,
-                  this.app,
-                  this.plugin,
-                  this
-                );
-                this.guaranteedScrollToBottom(50, true);
-                if (this.activePlaceholder.groupEl) {
-                  this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
-                }
-              } else {
-                this.plugin.logger.warn(`[Regenerate] activePlaceholder mismatch or contentEl missing during stream. Current ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}, expected: ${responseStartTimeMs}. Accumulated chunk anyway.`);
-                accumulatedResponse += chunk.response;
-              }
-            }
-            if ("done" in chunk && chunk.done) {
-              this.plugin.logger.debug("[Regenerate] Stream finished (done chunk received).");
-              break;
-            }
-          }
-          this.plugin.logger.debug(
-            `[Regenerate] Stream completed. Final response length: ${accumulatedResponse.length}. Placeholder still valid for this request: ${((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === responseStartTimeMs}`
-          );
-          if (accumulatedResponse.trim()) {
-            this.plugin.logger.debug(`[Regenerate] Adding assistant message to ChatManager for ts ${responseStartTimeMs}: "${accumulatedResponse.substring(0, 100)}..."`);
-            let resolver;
-            mainAssistantMessageProcessedPromise = new Promise((resolve) => {
-              resolver = resolve;
-            });
-            this.currentMessageAddedResolver = resolver;
-            this.plugin.chatManager.addMessageToActiveChat(
-              "assistant",
-              accumulatedResponse,
-              responseStartTime,
-              false
-            );
-          } else if (!this.currentAbortController.signal.aborted) {
-            this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
-            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
-              this.activePlaceholder.groupEl.remove();
-            }
-            if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
-              this.activePlaceholder = null;
-            }
-            let resolverForEmptySystem;
-            emptySystemMessageProcessedPromise = new Promise((resolve) => {
-              resolverForEmptySystem = resolve;
-            });
-            this.currentMessageAddedResolver = resolverForEmptySystem;
-            this.plugin.chatManager.addMessageToActiveChat(
-              "system",
-              "Assistant provided an empty response during regeneration.",
-              new Date()
-            );
-          }
-        } catch (error) {
-          streamErrorOccurred = error;
-          this.plugin.logger.error("[Regenerate] Error during regeneration process:", error);
-          if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
-            currentLocalPlaceholderRef = this.activePlaceholder;
-          }
-          if ((_h = currentLocalPlaceholderRef == null ? void 0 : currentLocalPlaceholderRef.groupEl) == null ? void 0 : _h.isConnected) {
-            this.plugin.logger.debug(`[Regenerate] Removing local placeholder (ts: ${responseStartTimeMs}) due to error: ${error.message}`);
-            currentLocalPlaceholderRef.groupEl.remove();
-          }
-          if (((_i = this.activePlaceholder) == null ? void 0 : _i.timestamp) === responseStartTimeMs) {
-            this.activePlaceholder = null;
-          }
-          let errorMsgForChat;
-          let errorMsgRole = "error";
-          let savePartialResponseOnError = false;
-          if (error.name === "AbortError" || ((_j = error.message) == null ? void 0 : _j.includes("aborted by user"))) {
-            this.plugin.logger.info("[Regenerate] Regeneration was stopped by user.");
-            errorMsgForChat = "Regeneration stopped.";
-            errorMsgRole = "system";
-            if (accumulatedResponse.trim()) {
-              savePartialResponseOnError = true;
-            }
-          } else {
-            errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
-            new import_obsidian14.Notice(errorMsgForChat, 5e3);
-          }
-          let errorResolver;
-          errorMessageProcessedPromise = new Promise((resolve) => {
-            errorResolver = resolve;
-          });
-          this.currentMessageAddedResolver = errorResolver;
-          this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
-          if (savePartialResponseOnError) {
-            this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
-            let partialResolver;
-            partialMessageProcessedPromise = new Promise((resolve) => {
-              partialResolver = resolve;
-            });
-            this.currentMessageAddedResolver = partialResolver;
-            this.plugin.chatManager.addMessageToActiveChat(
-              "assistant",
-              accumulatedResponse,
-              responseStartTime,
-              false
-            );
-          }
-        } finally {
-          this.plugin.logger.debug(`[Regenerate] FINALLY: Entering for request ${responseStartTimeMs}.`);
-          const promisesToAwait = [];
-          if (mainAssistantMessageProcessedPromise)
-            promisesToAwait.push(mainAssistantMessageProcessedPromise);
-          if (emptySystemMessageProcessedPromise)
-            promisesToAwait.push(emptySystemMessageProcessedPromise);
-          if (errorMessageProcessedPromise)
-            promisesToAwait.push(errorMessageProcessedPromise);
-          if (partialMessageProcessedPromise)
-            promisesToAwait.push(partialMessageProcessedPromise);
-          if (promisesToAwait.length > 0) {
-            this.plugin.logger.debug(`[Regenerate] FINALLY: Awaiting ${promisesToAwait.length} message processing promise(s) for ts ${responseStartTimeMs}.`);
-            try {
-              await Promise.all(promisesToAwait);
-              this.plugin.logger.debug(`[Regenerate] FINALLY: All message processing promises for ts ${responseStartTimeMs} resolved.`);
-            } catch (awaitError) {
-              this.plugin.logger.error(`[Regenerate] FINALLY: Error awaiting message processing promises for ts ${responseStartTimeMs}:`, awaitError);
-            }
-          } else {
-            this.plugin.logger.debug(`[Regenerate] FINALLY: No specific message promises to await for ts ${responseStartTimeMs}.`);
-          }
-          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate] FINALLY: Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. Removing now.`);
-            if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
-              this.activePlaceholder.groupEl.remove();
-            }
-            this.activePlaceholder = null;
-          }
-          this.currentAbortController = null;
-          this.isRegenerating = false;
-          this.setLoadingState(false);
-          this.plugin.logger.debug(`[Regenerate] FINALLY: Process finished for request ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, currentAbortController: ${this.currentAbortController}, isProcessing: ${this.isProcessing}`);
-          this.focusInput();
         }
       }
     ).open();
@@ -6561,7 +6320,289 @@ Summary:`;
       );
     }
   }
-  // --- КІНЕЦЬ МЕТОДІВ ДЛЯ ПЕРЕТЯГУВАННЯ ---
+  async handleRegenerateClick(userMessage) {
+    var _a;
+    if (this.isRegenerating) {
+      new import_obsidian14.Notice("Regeneration is already in progress. Please wait.", 3e3);
+      this.plugin.logger.warn("[Regenerate] Attempted to start regeneration while another one is already in progress.");
+      return;
+    }
+    if (this.currentAbortController) {
+      this.plugin.logger.warn(
+        "[Regenerate] Found an existing AbortController. Cancelling previous generation first."
+      );
+      this.cancelGeneration();
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      if (this.currentAbortController) {
+        new import_obsidian14.Notice("Please wait for the current generation to stop completely before regenerating.");
+        return;
+      }
+    }
+    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    if (!activeChat) {
+      new import_obsidian14.Notice("Cannot regenerate: No active chat found.");
+      return;
+    }
+    const chatId = activeChat.metadata.id;
+    const messageIndex = activeChat.messages.findIndex(
+      (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.role === userMessage.role
+    );
+    if (messageIndex === -1) {
+      this.plugin.logger.error(
+        "[Regenerate] Could not find the user message in the active chat history for regeneration.",
+        userMessage
+      );
+      new import_obsidian14.Notice("Error: Could not find the message to regenerate from.");
+      return;
+    }
+    const hasMessagesAfter = activeChat.messages.length > messageIndex + 1;
+    new ConfirmModal(
+      this.app,
+      "Confirm Regeneration",
+      hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
+      async () => {
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+        this.isRegenerating = true;
+        this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
+        this.currentAbortController = new AbortController();
+        let accumulatedResponse = "";
+        const responseStartTime = new Date();
+        const responseStartTimeMs = responseStartTime.getTime();
+        let currentLocalPlaceholderRef = null;
+        this.setLoadingState(true);
+        let streamErrorOccurred = null;
+        let mainAssistantMessageProcessedPromise = null;
+        let emptySystemMessageProcessedPromise = null;
+        let errorMessageProcessedPromise = null;
+        let partialMessageProcessedPromise = null;
+        try {
+          this.plugin.logger.debug(`[Regenerate] Starting for message at index ${messageIndex} in chat ${chatId}. HasMessagesAfter: ${hasMessagesAfter}`);
+          if (hasMessagesAfter) {
+            const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
+            if (!deleteSuccess) {
+              throw new Error("Failed to delete subsequent messages for regeneration.");
+            }
+            this.plugin.logger.debug(`[Regenerate] Subsequent messages deleted.`);
+          }
+          await this.loadAndDisplayActiveChat();
+          this.guaranteedScrollToBottom(50, true);
+          this.plugin.logger.debug(`[Regenerate] Chat reloaded to reflect deletions.`);
+          this.plugin.logger.debug(`[Regenerate] Creating placeholder for new assistant response (timestamp: ${responseStartTimeMs}).`);
+          const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
+            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
+          });
+          assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", responseStartTimeMs.toString());
+          renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
+          const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
+          messageWrapperEl.style.order = "2";
+          const assistantMessageElement = messageWrapperEl.createDiv({
+            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`
+          });
+          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
+          const assistantContentEl = contentContainer.createDiv({
+            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`
+          });
+          assistantContentEl.empty();
+          const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+          for (let i = 0; i < 3; i++)
+            dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+          if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
+            this.activePlaceholder = {
+              timestamp: responseStartTimeMs,
+              groupEl: assistantPlaceholderGroupEl,
+              contentEl: assistantContentEl,
+              messageWrapper: messageWrapperEl
+            };
+            currentLocalPlaceholderRef = this.activePlaceholder;
+            this.plugin.logger.debug(`[Regenerate] Placeholder created and activePlaceholder set for ts: ${responseStartTimeMs}.`);
+          } else {
+            this.plugin.logger.error("[Regenerate] Failed to create all placeholder elements!");
+            throw new Error("Failed to create placeholder elements for regeneration.");
+          }
+          assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
+          setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
+          this.guaranteedScrollToBottom(50, true);
+          const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
+          if (!chatForStreaming) {
+            throw new Error("Failed to get updated chat context for streaming regeneration.");
+          }
+          this.plugin.logger.debug(`[Regenerate] Starting stream with ${chatForStreaming.messages.length} messages in context for chat ${chatId}.`);
+          const stream = this.plugin.ollamaService.generateChatResponseStream(
+            chatForStreaming,
+            this.currentAbortController.signal
+          );
+          let firstChunk = true;
+          for await (const chunk of stream) {
+            if (this.currentAbortController.signal.aborted) {
+              this.plugin.logger.debug("[Regenerate] Stream aborted by user during iteration.");
+              throw new Error("aborted by user");
+            }
+            if ("error" in chunk && chunk.error) {
+              if (!chunk.error.includes("aborted by user")) {
+                this.plugin.logger.error(`[Regenerate] Stream error: ${chunk.error}`);
+                throw new Error(chunk.error);
+              } else {
+                throw new Error("aborted by user");
+              }
+            }
+            if ("response" in chunk && chunk.response) {
+              if (((_a2 = this.activePlaceholder) == null ? void 0 : _a2.timestamp) === responseStartTimeMs && this.activePlaceholder.contentEl) {
+                if (firstChunk) {
+                  const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+                  if (thinkingDots)
+                    thinkingDots.remove();
+                  firstChunk = false;
+                }
+                accumulatedResponse += chunk.response;
+                await AssistantMessageRenderer.renderAssistantContent(
+                  this.activePlaceholder.contentEl,
+                  accumulatedResponse,
+                  this.app,
+                  this.plugin,
+                  this
+                );
+                this.guaranteedScrollToBottom(50, true);
+                if (this.activePlaceholder.groupEl) {
+                  this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
+                }
+              } else {
+                this.plugin.logger.warn(`[Regenerate] activePlaceholder mismatch or contentEl missing during stream. Current ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}, expected: ${responseStartTimeMs}. Accumulated chunk anyway.`);
+                accumulatedResponse += chunk.response;
+              }
+            }
+            if ("done" in chunk && chunk.done) {
+              this.plugin.logger.debug("[Regenerate] Stream finished (done chunk received).");
+              break;
+            }
+          }
+          this.plugin.logger.debug(
+            `[Regenerate] Stream completed. Final response length: ${accumulatedResponse.length}. Placeholder still valid for this request: ${((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === responseStartTimeMs}`
+          );
+          if (accumulatedResponse.trim()) {
+            this.plugin.logger.debug(`[Regenerate] Adding assistant message to ChatManager for ts ${responseStartTimeMs}: "${accumulatedResponse.substring(0, 100)}..."`);
+            let resolver;
+            mainAssistantMessageProcessedPromise = new Promise((resolve) => {
+              resolver = resolve;
+            });
+            this.currentMessageAddedResolver = resolver;
+            this.plugin.chatManager.addMessageToActiveChat(
+              "assistant",
+              accumulatedResponse,
+              responseStartTime,
+              false
+            );
+          } else if (!this.currentAbortController.signal.aborted) {
+            this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
+            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
+              this.activePlaceholder.groupEl.remove();
+            }
+            if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
+              this.activePlaceholder = null;
+            }
+            let resolverForEmptySystem;
+            emptySystemMessageProcessedPromise = new Promise((resolve) => {
+              resolverForEmptySystem = resolve;
+            });
+            this.currentMessageAddedResolver = resolverForEmptySystem;
+            this.plugin.chatManager.addMessageToActiveChat(
+              "system",
+              "Assistant provided an empty response during regeneration.",
+              new Date()
+            );
+          }
+        } catch (error) {
+          streamErrorOccurred = error;
+          this.plugin.logger.error("[Regenerate] Error during regeneration process:", error);
+          if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
+            currentLocalPlaceholderRef = this.activePlaceholder;
+          }
+          if ((_h = currentLocalPlaceholderRef == null ? void 0 : currentLocalPlaceholderRef.groupEl) == null ? void 0 : _h.isConnected) {
+            this.plugin.logger.debug(`[Regenerate] Removing local placeholder (ts: ${responseStartTimeMs}) due to error: ${error.message}`);
+            currentLocalPlaceholderRef.groupEl.remove();
+          }
+          if (((_i = this.activePlaceholder) == null ? void 0 : _i.timestamp) === responseStartTimeMs) {
+            this.activePlaceholder = null;
+          }
+          let errorMsgForChat;
+          let errorMsgRole = "error";
+          let savePartialResponseOnError = false;
+          if (error.name === "AbortError" || ((_j = error.message) == null ? void 0 : _j.includes("aborted by user"))) {
+            this.plugin.logger.info("[Regenerate] Regeneration was stopped by user.");
+            errorMsgForChat = "Regeneration stopped.";
+            errorMsgRole = "system";
+            if (accumulatedResponse.trim()) {
+              savePartialResponseOnError = true;
+            }
+          } else {
+            errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
+            new import_obsidian14.Notice(errorMsgForChat, 5e3);
+          }
+          let errorResolver;
+          errorMessageProcessedPromise = new Promise((resolve) => {
+            errorResolver = resolve;
+          });
+          this.currentMessageAddedResolver = errorResolver;
+          this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
+          if (savePartialResponseOnError) {
+            this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
+            let partialResolver;
+            partialMessageProcessedPromise = new Promise((resolve) => {
+              partialResolver = resolve;
+            });
+            this.currentMessageAddedResolver = partialResolver;
+            this.plugin.chatManager.addMessageToActiveChat(
+              "assistant",
+              accumulatedResponse,
+              responseStartTime,
+              false
+            );
+          }
+        } finally {
+          this.plugin.logger.debug(`[Regenerate] FINALLY (START) for req ${responseStartTimeMs}.`);
+          const promisesToAwait = [];
+          if (mainAssistantMessageProcessedPromise)
+            promisesToAwait.push(mainAssistantMessageProcessedPromise);
+          if (emptySystemMessageProcessedPromise)
+            promisesToAwait.push(emptySystemMessageProcessedPromise);
+          if (errorMessageProcessedPromise)
+            promisesToAwait.push(errorMessageProcessedPromise);
+          if (partialMessageProcessedPromise)
+            promisesToAwait.push(partialMessageProcessedPromise);
+          if (promisesToAwait.length > 0) {
+            this.plugin.logger.debug(`[Regenerate] FINALLY: Awaiting ${promisesToAwait.length} message processing promise(s) for ts ${responseStartTimeMs}.`);
+            try {
+              await Promise.all(promisesToAwait);
+              this.plugin.logger.debug(`[Regenerate] FINALLY: All message processing promises for ts ${responseStartTimeMs} resolved.`);
+            } catch (awaitError) {
+              this.plugin.logger.error(`[Regenerate] FINALLY: Error awaiting message processing promises for ts ${responseStartTimeMs}:`, awaitError);
+            }
+          } else {
+            this.plugin.logger.debug(`[Regenerate] FINALLY: No specific message promises to await for ts ${responseStartTimeMs}.`);
+          }
+          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
+            this.plugin.logger.warn(`[Regenerate] FINALLY: Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. Removing now.`);
+            if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
+              this.activePlaceholder.groupEl.remove();
+            }
+            this.activePlaceholder = null;
+          }
+          this.plugin.logger.debug(`[Regenerate] FINALLY: Setting currentAbortController to null for req ${responseStartTimeMs}. Was: ${this.currentAbortController ? "NOT null" : "null"}`);
+          this.currentAbortController = null;
+          this.plugin.logger.debug(`[Regenerate] FINALLY: Setting isRegenerating to false for req ${responseStartTimeMs}. Was: ${this.isRegenerating}`);
+          this.isRegenerating = false;
+          this.plugin.logger.debug(`[Regenerate] FINALLY: Calling setLoadingState(false) for req ${responseStartTimeMs}.`);
+          this.setLoadingState(false);
+          requestAnimationFrame(() => {
+            this.plugin.logger.debug(`[Regenerate] FINALLY (requestAnimationFrame): Forcing updateSendButtonState for req ${responseStartTimeMs}. currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}, isProcessing: ${this.isProcessing}`);
+            this.updateSendButtonState();
+            this.plugin.logger.debug(`[Regenerate] FINALLY (requestAnimationFrame): UI update attempt finished for req ${responseStartTimeMs}.`);
+          });
+          this.plugin.logger.debug(`[Regenerate] FINALLY (END) for req ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}, isProcessing: ${this.isProcessing}`);
+          this.focusInput();
+        }
+      }
+    ).open();
+  }
 };
 
 // src/ragService.ts
@@ -9277,15 +9318,18 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.taskFileNeedsUpdate = false;
     this.taskCheckInterval = null;
     // Debounced функція оновлення для Vault Events
-    this.debouncedIndexAndUIRebuild = (0, import_obsidian20.debounce)(async () => {
-      this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
-      this.logger.info("Debounced Vault change detected, rebuilding index and updating UI...");
-      if (this.chatManager) {
-        await this.chatManager.rebuildIndexFromFiles();
-        this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
-        this.emit("chat-list-updated");
-      }
-    }, 1500, true);
+    this.debouncedIndexAndUIRebuild = (0, import_obsidian20.debounce)(
+      async () => {
+        this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
+        if (this.chatManager) {
+          await this.chatManager.rebuildIndexFromFiles();
+          this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
+          this.emit("chat-list-updated");
+        }
+      },
+      1500,
+      true
+    );
   }
   // --- Event Emitter Methods ---
   on(event, callback) {
@@ -9381,38 +9425,70 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => {
       this.activateView();
     });
-    this.addCommand({ id: "open-chat-view", name: "Open AI Forge Chat", callback: () => {
-      this.activateView();
-    } });
-    this.addCommand({ id: "index-rag-documents", name: "AI Forge: Index documents for RAG", callback: async () => {
-      if (this.settings.ragEnabled)
-        await this.ragService.indexDocuments();
-      else
-        new import_obsidian20.Notice("RAG is disabled in settings.");
-    } });
-    this.addCommand({ id: "clear-active-chat-history", name: "AI Forge: Clear Active Chat History", callback: async () => {
-      await this.clearMessageHistoryWithConfirmation();
-    } });
-    this.addCommand({ id: "refresh-roles", name: "AI Forge: Refresh Roles List", callback: async () => {
-      await this.listRoleFiles(true);
-      this.emit("roles-updated");
-      new import_obsidian20.Notice("Role list refreshed.");
-    } });
-    this.addCommand({ id: "new-chat", name: "AI Forge: New Chat", callback: async () => {
-      const newChat = await this.chatManager.createNewChat();
-      if (newChat) {
-        new import_obsidian20.Notice(`Created new chat: ${newChat.metadata.name}`);
+    this.addCommand({
+      id: "open-chat-view",
+      name: "Open AI Forge Chat",
+      callback: () => {
+        this.activateView();
       }
-    } });
-    this.addCommand({ id: "switch-chat", name: "AI Forge: Switch Chat", callback: async () => {
-      await this.showChatSwitcher();
-    } });
-    this.addCommand({ id: "rename-active-chat", name: "AI Forge: Rename Active Chat", callback: async () => {
-      await this.renameActiveChat();
-    } });
-    this.addCommand({ id: "delete-active-chat", name: "AI Forge: Delete Active Chat", callback: async () => {
-      await this.deleteActiveChatWithConfirmation();
-    } });
+    });
+    this.addCommand({
+      id: "index-rag-documents",
+      name: "AI Forge: Index documents for RAG",
+      callback: async () => {
+        if (this.settings.ragEnabled)
+          await this.ragService.indexDocuments();
+        else
+          new import_obsidian20.Notice("RAG is disabled in settings.");
+      }
+    });
+    this.addCommand({
+      id: "clear-active-chat-history",
+      name: "AI Forge: Clear Active Chat History",
+      callback: async () => {
+        await this.clearMessageHistoryWithConfirmation();
+      }
+    });
+    this.addCommand({
+      id: "refresh-roles",
+      name: "AI Forge: Refresh Roles List",
+      callback: async () => {
+        await this.listRoleFiles(true);
+        this.emit("roles-updated");
+        new import_obsidian20.Notice("Role list refreshed.");
+      }
+    });
+    this.addCommand({
+      id: "new-chat",
+      name: "AI Forge: New Chat",
+      callback: async () => {
+        const newChat = await this.chatManager.createNewChat();
+        if (newChat) {
+          new import_obsidian20.Notice(`Created new chat: ${newChat.metadata.name}`);
+        }
+      }
+    });
+    this.addCommand({
+      id: "switch-chat",
+      name: "AI Forge: Switch Chat",
+      callback: async () => {
+        await this.showChatSwitcher();
+      }
+    });
+    this.addCommand({
+      id: "rename-active-chat",
+      name: "AI Forge: Rename Active Chat",
+      callback: async () => {
+        await this.renameActiveChat();
+      }
+    });
+    this.addCommand({
+      id: "delete-active-chat",
+      name: "AI Forge: Delete Active Chat",
+      callback: async () => {
+        await this.deleteActiveChatWithConfirmation();
+      }
+    });
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.app.workspace.onLayoutReady(async () => {
@@ -9428,12 +9504,16 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       }
     });
     this.registerVaultListeners();
-    const debouncedRoleClear = (0, import_obsidian20.debounce)(() => {
-      var _a, _b;
-      this.roleListCache = null;
-      (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
-      this.emit("roles-updated");
-    }, 1500, true);
+    const debouncedRoleClear = (0, import_obsidian20.debounce)(
+      () => {
+        var _a, _b;
+        this.roleListCache = null;
+        (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
+        this.emit("roles-updated");
+      },
+      1500,
+      true
+    );
     const handleModifyEvent = (file) => {
       if (file instanceof import_obsidian20.TFile) {
         this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
@@ -9482,13 +9562,14 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     }
   }
   registerVaultListeners() {
-    this.logger.debug("Registering Vault listeners specifically for chat history updates...");
     const handleFileCreateDelete = (file) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
       const historyPath = (0, import_obsidian20.normalizePath)(this.settings.chatHistoryFolderPath);
       if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian20.TFolder)) {
-        this.logger.error(`[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`);
+        this.logger.error(
+          `[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`
+        );
         this.debouncedIndexAndUIRebuild();
       }
     };
@@ -9498,8 +9579,10 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       const historyPath = (0, import_obsidian20.normalizePath)(this.settings.chatHistoryFolderPath);
       const isInHistoryNew = file.path.startsWith(historyPath + "/");
       const isInHistoryOld = oldPath.startsWith(historyPath + "/");
-      if ((isInHistoryNew || isInHistoryOld) && (file.path !== historyPath && oldPath !== historyPath)) {
-        this.logger.error(`[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`);
+      if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
+        this.logger.error(
+          `[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`
+        );
         this.debouncedIndexAndUIRebuild();
       }
     };
@@ -9874,12 +9957,17 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     }
     const chatName = activeChat.metadata.name;
     const chatId = activeChat.metadata.id;
-    new ConfirmModal(this.app, "Delete Chat", `Are you sure you want to delete chat "${chatName}"?
-This action cannot be undone.`, async () => {
-      const success = await this.chatManager.deleteChat(chatId);
-      if (!success) {
+    new ConfirmModal(
+      this.app,
+      "Delete Chat",
+      `Are you sure you want to delete chat "${chatName}"?
+This action cannot be undone.`,
+      async () => {
+        const success = await this.chatManager.deleteChat(chatId);
+        if (!success) {
+        }
       }
-    }).open();
+    ).open();
   }
   async handleActiveChatChangedLocally(data) {
     if (this.settings.saveMessageHistory) {
