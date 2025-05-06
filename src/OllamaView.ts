@@ -1053,14 +1053,10 @@ private async addMessageStandard(message: Message): Promise<void> {
         renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
         break;
       case "error":
-        // Якщо handleErrorMessage вже викликаний для цієї помилки, він створить групу.
-        // Якщо ми тут, значить, це "незалежне" повідомлення про помилку.
-        // Щоб уникнути дублювання або конфліктів з групуванням помилок в handleErrorMessage,
-        // ми можемо або створити простий рендерер помилок тут, або покластися,
-        // що handleErrorMessage буде викликаний в іншому місці для цієї помилки.
-        // Для простоти, якщо помилка потрапляє сюди як окреме повідомлення, рендеримо її.
-        this.handleErrorMessage(message); // Делегуємо, handleErrorMessage додасть до DOM
-        return; // Виходимо, оскільки handleErrorMessage керує додаванням
+        // Якщо це повідомлення про помилку передається сюди, воно вже має бути Message.
+        // handleErrorMessage сам додасть його до DOM або згрупує.
+        this.handleErrorMessage(message); // Передаємо повний об'єкт message
+        return; 
       case "assistant":
         renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
         break;
@@ -1099,13 +1095,21 @@ private async addMessageStandard(message: Message): Promise<void> {
       `[addMessageStandard] Error rendering/appending standard message. Role: ${message.role}, Content: "${message.content.substring(0, 100)}"`,
       error
     );
-    // Не викликаємо handleErrorMessage тут, щоб уникнути рекурсії, якщо помилка в самому handleErrorMessage
-    // Натомість, просто логуємо. Викликаюча сторона (handleMessageAdded) має обробити помилку рендерингу.
-    // Або, якщо це помилка саме рендерингу, то можна створити DOM-елемент з повідомленням про помилку.
+    // Замість виклику handleErrorMessage з потенційно неповним об'єктом,
+    // створюємо DOM елемент помилки безпосередньо або викликаємо handleErrorMessage з повним об'єктом.
+    // Поточна версія створює DOM елемент:
     const errorDiv = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
     if (errorDiv) {
-      errorDiv.createDiv({ cls: CSS_CLASSES.ERROR_TEXT, text: `Failed to display ${message.role} message. Render Error.`});
-      this.chatContainer?.appendChild(errorDiv);
+      // Додаємо клас помилки до групи
+      errorDiv.addClass(CSS_CLASSES.ERROR_GROUP); // Припускаючи, що є такий клас для стилізації
+      // Додаємо аватар помилки (опціонально)
+      // RendererUtils.renderAvatar(this.app, this.plugin, errorDiv, true, 'error'); 
+      const errorWrapper = errorDiv.createDiv({cls: "message-wrapper"});
+      const errorMessageEl = errorWrapper.createDiv({cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.ERROR_MESSAGE}`});
+      errorMessageEl.createDiv({ cls: CSS_CLASSES.ERROR_TEXT, text: `Failed to display ${message.role} message. Render Error.`});
+      BaseMessageRenderer.addTimestamp(errorMessageEl, new Date(), this); // Додаємо поточний час для помилки рендерингу
+      
+      // this.chatContainer?.appendChild(errorDiv); // Вже додано через createDiv у chatContainer
       this.guaranteedScrollToBottom(50,true);
     }
   }
@@ -3586,25 +3590,25 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
   const messageTimestampForLog = messageForLog?.timestamp?.getTime();
   const messageRoleForLog = messageForLog?.role;
 
-  this.plugin.logger.debug(`[HMA ENTRY] For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}. localResolver ${resolverExistsAtStart ? 'EXISTS' : 'is NULL'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
+  this.plugin.logger.debug(`[HMA ENTRY id:${messageTimestampForLog}] Role: ${messageRoleForLog}. localResolver ${resolverExistsAtStart ? 'EXISTS' : 'is NULL'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
 
   try {
     if (!data || !data.message) {
-      this.plugin.logger.error("[HMA] Invalid data received.", data);
+      this.plugin.logger.error(`[HMA id:${messageTimestampForLog}] EXIT: Invalid data received.`, data);
       if (localResolver) {
-          this.plugin.logger.warn(`[HMA INVALID DATA] Calling localResolver early for ts ${messageTimestampForLog}.`);
+          this.plugin.logger.warn(`[HMA id:${messageTimestampForLog}] Calling localResolver (invalid data).`);
           localResolver();
       }
       return;
     }
 
     const { chatId: eventChatId, message } = data;
-    const messageTimestampMs = message.timestamp.getTime();
+    const messageTimestampMs = message.timestamp.getTime(); 
 
     if (!this.chatContainer || !this.plugin.chatManager) {
-      this.plugin.logger.error("[HMA] CRITICAL: Context (chatContainer or chatManager) missing!");
+      this.plugin.logger.error(`[HMA id:${messageTimestampMs}] EXIT: CRITICAL Context missing!`);
       if (localResolver) {
-          this.plugin.logger.warn(`[HMA MISSING CONTEXT] Calling localResolver early for ts ${messageTimestampForLog}.`);
+          this.plugin.logger.warn(`[HMA id:${messageTimestampMs}] Calling localResolver (missing context).`);
           localResolver();
       }
       return;
@@ -3612,65 +3616,56 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
 
     const activeChatId = this.plugin.chatManager.getActiveChatId();
     if (eventChatId !== activeChatId) {
-      this.plugin.logger.debug(`[HMA] Event for non-active chat ${eventChatId} (current is ${activeChatId}). Ignoring UI update.`);
+      this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] EXIT: Event for non-active chat ${eventChatId} (current is ${activeChatId}).`);
       if (localResolver) {
-          this.plugin.logger.debug(`[HMA NON-ACTIVE CHAT] Calling localResolver for ts ${messageTimestampForLog}.`);
+          this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Calling localResolver (non-active chat).`);
           localResolver();
       }
       return;
     }
 
-    // Перевірка на дублікат в DOM (повідомлення, а не плейсхолдера)
     const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
     if (existingRenderedMessage) {
-        this.plugin.logger.warn(`[HMA] Message (ts: ${messageTimestampMs}, role: ${message.role}) seems to be already rendered (not a placeholder). Skipping.`);
+        this.plugin.logger.warn(`[HMA id:${messageTimestampMs}] EXIT: Message already rendered (not placeholder). Role: ${message.role}.`);
         if (localResolver) {
-          this.plugin.logger.debug(`[HMA EXISTING RENDERED MSG] Calling localResolver for ts ${messageTimestampForLog}.`);
+          this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Calling localResolver (already rendered).`);
           localResolver();
         }
         return;
     }
     
-    // Перевірка на дублікат в currentMessages
     const alreadyInLogicCache = this.currentMessages.some(
       m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
     );
+    this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Cache check: alreadyInLogicCache = ${alreadyInLogicCache}.`);
 
     if (alreadyInLogicCache) {
-      // Повідомлення вже є в кеші this.currentMessages.
-      // Ми НЕ хочемо обробляти його знову, ЯКЩО ЦЕ НЕ випадок,
-      // коли це повідомлення асистента, яке має оновити активний плейсхолдер.
       const isAssistantMatchingActivePlaceholder = 
           message.role === 'assistant' && 
           this.activePlaceholder?.timestamp === messageTimestampMs;
+      this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Cache check: isAssistantMatchingActivePlaceholder = ${isAssistantMatchingActivePlaceholder}.`);
 
       if (isAssistantMatchingActivePlaceholder) {
-          // Це повідомлення асистента, яке відповідає активному плейсхолдеру.
-          // Хоча воно вже в кеші (що може бути дивно, можливо подія прийшла двічі),
-          // ми дозволимо коду нижче спробувати оновити плейсхолдер.
-          this.plugin.logger.debug(`[HMA MSG IN CACHE BUT IS ASSISTANT FOR PLACEHOLDER] ts: ${messageTimestampMs}. Proceeding to placeholder logic.`);
+          this.plugin.logger.info(`[HMA id:${messageTimestampMs}] Message in cache, BUT is assistant for active placeholder. Proceeding.`);
       } else {
-          // Це або не повідомлення асистента, або повідомлення асистента, але не для поточного активного плейсхолдера.
-          // Оскільки воно вже в кеші, вважаємо його дублікатом.
-          this.plugin.logger.warn(`[HMA MSG IN CACHE - TREATING AS DUPLICATE] ts: ${messageTimestampMs}, role: ${message.role}. Skipping further processing.`);
+          this.plugin.logger.warn(`[HMA id:${messageTimestampMs}] EXIT: Message in cache and NOT assistant for active placeholder. Skipping.`);
           if (localResolver) {
-              this.plugin.logger.debug(`[HMA MSG IN CACHE - DUPLICATE] Calling localResolver for ts ${messageTimestampForLog}.`);
+              this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Calling localResolver (in cache, not placeholder).`);
               localResolver();
           }
-          return; // Виходимо, бо це дублікат
+          return; 
       }
     }
 
-    // ----- Основна логіка обробки -----
-    // Тепер перевіряємо, чи потрібно оновлювати плейсхолдер
+    this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Passed initial checks. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
     if (message.role === "assistant" && this.activePlaceholder?.timestamp === messageTimestampMs) {
-      // Знайдено відповідний плейсхолдер для повідомлення асистента
-      this.plugin.logger.info( // Змінено на INFO для кращої видимості
-        `[HMA] Assistant message (ts: ${messageTimestampMs}) MATCHES active placeholder (ts: ${this.activePlaceholder.timestamp}). Updating placeholder.`
+      this.plugin.logger.info(
+        `[HMA id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating.`
       );
       const placeholderToUpdate = this.activePlaceholder; 
       
       if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
+        this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Placeholder DOM elements are valid.`);
         placeholderToUpdate.groupEl.classList.remove("placeholder");
         placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
         placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString()); 
@@ -3678,11 +3673,10 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
         const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
 
         if (!messageDomElement) {
-          this.plugin.logger.error("[HMA] Critical: Could not find .message element in placeholder. Removing placeholder, adding normally.");
+          this.plugin.logger.error(`[HMA id:${messageTimestampMs}] EXIT: .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
           if(placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove(); 
           this.activePlaceholder = null; 
-          await this.addMessageStandard(message);
-          // Додаємо в кеш після addMessageStandard
+          await this.addMessageStandard(message); 
           if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
               this.currentMessages.push(message);
           }
@@ -3692,9 +3686,13 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
 
         placeholderToUpdate.contentEl.classList.remove("streaming-text");
         const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-        if (dotsEl) dotsEl.remove();
+        if (dotsEl) {
+          dotsEl.remove();
+          this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Thinking dots removed.`);
+        }
 
         try {
+          this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Rendering final assistant content.`);
           await AssistantMessageRenderer.renderAssistantContent(
             placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this
           );
@@ -3706,34 +3704,32 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
           this.lastMessageElement = placeholderToUpdate.groupEl; 
           if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
                this.currentMessages.push(message);
+               this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Message pushed to currentMessages.`);
           }
           this.hideEmptyState();
           
           this.activePlaceholder = null; 
-          this.plugin.logger.info(`[HMA] Placeholder for ts ${messageTimestampMs} successfully updated and activePlaceholder CLEARED.`);
+          this.plugin.logger.info(`[HMA id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`);
 
-          setTimeout(() => {
-            if (placeholderToUpdate.groupEl.isConnected) {
-              this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
-            }
+          setTimeout(() => { 
+            if(placeholderToUpdate.groupEl.isConnected) this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
           }, 50); 
-           this.guaranteedScrollToBottom(100, false); 
+          this.guaranteedScrollToBottom(100, false); 
 
         } catch (renderError: any) {
-          this.plugin.logger.error("[HMA] Error during final render/update of placeholder:", renderError);
-          if (placeholderToUpdate.groupEl.isConnected) { 
-              placeholderToUpdate.groupEl.remove(); 
-          }
+          this.plugin.logger.error(`[HMA id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
+          if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove(); 
           this.activePlaceholder = null; 
+          // Ось тут виклик handleErrorMessage, який має бути коректним
           this.handleErrorMessage({ 
             role: "error",
-            content: `Failed to finalize assistant display: ${renderError.message}`,
-            timestamp: new Date(),
+            content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`, // Додано timestamp оригінального повідомлення
+            timestamp: new Date(), // Час виникнення помилки рендерингу
           });
         }
       } else {
         this.plugin.logger.error(
-          `[HMA] Active placeholder for ts ${messageTimestampMs} matched, but DOM elements invalid. groupEl connected: ${placeholderToUpdate.groupEl?.isConnected}. Adding message normally.`
+          `[HMA id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. groupEl connected: ${placeholderToUpdate.groupEl?.isConnected}. Adding normally.`
         );
         this.activePlaceholder = null; 
         await this.addMessageStandard(message); 
@@ -3742,48 +3738,40 @@ private async handleMessageAdded(data: { chatId: string; message: Message }): Pr
         }
       }
     } else {
-      // Немає відповідного плейсхолдера, або це не асистент, або timestamp не збігається.
-      if (message.role === "assistant") {
-          if (this.activePlaceholder) {
-              this.plugin.logger.warn(`[HMA] Assistant (ts: ${messageTimestampMs}) received. Active placeholder for DIFFERENT request (ts: ${this.activePlaceholder.timestamp}). Adding normally.`);
-          } else {
-              this.plugin.logger.debug(`[HMA] Assistant (ts: ${messageTimestampMs}) received. No active placeholder. Adding normally.`);
-          }
-      } else {
-           this.plugin.logger.debug(`[HMA] Non-assistant (Role: ${message.role}, Ts: ${messageTimestampMs}). Adding normally.`);
-      }
+      this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] No matching placeholder or non-assistant. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}. Adding normally.`);
       await this.addMessageStandard(message); 
-      // Додаємо в кеш ТІЛЬКИ якщо addMessageStandard не кинув помилку і повідомлення ще немає
-      // (addMessageStandard сам не додає в this.currentMessages)
       if (!this.currentMessages.some(m => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
           this.currentMessages.push(message);
+           this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Message (role ${message.role}) pushed to currentMessages after addMessageStandard.`);
       }
     }
-    this.plugin.logger.info(
-      `[HMA] <<< Nearing end of try block >>> For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`
+    this.plugin.logger.debug(
+      `[HMA id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
     );
-  } catch (outerError: any) {
-    this.plugin.logger.error(`[HMA CATCH] Outer error for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}:`, outerError, data);
-    this.handleErrorMessage({
+  } catch (outerError: any) { // Цей catch обробляє помилки з усього блоку try вище
+    this.plugin.logger.error(`[HMA id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
+    // Ось другий виклик handleErrorMessage, який також має бути коректним.
+    // Рядок 3718, ймовірно, вказує сюди.
+    this.handleErrorMessage({ 
       role: "error",
-      content: `Internal error in HMA for ${messageRoleForLog} msg: ${outerError.message}`,
-      timestamp: new Date(),
+      content: `Internal error in handleMessageAdded for role ${messageRoleForLog} (ts ${messageTimestampForLog}): ${outerError.message}`,
+      timestamp: new Date(), // Час виникнення цієї зовнішньої помилки
     });
   } finally {
-    this.plugin.logger.debug(`[HMA FINALLY START] For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}. localResolver originally ${localResolver ? 'EXISTED' : 'was NULL'}.`);
+    this.plugin.logger.debug(`[HMA id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. localResolver originally ${localResolver ? 'EXISTED' : 'was NULL'}.`);
     if (localResolver) {
-      this.plugin.logger.info(`[HMA FINALLY EXEC] >>> Calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog} <<<`);
+      this.plugin.logger.error(`[HMA id:${messageTimestampForLog}] FINALLY EXEC >>> Calling localResolver <<<`); 
       try {
           localResolver(); 
       } catch (resolverError) {
-          this.plugin.logger.error(`[HMA FINALLY] Error calling localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog}:`, resolverError);
+          this.plugin.logger.error(`[HMA id:${messageTimestampForLog}] FINALLY Error calling localResolver:`, resolverError);
       }
-      this.plugin.logger.info(`[HMA FINALLY EXEC] <<< Called localResolver for msg role ${messageRoleForLog}, ts ${messageTimestampForLog} <<<`);
+      this.plugin.logger.error(`[HMA id:${messageTimestampForLog}] FINALLY EXEC <<< Called localResolver <<<`); 
     } else {
-      this.plugin.logger.warn(`[HMA FINALLY SKIP] localResolver was originally null. For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}.`);
+      this.plugin.logger.warn(`[HMA id:${messageTimestampForLog}] FINALLY SKIP: localResolver was originally null.`);
     }
-    this.plugin.logger.info(
-      `[HMA EXIT] <<< FINALLY END >>> For msg role ${messageRoleForLog}, ts ${messageTimestampForLog}`
+    this.plugin.logger.debug(
+      `[HMA id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}.`
     );
   }
 }
