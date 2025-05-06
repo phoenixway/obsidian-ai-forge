@@ -15,7 +15,6 @@ export class OllamaService {
         this.plugin = plugin;
         if (!plugin.promptService) {
             const errorMsg = "[OllamaService] CRITICAL: PromptService not available on plugin instance during OllamaService construction!";
-            plugin.logger.error(errorMsg);
             throw new Error(errorMsg);
         }
         this.promptService = plugin.promptService;
@@ -48,12 +47,10 @@ export class OllamaService {
      */
     async* generateChatResponseStream(chat: Chat, signal?: AbortSignal): AsyncIterableIterator<OllamaStreamChunk> {
         if (!chat) {
-            this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat.");
             yield { error: "Chat object is null." };
             return;
         }
         if (!this.promptService) {
-            this.plugin.logger.error("[OllamaService] PromptService is not initialized!");
             yield { error: "Prompt service is unavailable." };
             return;
         }
@@ -63,7 +60,6 @@ export class OllamaService {
         const temperature = chat.metadata.temperature ?? currentSettings.temperature;
 
         if (!modelName) {
-            this.plugin.logger.error("[OllamaService] No model specified in chat metadata or settings.");
             yield { error: "No Ollama model selected." };
             return;
         }
@@ -73,14 +69,11 @@ export class OllamaService {
 
         try {
             const history = chat.getMessages();
-            this.plugin.logger.debug("[OllamaService] Getting system prompt from PromptService...");
             const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
 
-            this.plugin.logger.debug("[OllamaService] Preparing prompt body from PromptService...");
             const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
 
             if (promptBody === null || promptBody === undefined) {
-                this.plugin.logger.error("[OllamaService] Prompt body generation failed (returned null/undefined).");
                 yield { error: "Could not generate prompt body." };
                 return;
             }
@@ -94,7 +87,6 @@ export class OllamaService {
                 ...(systemPrompt && { system: systemPrompt })
             };
 
-            this.plugin.logger.debug(`[OllamaService] Starting STREAMING request to ${url}: Model:"${modelName}", Temp:${temperature}, System Provided: ${!!systemPrompt}`);
             this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", {...requestBody, prompt: promptBody.substring(0, 200) + "..."});
 
             const response = await fetch(url, {
@@ -130,7 +122,6 @@ export class OllamaService {
             while (true) {
                 const { done, value } = await reader.read();
                 if (signal?.aborted) {
-                    this.plugin.logger.info("[OllamaService] Stream reading aborted by signal.");
                     reader.cancel("Aborted by user"); // Скасовуємо читання
                     // Не кидаємо помилку, бо це очікувана поведінка
                     // Можна повернути спеціальний chunk або просто завершити ітератор
@@ -139,14 +130,12 @@ export class OllamaService {
                 }
 
                 if (done) {
-                    this.plugin.logger.debug("[OllamaService] Stream finished.");
                     // Обробка залишку буфера, якщо він не порожній і є валідним JSON
                     if (buffer.trim()) {
                          try {
                             const jsonChunk = JSON.parse(buffer.trim());
                             yield jsonChunk as OllamaStreamChunk;
                          } catch (e) {
-                              this.plugin.logger.warn(`[OllamaService] Could not parse final buffer content: ${buffer.trim()}`, e);
                          }
                     }
                     break; // Вихід з циклу, коли потік завершено
@@ -165,7 +154,6 @@ export class OllamaService {
                         yield jsonChunk as OllamaStreamChunk; // Віддаємо розпарсений chunk
                         if (jsonChunk.done) {
                             // Якщо Ollama надіслала done=true, ми маємо завершити читання
-                             this.plugin.logger.debug("[OllamaService] Received 'done: true' chunk, finalizing stream.");
                              reader.cancel("Stream finished by Ollama"); // Скасовуємо читання, оскільки Ollama сказала, що все
                              return; // Завершуємо генератор
                         }
@@ -179,10 +167,8 @@ export class OllamaService {
 
         } catch (error: any) {
             if (error.name === 'AbortError') {
-                this.plugin.logger.info('[OllamaService] Fetch request aborted.');
                  yield { error: "Generation aborted by user.", done: true }; // Віддаємо помилку переривання
             } else {
-                this.plugin.logger.error("[OllamaService] Error during chat response stream generation:", error);
                 let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
                  // Більш детальні повідомлення про помилки
                 if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError") || errorMessage.includes('Failed to fetch')) {
@@ -206,7 +192,6 @@ export class OllamaService {
      * (Залишаємо для можливої сумісності або інших потреб)
      */
     async generateRaw(requestBody: any): Promise<OllamaGenerateResponse> {
-        this.plugin.logger.debug("[OllamaService] Sending RAW (non-streaming) request to /api/generate:", { model: requestBody.model, temp: requestBody.temperature, system: !!requestBody.system, prompt_len: requestBody.prompt?.length });
         if (!requestBody.model || !requestBody.prompt) {
             throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
         }
@@ -232,7 +217,6 @@ export class OllamaService {
                      const errorJson = await response.json();
                      errorText += `: ${errorJson?.error || response.statusText || 'No details'}`;
                  } catch (e) { errorText += `: ${response.statusText || 'Could not parse error details'}`; }
-                 this.plugin.logger.error(`[OllamaService] ${errorText}`);
                  this.emit('connection-error', new Error(errorText));
                  throw new Error(errorText);
              }
@@ -241,7 +225,6 @@ export class OllamaService {
               return await response.json() as OllamaGenerateResponse; // Просто повертаємо JSON
 
         } catch (error: any) {
-             this.plugin.logger.error(`[OllamaService] Error in generateRaw (${url}):`, error);
              const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: /api/generate)`;
              if (!error.message?.includes('Ollama API error')) {
                  this.emit('connection-error', new Error(connectionErrorMsg));
@@ -259,14 +242,12 @@ export class OllamaService {
         const endpoint = '/api/embeddings';
         const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
         const headers = { 'Content-Type': 'application/json' };
-        this.plugin.logger.debug(`[OllamaService] Generating ${prompts.length} embeddings using model ${model}...`);
 
         const embeddingsList: number[][] = [];
         try {
             for (const prompt of prompts) {
                 const trimmedPrompt = prompt.trim();
                 if (!trimmedPrompt) {
-                    this.plugin.logger.warn("[OllamaService] Skipping empty prompt for embedding.");
                     continue;
                 }
                 const requestBody = JSON.stringify({ model: model, prompt: trimmedPrompt });
@@ -282,18 +263,14 @@ export class OllamaService {
                     if (embeddingResponse && embeddingResponse.embedding) {
                         embeddingsList.push(embeddingResponse.embedding);
                     } else {
-                       this.plugin.logger.warn(`[OllamaService] Invalid structure in embedding response for model ${model}. Prompt (start): "${trimmedPrompt.substring(0, 50)}..."`);
                     }
                 } catch (singleError: any) {
-                    this.plugin.logger.error(`[OllamaService] Failed to generate embedding for one prompt using model ${model}. Prompt (start): "${trimmedPrompt.substring(0, 50)}..."`, singleError);
                      this.emit('connection-error', new Error(singleError.message || 'Embedding generation failed')); // Emit error
                      // Вирішуємо: зупинятися чи продовжувати з іншими промптами? Продовжимо.
                 }
             } // End for loop
-            this.plugin.logger.debug(`[OllamaService] Successfully generated ${embeddingsList.length} embeddings (out of ${prompts.length} prompts).`);
             return embeddingsList.length > 0 ? embeddingsList : null;
         } catch (error) {
-            this.plugin.logger.error(`[OllamaService] General error during embedding generation for model ${model}:`, error);
             // Помилка вже емітована, якщо це була помилка з'єднання/API
             return null;
         }
@@ -306,7 +283,6 @@ export class OllamaService {
     async getModels(forceRefresh: boolean = false): Promise<string[]> {
         const endpoint = '/api/tags';
         const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
-        this.plugin.logger.debug(`[OllamaService] Fetching models from ${url}`);
         let modelListResult: string[] = [];
 
         try {
@@ -315,7 +291,6 @@ export class OllamaService {
              if (!response.ok) {
                  let errorText = `Ollama Tags API error! Status: ${response.status}`;
                  try { const errJson = await response.json(); errorText += `: ${errJson?.error || 'Details unavailable'}`; } catch {}
-                 this.plugin.logger.error(`[OllamaService] ${errorText}`);
                  this.emit('connection-error', new Error(errorText)); // Emit error
                  throw new Error(errorText);
              }
@@ -327,10 +302,8 @@ export class OllamaService {
                   .map((m) => m?.name)
                   .filter((name): name is string => typeof name === 'string' && name.length > 0)
                   .sort();
-                this.plugin.logger.debug(`[OllamaService] Found ${modelNames.length} models.`);
                 modelListResult = modelNames;
             } else {
-                this.plugin.logger.warn("[OllamaService] Invalid response structure received from /api/tags:", data);
             }
         } catch (e: any) {
             this.plugin.logger.error(`[OllamaService] Failed to fetch models:`, e);
@@ -346,7 +319,6 @@ export class OllamaService {
      * (Залишаємо без змін, використовує fetch)
      */
     async getModelDetails(modelName: string): Promise<OllamaShowResponse | null> {
-        this.plugin.logger.debug(`[OllamaService] Fetching details for model: ${modelName}`);
         const endpoint = '/api/show';
         const url = `${this.plugin.settings.ollamaServerUrl}${endpoint}`;
         const headers = { 'Content-Type': 'application/json' };
@@ -363,7 +335,6 @@ export class OllamaService {
              const data = await response.json() as OllamaShowResponse;
             return data;
         } catch (e: any) {
-            this.plugin.logger.warn(`[OllamaService] Failed to get details for model ${modelName}:`, e);
              if (!e.message?.includes('API error')) {
                   this.emit('connection-error', new Error(e.message || `Failed to get details for ${modelName}`));
              }
