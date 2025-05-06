@@ -1,7 +1,6 @@
 // src/styles/_section-content.scss
 // Стилі для вмісту секцій сайдбару (списків чатів, ролей)
 
-// --- Змінні (скопійовано з _sidebar.scss) ---
 $indent-step: 16px;
 $item-padding-vertical: var(--size-4-1);
 $item-padding-horizontal: var(--size-4-2, 8px);
@@ -32,7 +31,7 @@ $folder-icon-extra-indent: 4px;
     max-height: none; // Прибираємо обмеження max-height
     min-height: 50px; // Мінімальна висота, щоб було видно хоч щось
   }
-
+B
   // Стилі скролбару
   &::-webkit-scrollbar {
     width: 6px;
