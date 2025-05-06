@@ -4452,14 +4452,22 @@ This action cannot be undone.`,
       this.roleDisplayEl.title = `Current role: ${displayName}. Click to change.`;
     }
   }
+  // private updateSendButtonState(): void {
+  //   if (!this.inputEl || !this.sendButton) return;
+  //   const isDisabled = this.inputEl.value.trim() === "" || this.isProcessing || this.currentAbortController !== null;
+  //   this.sendButton.disabled = isDisabled;
+  //   this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled);
+  //   this.stopGeneratingButton?.toggle(this.currentAbortController !== null);
+  // }
   updateSendButtonState() {
-    var _a;
-    if (!this.inputEl || !this.sendButton)
+    if (!this.inputEl || !this.sendButton || !this.stopGeneratingButton)
       return;
-    const isDisabled = this.inputEl.value.trim() === "" || this.isProcessing || this.currentAbortController !== null;
-    this.sendButton.disabled = isDisabled;
-    this.sendButton.classList.toggle(CSS_CLASS_DISABLED, isDisabled);
-    (_a = this.stopGeneratingButton) == null ? void 0 : _a.toggle(this.currentAbortController !== null);
+    const generationInProgress = this.currentAbortController !== null;
+    const isSendDisabled = this.inputEl.value.trim() === "" || this.isProcessing || generationInProgress;
+    this.sendButton.disabled = isSendDisabled;
+    this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, isSendDisabled);
+    this.stopGeneratingButton.toggle(generationInProgress);
+    this.sendButton.toggle(!generationInProgress);
   }
   showEmptyState() {
     var _a, _b;
@@ -4774,7 +4782,7 @@ This action cannot be undone.`,
       "Confirm Regeneration",
       hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
       async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
         this.isRegenerating = true;
         this.plugin.logger.error(`[HANDLER] handleRegenerateClick FIRED for message timestamp: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
         this.currentAbortController = new AbortController();
@@ -4783,10 +4791,11 @@ This action cannot be undone.`,
         const responseStartTimeMs = responseStartTime.getTime();
         let currentLocalPlaceholderRef = null;
         this.setLoadingState(true);
-        (_a2 = this.stopGeneratingButton) == null ? void 0 : _a2.show();
-        (_b = this.sendButton) == null ? void 0 : _b.hide();
         let streamErrorOccurred = null;
         let mainAssistantMessageProcessedPromise = null;
+        let emptySystemMessageProcessedPromise = null;
+        let errorMessageProcessedPromise = null;
+        let partialMessageProcessedPromise = null;
         try {
           this.plugin.logger.debug(`[Regenerate] Starting for message at index ${messageIndex} in chat ${chatId}. HasMessagesAfter: ${hasMessagesAfter}`);
           if (hasMessagesAfter) {
@@ -4858,7 +4867,7 @@ This action cannot be undone.`,
               }
             }
             if ("response" in chunk && chunk.response) {
-              if (((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === responseStartTimeMs && this.activePlaceholder.contentEl) {
+              if (((_a2 = this.activePlaceholder) == null ? void 0 : _a2.timestamp) === responseStartTimeMs && this.activePlaceholder.contentEl) {
                 if (firstChunk) {
                   const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
                   if (thinkingDots)
@@ -4878,7 +4887,7 @@ This action cannot be undone.`,
                   this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
                 }
               } else {
-                this.plugin.logger.warn(`[Regenerate] activePlaceholder mismatch or contentEl missing during stream. Current ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}, expected: ${responseStartTimeMs}. Accumulated chunk anyway.`);
+                this.plugin.logger.warn(`[Regenerate] activePlaceholder mismatch or contentEl missing during stream. Current ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}, expected: ${responseStartTimeMs}. Accumulated chunk anyway.`);
                 accumulatedResponse += chunk.response;
               }
             }
@@ -4888,7 +4897,7 @@ This action cannot be undone.`,
             }
           }
           this.plugin.logger.debug(
-            `[Regenerate] Stream completed. Final response length: ${accumulatedResponse.length}. Placeholder still valid for this request: ${((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === responseStartTimeMs}`
+            `[Regenerate] Stream completed. Final response length: ${accumulatedResponse.length}. Placeholder still valid for this request: ${((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === responseStartTimeMs}`
           );
           if (accumulatedResponse.trim()) {
             this.plugin.logger.debug(`[Regenerate] Adding assistant message to ChatManager for ts ${responseStartTimeMs}: "${accumulatedResponse.substring(0, 100)}..."`);
@@ -4905,14 +4914,14 @@ This action cannot be undone.`,
             );
           } else if (!this.currentAbortController.signal.aborted) {
             this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
-            if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs && ((_g = this.activePlaceholder.groupEl) == null ? void 0 : _g.isConnected)) {
+            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
               this.activePlaceholder.groupEl.remove();
             }
-            if (((_h = this.activePlaceholder) == null ? void 0 : _h.timestamp) === responseStartTimeMs) {
+            if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
               this.activePlaceholder = null;
             }
             let resolverForEmptySystem;
-            const emptySystemProcessedPromise = new Promise((resolve) => {
+            emptySystemMessageProcessedPromise = new Promise((resolve) => {
               resolverForEmptySystem = resolve;
             });
             this.currentMessageAddedResolver = resolverForEmptySystem;
@@ -4921,25 +4930,24 @@ This action cannot be undone.`,
               "Assistant provided an empty response during regeneration.",
               new Date()
             );
-            await emptySystemProcessedPromise;
           }
         } catch (error) {
           streamErrorOccurred = error;
           this.plugin.logger.error("[Regenerate] Error during regeneration process:", error);
-          if (((_i = this.activePlaceholder) == null ? void 0 : _i.timestamp) === responseStartTimeMs) {
+          if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
             currentLocalPlaceholderRef = this.activePlaceholder;
           }
-          if ((_j = currentLocalPlaceholderRef == null ? void 0 : currentLocalPlaceholderRef.groupEl) == null ? void 0 : _j.isConnected) {
+          if ((_h = currentLocalPlaceholderRef == null ? void 0 : currentLocalPlaceholderRef.groupEl) == null ? void 0 : _h.isConnected) {
             this.plugin.logger.debug(`[Regenerate] Removing local placeholder (ts: ${responseStartTimeMs}) due to error: ${error.message}`);
             currentLocalPlaceholderRef.groupEl.remove();
           }
-          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
+          if (((_i = this.activePlaceholder) == null ? void 0 : _i.timestamp) === responseStartTimeMs) {
             this.activePlaceholder = null;
           }
           let errorMsgForChat;
           let errorMsgRole = "error";
           let savePartialResponseOnError = false;
-          if (error.name === "AbortError" || ((_l = error.message) == null ? void 0 : _l.includes("aborted by user"))) {
+          if (error.name === "AbortError" || ((_j = error.message) == null ? void 0 : _j.includes("aborted by user"))) {
             this.plugin.logger.info("[Regenerate] Regeneration was stopped by user.");
             errorMsgForChat = "Regeneration stopped.";
             errorMsgRole = "system";
@@ -4951,16 +4959,15 @@ This action cannot be undone.`,
             new import_obsidian14.Notice(errorMsgForChat, 5e3);
           }
           let errorResolver;
-          const errorMessageProcessedPromise = new Promise((resolve) => {
+          errorMessageProcessedPromise = new Promise((resolve) => {
             errorResolver = resolve;
           });
           this.currentMessageAddedResolver = errorResolver;
           this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
-          await errorMessageProcessedPromise;
           if (savePartialResponseOnError) {
             this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
             let partialResolver;
-            const partialMessageProcessedPromise = new Promise((resolve) => {
+            partialMessageProcessedPromise = new Promise((resolve) => {
               partialResolver = resolve;
             });
             this.currentMessageAddedResolver = partialResolver;
@@ -4970,41 +4977,59 @@ This action cannot be undone.`,
               responseStartTime,
               false
             );
-            await partialMessageProcessedPromise;
           }
         } finally {
-          if (mainAssistantMessageProcessedPromise && !streamErrorOccurred && accumulatedResponse.trim()) {
-            this.plugin.logger.debug(`[Regenerate] Waiting in finally for main assistant message (ts: ${responseStartTimeMs}) to be processed by handleMessageAdded.`);
+          this.plugin.logger.debug(`[Regenerate] FINALLY: Entering for request ${responseStartTimeMs}.`);
+          const promisesToAwait = [];
+          if (mainAssistantMessageProcessedPromise)
+            promisesToAwait.push(mainAssistantMessageProcessedPromise);
+          if (emptySystemMessageProcessedPromise)
+            promisesToAwait.push(emptySystemMessageProcessedPromise);
+          if (errorMessageProcessedPromise)
+            promisesToAwait.push(errorMessageProcessedPromise);
+          if (partialMessageProcessedPromise)
+            promisesToAwait.push(partialMessageProcessedPromise);
+          if (promisesToAwait.length > 0) {
+            this.plugin.logger.debug(`[Regenerate] FINALLY: Awaiting ${promisesToAwait.length} message processing promise(s) for ts ${responseStartTimeMs}.`);
             try {
-              await mainAssistantMessageProcessedPromise;
-              this.plugin.logger.debug(`[Regenerate] Main assistant message (ts: ${responseStartTimeMs}) processed successfully.`);
-            } catch (e) {
-              this.plugin.logger.error(`[Regenerate] Error awaiting mainAssistantMessageProcessedPromise:`, e);
+              await Promise.all(promisesToAwait);
+              this.plugin.logger.debug(`[Regenerate] FINALLY: All message processing promises for ts ${responseStartTimeMs} resolved.`);
+            } catch (awaitError) {
+              this.plugin.logger.error(`[Regenerate] FINALLY: Error awaiting message processing promises for ts ${responseStartTimeMs}:`, awaitError);
             }
-          } else if (this.currentMessageAddedResolver && !streamErrorOccurred && accumulatedResponse.trim()) {
-            this.plugin.logger.warn(`[Regenerate] Active resolver found in finally without mainAssistantMessageProcessedPromise. Clearing it. Error: ${!!streamErrorOccurred}, AccumResp: ${accumulatedResponse.trim()}`);
-            this.currentMessageAddedResolver = null;
+          } else {
+            this.plugin.logger.debug(`[Regenerate] FINALLY: No specific message promises to await for ts ${responseStartTimeMs}.`);
           }
-          this.plugin.logger.debug(`[Regenerate] Entering finally block for request ${responseStartTimeMs}. Current isRegenerating: ${this.isRegenerating}`);
-          if (((_m = this.activePlaceholder) == null ? void 0 : _m.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate] Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED after awaiting promise. This is highly unexpected. Removing if connected.`);
-            if ((_n = this.activePlaceholder.groupEl) == null ? void 0 : _n.isConnected) {
+          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
+            this.plugin.logger.warn(`[Regenerate] FINALLY: Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. Removing now.`);
+            if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
             this.activePlaceholder = null;
           }
-          this.setLoadingState(false);
-          (_o = this.stopGeneratingButton) == null ? void 0 : _o.hide();
-          (_p = this.sendButton) == null ? void 0 : _p.show();
           this.currentAbortController = null;
           this.isRegenerating = false;
-          this.plugin.logger.debug(`[Regenerate] Process finished for request ${responseStartTimeMs}. isRegenerating set to false.`);
-          this.updateSendButtonState();
+          this.setLoadingState(false);
+          this.plugin.logger.debug(`[Regenerate] FINALLY: Process finished for request ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, currentAbortController: ${this.currentAbortController}, isProcessing: ${this.isProcessing}`);
           this.focusInput();
         }
       }
     ).open();
   }
+  // Переконайтеся, що updateSendButtonState виглядає так:
+  // private updateSendButtonState(): void {
+  //   if (!this.inputEl || !this.sendButton || !this.stopGeneratingButton) return;
+  //   const generationInProgress = this.currentAbortController !== null; 
+  //   // isProcessing встановлюється/скидається через setLoadingState
+  //   // Кнопка Send вимкнена, якщо поле порожнє, або йде обробка (isProcessing), або йде генерація (generationInProgress)
+  //   const isSendDisabled = this.inputEl.value.trim() === "" || this.isProcessing || generationInProgress;
+  //   this.sendButton.disabled = isSendDisabled;
+  //   this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, isSendDisabled);
+  //   // Кнопка Stop активна (видима), тільки якщо є активний AbortController (тобто йде генерація)
+  //   this.stopGeneratingButton.toggle(generationInProgress);
+  //   // Кнопка Send ховається, якщо активна кнопка Stop
+  //   this.sendButton.toggle(!generationInProgress); 
+  // }
   // Переконайтеся, що handleMessageAdded очищує this.currentMessageAddedResolver НА ПОЧАТКУ
   // і викликає localResolver В КІНЦІ свого блоку try або в catch/finally.
   // Приклад структури handleMessageAdded (переконайтеся, що ваша версія схожа):
