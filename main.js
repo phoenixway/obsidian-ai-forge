@@ -7227,7 +7227,6 @@ var PromptService = class {
         this.currentSystemPrompt = definition.systemPrompt;
         return definition;
       } catch (error) {
-        this.plugin.logger.error(`[PromptService] Error processing role file ${normalizedPath}:`, error);
         new import_obsidian16.Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
         return { systemPrompt: null, isProductivityPersona: false };
@@ -7283,11 +7282,9 @@ General Rules for BOTH Context Sections:
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
       finalSystemPrompt += ragInstructions + "\n\n";
     } else {
-      this.plugin.logger.debug("[PromptService] RAG instructions NOT added (RAG disabled or semantic search disabled).");
     }
     if (roleSystemPrompt) {
       finalSystemPrompt += roleSystemPrompt.trim();
-      this.plugin.logger.debug(`[PromptService] Role system prompt added (Length: ${roleSystemPrompt.trim().length})`);
     } else {
     }
     if (isProductivityActive && finalSystemPrompt && settings.enableProductivityFeatures) {
@@ -7360,7 +7357,6 @@ ${processedHistoryString}`);
     if (!finalPromptBody) {
       return null;
     }
-    this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
     return finalPromptBody;
   }
   // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages
@@ -7378,7 +7374,6 @@ ${processedHistoryString}`);
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
       } else {
-        this.plugin.logger.debug(`[PromptService] Simple context limit reached (${currentTokens}/${maxTokens} tokens). Stopping history inclusion.`);
         break;
       }
     }
@@ -7417,7 +7412,6 @@ ${summary}`;
             olderContextTokens += messageTokens;
             includedOlderCount++;
           } else {
-            this.plugin.logger.debug(`[PromptService] Token limit reached while including older messages directly (${currentTokens + olderContextTokens}/${maxTokens}). Included ${includedOlderCount}.`);
             break;
           }
         }
@@ -7431,9 +7425,7 @@ ${olderContextContent.trim()}
       if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
         processedParts.push(olderContextContent);
         currentTokens += olderContextTokens;
-        this.plugin.logger.debug(`[PromptService] Added older context part (${olderContextTokens} tokens). Current total: ${currentTokens}`);
       } else if (olderContextContent) {
-        this.plugin.logger.warn(`[PromptService] Older context part (${olderContextTokens} tokens) exceeds limit (${maxTokens - currentTokens} available). Skipping.`);
       }
     }
     let keptMessagesString = "";
@@ -7450,14 +7442,12 @@ ${olderContextContent.trim()}
         keptMessagesTokens += messageTokens;
         includedKeptCount++;
       } else {
-        this.plugin.logger.debug(`[PromptService] Token limit reached while including kept messages (${currentTokens + keptMessagesTokens}/${maxTokens}). Included ${includedKeptCount}.`);
         break;
       }
     }
     if (keptMessagesString) {
       processedParts.push(keptMessagesString.trim());
       currentTokens += keptMessagesTokens;
-      this.plugin.logger.debug(`[PromptService] Added kept messages part (${keptMessagesTokens} tokens). Final total: ${currentTokens}`);
     } else {
     }
     return processedParts.join("\n\n").trim();
@@ -7490,19 +7480,16 @@ ${olderContextContent.trim()}
     };
     try {
       if (!this.plugin.ollamaService) {
-        this.plugin.logger.error("[PromptService] OllamaService is not available for summarization.");
         return null;
       }
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
         const summary = responseData.response.trim();
-        this.plugin.logger.info(`[PromptService] Summarization successful (${this._countTokens(summary)} tokens).`);
         return summary;
       } else {
         return null;
       }
     } catch (error) {
-      this.plugin.logger.error("[PromptService] Error during summarization request:", error, "Request body (model/options):", { model: requestBody.model, options: requestBody.options });
       return null;
     }
   }
