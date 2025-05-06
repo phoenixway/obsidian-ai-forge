@@ -66,23 +66,23 @@ export class Logger {
     updateSettings(settings: Partial<LoggerSettings>) {
         if (settings.consoleLogLevel !== undefined) {
             this.consoleLogLevel = this.getLogLevelFromString(settings.consoleLogLevel, LogLevel.INFO);
-            console.log(`[Logger] Console log level set to: ${this.getLogLevelName(this.consoleLogLevel)}`);
+            // console.log(`[Logger] Console log level set to: ${this.getLogLevelName(this.consoleLogLevel)}`);
         }
         if (settings.fileLogLevel !== undefined) {
             this.fileLogLevel = this.getLogLevelFromString(settings.fileLogLevel, LogLevel.WARN);
-            console.log(`[Logger] File log level set to: ${this.getLogLevelName(this.fileLogLevel)}`);
+            // console.log(`[Logger] File log level set to: ${this.getLogLevelName(this.fileLogLevel)}`);
         }
         if (settings.fileLoggingEnabled !== undefined) {
             const wasEnabled = this.fileLoggingEnabled;
             this.fileLoggingEnabled = settings.fileLoggingEnabled;
-             console.log(`[Logger] File logging enabled: ${this.fileLoggingEnabled}`);
+            //  console.log(`[Logger] File logging enabled: ${this.fileLoggingEnabled}`);
              if (!wasEnabled && this.fileLoggingEnabled) {
                 this.rotateLogFileIfNeeded();
             }
         }
          if (settings.logCallerInfo !== undefined) {
              this.logCallerInfo = settings.logCallerInfo;
-             console.log(`[Logger] Log Caller Info enabled: ${this.logCallerInfo}`);
+            //  console.log(`[Logger] Log Caller Info enabled: ${this.logCallerInfo}`);
          }
          // Оновлення шляху та розміру, якщо вони передані
          if (settings.logFilePath !== undefined) {
@@ -91,7 +91,7 @@ export class Logger {
          }
          if (settings.logFileMaxSizeMB !== undefined) {
              this.logFileMaxSizeMB = settings.logFileMaxSizeMB || 5;
-             console.log(`[Logger] Log file max size updated to: ${this.logFileMaxSizeMB} MB`);
+            //  console.log(`[Logger] Log file max size updated to: ${this.logFileMaxSizeMB} MB`);
          }
     }
 

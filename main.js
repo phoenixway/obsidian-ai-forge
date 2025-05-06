@@ -166,30 +166,25 @@ var Logger = class {
   updateSettings(settings) {
     if (settings.consoleLogLevel !== void 0) {
       this.consoleLogLevel = this.getLogLevelFromString(settings.consoleLogLevel, 2 /* INFO */);
-      console.log(`[Logger] Console log level set to: ${this.getLogLevelName(this.consoleLogLevel)}`);
     }
     if (settings.fileLogLevel !== void 0) {
       this.fileLogLevel = this.getLogLevelFromString(settings.fileLogLevel, 3 /* WARN */);
-      console.log(`[Logger] File log level set to: ${this.getLogLevelName(this.fileLogLevel)}`);
     }
     if (settings.fileLoggingEnabled !== void 0) {
       const wasEnabled = this.fileLoggingEnabled;
       this.fileLoggingEnabled = settings.fileLoggingEnabled;
-      console.log(`[Logger] File logging enabled: ${this.fileLoggingEnabled}`);
       if (!wasEnabled && this.fileLoggingEnabled) {
         this.rotateLogFileIfNeeded();
       }
     }
     if (settings.logCallerInfo !== void 0) {
       this.logCallerInfo = settings.logCallerInfo;
-      console.log(`[Logger] Log Caller Info enabled: ${this.logCallerInfo}`);
     }
     if (settings.logFilePath !== void 0) {
       this.logFilePath = (0, import_obsidian3.normalizePath)(settings.logFilePath || `${this.plugin.manifest.dir}/ai-forge.log`);
     }
     if (settings.logFileMaxSizeMB !== void 0) {
       this.logFileMaxSizeMB = settings.logFileMaxSizeMB || 5;
-      console.log(`[Logger] Log file max size updated to: ${this.logFileMaxSizeMB} MB`);
     }
   }
   getCallerInfo() {
