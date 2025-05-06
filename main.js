@@ -148,10 +148,8 @@ var Logger = class {
     this.updateSettings(initialSettings);
     if (this.fileLoggingEnabled) {
       this.rotateLogFileIfNeeded().then(() => {
-        this.info("Logger initialized & file rotation checked.");
       });
     } else {
-      this.info("Logger initialized.");
     }
   }
   // --- ДОДАНО: Публічний метод для отримання шляху ---
@@ -1454,7 +1452,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     messageWrapper.style.order = "2";
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling static renderAssistantContent...`);
     try {
       await AssistantMessageRenderer.renderAssistantContent(
         contentEl,
@@ -1463,7 +1460,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         this.plugin,
         this.view
       );
-      this.plugin.logger.debug(`[AssistantMessageRenderer] Static renderAssistantContent finished successfully.`);
     } catch (error) {
       this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling static renderAssistantContent FAILED:`, error);
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
@@ -1473,7 +1469,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     AssistantMessageRenderer.addAssistantActionButtons(messageWrapper, contentEl, this.message, this.plugin, this.view);
     this.plugin.logger.debug(`[AssistantMessageRenderer] Adding timestamp (static)...`);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Scheduling checkMessageForCollapsing...`);
     setTimeout(() => {
       if (messageEl.isConnected)
         this.view.checkMessageForCollapsing(messageEl);
@@ -1492,18 +1487,13 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
    */
   static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
-    plugin.logger.debug("[renderAssistantContent STAT] Entering.");
     const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
     if (markdownText.trim().length > 0 && dotsEl) {
-      plugin.logger.debug("[renderAssistantContent STAT] First chunk received, removing thinking dots.");
       dotsEl.remove();
     } else if (!dotsEl && contentEl.hasChildNodes()) {
-      plugin.logger.debug("[renderAssistantContent STAT] Subsequent chunk, clearing contentEl.");
       contentEl.empty();
     } else if (!dotsEl && !contentEl.hasChildNodes()) {
-      plugin.logger.debug("[renderAssistantContent STAT] No dots and no content, proceeding.");
     } else {
-      plugin.logger.debug("[renderAssistantContent STAT] Empty markdown chunk received, dots untouched.");
     }
     let processedMarkdown = markdownText;
     try {
@@ -1511,39 +1501,32 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       const thinkDetection = detectThinkingTags(decoded);
       processedMarkdown = thinkDetection.contentWithoutTags;
       if (thinkDetection.hasThinkingTags) {
-        plugin.logger.debug("[renderAssistantContent STAT] Removed <think> tags.");
       }
     } catch (e) {
       plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e);
     }
     if (processedMarkdown.trim().length === 0) {
-      plugin.logger.debug("[renderAssistantContent STAT] No content to render after processing.");
       return;
     }
-    plugin.logger.debug("[renderAssistantContent STAT] Starting MarkdownRenderer.render...");
     try {
       await import_obsidian9.MarkdownRenderer.render(app, processedMarkdown, contentEl, (_b = (_a = plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", view);
-      plugin.logger.debug("[renderAssistantContent STAT] MarkdownRenderer.render finished successfully.");
     } catch (error) {
       plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
       contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
       throw error;
     }
-    plugin.logger.debug("[renderAssistantContent STAT] Processing code blocks...");
     try {
       enhanceCodeBlocks(contentEl, view);
     } catch (error) {
       plugin.logger.error("[renderAssistantContent STAT] Error processing code blocks:", error);
     }
     if (plugin.settings.fixBrokenEmojis) {
-      plugin.logger.debug("[renderAssistantContent STAT] Fixing Twemoji images...");
       try {
         fixBrokenTwemojiImages(contentEl);
       } catch (error) {
         plugin.logger.error("[renderAssistantContent STAT] Error fixing Twemoji:", error);
       }
     }
-    plugin.logger.debug("[renderAssistantContent STAT] Exiting.");
   }
   /**
    * Статичний метод для додавання кнопок дій асистента.
@@ -1555,10 +1538,8 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
    */
   static addAssistantActionButtons(messageWrapper, contentEl, message, plugin, view) {
     if (messageWrapper.querySelector(".message-actions-wrapper")) {
-      plugin.logger.debug("[addAssistantActionButtons STAT] Buttons already exist, skipping.");
       return;
     }
-    plugin.logger.debug("[addAssistantActionButtons STAT] Adding buttons...");
     const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
     const finalContent = message.content;
     const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
@@ -4367,8 +4348,9 @@ This action cannot be undone.`,
   handleContextMenuRename(chatId, currentName) {
     this.handleRenameChatClick(chatId, currentName);
   }
+  // OllamaView.ts
   async addMessageStandard(message) {
-    var _a;
+    var _a, _b, _c;
     const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
     if (isNewDay) {
       this.renderDateSeparator(message.timestamp);
@@ -4389,15 +4371,12 @@ This action cannot be undone.`,
           break;
         case "error":
           this.handleErrorMessage(message);
-          if (this.currentMessageAddedResolver) {
-            this.currentMessageAddedResolver();
-            this.currentMessageAddedResolver = null;
-          }
           return;
         case "assistant":
           renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
           break;
         default:
+          this.plugin.logger.warn(`[addMessageStandard] Unknown message role: ${message == null ? void 0 : message.role}`);
           return;
       }
       if (renderer) {
@@ -4408,7 +4387,7 @@ This action cannot be undone.`,
         this.chatContainer.appendChild(messageGroupEl);
         this.lastMessageElement = messageGroupEl;
         if (!messageGroupEl.isConnected) {
-          this.plugin.logger.error(`[addMessageStandard] Node not connected! Role: ${message.role}`);
+          this.plugin.logger.error(`[addMessageStandard] Node not connected after append! Role: ${message.role}`);
         }
         messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
         setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
@@ -4420,32 +4399,18 @@ This action cannot be undone.`,
         }
         setTimeout(() => this.updateScrollStateAndIndicators(), 100);
       } else if (renderer) {
-      }
-      if (this.currentMessageAddedResolver) {
-        try {
-          this.currentMessageAddedResolver();
-        } catch (e) {
-          this.plugin.logger.error("Error resolving promise in addMessageStandard:", e);
-        }
-        this.currentMessageAddedResolver = null;
+        this.plugin.logger.warn(`[addMessageStandard] Renderer created for role ${message.role} but no messageGroupEl or chatContainer.`);
       }
     } catch (error) {
       this.plugin.logger.error(
-        `[addMessageStandard] Error rendering/appending standard message. Role: ${message.role}`,
+        `[addMessageStandard] Error rendering/appending standard message. Role: ${message.role}, Content: "${message.content.substring(0, 100)}"`,
         error
       );
-      this.handleErrorMessage({
-        role: "error",
-        content: `Failed to display ${message.role} message. Render Error: ${error.message}`,
-        timestamp: new Date()
-      });
-      if (this.currentMessageAddedResolver) {
-        try {
-          this.currentMessageAddedResolver();
-        } catch (e) {
-          this.plugin.logger.error("Error resolving promise after error:", e);
-        }
-        this.currentMessageAddedResolver = null;
+      const errorDiv = (_b = this.chatContainer) == null ? void 0 : _b.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
+      if (errorDiv) {
+        errorDiv.createDiv({ cls: CSS_CLASSES.ERROR_TEXT, text: `Failed to display ${message.role} message. Render Error.` });
+        (_c = this.chatContainer) == null ? void 0 : _c.appendChild(errorDiv);
+        this.guaranteedScrollToBottom(50, true);
       }
     }
   }
@@ -6378,9 +6343,6 @@ Summary:`;
         this.setLoadingState(true);
         let streamErrorOccurred = null;
         let mainAssistantMessageProcessedPromise = null;
-        let emptySystemMessageProcessedPromise = null;
-        let errorMessageProcessedPromise = null;
-        let partialMessageProcessedPromise = null;
         try {
           this.plugin.logger.debug(`[Regenerate] Starting for message at index ${messageIndex} in chat ${chatId}. HasMessagesAfter: ${hasMessagesAfter}`);
           if (hasMessagesAfter) {
@@ -6436,7 +6398,6 @@ Summary:`;
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             chatForStreaming,
             this.currentAbortController.signal
-            // Використовуємо AbortController, встановлений на початку
           );
           let firstChunk = true;
           for await (const chunk of stream) {
@@ -6499,6 +6460,11 @@ Summary:`;
               responseStartTime,
               false
             );
+            if (mainAssistantMessageProcessedPromise) {
+              this.plugin.logger.debug(`[Regenerate] TRY: Awaiting mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs}`);
+              await mainAssistantMessageProcessedPromise;
+              this.plugin.logger.debug(`[Regenerate] TRY: mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs} resolved.`);
+            }
           } else if (!this.currentAbortController.signal.aborted) {
             this.plugin.logger.warn("[Regenerate] Assistant provided an empty response, and not due to cancellation.");
             if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
@@ -6508,11 +6474,6 @@ Summary:`;
             if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
               this.activePlaceholder = null;
             }
-            let resolverForEmptySystem;
-            emptySystemMessageProcessedPromise = new Promise((resolve) => {
-              resolverForEmptySystem = resolve;
-            });
-            this.currentMessageAddedResolver = resolverForEmptySystem;
             this.plugin.chatManager.addMessageToActiveChat(
               "system",
               "Assistant provided an empty response during regeneration.",
@@ -6546,19 +6507,9 @@ Summary:`;
             errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
             new import_obsidian14.Notice(errorMsgForChat, 5e3);
           }
-          let errorResolver;
-          errorMessageProcessedPromise = new Promise((resolve) => {
-            errorResolver = resolve;
-          });
-          this.currentMessageAddedResolver = errorResolver;
           this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
           if (savePartialResponseOnError) {
             this.plugin.logger.debug("[Regenerate] Saving partial response after cancellation.");
-            let partialResolver;
-            partialMessageProcessedPromise = new Promise((resolve) => {
-              partialResolver = resolve;
-            });
-            this.currentMessageAddedResolver = partialResolver;
             this.plugin.chatManager.addMessageToActiveChat(
               "assistant",
               accumulatedResponse,
@@ -6568,28 +6519,12 @@ Summary:`;
           }
         } finally {
           this.plugin.logger.debug(`[Regenerate] FINALLY (START) for req ${responseStartTimeMs}. isRegenerating: ${this.isRegenerating}, AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
-          const promisesToAwait = [];
-          if (mainAssistantMessageProcessedPromise)
-            promisesToAwait.push(mainAssistantMessageProcessedPromise);
-          if (emptySystemMessageProcessedPromise)
-            promisesToAwait.push(emptySystemMessageProcessedPromise);
-          if (errorMessageProcessedPromise)
-            promisesToAwait.push(errorMessageProcessedPromise);
-          if (partialMessageProcessedPromise)
-            promisesToAwait.push(partialMessageProcessedPromise);
-          if (promisesToAwait.length > 0) {
-            this.plugin.logger.debug(`[Regenerate] FINALLY: Awaiting ${promisesToAwait.length} message processing promise(s) for ts ${responseStartTimeMs}.`);
-            try {
-              await Promise.all(promisesToAwait);
-              this.plugin.logger.debug(`[Regenerate] FINALLY: All message processing promises for ts ${responseStartTimeMs} resolved.`);
-            } catch (awaitError) {
-              this.plugin.logger.error(`[Regenerate] FINALLY: Error awaiting message processing promises for ts ${responseStartTimeMs}:`, awaitError);
-            }
-          } else {
-            this.plugin.logger.debug(`[Regenerate] FINALLY: No specific message promises to await for ts ${responseStartTimeMs}.`);
+          if (this.currentMessageAddedResolver && mainAssistantMessageProcessedPromise) {
+            this.plugin.logger.warn(`[Regenerate] FINALLY: currentMessageAddedResolver still set after main promise await attempt. Clearing.`);
+            this.currentMessageAddedResolver = null;
           }
           if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate] FINALLY (after await): Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. This indicates an issue in handleMessageAdded or promise logic. Removing now.`);
+            this.plugin.logger.warn(`[Regenerate] FINALLY: Active placeholder for ts ${responseStartTimeMs} was STILL NOT CLEARED. Removing now.`);
             if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }

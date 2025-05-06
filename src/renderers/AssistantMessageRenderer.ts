@@ -33,13 +33,12 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
         const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
         contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
 
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Created base structure. Calling static renderAssistantContent...`);
         try {
             // Викликаємо статичний метод для рендерингу контенту
             await AssistantMessageRenderer.renderAssistantContent(
                 contentEl, this.message.content, this.app, this.plugin, this.view
             );
-            this.plugin.logger.debug(`[AssistantMessageRenderer] Static renderAssistantContent finished successfully.`);
+            
         } catch (error) {
              this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling static renderAssistantContent FAILED:`, error);
              contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
@@ -54,7 +53,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
         // Викликаємо статичний метод базового класу для мітки часу
 		BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
 
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Scheduling checkMessageForCollapsing...`);
+        
 		setTimeout(() => { if (messageEl.isConnected) this.view.checkMessageForCollapsing(messageEl) }, 50);
 
         this.plugin.logger.debug(`[AssistantMessageRenderer] Finished render for ts: ${this.message.timestamp.getTime()}`);
@@ -74,24 +73,24 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
 	public static async renderAssistantContent(
         contentEl: HTMLElement, markdownText: string, app: App, plugin: OllamaPlugin, view: OllamaView
     ): Promise<void> {
-		plugin.logger.debug("[renderAssistantContent STAT] Entering.");
+		
 
         // --- ЗМІНЕНО ЛОГІКУ ОЧИЩЕННЯ ---
         const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
         // Перевіряємо, чи є новий текст і чи існують крапки
         if (markdownText.trim().length > 0 && dotsEl) {
-             plugin.logger.debug("[renderAssistantContent STAT] First chunk received, removing thinking dots.");
+             
              dotsEl.remove(); // Видаляємо тільки крапки
         } else if (!dotsEl && contentEl.hasChildNodes()) {
              // Якщо крапок вже немає (наступні чанки), але є інший контент, очищуємо повністю
-             plugin.logger.debug("[renderAssistantContent STAT] Subsequent chunk, clearing contentEl.");
+             
              contentEl.empty();
         } else if (!dotsEl && !contentEl.hasChildNodes()) {
             // Якщо крапок немає і контенту немає (перший виклик, але крапки зникли з іншої причини?), нічого не робимо з очищенням
-            plugin.logger.debug("[renderAssistantContent STAT] No dots and no content, proceeding.");
+            
         } else {
             // Якщо текст порожній (порожній чанк?), не чіпаємо крапки
-            plugin.logger.debug("[renderAssistantContent STAT] Empty markdown chunk received, dots untouched.");
+            
         }
         // --- КІНЕЦЬ ЗМІНИ ---
 
@@ -101,24 +100,24 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
 			const decoded = RendererUtils.decodeHtmlEntities(markdownText);
 			const thinkDetection = RendererUtils.detectThinkingTags(decoded);
 			processedMarkdown = thinkDetection.contentWithoutTags;
-			if (thinkDetection.hasThinkingTags) { plugin.logger.debug("[renderAssistantContent STAT] Removed <think> tags."); }
+			if (thinkDetection.hasThinkingTags) {  }
 		} catch (e) { plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e); }
 
         // --- Додаємо перевірку, чи є що рендерити після обробки ---
         if (processedMarkdown.trim().length === 0) {
-            plugin.logger.debug("[renderAssistantContent STAT] No content to render after processing.");
+            
             return; // Не викликаємо MarkdownRenderer для порожнього рядка
         }
         // --- Кінець перевірки ---
 
 		// 2. Render Markdown
-		plugin.logger.debug("[renderAssistantContent STAT] Starting MarkdownRenderer.render...");
+		
 		try {
             // Рендеримо оброблений markdown. Оскільки ми не робили empty() для першого чанка,
             // а видалили тільки dotsEl, MarkdownRenderer додасть новий контент.
             // Для наступних чанків ми робимо empty(), тому MarkdownRenderer перезапише все.
 			await MarkdownRenderer.render( app, processedMarkdown, contentEl, plugin.app.vault.getRoot()?.path ?? "", view );
-			 plugin.logger.debug("[renderAssistantContent STAT] MarkdownRenderer.render finished successfully.");
+			 
 		} catch (error) {
 			 plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
 			 contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
@@ -126,18 +125,18 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
 		}
 
 		// 3. Enhance Code Blocks (залишаємо)
-		plugin.logger.debug("[renderAssistantContent STAT] Processing code blocks...");
+		
 		try { RendererUtils.enhanceCodeBlocks(contentEl, view); }
         catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error processing code blocks:", error); }
 
 		// 4. Fix Twemoji (залишаємо)
 		if (plugin.settings.fixBrokenEmojis) {
-            plugin.logger.debug("[renderAssistantContent STAT] Fixing Twemoji images...");
+            
 			try { RendererUtils.fixBrokenTwemojiImages(contentEl); }
             catch (error) { plugin.logger.error("[renderAssistantContent STAT] Error fixing Twemoji:", error); }
 		}
 
-		 plugin.logger.debug("[renderAssistantContent STAT] Exiting.");
+		 
 	}
 
 	/**
@@ -154,10 +153,10 @@ export class AssistantMessageRenderer extends BaseMessageRenderer {
          // Перевіряємо, чи кнопки вже існують
          if (messageWrapper.querySelector(".message-actions-wrapper")) {
              // Можна оновити обробники, якщо треба, але поки що просто виходимо
-             plugin.logger.debug("[addAssistantActionButtons STAT] Buttons already exist, skipping.");
+             
              return;
          }
-         plugin.logger.debug("[addAssistantActionButtons STAT] Adding buttons...");
+         
 		 const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
 		 const finalContent = message.content; // Використовуємо передане повідомлення
 

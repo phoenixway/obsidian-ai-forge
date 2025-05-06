@@ -47,10 +47,10 @@ export class Logger {
 
         if (this.fileLoggingEnabled) {
             this.rotateLogFileIfNeeded().then(() => {
-                this.info('Logger initialized & file rotation checked.');
+                
             });
         } else {
-             this.info('Logger initialized.');
+             
         }
     }
 
