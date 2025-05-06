@@ -26,10 +26,10 @@ $folder-icon-extra-indent: 4px;
     overflow-y: auto; // <--- Додає скрол, якщо вміст не влазить
     opacity: 1; // Робить видимим
     // Зменшуємо верхній відступ, щоб список був ближче до заголовка
-    padding-top: calc(var(--size-4-1) / 3); // Маленький відступ зверху
+    padding-top: calc(var(--size-4-1) / 2); // Маленький відступ зверху
     padding-bottom: var(--size-4-1); // Нижній відступ
     max-height: none; // Прибираємо обмеження max-height
-    // min-height: 50px; // Мінімальна висота, щоб було видно хоч щось
+    min-height: 50px; // Мінімальна висота, щоб було видно хоч щось
     min-height: 0;
   }
 
@@ -342,6 +342,8 @@ $folder-icon-extra-indent: 4px;
   overflow: hidden !important;
   visibility: hidden;
   transition: none !important; // Миттєве приховування
+  flex-grow: 0 !important; // Не займати місце
+  min-height: 0 !important; // Дозволити згортатись до нуля
 }
 
 // Анімація спіннера
