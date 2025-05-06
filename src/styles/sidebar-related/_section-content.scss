@@ -86,7 +86,7 @@ $folder-icon-extra-indent: 0px;
         width: 100%;
         box-sizing: border-box;
         padding: $item-padding-vertical $item-padding-horizontal $item-padding-vertical 0;
-        // gap: $icon-margin;
+        gap: $icon-margin;
         position: relative;
         min-height: calc($icon-size + 2 * $item-padding-vertical);
         border-radius: inherit;
@@ -101,7 +101,7 @@ $folder-icon-extra-indent: 0px;
           align-items: center;
           justify-content: center;
           margin-left: 0;
-          // margin-right: $icon-margin;
+          margin-right: 4px;
           .ollama-folder-item & {
             margin-left: $folder-icon-extra-indent;
           }
