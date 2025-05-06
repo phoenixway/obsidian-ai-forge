@@ -228,7 +228,8 @@ $folder-icon-extra-indent: 4px;
         &.ollama-role-panel-item > .ollama-role-panel-item-text {
              flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
              // Встановлюємо потрібні стилі з !important
-             font-size: var(--font-ui-small) !important;
+            //  font-size: var(--font-ui-small) !important;
+            font-size: 10px !important; // Тестуємо з дуже маленьким розміром
              line-height: 1.3 !important;
              color: var(--text-normal) !important;
              font-weight: inherit !important; // Скидаємо можливий жирний шрифт від .menu-option-text
