@@ -1434,7 +1434,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   }
   // Метод render залишається методом екземпляра, бо викликає статичні та protected методи
   async render() {
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Starting render for ts: ${this.message.timestamp.getTime()}`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
     this.addAvatar(messageGroup, false);
     const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
@@ -1450,19 +1449,15 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         this.view
       );
     } catch (error) {
-      this.plugin.logger.error(`[AssistantMessageRenderer] <<< CAUGHT ERROR in render >>> Calling static renderAssistantContent FAILED:`, error);
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
       throw error;
     }
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Adding action buttons (static)...`);
     AssistantMessageRenderer.addAssistantActionButtons(messageWrapper, contentEl, this.message, this.plugin, this.view);
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Adding timestamp (static)...`);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     setTimeout(() => {
       if (messageEl.isConnected)
         this.view.checkMessageForCollapsing(messageEl);
     }, 50);
-    this.plugin.logger.debug(`[AssistantMessageRenderer] Finished render for ts: ${this.message.timestamp.getTime()}`);
     return messageGroup;
   }
   /**
