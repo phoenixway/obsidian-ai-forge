@@ -2,11 +2,11 @@
 // ВИПРАВЛЕНО СЕЛЕКТОР для .ollama-role-panel-list та стилі шрифту
 
 // --- Змінні ---
-$indent-step: 16px;
+$indent-step: 12px;
 $item-padding-vertical: var(--size-4-1);
-$item-padding-horizontal: var(--size-4-2, 5px); // Базовий горизонтальний відступ з fallback
+$item-padding-horizontal: 2px; // Базовий горизонтальний відступ з fallback
 $icon-size: 16px;
-$icon-margin: var(--size-4-2);
+$icon-margin: 0px;
 $folder-icon-extra-indent: 0px;
 // ---
 
