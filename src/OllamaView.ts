@@ -3580,7 +3580,8 @@ private handleActiveChatChanged = async (data: { chatId: string | null; chat: Ch
       this.saveWidthDebounced();
   };
 
-// handleRegenerateClick
+
+// OllamaView.ts
 
 public async handleRegenerateClick(userMessage: Message): Promise<void> {
   if (this.isRegenerating) {
@@ -3717,7 +3718,7 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
               if (this.activePlaceholder.groupEl) { this.checkMessageForCollapsing(this.activePlaceholder.groupEl); }
             } else {
                this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder mismatch during stream. Current.ts: ${this.activePlaceholder?.timestamp}, expected: ${responseStartTimeMs}.`);
-               accumulatedResponse += chunk.response; // Накопичуємо, навіть якщо плейсхолдер не той
+               accumulatedResponse += chunk.response; 
             }
           }
           if ("done" in chunk && chunk.done) { 
@@ -3738,13 +3739,11 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
               this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] Resolver ADDED to map for ts ${responseStartTimeMs}. Map size: ${this.messageAddedResolvers.size}`);
           });
           
-          // Цей виклик має призвести до виклику handleMessageAdded з повідомленням,
-          // timestamp якого = responseStartTimeMs (бо ми передаємо responseStartTime)
           this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false );
           
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] TRY: Awaiting mainAssistantMessageProcessedPromise (via map) for ts ${responseStartTimeMs}`);
           
-          const timeoutDuration = 10000; // 10 секунд
+          const timeoutDuration = 10000; 
           const timeoutPromise = new Promise<void>((_, reject) => 
               setTimeout(() => reject(new Error(`Timeout (${timeoutDuration/1000}s) waiting for HMA for ts ${responseStartTimeMs}`)), timeoutDuration) 
           );
@@ -3754,7 +3753,6 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
           } catch (awaitPromiseError: any) {
               this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] TRY: Error or Timeout awaiting mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs}: ${awaitPromiseError.message}`);
               streamErrorOccurred = streamErrorOccurred || awaitPromiseError; 
-              // Якщо був таймаут, це означає, що resolver не був викликаний. Видаляємо його з мапи.
               if (this.messageAddedResolvers.has(responseStartTimeMs)) {
                   this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] Timeout/Error awaiting, removing resolver from map for ts ${responseStartTimeMs}.`);
                   this.messageAddedResolvers.delete(responseStartTimeMs);
@@ -3787,19 +3785,24 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
             this.messageAddedResolvers.delete(responseStartTimeMs);
         }
         
-        let errorMsgForChat: string;
+        // ВИПРАВЛЕННЯ: Ініціалізація errorMsgForChat
+        let errorMsgForChat: string = "An unexpected error occurred during regeneration."; 
         let errorMsgRole: "system" | "error" = "error";
         let savePartialResponseOnError = false;
+
         if (error.name === "AbortError" || error.message?.includes("aborted by user")) {
           this.plugin.logger.info(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Regeneration was stopped/aborted.`);
-          errorMsgForChat = "Regeneration stopped.";
+          errorMsgForChat = "Regeneration stopped."; 
           errorMsgRole = "system";
           if (accumulatedResponse.trim()) savePartialResponseOnError = true;
         } else {
-          errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
+          errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`; 
           new Notice(errorMsgForChat, 5000);
         }
+        
+        this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Adding error/system message to chat: "${errorMsgForChat}"`);
         this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
+
         if (savePartialResponseOnError) {
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Saving partial response after cancellation.`);
           this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, false);
@@ -3838,13 +3841,12 @@ public async handleRegenerateClick(userMessage: Message): Promise<void> {
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (requestAnimationFrame): UI update attempt finished.`);
         });
         
-        this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (END). isRegenerating: ${this.isRegenerating}, AbortCtrl: ${this.currentAbortController ? 'active' : 'null'}, isProcessing: ${this.isProcessing}`);
+        this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (END).`);
         this.focusInput();
       }
     }
   ).open();
 }
-
 
   // OllamaView.ts
 
