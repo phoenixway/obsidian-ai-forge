@@ -6117,7 +6117,180 @@ Summary:`;
       this.plugin.logger.debug(`[sendMessage] Finished for request ${responseStartTimeMs}.`);
     }
   }
-  // handleRegenerateClick
+  // OllamaView.ts
+  async handleMessageAdded(data) {
+    var _a, _b, _c, _d;
+    const messageForLog = data == null ? void 0 : data.message;
+    const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
+    const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
+    const hmaEntryId = Date.now();
+    let resolverForThisMessage;
+    if (messageTimestampForLog) {
+      resolverForThisMessage = this.messageAddedResolvers.get(messageTimestampForLog);
+      if (resolverForThisMessage) {
+        this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Found resolver in map. Will use and delete it.`);
+        this.messageAddedResolvers.delete(messageTimestampForLog);
+      } else {
+        this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map.`);
+      }
+    } else {
+      this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get resolver.`);
+    }
+    this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? "FOUND" : "NOT FOUND"}. Active placeholder ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}`);
+    try {
+      if (!data || !data.message) {
+        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT: Invalid data received.`, data);
+        if (resolverForThisMessage) {
+          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage (invalid data).`);
+          resolverForThisMessage();
+        }
+        return;
+      }
+      const { chatId: eventChatId, message } = data;
+      const messageTimestampMs = message.timestamp.getTime();
+      if (!this.chatContainer || !this.plugin.chatManager) {
+        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: CRITICAL Context missing!`);
+        if (resolverForThisMessage) {
+          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context).`);
+          resolverForThisMessage();
+        }
+        return;
+      }
+      const activeChatId = this.plugin.chatManager.getActiveChatId();
+      if (eventChatId !== activeChatId) {
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: Event for non-active chat ${eventChatId}.`);
+        if (resolverForThisMessage) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat).`);
+          resolverForThisMessage();
+        }
+        return;
+      }
+      const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
+      if (existingRenderedMessage) {
+        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: Message already rendered (not placeholder). Role: ${message.role}.`);
+        if (resolverForThisMessage) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered).`);
+          resolverForThisMessage();
+        }
+        return;
+      }
+      const alreadyInLogicCache = this.currentMessages.some(
+        (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
+      );
+      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
+      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
+      if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
+        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: In cache and NOT assistant for active placeholder. Role: ${message.role}.`);
+        if (resolverForThisMessage) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match).`);
+          resolverForThisMessage();
+        }
+        return;
+      }
+      if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
+        this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS assistant for active placeholder. Proceeding.`);
+      }
+      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}`);
+      if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
+        this.plugin.logger.error(
+          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating.`
+        );
+        const placeholderToUpdate = this.activePlaceholder;
+        if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder DOM elements are valid for update.`);
+          placeholderToUpdate.groupEl.classList.remove("placeholder");
+          placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
+          placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
+          const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
+          if (!messageDomElement) {
+            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND. Removing placeholder, adding normally.`);
+            if (placeholderToUpdate.groupEl.isConnected)
+              placeholderToUpdate.groupEl.remove();
+            this.activePlaceholder = null;
+            await this.addMessageStandard(message);
+            if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
+              this.currentMessages.push(message);
+            }
+          } else {
+            placeholderToUpdate.contentEl.classList.remove("streaming-text");
+            const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+            if (dotsEl) {
+              dotsEl.remove();
+              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);
+            }
+            try {
+              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering final assistant content into placeholder.`);
+              await AssistantMessageRenderer.renderAssistantContent(placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this);
+              AssistantMessageRenderer.addAssistantActionButtons(placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message, this.plugin, this);
+              BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
+              this.lastMessageElement = placeholderToUpdate.groupEl;
+              if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
+                this.currentMessages.push(message);
+                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message pushed to currentMessages after placeholder update.`);
+              } else {
+                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message already in currentMessages after placeholder update (expected if alreadyInLogicCache was true).`);
+              }
+              this.hideEmptyState();
+              this.activePlaceholder = null;
+              this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`);
+              setTimeout(() => {
+                if (placeholderToUpdate.groupEl.isConnected)
+                  this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
+              }, 50);
+              this.guaranteedScrollToBottom(100, false);
+            } catch (renderError) {
+              this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
+              if (placeholderToUpdate.groupEl.isConnected)
+                placeholderToUpdate.groupEl.remove();
+              this.activePlaceholder = null;
+              this.handleErrorMessage({ role: "error", content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
+            }
+          }
+        } else {
+          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. Adding normally.`);
+          this.activePlaceholder = null;
+          await this.addMessageStandard(message);
+          if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
+            this.currentMessages.push(message);
+          }
+        }
+      } else {
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR non-assistant/non-matching. Adding normally.`);
+        await this.addMessageStandard(message);
+        if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
+          this.currentMessages.push(message);
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) pushed to currentMessages after addMessageStandard.`);
+        }
+      }
+      this.plugin.logger.debug(
+        `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
+      );
+    } catch (outerError) {
+      this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
+      this.handleErrorMessage({
+        role: "error",
+        content: `Internal error in HMA for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
+        timestamp: new Date()
+      });
+    } finally {
+      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? "EXISTS" : "is NULL"}.`);
+      if (resolverForThisMessage) {
+        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`);
+        try {
+          resolverForThisMessage();
+        } catch (resolverError) {
+          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
+        }
+        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`);
+      } else {
+        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found or already used for this message.`);
+      }
+      this.plugin.logger.debug(
+        `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}.`
+      );
+    }
+  }
+  // OllamaView.ts
   async handleRegenerateClick(userMessage) {
     var _a;
     if (this.isRegenerating) {
@@ -6302,7 +6475,7 @@ Summary:`;
             this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error occurred, removing resolver from map for ts ${responseStartTimeMs} if it exists.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
-          let errorMsgForChat;
+          let errorMsgForChat = "An unexpected error occurred during regeneration.";
           let errorMsgRole = "error";
           let savePartialResponseOnError = false;
           if (error.name === "AbortError" || ((_i = error.message) == null ? void 0 : _i.includes("aborted by user"))) {
@@ -6315,6 +6488,7 @@ Summary:`;
             errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
             new import_obsidian14.Notice(errorMsgForChat, 5e3);
           }
+          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Adding error/system message to chat: "${errorMsgForChat}"`);
           this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date());
           if (savePartialResponseOnError) {
             this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Saving partial response after cancellation.`);
@@ -6323,7 +6497,7 @@ Summary:`;
         } finally {
           this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_j = this.activePlaceholder) == null ? void 0 : _j.timestamp}, messageAddedResolvers size: ${this.messageAddedResolvers.size}`);
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Resolver for ts ${responseStartTimeMs} still in map (maybe promise wasn't awaited or error before await). Removing.`);
+            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Resolver for ts ${responseStartTimeMs} still in map. Removing.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
           if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
@@ -6346,184 +6520,11 @@ Summary:`;
             this.updateSendButtonState();
             this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (requestAnimationFrame): UI update attempt finished.`);
           });
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (END). isRegenerating: ${this.isRegenerating}, AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
+          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (END).`);
           this.focusInput();
         }
       }
     ).open();
-  }
-  // OllamaView.ts
-  async handleMessageAdded(data) {
-    var _a, _b, _c, _d, _e;
-    const messageForLog = data == null ? void 0 : data.message;
-    const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
-    const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
-    const hmaEntryId = Date.now();
-    let resolverForThisMessage;
-    if (messageTimestampForLog) {
-      resolverForThisMessage = this.messageAddedResolvers.get(messageTimestampForLog);
-      if (resolverForThisMessage) {
-        this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Found resolver in map. Will use and delete it.`);
-        this.messageAddedResolvers.delete(messageTimestampForLog);
-      } else {
-        this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map.`);
-      }
-    } else {
-      this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get resolver.`);
-    }
-    this.plugin.logger.error(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? "FOUND" : "NOT FOUND"}. Active placeholder ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}`);
-    try {
-      if (!data || !data.message) {
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT: Invalid data received.`, data);
-        if (resolverForThisMessage) {
-          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage (invalid data).`);
-          resolverForThisMessage();
-        }
-        return;
-      }
-      const { chatId: eventChatId, message } = data;
-      const messageTimestampMs = message.timestamp.getTime();
-      if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: CRITICAL Context missing!`);
-        if (resolverForThisMessage) {
-          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context).`);
-          resolverForThisMessage();
-        }
-        return;
-      }
-      const activeChatId = this.plugin.chatManager.getActiveChatId();
-      if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: Event for non-active chat ${eventChatId}.`);
-        if (resolverForThisMessage) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat).`);
-          resolverForThisMessage();
-        }
-        return;
-      }
-      const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
-      if (existingRenderedMessage) {
-        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: Message already rendered (not placeholder). Role: ${message.role}.`);
-        if (resolverForThisMessage) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered).`);
-          resolverForThisMessage();
-        }
-        return;
-      }
-      const alreadyInLogicCache = this.currentMessages.some(
-        (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
-      );
-      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
-      if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT: In cache and NOT assistant for active placeholder. Role: ${message.role}.`);
-        if (resolverForThisMessage) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match).`);
-          resolverForThisMessage();
-        }
-        return;
-      }
-      if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS assistant for active placeholder. Proceeding.`);
-      }
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}`);
-      if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating.`
-        );
-        const placeholderToUpdate = this.activePlaceholder;
-        if (placeholderToUpdate.groupEl && placeholderToUpdate.groupEl.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder DOM elements are valid for update.`);
-          placeholderToUpdate.groupEl.classList.remove("placeholder");
-          placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
-          placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
-          const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
-          if (!messageDomElement) {
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
-            if (placeholderToUpdate.groupEl.isConnected)
-              placeholderToUpdate.groupEl.remove();
-            this.activePlaceholder = null;
-            await this.addMessageStandard(message);
-            if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
-              this.currentMessages.push(message);
-            }
-          } else {
-            placeholderToUpdate.contentEl.classList.remove("streaming-text");
-            const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-            if (dotsEl) {
-              dotsEl.remove();
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);
-            }
-            try {
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering final assistant content into placeholder.`);
-              await AssistantMessageRenderer.renderAssistantContent(placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this);
-              AssistantMessageRenderer.addAssistantActionButtons(placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message, this.plugin, this);
-              BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
-              this.lastMessageElement = placeholderToUpdate.groupEl;
-              if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
-                this.currentMessages.push(message);
-                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message pushed to currentMessages after placeholder update.`);
-              } else {
-                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message already in currentMessages after placeholder update (expected if alreadyInLogicCache was true).`);
-              }
-              this.hideEmptyState();
-              this.activePlaceholder = null;
-              this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`);
-              setTimeout(() => {
-                if (placeholderToUpdate.groupEl.isConnected)
-                  this.checkMessageForCollapsing(placeholderToUpdate.groupEl);
-              }, 50);
-              this.guaranteedScrollToBottom(100, false);
-            } catch (renderError) {
-              this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
-              if (placeholderToUpdate.groupEl.isConnected)
-                placeholderToUpdate.groupEl.remove();
-              this.activePlaceholder = null;
-              this.handleErrorMessage({ role: "error", content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
-            }
-          }
-        } else {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. Adding normally.`);
-          this.activePlaceholder = null;
-          await this.addMessageStandard(message);
-          if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
-            this.currentMessages.push(message);
-          }
-        }
-      } else {
-        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR non-assistant/non-matching. Role: ${message.role}. Active placeholder ts: ${(_e = this.activePlaceholder) == null ? void 0 : _e.timestamp}. Adding normally.`);
-        await this.addMessageStandard(message);
-        if (!this.currentMessages.some((m) => m.timestamp.getTime() === message.timestamp.getTime() && m.role === message.role)) {
-          this.currentMessages.push(message);
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) pushed to currentMessages after addMessageStandard.`);
-        }
-      }
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
-      );
-    } catch (outerError) {
-      this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
-      this.handleErrorMessage({
-        role: "error",
-        content: `Internal error in HMA for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
-        timestamp: new Date()
-      });
-    } finally {
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? "EXISTS" : "is NULL"}.`);
-      if (resolverForThisMessage) {
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`);
-        try {
-          resolverForThisMessage();
-        } catch (resolverError) {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
-        }
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`);
-      } else {
-        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found or already used for this message.`);
-      }
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}.`
-      );
-    }
   }
 };
 
