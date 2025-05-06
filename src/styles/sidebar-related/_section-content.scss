@@ -97,7 +97,7 @@ $folder-icon-extra-indent: 4px;
           // Застосовуємо до контенту, якщо його батько має клас рівня
           .ollama-hierarchy-item.ollama-indent-level-#{$i} > & {
               // Встановлюємо padding-left (БЕЗ !important спочатку)
-              padding-left: $item-padding-horizontal + ($i * $indent-step);
+              padding-left: $item-padding-horizontal + ($i * $indent-step) !important;
 
               // Додатковий зсув для контенту ПАПКИ
               &.ollama-folder-item .ollama-hierarchy-item-content > .ollama-folder-icon {
