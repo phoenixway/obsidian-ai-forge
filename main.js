@@ -5524,18 +5524,16 @@ This action cannot be undone.`,
       return;
     }
     const contentCollapsible = messageGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-    const maxH = this.plugin.settings.maxMessageHeight;
-    if (!contentCollapsible) {
-      this.plugin.logger.trace(`[checkMessageForCollapsing] No contentCollapsible found in message group (ts: ${messageGroupEl.dataset.timestamp || messageGroupEl.dataset.placeholderTimestamp}).`);
+    const messageEl = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
+    if (!contentCollapsible || !messageEl) {
+      this.plugin.logger.trace(`[checkMessageForCollapsing] No contentCollapsible or messageEl found in message group (ts: ${messageGroupEl.dataset.timestamp || messageGroupEl.dataset.placeholderTimestamp}).`);
       return;
     }
-    const isStreamingNow = this.isProcessing && // Чи йде якась обробка на рівні View
-    messageGroupEl.classList.contains("placeholder") && // Чи це елемент, позначений як плейсхолдер
-    messageGroupEl.hasAttribute("data-placeholder-timestamp") && // Чи має він timestamp плейсхолдера
-    contentCollapsible.classList.contains("streaming-text");
+    const maxH = this.plugin.settings.maxMessageHeight;
+    const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && messageGroupEl.hasAttribute("data-placeholder-timestamp") && contentCollapsible.classList.contains("streaming-text");
     if (isStreamingNow) {
       this.plugin.logger.debug(`[checkMessageForCollapsing] Streaming placeholder (ts: ${messageGroupEl.dataset.placeholderTimestamp}). No 'Show More' button. Content expanded.`);
-      const existingButton = messageGroupEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
@@ -5543,41 +5541,42 @@ This action cannot be undone.`,
     }
     if (maxH <= 0) {
       this.plugin.logger.trace(`[checkMessageForCollapsing] maxMessageHeight disabled. Removing button, expanding content for (ts: ${messageGroupEl.dataset.timestamp}).`);
-      const existingButton = messageGroupEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
+      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton == null ? void 0 : existingButton.remove();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
       return;
     }
     requestAnimationFrame(() => {
-      if (!contentCollapsible || !contentCollapsible.isConnected || !messageGroupEl.isConnected)
+      if (!contentCollapsible || !contentCollapsible.isConnected || !messageGroupEl.isConnected || !messageEl.isConnected)
         return;
-      let existingButton = messageGroupEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
-      const wasCollapsed = contentCollapsible.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+      let existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
       contentCollapsible.style.maxHeight = "";
       const scrollHeight = contentCollapsible.scrollHeight;
-      if (existingButton && previousMaxHeightStyle) {
+      if (existingButton && previousMaxHeightStyle && !existingButton.classList.contains("explicitly-expanded")) {
         contentCollapsible.style.maxHeight = previousMaxHeightStyle;
       }
       if (scrollHeight > maxH) {
         if (!existingButton) {
           this.plugin.logger.debug(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) > maxH (${maxH}). Adding 'Show More' button for (ts: ${messageGroupEl.dataset.timestamp}).`);
-          existingButton = messageGroupEl.createEl("button", {
+          existingButton = messageEl.createEl("button", {
             cls: CSS_CLASSES.SHOW_MORE_BUTTON
           });
-          this.registerDomEvent(
-            existingButton,
-            "click",
-            () => this.toggleMessageCollapse(contentCollapsible, existingButton)
-          );
+          this.registerDomEvent(existingButton, "click", () => {
+            if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
+              existingButton.classList.add("explicitly-expanded");
+            } else {
+              existingButton.classList.remove("explicitly-expanded");
+            }
+            this.toggleMessageCollapse(contentCollapsible, existingButton);
+          });
           contentCollapsible.style.maxHeight = `${maxH}px`;
-          contentCollapsible.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
+          contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
           existingButton.setText("Show More \u25BC");
-          existingButton.removeAttribute("data-initial-state");
         } else {
           this.plugin.logger.trace(`[checkMessageForCollapsing] scrollHeight (${scrollHeight}) > maxH (${maxH}). Button already exists for (ts: ${messageGroupEl.dataset.timestamp}). Updating text if needed.`);
-          if (contentCollapsible.classList.contains(CSS_CLASS_CONTENT_COLLAPSED)) {
+          if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
             existingButton.setText("Show More \u25BC");
           } else {
             existingButton.setText("Show Less \u25B2");
@@ -5589,10 +5588,14 @@ This action cannot be undone.`,
           existingButton.remove();
         }
         contentCollapsible.style.maxHeight = "";
-        contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+        contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
     });
   }
+  // Метод toggleMessageCollapse залишається без змін з відповіді #2 (або вашої поточної версії)
+  // public toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void {
+  //   // ... (логіка згортання/розгортання)
+  // }
   async handleSummarizeClick(originalContent, buttonEl) {
     var _a;
     const summarizationModel = this.plugin.settings.summarizationModelName;
