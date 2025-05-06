@@ -235,7 +235,7 @@ $folder-icon-extra-indent: 4px;
             }
         }
 
-        > .ollama-role-panel-item-text {
+        .ollama-role-panel-item-text {
             flex-grow: 1;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
             // --- Явно вказуємо стилі шрифту як у ієрархії ---
