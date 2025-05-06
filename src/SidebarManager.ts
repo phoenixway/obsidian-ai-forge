@@ -62,7 +62,12 @@ const FOLDER_ICON_CLOSED = "lucide-folder";
 const FOLDER_ICON_OPEN = "lucide-folder-open";
 const CHAT_ICON = "lucide-message-square";
 const CHAT_ICON_ACTIVE = "lucide-check";
+const CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon"; // Повертаємо клас лівої іконки
+// ...
 
+// --- Іконки ---
+const CHATS_SECTION_ICON = "lucide-messages-square"; // Іконка для секції Chats
+const ROLES_SECTION_ICON = "lucide-users"; // Іконка для секції Roles
 
 export class SidebarManager {
   private plugin: OllamaPlugin;
@@ -96,16 +101,15 @@ export class SidebarManager {
         attr: { "data-section-type": "chats", "data-collapsed": "false" },
     });
     const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    // --- ДОДАНО: Ліва іконка для Chats ---
+    setIcon(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), CHATS_SECTION_ICON);
+    // ---
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
 
     const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
-    // --- ЗМІНА: Спочатку кнопки, потім шеврон ---
     this.newFolderSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Folder", title: "New Folder" }, }); setIcon(this.newFolderSidebarButton, "lucide-folder-plus");
     this.newChatSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Chat", title: "New Chat" }, }); setIcon(this.newChatSidebarButton, "lucide-plus-circle");
-    // Тепер додаємо шеврон
-    const chatChevron = chatHeaderActions.createSpan({ cls: ["ollama-section-toggle-chevron", "clickable-icon"]});
-    setIcon(chatChevron, EXPAND_ICON_ACCORDION); // Розгорнуто
-    // --- КІНЕЦЬ ЗМІНИ ---
+    const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"]}); setIcon(chatChevron, EXPAND_ICON_ACCORDION);
 
     this.chatPanelListContainerEl = chatPanel.createDiv({ cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"], });
 
@@ -116,12 +120,13 @@ export class SidebarManager {
         attr: { "data-section-type": "roles", "data-collapsed": "true" },
     });
     const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+     // --- ДОДАНО: Ліва іконка для Roles ---
+    setIcon(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), ROLES_SECTION_ICON);
+     // ---
     roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
 
     const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
-    // Тут лише шеврон, порядок не важливий
-    const roleChevron = roleHeaderActions.createSpan({ cls: ["ollama-section-toggle-chevron", "clickable-icon"]});
-    setIcon(roleChevron, COLLAPSE_ICON_ACCORDION); // Згорнуто
+    const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"]}); setIcon(roleChevron, COLLAPSE_ICON_ACCORDION);
 
     this.rolePanelListEl = rolePanel.createDiv({ cls: ["ollama-role-panel-list", "ollama-sidebar-section-content"], });
 
@@ -130,6 +135,7 @@ export class SidebarManager {
     if (this.isSectionVisible("chats")) { this.updateChatList(); }
     return this.containerEl;
 }
+
 
   private attachSidebarEventListeners(): void {
     if (!this.chatPanelHeaderEl || !this.rolePanelHeaderEl || !this.newChatSidebarButton || !this.newFolderSidebarButton) { this.plugin.logger.error("[SidebarManager] Cannot attach listeners: UI elements missing."); return; }

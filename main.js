@@ -1877,6 +1877,9 @@ var FOLDER_ICON_CLOSED = "lucide-folder";
 var FOLDER_ICON_OPEN = "lucide-folder-open";
 var CHAT_ICON = "lucide-message-square";
 var CHAT_ICON_ACTIVE = "lucide-check";
+var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
+var CHATS_SECTION_ICON = "lucide-messages-square";
+var ROLES_SECTION_ICON = "lucide-users";
 var SidebarManager = class {
   constructor(plugin, app, view) {
     this.folderExpansionState = /* @__PURE__ */ new Map();
@@ -2140,13 +2143,14 @@ var SidebarManager = class {
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
     });
     const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    (0, import_obsidian12.setIcon)(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), CHATS_SECTION_ICON);
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
     const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
     this.newFolderSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Folder", title: "New Folder" } });
     (0, import_obsidian12.setIcon)(this.newFolderSidebarButton, "lucide-folder-plus");
     this.newChatSidebarButton = chatHeaderActions.createDiv({ cls: ["ollama-sidebar-header-button", "clickable-icon"], attr: { "aria-label": "New Chat", title: "New Chat" } });
     (0, import_obsidian12.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
-    const chatChevron = chatHeaderActions.createSpan({ cls: ["ollama-section-toggle-chevron", "clickable-icon"] });
+    const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
     (0, import_obsidian12.setIcon)(chatChevron, EXPAND_ICON_ACCORDION);
     this.chatPanelListContainerEl = chatPanel.createDiv({ cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"] });
     const rolePanel = this.containerEl.createDiv({ cls: "ollama-role-panel" });
@@ -2155,9 +2159,10 @@ var SidebarManager = class {
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
     });
     const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    (0, import_obsidian12.setIcon)(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), ROLES_SECTION_ICON);
     roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
     const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
-    const roleChevron = roleHeaderActions.createSpan({ cls: ["ollama-section-toggle-chevron", "clickable-icon"] });
+    const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
     (0, import_obsidian12.setIcon)(roleChevron, COLLAPSE_ICON_ACCORDION);
     this.rolePanelListEl = rolePanel.createDiv({ cls: ["ollama-role-panel-list", "ollama-sidebar-section-content"] });
     this.plugin.logger.debug("[SidebarManager] UI Created.");
@@ -3258,7 +3263,7 @@ var CSS_ROLE_PANEL_ITEM_TEXT2 = "ollama-role-panel-item-text";
 var CSS_ROLE_PANEL_ITEM_ACTIVE2 = "is-active";
 var CSS_ROLE_PANEL_ITEM_CUSTOM2 = "is-custom";
 var CSS_ROLE_PANEL_ITEM_NONE2 = "ollama-role-panel-item-none";
-var CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
+var CSS_SIDEBAR_SECTION_ICON2 = "ollama-sidebar-section-icon";
 var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 var CSS_CLASS_CHAT_LIST_ITEM2 = "ollama-chat-list-item";
 var CSS_CLASS_RESIZER_HANDLE = "ollama-resizer-handle";
@@ -5645,7 +5650,7 @@ This action cannot be undone.`,
   async toggleSidebarSection(clickedHeaderEl) {
     const sectionType = clickedHeaderEl.getAttribute("data-section-type");
     const isCurrentlyCollapsed = clickedHeaderEl.getAttribute("data-collapsed") === "true";
-    const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+    const iconEl = clickedHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON2}`);
     let contentEl = null;
     let updateFunction = null;
     let otherHeaderEl = null;
@@ -5673,7 +5678,7 @@ This action cannot be undone.`,
     }
     if (isCurrentlyCollapsed) {
       if (otherHeaderEl.getAttribute("data-collapsed") === "false") {
-        const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON}`);
+        const otherIconEl = otherHeaderEl.querySelector(`.${CSS_SIDEBAR_SECTION_ICON2}`);
         otherHeaderEl.setAttribute("data-collapsed", "true");
         if (otherIconEl)
           (0, import_obsidian14.setIcon)(otherIconEl, collapseIcon);
