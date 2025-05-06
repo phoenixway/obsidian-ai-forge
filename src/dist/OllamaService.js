@@ -96,7 +96,6 @@ var OllamaService = /** @class */ (function () {
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
-                        console.log("[OllamaService] Sending RAW request to /api/generate:", JSON.stringify(__assign(__assign({}, requestBody), { prompt: ((_a = requestBody.prompt) === null || _a === void 0 ? void 0 : _a.substring(0, 100)) + "..." })));
                         // Note: generateRaw itself doesn't know about PromptService or Chat objects
                         // It relies on the caller to format the prompt and system message correctly.
                         if (!requestBody.model || !requestBody.prompt) {
@@ -128,7 +127,6 @@ var OllamaService = /** @class */ (function () {
                 switch (_b.label) {
                     case 0:
                         if (!chat) {
-                            console.error("[OllamaService] generateChatResponse called with null chat.");
                             return [2 /*return*/, null];
                         }
                         currentSettings = this.plugin.settings;
@@ -141,7 +139,6 @@ var OllamaService = /** @class */ (function () {
                         history = chat.getMessages();
                         lastUserMessage = history.findLast(function (m) { return m.role === 'user'; });
                         if (!lastUserMessage) {
-                            console.warn("[OllamaService] No user message in history for response.");
                             return [2 /*return*/, null];
                         }
                         return [4 /*yield*/, this.plugin.promptService.prepareFullPrompt(history, chat.metadata)];
@@ -158,7 +155,6 @@ var OllamaService = /** @class */ (function () {
                             options: { num_ctx: currentSettings.contextWindow },
                             system: systemPrompt !== null && systemPrompt !== void 0 ? systemPrompt : undefined
                         };
-                        console.log("[OllamaService] Calling generateRaw for chat response: Model:\"" + modelName + "\", Temp:" + temperature);
                         return [4 /*yield*/, this.generateRaw(requestBody)];
                     case 4:
                         responseData = _b.sent();
@@ -173,13 +169,11 @@ var OllamaService = /** @class */ (function () {
                             return [2 /*return*/, assistantMessage];
                         }
                         else {
-                            console.warn("[OllamaService] generateRaw returned unexpected structure:", responseData);
                             throw new Error("Received unexpected or empty response from the model.");
                         }
                         return [3 /*break*/, 6];
                     case 5:
                         error_1 = _b.sent();
-                        console.error("[OllamaService] Error during chat response generation cycle:", error_1);
                         errorMessage = error_1 instanceof Error ? error_1.message : "Unknown error generating response.";
                         if (errorMessage.includes("model not found")) {
                             errorMessage = "Model '" + modelName + "' not found. Check Ollama server or model name in settings/chat.";

@@ -6892,7 +6892,6 @@ var OllamaService = class {
         options: { num_ctx: currentSettings.contextWindow },
         ...systemPrompt && { system: systemPrompt }
       };
-      this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", { ...requestBody, prompt: promptBody.substring(0, 200) + "..." });
       const response = await fetch(url, {
         method: "POST",
         headers,
@@ -6908,7 +6907,6 @@ var OllamaService = class {
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
-        this.plugin.logger.error(`[OllamaService] ${errorText}`);
         this.emit("connection-error", new Error(errorText));
         yield { error: errorText };
         return;
@@ -6950,7 +6948,6 @@ var OllamaService = class {
               return;
             }
           } catch (e) {
-            this.plugin.logger.error(`[OllamaService] Failed to parse JSON chunk: ${line.trim()}`, e);
           }
         }
       }
@@ -7087,7 +7084,6 @@ var OllamaService = class {
       } else {
       }
     } catch (e) {
-      this.plugin.logger.error(`[OllamaService] Failed to fetch models:`, e);
       if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
         this.emit("connection-error", new Error(e.message || "Failed to fetch models"));
       }
@@ -7112,7 +7108,6 @@ var OllamaService = class {
           errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
         } catch (e) {
         }
-        this.plugin.logger.error(`[OllamaService] ${errorText}`);
         this.emit("connection-error", new Error(errorText));
         throw new Error(errorText);
       }

@@ -87,7 +87,6 @@ export class OllamaService {
                 ...(systemPrompt && { system: systemPrompt })
             };
 
-            this.plugin.logger.debug("[OllamaService] Request body (prompt truncated):", {...requestBody, prompt: promptBody.substring(0, 200) + "..."});
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -104,7 +103,6 @@ export class OllamaService {
                 } catch (e) {
                     errorText += `: ${response.statusText || 'Could not parse error details'}`;
                 }
-                this.plugin.logger.error(`[OllamaService] ${errorText}`);
                 this.emit('connection-error', new Error(errorText)); // Emit connection error (though maybe API error)
                 yield { error: errorText };
                 return;
@@ -158,7 +156,6 @@ export class OllamaService {
                              return; // Завершуємо генератор
                         }
                     } catch (e) {
-                        this.plugin.logger.error(`[OllamaService] Failed to parse JSON chunk: ${line.trim()}`, e);
                         // Вирішуємо, чи продовжувати, чи зупинитися при помилці парсингу
                         // Можна віддати помилку: yield { error: `Failed to parse chunk: ${line.trim()}` };
                     }
@@ -306,7 +303,6 @@ export class OllamaService {
             } else {
             }
         } catch (e: any) {
-            this.plugin.logger.error(`[OllamaService] Failed to fetch models:`, e);
              if (!e.message?.includes('API error')) { // Avoid duplicate emits
                 this.emit('connection-error', new Error(e.message || 'Failed to fetch models'));
              }
@@ -328,7 +324,6 @@ export class OllamaService {
               if (!response.ok) {
                  let errorText = `Ollama Show API error! Status: ${response.status}`;
                  try { const errJson = await response.json(); errorText += `: ${errJson?.error || 'Details unavailable'}`; } catch {}
-                 this.plugin.logger.error(`[OllamaService] ${errorText}`);
                  this.emit('connection-error', new Error(errorText));
                  throw new Error(errorText);
               }
