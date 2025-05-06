@@ -7187,17 +7187,15 @@ var PromptService = class {
     this.currentSystemPrompt = null;
   }
   clearModelDetailsCache() {
-    this.plugin.logger.debug("[PromptService] Clearing model details cache.");
     this.modelDetailsCache = {};
   }
   async getRoleDefinition(rolePath) {
-    var _a, _b, _c;
+    var _a, _b;
     const normalizedPath = rolePath ? (0, import_obsidian16.normalizePath)(rolePath) : null;
     if (normalizedPath === this.currentRolePath && normalizedPath && this.roleCache[normalizedPath]) {
       return this.roleCache[normalizedPath];
     }
     if (normalizedPath !== this.currentRolePath) {
-      this.plugin.logger.info(`[PromptService] Role path changing from '${this.currentRolePath}' to '${normalizedPath}'. Clearing cache.`);
       if (this.currentRolePath && this.roleCache[this.currentRolePath]) {
         delete this.roleCache[this.currentRolePath];
       }
@@ -7205,7 +7203,6 @@ var PromptService = class {
       this.currentSystemPrompt = null;
     }
     if (!normalizedPath || !this.plugin.settings.followRole) {
-      this.plugin.logger.debug("[PromptService] No role path or followRole disabled. Role definition is null.");
       const definition = {
         systemPrompt: null,
         // Тут не можемо визначити isProductivityPersona без читання файлу,
@@ -7216,11 +7213,9 @@ var PromptService = class {
       return definition;
     }
     if (this.roleCache[normalizedPath]) {
-      this.plugin.logger.debug(`[PromptService] Returning newly cached role definition for: ${normalizedPath}`);
       this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
       return this.roleCache[normalizedPath];
     }
-    this.plugin.logger.debug(`[PromptService] Loading role definition from file: ${normalizedPath}`);
     const file = this.app.vault.getAbstractFileByPath(normalizedPath);
     if (file instanceof import_obsidian16.TFile) {
       try {
@@ -7233,7 +7228,6 @@ var PromptService = class {
           systemPrompt: systemPromptBody || null,
           isProductivityPersona: isProductivity
         };
-        this.plugin.logger.info(`[PromptService] Role loaded: ${normalizedPath}. Is Productivity: ${isProductivity}. Prompt length: ${((_c = definition.systemPrompt) == null ? void 0 : _c.length) || 0}`);
         this.roleCache[normalizedPath] = definition;
         this.currentSystemPrompt = definition.systemPrompt;
         return definition;
@@ -7244,7 +7238,6 @@ var PromptService = class {
         return { systemPrompt: null, isProductivityPersona: false };
       }
     } else {
-      this.plugin.logger.warn(`[PromptService] Role file not found or not a file: ${normalizedPath}`);
       this.currentSystemPrompt = null;
       return { systemPrompt: null, isProductivityPersona: false };
     }
@@ -7261,16 +7254,15 @@ var PromptService = class {
    * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції.
    */
   async getSystemPromptForAPI(chatMetadata) {
-    var _a, _b;
+    var _a;
     const settings = this.plugin.settings;
-    this.plugin.logger.debug(`[PromptService] Building system prompt for chat: ${chatMetadata.id}, Role path: ${(_a = chatMetadata.selectedRolePath) != null ? _a : settings.selectedRolePath}`);
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
     let roleDefinition = null;
     if (selectedRolePath && settings.followRole) {
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
     }
     const roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
-    const isProductivityActive = (_b = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _b : false;
+    const isProductivityActive = (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
     const ragInstructions = `
 --- RAG Data Interpretation Rules ---
 You will be provided context from the user's notes, potentially split into two sections:
@@ -7295,7 +7287,6 @@ General Rules for BOTH Context Sections:
     let finalSystemPrompt = "";
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
       finalSystemPrompt += ragInstructions + "\n\n";
-      this.plugin.logger.debug("[PromptService] RAG instructions added to system prompt.");
     } else {
       this.plugin.logger.debug("[PromptService] RAG instructions NOT added (RAG disabled or semantic search disabled).");
     }
@@ -7303,7 +7294,6 @@ General Rules for BOTH Context Sections:
       finalSystemPrompt += roleSystemPrompt.trim();
       this.plugin.logger.debug(`[PromptService] Role system prompt added (Length: ${roleSystemPrompt.trim().length})`);
     } else {
-      this.plugin.logger.debug("[PromptService] No role system prompt to add.");
     }
     if (isProductivityActive && finalSystemPrompt && settings.enableProductivityFeatures) {
       const now = new Date();
@@ -7311,10 +7301,8 @@ General Rules for BOTH Context Sections:
       const formattedTime = now.toLocaleTimeString(void 0, { hour: "numeric", minute: "2-digit" });
       finalSystemPrompt = finalSystemPrompt.replace(/\[Current Time\]/gi, formattedTime);
       finalSystemPrompt = finalSystemPrompt.replace(/\[Current Date\]/gi, formattedDate);
-      this.plugin.logger.debug("[PromptService] Dynamic date/time injected.");
     }
     const trimmedFinalPrompt = finalSystemPrompt.trim();
-    this.plugin.logger.debug(`[PromptService] Final System Prompt Length: ${trimmedFinalPrompt.length} chars. Has content: ${trimmedFinalPrompt.length > 0}`);
     return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
   }
   /**
@@ -7323,11 +7311,9 @@ General Rules for BOTH Context Sections:
    */
   async preparePromptBody(history, chatMetadata) {
     var _a, _b;
-    this.plugin.logger.debug("[PromptService] Preparing prompt body...");
     const settings = this.plugin.settings;
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
     const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
-    this.plugin.logger.debug(`[PromptService] Productivity features potentially active for body: ${isProductivityActive}`);
     let taskContext = "";
     if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
       await ((_b = (_a = this.plugin).checkAndProcessTaskUpdate) == null ? void 0 : _b.call(_a));
@@ -7341,13 +7327,11 @@ General Rules for BOTH Context Sections:
         taskContext += "--- End Tasks Context ---";
         this.plugin.logger.debug(`[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`);
       } else {
-        this.plugin.logger.debug("[PromptService] No relevant task state found or no tasks to inject.");
       }
     }
     const approxTaskTokens = this._countTokens(taskContext);
     const maxRagTokens = settings.ragEnabled ? settings.ragTopK * settings.ragChunkSize / 4 * 1.8 : 0;
     const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250;
-    this.plugin.logger.debug(`[PromptService] Max tokens available for history processing: ${maxHistoryTokens}`);
     let processedHistoryString = "";
     if (isProductivityActive && settings.useAdvancedContextStrategy) {
       processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
@@ -7359,15 +7343,12 @@ General Rules for BOTH Context Sections:
       const lastUserMessage = history.findLast((m) => m.role === "user");
       if (lastUserMessage == null ? void 0 : lastUserMessage.content) {
         ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
-        if (!ragContext)
-          this.plugin.logger.info("[PromptService] RAG prepareContext returned empty.");
-        else
-          this.plugin.logger.debug(`[PromptService] RAG context length: ${ragContext.length} chars`);
+        if (!ragContext) {
+        } else {
+        }
       } else {
-        this.plugin.logger.warn("[PromptService] RAG enabled, but no last user message found.");
       }
     } else {
-      this.plugin.logger.debug("[PromptService] RAG context NOT prepared.");
     }
     let finalPromptBodyParts = [];
     if (ragContext) {
@@ -7382,7 +7363,6 @@ ${processedHistoryString}`);
     }
     const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
     if (!finalPromptBody) {
-      this.plugin.logger.warn("[PromptService] No RAG, no tasks, and no history processed. Returning null prompt body.");
       return null;
     }
     this.plugin.logger.debug(`[PromptService] Final prompt body length (approx tokens): ${this._countTokens(finalPromptBody)}`);
@@ -7410,7 +7390,6 @@ ${processedHistoryString}`);
     return context.trim();
   }
   async _buildAdvancedContext(history, chatMetadata, maxTokens) {
-    this.plugin.logger.debug("[PromptService] Building advanced context...");
     const settings = this.plugin.settings;
     const processedParts = [];
     let currentTokens = 0;
@@ -7418,23 +7397,19 @@ ${processedHistoryString}`);
     const actualKeepN = Math.min(history.length, keepN);
     const messagesToKeep = history.slice(-actualKeepN);
     const messagesToProcess = history.slice(0, -actualKeepN);
-    this.plugin.logger.debug(`[PromptService] Advanced Context: Keeping last ${messagesToKeep.length}, processing ${messagesToProcess.length} older messages.`);
     if (messagesToProcess.length > 0) {
       let olderContextTokens = 0;
       let olderContextContent = "";
       if (settings.enableSummarization) {
-        this.plugin.logger.info("[PromptService] Summarization enabled, attempting to summarize older messages...");
         const summary = await this._summarizeMessages(messagesToProcess, chatMetadata);
         if (summary) {
           olderContextContent = `[Summary of earlier conversation]:
 ${summary}`;
           olderContextTokens = this._countTokens(olderContextContent) + 10;
         } else {
-          this.plugin.logger.warn("[PromptService] Summarization failed or returned empty. Will try to include older messages directly.");
         }
       }
       if (!olderContextContent) {
-        this.plugin.logger.info("[PromptService] Including older messages directly if space allows.");
         let includedOlderCount = 0;
         for (let i = messagesToProcess.length - 1; i >= 0; i--) {
           const message = messagesToProcess[i];
@@ -7489,25 +7464,20 @@ ${olderContextContent.trim()}
       currentTokens += keptMessagesTokens;
       this.plugin.logger.debug(`[PromptService] Added kept messages part (${keptMessagesTokens} tokens). Final total: ${currentTokens}`);
     } else {
-      this.plugin.logger.debug("[PromptService] No kept messages to add or token limit prevented inclusion.");
     }
-    this.plugin.logger.debug(`[PromptService] Advanced context built. Final approx tokens: ${currentTokens}`);
     return processedParts.join("\n\n").trim();
   }
   async _summarizeMessages(messagesToSummarize, chatMetadata) {
     if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
       return null;
     }
-    this.plugin.logger.info(`[PromptService] Summarizing chunk of ${messagesToSummarize.length} messages...`);
     const textToSummarize = messagesToSummarize.filter((m) => m.role === "user" || m.role === "assistant").map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
     if (!textToSummarize.trim()) {
-      this.plugin.logger.warn("[PromptService] No actual user/assistant text content in messages to summarize.");
       return null;
     }
     const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely:\n\n{text_to_summarize}";
     const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
     const summarizationModelName = this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
-    this.plugin.logger.debug(`[PromptService] Using model for summarization: ${summarizationModelName}`);
     const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
     const requestBody = {
       model: summarizationModelName,
@@ -7528,14 +7498,12 @@ ${olderContextContent.trim()}
         this.plugin.logger.error("[PromptService] OllamaService is not available for summarization.");
         return null;
       }
-      this.plugin.logger.debug(`[PromptService] Sending summarization request. Prompt length: ${summarizationFullPrompt.length}`);
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
         const summary = responseData.response.trim();
         this.plugin.logger.info(`[PromptService] Summarization successful (${this._countTokens(summary)} tokens).`);
         return summary;
       } else {
-        this.plugin.logger.warn("[PromptService] Summarization request returned unexpected structure:", responseData);
         return null;
       }
     } catch (error) {
