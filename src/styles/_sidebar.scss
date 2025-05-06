@@ -2,9 +2,9 @@
 // Головний файл стилів сайдбару
 
 // --- Імпорт ---
-@import 'sidebar-related/section-content'; // Переконайтесь, що шлях правильний
+// Переконайтесь, що шлях правильний відносно цього файлу
+@import 'sidebar-related/section-content';
 // ---
-
 
 // --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
@@ -35,10 +35,7 @@
 .ollama-chat-panel,
 .ollama-role-panel {
     display: flex; flex-direction: column; // Кожна секція - колонка (заголовок+контент)
-    // --- ВИДАЛЕНО: flex-grow та flex-shrink з панелей ---
-    // &.ollama-role-panel { flex-shrink: 0; }
-    // &.ollama-chat-panel { flex-grow: 1; min-height: 0; overflow: hidden; }
-    // Тепер розмір визначається вмістом (заголовком + контентом)
+    // Прибираємо flex-grow/shrink звідси, вони тепер на контенті
 }
 
 .ollama-sidebar-section-header {
@@ -55,6 +52,7 @@
     .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
     .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
 }
+
 // --- Стилі для контенту тепер імпортуються з _section-content.scss ---
 
 // --- Стилізація контекстного меню ---
