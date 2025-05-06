@@ -206,13 +206,13 @@ $folder-icon-extra-indent: 4px;
   .ollama-role-panel-list {
     // flex-grow: 1; // Прибрано в попередньому кроці для акордеону
     // min-height: 0;
+    color: rgb(255, 0, 55) !important; // Для тестування
 
     .ollama-role-panel-item {
         margin: 1px 0; border-radius: var(--radius-s); cursor: pointer; display: flex; align-items: center;
         padding: $item-padding-vertical $item-padding-horizontal; // Симетричний padding
         min-height: calc($icon-size + 2 * $item-padding-vertical);
         gap: $icon-margin; // Використовуємо gap
-        color: aqua !important; // Для тестування
 
         &:hover { background-color: var(--background-modifier-hover); }
 
