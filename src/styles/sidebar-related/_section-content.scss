@@ -250,7 +250,7 @@ $folder-icon-extra-indent: 4px;
       > .ollama-role-panel-item-text {
         @extend .ollama-hierarchy-item-text; // Успадковуємо базові стилі тексту
         // --- ДОДАНО/ЗМІНЕНО: Явно встановлюємо font-size ---
-        // font-size: var(--font-ui-small) !important; // <--- Гарантуємо однаковий розмір
+        font-size: var(--font-ui-small) !important; // <--- Гарантуємо однаковий розмір
         // ---
         // Переконуємося, що інші властивості тексту теж коректні
         line-height: 1.3;
