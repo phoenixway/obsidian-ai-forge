@@ -1,132 +1,64 @@
 // src/styles/_sidebar.scss
+// Головний файл стилів сайдбару
 
-// --- Змінні ---
-$indent-step: 16px;
-$item-padding-vertical: var(--size-4-1);
-$item-padding-horizontal: var(--size-4-2, 8px);
-$icon-size: 16px;
-$icon-margin: var(--size-4-2);
-$folder-icon-extra-indent: 4px;
+// --- ДОДАНО: Імпорт стилів для контенту секцій ---
+@import 'sidebar-related/section-content'; // Переконайтесь, що шлях правильний
+// ---
+
+// --- Змінні (Залиште тут ті, що використовуються ТІЛЬКИ в цьому файлі) ---
+// $item-padding-vertical: var(--size-4-1); // Наприклад, якщо потрібні тут
+// $item-padding-horizontal: var(--size-4-2, 8px);
+// $icon-size: 16px;
+// $icon-margin: var(--size-4-2);
+// Примітка: Краще всі змінні винести в окремий файл _variables.scss та імпортувати його тут і в _section-content.scss
 
 // --- Sidebar Panel (Hosts Accordion) ---
 .ollama-sidebar-container {
-  display: flex;
-  flex-direction: column; // Головний контейнер - колонка
-  width: var(--ai-forge-sidebar-width, 250px);
-  min-width: var(--ai-forge-sidebar-width, 250px);
-  flex-shrink: 0;
-  background-color: var(--background-secondary);
-  border-right: 1px solid var(--divider-color);
-  height: 100%; // Займає всю висоту
-  overflow: hidden; // Важливо, щоб внутрішній скрол працював
-  box-sizing: border-box;
-  padding: var(--size-4-2);
-  margin-right: var(--size-4-2);
-  transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out,
-    margin 0.25s ease-out, border 0.25s ease-out;
+    display: flex;
+    flex-direction: column;
+    width: var(--ai-forge-sidebar-width, 250px);
+    min-width: var(--ai-forge-sidebar-width, 250px);
+    flex-shrink: 0;
+    background-color: var(--background-secondary);
+    border-right: 1px solid var(--divider-color);
+    height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding: var(--size-4-2);
+    margin-right: var(--size-4-2);
+    transition: width 0.25s ease-out, min-width 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin 0.25s ease-out, border 0.25s ease-out;
 
-  &.internal-sidebar-hidden {
-    width: 0 !important;
-    min-width: 0 !important;
-    opacity: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-    overflow: hidden !important;
-    pointer-events: none !important;
-  }
+    &.internal-sidebar-hidden {
+        width: 0 !important; min-width: 0 !important; opacity: 0 !important;
+        padding: 0 !important; margin: 0 !important; border: none !important;
+        overflow: hidden !important; pointer-events: none !important;
+    }
 }
 // --- End Sidebar Panel ---
+
 
 // --- Sidebar Accordion Sections ---
 .ollama-chat-panel,
 .ollama-role-panel {
-  display: flex; // Внутрішні елементи теж flex
-  flex-direction: column; // Колонка: Заголовок + Контент
-  // Панель ролей не має рости, притискається до низу
-  &.ollama-role-panel {
-    flex-shrink: 0;
-  }
-  // Панель чатів має займати доступний простір
-  &.ollama-chat-panel {
-    flex-grow: 1;
-    min-height: 0; // Дозволяє стискатись по висоті
-    overflow: hidden; // Приховує надлишковий контент панелі чатів
-  }
+    display: flex; flex-direction: column;
+    // Акордеонна логіка для панелей
+    &.ollama-role-panel { flex-shrink: 0; }
+    &.ollama-chat-panel { flex-grow: 1; min-height: 0; overflow: hidden; }
 }
 
 .ollama-sidebar-section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
-  user-select: none;
-  cursor: pointer;
-  flex-shrink: 0; // Заголовок не стискається
-  position: relative;
-  border-radius: var(--radius-s);
-  margin: 1px 0;
-  min-height: var(--nav-item-size); // Мінімальна висота заголовка
-  &:hover {
-    background-color: var(--background-modifier-hover);
-  }
-  .ollama-sidebar-header-left {
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    margin-right: var(--size-4-2);
-    gap: var(--size-4-3);
-  }
-  .ollama-sidebar-section-icon {
-    min-width: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    .svg-icon {
-      width: 18px;
-      height: 18px;
-      color: var(--text-faint);
-    }
-  }
-  &:hover .ollama-sidebar-section-icon .svg-icon {
-    color: var(--text-muted);
-  }
-  .menu-option-text {
-    font-weight: var(--nav-item-font-weight);
-    font-size: var(--nav-item-size);
-    color: var(--text-normal);
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .ollama-sidebar-header-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--size-4-1);
-    margin-left: auto;
-    flex-shrink: 0;
-  }
-  .ollama-sidebar-header-button {
-    padding: var(--size-4-1);
-    color: var(--text-muted);
-    border-radius: var(--radius-s);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    &:hover {
-      color: var(--text-normal);
-      background-color: var(--background-modifier-hover);
-    }
-    .svg-icon {
-      width: 18px;
-      height: 18px;
-    }
-  }
+    display: flex; justify-content: space-between; align-items: center;
+    padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
+    user-select: none; cursor: pointer; flex-shrink: 0; position: relative;
+    border-radius: var(--radius-s); margin: 1px 0; min-height: var(--nav-item-size);
+    &:hover { background-color: var(--background-modifier-hover); }
+    .ollama-sidebar-header-left { display: flex; align-items: center; overflow: hidden; margin-right: var(--size-4-2); gap: var(--size-4-3); }
+    .ollama-sidebar-section-icon { min-width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; .svg-icon { width: 18px; height: 18px; color: var(--text-faint); } }
+    &:hover .ollama-sidebar-section-icon .svg-icon { color: var(--text-muted); }
+    .menu-option-text { font-weight: var(--nav-item-font-weight); font-size: var(--nav-item-size); color: var(--text-normal); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ollama-sidebar-header-actions { display: flex; align-items: center; gap: var(--size-4-1); margin-left: auto; flex-shrink: 0; }
+    .ollama-sidebar-header-button { padding: var(--size-4-1); color: var(--text-muted); border-radius: var(--radius-s); display: flex; align-items: center; justify-content: center; &:hover { color: var(--text-normal); background-color: var(--background-modifier-hover); } .svg-icon { width: 18px; height: 18px; } }
 }
-
-// Контейнер вмісту секції (список чатів або ролей)
 .ollama-sidebar-section-content {
   overflow: hidden; // Ховаємо вміст, коли згорнуто
   flex-shrink: 1; // Дозволяємо стискатись, якщо обидві секції відкриті (хоча акордеон не має цього допустити)
@@ -451,91 +383,45 @@ $folder-icon-extra-indent: 4px;
     }
   }
 }
-// --- End Sidebar Accordion Sections Content ---
+// --- ВИДАЛЕНО ВЕЛИКИЙ БЛОК СТИЛІВ ДЛЯ .ollama-sidebar-section-content ---
+// Він тепер знаходиться в _section-content.scss і імпортується вище
 
-// --- Стилізація контекстного меню ---
+// --- Стилізація контекстного меню (залишається тут або виноситься в _menu.scss) ---
 .menu {
-  .menu-item {
-    &[aria-label*="Delete Folder" i],
-    &[aria-label*="Delete Chat" i],
-    &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]) {
-      .menu-item-title {
-        color: var(--text-error) !important;
-      }
-      .menu-item-icon {
-        color: var(--text-error) !important;
-      }
-      &:hover {
-        background-color: var(--background-modifier-error-hover) !important;
-        .menu-item-title,
-        .menu-item-icon {
-          color: var(--text-on-error) !important;
-        }
-      }
-    }
-    &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]),
-    &:has(> .menu-item-title:contains("Clear Messages")) {
-      .menu-item-title {
-        color: var(--text-warning) !important;
-      }
-      .menu-item-icon {
-        color: var(--text-warning) !important;
-      }
-      &:hover {
-        background-color: var(--background-modifier-warning-hover) !important;
-        .menu-item-title,
-        .menu-item-icon {
-          color: var(--text-on-warning) !important;
-        }
-      }
-    }
-  }
-}
-// --- Стилі для контейнера списку чатів/папок ---
-.ollama-chat-list-container {
-  position: relative; // Потрібно для абсолютного позиціонування ::before
-
-  // Стиль під час завантаження/оновлення списку
-  &.is-loading {
-    // Можна додати легке затемнення або зменшення прозорості основного контенту
-    // > *:not(.loading-indicator-element) { // Якщо використовуєте окремий елемент індикатора
-    //    opacity: 0.5;
-    //    pointer-events: none;
-    // }
-
-    // Додаємо оверлей зі спіннером через псевдоелемент
-    &::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(var(--background-secondary-rgb), 0.6); // Напівпрозорий фон
-      z-index: 10; // Має бути над списком
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: var(--radius-m); // Опціонально
-
-      // Створюємо спіннер
-      width: 24px; // Розмір спіннера
-      height: 24px;
-      margin: auto; // Центруємо спіннер
-      border: 3px solid rgba(var(--text-muted-rgb), 0.3); // Колір кільця
-      border-top-color: var(--text-accent); // Колір активної частини
-      border-radius: 50%;
-      animation: ollama-spin 0.8s linear infinite; // Анімація обертання
-    }
-  }
+     .menu-item {
+         &[aria-label*="Delete Folder" i],
+         &[aria-label*="Delete Chat" i],
+         &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash-2"]) {
+             .menu-item-title { color: var(--text-error) !important; }
+             .menu-item-icon { color: var(--text-error) !important; }
+              &:hover { background-color: var(--background-modifier-error-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-error) !important; } }
+         }
+          &:has(> .menu-item-icon > .svg-icon[icon-name="lucide-trash"]),
+          &:has(> .menu-item-title:contains("Clear Messages")) {
+              .menu-item-title { color: var(--text-warning) !important; }
+              .menu-item-icon { color: var(--text-warning) !important; }
+               &:hover { background-color: var(--background-modifier-warning-hover) !important; .menu-item-title, .menu-item-icon { color: var(--text-on-warning) !important; } }
+          }
+     }
 }
 
-// Анімація обертання (якщо ще не визначена)
-@keyframes ollama-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+// Стилі для body під час перетягування (залишається тут або виноситься в _resizer.scss)
+body.is-resizing { cursor: ew-resize !important; user-select: none !important; }
+
+// Стилі для роздільника (залишається тут або виноситься в _resizer.scss)
+.ollama-resizer-handle {
+     width: 4px;
+     background-color: var(--divider-color);
+     cursor: ew-resize;
+     flex-shrink: 0;
+     transition: background-color 0.2s ease-out;
+     position: relative;
+
+     &:hover {
+         background-color: var(--interactive-accent);
+     }
+
+     &.internal-sidebar-hidden {
+         width: 0 !important; min-width: 0 !important; border: none !important; margin: 0 !important; padding: 0 !important; overflow: hidden !important; pointer-events: none !important;
+     }
+ }
