@@ -32,7 +32,12 @@
 
 
 // --- Sidebar Accordion Sections ---
-&.ollama-chat-panel,
+&.ollama-chat-panel {
+    overflow-y: auto;
+    min-height: 0; // Критично для flex-контейнерів
+  }
+
+
 &.ollama-role-panel {
     overflow-y: auto;
     min-height: 0; // Критично для flex-контейнерів
