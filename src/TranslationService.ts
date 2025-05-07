@@ -74,6 +74,9 @@ export class TranslationService {
      * Переклад за допомогою Google Translate API.
      */
     private async _translateWithGoogle(text: string, targetLang: string, apiKey: string): Promise<string | null> {
+        if (targetLang === 'English') {
+            targetLang = 'en'; // Google API вимагає код мови, а не назву
+        }
         this.plugin.logger.debug(`[_translateWithGoogle] Translating to ${targetLang}...`);
         try {
             const response = await fetch(`${GOOGLE_TRANSLATE_API_URL}?key=${apiKey}`, {

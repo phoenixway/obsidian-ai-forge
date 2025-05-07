@@ -8994,6 +8994,9 @@ var TranslationService = class {
    */
   async _translateWithGoogle(text, targetLang, apiKey) {
     var _a, _b, _c, _d;
+    if (targetLang === "English") {
+      targetLang = "en";
+    }
     this.plugin.logger.debug(`[_translateWithGoogle] Translating to ${targetLang}...`);
     try {
       const response = await fetch(`${GOOGLE_TRANSLATE_API_URL}?key=${apiKey}`, {
