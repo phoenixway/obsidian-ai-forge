@@ -8567,7 +8567,6 @@ var ChatManager = class {
       };
       this.chatIndex[newId] = storedMeta;
       await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
       const savedImmediately = await clonedChat.saveImmediately();
       if (!savedImmediately) {
         delete this.chatIndex[newId];

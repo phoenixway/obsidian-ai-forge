@@ -1025,7 +1025,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
       };
       this.chatIndex[newId] = storedMeta;
       await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
+      // this.plugin.emit("chat-list-updated");
 
       const savedImmediately = await clonedChat.saveImmediately();
       if (!savedImmediately) {
