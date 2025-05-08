@@ -3105,6 +3105,8 @@ var OllamaView = class extends import_obsidian14.ItemView {
     this.isRegenerating = false;
     // Новий прапорець
     this.messageAddedResolvers = /* @__PURE__ */ new Map();
+    this.isChatListUpdateScheduled = false;
+    this.chatListUpdateTimeoutId = null;
     this.activePlaceholder = null;
     this.currentMessageAddedResolver = null;
     // Посилання на div роздільника
@@ -3694,47 +3696,12 @@ This action cannot be undone.`,
         textarea.scrollTop = currentScrollTop;
       });
     };
-    // Модифікуємо handleActiveChatChanged
-    this.handleActiveChatChanged = async (data) => {
-      var _a, _b, _c, _d, _e;
-      if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
-        this.lastProcessedChatId = data.chatId;
-        return;
-      }
-      const chatSwitched = data.chatId !== this.lastProcessedChatId;
-      if (chatSwitched || data.chatId !== null && data.chat === null) {
-        const currentStack = new Error().stack;
-        this.plugin.logger.error(`[handleActiveChatChanged] Stack trace for reload condition: ${currentStack}`);
-        this.lastProcessedChatId = data.chatId;
-        await this.loadAndDisplayActiveChat();
-      } else if (data.chatId !== null && data.chat !== null) {
-        this.lastProcessedChatId = data.chatId;
-        const chat = data.chat;
-        const currentRolePath = (_b = (_a = chat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
-        const currentRoleName = await this.findRoleNameByPath(currentRolePath);
-        const currentModelName = ((_c = chat.metadata) == null ? void 0 : _c.modelName) || this.plugin.settings.modelName;
-        const currentTemperature = (_e = (_d = chat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
-        this.updateModelDisplay(currentModelName);
-        this.updateRoleDisplay(currentRoleName);
-        this.updateInputPlaceholder(currentRoleName);
-        this.updateTemperatureIndicator(currentTemperature);
-      } else {
-        this.lastProcessedChatId = data.chatId;
-      }
-      if (this.dropdownMenuManager) {
-        this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
-      }
-    };
+    // src/OllamaView.ts
     this.handleChatListUpdated = () => {
-      var _a;
+      this.plugin.logger.debug(`[OllamaView] handleChatListUpdated: Event received. Scheduling sidebar list update.`);
+      this.scheduleSidebarChatListUpdate();
       if (this.dropdownMenuManager) {
         this.dropdownMenuManager.updateChatListIfVisible().catch((e) => this.plugin.logger.error("Error updating chat dropdown list:", e));
-      }
-      if ((_a = this.sidebarManager) == null ? void 0 : _a.isSectionVisible("chats")) {
-        this.sidebarManager.updateChatList().catch((error) => {
-          this.plugin.logger.error("[OllamaView -> Sidebar] Error updating chat panel list:", error);
-        });
-      } else {
       }
     };
     this.handleSettingsUpdated = async () => {
@@ -3999,6 +3966,77 @@ This action cannot be undone.`,
       document.body.style.cursor = "";
       document.body.classList.remove(CSS_CLASS_RESIZING);
       this.saveWidthDebounced();
+    };
+    this.scheduleSidebarChatListUpdate = (delay = 50) => {
+      if (this.chatListUpdateTimeoutId) {
+        clearTimeout(this.chatListUpdateTimeoutId);
+      } else {
+        if (this.isChatListUpdateScheduled) {
+          this.plugin.logger.debug("[OllamaView.scheduleSidebarChatListUpdate] Update already scheduled and pending, deferring new direct call.");
+          return;
+        }
+        this.isChatListUpdateScheduled = true;
+      }
+      this.plugin.logger.debug(`[OllamaView.scheduleSidebarChatListUpdate] Scheduling updateChatList with delay: ${delay}ms. Was pending: ${!!this.chatListUpdateTimeoutId}`);
+      this.chatListUpdateTimeoutId = setTimeout(() => {
+        var _a;
+        this.plugin.logger.debug("[OllamaView.scheduleSidebarChatListUpdate] Timeout fired. Executing updateChatList.");
+        if ((_a = this.sidebarManager) == null ? void 0 : _a.isSectionVisible("chats")) {
+          this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list via scheduleSidebarChatListUpdate:", e));
+        }
+        this.chatListUpdateTimeoutId = null;
+        this.isChatListUpdateScheduled = false;
+        this.plugin.logger.debug("[OllamaView.scheduleSidebarChatListUpdate] Executed and flags reset.");
+      }, delay);
+    };
+    // src/OllamaView.ts
+    // Переконайтесь, що властивості isChatListUpdateScheduled та chatListUpdateTimeoutId
+    // та метод scheduleSidebarChatListUpdate визначені у класі OllamaView, як було показано раніше.
+    this.handleActiveChatChanged = async (data) => {
+      var _a, _b, _c, _d, _e, _f;
+      this.plugin.logger.error(`[OllamaView] handleActiveChatChanged: Received event. New activeId: ${data.chatId}, Prev activeId: ${this.lastProcessedChatId}. Chat object in event is ${data.chat ? "present" : "null"}.`);
+      if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
+        this.plugin.logger.warn(`[OllamaView] handleActiveChatChanged: Ignoring event for chat ${data.chatId} because regeneration is in progress.`);
+        this.lastProcessedChatId = data.chatId;
+        return;
+      }
+      const chatSwitched = data.chatId !== this.lastProcessedChatId;
+      this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Chat switched: ${chatSwitched}.`);
+      if (chatSwitched || data.chatId !== null && data.chat === null) {
+        this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: FULL CHAT RELOAD condition met (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}).`);
+        this.lastProcessedChatId = data.chatId;
+        await this.loadAndDisplayActiveChat();
+      } else if (data.chatId !== null && data.chat !== null) {
+        this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Lighter update path (chat ID same, chat data provided).`);
+        this.lastProcessedChatId = data.chatId;
+        const chat = data.chat;
+        const currentRolePath = (_b = (_a = chat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
+        const currentRoleName = await this.findRoleNameByPath(currentRolePath);
+        const currentModelName = ((_c = chat.metadata) == null ? void 0 : _c.modelName) || this.plugin.settings.modelName;
+        const currentTemperature = (_e = (_d = chat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
+        this.updateModelDisplay(currentModelName);
+        this.updateRoleDisplay(currentRoleName);
+        this.updateInputPlaceholder(currentRoleName);
+        this.updateTemperatureIndicator(currentTemperature);
+      } else if (data.chatId === null) {
+        this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Active chat is now null.`);
+        this.lastProcessedChatId = null;
+        this.clearDisplayAndState();
+      } else {
+        this.plugin.logger.warn(`[OllamaView] handleActiveChatChanged: Unhandled case? chatId=${data.chatId}, chat=${data.chat}, chatSwitched=${chatSwitched}`);
+        this.lastProcessedChatId = data.chatId;
+      }
+      this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Scheduling sidebar chat list update.`);
+      this.scheduleSidebarChatListUpdate();
+      if ((_f = this.sidebarManager) == null ? void 0 : _f.isSectionVisible("roles")) {
+        this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Triggering sidebar role list update.`);
+        this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list in handleActiveChatChanged:", e));
+      }
+      if (this.dropdownMenuManager) {
+        this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Triggering dropdown role list update check.`);
+        this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
+      }
+      this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Finished processing event for chatId: ${data.chatId}.`);
     };
     this.plugin = plugin;
     this.app = plugin.app;
@@ -4439,7 +4477,7 @@ This action cannot be undone.`,
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     try {
       this.clearChatContainerInternal();
       this.currentMessages = [];
@@ -4560,22 +4598,6 @@ This action cannot be undone.`,
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
       this.updateTemperatureIndicator(finalTemperature);
-      const panelUpdatePromises = [];
-      if ((_k = this.sidebarManager) == null ? void 0 : _k.isSectionVisible("chats")) {
-        panelUpdatePromises.push(
-          this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list:", e))
-        );
-      } else {
-      }
-      if ((_l = this.sidebarManager) == null ? void 0 : _l.isSectionVisible("roles")) {
-        panelUpdatePromises.push(
-          this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e))
-        );
-      } else {
-      }
-      if (panelUpdatePromises.length > 0) {
-        await Promise.all(panelUpdatePromises);
-      }
       if (finalModelName === null) {
         if (this.inputEl) {
           this.inputEl.disabled = true;
