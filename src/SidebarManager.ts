@@ -560,24 +560,36 @@ export class SidebarManager {
     } else {
     }
   };
-  private handleNewChatClick = async (targetFolderPath?: string): Promise<void> => {
-    const folderPath: string = targetFolderPath ?? this.plugin.chatManager.chatsFolderPath ?? "/";
-    try {
-      const newChat = await this.plugin.chatManager.createNewChat(undefined, folderPath);
-      if (newChat) {
-        new Notice(`Created new chat: ${newChat.metadata.name}`);
-        this.plugin.emit("focus-input-request");
-        const parentPath = folderPath.substring(0, folderPath.lastIndexOf("/"));
-        if (parentPath && parentPath !== "/") {
-          this.folderExpansionState.set(parentPath, true);
-        }
-        this.updateChatList();
+  
+  // src/SidebarManager.ts
+private handleNewChatClick = async (targetFolderPath?: string): Promise<void> => {
+  const folderPath: string = targetFolderPath ?? this.plugin.chatManager.chatsFolderPath ?? "/";
+  try {
+    const newChat = await this.plugin.chatManager.createNewChat(undefined, folderPath);
+    if (newChat) {
+      new Notice(`Created new chat: ${newChat.metadata.name}`);
+      this.plugin.emit("focus-input-request");
+      const parentPath = folderPath.substring(0, folderPath.lastIndexOf("/"));
+
+      // Розгортаємо батьківську папку, якщо чат створено всередині неї
+      // і це не коренева папка чатів.
+      const normalizedParentPath = normalizePath(parentPath);
+      const normalizedChatsFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath ?? "/");
+
+      if (parentPath && normalizedParentPath !== "/" && normalizedParentPath !== normalizedChatsFolderPath) {
+         this.folderExpansionState.set(normalizedParentPath, true);
       }
-    } catch (error) {
-      this.plugin.logger.error("[SidebarManager] Error creating new chat:", error);
-      new Notice(`Error creating new chat: ${error instanceof Error ? error.message : "Unknown error"}`);
+
+      // РЕЛІЗ: Видалено прямий виклик this.updateChatList();
+      // Тепер оновлення списку має відбуватися через подію (наприклад, 'active-chat-changed' або 'chat-list-updated'),
+      // яку ChatManager.createNewChat() має згенерувати, а OllamaView обробити.
     }
-  };
+  } catch (error) {
+    this.plugin.logger.error("[SidebarManager] Error creating new chat:", error);
+    new Notice(`Error creating new chat: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
+};
+  
   private handleNewFolderClick = async (parentFolderPath?: string): Promise<void> => {
     const targetParentPath: string = parentFolderPath ?? this.plugin.chatManager.chatsFolderPath ?? "/";
     new PromptModal(this.app, "Create New Folder", "Enter folder name:", "", async newName => {

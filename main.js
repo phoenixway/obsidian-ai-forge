@@ -1833,8 +1833,9 @@ var SidebarManager = class {
       } else {
       }
     };
+    // src/SidebarManager.ts
     this.handleNewChatClick = async (targetFolderPath) => {
-      var _a;
+      var _a, _b;
       const folderPath = (_a = targetFolderPath != null ? targetFolderPath : this.plugin.chatManager.chatsFolderPath) != null ? _a : "/";
       try {
         const newChat = await this.plugin.chatManager.createNewChat(void 0, folderPath);
@@ -1842,10 +1843,11 @@ var SidebarManager = class {
           new import_obsidian12.Notice(`Created new chat: ${newChat.metadata.name}`);
           this.plugin.emit("focus-input-request");
           const parentPath = folderPath.substring(0, folderPath.lastIndexOf("/"));
-          if (parentPath && parentPath !== "/") {
-            this.folderExpansionState.set(parentPath, true);
+          const normalizedParentPath = (0, import_obsidian12.normalizePath)(parentPath);
+          const normalizedChatsFolderPath = (0, import_obsidian12.normalizePath)((_b = this.plugin.chatManager.chatsFolderPath) != null ? _b : "/");
+          if (parentPath && normalizedParentPath !== "/" && normalizedParentPath !== normalizedChatsFolderPath) {
+            this.folderExpansionState.set(normalizedParentPath, true);
           }
-          this.updateChatList();
         }
       } catch (error) {
         this.plugin.logger.error("[SidebarManager] Error creating new chat:", error);
