@@ -4074,13 +4074,15 @@ This action cannot be undone.`,
   getIcon() {
     return "brain-circuit";
   }
+  // src/OllamaView.ts
   async onOpen() {
-    var _a, _b, _c, _d;
+    this.plugin.logger.info("[OllamaView] onOpen START");
     this.createUIElements();
     const savedWidth = this.plugin.settings.sidebarWidth;
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === "number" && savedWidth > 50) {
       this.sidebarRootEl.style.width = `${savedWidth}px`;
       this.sidebarRootEl.style.minWidth = `${savedWidth}px`;
+      this.plugin.logger.debug(`[OllamaView] Applied saved sidebar width: ${savedWidth}px`);
     } else if (this.sidebarRootEl) {
       let defaultWidth = 250;
       try {
@@ -4089,52 +4091,57 @@ This action cannot be undone.`,
           const parsedWidth = parseInt(cssVarWidth, 10);
           if (!isNaN(parsedWidth) && parsedWidth > 50) {
             defaultWidth = parsedWidth;
+            this.plugin.logger.debug(`[OllamaView] Used sidebar width from CSS variable: ${defaultWidth}px`);
           }
         }
       } catch (e) {
+        this.plugin.logger.warn("[OllamaView] Could not read default sidebar width from CSS variable.", e);
       }
       this.sidebarRootEl.style.width = `${defaultWidth}px`;
       this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
+      if (!savedWidth) {
+        this.plugin.logger.debug(`[OllamaView] Applied default sidebar width: ${defaultWidth}px`);
+      }
     }
     try {
       const initialRolePath = this.plugin.settings.selectedRolePath;
       const initialRoleName = await this.findRoleNameByPath(initialRolePath);
+      const initialModelName = this.plugin.settings.modelName;
+      const initialTemperature = this.plugin.settings.temperature;
       this.updateInputPlaceholder(initialRoleName);
       this.updateRoleDisplay(initialRoleName);
-      this.updateModelDisplay(this.plugin.settings.modelName);
-      this.updateTemperatureIndicator(this.plugin.settings.temperature);
+      this.updateModelDisplay(initialModelName);
+      this.updateTemperatureIndicator(initialTemperature);
+      this.plugin.logger.debug("[OllamaView] Initial UI elements updated in onOpen (using defaults/settings).");
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
+      this.plugin.logger.error("[OllamaView] Error during initial UI element update in onOpen:", error);
     }
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
+      this.plugin.logger.debug("[OllamaView] onOpen: Calling loadAndDisplayActiveChat...");
       await this.loadAndDisplayActiveChat();
-      (_a = this.sidebarManager) == null ? void 0 : _a.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat list after initial load:", e));
-      (_b = this.sidebarManager) == null ? void 0 : _b.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role list after initial load:", e));
+      this.plugin.logger.debug("[OllamaView] onOpen: loadAndDisplayActiveChat finished.");
+      this.plugin.logger.debug("[OllamaView] onOpen: Skipping explicit sidebar panel update. Relying on event handlers and scheduler.");
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
+      this.plugin.logger.error("[OllamaView] Error during initial chat load or processing in onOpen:", error);
       this.showEmptyState();
-      const updatePromises = [];
-      if ((_c = this.sidebarManager) == null ? void 0 : _c.isSectionVisible("chats")) {
-        updatePromises.push(this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list in catch:", e)));
-      }
-      if ((_d = this.sidebarManager) == null ? void 0 : _d.isSectionVisible("roles")) {
-        updatePromises.push(this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list in catch:", e)));
-      }
-      if (updatePromises.length > 0) {
-        await Promise.all(updatePromises);
-      }
     }
     setTimeout(() => {
-      var _a2;
-      (_a2 = this.inputEl) == null ? void 0 : _a2.focus();
+      if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
+        this.inputEl.focus();
+        this.plugin.logger.debug("[OllamaView] Input focused via onOpen timeout.");
+      } else {
+        this.plugin.logger.debug("[OllamaView] Input focus skipped in onOpen timeout (view not active/visible or input missing).");
+      }
     }, 150);
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
     }
+    this.plugin.logger.info("[OllamaView] onOpen END");
   }
+  // --- Кінець методу onOpen ---
   async onClose() {
     var _a, _b;
     document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });

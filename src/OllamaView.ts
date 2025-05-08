@@ -207,79 +207,114 @@ export class OllamaView extends ItemView {
     return "brain-circuit";
   }
 
+  // src/OllamaView.ts
+
   async onOpen(): Promise<void> {
-    
+    this.plugin.logger.info("[OllamaView] onOpen START");
+
     // Спочатку створюємо UI, включаючи роздільник
     this.createUIElements();
 
     // --- Застосовуємо збережену/дефолтну ширину сайдбару ---
     const savedWidth = this.plugin.settings.sidebarWidth;
-    // Перевіряємо наявність sidebarRootEl та валідність збереженої ширини
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === 'number' && savedWidth > 50) {
-         
-         this.sidebarRootEl.style.width = `${savedWidth}px`;
-         this.sidebarRootEl.style.minWidth = `${savedWidth}px`; // Важливо для flex-shrink
+        this.sidebarRootEl.style.width = `${savedWidth}px`;
+        this.sidebarRootEl.style.minWidth = `${savedWidth}px`;
+        this.plugin.logger.debug(`[OllamaView] Applied saved sidebar width: ${savedWidth}px`);
     } else if (this.sidebarRootEl) {
-         // Встановлюємо дефолтну ширину, якщо збереженої немає або вона невалідна
-         // Спробуємо прочитати з CSS змінної або встановити фіксоване значення
-         let defaultWidth = 250; // Значення за замовчуванням
-         try {
-             const cssVarWidth = getComputedStyle(this.sidebarRootEl).getPropertyValue('--ai-forge-sidebar-width').trim();
-             if (cssVarWidth && cssVarWidth.endsWith('px')) {
-                 const parsedWidth = parseInt(cssVarWidth, 10);
-                 if (!isNaN(parsedWidth) && parsedWidth > 50) {
-                     defaultWidth = parsedWidth;
-                 }
-             }
-         } catch (e) {
-             
-         }
-         
-         this.sidebarRootEl.style.width = `${defaultWidth}px`;
-         this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
+        // Встановлюємо дефолтну ширину, якщо збереженої немає або вона невалідна
+        let defaultWidth = 250; // Значення за замовчуванням
+        try {
+            // Спробуємо прочитати з CSS змінної
+            const cssVarWidth = getComputedStyle(this.sidebarRootEl).getPropertyValue('--ai-forge-sidebar-width').trim();
+            if (cssVarWidth && cssVarWidth.endsWith('px')) {
+                const parsedWidth = parseInt(cssVarWidth, 10);
+                if (!isNaN(parsedWidth) && parsedWidth > 50) {
+                    defaultWidth = parsedWidth;
+                     this.plugin.logger.debug(`[OllamaView] Used sidebar width from CSS variable: ${defaultWidth}px`);
+                }
+            }
+        } catch (e) {
+             this.plugin.logger.warn("[OllamaView] Could not read default sidebar width from CSS variable.", e);
+        }
+        this.sidebarRootEl.style.width = `${defaultWidth}px`;
+        this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
+        if (!savedWidth) {
+           this.plugin.logger.debug(`[OllamaView] Applied default sidebar width: ${defaultWidth}px`);
+        }
     }
     // --- Кінець застосування ширини ---
 
     // Оновлюємо початкові елементи UI (плейсхолдер, роль, модель...)
+    // Краще робити це ПІСЛЯ loadAndDisplayActiveChat, щоб мати актуальні дані
+    // Однак, щоб уникнути "миготіння" можна встановити початкові значення з налаштувань
     try {
+        // Беремо значення з глобальних налаштувань як початкові
         const initialRolePath = this.plugin.settings.selectedRolePath;
-        const initialRoleName = await this.findRoleNameByPath(initialRolePath);
+        const initialRoleName = await this.findRoleNameByPath(initialRolePath); // Спробуємо знайти ім'я
+        const initialModelName = this.plugin.settings.modelName;
+        const initialTemperature = this.plugin.settings.temperature;
+
+        // Оновлюємо відповідні елементи UI цими початковими значеннями
         this.updateInputPlaceholder(initialRoleName);
         this.updateRoleDisplay(initialRoleName);
-        this.updateModelDisplay(this.plugin.settings.modelName);
-        this.updateTemperatureIndicator(this.plugin.settings.temperature);
-        
+        this.updateModelDisplay(initialModelName);
+        this.updateTemperatureIndicator(initialTemperature);
+        this.plugin.logger.debug("[OllamaView] Initial UI elements updated in onOpen (using defaults/settings).");
     } catch (error) {
-         this.plugin.logger.error("[OllamaView] Error during initial UI update in onOpen:", error);
+        this.plugin.logger.error("[OllamaView] Error during initial UI element update in onOpen:", error);
     }
 
-    this.attachEventListeners(); // Тепер включає слухач для роздільника
-    this.autoResizeTextarea();
-    this.updateSendButtonState();
+    // Прив'язуємо всі необхідні обробники подій DOM та плагіна
+    this.attachEventListeners(); // Включає слухач для роздільника сайдбару
 
-    // Завантажуємо чат
+    // Налаштовуємо поле вводу
+    this.autoResizeTextarea(); // Встановлюємо початкову висоту
+    this.updateSendButtonState(); // Встановлюємо початковий стан кнопки Send
+
+    // Завантажуємо активний чат та обробляємо потенційне оновлення метаданих
     try {
-        
-        await this.loadAndDisplayActiveChat(); // Цей метод вже НЕ викликає update*List сам
-        
-        // ЯВНО оновлюємо списки ПІСЛЯ завантаження чату
-        this.sidebarManager?.updateChatList().catch(e => this.plugin.logger.error("Error updating chat list after initial load:", e));
-        this.sidebarManager?.updateRoleList().catch(e => this.plugin.logger.error("Error updating role list after initial load:", e));
+        this.plugin.logger.debug("[OllamaView] onOpen: Calling loadAndDisplayActiveChat...");
+        // loadAndDisplayActiveChat завантажить контент, оновить елементи типу model/role display в цій View,
+        // може виправити метадані (що викличе події 'chat-list-updated' -> scheduleSidebarChatListUpdate),
+        // але БІЛЬШЕ НЕ ОНОВЛЮЄ САЙДБАР НАПРЯМУ.
+        await this.loadAndDisplayActiveChat();
+        this.plugin.logger.debug("[OllamaView] onOpen: loadAndDisplayActiveChat finished.");
+
+        // --- ВИДАЛЕНО ЯВНЕ ОНОВЛЕННЯ СПИСКІВ САЙДБАРУ ---
+        // Тепер покладаємося на події:
+        // 1. 'active-chat-changed', згенерована під час ChatManager.initialize(), буде оброблена handleActiveChatChanged,
+        //    який викличе scheduleSidebarChatListUpdate.
+        // 2. 'chat-list-updated', якщо loadAndDisplayActiveChat виправив метадані, буде оброблена handleChatListUpdated,
+        //    який також викличе scheduleSidebarChatListUpdate.
+        // Механізм scheduleSidebarChatListUpdate об'єднає ці виклики.
+        this.plugin.logger.debug("[OllamaView] onOpen: Skipping explicit sidebar panel update. Relying on event handlers and scheduler.");
 
     } catch (error) {
-         this.plugin.logger.error("[OllamaView] Error during initial chat load in onOpen:", error);
-         this.showEmptyState(); // Показуємо порожній стан при помилці
-          // Оновлюємо видимі панелі навіть при помилці
-         const updatePromises = [];
-         if (this.sidebarManager?.isSectionVisible("chats")) { updatePromises.push( this.sidebarManager.updateChatList().catch(e => this.plugin.logger.error("Error updating chat panel list in catch:", e)) ); }
-         if (this.sidebarManager?.isSectionVisible("roles")) { updatePromises.push( this.sidebarManager.updateRoleList().catch(e => this.plugin.logger.error("Error updating role panel list in catch:", e)) ); }
-         if (updatePromises.length > 0) { await Promise.all(updatePromises); }
+        // Обробка помилок, що могли виникнути під час loadAndDisplayActiveChat
+        this.plugin.logger.error("[OllamaView] Error during initial chat load or processing in onOpen:", error);
+        this.showEmptyState(); // Показуємо порожній стан чату при помилці
+        // Навіть при помилці тут, подія 'active-chat-changed' з ChatManager.initialize (якщо вона була)
+        // вже мала викликати оновлення сайдбару через handleActiveChatChanged -> scheduleSidebarChatListUpdate.
     }
 
-    // Фокус
-    setTimeout(() => { this.inputEl?.focus();  }, 150);
-    if (this.inputEl) { this.inputEl.dispatchEvent(new Event("input")); }
- }
+    // Встановлюємо фокус на поле вводу з невеликою затримкою
+    setTimeout(() => {
+        // Додаткова перевірка, чи view все ще активне/існує і видиме користувачу
+        if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
+             this.inputEl.focus();
+             this.plugin.logger.debug("[OllamaView] Input focused via onOpen timeout.");
+        } else {
+            this.plugin.logger.debug("[OllamaView] Input focus skipped in onOpen timeout (view not active/visible or input missing).");
+        }
+     }, 150); // Затримка може бути потрібна, щоб елементи встигли відрендеритися
+
+     // Оновлюємо висоту textarea про всяк випадок (наприклад, якщо початкове значення було довгим)
+     if (this.inputEl) {
+         this.inputEl.dispatchEvent(new Event("input"));
+     }
+     this.plugin.logger.info("[OllamaView] onOpen END");
+  } // --- Кінець методу onOpen ---
 
  async onClose(): Promise<void> {
   // --- Додано очищення слухачів перетягування ---
