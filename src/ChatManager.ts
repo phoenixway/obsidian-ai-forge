@@ -459,35 +459,33 @@ export class ChatManager {
     }
   }
 
-  async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
-    const targetFolder = folderPath ? normalizePath(folderPath) : this.chatsFolderPath;
-    const finalFolderPath = targetFolder === "" || targetFolder === "." ? "/" : targetFolder;
+  // src/ChatManager.ts
+async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
+  const targetFolder = folderPath ? normalizePath(folderPath) : this.chatsFolderPath;
+  const finalFolderPath = targetFolder === "" || targetFolder === "." ? "/" : targetFolder;
 
-    try {
-      // Перевіряємо/створюємо цільову папку перед створенням чату
+  try {
       await this.ensureSpecificFolderExists(finalFolderPath);
-    } catch (folderError) {
-      // Помилка вже залогована в ensureSpecificFolderExists
+  } catch (folderError) {
+      // Повідомлення про помилку вже є в ensureSpecificFolderExists або вище
       new Notice(`Failed to ensure target folder exists: ${finalFolderPath}`);
       return null;
-    }
+  }
 
-    try {
+  try {
       const now = new Date();
       const newId = uuidv4();
       const filePath = this.getChatFilePath(newId, finalFolderPath);
 
       const initialMetadata: ChatMetadata = {
-        id: newId,
-        name:
-          name ||
-          `Chat ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-        modelName: this.plugin.settings.modelName,
-        selectedRolePath: this.plugin.settings.selectedRolePath,
-        temperature: this.plugin.settings.temperature,
-        contextWindow: this.plugin.settings.contextWindow,
-        createdAt: now.toISOString(),
-        lastModified: now.toISOString(),
+          id: newId,
+          name: name || `Chat ${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+          modelName: this.plugin.settings.modelName,
+          selectedRolePath: this.plugin.settings.selectedRolePath,
+          temperature: this.plugin.settings.temperature,
+          contextWindow: this.plugin.settings.contextWindow,
+          createdAt: now.toISOString(),
+          lastModified: now.toISOString(),
       };
 
       const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
@@ -496,38 +494,43 @@ export class ChatManager {
       const newChat = new Chat(this.adapter, constructorSettings, chatData, filePath, this.logger);
 
       const storedMeta: ChatSessionStored = {
-        name: initialMetadata.name,
-        lastModified: initialMetadata.lastModified,
-        createdAt: initialMetadata.createdAt,
-        modelName: initialMetadata.modelName,
-        selectedRolePath: initialMetadata.selectedRolePath,
-        temperature: initialMetadata.temperature,
-        contextWindow: initialMetadata.contextWindow,
+          name: initialMetadata.name,
+          lastModified: initialMetadata.lastModified,
+          createdAt: initialMetadata.createdAt,
+          modelName: initialMetadata.modelName,
+          selectedRolePath: initialMetadata.selectedRolePath,
+          temperature: initialMetadata.temperature,
+          contextWindow: initialMetadata.contextWindow,
       };
       this.chatIndex[newId] = storedMeta;
       await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
+      // ВИДАЛЕНО: this.plugin.emit("chat-list-updated");
+      // Покладаємося на 'active-chat-changed' з setActiveChat для оновлення UI.
 
       const savedImmediately = await newChat.saveImmediately();
       if (!savedImmediately) {
-        delete this.chatIndex[newId];
-        await this.saveChatIndex();
-        this.plugin.emit("chat-list-updated");
+          delete this.chatIndex[newId];
+          await this.saveChatIndex();
+          // Ця емісія може залишитися, оскільки це шлях обробки помилки/очищення
+          this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from createNewChat (saveImmediately FAILED) for ID: ${newId}`);
+          this.plugin.emit("chat-list-updated");
 
-        new Notice("Error: Failed to save new chat file.");
-        return null;
+          new Notice("Error: Failed to save new chat file.");
+          return null;
       }
 
       this.loadedChats[newId] = newChat;
+      // setActiveChat згенерує 'active-chat-changed', що має оновити OllamaView,
+      // включаючи виклик sidebarManager.updateChatList() через loadAndDisplayActiveChat.
       await this.setActiveChat(newId);
 
       return newChat;
-    } catch (error) {
+  } catch (error) {
       this.logger.error("Error creating new chat:", error);
       new Notice("Error creating new chat session.");
       return null;
-    }
   }
+}
 
   private async ensureSpecificFolderExists(folderPath: string): Promise<void> {
     if (!folderPath || folderPath === "/" || folderPath === ".") return;

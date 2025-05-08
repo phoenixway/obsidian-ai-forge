@@ -8039,6 +8039,7 @@ var ChatManager = class {
       return false;
     }
   }
+  // src/ChatManager.ts
   async createNewChat(name, folderPath) {
     const targetFolder = folderPath ? (0, import_obsidian18.normalizePath)(folderPath) : this.chatsFolderPath;
     const finalFolderPath = targetFolder === "" || targetFolder === "." ? "/" : targetFolder;
@@ -8076,11 +8077,11 @@ var ChatManager = class {
       };
       this.chatIndex[newId] = storedMeta;
       await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
       const savedImmediately = await newChat.saveImmediately();
       if (!savedImmediately) {
         delete this.chatIndex[newId];
         await this.saveChatIndex();
+        this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from createNewChat (saveImmediately FAILED) for ID: ${newId}`);
         this.plugin.emit("chat-list-updated");
         new import_obsidian18.Notice("Error: Failed to save new chat file.");
         return null;
