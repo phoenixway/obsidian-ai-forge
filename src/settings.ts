@@ -177,6 +177,7 @@ export interface OllamaPluginSettings extends LoggerSettings {
   fixBrokenEmojis: boolean; // Налаштування для виправлення емодзі
   translationProvider: TranslationProvider; // Вибір провайдера
   ollamaTranslationModel: string; // Модель Ollama для перекладу
+  ragAutoIndexOnStartup: boolean; // <--- ДОДАНО ТУТ
   sidebarWidth?: number; // Опціональна властивість для збереженої ширини сайдбару
 }
 
@@ -217,6 +218,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   ragSimilarityThreshold: 0.5,
   ragTopK: 3,
   maxCharsPerDoc: 1500,
+  ragAutoIndexOnStartup: true, 
 
   // Productivity
   enableProductivityFeatures: false,
@@ -242,7 +244,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   logCallerInfo: false,
   logFilePath: "", // Logger сам підставить шлях до папки плагіна
   logFileMaxSizeMB: 5,
-  fallbackSummarizationModelName: "http://localhost:11434",
+  fallbackSummarizationModelName: "gemma3:4b",
   fixBrokenEmojis: true,
   translationProvider: 'ollama', // За замовчуванням вимкнено
   ollamaTranslationModel: '',

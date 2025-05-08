@@ -371,6 +371,7 @@ var DEFAULT_SETTINGS = {
   ragSimilarityThreshold: 0.5,
   ragTopK: 3,
   maxCharsPerDoc: 1500,
+  ragAutoIndexOnStartup: true,
   // Productivity
   enableProductivityFeatures: false,
   dailyTaskFileName: "Tasks_Today.md",
@@ -394,7 +395,7 @@ var DEFAULT_SETTINGS = {
   logFilePath: "",
   // Logger сам підставить шлях до папки плагіна
   logFileMaxSizeMB: 5,
-  fallbackSummarizationModelName: "http://localhost:11434",
+  fallbackSummarizationModelName: "gemma3:4b",
   fixBrokenEmojis: true,
   translationProvider: "ollama",
   // За замовчуванням вимкнено
@@ -9148,7 +9149,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       async () => {
         if (this.chatManager) {
           await this.chatManager.rebuildIndexFromFiles();
-          this.emit("chat-list-updated");
         }
       },
       1500,
@@ -9183,9 +9183,11 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   isTaskFileUpdated() {
     return this.taskFileNeedsUpdate;
   }
+  // src/main.ts
   async onload() {
     const initialSettingsData = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     const loggerSettings = {
+      // Визначаємо рівень логування для консолі залежно від середовища
       consoleLogLevel: true ? initialSettingsData.consoleLogLevel || "INFO" : "DEBUG",
       fileLoggingEnabled: initialSettingsData.fileLoggingEnabled,
       fileLogLevel: initialSettingsData.fileLogLevel,
@@ -9194,6 +9196,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       logFileMaxSizeMB: initialSettingsData.logFileMaxSizeMB
     };
     this.logger = new Logger(this, loggerSettings);
+    this.logger.info("AI Forge Plugin loading...");
     await this.loadSettingsAndMigrate();
     this.promptService = new PromptService(this);
     this.ollamaService = new OllamaService(this);
@@ -9201,6 +9204,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this);
     await this.chatManager.initialize();
+    this.logger.info("Chat Manager initialized.");
     this.logger.updateSettings({
       consoleLogLevel: this.settings.consoleLogLevel,
       fileLoggingEnabled: this.settings.fileLoggingEnabled,
@@ -9210,16 +9214,18 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       logFileMaxSizeMB: this.settings.logFileMaxSizeMB
     });
     this.registerView(VIEW_TYPE_OLLAMA_PERSONAS, (leaf) => {
+      this.logger.info("Creating OllamaView instance.");
       this.view = new OllamaView(leaf, this);
       return this.view;
     });
     this.ollamaService.on("connection-error", (error) => {
+      this.logger.error("Ollama connection error detected:", error);
       this.emit("ollama-connection-error", error.message || "Unknown connection error");
     });
     this.register(
       this.on("ollama-connection-error", async (message) => {
         if (this.chatManager) {
-          await this.chatManager.addMessageToActiveChat("error", message, new Date());
+          await this.chatManager.addMessageToActiveChat("error", `Ollama Connection Error: ${message}`, new Date());
         } else {
           new import_obsidian20.Notice(`Ollama Connection Error: ${message}`);
         }
@@ -9229,6 +9235,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.register(
       this.on("settings-updated", () => {
         var _a, _b, _c, _d;
+        this.logger.info("Settings updated, applying changes...");
         this.logger.updateSettings({
           consoleLogLevel: this.settings.consoleLogLevel,
           fileLoggingEnabled: this.settings.fileLoggingEnabled,
@@ -9260,10 +9267,11 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       id: "index-rag-documents",
       name: "AI Forge: Index documents for RAG",
       callback: async () => {
-        if (this.settings.ragEnabled)
+        if (this.settings.ragEnabled) {
           await this.ragService.indexDocuments();
-        else
+        } else {
           new import_obsidian20.Notice("RAG is disabled in settings.");
+        }
       }
     });
     this.addCommand({
@@ -9289,6 +9297,8 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         const newChat = await this.chatManager.createNewChat();
         if (newChat) {
           new import_obsidian20.Notice(`Created new chat: ${newChat.metadata.name}`);
+        } else {
+          new import_obsidian20.Notice("Failed to create new chat.");
         }
       }
     });
@@ -9316,28 +9326,23 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.app.workspace.onLayoutReady(async () => {
-      if (this.settings.ragEnabled) {
+      this.logger.info("Workspace layout ready.");
+      if (this.settings.ragEnabled && this.settings.ragAutoIndexOnStartup) {
+        this.logger.info("RAG enabled, starting initial indexing after delay...");
         setTimeout(() => {
           var _a;
           (_a = this.ragService) == null ? void 0 : _a.indexDocuments();
         }, 5e3);
       }
-      const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
-      if (savedActiveId && this.settings.saveMessageHistory) {
-        await this.chatManager.setActiveChat(savedActiveId);
-      }
     });
     this.registerVaultListeners();
-    const debouncedRoleClear = (0, import_obsidian20.debounce)(
-      () => {
-        var _a, _b;
-        this.roleListCache = null;
-        (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
-        this.emit("roles-updated");
-      },
-      1500,
-      true
-    );
+    const debouncedRoleClear = (0, import_obsidian20.debounce)(() => {
+      var _a, _b;
+      this.logger.debug("Debounced role cache clear triggered.");
+      this.roleListCache = null;
+      (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
+      this.emit("roles-updated");
+    }, 1500, true);
     const handleModifyEvent = (file) => {
       if (file instanceof import_obsidian20.TFile) {
         this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
@@ -9384,7 +9389,9 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       this.taskCheckInterval = setInterval(() => this.checkAndProcessTaskUpdate(), 5e3);
       this.registerInterval(this.taskCheckInterval);
     }
+    this.logger.info("AI Forge Plugin loaded successfully.");
   }
+  // --- кінець onload ---
   registerVaultListeners() {
     const handleFileCreateDelete = (file) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)

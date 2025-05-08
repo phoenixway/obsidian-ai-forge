@@ -73,7 +73,7 @@ export default class OllamaPlugin extends Plugin {
       if (this.chatManager) {
         await this.chatManager.rebuildIndexFromFiles();
         // this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
-        this.emit("chat-list-updated");
+        // this.emit("chat-list-updated");
       }
     },
     1500,
@@ -108,11 +108,14 @@ export default class OllamaPlugin extends Plugin {
     return this.taskFileNeedsUpdate;
   }
 
+  // src/main.ts
+
   async onload() {
     const initialSettingsData = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 
     // --- Ініціалізація Логера ---
     const loggerSettings: LoggerSettings = {
+      // Визначаємо рівень логування для консолі залежно від середовища
       consoleLogLevel: process.env.NODE_ENV === "production" ? initialSettingsData.consoleLogLevel || "INFO" : "DEBUG",
       fileLoggingEnabled: initialSettingsData.fileLoggingEnabled,
       fileLogLevel: initialSettingsData.fileLogLevel,
@@ -121,19 +124,24 @@ export default class OllamaPlugin extends Plugin {
       logFileMaxSizeMB: initialSettingsData.logFileMaxSizeMB,
     };
     this.logger = new Logger(this, loggerSettings);
-
+    this.logger.info("AI Forge Plugin loading...");
     // ---
 
+    // Завантажуємо налаштування та виконуємо міграцію, якщо потрібно
     await this.loadSettingsAndMigrate();
 
+    // Ініціалізуємо сервіси
     this.promptService = new PromptService(this);
     this.ollamaService = new OllamaService(this);
     this.translationService = new TranslationService(this);
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this);
 
+    // Ініціалізуємо менеджер чатів (завантажує індекс, відновлює активний чат)
     await this.chatManager.initialize();
+    this.logger.info("Chat Manager initialized.");
 
+    // Оновлюємо налаштування логера реальними значеннями після завантаження
     this.logger.updateSettings({
       consoleLogLevel: this.settings.consoleLogLevel,
       fileLoggingEnabled: this.settings.fileLoggingEnabled,
@@ -143,51 +151,67 @@ export default class OllamaPlugin extends Plugin {
       logFileMaxSizeMB: this.settings.logFileMaxSizeMB,
     });
 
+    // Реєструємо View плагіна
     this.registerView(VIEW_TYPE_OLLAMA_PERSONAS, leaf => {
+      this.logger.info("Creating OllamaView instance.");
       this.view = new OllamaView(leaf, this);
       return this.view;
     });
 
+    // Обробка помилок з'єднання з Ollama Service
     this.ollamaService.on("connection-error", error => {
-      this.emit("ollama-connection-error", error.message || "Unknown connection error");
+        this.logger.error("Ollama connection error detected:", error);
+        // Генеруємо подію плагіна про помилку з'єднання
+        this.emit("ollama-connection-error", error.message || "Unknown connection error");
     });
 
-    // Реєстрація обробників подій плагіна
+    // Реєстрація обробників внутрішніх подій плагіна
     this.register(
       this.on("ollama-connection-error", async (message: string) => {
         if (this.chatManager) {
-          await this.chatManager.addMessageToActiveChat("error", message, new Date());
+          // Додаємо повідомлення про помилку до активного чату
+          await this.chatManager.addMessageToActiveChat("error", `Ollama Connection Error: ${message}`, new Date());
         } else {
+          // Якщо ChatManager ще не готовий, показуємо стандартне повідомлення
           new Notice(`Ollama Connection Error: ${message}`);
         }
       })
     );
+    // Реєструємо локальний обробник для збереження ID активного чату
     this.register(this.on("active-chat-changed", this.handleActiveChatChangedLocally.bind(this)));
+    // Реєструємо обробник для оновлення налаштувань
     this.register(
       this.on("settings-updated", () => {
+        this.logger.info("Settings updated, applying changes...");
+        // Оновлюємо налаштування логера
         this.logger.updateSettings({
-          consoleLogLevel: this.settings.consoleLogLevel,
-          fileLoggingEnabled: this.settings.fileLoggingEnabled,
-          fileLogLevel: this.settings.fileLogLevel,
-          logCallerInfo: this.settings.logCallerInfo,
-          logFilePath: this.settings.logFilePath,
-          logFileMaxSizeMB: this.settings.logFileMaxSizeMB,
-        });
+            consoleLogLevel: this.settings.consoleLogLevel,
+            fileLoggingEnabled: this.settings.fileLoggingEnabled,
+            fileLogLevel: this.settings.fileLogLevel,
+            logCallerInfo: this.settings.logCallerInfo,
+            logFilePath: this.settings.logFilePath,
+            logFileMaxSizeMB: this.settings.logFileMaxSizeMB,
+         });
+        // Оновлюємо шлях до файлу завдань та завантажуємо їх
         this.updateDailyTaskFilePath();
-        this.loadAndProcessInitialTasks(); // Потрібен await? Ні, хай працює у фоні
+        this.loadAndProcessInitialTasks(); // Не блокуємо потік, хай працює асинхронно
+        // Оновлюємо конфігурацію Ollama Service (напр., URL)
         this.updateOllamaServiceConfig();
+        // Скидаємо кеш ролей та сповіщаємо про їх оновлення
         this.roleListCache = null;
         this.promptService?.clearRoleCache?.();
-        this.emit("roles-updated"); // Повідомляємо про оновлення ролей
-        this.view?.handleSettingsUpdated?.(); // View сам оновить решту
+        this.emit("roles-updated");
+        // Сповіщаємо View про оновлення налаштувань
+        this.view?.handleSettingsUpdated?.();
       })
     );
     // -------------------------------------------------
 
-    // --- Ribbon & Commands ---
+    // --- Додавання стрічки (Ribbon) та команд ---
     this.addRibbonIcon("brain-circuit", "Open AI Forge Chat", () => {
       this.activateView();
     });
+    // Команда для відкриття чату
     this.addCommand({
       id: "open-chat-view",
       name: "Open AI Forge Chat",
@@ -195,14 +219,19 @@ export default class OllamaPlugin extends Plugin {
         this.activateView();
       },
     });
+    // Команда для індексації RAG
     this.addCommand({
       id: "index-rag-documents",
       name: "AI Forge: Index documents for RAG",
       callback: async () => {
-        if (this.settings.ragEnabled) await this.ragService.indexDocuments();
-        else new Notice("RAG is disabled in settings.");
+        if (this.settings.ragEnabled) {
+            await this.ragService.indexDocuments();
+        } else {
+            new Notice("RAG is disabled in settings.");
+        }
       },
     });
+    // Команда для очищення історії активного чату
     this.addCommand({
       id: "clear-active-chat-history",
       name: "AI Forge: Clear Active Chat History",
@@ -210,15 +239,17 @@ export default class OllamaPlugin extends Plugin {
         await this.clearMessageHistoryWithConfirmation();
       },
     });
+    // Команда для оновлення списку ролей
     this.addCommand({
       id: "refresh-roles",
       name: "AI Forge: Refresh Roles List",
       callback: async () => {
-        await this.listRoleFiles(true);
-        this.emit("roles-updated");
+        await this.listRoleFiles(true); // Примусово оновлюємо список
+        this.emit("roles-updated"); // Сповіщаємо UI
         new Notice("Role list refreshed.");
       },
     });
+    // Команда для створення нового чату
     this.addCommand({
       id: "new-chat",
       name: "AI Forge: New Chat",
@@ -226,9 +257,13 @@ export default class OllamaPlugin extends Plugin {
         const newChat = await this.chatManager.createNewChat();
         if (newChat) {
           new Notice(`Created new chat: ${newChat.metadata.name}`);
+           // Фокус на поле вводу може оброблятися через подію 'active-chat-changed' у View
+        } else {
+           new Notice("Failed to create new chat.");
         }
       },
     });
+    // Команда для перемикання чатів (UI не реалізовано)
     this.addCommand({
       id: "switch-chat",
       name: "AI Forge: Switch Chat",
@@ -236,6 +271,7 @@ export default class OllamaPlugin extends Plugin {
         await this.showChatSwitcher();
       },
     });
+    // Команда для перейменування активного чату
     this.addCommand({
       id: "rename-active-chat",
       name: "AI Forge: Rename Active Chat",
@@ -243,6 +279,7 @@ export default class OllamaPlugin extends Plugin {
         await this.renameActiveChat();
       },
     });
+    // Команда для видалення активного чату
     this.addCommand({
       id: "delete-active-chat",
       name: "AI Forge: Delete Active Chat",
@@ -252,84 +289,99 @@ export default class OllamaPlugin extends Plugin {
     });
     // --------------------------
 
+    // Додаємо вкладку налаштувань
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
 
+    // Виконуємо дії після того, як робочий простір готовий
     this.app.workspace.onLayoutReady(async () => {
-      if (this.settings.ragEnabled) {
+      this.logger.info("Workspace layout ready.");
+      // Автоматична індексація RAG при старті, якщо увімкнено
+      if (this.settings.ragEnabled && this.settings.ragAutoIndexOnStartup) {
+        this.logger.info("RAG enabled, starting initial indexing after delay...");
         setTimeout(() => {
           this.ragService?.indexDocuments();
-        }, 5000);
+        }, 5000); // Запускаємо з невеликою затримкою
       }
-      const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
-      if (savedActiveId && this.settings.saveMessageHistory) {
-        await this.chatManager.setActiveChat(savedActiveId);
-      }
+      // Спроба відновити активний чат - ця логіка тепер виконується в chatManager.initialize()
+      // const savedActiveId = await this.loadDataKey(ACTIVE_CHAT_ID_KEY);
+      // if (savedActiveId && this.settings.saveMessageHistory && this.chatManager) {
+      //    await this.chatManager.setActiveChat(savedActiveId);
+      // }
     });
 
-    // --- Реєстрація слухачів Vault ---
-    this.registerVaultListeners();
+    // --- Реєстрація слухачів Vault для папки ЧАТІВ ---
+    this.registerVaultListeners(); // Викликаємо метод реєстрації
     // ---
 
-    // --- Реєстрація слухачів для ролей/RAG (ваш існуючий код) ---
-    // Важливо: Ці обробники НЕ ПОВИННІ викликати debouncedIndexAndUIRebuild, бо він для папки ЧАТІВ
-    const debouncedRoleClear = debounce(
-      () => {
-        this.roleListCache = null;
-        this.promptService?.clearRoleCache?.();
-        this.emit("roles-updated");
-      },
-      1500,
-      true
-    );
+    // --- Реєстрація слухачів для папки РОЛЕЙ та RAG ---
+    // Ці слухачі НЕ повинні викликати повний rebuild індексу чатів
+    const debouncedRoleClear = debounce( () => {
+        this.logger.debug("Debounced role cache clear triggered.");
+        this.roleListCache = null; // Скидаємо кеш списку ролей
+        this.promptService?.clearRoleCache?.(); // Скидаємо кеш контенту ролей
+        this.emit("roles-updated"); // Сповіщаємо про необхідність оновити списки ролей в UI
+      }, 1500, true ); // Затримка та негайне виконання
+
+    // Створюємо обробники для подій Vault, які стосуються ролей/RAG
     const handleModifyEvent = (file: TAbstractFile) => {
       if (file instanceof TFile) {
         this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
-        this.handleTaskFileModify(file);
+        this.handleTaskFileModify(file); // Окрема обробка файлу завдань
       }
     };
     const handleDeleteEvent = (file: TAbstractFile) => {
-      this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, true);
+      this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, true); // Помічаємо як видалення
       if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
-        this.dailyTaskFilePath = null;
-        this.taskFileContentCache = null;
-        this.taskFileNeedsUpdate = false;
-        this.chatManager?.updateTaskState(null);
+         // Якщо видалено файл завдань
+         this.dailyTaskFilePath = null;
+         this.taskFileContentCache = null;
+         this.taskFileNeedsUpdate = false;
+         this.chatManager?.updateTaskState(null); // Скидаємо стан завдань
       }
     };
     const handleRenameEvent = (file: TAbstractFile, oldPath: string) => {
+      // Реагуємо і на новий, і на старий шлях для ролей/RAG
       this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
       this.handleRoleOrRagFileChange(oldPath, debouncedRoleClear, true);
+      // Обробка перейменування файлу завдань
       if (this.settings.enableProductivityFeatures) {
-        if (oldPath === this.dailyTaskFilePath) {
-          this.updateDailyTaskFilePath();
-          this.loadAndProcessInitialTasks();
-        } else if (file.path === this.dailyTaskFilePath) {
+        if (oldPath === this.dailyTaskFilePath) { // Якщо перейменовано файл завдань
+          this.updateDailyTaskFilePath(); // Оновлюємо шлях
+          this.loadAndProcessInitialTasks(); // Перезавантажуємо завдання
+        } else if (file.path === this.dailyTaskFilePath) { // Якщо якийсь файл перейменовано НА файл завдань
           this.taskFileNeedsUpdate = true;
           this.checkAndProcessTaskUpdate();
         }
       }
     };
     const handleCreateEvent = (file: TAbstractFile) => {
-      this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
-      if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
-        this.taskFileNeedsUpdate = true;
-        this.checkAndProcessTaskUpdate();
-      }
+        // Цей 'create' обробляє створення файлів ролей/RAG
+        this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
+        // Обробка створення файлу завдань
+        if (this.settings.enableProductivityFeatures && file.path === this.dailyTaskFilePath) {
+            this.taskFileNeedsUpdate = true;
+            this.checkAndProcessTaskUpdate();
+        }
     };
+    // Реєструємо ці окремі обробники
     this.registerEvent(this.app.vault.on("modify", handleModifyEvent));
     this.registerEvent(this.app.vault.on("delete", handleDeleteEvent));
     this.registerEvent(this.app.vault.on("rename", handleRenameEvent));
+    // Важливо: Цей 'create' обробляє ролі/RAG, а той, що в registerVaultListeners - чати.
     this.registerEvent(this.app.vault.on("create", handleCreateEvent));
     // ---
 
-    this.updateDailyTaskFilePath();
-    await this.loadAndProcessInitialTasks();
+    // --- Логіка файлу завдань ---
+    this.updateDailyTaskFilePath(); // Визначаємо шлях до файлу завдань
+    await this.loadAndProcessInitialTasks(); // Завантажуємо початковий стан завдань
     if (this.settings.enableProductivityFeatures) {
+      // Запускаємо періодичну перевірку оновлень файлу завдань
       this.taskCheckInterval = setInterval(() => this.checkAndProcessTaskUpdate(), 5000);
-      this.registerInterval(this.taskCheckInterval as any);
+      this.registerInterval(this.taskCheckInterval as any); // Реєструємо інтервал для авто-очищення
     }
-  }
+    this.logger.info("AI Forge Plugin loaded successfully.");
+  } // --- кінець onload ---
 
   registerVaultListeners(): void {
     // Обробник для create та delete
