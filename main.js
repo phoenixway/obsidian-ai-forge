@@ -1877,7 +1877,6 @@ var SidebarManager = class {
             if (targetParentPath && targetParentPath !== "/") {
               this.folderExpansionState.set(targetParentPath, true);
             }
-            this.updateChatList();
           }
         } catch (error) {
           this.plugin.logger.error(`[SidebarManager] Error creating folder ${newFolderPath}:`, error);
@@ -1916,7 +1915,6 @@ var SidebarManager = class {
               this.folderExpansionState.delete(folderNode.path);
               this.folderExpansionState.set(newFolderPath, wasExpanded);
             }
-            this.updateChatList();
           }
         } catch (error) {
           this.plugin.logger.error(
@@ -1945,7 +1943,6 @@ var SidebarManager = class {
             if (success) {
               const keysToDelete = Array.from(this.folderExpansionState.keys()).filter((key) => key.startsWith(folderPath));
               keysToDelete.forEach((key) => this.folderExpansionState.delete(key));
-              this.updateChatList();
             }
           } catch (error) {
             this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);

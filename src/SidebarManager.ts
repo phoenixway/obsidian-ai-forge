@@ -612,7 +612,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
           if (targetParentPath && targetParentPath !== "/") {
             this.folderExpansionState.set(targetParentPath, true);
           }
-          this.updateChatList();
+          // this.updateChatList();
         }
       } catch (error) {
         this.plugin.logger.error(`[SidebarManager] Error creating folder ${newFolderPath}:`, error);
@@ -650,7 +650,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
             this.folderExpansionState.delete(folderNode.path);
             this.folderExpansionState.set(newFolderPath, wasExpanded!);
           }
-          this.updateChatList();
+          // this.updateChatList();
         }
       } catch (error) {
         this.plugin.logger.error(
@@ -679,7 +679,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
           if (success) {
             const keysToDelete = Array.from(this.folderExpansionState.keys()).filter(key => key.startsWith(folderPath));
             keysToDelete.forEach(key => this.folderExpansionState.delete(key));
-            this.updateChatList();
+            // this.updateChatList();
           }
         } catch (error) {
           this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
