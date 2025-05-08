@@ -733,7 +733,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
       const c = await this.plugin.chatManager.cloneChat(chatId);
       if (c) {
         new Notice(`Chat cloned as "${c.metadata.name}"`);
-        this.updateChatList();
+        // this.updateChatList();
         this.plugin.emit("focus-input-request");
       }
     } catch (e) {
