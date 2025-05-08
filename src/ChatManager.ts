@@ -611,88 +611,118 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
     return this.activeChatId;
   }
 
-  async getChat(id: string, filePath?: string): Promise<Chat | null> {
-    if (this.loadedChats[id]) {
+  // src/ChatManager.ts
+
+async getChat(id: string, filePath?: string): Promise<Chat | null> {
+  if (this.loadedChats[id]) {
+      this.logger.trace(`[ChatManager.getChat] Returning cached chat for ID: ${id}`);
       return this.loadedChats[id];
-    }
+  }
 
-    let actualFilePath: string | undefined = filePath;
-    if (!actualFilePath) {
+  let actualFilePath: string | undefined = filePath;
+  if (!actualFilePath) {
+      this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
       try {
-        const hierarchy = await this.getChatHierarchy();
-        actualFilePath = this.findChatPathInHierarchy(id, hierarchy) ?? undefined;
-        if (actualFilePath) {
-        }
+          const hierarchy = await this.getChatHierarchy();
+          actualFilePath = this.findChatPathInHierarchy(id, hierarchy) ?? undefined;
+          if (actualFilePath) {
+              this.logger.debug(`[ChatManager.getChat] Found file path for ID ${id} in hierarchy: ${actualFilePath}`);
+          } else {
+              this.logger.warn(`[ChatManager.getChat] File path for ID ${id} NOT found in hierarchy.`);
+          }
       } catch (hierarchyError) {
-        this.logger.error(`Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
-        actualFilePath = undefined;
+          this.logger.error(`[ChatManager.getChat] Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
+          actualFilePath = undefined; // Забезпечуємо, що undefined, якщо була помилка
       }
-    }
+  }
 
-    if (!actualFilePath) {
-      this.logger.error(`Could not find or determine file path for chat ID ${id}.`);
-      if (this.chatIndex[id]) {
-      }
+  // Якщо шлях так і не визначено, але чат є в індексі, це проблема з консистентністю
+  if (!actualFilePath && this.chatIndex[id]) {
+      this.logger.error(`[ChatManager.getChat] Chat ID ${id} exists in index but its file path could not be determined. Chat may be orphaned or index is stale.`);
+      // Можливо, варто спробувати перебудувати індекс тут, або просто повернути null
+      // await this.rebuildIndexFromFiles(); // Обережно: може бути рекурсивно, якщо getChat викликається з rebuildIndex
+      // if (!this.chatIndex[id]) return null; // Якщо після rebuild його немає
+      // actualFilePath = this.findChatPathInHierarchy(id, await this.getChatHierarchy()) ?? undefined;
+      // if (!actualFilePath) {
+      //     this.logger.error(`[ChatManager.getChat] Still no path after potential index rebuild for ${id}.`);
+      //     return null;
+      // }
+      return null; // Поки що просто повертаємо null, якщо шлях не знайдено
+  }
+
+  // Якщо чату немає в індексі і шлях не надано/не знайдено, то чату немає
+  if (!this.chatIndex[id] && !actualFilePath) {
+      this.logger.warn(`[ChatManager.getChat] Chat ID ${id} not found in index and no file path available.`);
       return null;
-    }
+  }
 
-    if (!this.chatIndex[id]) {
-      if (!filePath) {
-        await this.rebuildIndexFromFiles();
-        if (!this.chatIndex[id]) {
-          this.logger.error(
-            `Chat ID ${id} still not found in index after rescan, despite file existing at ${actualFilePath}.`
-          );
-          return null;
-        }
-      } else {
-      }
-    }
+  // Якщо шлях є, але чату немає в індексі -> спробувати завантажити, потім оновити індекс
+  // Якщо чат є в індексі, але шлях не надано -> ми вже спробували його знайти
+  // Якщо і шлях є, і в індексі є -> завантажуємо
 
-    try {
-      if (typeof actualFilePath !== "string") {
-        this.logger.error(`Internal error: actualFilePath is undefined before calling Chat.loadFromFile for ID ${id}`);
-        return null;
-      }
+  if (!actualFilePath) { // Ця умова тепер має бути рідкісною, якщо логіка вище відпрацювала
+       this.logger.error(`[ChatManager.getChat] CRITICAL: actualFilePath is still undefined for chat ID ${id} when it should be known or chat should be considered non-existent.`);
+       return null;
+  }
 
+
+  try {
+      // actualFilePath тут точно має бути string
       const chat = await Chat.loadFromFile(actualFilePath, this.adapter, this.plugin.settings, this.logger);
 
       if (chat) {
-        this.loadedChats[id] = chat;
+          this.loadedChats[id] = chat; // Кешуємо завантажений чат
 
-        const storedMeta = this.chatIndex[id];
-        const currentMeta = chat.metadata;
-        const indexNeedsUpdate =
-          !storedMeta ||
-          storedMeta.name !== currentMeta.name ||
-          storedMeta.lastModified !== currentMeta.lastModified ||
-          storedMeta.createdAt !== currentMeta.createdAt || // Додано createdAt
-          storedMeta.modelName !== currentMeta.modelName ||
-          storedMeta.selectedRolePath !== currentMeta.selectedRolePath ||
-          storedMeta.temperature !== currentMeta.temperature ||
-          storedMeta.contextWindow !== currentMeta.contextWindow;
+          // Перевіряємо та оновлюємо індекс, якщо метадані у файлі новіші/відрізняються
+          const storedMeta = this.chatIndex[id];
+          const currentMeta = chat.metadata;
+          const indexNeedsUpdate =
+              !storedMeta || // Якщо чату не було в індексі (наприклад, завантажили по прямому шляху)
+              storedMeta.name !== currentMeta.name ||
+              storedMeta.lastModified !== currentMeta.lastModified ||
+              storedMeta.createdAt !== currentMeta.createdAt ||
+              storedMeta.modelName !== currentMeta.modelName ||
+              storedMeta.selectedRolePath !== currentMeta.selectedRolePath ||
+              storedMeta.temperature !== currentMeta.temperature ||
+              storedMeta.contextWindow !== currentMeta.contextWindow;
 
-        if (indexNeedsUpdate) {
-          await this.saveChatAndUpdateIndex(chat);
-        }
-        return chat;
+          if (indexNeedsUpdate) {
+              this.logger.debug(`[ChatManager.getChat] Index needs update for chat ${id}. Calling saveChatAndUpdateIndex.`);
+              // saveChatAndUpdateIndex оновить індекс і згенерує 'chat-list-updated', якщо потрібно
+              await this.saveChatAndUpdateIndex(chat);
+          }
+          return chat;
       } else {
-        this.logger.error(
-          `Chat.loadFromFile returned null for ${id} at path ${actualFilePath}. Removing from index if present.`
-        );
-        await this.deleteChatFileAndIndexEntry(id, actualFilePath, false);
-        if (this.activeChatId === id) await this.setActiveChat(null);
-        return null;
+          // Chat.loadFromFile повернув null (файл пошкоджений або невалідний)
+          this.logger.error(
+          `[ChatManager.getChat] Chat.loadFromFile returned null for ID ${id} at path ${actualFilePath}. Removing from index if present.`
+          );
+          // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
+          await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); // false - не намагаємось видалити файл, бо він або не існує, або пошкоджений
+          // ---
+          if (this.activeChatId === id) {
+              this.logger.warn(`[ChatManager.getChat] Active chat ${id} failed to load, setting active chat to null.`);
+              await this.setActiveChat(null); // Згенерує 'active-chat-changed'
+          }
+          return null;
       }
-    } catch (error: any) {
-      this.logger.error(`Unexpected error during getChat for ${id} from ${actualFilePath}:`, error);
-      if (error.code === "ENOENT") {
-        await this.deleteChatFileAndIndexEntry(id, actualFilePath, false);
-        if (this.activeChatId === id) await this.setActiveChat(null);
+  } catch (error: any) {
+      this.logger.error(`[ChatManager.getChat] Unexpected error during getChat for ID ${id} from ${actualFilePath}:`, error);
+      if (error.code === "ENOENT") { // Файл не знайдено
+          this.logger.warn(`[ChatManager.getChat] File not found (ENOENT) for chat ${id} at ${actualFilePath}. Cleaning up index.`);
+          // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
+          await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); // false - файл і так не знайдено
+          // ---
+          if (this.activeChatId === id) {
+              this.logger.warn(`[ChatManager.getChat] Active chat ${id} file not found, setting active chat to null.`);
+              await this.setActiveChat(null); // Згенерує 'active-chat-changed'
+          }
       }
+      // Для інших помилок, можливо, не варто видаляти з індексу одразу,
+      // але це залежить від бажаної поведінки. Поточна логіка - видалити.
       return null;
-    }
   }
+}
 
   private findChatPathInHierarchy(chatId: string, nodes: HierarchyNode[]): string | null {
     for (const node of nodes) {
@@ -708,55 +738,8 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
     return null;
   }
 
-  private async deleteChatFileAndIndexEntry(
-    id: string,
-    filePath: string | null,
-    deleteFile: boolean = true
-  ): Promise<void> {
-    const safeFilePath = filePath ?? "unknown_path"; // Використовуємо замінник, якщо шлях null
-
-    let indexChanged = false;
-
-    if (this.loadedChats[id]) {
-      delete this.loadedChats[id];
-    }
-    if (this.chatIndex[id]) {
-      delete this.chatIndex[id];
-      indexChanged = true;
-    } else {
-    }
-
-    // Видаляємо файл, тільки якщо шлях валідний
-    if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
-      try {
-        const fileExists = await this.adapter.exists(filePath);
-        if (fileExists) {
-          const stat = await this.adapter.stat(filePath);
-          if (stat?.type === "file") {
-            await this.adapter.remove(filePath);
-          } else {
-            this.logger.error(`Attempted to remove a non-file path during chat deletion: ${filePath}`);
-          }
-        } else {
-        }
-      } catch (e: any) {
-        if (e.code === "EPERM" || e.code === "EACCES") {
-          this.logger.error(`Permission error removing chat file ${filePath}:`, e);
-          new Notice(`Permission error deleting file: ${filePath}`);
-        } else {
-          this.logger.error(`Error removing chat file ${filePath} during cleanup:`, e);
-          new Notice(`Error deleting file: ${filePath}`);
-        }
-      }
-    } else if (deleteFile) {
-    }
-
-    if (indexChanged) {
-      await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
-    }
-  }
-
+  
+  
   async getActiveChat(): Promise<Chat | null> {
     if (!this.activeChatId) {
       return null;
@@ -924,44 +907,157 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
     }
   }
 
-  async deleteChat(id: string): Promise<boolean> {
-    const chatExistedInIndex = !!this.chatIndex[id];
-    const wasActive = id === this.activeChatId;
+// src/ChatManager.ts
 
-    let filePath: string | null = null;
-    try {
+// ДОДАЙТЕ ЦЕЙ НОВИЙ ПРИВАТНИЙ МЕТОД:
+/**
+ * Допоміжний метод для видалення файлу чату та запису з індексу БЕЗ генерації подій.
+ * @param id ID чату для видалення.
+ * @param filePath Шлях до файлу чату (може бути null).
+ * @param deleteFile Чи потрібно видаляти фізичний файл.
+ * @returns true, якщо індекс chatIndex був змінений, false в іншому випадку.
+ */
+private async deleteChatFileAndIndexEntry_NoEmit(
+  id: string,
+  filePath: string | null,
+  deleteFile: boolean = true
+): Promise<boolean> { // Повертає true, якщо індекс змінено
+  const safeFilePath = filePath ?? "unknown_path"; // Для логування
+  let indexChanged = false;
+
+  // Видалення з кешу завантажених чатів
+  if (this.loadedChats[id]) {
+      delete this.loadedChats[id];
+      this.logger.debug(`[deleteHelper] Removed chat ${id} from loadedChats cache.`);
+  }
+  // Видалення з індексу
+  if (this.chatIndex[id]) {
+      delete this.chatIndex[id];
+      indexChanged = true; // Помічаємо, що індекс змінився
+      this.logger.debug(`[deleteHelper] Removed chat ${id} from chatIndex.`);
+  } else {
+      this.logger.debug(`[deleteHelper] Chat ${id} was not in chatIndex.`);
+  }
+
+  // Видалення файлу, якщо потрібно і можливо
+  if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
+      try {
+          const fileExists = await this.adapter.exists(filePath);
+          if (fileExists) {
+              const stat = await this.adapter.stat(filePath);
+              if (stat?.type === "file") {
+                  await this.adapter.remove(filePath);
+                  this.logger.debug(`[deleteHelper] Removed chat file: ${filePath}`);
+              } else {
+                   this.logger.error(`[deleteHelper] Attempted to remove a non-file path: ${filePath}`);
+              }
+          } else {
+               this.logger.warn(`[deleteHelper] Chat file not found for removal: ${filePath}`);
+          }
+      } catch (e: any) {
+          this.logger.error(`[deleteHelper] Error removing chat file ${filePath}:`, e);
+          new Notice(`Error deleting file: ${filePath.split('/').pop()}`);
+          // Не перериваємо процес через помилку видалення файлу, індекс важливіший
+      }
+  } else if (deleteFile && filePath) {
+       // Логуємо, якщо шлях некоректний для видалення
+       this.logger.warn(`[deleteHelper] Invalid file path provided for deletion: ${filePath}`);
+  }
+
+  // Зберігаємо індекс, ТІЛЬКИ якщо він змінився
+  if (indexChanged) {
+      await this.saveChatIndex();
+      this.logger.debug(`[deleteHelper] Saved updated chatIndex after removing ${id}.`);
+  }
+  return indexChanged; // Повертаємо статус зміни індексу
+}
+
+  // src/ChatManager.ts
+
+async deleteChat(id: string): Promise<boolean> {
+  const chatExistedInIndex = !!this.chatIndex[id];
+  const wasActive = id === this.activeChatId;
+  this.logger.debug(`[deleteChat] Deleting chat ${id}. Was active: ${wasActive}. Existed in index: ${chatExistedInIndex}.`);
+
+  let filePath: string | null = null;
+  try {
+      // Знаходимо шлях до файлу (найкраще через ієрархію)
       const hierarchy = await this.getChatHierarchy();
       filePath = this.findChatPathInHierarchy(id, hierarchy);
-    } catch (hierarchyError) {
+      if (!filePath && chatExistedInIndex) {
+           this.logger.warn(`[deleteChat] File path for chat ${id} not found in hierarchy, but chat exists in index. Will only remove from index.`);
+      }
+  } catch (hierarchyError) {
       this.logger.error(`Error getting hierarchy during delete operation for ${id}:`, hierarchyError);
-    }
+      // Продовжуємо без шляху, якщо чат є в індексі
+  }
 
-    if (!filePath && chatExistedInIndex) {
-    } else if (!filePath && !chatExistedInIndex) {
-      return false;
-    }
+  // Якщо чату немає ні в індексі, ні шлях не знайдено (якщо він був потрібен)
+  if (!filePath && !chatExistedInIndex) {
+      this.logger.warn(`[deleteChat] Chat ${id} not found in index or hierarchy. Nothing to delete.`);
+      return false; // Чату не існує
+  }
 
-    let success = true;
-    try {
-      // Видаляємо з кешу та індексу, видаляємо файл
-      await this.deleteChatFileAndIndexEntry(id, filePath, true); // filePath може бути null
-    } catch (error) {
+  let success = true;
+  // Змінна для події, яку потрібно згенерувати ПІСЛЯ всіх операцій
+  let eventToEmit: { name: string; data: any } | null = null;
+
+  try {
+      // Викликаємо новий допоміжний метод, який НЕ генерує подій
+      const indexWasChanged = await this.deleteChatFileAndIndexEntry_NoEmit(id, filePath, true);
+      this.logger.debug(`[deleteChat] deleteChatFileAndIndexEntry_NoEmit finished. Index changed: ${indexWasChanged}`);
+
+      // Визначаємо, яку подію генерувати (або жодної)
+      if (wasActive) {
+          this.logger.debug(`[deleteChat] Deleted chat was active. Finding and setting next active chat...`);
+          // Визначаємо наступний активний чат
+          const newHierarchy = await this.getChatHierarchy(); // Отримуємо оновлену ієрархію
+          const firstChat = this.findFirstChatInHierarchy(newHierarchy);
+          const nextActiveId = firstChat ? firstChat.metadata.id : null;
+          this.logger.debug(`[deleteChat] Next active chat will be: ${nextActiveId}`);
+
+          // Викликаємо setActiveChat. Він сам згенерує 'active-chat-changed'.
+          // Ця подія має бути достатньою для оновлення UI (включаючи список).
+          await this.setActiveChat(nextActiveId);
+          // Немає потреби генерувати 'chat-list-updated' окремо тут.
+
+      } else if (indexWasChanged) {
+          // Якщо видалено НЕактивний чат, але індекс змінився,
+          // нам ПОТРІБНА подія 'chat-list-updated', щоб список оновився.
+          this.logger.debug(`[deleteChat] Non-active chat deleted and index changed. Setting 'chat-list-updated' to be emitted.`);
+          eventToEmit = { name: "chat-list-updated", data: undefined };
+      }
+
+  } catch (error) {
       this.logger.error(`Error during deletion process for chat ${id}:`, error);
       new Notice(`Error deleting chat ${id}. Check console.`);
       success = false;
+      // Спробуємо відновити консистентність індексу при помилці
       await this.rebuildIndexFromFiles();
-    } finally {
-      if (wasActive) {
-        const newHierarchy = await this.getChatHierarchy();
-        const firstChat = this.findFirstChatInHierarchy(newHierarchy);
-        const nextActiveId = firstChat ? firstChat.metadata.id : null;
-        await this.setActiveChat(nextActiveId);
-      } else if (success && chatExistedInIndex) {
-        new Notice(`Chat deleted.`);
+      // Після перебудови індексу точно потрібне оновлення списку
+      eventToEmit = { name: "chat-list-updated", data: undefined };
+  } finally {
+      // Генеруємо подію, якщо вона була запланована
+      if (eventToEmit) {
+           this.logger.debug(`[deleteChat] Emitting final event: ${eventToEmit.name}`);
+           this.plugin.emit(eventToEmit.name, eventToEmit.data);
+      } else if (wasActive) {
+           this.logger.debug(`[deleteChat] No final event emitted from deleteChat itself (relied on setActiveChat).`);
+      } else {
+           this.logger.debug(`[deleteChat] No final event emitted (non-active deleted, index unchanged, or error without rebuild).`);
       }
-    }
-    return success && chatExistedInIndex;
+
+      // Показуємо сповіщення, тільки якщо видалення було успішним і чат існував
+      if (success && chatExistedInIndex) {
+          new Notice(`Chat deleted.`);
+          this.logger.info(`Chat ${id} deleted successfully.`);
+      } else if (!chatExistedInIndex) {
+           this.logger.info(`Chat ${id} deletion attempt - chat did not exist in index.`);
+      }
   }
+  // Повертаємо true, якщо чат існував і операція (принаймні оновлення індексу) пройшла успішно
+  return success && chatExistedInIndex;
+}
 
   async cloneChat(chatIdToClone: string): Promise<Chat | null> {
     let originalFilePath: string | null = null;

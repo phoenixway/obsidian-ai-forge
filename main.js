@@ -8220,72 +8220,74 @@ var ChatManager = class {
   getActiveChatId() {
     return this.activeChatId;
   }
+  // src/ChatManager.ts
   async getChat(id, filePath) {
     var _a;
     if (this.loadedChats[id]) {
+      this.logger.trace(`[ChatManager.getChat] Returning cached chat for ID: ${id}`);
       return this.loadedChats[id];
     }
     let actualFilePath = filePath;
     if (!actualFilePath) {
+      this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
       try {
         const hierarchy = await this.getChatHierarchy();
         actualFilePath = (_a = this.findChatPathInHierarchy(id, hierarchy)) != null ? _a : void 0;
         if (actualFilePath) {
+          this.logger.debug(`[ChatManager.getChat] Found file path for ID ${id} in hierarchy: ${actualFilePath}`);
+        } else {
+          this.logger.warn(`[ChatManager.getChat] File path for ID ${id} NOT found in hierarchy.`);
         }
       } catch (hierarchyError) {
-        this.logger.error(`Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
+        this.logger.error(`[ChatManager.getChat] Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
         actualFilePath = void 0;
       }
     }
-    if (!actualFilePath) {
-      this.logger.error(`Could not find or determine file path for chat ID ${id}.`);
-      if (this.chatIndex[id]) {
-      }
+    if (!actualFilePath && this.chatIndex[id]) {
+      this.logger.error(`[ChatManager.getChat] Chat ID ${id} exists in index but its file path could not be determined. Chat may be orphaned or index is stale.`);
       return null;
     }
-    if (!this.chatIndex[id]) {
-      if (!filePath) {
-        await this.rebuildIndexFromFiles();
-        if (!this.chatIndex[id]) {
-          this.logger.error(
-            `Chat ID ${id} still not found in index after rescan, despite file existing at ${actualFilePath}.`
-          );
-          return null;
-        }
-      } else {
-      }
+    if (!this.chatIndex[id] && !actualFilePath) {
+      this.logger.warn(`[ChatManager.getChat] Chat ID ${id} not found in index and no file path available.`);
+      return null;
+    }
+    if (!actualFilePath) {
+      this.logger.error(`[ChatManager.getChat] CRITICAL: actualFilePath is still undefined for chat ID ${id} when it should be known or chat should be considered non-existent.`);
+      return null;
     }
     try {
-      if (typeof actualFilePath !== "string") {
-        this.logger.error(`Internal error: actualFilePath is undefined before calling Chat.loadFromFile for ID ${id}`);
-        return null;
-      }
       const chat = await Chat.loadFromFile(actualFilePath, this.adapter, this.plugin.settings, this.logger);
       if (chat) {
         this.loadedChats[id] = chat;
         const storedMeta = this.chatIndex[id];
         const currentMeta = chat.metadata;
-        const indexNeedsUpdate = !storedMeta || storedMeta.name !== currentMeta.name || storedMeta.lastModified !== currentMeta.lastModified || storedMeta.createdAt !== currentMeta.createdAt || // Додано createdAt
-        storedMeta.modelName !== currentMeta.modelName || storedMeta.selectedRolePath !== currentMeta.selectedRolePath || storedMeta.temperature !== currentMeta.temperature || storedMeta.contextWindow !== currentMeta.contextWindow;
+        const indexNeedsUpdate = !storedMeta || // Якщо чату не було в індексі (наприклад, завантажили по прямому шляху)
+        storedMeta.name !== currentMeta.name || storedMeta.lastModified !== currentMeta.lastModified || storedMeta.createdAt !== currentMeta.createdAt || storedMeta.modelName !== currentMeta.modelName || storedMeta.selectedRolePath !== currentMeta.selectedRolePath || storedMeta.temperature !== currentMeta.temperature || storedMeta.contextWindow !== currentMeta.contextWindow;
         if (indexNeedsUpdate) {
+          this.logger.debug(`[ChatManager.getChat] Index needs update for chat ${id}. Calling saveChatAndUpdateIndex.`);
           await this.saveChatAndUpdateIndex(chat);
         }
         return chat;
       } else {
         this.logger.error(
-          `Chat.loadFromFile returned null for ${id} at path ${actualFilePath}. Removing from index if present.`
+          `[ChatManager.getChat] Chat.loadFromFile returned null for ID ${id} at path ${actualFilePath}. Removing from index if present.`
         );
-        await this.deleteChatFileAndIndexEntry(id, actualFilePath, false);
-        if (this.activeChatId === id)
+        await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false);
+        if (this.activeChatId === id) {
+          this.logger.warn(`[ChatManager.getChat] Active chat ${id} failed to load, setting active chat to null.`);
           await this.setActiveChat(null);
+        }
         return null;
       }
     } catch (error) {
-      this.logger.error(`Unexpected error during getChat for ${id} from ${actualFilePath}:`, error);
+      this.logger.error(`[ChatManager.getChat] Unexpected error during getChat for ID ${id} from ${actualFilePath}:`, error);
       if (error.code === "ENOENT") {
-        await this.deleteChatFileAndIndexEntry(id, actualFilePath, false);
-        if (this.activeChatId === id)
+        this.logger.warn(`[ChatManager.getChat] File not found (ENOENT) for chat ${id} at ${actualFilePath}. Cleaning up index.`);
+        await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false);
+        if (this.activeChatId === id) {
+          this.logger.warn(`[ChatManager.getChat] Active chat ${id} file not found, setting active chat to null.`);
           await this.setActiveChat(null);
+        }
       }
       return null;
     }
@@ -8302,45 +8304,6 @@ var ChatManager = class {
       }
     }
     return null;
-  }
-  async deleteChatFileAndIndexEntry(id, filePath, deleteFile = true) {
-    const safeFilePath = filePath != null ? filePath : "unknown_path";
-    let indexChanged = false;
-    if (this.loadedChats[id]) {
-      delete this.loadedChats[id];
-    }
-    if (this.chatIndex[id]) {
-      delete this.chatIndex[id];
-      indexChanged = true;
-    } else {
-    }
-    if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
-      try {
-        const fileExists = await this.adapter.exists(filePath);
-        if (fileExists) {
-          const stat = await this.adapter.stat(filePath);
-          if ((stat == null ? void 0 : stat.type) === "file") {
-            await this.adapter.remove(filePath);
-          } else {
-            this.logger.error(`Attempted to remove a non-file path during chat deletion: ${filePath}`);
-          }
-        } else {
-        }
-      } catch (e) {
-        if (e.code === "EPERM" || e.code === "EACCES") {
-          this.logger.error(`Permission error removing chat file ${filePath}:`, e);
-          new import_obsidian18.Notice(`Permission error deleting file: ${filePath}`);
-        } else {
-          this.logger.error(`Error removing chat file ${filePath} during cleanup:`, e);
-          new import_obsidian18.Notice(`Error deleting file: ${filePath}`);
-        }
-      }
-    } else if (deleteFile) {
-    }
-    if (indexChanged) {
-      await this.saveChatIndex();
-      this.plugin.emit("chat-list-updated");
-    }
   }
   async getActiveChat() {
     if (!this.activeChatId) {
@@ -8478,36 +8441,111 @@ var ChatManager = class {
       return false;
     }
   }
+  // src/ChatManager.ts
+  // ДОДАЙТЕ ЦЕЙ НОВИЙ ПРИВАТНИЙ МЕТОД:
+  /**
+   * Допоміжний метод для видалення файлу чату та запису з індексу БЕЗ генерації подій.
+   * @param id ID чату для видалення.
+   * @param filePath Шлях до файлу чату (може бути null).
+   * @param deleteFile Чи потрібно видаляти фізичний файл.
+   * @returns true, якщо індекс chatIndex був змінений, false в іншому випадку.
+   */
+  async deleteChatFileAndIndexEntry_NoEmit(id, filePath, deleteFile = true) {
+    const safeFilePath = filePath != null ? filePath : "unknown_path";
+    let indexChanged = false;
+    if (this.loadedChats[id]) {
+      delete this.loadedChats[id];
+      this.logger.debug(`[deleteHelper] Removed chat ${id} from loadedChats cache.`);
+    }
+    if (this.chatIndex[id]) {
+      delete this.chatIndex[id];
+      indexChanged = true;
+      this.logger.debug(`[deleteHelper] Removed chat ${id} from chatIndex.`);
+    } else {
+      this.logger.debug(`[deleteHelper] Chat ${id} was not in chatIndex.`);
+    }
+    if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
+      try {
+        const fileExists = await this.adapter.exists(filePath);
+        if (fileExists) {
+          const stat = await this.adapter.stat(filePath);
+          if ((stat == null ? void 0 : stat.type) === "file") {
+            await this.adapter.remove(filePath);
+            this.logger.debug(`[deleteHelper] Removed chat file: ${filePath}`);
+          } else {
+            this.logger.error(`[deleteHelper] Attempted to remove a non-file path: ${filePath}`);
+          }
+        } else {
+          this.logger.warn(`[deleteHelper] Chat file not found for removal: ${filePath}`);
+        }
+      } catch (e) {
+        this.logger.error(`[deleteHelper] Error removing chat file ${filePath}:`, e);
+        new import_obsidian18.Notice(`Error deleting file: ${filePath.split("/").pop()}`);
+      }
+    } else if (deleteFile && filePath) {
+      this.logger.warn(`[deleteHelper] Invalid file path provided for deletion: ${filePath}`);
+    }
+    if (indexChanged) {
+      await this.saveChatIndex();
+      this.logger.debug(`[deleteHelper] Saved updated chatIndex after removing ${id}.`);
+    }
+    return indexChanged;
+  }
+  // src/ChatManager.ts
   async deleteChat(id) {
     const chatExistedInIndex = !!this.chatIndex[id];
     const wasActive = id === this.activeChatId;
+    this.logger.debug(`[deleteChat] Deleting chat ${id}. Was active: ${wasActive}. Existed in index: ${chatExistedInIndex}.`);
     let filePath = null;
     try {
       const hierarchy = await this.getChatHierarchy();
       filePath = this.findChatPathInHierarchy(id, hierarchy);
+      if (!filePath && chatExistedInIndex) {
+        this.logger.warn(`[deleteChat] File path for chat ${id} not found in hierarchy, but chat exists in index. Will only remove from index.`);
+      }
     } catch (hierarchyError) {
       this.logger.error(`Error getting hierarchy during delete operation for ${id}:`, hierarchyError);
     }
-    if (!filePath && chatExistedInIndex) {
-    } else if (!filePath && !chatExistedInIndex) {
+    if (!filePath && !chatExistedInIndex) {
+      this.logger.warn(`[deleteChat] Chat ${id} not found in index or hierarchy. Nothing to delete.`);
       return false;
     }
     let success = true;
+    let eventToEmit = null;
     try {
-      await this.deleteChatFileAndIndexEntry(id, filePath, true);
+      const indexWasChanged = await this.deleteChatFileAndIndexEntry_NoEmit(id, filePath, true);
+      this.logger.debug(`[deleteChat] deleteChatFileAndIndexEntry_NoEmit finished. Index changed: ${indexWasChanged}`);
+      if (wasActive) {
+        this.logger.debug(`[deleteChat] Deleted chat was active. Finding and setting next active chat...`);
+        const newHierarchy = await this.getChatHierarchy();
+        const firstChat = this.findFirstChatInHierarchy(newHierarchy);
+        const nextActiveId = firstChat ? firstChat.metadata.id : null;
+        this.logger.debug(`[deleteChat] Next active chat will be: ${nextActiveId}`);
+        await this.setActiveChat(nextActiveId);
+      } else if (indexWasChanged) {
+        this.logger.debug(`[deleteChat] Non-active chat deleted and index changed. Setting 'chat-list-updated' to be emitted.`);
+        eventToEmit = { name: "chat-list-updated", data: void 0 };
+      }
     } catch (error) {
       this.logger.error(`Error during deletion process for chat ${id}:`, error);
       new import_obsidian18.Notice(`Error deleting chat ${id}. Check console.`);
       success = false;
       await this.rebuildIndexFromFiles();
+      eventToEmit = { name: "chat-list-updated", data: void 0 };
     } finally {
-      if (wasActive) {
-        const newHierarchy = await this.getChatHierarchy();
-        const firstChat = this.findFirstChatInHierarchy(newHierarchy);
-        const nextActiveId = firstChat ? firstChat.metadata.id : null;
-        await this.setActiveChat(nextActiveId);
-      } else if (success && chatExistedInIndex) {
+      if (eventToEmit) {
+        this.logger.debug(`[deleteChat] Emitting final event: ${eventToEmit.name}`);
+        this.plugin.emit(eventToEmit.name, eventToEmit.data);
+      } else if (wasActive) {
+        this.logger.debug(`[deleteChat] No final event emitted from deleteChat itself (relied on setActiveChat).`);
+      } else {
+        this.logger.debug(`[deleteChat] No final event emitted (non-active deleted, index unchanged, or error without rebuild).`);
+      }
+      if (success && chatExistedInIndex) {
         new import_obsidian18.Notice(`Chat deleted.`);
+        this.logger.info(`Chat ${id} deleted successfully.`);
+      } else if (!chatExistedInIndex) {
+        this.logger.info(`Chat ${id} deletion attempt - chat did not exist in index.`);
       }
     }
     return success && chatExistedInIndex;
