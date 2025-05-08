@@ -3990,8 +3990,8 @@ This action cannot be undone.`,
       }, delay);
     };
     // src/OllamaView.ts
-    // Переконайтесь, що властивості isChatListUpdateScheduled та chatListUpdateTimeoutId
-    // та метод scheduleSidebarChatListUpdate визначені у класі OllamaView, як було показано раніше.
+    // Переконайтесь, що scheduleSidebarChatListUpdate визначено у класі
+    // та інші залежності (Logger, CSS класи, типи) імпортовано/визначено.
     this.handleActiveChatChanged = async (data) => {
       var _a, _b, _c, _d, _e, _f;
       this.plugin.logger.error(`[OllamaView] handleActiveChatChanged: Received event. New activeId: ${data.chatId}, Prev activeId: ${this.lastProcessedChatId}. Chat object in event is ${data.chat ? "present" : "null"}.`);
@@ -4002,10 +4002,12 @@ This action cannot be undone.`,
       }
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Chat switched: ${chatSwitched}.`);
+      let metadataWasUpdatedByLoad = false;
       if (chatSwitched || data.chatId !== null && data.chat === null) {
         this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: FULL CHAT RELOAD condition met (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}).`);
         this.lastProcessedChatId = data.chatId;
-        await this.loadAndDisplayActiveChat();
+        const result = await this.loadAndDisplayActiveChat();
+        metadataWasUpdatedByLoad = result.metadataUpdated;
       } else if (data.chatId !== null && data.chat !== null) {
         this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Lighter update path (chat ID same, chat data provided).`);
         this.lastProcessedChatId = data.chatId;
@@ -4026,8 +4028,12 @@ This action cannot be undone.`,
         this.plugin.logger.warn(`[OllamaView] handleActiveChatChanged: Unhandled case? chatId=${data.chatId}, chat=${data.chat}, chatSwitched=${chatSwitched}`);
         this.lastProcessedChatId = data.chatId;
       }
-      this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Scheduling sidebar chat list update.`);
-      this.scheduleSidebarChatListUpdate();
+      if (!metadataWasUpdatedByLoad) {
+        this.plugin.logger.debug(`[OllamaView.handleActiveChatChanged] Metadata was NOT updated by load (or light/null path); Scheduling sidebar list update.`);
+        this.scheduleSidebarChatListUpdate();
+      } else {
+        this.plugin.logger.debug(`[OllamaView.handleActiveChatChanged] Metadata WAS updated by load; Relying on chat-list-updated event to schedule list update.`);
+      }
       if ((_f = this.sidebarManager) == null ? void 0 : _f.isSectionVisible("roles")) {
         this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Triggering sidebar role list update.`);
         this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list in handleActiveChatChanged:", e));
@@ -4036,7 +4042,7 @@ This action cannot be undone.`,
         this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Triggering dropdown role list update check.`);
         this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
       }
-      this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Finished processing event for chatId: ${data.chatId}.`);
+      this.plugin.logger.debug(`[OllamaView] handleActiveChatChanged: Finished processing event for chatId: ${data.chatId}. Metadata updated by load: ${metadataWasUpdatedByLoad}`);
     };
     this.plugin = plugin;
     this.app = plugin.app;
@@ -4475,149 +4481,6 @@ This action cannot be undone.`,
   isSidebarSectionVisible(type) {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
-  }
-  async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
-    try {
-      this.clearChatContainerInternal();
-      this.currentMessages = [];
-      this.lastRenderedMessageDate = null;
-      this.lastMessageElement = null;
-      this.consecutiveErrorMessages = [];
-      this.errorGroupElement = null;
-      let activeChat = null;
-      let availableModels = [];
-      let finalModelName = null;
-      let finalRolePath = void 0;
-      let finalRoleName = "None";
-      let finalTemperature = void 0;
-      let errorOccurred = false;
-      try {
-        activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
-        availableModels = await this.plugin.ollamaService.getModels();
-        finalRolePath = (_c = (_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) != null ? _c : this.plugin.settings.selectedRolePath;
-        finalRoleName = await this.findRoleNameByPath(finalRolePath);
-      } catch (error) {
-        new import_obsidian14.Notice("Error connecting to Ollama or loading chat data.", 5e3);
-        errorOccurred = true;
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_d = availableModels[0]) != null ? _d : null;
-        finalTemperature = this.plugin.settings.temperature;
-        finalRolePath = this.plugin.settings.selectedRolePath;
-        finalRoleName = await this.findRoleNameByPath(finalRolePath);
-        activeChat = null;
-      }
-      if (!errorOccurred && activeChat) {
-        let preferredModel = ((_e = activeChat.metadata) == null ? void 0 : _e.modelName) || this.plugin.settings.modelName;
-        if (availableModels.length > 0) {
-          if (preferredModel && availableModels.includes(preferredModel)) {
-            finalModelName = preferredModel;
-          } else {
-            finalModelName = availableModels[0];
-          }
-        } else {
-          finalModelName = null;
-        }
-        if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-          this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName }).catch((updateError) => {
-            this.plugin.logger.error(
-              "[loadAndDisplayActiveChat] Background error updating chat model metadata:",
-              updateError
-            );
-          });
-        }
-        finalTemperature = (_g = (_f = activeChat.metadata) == null ? void 0 : _f.temperature) != null ? _g : this.plugin.settings.temperature;
-      } else if (!errorOccurred && !activeChat) {
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_h = availableModels[0]) != null ? _h : null;
-        finalTemperature = this.plugin.settings.temperature;
-      }
-      if (activeChat !== null && !errorOccurred && ((_i = activeChat.messages) == null ? void 0 : _i.length) > 0) {
-        this.hideEmptyState();
-        this.currentMessages = [...activeChat.messages];
-        this.lastRenderedMessageDate = null;
-        for (const message of this.currentMessages) {
-          let messageGroupEl = null;
-          const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
-          const isFirstMessageInContainer = this.chatContainer.children.length === 0;
-          if (isNewDay || isFirstMessageInContainer) {
-            if (isNewDay) {
-              this.renderDateSeparator(message.timestamp);
-            }
-            this.lastRenderedMessageDate = message.timestamp;
-          }
-          try {
-            let renderer = null;
-            switch (message.role) {
-              case "user":
-                renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
-                break;
-              case "assistant":
-                renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
-                break;
-              case "system":
-                renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
-                break;
-              case "error":
-                renderer = new ErrorMessageRenderer(this.app, this.plugin, message, this);
-                this.lastMessageElement = null;
-                this.errorGroupElement = null;
-                this.consecutiveErrorMessages = [];
-                break;
-              default:
-            }
-            if (renderer) {
-              const result = renderer.render();
-              if (result instanceof Promise) {
-                messageGroupEl = await result;
-              } else {
-                messageGroupEl = result;
-              }
-            }
-          } catch (renderError) {
-            this.plugin.logger.error("Error rendering message during load:", renderError, message);
-            const errorDiv = this.chatContainer.createDiv({ cls: "render-error" });
-            errorDiv.setText(`Error rendering message (role: ${message.role})`);
-            messageGroupEl = errorDiv;
-          }
-          if (messageGroupEl) {
-            this.chatContainer.appendChild(messageGroupEl);
-            this.lastMessageElement = messageGroupEl;
-          }
-        }
-        setTimeout(() => this.checkAllMessagesForCollapsing(), 100);
-        setTimeout(() => {
-          this.guaranteedScrollToBottom(100, false);
-          setTimeout(() => {
-            this.updateScrollStateAndIndicators();
-          }, 150);
-        }, 150);
-      } else {
-        this.showEmptyState();
-        (_j = this.scrollToBottomButton) == null ? void 0 : _j.classList.remove(CSS_CLASSES.VISIBLE);
-      }
-      this.updateInputPlaceholder(finalRoleName);
-      this.updateRoleDisplay(finalRoleName);
-      this.updateModelDisplay(finalModelName);
-      this.updateTemperatureIndicator(finalTemperature);
-      if (finalModelName === null) {
-        if (this.inputEl) {
-          this.inputEl.disabled = true;
-          this.inputEl.placeholder = "No models available...";
-        }
-        if (this.sendButton) {
-          this.sendButton.disabled = true;
-          this.sendButton.classList.add(CSS_CLASSES.DISABLED);
-        }
-        this.setLoadingState(false);
-      } else {
-        if (this.inputEl) {
-          this.inputEl.disabled = this.isProcessing;
-        }
-        this.updateSendButtonState();
-      }
-    } catch (error) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX \u041F\u041E\u041C\u0418\u041B\u041A\u0410 \u043F\u0456\u0434 \u0447\u0430\u0441 \u0432\u0438\u043A\u043E\u043D\u0430\u043D\u043D\u044F XXX", error);
-    } finally {
-    }
   }
   async handleDeleteMessageClick(messageToDelete) {
     var _a;
@@ -6477,6 +6340,171 @@ Summary:`;
       }
     ).open();
   }
+  // src/OllamaView.ts
+  async loadAndDisplayActiveChat() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat START for activeId: ${(_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId()}`);
+    let metadataUpdated = false;
+    try {
+      this.clearChatContainerInternal();
+      this.currentMessages = [];
+      this.lastRenderedMessageDate = null;
+      this.lastMessageElement = null;
+      this.consecutiveErrorMessages = [];
+      this.errorGroupElement = null;
+      let activeChat = null;
+      let availableModels = [];
+      let finalModelName = null;
+      let finalRolePath = void 0;
+      let finalRoleName = "None";
+      let finalTemperature = void 0;
+      let errorOccurred = false;
+      try {
+        activeChat = await ((_b = this.plugin.chatManager) == null ? void 0 : _b.getActiveChat()) || null;
+        this.plugin.logger.debug(
+          `[loadAndDisplayActiveChat] Active chat fetched: ${(_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.id) != null ? _d : "null"}`
+        );
+        availableModels = await this.plugin.ollamaService.getModels();
+        finalRolePath = (_f = (_e = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _e.selectedRolePath) != null ? _f : this.plugin.settings.selectedRolePath;
+        finalRoleName = await this.findRoleNameByPath(finalRolePath);
+      } catch (error) {
+        this.plugin.logger.error("[loadAndDisplayActiveChat] Error loading initial chat data or models:", error);
+        new import_obsidian14.Notice("Error connecting to Ollama or loading chat data.", 5e3);
+        errorOccurred = true;
+        availableModels = availableModels || [];
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_g = availableModels[0]) != null ? _g : null;
+        finalTemperature = this.plugin.settings.temperature;
+        finalRolePath = this.plugin.settings.selectedRolePath;
+        finalRoleName = await this.findRoleNameByPath(finalRolePath);
+        activeChat = null;
+      }
+      if (!errorOccurred && activeChat) {
+        let preferredModel = ((_h = activeChat.metadata) == null ? void 0 : _h.modelName) || this.plugin.settings.modelName;
+        if (availableModels.length > 0) {
+          if (preferredModel && availableModels.includes(preferredModel)) {
+            finalModelName = preferredModel;
+          } else {
+            finalModelName = availableModels[0];
+            this.plugin.logger.warn(`[loadAndDisplayActiveChat] Preferred model "${preferredModel}" not found in available models [${availableModels.join(", ")}]. Using first available: "${finalModelName}".`);
+          }
+        } else {
+          finalModelName = null;
+          this.plugin.logger.error(`[loadAndDisplayActiveChat] No available models detected.`);
+        }
+        if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
+          this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat: Aligning model name in metadata (AWAITING)... Old: ${activeChat.metadata.modelName}, New: ${finalModelName}`);
+          try {
+            const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
+            if (updateSuccess) {
+              metadataUpdated = true;
+              this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat: Metadata alignment finished (success). metadataUpdated = true.`);
+              const potentiallyUpdatedChat = await this.plugin.chatManager.getChat(activeChat.metadata.id);
+              if (potentiallyUpdatedChat)
+                activeChat = potentiallyUpdatedChat;
+            } else {
+              this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat: Metadata alignment finished (no change needed). metadataUpdated = false.`);
+            }
+          } catch (updateError) {
+            this.plugin.logger.error("[loadAndDisplayActiveChat] Error awaiting chat model metadata update:", updateError);
+          }
+        }
+        finalTemperature = (_j = (_i = activeChat.metadata) == null ? void 0 : _i.temperature) != null ? _j : this.plugin.settings.temperature;
+      } else if (!errorOccurred && !activeChat) {
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_k = availableModels[0]) != null ? _k : null;
+        finalTemperature = this.plugin.settings.temperature;
+      }
+      if (activeChat !== null && !errorOccurred && ((_l = activeChat.messages) == null ? void 0 : _l.length) > 0) {
+        this.hideEmptyState();
+        this.currentMessages = [...activeChat.messages];
+        this.lastRenderedMessageDate = null;
+        for (const message of this.currentMessages) {
+          let messageGroupEl = null;
+          const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+          const isFirstMessageInContainer = this.chatContainer.children.length === 0;
+          if (isNewDay || isFirstMessageInContainer) {
+            if (isNewDay) {
+              this.renderDateSeparator(message.timestamp);
+            }
+            this.lastRenderedMessageDate = message.timestamp;
+          }
+          try {
+            let renderer = null;
+            switch (message.role) {
+              case "user":
+                renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
+                break;
+              case "assistant":
+                renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
+                break;
+              case "system":
+                renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
+                break;
+              case "error":
+                this.handleErrorMessage(message);
+                continue;
+              default:
+                this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role found in history: ${message == null ? void 0 : message.role}`);
+                continue;
+            }
+            if (renderer) {
+              const result = renderer.render();
+              messageGroupEl = result instanceof Promise ? await result : result;
+            }
+          } catch (renderError) {
+            this.plugin.logger.error("[loadAndDisplayActiveChat] Error rendering message during load:", renderError, message);
+            const errorDiv = this.chatContainer.createDiv({ cls: "render-error" });
+            errorDiv.setText(`Error rendering message (role: ${message.role})`);
+            messageGroupEl = errorDiv;
+          }
+          if (messageGroupEl) {
+            this.chatContainer.appendChild(messageGroupEl);
+            this.lastMessageElement = messageGroupEl;
+          }
+        }
+        setTimeout(() => this.checkAllMessagesForCollapsing(), 100);
+        setTimeout(() => {
+          this.guaranteedScrollToBottom(100, false);
+          setTimeout(() => {
+            this.updateScrollStateAndIndicators();
+          }, 150);
+        }, 150);
+      } else {
+        this.showEmptyState();
+        (_m = this.scrollToBottomButton) == null ? void 0 : _m.classList.remove(CSS_CLASSES.VISIBLE);
+      }
+      this.updateInputPlaceholder(finalRoleName);
+      this.updateRoleDisplay(finalRoleName);
+      this.updateModelDisplay(finalModelName);
+      this.updateTemperatureIndicator(finalTemperature);
+      if (finalModelName === null) {
+        if (this.inputEl) {
+          this.inputEl.disabled = true;
+          this.inputEl.placeholder = "No models available...";
+        }
+        if (this.sendButton) {
+          this.sendButton.disabled = true;
+          this.sendButton.classList.add(CSS_CLASSES.DISABLED);
+        }
+        if (this.isProcessing)
+          this.setLoadingState(false);
+      } else {
+        if (this.inputEl && !this.isProcessing) {
+          this.inputEl.disabled = false;
+        }
+        this.updateSendButtonState();
+      }
+      this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat FINISHED. Metadata was updated: ${metadataUpdated}`);
+    } catch (error) {
+      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL ERROR XXX", error);
+      this.clearChatContainerInternal();
+      this.showEmptyState();
+      const errorMsg = this.chatContainer.createDiv({ cls: "fatal-error-message", text: "Failed to load chat content." });
+      return { metadataUpdated: false };
+    } finally {
+    }
+    return { metadataUpdated };
+  }
+  // --- Кінець методу handleActiveChatChanged ---
 };
 
 // src/ragService.ts
