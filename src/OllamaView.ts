@@ -31,6 +31,7 @@ import { ErrorMessageRenderer } from "./renderers/ErrorMessageRenderer";
 import { BaseMessageRenderer } from "./renderers/BaseMessageRenderer";
 import { SidebarManager } from "./SidebarManager";
 import { DropdownMenuManager } from "./DropdownMenuManager";
+import { ToolMessageRenderer } from "./renderers/ToolMessageRenderer";
 
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
@@ -1124,100 +1125,135 @@ export class OllamaView extends ItemView {
     }
   };
 
-  // OllamaView.ts
+  // src/OllamaView.ts
 
-  private async addMessageStandard(message: Message): Promise<void> {
-    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
-    if (isNewDay) {
-      this.renderDateSeparator(message.timestamp);
-      this.lastRenderedMessageDate = message.timestamp;
-    } else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) {
-      this.lastRenderedMessageDate = message.timestamp;
+// ... (початок класу OllamaView та інші методи) ...
+
+private async addMessageStandard(message: Message): Promise<void> {
+  const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+  if (isNewDay) {
+    this.renderDateSeparator(message.timestamp);
+    this.lastRenderedMessageDate = message.timestamp;
+  } else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) {
+    // Встановлюємо дату для першого повідомлення, навіть якщо не новий день, щоб наступні могли порівнювати
+    this.lastRenderedMessageDate = message.timestamp;
+  }
+  this.hideEmptyState();
+
+  let messageGroupEl: HTMLElement | null = null;
+  try {
+    let renderer:
+      | UserMessageRenderer
+      | SystemMessageRenderer
+      | AssistantMessageRenderer
+      | ErrorMessageRenderer // Залишаємо на випадок прямого використання, хоча зазвичай error обробляється handleErrorMessage
+      | ToolMessageRenderer
+      | null = null;
+
+    switch (message.role) {
+      case "user":
+        renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
+        break;
+      case "assistant":
+        // AssistantMessageRenderer має обробляти наявність message.tool_calls
+        // для можливого спеціального відображення (напр., іконки "використовую інструмент")
+        // Також він рендерить message.content, де можуть бути текстові <tool_call> теги,
+        // якщо ви не прибираєте їх перед рендерингом.
+        renderer = new AssistantMessageRenderer(this.app, this.plugin, message as AssistantMessage, this); // Типізуємо як AssistantMessage
+        break;
+      case "system":
+        renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
+        break;
+      case "error":
+        // handleErrorMessage зазвичай сам додає елемент до DOM або керує групуванням помилок.
+        this.handleErrorMessage(message); 
+        return; // Виходимо, оскільки handleErrorMessage вже виконав рендеринг/додавання.
+      
+      case "tool":
+        this.plugin.logger.info(`[addMessageStandard] Creating ToolMessageRenderer for tool: ${message.name}, Content preview: "${message.content.substring(0, 70)}..."`);
+        renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
+        break;
+        
+      default:
+        // Обробка невідомої ролі
+        const exhaustiveCheck: never = message.role; // Допомагає TypeScript відстежити всі варіанти
+        this.plugin.logger.warn(`[addMessageStandard] Unknown message role encountered in switch: '${(message as any)?.role}'. Content: "${message.content.substring(0, 70)}"`);
+        
+        // Створюємо DOM елемент для невідомої ролі, щоб уникнути повної відсутності повідомлення
+        const unknownRoleGroup = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
+        if (unknownRoleGroup && this.chatContainer) { 
+            RendererUtils.renderAvatar(this.app, this.plugin, unknownRoleGroup, false); // <--- ВИПРАВЛЕНО: 4 аргументи            
+            const wrapper = unknownRoleGroup.createDiv({cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper"}); // Додано || "message-wrapper" як fallback
+            const msgBubble = wrapper.createDiv({cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.SYSTEM_MESSAGE}`}); // Стилізуємо як системне
+            msgBubble.createDiv({cls: "system-message-text", text: `Internal Plugin Error: Unknown message role received by renderer: '${message.role}'. Message content was logged.`});
+            BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this); // <--- ВИПРАВЛЕНО: this замість this.view
+            this.chatContainer.appendChild(unknownRoleGroup);
+
+            this.lastMessageElement = unknownRoleGroup; // Оновлюємо останній елемент
+        }
+        return; 
     }
-    this.hideEmptyState();
 
-    let messageGroupEl: HTMLElement | null = null;
+    if (renderer) {
+      const result = renderer.render(); // render() в BaseMessageRenderer тепер не abstract
+      messageGroupEl = result instanceof Promise ? await result : result;
+    } else {
+        // Це не мало б статися, якщо switch обробляє всі відомі ролі, а error/default роблять return
+        this.plugin.logger.warn(`[addMessageStandard] Renderer was not created for role: ${message.role}. This indicates a logic issue.`);
+        return;
+    }
+
+    if (messageGroupEl && this.chatContainer) {
+      this.chatContainer.appendChild(messageGroupEl);
+      this.lastMessageElement = messageGroupEl; // Оновлюємо посилання на останній елемент
+      if (!messageGroupEl.isConnected) {
+        // Це серйозна проблема, якщо DOM елемент не додається
+        this.plugin.logger.error(`[addMessageStandard] CRITICAL: Message group node for role ${message.role} was not connected to DOM after append!`);
+      }
+
+      messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"); // Додано fallback
+      setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"), 500);
+
+      const isUserMessage = message.role === "user";
+      // Логіка прокрутки та індикатора нових повідомлень
+      if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
+        this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE || "visible");  // Додано fallback
+      } else if (!this.userScrolledUp) {
+        // Плавна прокрутка, якщо користувач внизу, або швидка, якщо йде обробка
+        const scrollDelay = this.isProcessing && message.role === 'assistant' ? 30 : (isUserMessage ? 50 : 100);
+        const forceScroll = this.isProcessing ? true : !isUserMessage; // Форсуємо прокрутку для відповідей асистента під час обробки
+        this.guaranteedScrollToBottom(scrollDelay, forceScroll);
+      }
+      // Оновлюємо стан кнопок прокрутки з невеликою затримкою, щоб врахувати анімацію/прокрутку
+      setTimeout(() => this.updateScrollStateAndIndicators(), 150);
+    } else if (renderer) {
+        // Якщо рендерер був, але messageGroupEl не створено (що малоймовірно, якщо render() працює)
+        this.plugin.logger.warn(`[addMessageStandard] Renderer was created for role ${message.role}, but messageGroupEl was not generated or chatContainer is missing.`);
+    }
+  } catch (error: any) {
+    this.plugin.logger.error(
+      `[addMessageStandard] Unexpected error during message rendering. Role: ${
+        message?.role || "unknown"
+      }, Content Preview: "${message?.content?.substring(0, 100) || "N/A"}"`,
+      error
+    );
+    // Спроба відобразити повідомлення про помилку рендерингу в самому чаті
     try {
-      let renderer:
-        | UserMessageRenderer
-        | SystemMessageRenderer
-        | AssistantMessageRenderer
-        | ErrorMessageRenderer
-        | null = null;
-
-      switch (message.role) {
-        case "user":
-          renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
-          break;
-        case "system":
-          renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
-          break;
-        case "error":
-          // Якщо це повідомлення про помилку передається сюди, воно вже має бути Message.
-          // handleErrorMessage сам додасть його до DOM або згрупує.
-          this.handleErrorMessage(message); // Передаємо повний об'єкт message
-          return;
-        case "assistant":
-          renderer = new AssistantMessageRenderer(this.app, this.plugin, message, this);
-          break;
-        default:
-          this.plugin.logger.warn(`[addMessageStandard] Unknown message role: ${(message as any)?.role}`);
-          return;
-      }
-
-      if (renderer) {
-        const result = renderer.render();
-        messageGroupEl = result instanceof Promise ? await result : result;
-      }
-
-      if (messageGroupEl && this.chatContainer) {
-        this.chatContainer.appendChild(messageGroupEl);
-        this.lastMessageElement = messageGroupEl;
-        if (!messageGroupEl.isConnected) {
-          this.plugin.logger.error(`[addMessageStandard] Node not connected after append! Role: ${message.role}`);
-        }
-
-        messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-        setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-
-        const isUserMessage = message.role === "user";
-        if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
-          this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE);
-        } else if (!this.userScrolledUp) {
-          this.guaranteedScrollToBottom(isUserMessage ? 50 : 100, !isUserMessage);
-        }
-        setTimeout(() => this.updateScrollStateAndIndicators(), 100);
-      } else if (renderer) {
-      }
-    } catch (error: any) {
-      this.plugin.logger.error(
-        `[addMessageStandard] Error rendering/appending standard message. Role: ${
-          message.role
-        }, Content: "${message.content.substring(0, 100)}"`,
-        error
-      );
-      // Замість виклику handleErrorMessage з потенційно неповним об'єктом,
-      // створюємо DOM елемент помилки безпосередньо або викликаємо handleErrorMessage з повним об'єктом.
-      // Поточна версія створює DOM елемент:
-      const errorDiv = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
-      if (errorDiv) {
-        // Додаємо клас помилки до групи
-        errorDiv.addClass(CSS_CLASSES.ERROR_GROUP); // Припускаючи, що є такий клас для стилізації
-        // Додаємо аватар помилки (опціонально)
-        // RendererUtils.renderAvatar(this.app, this.plugin, errorDiv, true, 'error');
-        const errorWrapper = errorDiv.createDiv({ cls: "message-wrapper" });
-        const errorMessageEl = errorWrapper.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.ERROR_MESSAGE}` });
-        errorMessageEl.createDiv({
-          cls: CSS_CLASSES.ERROR_TEXT,
-          text: `Failed to display ${message.role} message. Render Error.`,
-        });
-        BaseMessageRenderer.addTimestamp(errorMessageEl, new Date(), this); // Додаємо поточний час для помилки рендерингу
-
-        // this.chatContainer?.appendChild(errorDiv); // Вже додано через createDiv у chatContainer
-        this.guaranteedScrollToBottom(50, true);
-      }
+        const errorNotice = `Failed to render message (Role: ${message?.role}). Check console for details.`;
+        const errorMsgObject: Message = {
+            role: 'error', // Використовуємо роль 'error'
+            content: errorNotice,
+            timestamp: new Date()
+        };
+        this.handleErrorMessage(errorMsgObject); // Використовуємо існуючий обробник помилок
+    } catch (criticalError){
+        this.plugin.logger.error("[addMessageStandard] CRITICAL: Failed even to display a render error message.", criticalError);
+        new Notice("Critical error displaying message. Check console.");
     }
   }
+}
+
+// ... (решта вашого класу OllamaView) ...
 
   private handleMessagesCleared = (chatId: string): void => {
     if (chatId === this.plugin.chatManager?.getActiveChatId()) {

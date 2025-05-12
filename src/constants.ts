@@ -51,5 +51,13 @@ export const CSS_CLASSES = {
     // States & Modifiers
     TRANSLATION_PENDING: "translation-pending", // For translate button maybe?
     RECORDING: "recording", // For voice button
+
+    TOOL_MESSAGE: "tool-message", // Клас для повідомлення від інструменту
+    TOOL_RESULT_HEADER: "tool-result-header", // Клас для заголовка результату інструменту
+    TOOL_RESULT_ICON: "tool-result-icon", // Клас для іконки в заголовку результату
+    TOOL_RESULT_CONTENT: "tool-result-content", // Клас для контенту результату інструменту
+
+    TOOL_MESSAGE_GROUP: "tool-message-group", // Клас для обгортки групи повідомлення інструменту
+    MESSAGE_WRAPPER: "message-wrapper"      // Клас для внутрішньої обгортки повідомлення (між аватаром та вмістом)
 };
 export const SCROLL_THRESHOLD = 150;

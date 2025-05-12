@@ -1,0 +1,89 @@
+// Змінні для кольорів (адаптуйте до вашої теми або використовуйте CSS змінні Obsidian)
+$tool-message-background: var(--background-secondary-alt, #2a2a2f); // Трохи світліший фон
+$tool-message-border-color: var(--background-modifier-border, #444);
+$tool-message-text-color: var(--text-muted, #999da5);
+$tool-message-header-color: var(--text-normal, #dddfe4);
+$tool-code-background: var(--background-primary, #202020);
+
+.tool-message-group {
+  // Можна додати відступи, якщо потрібно відрізняти від інших груп
+  // margin-bottom: 5px; 
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start; // Аватар зверху, якщо він багаторядковий
+  
+  // Якщо аватар зліва (як у асистента)
+  .avatar { // Припускаючи, що ваш RendererUtils.renderAvatar створює div з класом 'avatar'
+    margin-right: 8px; 
+  }
+}
+
+.tool-message {
+  background-color: $tool-message-background;
+  border: 1px solid $tool-message-border-color;
+  border-radius: var(--radius-m, 6px); // Використовуємо змінну Obsidian для радіусу
+  padding: 8px 12px;
+  color: $tool-message-text-color;
+  font-size: var(--font-ui-smaller, 0.85em); // Трохи менший шрифт
+  width: fit-content; // Або max-width, якщо потрібно обмежити
+  max-width: 85%; // Щоб не займало всю ширину
+  align-self: flex-start; // Розташування бульбашки в message-wrapper
+
+  .tool-result-header {
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    color: $tool-message-header-color;
+    margin-bottom: 6px;
+    font-size: var(--font-ui-small, 0.9em);
+
+    .tool-result-icon {
+      margin-right: 6px;
+      svg { // Стилізація SVG всередині іконки, якщо setIcon додає SVG
+        width: 1em;
+        height: 1em;
+        vertical-align: middle;
+      }
+    }
+  }
+
+  .tool-result-content {
+    // Стилі для <pre><code> всередині
+    pre {
+      background-color: $tool-code-background;
+      padding: 8px;
+      border-radius: var(--radius-s, 4px);
+      overflow-x: auto; // Горизонтальна прокрутка для довгого коду/тексту
+      margin: 0; // Скидаємо дефолтні відступи pre
+
+      code {
+        font-family: var(--font-monospace, monospace);
+        font-size: var(--font-ui-smaller, 0.85em); // Або інший розмір
+        color: var(--text-normal); // Колір тексту коду
+        white-space: pre-wrap; // Переносити довгі рядки, зберігаючи пробіли
+        word-break: break-all; // Дозволяє розривати дуже довгі слова/рядки без пробілів
+      }
+    }
+  }
+
+  // Стилізація кнопок дій, якщо вони є всередині .tool-message
+  .message-actions-wrapper {
+    margin-top: 8px;
+    text-align: right; // Або інше вирівнювання
+
+    .message-action-button, .copy-button, .delete-message-button { // Припускаючи, що це ваші класи
+      // Спільні стилі для кнопок, якщо потрібно
+      // Наприклад, зменшити розмір
+      padding: 2px 4px;
+      font-size: 0.9em;
+    }
+  }
+}
+
+// Додатково, якщо ви використовуєтеRendererUtils.renderAvatar з типом 'tool'
+// і він додає клас, наприклад, 'avatar-tool' до елемента аватара:
+.avatar-tool svg { // Приклад, якщо renderAvatar додає клас 'avatar-tool'
+  // Специфічні стилі для іконки інструменту, якщо це потрібно
+  // Наприклад, колір
+  // color: var(--text-accent);
+}
