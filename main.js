@@ -7379,7 +7379,7 @@ Summary:`;
     }
     return { metadataUpdated };
   }
-  // src/OllamaView.ts (всередині класу OllamaView)
+  // В OllamaView.ts
   parseAllTextualToolCalls(text) {
     const calls = [];
     const openTag = "<tool_call>";
@@ -7387,35 +7387,31 @@ Summary:`;
     let currentIndex = 0;
     while (currentIndex < text.length) {
       const openTagIndex = text.indexOf(openTag, currentIndex);
-      if (openTagIndex === -1) {
+      if (openTagIndex === -1)
         break;
-      }
       const closeTagIndex = text.indexOf(closeTag, openTagIndex + openTag.length);
       if (closeTagIndex === -1) {
-        this.plugin.logger.warn("[OllamaView.parseAllTextualToolCalls] Found an open <tool_call> tag without a closing tag. Stopping parse here.", { textFrom: text.substring(openTagIndex) });
+        this.plugin.logger.warn("[OllamaView.parseAllTextualToolCalls] Found an open <tool_call> tag without a subsequent closing tag.", { searchStartIndex: openTagIndex });
         break;
       }
       const jsonString = text.substring(openTagIndex + openTag.length, closeTagIndex).trim();
-      currentIndex = closeTagIndex + closeTag.length;
+      this.plugin.logger.debug(`[OllamaView.parseAllTextualToolCalls] Attempting to parse JSON string: "${jsonString}"`);
       try {
         const parsedJson = JSON.parse(jsonString);
         if (parsedJson && typeof parsedJson.name === "string" && (typeof parsedJson.arguments === "object" || parsedJson.arguments === void 0 || parsedJson.arguments === null)) {
           calls.push({ name: parsedJson.name, arguments: parsedJson.arguments || {} });
         } else {
-          this.plugin.logger.error(
-            "[OllamaView.parseAllTextualToolCalls] Parsed JSON from within <tool_call> tags does not match expected structure (name: string, arguments: object/undefined). Parsed:",
-            parsedJson
-          );
+          this.plugin.logger.error("[OllamaView.parseAllTextualToolCalls] Parsed JSON does not match expected structure.", { jsonString, parsedJson });
         }
       } catch (e) {
-        this.plugin.logger.error(
-          `[OllamaView.parseAllTextualToolCalls] Failed to parse JSON from tool_call content. JSON string was: "${jsonString}". Error:`,
-          e.message
-        );
+        this.plugin.logger.error(`[OllamaView.parseAllTextualToolCalls] Failed to parse JSON from tool_call content. JSON string was: "${jsonString}". Error:`, e.message);
       }
+      currentIndex = closeTagIndex + closeTag.length;
     }
     if (calls.length > 0) {
       this.plugin.logger.info(`[OllamaView.parseAllTextualToolCalls] Successfully parsed ${calls.length} textual tool call(s).`);
+    } else if (text.includes(openTag)) {
+      this.plugin.logger.warn(`[OllamaView.parseAllTextualToolCalls] <tool_call> tags were present, but no valid JSON calls were parsed.`);
     }
     return calls;
   }
