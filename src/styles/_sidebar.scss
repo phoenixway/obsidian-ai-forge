@@ -206,3 +206,24 @@ body.is-resizing {
     pointer-events: none !important;
   }
 }
+
+/* Стиль для елемента, який перетягується */
+.ollama-hierarchy-item.is-dragging {
+  opacity: 0.5;
+  /* Можна додати інші стилі, наприклад, зміну курсора */
+  cursor: grabbing; /* Або 'move' */
+}
+
+/* Стиль для папки, над якою можливе скидання */
+.ollama-folder-item.drag-over-target > .ollama-hierarchy-item-content {
+  background-color: var(--background-modifier-hover); /* Або інший колір для підсвічування */
+  outline: 1px dashed var(--interactive-accent);
+  outline-offset: -1px;
+}
+
+/* Забороняємо перетягування тексту всередині елементів списку */
+.ollama-hierarchy-item-content span {
+   user-select: none; /* Щоб випадково не почати перетягувати текст */
+   -webkit-user-select: none;
+}
+
