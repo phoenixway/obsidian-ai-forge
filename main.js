@@ -2568,6 +2568,7 @@ var SidebarManager = class {
     (_a = this.containerEl) == null ? void 0 : _a.remove();
     this.folderExpansionState.clear();
   }
+  // src/SidebarManager.ts
   handleDragStart(event, node) {
     this.plugin.logger.error(
       `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${node.type === "folder" ? node.name : node.metadata.name}, Path: ${node.type === "folder" ? node.path : node.filePath}`
@@ -2595,16 +2596,29 @@ var SidebarManager = class {
       event.target.addClass("is-dragging");
     }
     this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
+    if (this.containerEl) {
+      this.containerEl.classList.add("sidebar-drag-active");
+      this.plugin.logger.debug("[DragStart] Added 'sidebar-drag-active' to main container.");
+    }
     event.stopPropagation();
     this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
   }
+  // src/SidebarManager.ts
   handleDragEnd(event) {
+    var _a;
+    if (this.containerEl) {
+      this.containerEl.classList.remove("sidebar-drag-active");
+      this.plugin.logger.debug("[DragEnd] Removed 'sidebar-drag-active' from main container.");
+    }
+    if (this.rootDropZoneEl) {
+      this.rootDropZoneEl.removeClass("drag-over-root-target");
+    }
     if (event.target instanceof HTMLElement) {
       event.target.removeClass("is-dragging");
     }
-    this.containerEl.querySelectorAll(".drag-over-target").forEach((el) => el.removeClass("drag-over-target"));
+    (_a = this.containerEl) == null ? void 0 : _a.querySelectorAll(".drag-over-target").forEach((el) => el.removeClass("drag-over-target"));
     this.draggedItemData = null;
-    this.plugin.logger.trace("Drag End");
+    this.plugin.logger.trace("Drag End: Cleaned up draggedItemData and styles.");
   }
   handleDragOver(event) {
     event.preventDefault();
@@ -4400,21 +4414,17 @@ This action cannot be undone.`,
         clearTimeout(this.chatListUpdateTimeoutId);
       } else {
         if (this.isChatListUpdateScheduled) {
-          this.plugin.logger.debug("[OllamaView.scheduleSidebarChatListUpdate] Update already scheduled and pending, deferring new direct call.");
           return;
         }
         this.isChatListUpdateScheduled = true;
       }
-      this.plugin.logger.debug(`[OllamaView.scheduleSidebarChatListUpdate] Scheduling updateChatList with delay: ${delay}ms. Was pending: ${!!this.chatListUpdateTimeoutId}`);
       this.chatListUpdateTimeoutId = setTimeout(() => {
         var _a;
-        this.plugin.logger.debug("[OllamaView.scheduleSidebarChatListUpdate] Timeout fired. Executing updateChatList.");
         if ((_a = this.sidebarManager) == null ? void 0 : _a.isSectionVisible("chats")) {
           this.sidebarManager.updateChatList().catch((e) => this.plugin.logger.error("Error updating chat panel list via scheduleSidebarChatListUpdate:", e));
         }
         this.chatListUpdateTimeoutId = null;
         this.isChatListUpdateScheduled = false;
-        this.plugin.logger.debug("[OllamaView.scheduleSidebarChatListUpdate] Executed and flags reset.");
       }, delay);
     };
     // src/OllamaView.ts
@@ -6581,7 +6591,7 @@ Summary:`;
       "Confirm Regeneration",
       hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
       async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
         this.isRegenerating = true;
         const regenerationRequestTimestamp = new Date().getTime();
         this.plugin.logger.error(`[Regenerate START id:${regenerationRequestTimestamp}] For userMsg ts: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`);
@@ -6713,22 +6723,18 @@ Summary:`;
           }
         } catch (error) {
           streamErrorOccurred = error;
-          this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error during regeneration process:`, error);
           if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Removing active placeholder (ts: ${responseStartTimeMs}) due to error.`);
             if ((_h = this.activePlaceholder.groupEl) == null ? void 0 : _h.isConnected)
               this.activePlaceholder.groupEl.remove();
             this.activePlaceholder = null;
           }
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Error occurred, removing resolver from map for ts ${responseStartTimeMs} if it exists.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
           let errorMsgForChat = "An unexpected error occurred during regeneration.";
           let errorMsgRole = "error";
           let savePartialResponseOnError = false;
           if (error.name === "AbortError" || ((_i = error.message) == null ? void 0 : _i.includes("aborted by user"))) {
-            this.plugin.logger.info(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Regeneration was stopped/aborted.`);
             errorMsgForChat = "Regeneration stopped.";
             errorMsgRole = "system";
             if (accumulatedResponse.trim())
@@ -6737,39 +6743,28 @@ Summary:`;
             errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
             new import_obsidian14.Notice(errorMsgForChat, 5e3);
           }
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Adding error/system message to chat: "${errorMsgForChat}"`);
           this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true);
           if (savePartialResponseOnError) {
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] CATCH: Saving partial response after cancellation.`);
             this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
           }
         } finally {
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_j = this.activePlaceholder) == null ? void 0 : _j.timestamp}, messageAddedResolvers size: ${this.messageAddedResolvers.size}`);
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Resolver for ts ${responseStartTimeMs} still in map. Removing.`);
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
-          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === responseStartTimeMs) {
-            this.plugin.logger.warn(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Active placeholder (ts: ${responseStartTimeMs}) was STILL NOT CLEARED by HMA. Removing now.`);
-            if ((_l = this.activePlaceholder.groupEl) == null ? void 0 : _l.isConnected) {
+          if (((_j = this.activePlaceholder) == null ? void 0 : _j.timestamp) === responseStartTimeMs) {
+            if ((_k = this.activePlaceholder.groupEl) == null ? void 0 : _k.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
             this.activePlaceholder = null;
           }
           const prevAbortCtrl = this.currentAbortController;
           this.currentAbortController = null;
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: currentAbortController set to null. Was: ${prevAbortCtrl ? "active" : "null"}. Now: ${this.currentAbortController ? "active" : "null"}`);
           const prevIsRegen = this.isRegenerating;
           this.isRegenerating = false;
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: isRegenerating set to false. Was: ${prevIsRegen}. Now: ${this.isRegenerating}`);
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY: Calling setLoadingState(false).`);
           this.setLoadingState(false);
           requestAnimationFrame(() => {
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (requestAnimationFrame): Forcing updateSendButtonState. AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}`);
             this.updateSendButtonState();
-            this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (requestAnimationFrame): UI update attempt finished.`);
           });
-          this.plugin.logger.debug(`[Regenerate id:${regenerationRequestTimestamp}] FINALLY (END).`);
           this.focusInput();
         }
       }

@@ -1079,69 +1079,82 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
     this.folderExpansionState.clear();
   }
 
-  private handleDragStart(event: DragEvent, node: HierarchyNode): void {
-    // Ваш лог для відстеження, який вузол ініціював перетягування
-    this.plugin.logger.error( 
-        `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${
-        node.type === 'folder' ? node.name : node.metadata.name
-        }, Path: ${node.type === 'folder' ? node.path : node.filePath}`
-    );
+  // src/SidebarManager.ts
 
-    if (!event.dataTransfer) {
-        this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
-        return;
-    }
+private handleDragStart(event: DragEvent, node: HierarchyNode): void {
+  this.plugin.logger.error(
+      `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${
+      node.type === 'folder' ? node.name : node.metadata.name
+      }, Path: ${node.type === 'folder' ? node.path : node.filePath}`
+  );
 
-    // Якщо ця перевірка вам потрібна для дуже складних випадків вкладеності,
-    // її можна залишити, але stopPropagation має бути ефективнішим.
-    // if (this.draggedItemData && event.currentTarget !== event.target) {
-    //     this.plugin.logger.debug("[DragStart] Event currentTarget is different from target, possibly a parent. Current draggedItemData preserved if set by child.");
-    //     // Не перезаписуємо, якщо вже встановлено для більш глибокого елемента
-    //     // (це може бути не зовсім надійно без додаткової логіки)
-    // }
+  if (!event.dataTransfer) {
+      this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
+      return;
+  }
 
-    let id: string;
-    let path: string;
-    let name: string;
+  let id: string;
+  let path: string;
+  let name: string;
 
-    if (node.type === 'chat') {
-        id = node.metadata.id;
-        path = node.filePath;
-        name = node.metadata.name;
-    } else { // node.type === 'folder'
-        id = node.path; // Використовуємо path як "ID" для папки в контексті DND
-        path = node.path;
-        name = node.name;
-    }
+  if (node.type === 'chat') {
+      id = node.metadata.id;
+      path = node.filePath;
+      name = node.metadata.name;
+  } else { // node.type === 'folder'
+      id = node.path;
+      path = node.path;
+      name = node.name;
+  }
 
-    // Встановлюємо дані про перетягуваний елемент
-    this.draggedItemData = { type: node.type, id: id, path: path, name: name };
+  this.draggedItemData = { type: node.type, id: id, path: path, name: name };
 
-    event.dataTransfer.setData('text/plain', JSON.stringify(this.draggedItemData));
-    event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', JSON.stringify(this.draggedItemData));
+  event.dataTransfer.effectAllowed = 'move';
 
-    if (event.target instanceof HTMLElement) {
-      event.target.addClass('is-dragging');
-    }
-    this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
+  if (event.target instanceof HTMLElement) {
+    event.target.addClass('is-dragging');
+  }
+  this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
 
-    // --- ВАЖЛИВО: Зупиняємо подальше спливання події dragstart ---
-    event.stopPropagation();
-    this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
+  // --- ДОДАНО: Робимо rootDropZone видимою ---
+  if (this.containerEl) { // Переконуємось, що головний контейнер існує
+      this.containerEl.classList.add('sidebar-drag-active');
+      this.plugin.logger.debug("[DragStart] Added 'sidebar-drag-active' to main container.");
+  }
+  // --- КІНЕЦЬ ДОДАНОГО ---
+
+  event.stopPropagation();
+  this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
 }
 
 
-  private handleDragEnd(event: DragEvent): void {
-    // Очищаємо дані та стилі
-    if (event.target instanceof HTMLElement) {
-      event.target.removeClass('is-dragging');
-      // event.target.style.opacity = ''; // Повертаємо непрозорість
-    }
-    // Очищаємо візуальне підсвічування з усіх можливих цілей
-    this.containerEl.querySelectorAll('.drag-over-target').forEach(el => el.removeClass('drag-over-target'));
-    this.draggedItemData = null; // Скидаємо збережені дані
-     this.plugin.logger.trace('Drag End');
+  // src/SidebarManager.ts
+
+private handleDragEnd(event: DragEvent): void {
+  // --- ДОДАНО: Ховаємо rootDropZone ---
+  if (this.containerEl) { // Переконуємось, що головний контейнер існує
+      this.containerEl.classList.remove('sidebar-drag-active');
+      this.plugin.logger.debug("[DragEnd] Removed 'sidebar-drag-active' from main container.");
   }
+  // Також прибираємо підсвічування з самої зони, якщо воно було
+  if (this.rootDropZoneEl) {
+      this.rootDropZoneEl.removeClass('drag-over-root-target');
+  }
+  // --- КІНЕЦЬ ДОДАНОГО ---
+
+
+  // Очищаємо стилі з елемента, який перетягували
+  if (event.target instanceof HTMLElement) {
+    event.target.removeClass('is-dragging');
+    // event.target.style.opacity = ''; // Якщо ви змінювали opacity напряму
+  }
+  // Очищаємо візуальне підсвічування з усіх можливих цілей (папок)
+  this.containerEl?.querySelectorAll('.drag-over-target').forEach(el => el.removeClass('drag-over-target'));
+  
+  this.draggedItemData = null; // Скидаємо збережені дані про перетягуваний елемент
+  this.plugin.logger.trace('Drag End: Cleaned up draggedItemData and styles.');
+}
 
   private handleDragOver(event: DragEvent): void {
     event.preventDefault();
