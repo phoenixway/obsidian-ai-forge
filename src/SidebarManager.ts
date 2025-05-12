@@ -1224,9 +1224,10 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
   }
 
   private handleDragEnterRoot(event: DragEvent): void {
+    
     event.preventDefault();
     const targetElement = event.currentTarget as HTMLElement;
-
+    this.plugin.logger.debug(`[DragEnterRoot] Event fired for target: ${targetElement.className}`);
     // Перевіряємо, чи щось перетягується
     if (!this.draggedItemData) return;
 

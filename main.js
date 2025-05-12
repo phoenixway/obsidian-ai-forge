@@ -2672,6 +2672,7 @@ var SidebarManager = class {
   handleDragEnterRoot(event) {
     event.preventDefault();
     const targetElement = event.currentTarget;
+    this.plugin.logger.debug(`[DragEnterRoot] Event fired for target: ${targetElement.className}`);
     if (!this.draggedItemData)
       return;
     if (targetElement === this.chatPanelListContainerEl) {
