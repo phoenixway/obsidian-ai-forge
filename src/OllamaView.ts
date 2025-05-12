@@ -3214,7 +3214,7 @@ export class OllamaView extends ItemView {
         this.plugin.logger.error(
           `[sendMessage id:${requestTimestampId}] No active chat and failed to create a new one.`
         );
-        this.setLoadingState(false); 
+        this.setLoadingState(false);
         return;
       }
       new Notice(`Started new chat: ${activeChat.metadata.name}`);
@@ -3238,19 +3238,18 @@ export class OllamaView extends ItemView {
     const llmResponseStartTimeMs = llmResponseStartTime.getTime();
 
     let streamErrorOccurred: Error | null = null;
-    let userMessageProcessedPromise: Promise<void> | undefined;
     
     let currentMessagesForLlmTurn: Message[];
     let continueConversation = true;
-    const maxTurns = 5;
+    const maxTurns = 5; // Запобіжник від нескінченних циклів інструментів
     let turns = 0;
-    let currentTurnLlmResponseTsForCatch: number | null = null; 
+    let currentTurnLlmResponseTsForCatch: number | null = null;
 
     try {
       this.plugin.logger.debug(
         `[sendMessage id:${requestTimestampId}] Setting up resolver for UserMessage (ts: ${userMessageTimestampMs}).`
       );
-      userMessageProcessedPromise = new Promise<void>((resolve, reject) => {
+      let userMessageProcessedPromise = new Promise<void>((resolve, reject) => {
         this.messageAddedResolvers.set(userMessageTimestampMs, resolve);
         setTimeout(() => {
           if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
@@ -3271,7 +3270,7 @@ export class OllamaView extends ItemView {
         "user",
         userMessageContent,
         userMessageTimestamp,
-        true
+        true 
       );
 
       await userMessageProcessedPromise;
@@ -3279,7 +3278,7 @@ export class OllamaView extends ItemView {
         `[sendMessage id:${requestTimestampId}] UserMessage (ts: ${userMessageTimestampMs}) processed by HMA.`
       );
 
-      const initialChatState = await this.plugin.chatManager.getActiveChatOrFail(); // Потрібен цей метод в ChatManager
+      const initialChatState = await this.plugin.chatManager.getActiveChatOrFail();
       currentMessagesForLlmTurn = [...initialChatState.messages];
 
       while (continueConversation && turns < maxTurns && !this.currentAbortController.signal.aborted) {
@@ -3312,7 +3311,7 @@ export class OllamaView extends ItemView {
           assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", currentTurnLlmResponseTs.toString());
           RendererUtils.renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
           const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-          messageWrapperEl.style.order = "2"; 
+          messageWrapperEl.style.order = "2";
           const assistantMessageElement = messageWrapperEl.createDiv({
             cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`,
           });
@@ -3345,20 +3344,20 @@ export class OllamaView extends ItemView {
           );
         }
 
-        const currentChatStateForStream = await this.plugin.chatManager.getChat(chatId); 
+        const currentChatStateForStream = await this.plugin.chatManager.getChat(chatId);
         if (!currentChatStateForStream) {
             this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] Active chat (ID: ${chatId}) disappeared mid-turn ${turns}.`);
             throw new Error(`Active chat (ID: ${chatId}) disappeared mid-turn.`);
         }
-        currentMessagesForLlmTurn = [...currentChatStateForStream.messages]; // Оновлюємо перед кожним запитом
+        currentMessagesForLlmTurn = [...currentChatStateForStream.messages];
 
         const stream = this.plugin.ollamaService.generateChatResponseStream(
-          currentChatStateForStream, 
+          currentChatStateForStream,
           this.currentAbortController.signal
         );
 
         let firstChunkForTurn = true;
-        let pendingNativeToolCalls: ToolCall[] | null = null; // Для нативних tool_calls
+        let pendingNativeToolCalls: ToolCall[] | null = null;
         let assistantMessageObjectWithNativeCalls: AssistantMessage | null = null;
 
         for await (const chunk of stream) {
@@ -3375,8 +3374,8 @@ export class OllamaView extends ItemView {
             this.plugin.logger.warn(
               `[sendMessage id:${requestTimestampId}] Stale placeholder detected during stream processing (active_ts: ${this.activePlaceholder?.timestamp}, current_turn_ts: ${currentTurnLlmResponseTs}). Chunk for current_turn_ts might be ignored by placeholder update.`
             );
-            if (chunk.type === "done") break; 
-            continue; 
+            if (chunk.type === "done") break;
+            continue;
           }
 
           if (chunk.type === "content") {
@@ -3396,7 +3395,7 @@ export class OllamaView extends ItemView {
               );
               this.guaranteedScrollToBottom(30, true);
             }
-          } else if (chunk.type === "tool_calls") { // Нативний tool_call
+          } else if (chunk.type === "tool_calls") {
             this.plugin.logger.info(
               `[sendMessage id:${requestTimestampId}] Orchestrator: Native TOOL_CALLS received from chunk:`, chunk.calls
             );
@@ -3426,110 +3425,96 @@ export class OllamaView extends ItemView {
             this.plugin.logger.info(
               `[sendMessage id:${requestTimestampId}] Orchestrator: LLM stream turn ${turns} done (received 'done' chunk).`
             );
-            break; 
-          }
-        } 
-
-        if (this.currentAbortController.signal.aborted) throw new Error("aborted by user");
-
-        let toolsToExecute: ToolCall[] | null = pendingNativeToolCalls;
-        let assistantMessageForTurn: AssistantMessage | null = assistantMessageObjectWithNativeCalls;
-        let isTextualFallback = false;
-
-        if (!toolsToExecute || toolsToExecute.length === 0) {
-          // Немає нативних tool_calls, перевіряємо на текстовий fallback
-          this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] No native tool_calls. Checking for textual tool_call in accumulated response (length: ${accumulatedAssistantResponseContent.length})`);
-          const textualToolCallParsed = this.parseTextForToolCall(accumulatedAssistantResponseContent);
-
-          if (textualToolCallParsed) {
-            this.plugin.logger.info(
-              `[sendMessage id:${requestTimestampId}] Orchestrator: Fallback textual tool_call parsed for turn ${turns}:`, textualToolCallParsed
-            );
-            isTextualFallback = true;
-            // Створюємо структуру, схожу на нативний ToolCall
-            toolsToExecute = [{
-              type: "function",
-              id: `texttool-${Date.now()}-${Math.random().toString(36).substring(2,7)}`, // Унікальний ID
-              function: {
-                name: textualToolCallParsed.name,
-                arguments: JSON.stringify(textualToolCallParsed.arguments || {}), // Переконуємось, що arguments - це JSON рядок
-              },
-            }];
-            // Повідомлення асистента - це весь текст, що містив виклик
-            assistantMessageForTurn = {
-              role: "assistant",
-              content: accumulatedAssistantResponseContent,
-              timestamp: new Date(currentTurnLlmResponseTs),
-              // Можна додати поле, що вказує на текстовий виклик, для внутрішніх потреб (не стандартне)
-              // _textual_tool_call_info: textualToolCallParsed 
-            };
+            break;
           }
         }
 
-        if (toolsToExecute && toolsToExecute.length > 0) {
+        if (this.currentAbortController.signal.aborted) throw new Error("aborted by user");
+
+        let processedToolCallsThisTurn: ToolCall[] | null = pendingNativeToolCalls;
+        let assistantMessageContentForHistory = accumulatedAssistantResponseContent;
+        let assistantMessageObjectForHistory: AssistantMessage | null = assistantMessageObjectWithNativeCalls;
+        let isTextualFallbackUsed = false;
+
+        if (!processedToolCallsThisTurn || processedToolCallsThisTurn.length === 0) {
+          this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] No native tool_calls. Checking for textual tool_calls in accumulated response (length: ${accumulatedAssistantResponseContent.length})`);
+          const parsedTextualCalls = this.parseAllTextualToolCalls(accumulatedAssistantResponseContent);
+
+          if (parsedTextualCalls.length > 0) {
+            this.plugin.logger.info(
+              `[sendMessage id:${requestTimestampId}] Orchestrator: Fallback textual tool_calls parsed (count: ${parsedTextualCalls.length}) for turn ${turns}:`, parsedTextualCalls
+            );
+            isTextualFallbackUsed = true;
+            processedToolCallsThisTurn = parsedTextualCalls.map((tc, index) => ({
+              type: "function",
+              id: `texttool-${currentTurnLlmResponseTs}-${index}`,
+              function: {
+                name: tc.name,
+                arguments: JSON.stringify(tc.arguments || {}),
+              },
+            }));
+            assistantMessageObjectForHistory = {
+              role: "assistant",
+              content: accumulatedAssistantResponseContent,
+              timestamp: new Date(currentTurnLlmResponseTs),
+            };
+            assistantMessageContentForHistory = accumulatedAssistantResponseContent;
+          }
+        }
+
+        if (processedToolCallsThisTurn && processedToolCallsThisTurn.length > 0) {
           this.plugin.logger.info(
-            `[sendMessage id:${requestTimestampId}] Orchestrator: Executing ${toolsToExecute.length} tools (native or textual fallback) for turn ${turns}.`
+            `[sendMessage id:${requestTimestampId}] Orchestrator: Executing ${processedToolCallsThisTurn.length} tools (type: ${isTextualFallbackUsed ? 'textual_fallback' : 'native'}) for turn ${turns}.`
           );
 
-          // Переконуємось, що assistantMessageForTurn існує (для текстового fallback воно створюється вище)
-          if (!assistantMessageForTurn) {
-              // Це трапиться, якщо були pendingNativeToolCalls, але assistantMessageObjectWithNativeCalls був null
-              // (що малоймовірно, якщо OllamaService працює правильно)
-              assistantMessageForTurn = {
-                role: "assistant",
-                content: accumulatedAssistantResponseContent,
-                timestamp: new Date(currentTurnLlmResponseTs),
-                tool_calls: toolsToExecute // Додаємо сюди, якщо це нативні
+          if (!assistantMessageObjectForHistory) {
+              assistantMessageObjectForHistory = {
+                  role: "assistant",
+                  content: assistantMessageContentForHistory,
+                  timestamp: new Date(currentTurnLlmResponseTs),
+                  tool_calls: isTextualFallbackUsed ? undefined : processedToolCallsThisTurn 
               };
-              this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] assistantMessageObjectWithNativeCalls was null, constructed assistantMessageForTurn manually.`);
           } else {
-            // Якщо це нативний виклик, поле tool_calls вже має бути в assistantMessageForTurn (воно ж assistantMessageObjectWithNativeCalls)
-            // Якщо це текстовий, ми не додаємо tool_calls до цього об'єкту, бо це імітація
-            if (!isTextualFallback && assistantMessageForTurn) {
-                 assistantMessageForTurn.tool_calls = toolsToExecute; // Переконуємось, що tool_calls на місці для нативних
-            }
+              assistantMessageObjectForHistory.content = assistantMessageContentForHistory;
+              if (!isTextualFallbackUsed) {
+                  assistantMessageObjectForHistory.tool_calls = processedToolCallsThisTurn;
+              } else {
+                   delete assistantMessageObjectForHistory.tool_calls; 
+              }
           }
           
-          // Переприсвоюємо контент, якщо він змінився (наприклад, додався з assistantMessageObjectWithNativeCalls.content)
-          assistantMessageForTurn.content = accumulatedAssistantResponseContent;
-
-          const assistantMsgTsMs = assistantMessageForTurn.timestamp.getTime();
+          const assistantMsgTsMs = assistantMessageObjectForHistory.timestamp.getTime();
           this.plugin.logger.debug(
-            `[sendMessage id:${requestTimestampId}] Adding assistant message (intent to call tools) to ChatManager (ts: ${assistantMsgTsMs}). Content: "${assistantMessageForTurn.content?.substring(0,30)}..." Tools: ${JSON.stringify(assistantMessageForTurn.tool_calls)}`
+            `[sendMessage id:${requestTimestampId}] Adding assistant message (intent to call tools) to ChatManager (ts: ${assistantMsgTsMs}). Content: "${assistantMessageObjectForHistory.content?.substring(0,100)}..."`
           );
           
           let assistantMsgProcessedPromise = new Promise<void>((resolve, reject) => {
-            this.messageAddedResolvers.set(assistantMsgTsMs, resolve);
-            setTimeout(() => { if (this.messageAddedResolvers.has(assistantMsgTsMs)) { this.messageAddedResolvers.delete(assistantMsgTsMs); reject(new Error(`Timeout HMA for assistant msg with tool intent (ts: ${assistantMsgTsMs})`));}}, 10000);
+              this.messageAddedResolvers.set(assistantMsgTsMs, resolve);
+              setTimeout(() => { if (this.messageAddedResolvers.has(assistantMsgTsMs)) { this.messageAddedResolvers.delete(assistantMsgTsMs); reject(new Error(`Timeout HMA for assistant msg with tool intent (ts: ${assistantMsgTsMs})`));}}, 10000);
           });
-          await this.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageForTurn, true);
+          await this.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageObjectForHistory, true);
           await assistantMsgProcessedPromise;
           this.plugin.logger.info(
             `[sendMessage id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`
           );
           
-          // Важливо: НЕ оновлюємо currentMessagesForLlmTurn тут, це має статися ПІСЛЯ додавання результатів інструментів
-
           if (this.activePlaceholder?.timestamp === currentTurnLlmResponseTs) {
             this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${currentTurnLlmResponseTs}) as assistant message with tool intent was processed by HMA.`);
             this.activePlaceholder = null; 
           }
 
-          for (const call of toolsToExecute) {
+          for (const call of processedToolCallsThisTurn) {
             if (this.currentAbortController.signal.aborted) throw new Error("aborted by user");
             if (call.type === "function") {
               const toolName = call.function.name;
               let toolArgs = {};
               try {
-                // call.function.arguments ВЖЕ має бути рядком JSON
                 toolArgs = JSON.parse(call.function.arguments || "{}"); 
               } catch (e: any) {
-                // ... (обробка помилки парсингу аргументів, як раніше) ...
                 const errorResultMsgContent = `Error: Could not parse arguments for tool ${toolName}. Invalid JSON: ${e.message}. Arguments string: "${call.function.arguments}"`;
-                // ... (додавання errorToolMsg до ChatManager та очікування HMA)
                 const errorToolTimestamp = new Date();
                 const errorToolMsg: Message = { role: "tool", tool_call_id: call.id, name: toolName, content: errorResultMsgContent, timestamp: errorToolTimestamp };
-                let toolErrorMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(errorToolMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for tool error")), 10000); });
+                let toolErrorMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(errorToolMsg.timestamp.getTime(), resolve); setTimeout(() => { if(this.messageAddedResolvers.has(errorToolMsg.timestamp.getTime())) {this.messageAddedResolvers.delete(errorToolMsg.timestamp.getTime()); reject(new Error("HMA timeout for tool error"));}}, 10000); });
                 await this.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
                 try { await toolErrorMsgProcessedPromise; } catch(e_hma){this.plugin.logger.error("HMA error/timeout for tool error message", e_hma);};
                 continue;
@@ -3550,11 +3535,11 @@ export class OllamaView extends ItemView {
               this.plugin.logger.info( `[sendMessage id:${requestTimestampId}] Tool result message (ts: ${toolResponseMessage.timestamp.getTime()}) for ${toolName} processed by HMA.` );
             }
           }
-          // Після обробки всіх інструментів, оновлюємо історію для наступного ходу LLM
-          const updatedChatAfterTools = await this.plugin.chatManager.getActiveChatOrFail();
-          currentMessagesForLlmTurn = [...updatedChatAfterTools.messages];
+          const updatedChatAfterToolsLoop = await this.plugin.chatManager.getActiveChatOrFail();
+          currentMessagesForLlmTurn = [...updatedChatAfterToolsLoop.messages];
           continueConversation = true;
-        } else { // Немає ані нативних, ані текстових викликів - фінальна відповідь
+
+        } else { 
           this.plugin.logger.info( `[sendMessage id:${requestTimestampId}] Orchestrator: No native or textual tool calls for turn ${turns}. This is a final text response.` );
           if (accumulatedAssistantResponseContent.trim()) {
             const finalAssistantMessageTimestamp = new Date(currentTurnLlmResponseTs);
@@ -3580,7 +3565,7 @@ export class OllamaView extends ItemView {
             }
             const emptyResponseMsgTimestamp = new Date();
             const emptyResponseMsg: Message = {role: "system", content: "Assistant provided an empty response.", timestamp: emptyResponseMsgTimestamp};
-            let emptyResponseMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(emptyResponseMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for empty sys msg")), 10000);});
+            let emptyResponseMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(emptyResponseMsg.timestamp.getTime(), resolve); setTimeout(() => { if(this.messageAddedResolvers.has(emptyResponseMsg.timestamp.getTime())){this.messageAddedResolvers.delete(emptyResponseMsg.timestamp.getTime()); reject(new Error("HMA timeout for empty sys msg"))}}, 10000);});
             await this.plugin.chatManager.addMessageToActiveChatPayload(emptyResponseMsg, true);
             try { await emptyResponseMsgProcessedPromise; } catch(e_hma){this.plugin.logger.error("HMA error/timeout for empty response system message", e_hma);}
           }
@@ -3603,7 +3588,7 @@ export class OllamaView extends ItemView {
           content: "Max processing turns reached. If the task is not complete, please try rephrasing or breaking it down.",
           timestamp: maxTurnsMsgTimestamp,
         };
-        let maxTurnsMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(maxTurnsMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for max turns")), 10000);});
+        let maxTurnsMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(maxTurnsMsg.timestamp.getTime(), resolve); setTimeout(() => {if(this.messageAddedResolvers.has(maxTurnsMsg.timestamp.getTime())){this.messageAddedResolvers.delete(maxTurnsMsg.timestamp.getTime()); reject(new Error("HMA timeout for max turns"))}}, 10000);});
         await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
         try {await maxTurnsMsgProcessedPromise;} catch(e_hma){this.plugin.logger.error("HMA error/timeout for max turns system message", e_hma);}
       }
@@ -3626,7 +3611,6 @@ export class OllamaView extends ItemView {
         this.activePlaceholder = null;
       }
       
-      // Очищення резолверів
       this.messageAddedResolvers.delete(userMessageTimestampMs);
       this.messageAddedResolvers.delete(llmResponseStartTimeMs);
       if (currentTurnLlmResponseTsForCatch !== null) {
@@ -3646,7 +3630,7 @@ export class OllamaView extends ItemView {
       const errorTimestamp = new Date();
       const errorDisplayMsg: Message = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorTimestamp };
 
-      let errorDisplayMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(errorDisplayMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for error display")), 10000); });
+      let errorDisplayMsgProcessedPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(errorDisplayMsg.timestamp.getTime(), resolve); setTimeout(() => {if(this.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())){this.messageAddedResolvers.delete(errorDisplayMsg.timestamp.getTime()); reject(new Error("HMA timeout for error display"))}}, 10000); });
       await this.plugin.chatManager.addMessageToActiveChatPayload(errorDisplayMsg, true);
       try { await errorDisplayMsgProcessedPromise; } catch (e_hma) { this.plugin.logger.error("[sendMessage] Timeout/Error waiting for HMA of error display message", e_hma); }
 
@@ -3664,8 +3648,7 @@ export class OllamaView extends ItemView {
       if (currentTurnLlmResponseTsForCatch !== null) {
           this.messageAddedResolvers.delete(currentTurnLlmResponseTsForCatch);
       }
-      // Можна додати this.messageAddedResolvers.clear(); якщо є побоювання щодо "завислих" резолверів.
-
+      
       if (this.activePlaceholder) {
         if (this.activePlaceholder.groupEl.classList.contains("placeholder")) {
           this.plugin.logger.warn(
@@ -4694,7 +4677,57 @@ export class OllamaView extends ItemView {
     return { metadataUpdated }; // Повертаємо результат
   }
 
-  // src/OllamaView.ts
+  // src/OllamaView.ts (всередині класу OllamaView)
+
+private parseAllTextualToolCalls(text: string): Array<{ name: string; arguments: any }> {
+  const calls: Array<{ name: string; arguments: any }> = [];
+  const openTag = "<tool_call>";
+  const closeTag = "</tool_call>";
+  let currentIndex = 0;
+
+  while (currentIndex < text.length) {
+    const openTagIndex = text.indexOf(openTag, currentIndex);
+    if (openTagIndex === -1) {
+      // Більше немає відкриваючих тегів
+      break;
+    }
+
+    const closeTagIndex = text.indexOf(closeTag, openTagIndex + openTag.length);
+    if (closeTagIndex === -1) {
+      // Немає відповідного закриваючого тегу для останнього знайденого відкритого
+      this.plugin.logger.warn("[OllamaView.parseAllTextualToolCalls] Found an open <tool_call> tag without a closing tag. Stopping parse here.", { textFrom: text.substring(openTagIndex) });
+      break;
+    }
+
+    const jsonString = text.substring(openTagIndex + openTag.length, closeTagIndex).trim();
+    
+    // Важливо: оновлюємо currentIndex, щоб наступний пошук почався ПІСЛЯ поточного блоку
+    currentIndex = closeTagIndex + closeTag.length;
+
+    try {
+      const parsedJson = JSON.parse(jsonString);
+      if (parsedJson && 
+          typeof parsedJson.name === 'string' && 
+          (typeof parsedJson.arguments === 'object' || parsedJson.arguments === undefined || parsedJson.arguments === null)
+         ) {
+        calls.push({ name: parsedJson.name, arguments: parsedJson.arguments || {} }); // Використовуємо {} якщо arguments undefined/null
+      } else {
+        this.plugin.logger.error(
+          "[OllamaView.parseAllTextualToolCalls] Parsed JSON from within <tool_call> tags does not match expected structure (name: string, arguments: object/undefined). Parsed:", parsedJson
+        );
+      }
+    } catch (e: any) {
+      this.plugin.logger.error(
+        `[OllamaView.parseAllTextualToolCalls] Failed to parse JSON from tool_call content. JSON string was: "${jsonString}". Error:`, e.message
+      );
+    }
+  }
+
+  if (calls.length > 0) {
+    this.plugin.logger.info(`[OllamaView.parseAllTextualToolCalls] Successfully parsed ${calls.length} textual tool call(s).`);
+  }
+  return calls;
+}
 
   // Переконайтесь, що scheduleSidebarChatListUpdate визначено у класі
   // та інші залежності (Logger, CSS класи, типи) імпортовано/визначено.
