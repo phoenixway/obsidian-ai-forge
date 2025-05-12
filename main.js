@@ -1505,6 +1505,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}
 
 ${contentToRender}` : usingToolMessage;
+      this.plugin.logger.debug(`[AssistantMessageRenderer] toolNamesCalled: "${toolNamesCalled}"`);
       this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after processing tool indicators: "${contentToRender}"`);
     }
     try {
