@@ -1452,7 +1452,6 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
 // src/renderers/AssistantMessageRenderer.ts
 var import_obsidian9 = require("obsidian");
 var AssistantMessageRenderer = class extends BaseMessageRenderer {
-  // У конструкторі ми очікуємо AssistantMessage, щоб мати доступ до message.tool_calls
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
     if (message.role !== "assistant") {
@@ -1471,54 +1470,48 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
     let contentToRender = this.message.content;
     const assistantMessage = this.message;
-    const hasTextualToolCallTags = contentToRender.includes("<tool_call>");
+    const hasTextualToolCallTags = typeof contentToRender === "string" && contentToRender.includes("<tool_call>");
     const hasNativeToolCalls = assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
-    if (this.plugin.settings.enableToolUse && hasTextualToolCallTags && !hasNativeToolCalls) {
-      this.plugin.logger.debug(`[AssistantMessageRenderer] Message (ts: ${this.message.timestamp.getTime()}) contains textual tool call tags. Preparing display content.`);
-      let strippedContent = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-      if (strippedContent.startsWith("***")) {
-        strippedContent = strippedContent.substring(3).trim();
-      }
-      if (strippedContent.endsWith("***")) {
-        strippedContent = strippedContent.substring(0, strippedContent.length - 3).trim();
-      }
-      const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
-      let match;
-      const toolNamesCalled = [];
-      toolCallRegex.lastIndex = 0;
-      while ((match = toolCallRegex.exec(contentToRender)) !== null) {
-        if (match[1])
-          toolNamesCalled.push(match[1]);
-      }
+    if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls)) {
+      this.plugin.logger.debug(`[AssistantMessageRenderer] Message (ts: ${this.message.timestamp.getTime()}) contains tool call indicators. Preparing display content.`);
       let usingToolMessage = "( ";
+      const toolNamesCalled = [];
+      if (hasNativeToolCalls && assistantMessage.tool_calls) {
+        this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls found: ${assistantMessage.tool_calls.length}`);
+        assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
+      } else if (hasTextualToolCallTags && typeof contentToRender === "string") {
+        this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found.`);
+        const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
+        let match;
+        toolCallRegex.lastIndex = 0;
+        while ((match = toolCallRegex.exec(contentToRender)) !== null) {
+          if (match[1])
+            toolNamesCalled.push(match[1]);
+        }
+        contentToRender = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+        if (contentToRender.startsWith("***")) {
+          contentToRender = contentToRender.substring(3).trim();
+        }
+        if (contentToRender.endsWith("***")) {
+          contentToRender = contentToRender.substring(0, contentToRender.length - 3).trim();
+        }
+      }
       if (toolNamesCalled.length > 0) {
         usingToolMessage += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
-      } else {
-        usingToolMessage += "Attempting to use a tool... ";
+      } else if (hasTextualToolCallTags || hasNativeToolCalls) {
+        usingToolMessage += "Attempting to use tool(s)... ";
       }
       usingToolMessage += ")";
-      contentToRender = strippedContent ? `${usingToolMessage}
-
-${strippedContent}` : usingToolMessage;
-      this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after stripping tags: "${contentToRender}"`);
-    } else if (this.plugin.settings.enableToolUse && hasNativeToolCalls) {
-      let usingToolMessage = "( ";
-      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        usingToolMessage += `Using tool${assistantMessage.tool_calls.length > 1 ? "s" : ""}: ${assistantMessage.tool_calls.map((tc) => tc.function.name).join(", ")}... `;
-      } else {
-        usingToolMessage += "Using tools... ";
-      }
-      usingToolMessage += ")";
-      contentToRender = contentToRender.trim() ? `${usingToolMessage}
+      contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}
 
 ${contentToRender}` : usingToolMessage;
-      this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls present. Content to render: "${contentToRender}"`);
+      this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after processing tool indicators: "${contentToRender}"`);
     }
     try {
       await AssistantMessageRenderer.renderAssistantContent(
         contentEl,
-        contentToRender,
-        // <--- Передаємо оброблений contentToRender
+        contentToRender || "",
+        // Передаємо порожній рядок, якщо contentToRender став null/undefined
         this.app,
         this.plugin,
         this.view
@@ -1527,23 +1520,22 @@ ${contentToRender}` : usingToolMessage;
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
       this.plugin.logger.error("[AssistantMessageRenderer] Error in render -> renderAssistantContent:", error);
     }
-    AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, this.message, this.plugin, this.view);
+    AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     setTimeout(() => {
-      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`))
+      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP || "message-group"}`)) {
         this.view.checkMessageForCollapsing(messageEl);
-    }, 50);
+      }
+    }, 70);
     return messageGroup;
   }
   static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
     const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-    if (markdownText.trim().length > 0 && dotsEl) {
+    if (dotsEl) {
       dotsEl.remove();
-    } else if (!dotsEl && contentEl.hasChildNodes() && markdownText.trim().length > 0) {
-      contentEl.empty();
-    } else if (!dotsEl && !contentEl.hasChildNodes()) {
     }
+    contentEl.empty();
     let processedMarkdown = markdownText;
     try {
       const decoded = decodeHtmlEntities(markdownText);
@@ -1552,18 +1544,10 @@ ${contentToRender}` : usingToolMessage;
     } catch (e) {
       plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e);
     }
-    if (processedMarkdown.trim().length === 0 && !contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`)) {
-      if (contentEl.innerHTML.trim() === "") {
-        const dots = contentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-        for (let i = 0; i < 3; i++)
-          dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-      }
+    if (processedMarkdown.trim().length === 0) {
       return;
     }
     try {
-      if (dotsEl)
-        dotsEl.remove();
-      contentEl.empty();
       await import_obsidian9.MarkdownRenderer.render(app, processedMarkdown, contentEl, (_b = (_a = plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", view);
     } catch (error) {
       plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
@@ -1588,41 +1572,42 @@ ${contentToRender}` : usingToolMessage;
     }
     const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
     const finalContent = message.content;
-    const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Copy", title: "Copy" } });
+    const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Copy", title: "Copy" } });
     (0, import_obsidian9.setIcon)(copyBtn, "copy");
     view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
-      view.handleCopyClick(finalContent, copyBtn);
+      view.handleCopyClick(finalContent || "", copyBtn);
     });
     if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && finalContent && finalContent.trim()) {
-      const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Translate", title: "Translate" } });
+      const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON || "translate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Translate", title: "Translate" } });
       (0, import_obsidian9.setIcon)(translateBtn, "languages");
       view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
         if (contentEl.isConnected) {
-          view.handleTranslateClick(finalContent, contentEl, translateBtn);
+          view.handleTranslateClick(finalContent || "", contentEl, translateBtn);
         } else {
           new import_obsidian9.Notice("Cannot translate: message content element not found.");
         }
       });
     }
     if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && finalContent && finalContent.trim()) {
-      const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { title: "Summarize message" } });
+      const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { title: "Summarize message" } });
       (0, import_obsidian9.setIcon)(summarizeBtn, "scroll-text");
       view.registerDomEvent(summarizeBtn, "click", (e) => {
         e.stopPropagation();
-        view.handleSummarizeClick(finalContent, summarizeBtn);
+        view.handleSummarizeClick(finalContent || "", summarizeBtn);
       });
     }
-    if (!message.tool_calls || message.tool_calls.length === 0) {
-      const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Regenerate response", title: "Regenerate Response" } });
+    const contentContainsTextualToolCall = typeof finalContent === "string" && finalContent.includes("<tool_call>");
+    if ((!message.tool_calls || message.tool_calls.length === 0) && !contentContainsTextualToolCall) {
+      const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Regenerate response", title: "Regenerate Response" } });
       (0, import_obsidian9.setIcon)(regenerateBtn, "refresh-cw");
       view.registerDomEvent(regenerateBtn, "click", (e) => {
         e.stopPropagation();
         view.handleRegenerateClick(message);
       });
     }
-    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button", CSS_CLASSES.DANGER_OPTION || "danger-option", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Delete message", title: "Delete Message" } });
     (0, import_obsidian9.setIcon)(deleteBtn, "trash");
     view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
