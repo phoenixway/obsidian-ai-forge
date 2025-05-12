@@ -1,149 +1,155 @@
 // PromptService.ts
-import { App, normalizePath, TFile, Notice, FrontMatterCache } from 'obsidian';
-import OllamaPlugin from './main';
-import { Message, MessageRole, OllamaGenerateResponse, RoleDefinition } from './types';
-import { ChatMetadata } from './Chat';
+import { App, normalizePath, TFile, Notice, FrontMatterCache } from "obsidian";
+import OllamaPlugin from "./main";
+import { Message, MessageRole, OllamaGenerateResponse, RoleDefinition } from "./types";
+import { ChatMetadata } from "./Chat";
 
 export class PromptService {
-    private plugin: OllamaPlugin;
-    private app: App;
-    private currentSystemPrompt: string | null = null;
-    private currentRolePath: string | null = null;
-    private roleCache: Record<string, RoleDefinition> = {};
-    private modelDetailsCache: Record<string, any> = {};
+  private plugin: OllamaPlugin;
+  private app: App;
+  private currentSystemPrompt: string | null = null;
+  private currentRolePath: string | null = null;
+  private roleCache: Record<string, RoleDefinition> = {};
+  private modelDetailsCache: Record<string, any> = {};
 
-    constructor(plugin: OllamaPlugin) {
-        this.plugin = plugin;
-        this.app = plugin.app;
+  constructor(plugin: OllamaPlugin) {
+    this.plugin = plugin;
+    this.app = plugin.app;
+  }
+
+  private _countTokens(text: string): number {
+    // ... (без змін) ...
+    if (!text) return 0;
+    return Math.ceil(text.length / 4);
+  }
+
+  clearRoleCache(): void {
+    // ... (без змін) ...
+    //
+    this.roleCache = {};
+    this.currentRolePath = null; // Скидаємо кешований шлях
+    this.currentSystemPrompt = null;
+  }
+
+  clearModelDetailsCache(): void {
+    // ... (без змін) ...
+
+    this.modelDetailsCache = {};
+  }
+
+  async getRoleDefinition(rolePath: string | null | undefined): Promise<RoleDefinition | null> {
+    // ... (без змін, ця логіка завантаження ролі не залежить від RAG) ...
+    const normalizedPath = rolePath ? normalizePath(rolePath) : null;
+
+    // Використовуємо кеш, якщо шлях не змінився
+    if (normalizedPath === this.currentRolePath && normalizedPath && this.roleCache[normalizedPath]) {
+      return this.roleCache[normalizedPath];
     }
 
-    private _countTokens(text: string): number {
-        // ... (без змін) ...
-        if (!text) return 0;
-        return Math.ceil(text.length / 4);
+    // Якщо шлях змінився або кешу немає - завантажуємо
+    if (normalizedPath !== this.currentRolePath) {
+      if (this.currentRolePath && this.roleCache[this.currentRolePath]) {
+        delete this.roleCache[this.currentRolePath]; // Видаляємо старий кеш
+      }
+      this.currentRolePath = normalizedPath; // Оновлюємо поточний шлях
+      this.currentSystemPrompt = null; // Скидаємо системний промпт
     }
 
-    clearRoleCache(): void {
-        // ... (без змін) ...
-        // 
-        this.roleCache = {};
-        this.currentRolePath = null; // Скидаємо кешований шлях
+    // Якщо шлях порожній або не треба слідувати ролі - повертаємо null
+    if (!normalizedPath || !this.plugin.settings.followRole) {
+      // Повертаємо об'єкт з null промптом, але зберігаємо інформацію про продуктивність, якщо вона є у фронтматері
+      const definition: RoleDefinition = {
+        systemPrompt: null,
+        // Тут не можемо визначити isProductivityPersona без читання файлу,
+        // але для випадку без ролі це не важливо. Якщо б логіка була іншою,
+        // треба було б додати перевірку файлу тут.
+        isProductivityPersona: false,
+      };
+      return definition; // Повертаємо об'єкт, а не просто null
+    }
+
+    // Перевіряємо кеш ще раз після оновлення this.currentRolePath
+    if (this.roleCache[normalizedPath]) {
+      this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
+      return this.roleCache[normalizedPath];
+    }
+
+    const file = this.app.vault.getAbstractFileByPath(normalizedPath);
+
+    if (file instanceof TFile) {
+      try {
+        const fileCache = this.app.metadataCache.getFileCache(file);
+        const frontmatter = fileCache?.frontmatter;
+        const content = await this.app.vault.cachedRead(file);
+        const systemPromptBody = fileCache?.frontmatterPosition?.end
+          ? content.substring(fileCache.frontmatterPosition.end.offset).trim()
+          : content.trim();
+
+        const isProductivity =
+          frontmatter?.assistant_type?.toLowerCase() === "productivity" || frontmatter?.is_planner === true;
+
+        const definition: RoleDefinition = {
+          systemPrompt: systemPromptBody || null,
+          isProductivityPersona: isProductivity,
+        };
+
+        this.roleCache[normalizedPath] = definition; // Кешуємо
+        this.currentSystemPrompt = definition.systemPrompt;
+        return definition;
+      } catch (error) {
+        new Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
+        // Повертаємо об'єкт помилки або null, залежно від бажаної обробки
+        return { systemPrompt: null, isProductivityPersona: false };
+      }
+    } else {
+      this.currentSystemPrompt = null;
+      return { systemPrompt: null, isProductivityPersona: false };
+    }
+  }
+
+  private async _isProductivityPersonaActive(rolePath: string | null | undefined): Promise<boolean> {
+    // ... (без змін) ...
+    if (!this.plugin.settings.enableProductivityFeatures) {
+      return false;
+    }
+    const roleDefinition = await this.getRoleDefinition(rolePath);
+    return roleDefinition?.isProductivityPersona ?? false;
+  }
+
+  // src/PromptService.ts
+
+  // ... (інші імпорти та частини класу PromptService) ...
+
+  /**
+   * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції
+   * та дефолтний промпт для використання інструментів, якщо іншого немає.
+   */
+  async getSystemPromptForAPI(chatMetadata: ChatMetadata): Promise<string | null> {
+    const settings = this.plugin.settings; // Додано для доступу до this.plugin.settings
+
+    const selectedRolePath =
+      chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
+        ? chatMetadata.selectedRolePath
+        : settings.selectedRolePath;
+
+    let roleDefinition: RoleDefinition | null = null;
+    if (selectedRolePath && settings.followRole) {
+      // this.plugin.logger.debug(`[PromptService] Attempting to load role from: ${selectedRolePath}`);
+      roleDefinition = await this.getRoleDefinition(selectedRolePath);
+      // if (roleDefinition?.systemPrompt) {
+      //   this.plugin.logger.debug(`[PromptService] Role loaded. Prompt length: ${roleDefinition.systemPrompt.length}`);
+      // } else {
+      //   this.plugin.logger.debug(`[PromptService] Role loaded but no system prompt found or role not followed.`);
+      // }
+    } else {
+      // this.plugin.logger.debug(`[PromptService] No role selected or settings.followRole is false.`);
     }
 
-    clearModelDetailsCache(): void {
-       // ... (без змін) ...
-        
-        this.modelDetailsCache = {};
-    }
+    const roleSystemPrompt = roleDefinition?.systemPrompt || null;
+    const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
 
-    async getRoleDefinition(rolePath: string | null | undefined): Promise<RoleDefinition | null> {
-       // ... (без змін, ця логіка завантаження ролі не залежить від RAG) ...
-        const normalizedPath = rolePath ? normalizePath(rolePath) : null;
-
-        // Використовуємо кеш, якщо шлях не змінився
-        if (normalizedPath === this.currentRolePath && normalizedPath && this.roleCache[normalizedPath]) {
-             return this.roleCache[normalizedPath];
-        }
-
-         // Якщо шлях змінився або кешу немає - завантажуємо
-        if (normalizedPath !== this.currentRolePath) {
-            
-            if (this.currentRolePath && this.roleCache[this.currentRolePath]) {
-                delete this.roleCache[this.currentRolePath]; // Видаляємо старий кеш
-            }
-            this.currentRolePath = normalizedPath; // Оновлюємо поточний шлях
-            this.currentSystemPrompt = null; // Скидаємо системний промпт
-        }
-
-        // Якщо шлях порожній або не треба слідувати ролі - повертаємо null
-        if (!normalizedPath || !this.plugin.settings.followRole) {
-            
-            // Повертаємо об'єкт з null промптом, але зберігаємо інформацію про продуктивність, якщо вона є у фронтматері
-             const definition: RoleDefinition = {
-                systemPrompt: null,
-                // Тут не можемо визначити isProductivityPersona без читання файлу,
-                // але для випадку без ролі це не важливо. Якщо б логіка була іншою,
-                // треба було б додати перевірку файлу тут.
-                isProductivityPersona: false
-            };
-            return definition; // Повертаємо об'єкт, а не просто null
-        }
-
-        // Перевіряємо кеш ще раз після оновлення this.currentRolePath
-        if (this.roleCache[normalizedPath]) {
-           
-           this.currentSystemPrompt = this.roleCache[normalizedPath].systemPrompt;
-           return this.roleCache[normalizedPath];
-        }
-
-        
-        const file = this.app.vault.getAbstractFileByPath(normalizedPath);
-
-        if (file instanceof TFile) {
-            try {
-                const fileCache = this.app.metadataCache.getFileCache(file);
-                const frontmatter = fileCache?.frontmatter;
-                const content = await this.app.vault.cachedRead(file);
-                const systemPromptBody = fileCache?.frontmatterPosition?.end
-                    ? content.substring(fileCache.frontmatterPosition.end.offset).trim()
-                    : content.trim();
-
-                const isProductivity = frontmatter?.assistant_type?.toLowerCase() === 'productivity' || frontmatter?.is_planner === true;
-
-                const definition: RoleDefinition = {
-                    systemPrompt: systemPromptBody || null,
-                    isProductivityPersona: isProductivity
-                };
-
-                
-                this.roleCache[normalizedPath] = definition; // Кешуємо
-                this.currentSystemPrompt = definition.systemPrompt;
-                return definition;
-
-            } catch (error) {
-                new Notice(`Error loading role: ${file.basename}. Check console.`);
-                this.currentSystemPrompt = null;
-                // Повертаємо об'єкт помилки або null, залежно від бажаної обробки
-                 return { systemPrompt: null, isProductivityPersona: false };
-            }
-        } else {
-            
-            this.currentSystemPrompt = null;
-            return { systemPrompt: null, isProductivityPersona: false };
-        }
-    }
-
-    private async _isProductivityPersonaActive(rolePath: string | null | undefined): Promise<boolean> {
-        // ... (без змін) ...
-         if (!this.plugin.settings.enableProductivityFeatures) {
-            return false;
-        }
-        const roleDefinition = await this.getRoleDefinition(rolePath);
-        return roleDefinition?.isProductivityPersona ?? false;
-    }
-
-    /**
-     * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції.
-     */
-    async getSystemPromptForAPI(chatMetadata: ChatMetadata): Promise<string | null> {
-        const settings = this.plugin.settings;
-        
-
-        const selectedRolePath = chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
-                               ? chatMetadata.selectedRolePath
-                               : settings.selectedRolePath;
-
-        let roleDefinition: RoleDefinition | null = null;
-        if (selectedRolePath && settings.followRole) {
-            roleDefinition = await this.getRoleDefinition(selectedRolePath);
-        }
-
-        const roleSystemPrompt = roleDefinition?.systemPrompt || null;
-        const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
-
-        // --- ОНОВЛЕНІ RAG ІНСТРУКЦІЇ ---
-        const ragInstructions = `
+    const ragInstructions = `
 --- RAG Data Interpretation Rules ---
 You will be provided context from the user's notes, potentially split into two sections:
 1.  '### Personal Focus Context (User's Life State & Goals)':
@@ -164,285 +170,319 @@ General Rules for BOTH Context Sections:
 * If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context (both Personal Focus and General Context sections). Analyze themes across different chunks and documents.
 --- End RAG Data Interpretation Rules ---
         `.trim();
-        // --- Кінець ОНОВЛЕНИХ інструкцій ---
 
-        let finalSystemPrompt = "";
+    let finalSystemPromptParts: string[] = [];
 
-        // Додаємо RAG інструкції, якщо RAG та семантичний пошук увімкнені
-        if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-             finalSystemPrompt += ragInstructions + "\n\n";
-             
+    if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
+      // this.plugin.logger.debug("[PromptService] RAG is enabled, adding RAG instructions to system prompt.");
+      finalSystemPromptParts.push(ragInstructions);
+    }
+
+    if (roleSystemPrompt) {
+      // this.plugin.logger.debug("[PromptService] Role system prompt exists, adding to system prompt.");
+      finalSystemPromptParts.push(roleSystemPrompt.trim());
+    }
+
+    let combinedPrompt = finalSystemPromptParts.join("\n\n").trim();
+
+    if (isProductivityActive && combinedPrompt && settings.enableProductivityFeatures) {
+      // this.plugin.logger.debug("[PromptService] Productivity features active, injecting date/time.");
+      const now = new Date();
+      const formattedDate = now.toLocaleDateString(undefined, {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+      const formattedTime = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      combinedPrompt = combinedPrompt.replace(/\[Current Time\]/gi, formattedTime);
+      combinedPrompt = combinedPrompt.replace(/\[Current Date\]/gi, formattedDate);
+    }
+
+    // --- МОДИФІКАЦІЯ ДЛЯ ДЕФОЛТНОГО ПРОМПТУ ТА ІНСТРУКЦІЙ ЩОДО ІНСТРУМЕНТІВ ---
+    if (combinedPrompt.length > 0) {
+      // Якщо вже є якийсь системний промпт (від ролі чи RAG)
+      if (settings.enableToolUse && !combinedPrompt.toLowerCase().includes("tool")) {
+        // І якщо інструменти увімкнені, але промпт не згадує їх явно,
+        // можна додати загальне заохочення.
+        // Обережно: не додавайте, якщо роль вже містить детальні інструкції по інструментам.
+        const toolEncouragement =
+          "\nYou have access to tools. Use them when appropriate to fulfill the user's request.";
+        // this.plugin.logger.debug("[PromptService] Appending generic tool encouragement to existing system prompt.");
+        combinedPrompt += toolEncouragement;
+      }
+      // this.plugin.logger.debug(`[PromptService] Final system prompt from RAG/Role (possibly with tool encouragement), length: ${combinedPrompt.length}`);
+      return combinedPrompt;
+    } else if (settings.enableToolUse) {
+      // Якщо промпт ПОРОЖНІЙ, але інструменти УВІМКНЕНІ, надаємо дефолтний промпт.
+      // Це вирішить проблему "System prompt length: 0" у сценаріях з інструментами.
+      const defaultToolAwarePrompt =
+        "You are a helpful AI assistant. You have access to tools. Use them when appropriate to fulfill the user's request. If you decide to use a tool, ensure your response contains only the tool call JSON structure as required by the system for a tool invocation. If no tool is needed, respond directly to the user.";
+      this.plugin.logger.debug(
+        "[PromptService] No RAG/Role prompt, but tools enabled. Using default tool-aware system prompt."
+      );
+      return defaultToolAwarePrompt;
+    } else {
+      // Якщо промпт порожній і інструменти ВИМКНЕНІ (або не enableToolUse)
+      // this.plugin.logger.debug("[PromptService] No RAG/Role prompt and tools disabled (or setting off), returning null system prompt.");
+      return null; // Або дуже загальний, наприклад: "You are a helpful assistant."
+    }
+    // --- КІНЕЦЬ МОДИФІКАЦІЇ ---
+  }
+
+  // ... (решта вашого класу PromptService) ...
+
+  /**
+   * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
+   * Використовує оновлений `prepareContext` з `RagService`.
+   */
+  async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
+    // ... (Логіка отримання isProductivityActive та обробки taskContext без змін) ...
+
+    const settings = this.plugin.settings;
+    const selectedRolePath =
+      chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
+        ? chatMetadata.selectedRolePath
+        : settings.selectedRolePath;
+    const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
+
+    // --- Контекст завдань ---
+    let taskContext = "";
+    if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
+      // Отримуємо стан завдань
+      await this.plugin.checkAndProcessTaskUpdate?.();
+      const taskState = this.plugin.chatManager.getCurrentTaskState();
+
+      if (taskState && taskState.hasContent) {
+        taskContext = "\n--- Today's Tasks Context ---\n";
+        taskContext += `Urgent: ${taskState.urgent.join(", ") || "None"}\n`;
+        taskContext += `Other: ${taskState.regular.join(", ") || "None"}\n`;
+        taskContext += "--- End Tasks Context ---";
+        this.plugin.logger.debug(
+          `[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`
+        );
+      } else {
+      }
+    }
+
+    // --- Розрахунок токенів та історії (без змін) ---
+    const approxTaskTokens = this._countTokens(taskContext);
+    // Запас для RAG може потребувати коригування, якщо контекст став значно довшим
+    const maxRagTokens = settings.ragEnabled ? ((settings.ragTopK * settings.ragChunkSize) / 4) * 1.8 : 0; // Збільшив запас
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250; // Збільшив резерв
+
+    let processedHistoryString = "";
+    if (isProductivityActive && settings.useAdvancedContextStrategy) {
+      processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
+    } else {
+      processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
+    }
+
+    // --- RAG Контекст (використовує оновлений prepareContext) ---
+    let ragContext = "";
+    if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
+      const lastUserMessage = history.findLast(m => m.role === "user");
+      if (lastUserMessage?.content) {
+        // prepareContext тепер повертає рядок з розділеними секціями
+        ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
+        if (!ragContext) {
         } else {
         }
+      } else {
+      }
+    } else {
+    }
 
-        // Додаємо системний промпт ролі, якщо є
-        if (roleSystemPrompt) {
-            finalSystemPrompt += roleSystemPrompt.trim();
+    // --- Формування фінального тіла промпту (без змін) ---
+    let finalPromptBodyParts: string[] = [];
+    if (ragContext) {
+      finalPromptBodyParts.push(ragContext);
+    } // Додаємо новий формат RAG
+    if (taskContext) {
+      finalPromptBodyParts.push(taskContext);
+    }
+    if (processedHistoryString) {
+      finalPromptBodyParts.push(`### Conversation History:\n${processedHistoryString}`);
+    }
+
+    const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
+
+    if (!finalPromptBody) {
+      return null;
+    }
+
+    return finalPromptBody;
+  }
+
+  // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages
+  // залишаються без структурних змін (тільки логування)
+  private _buildSimpleContext(history: Message[], maxTokens: number): string {
+    // ... (без змін, окрім логування) ...
+    let context = "";
+    let currentTokens = 0;
+    for (let i = history.length - 1; i >= 0; i--) {
+      const message = history[i];
+      // Пропускаємо системні/помилкові повідомлення з простої історії
+      if (message.role === "system" || message.role === "error") continue;
+
+      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+      const messageTokens = this._countTokens(formattedMessage) + 5; // +5 за форматування/роздільники
+      if (currentTokens + messageTokens <= maxTokens) {
+        context = formattedMessage + "\n\n" + context; // Додаємо на початок
+        currentTokens += messageTokens;
+      } else {
+        break; // Досягли ліміту
+      }
+    }
+    return context.trim();
+  }
+
+  private async _buildAdvancedContext(
+    history: Message[],
+    chatMetadata: ChatMetadata,
+    maxTokens: number
+  ): Promise<string> {
+    const settings = this.plugin.settings;
+    const processedParts: string[] = [];
+    let currentTokens = 0;
+
+    // Визначаємо, скільки останніх повідомлень залишити без змін
+    const keepN = Math.max(0, settings.keepLastNMessagesBeforeSummary || 3); // Гарантуємо невід'ємне значення
+    const actualKeepN = Math.min(history.length, keepN); // Не можемо залишити більше, ніж є
+    const messagesToKeep = history.slice(-actualKeepN);
+    const messagesToProcess = history.slice(0, -actualKeepN);
+
+    // 1. Обробка старих повідомлень (сумаризація або пряме включення)
+    if (messagesToProcess.length > 0) {
+      let olderContextTokens = 0;
+      let olderContextContent = "";
+
+      if (settings.enableSummarization) {
+        const summary = await this._summarizeMessages(messagesToProcess, chatMetadata);
+        if (summary) {
+          olderContextContent = `[Summary of earlier conversation]:\n${summary}`;
+          olderContextTokens = this._countTokens(olderContextContent) + 10; // +10 за заголовок
         } else {
-             
+          // Якщо сумаризація не вдалася, спробуємо включити їх напряму (див. else блок)
         }
+      }
 
-        // Динамічна дата/час (без змін, залежить від isProductivityActive)
-        if (isProductivityActive && finalSystemPrompt && settings.enableProductivityFeatures) {
-            const now = new Date();
-            const formattedDate = now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            const formattedTime = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-            finalSystemPrompt = finalSystemPrompt.replace(/\[Current Time\]/gi, formattedTime);
-            finalSystemPrompt = finalSystemPrompt.replace(/\[Current Date\]/gi, formattedDate);
-            
+      // Якщо сумаризація вимкнена АБО не вдалася
+      if (!olderContextContent) {
+        let includedOlderCount = 0;
+        for (let i = messagesToProcess.length - 1; i >= 0; i--) {
+          const message = messagesToProcess[i];
+          if (message.role === "system" || message.role === "error") continue;
+          const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+          const messageTokens = this._countTokens(formattedMessage) + 5;
+          // Перевіряємо загальний ліміт maxTokens
+          if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
+            olderContextContent = formattedMessage + "\n\n" + olderContextContent;
+            olderContextTokens += messageTokens;
+            includedOlderCount++;
+          } else {
+            break;
+          }
         }
+        if (includedOlderCount > 0) {
+          olderContextContent = `[Start of older messages directly included]:\n${olderContextContent.trim()}\n[End of older messages]`;
+          olderContextTokens += 10; // Додаємо за маркери
+        }
+      }
 
-        const trimmedFinalPrompt = finalSystemPrompt.trim();
-        
-        return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
+      // Додаємо оброблену стару частину, якщо вона є і вміщається
+      if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
+        processedParts.push(olderContextContent);
+        currentTokens += olderContextTokens;
+      } else if (olderContextContent) {
+      }
     }
 
-    /**
-     * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
-     * Використовує оновлений `prepareContext` з `RagService`.
-     */
-    async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
-        // ... (Логіка отримання isProductivityActive та обробки taskContext без змін) ...
-         
-        const settings = this.plugin.settings;
-        const selectedRolePath = chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
-                               ? chatMetadata.selectedRolePath : settings.selectedRolePath;
-        const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
-        
-
-        // --- Контекст завдань ---
-        let taskContext = "";
-        if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
-            // Отримуємо стан завдань
-            await this.plugin.checkAndProcessTaskUpdate?.();
-            const taskState = this.plugin.chatManager.getCurrentTaskState();
-
-            if (taskState && taskState.hasContent) {
-                taskContext = "\n--- Today's Tasks Context ---\n";
-                taskContext += `Urgent: ${taskState.urgent.join(', ') || "None"}\n`;
-                taskContext += `Other: ${taskState.regular.join(', ') || "None"}\n`;
-                taskContext += "--- End Tasks Context ---";
-                this.plugin.logger.debug(`[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`);
-            } else {
-                 
-            }
-        }
-
-        // --- Розрахунок токенів та історії (без змін) ---
-        const approxTaskTokens = this._countTokens(taskContext);
-        // Запас для RAG може потребувати коригування, якщо контекст став значно довшим
-        const maxRagTokens = settings.ragEnabled ? (settings.ragTopK * settings.ragChunkSize / 4) * 1.8 : 0; // Збільшив запас
-        const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250; // Збільшив резерв
-        
-
-        let processedHistoryString = "";
-        if (isProductivityActive && settings.useAdvancedContextStrategy) {
-            processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
-        } else {
-            processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
-        }
-
-        // --- RAG Контекст (використовує оновлений prepareContext) ---
-        let ragContext = "";
-        if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-            const lastUserMessage = history.findLast(m => m.role === 'user');
-            if (lastUserMessage?.content) {
-                // prepareContext тепер повертає рядок з розділеними секціями
-                ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
-                 if(!ragContext) {}
-                 else {}
-            } else {  }
-        } else {  }
-
-        // --- Формування фінального тіла промпту (без змін) ---
-        let finalPromptBodyParts: string[] = [];
-        if (ragContext) { finalPromptBodyParts.push(ragContext); } // Додаємо новий формат RAG
-        if (taskContext) { finalPromptBodyParts.push(taskContext); }
-        if (processedHistoryString) { finalPromptBodyParts.push(`### Conversation History:\n${processedHistoryString}`); }
-
-        const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
-
-        if (!finalPromptBody) {
-            
-             return null;
-        }
-
-        return finalPromptBody;
+    // 2. Обробка останніх N повідомлень
+    let keptMessagesString = "";
+    let keptMessagesTokens = 0;
+    let includedKeptCount = 0;
+    for (let i = messagesToKeep.length - 1; i >= 0; i--) {
+      const message = messagesToKeep[i];
+      if (message.role === "system" || message.role === "error") continue;
+      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+      const messageTokens = this._countTokens(formattedMessage) + 5;
+      // Перевіряємо ліміт з урахуванням вже доданих частин
+      if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
+        keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
+        keptMessagesTokens += messageTokens;
+        includedKeptCount++;
+      } else {
+        break; // Досягли ліміту
+      }
     }
 
-    // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages
-    // залишаються без структурних змін (тільки логування)
-    private _buildSimpleContext(history: Message[], maxTokens: number): string {
-       // ... (без змін, окрім логування) ...
-        let context = "";
-        let currentTokens = 0;
-        for (let i = history.length - 1; i >= 0; i--) {
-            const message = history[i];
-            // Пропускаємо системні/помилкові повідомлення з простої історії
-            if (message.role === 'system' || message.role === 'error') continue;
-
-            const formattedMessage = `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content.trim()}`;
-            const messageTokens = this._countTokens(formattedMessage) + 5; // +5 за форматування/роздільники
-            if (currentTokens + messageTokens <= maxTokens) {
-                context = formattedMessage + "\n\n" + context; // Додаємо на початок
-                currentTokens += messageTokens;
-            } else {
-                break; // Досягли ліміту
-            }
-        }
-        return context.trim();
+    // Додаємо останні повідомлення, якщо вони є
+    if (keptMessagesString) {
+      processedParts.push(keptMessagesString.trim());
+      currentTokens += keptMessagesTokens;
+    } else {
     }
 
-     private async _buildAdvancedContext(history: Message[], chatMetadata: ChatMetadata, maxTokens: number): Promise<string> {
-        
-        const settings = this.plugin.settings;
-        const processedParts: string[] = [];
-        let currentTokens = 0;
+    return processedParts.join("\n\n").trim(); // Об'єднуємо частини (сумарі/старі + нові)
+  }
 
-        // Визначаємо, скільки останніх повідомлень залишити без змін
-        const keepN = Math.max(0, settings.keepLastNMessagesBeforeSummary || 3); // Гарантуємо невід'ємне значення
-        const actualKeepN = Math.min(history.length, keepN); // Не можемо залишити більше, ніж є
-        const messagesToKeep = history.slice(-actualKeepN);
-        const messagesToProcess = history.slice(0, -actualKeepN);
+  private async _summarizeMessages(messagesToSummarize: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
+    // ... (без змін, окрім логування) ...
+    if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
+      return null;
+    }
+    // Використовуємо логер
+    const textToSummarize = messagesToSummarize
+      .filter(m => m.role === "user" || m.role === "assistant") // Беремо тільки user/assistant
+      .map(m => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`)
+      .join("\n");
 
-        
-
-        // 1. Обробка старих повідомлень (сумаризація або пряме включення)
-        if (messagesToProcess.length > 0) {
-            let olderContextTokens = 0;
-            let olderContextContent = "";
-
-            if (settings.enableSummarization) {
-                
-                const summary = await this._summarizeMessages(messagesToProcess, chatMetadata);
-                if (summary) {
-                    olderContextContent = `[Summary of earlier conversation]:\n${summary}`;
-                    olderContextTokens = this._countTokens(olderContextContent) + 10; // +10 за заголовок
-                } else {
-                    
-                    // Якщо сумаризація не вдалася, спробуємо включити їх напряму (див. else блок)
-                }
-            }
-
-            // Якщо сумаризація вимкнена АБО не вдалася
-            if (!olderContextContent) {
-                
-                let includedOlderCount = 0;
-                for (let i = messagesToProcess.length - 1; i >= 0; i--) {
-                     const message = messagesToProcess[i];
-                     if (message.role === 'system' || message.role === 'error') continue;
-                     const formattedMessage = `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content.trim()}`;
-                     const messageTokens = this._countTokens(formattedMessage) + 5;
-                     // Перевіряємо загальний ліміт maxTokens
-                     if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
-                         olderContextContent = formattedMessage + "\n\n" + olderContextContent;
-                         olderContextTokens += messageTokens;
-                         includedOlderCount++;
-                     } else {
-                         break;
-                     }
-                }
-                 if(includedOlderCount > 0) {
-                    olderContextContent = `[Start of older messages directly included]:\n${olderContextContent.trim()}\n[End of older messages]`;
-                    olderContextTokens += 10; // Додаємо за маркери
-                 }
-            }
-
-             // Додаємо оброблену стару частину, якщо вона є і вміщається
-             if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
-                processedParts.push(olderContextContent);
-                currentTokens += olderContextTokens;
-            } else if (olderContextContent) {
-            }
-        }
-
-        // 2. Обробка останніх N повідомлень
-        let keptMessagesString = "";
-        let keptMessagesTokens = 0;
-        let includedKeptCount = 0;
-         for (let i = messagesToKeep.length - 1; i >= 0; i--) {
-             const message = messagesToKeep[i];
-             if (message.role === 'system' || message.role === 'error') continue;
-             const formattedMessage = `${message.role === 'user' ? 'User' : 'Assistant'}: ${message.content.trim()}`;
-             const messageTokens = this._countTokens(formattedMessage) + 5;
-              // Перевіряємо ліміт з урахуванням вже доданих частин
-             if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
-                keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
-                keptMessagesTokens += messageTokens;
-                includedKeptCount++;
-             } else {
-                 break; // Досягли ліміту
-             }
-        }
-
-        // Додаємо останні повідомлення, якщо вони є
-         if (keptMessagesString) {
-             processedParts.push(keptMessagesString.trim());
-             currentTokens += keptMessagesTokens;
-         } else {
-              
-         }
-
-        
-        return processedParts.join("\n\n").trim(); // Об'єднуємо частини (сумарі/старі + нові)
+    if (!textToSummarize.trim()) {
+      // Використовуємо логер
+      return null;
     }
 
+    const summarizationPromptTemplate =
+      this.plugin.settings.summarizationPrompt ||
+      "Summarize the following conversation concisely:\n\n{text_to_summarize}";
+    const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
 
-    private async _summarizeMessages(messagesToSummarize: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
-        // ... (без змін, окрім логування) ...
-         if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
-            return null;
-        }
-         // Використовуємо логер
-        const textToSummarize = messagesToSummarize
-                                    .filter(m => m.role === 'user' || m.role === 'assistant') // Беремо тільки user/assistant
-                                    .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`)
-                                    .join("\n");
+    // Використовуємо модель з налаштувань сумаризації, ЯКЩО вона вказана, інакше - модель чату
+    const summarizationModelName =
+      this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
 
-        if (!textToSummarize.trim()) {
-             // Використовуємо логер
-            return null;
-        }
+    const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096); // Можливо, варто мати окреме налаштування?
 
-        const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely:\n\n{text_to_summarize}";
-        const summarizationFullPrompt = summarizationPromptTemplate.replace('{text_to_summarize}', textToSummarize);
+    const requestBody = {
+      model: summarizationModelName, // Використовуємо визначену модель
+      prompt: summarizationFullPrompt,
+      stream: false,
+      temperature: 0.3, // Низька температура для консистентної сумаризації
+      options: {
+        num_ctx: summarizationContextWindow,
+        // Можна додати stop token, якщо потрібно, наприклад ["User:", "Assistant:"]
+      },
+      // Системний промпт для сумаризатора
+      system:
+        "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, and unresolved questions.",
+    };
 
-        // Використовуємо модель з налаштувань сумаризації, ЯКЩО вона вказана, інакше - модель чату
-        const summarizationModelName = this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
-        
+    try {
+      if (!this.plugin.ollamaService) {
+        return null;
+      }
 
-        const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096); // Можливо, варто мати окреме налаштування?
+      const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
 
-        const requestBody = {
-            model: summarizationModelName, // Використовуємо визначену модель
-            prompt: summarizationFullPrompt,
-            stream: false,
-            temperature: 0.3, // Низька температура для консистентної сумаризації
-            options: {
-                num_ctx: summarizationContextWindow,
-                // Можна додати stop token, якщо потрібно, наприклад ["User:", "Assistant:"]
-            },
-            // Системний промпт для сумаризатора
-            system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, and unresolved questions."
-        };
-
-        try {
-            if (!this.plugin.ollamaService) {
-                return null;
-            }
-             
-            const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
-
-            if (responseData && typeof responseData.response === 'string') {
-                const summary = responseData.response.trim();
-                return summary;
-            } else {
-                
-                return null;
-            }
-        } catch (error) {
-            return null;
-        }
+      if (responseData && typeof responseData.response === "string") {
+        const summary = responseData.response.trim();
+        return summary;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      return null;
     }
-
+  }
 } // End of PromptService class

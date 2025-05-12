@@ -4979,9 +4979,6 @@ This action cannot be undone.`,
   setLoadingState(isLoading) {
     const oldIsProcessing = this.isProcessing;
     this.isProcessing = isLoading;
-    this.plugin.logger.debug(
-      `[OllamaView] setLoadingState: isProcessing set to ${this.isProcessing} (was ${oldIsProcessing}). isLoading param: ${isLoading}. currentAbortController is ${this.currentAbortController ? "NOT null" : "null"}`
-    );
     if (this.inputEl)
       this.inputEl.disabled = isLoading;
     this.updateSendButtonState();
@@ -8241,8 +8238,11 @@ var PromptService = class {
     const roleDefinition = await this.getRoleDefinition(rolePath);
     return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
   }
+  // src/PromptService.ts
+  // ... (інші імпорти та частини класу PromptService) ...
   /**
-   * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції.
+   * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції
+   * та дефолтний промпт для використання інструментів, якщо іншого немає.
    */
   async getSystemPromptForAPI(chatMetadata) {
     var _a;
@@ -8251,6 +8251,7 @@ var PromptService = class {
     let roleDefinition = null;
     if (selectedRolePath && settings.followRole) {
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
+    } else {
     }
     const roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
     const isProductivityActive = (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
@@ -8275,25 +8276,43 @@ General Rules for BOTH Context Sections:
 * If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context (both Personal Focus and General Context sections). Analyze themes across different chunks and documents.
 --- End RAG Data Interpretation Rules ---
         `.trim();
-    let finalSystemPrompt = "";
+    let finalSystemPromptParts = [];
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-      finalSystemPrompt += ragInstructions + "\n\n";
-    } else {
+      finalSystemPromptParts.push(ragInstructions);
     }
     if (roleSystemPrompt) {
-      finalSystemPrompt += roleSystemPrompt.trim();
-    } else {
+      finalSystemPromptParts.push(roleSystemPrompt.trim());
     }
-    if (isProductivityActive && finalSystemPrompt && settings.enableProductivityFeatures) {
+    let combinedPrompt = finalSystemPromptParts.join("\n\n").trim();
+    if (isProductivityActive && combinedPrompt && settings.enableProductivityFeatures) {
       const now = new Date();
-      const formattedDate = now.toLocaleDateString(void 0, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const formattedDate = now.toLocaleDateString(void 0, {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      });
       const formattedTime = now.toLocaleTimeString(void 0, { hour: "numeric", minute: "2-digit" });
-      finalSystemPrompt = finalSystemPrompt.replace(/\[Current Time\]/gi, formattedTime);
-      finalSystemPrompt = finalSystemPrompt.replace(/\[Current Date\]/gi, formattedDate);
+      combinedPrompt = combinedPrompt.replace(/\[Current Time\]/gi, formattedTime);
+      combinedPrompt = combinedPrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
-    const trimmedFinalPrompt = finalSystemPrompt.trim();
-    return trimmedFinalPrompt.length > 0 ? trimmedFinalPrompt : null;
+    if (combinedPrompt.length > 0) {
+      if (settings.enableToolUse && !combinedPrompt.toLowerCase().includes("tool")) {
+        const toolEncouragement = "\nYou have access to tools. Use them when appropriate to fulfill the user's request.";
+        combinedPrompt += toolEncouragement;
+      }
+      return combinedPrompt;
+    } else if (settings.enableToolUse) {
+      const defaultToolAwarePrompt = "You are a helpful AI assistant. You have access to tools. Use them when appropriate to fulfill the user's request. If you decide to use a tool, ensure your response contains only the tool call JSON structure as required by the system for a tool invocation. If no tool is needed, respond directly to the user.";
+      this.plugin.logger.debug(
+        "[PromptService] No RAG/Role prompt, but tools enabled. Using default tool-aware system prompt."
+      );
+      return defaultToolAwarePrompt;
+    } else {
+      return null;
+    }
   }
+  // ... (решта вашого класу PromptService) ...
   /**
    * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
    * Використовує оновлений `prepareContext` з `RagService`.
@@ -8314,7 +8333,9 @@ General Rules for BOTH Context Sections:
         taskContext += `Other: ${taskState.regular.join(", ") || "None"}
 `;
         taskContext += "--- End Tasks Context ---";
-        this.plugin.logger.debug(`[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`);
+        this.plugin.logger.debug(
+          `[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`
+        );
       } else {
       }
     }

@@ -1387,13 +1387,13 @@ export class OllamaView extends ItemView {
     const oldIsProcessing = this.isProcessing;
     // ВАЖЛИВО: Спочатку змінюємо isProcessing
     this.isProcessing = isLoading;
-    this.plugin.logger.debug(
-      `[OllamaView] setLoadingState: isProcessing set to ${
-        this.isProcessing
-      } (was ${oldIsProcessing}). isLoading param: ${isLoading}. currentAbortController is ${
-        this.currentAbortController ? "NOT null" : "null"
-      }`
-    );
+    // this.plugin.logger.debug(
+    //   `[OllamaView] setLoadingState: isProcessing set to ${
+    //     this.isProcessing
+    //   } (was ${oldIsProcessing}). isLoading param: ${isLoading}. currentAbortController is ${
+    //     this.currentAbortController ? "NOT null" : "null"
+    //   }`
+    // );
 
     if (this.inputEl) this.inputEl.disabled = isLoading;
 
