@@ -126,7 +126,7 @@ export class PromptService {
    * та дефолтний промпт для використання інструментів, якщо іншого немає.
    */
   async getSystemPromptForAPI(chatMetadata: ChatMetadata): Promise<string | null> {
-    const settings = this.plugin.settings; // Додано для доступу до this.plugin.settings
+    const settings = this.plugin.settings;
 
     const selectedRolePath =
       chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
@@ -135,15 +135,15 @@ export class PromptService {
 
     let roleDefinition: RoleDefinition | null = null;
     if (selectedRolePath && settings.followRole) {
-      // this.plugin.logger.debug(`[PromptService] Attempting to load role from: ${selectedRolePath}`);
+      this.plugin.logger.debug(`[PromptService] Attempting to load role from: ${selectedRolePath}`);
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
-      // if (roleDefinition?.systemPrompt) {
-      //   this.plugin.logger.debug(`[PromptService] Role loaded. Prompt length: ${roleDefinition.systemPrompt.length}`);
-      // } else {
-      //   this.plugin.logger.debug(`[PromptService] Role loaded but no system prompt found or role not followed.`);
-      // }
+      if (roleDefinition?.systemPrompt) {
+        this.plugin.logger.debug(`[PromptService] Role loaded. Prompt length: ${roleDefinition.systemPrompt.length}`);
+      } else {
+        this.plugin.logger.debug(`[PromptService] Role loaded but no system prompt found in role file, or role not followed.`);
+      }
     } else {
-      // this.plugin.logger.debug(`[PromptService] No role selected or settings.followRole is false.`);
+      this.plugin.logger.debug(`[PromptService] No role selected or settings.followRole is false.`);
     }
 
     const roleSystemPrompt = roleDefinition?.systemPrompt || null;
@@ -171,22 +171,77 @@ General Rules for BOTH Context Sections:
 --- End RAG Data Interpretation Rules ---
         `.trim();
 
-    let finalSystemPromptParts: string[] = [];
+    let systemPromptParts: string[] = [];
 
+    // 1. Додаємо RAG інструкції
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-      // this.plugin.logger.debug("[PromptService] RAG is enabled, adding RAG instructions to system prompt.");
-      finalSystemPromptParts.push(ragInstructions);
+      this.plugin.logger.debug("[PromptService] RAG is enabled, adding RAG instructions.");
+      systemPromptParts.push(ragInstructions);
     }
 
+    // 2. Додаємо системний промпт ролі
     if (roleSystemPrompt) {
-      // this.plugin.logger.debug("[PromptService] Role system prompt exists, adding to system prompt.");
-      finalSystemPromptParts.push(roleSystemPrompt.trim());
+      this.plugin.logger.debug("[PromptService] Role system prompt exists, adding it.");
+      systemPromptParts.push(roleSystemPrompt.trim());
     }
 
-    let combinedPrompt = finalSystemPromptParts.join("\n\n").trim();
+    // 3. Збираємо базовий системний промпт
+    let combinedBasePrompt = systemPromptParts.join("\n\n").trim();
 
-    if (isProductivityActive && combinedPrompt && settings.enableProductivityFeatures) {
-      // this.plugin.logger.debug("[PromptService] Productivity features active, injecting date/time.");
+    // 4. Додаємо інструкції для інструментів, ЯКЩО enableToolUse увімкнено
+    if (settings.enableToolUse && this.plugin.agentManager) {
+      const agentTools = this.plugin.agentManager.getAllToolDefinitions();
+      let toolUsageInstructions = "";
+
+      if (agentTools.length > 0) {
+        toolUsageInstructions = "\n\n--- Tool Usage Guidelines ---\n";
+        toolUsageInstructions += "You have access to the following tools. ";
+        // Важливо: ця інструкція для fallback-механізму (текстовий виклик)
+        toolUsageInstructions += "If you decide to use a tool, you MUST respond ONLY with a single JSON object representing the tool call, enclosed in <tool_call></tool_call> XML-like tags. Do NOT add any other text, explanation, or markdown formatting before or after these tags.\n";
+        toolUsageInstructions += "The JSON object must have a 'name' property with the tool's name and an 'arguments' property containing an object of parameters for that tool.\n";
+        toolUsageInstructions += "Example of a tool call response:\n";
+        toolUsageInstructions += "<tool_call>\n";
+        toolUsageInstructions += "{\n";
+        toolUsageInstructions += "  \"name\": \"example_tool_name\",\n";
+        toolUsageInstructions += "  \"arguments\": {\n";
+        toolUsageInstructions += "    \"parameter_1_name\": \"value_for_param1\",\n";
+        toolUsageInstructions += "    \"parameter_2_name\": true\n";
+        toolUsageInstructions += "  }\n";
+        toolUsageInstructions += "}\n";
+        toolUsageInstructions += "</tool_call>\n\n";
+        toolUsageInstructions += "Available tools are:\n";
+        agentTools.forEach(tool => {
+          toolUsageInstructions += `\nTool Name: "${tool.name}"\n`;
+          toolUsageInstructions += `  Description: ${tool.description}\n`;
+          toolUsageInstructions += `  Parameters Schema (JSON Schema format):\n  ${JSON.stringify(tool.parameters, null, 2).replace(/\n/g, '\n  ')}\n`;
+        });
+        toolUsageInstructions += "--- End Tool Usage Guidelines ---";
+      } else {
+        toolUsageInstructions = "\n\n--- Tool Usage Guidelines ---\nNo tools are currently available.\n--- End Tool Usage Guidelines ---";
+      }
+
+      if (combinedBasePrompt.length === 0) {
+        // Якщо не було RAG/Ролі, починаємо з дефолтного + інструменти
+        combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
+        this.plugin.logger.debug("[PromptService] No RAG/Role prompt, using default assistant prompt + tool instructions.");
+      } else {
+        // Додаємо інструкції до існуючого промпту
+        combinedBasePrompt += toolUsageInstructions;
+        this.plugin.logger.debug("[PromptService] Appended tool instructions to existing RAG/Role prompt.");
+      }
+    } else if (combinedBasePrompt.length === 0) {
+        // Немає RAG/Ролі І інструменти вимкнені - можна повернути дуже простий дефолт або null
+        // combinedBasePrompt = "You are a helpful assistant.";
+        // this.plugin.logger.debug("[PromptService] No RAG/Role prompt and tools disabled. Using minimal/null system prompt.");
+        // Повернення null тут призведе до system_prompt_length: 0, що ми намагалися виправити.
+        // Якщо інструменти не використовуються, але потрібен системний промпт, можна встановити:
+        // if (!combinedBasePrompt) combinedBasePrompt = "You are a helpful assistant.";
+    }
+
+
+    // 5. Динамічна дата/час
+    if (isProductivityActive && combinedBasePrompt && settings.enableProductivityFeatures) {
+      this.plugin.logger.debug("[PromptService] Productivity features active, injecting date/time.");
       const now = new Date();
       const formattedDate = now.toLocaleDateString(undefined, {
         weekday: "long",
@@ -195,39 +250,14 @@ General Rules for BOTH Context Sections:
         day: "numeric",
       });
       const formattedTime = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-      combinedPrompt = combinedPrompt.replace(/\[Current Time\]/gi, formattedTime);
-      combinedPrompt = combinedPrompt.replace(/\[Current Date\]/gi, formattedDate);
+      combinedBasePrompt = combinedBasePrompt.replace(/\[Current Time\]/gi, formattedTime);
+      combinedBasePrompt = combinedBasePrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
-
-    // --- МОДИФІКАЦІЯ ДЛЯ ДЕФОЛТНОГО ПРОМПТУ ТА ІНСТРУКЦІЙ ЩОДО ІНСТРУМЕНТІВ ---
-    if (combinedPrompt.length > 0) {
-      // Якщо вже є якийсь системний промпт (від ролі чи RAG)
-      if (settings.enableToolUse && !combinedPrompt.toLowerCase().includes("tool")) {
-        // І якщо інструменти увімкнені, але промпт не згадує їх явно,
-        // можна додати загальне заохочення.
-        // Обережно: не додавайте, якщо роль вже містить детальні інструкції по інструментам.
-        const toolEncouragement =
-          "\nYou have access to tools. Use them when appropriate to fulfill the user's request.";
-        // this.plugin.logger.debug("[PromptService] Appending generic tool encouragement to existing system prompt.");
-        combinedPrompt += toolEncouragement;
-      }
-      // this.plugin.logger.debug(`[PromptService] Final system prompt from RAG/Role (possibly with tool encouragement), length: ${combinedPrompt.length}`);
-      return combinedPrompt;
-    } else if (settings.enableToolUse) {
-      // Якщо промпт ПОРОЖНІЙ, але інструменти УВІМКНЕНІ, надаємо дефолтний промпт.
-      // Це вирішить проблему "System prompt length: 0" у сценаріях з інструментами.
-      const defaultToolAwarePrompt =
-        "You are a helpful AI assistant. You have access to tools. Use them when appropriate to fulfill the user's request. If you decide to use a tool, ensure your response contains only the tool call JSON structure as required by the system for a tool invocation. If no tool is needed, respond directly to the user.";
-      this.plugin.logger.debug(
-        "[PromptService] No RAG/Role prompt, but tools enabled. Using default tool-aware system prompt."
-      );
-      return defaultToolAwarePrompt;
-    } else {
-      // Якщо промпт порожній і інструменти ВИМКНЕНІ (або не enableToolUse)
-      // this.plugin.logger.debug("[PromptService] No RAG/Role prompt and tools disabled (or setting off), returning null system prompt.");
-      return null; // Або дуже загальний, наприклад: "You are a helpful assistant."
-    }
-    // --- КІНЕЦЬ МОДИФІКАЦІЇ ---
+    
+    const finalTrimmedPrompt = combinedBasePrompt.trim();
+    this.plugin.logger.debug(`[PromptService] Final system prompt length: ${finalTrimmedPrompt.length}. Content preview: "${finalTrimmedPrompt.substring(0,100)}..."`);
+    
+    return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
 
   // ... (решта вашого класу PromptService) ...
