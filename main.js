@@ -8661,9 +8661,7 @@ var ChatManager = class {
         const hierarchy = await this.getChatHierarchy();
         actualFilePath = (_a = this.findChatPathInHierarchy(id, hierarchy)) != null ? _a : void 0;
         if (actualFilePath) {
-          this.logger.debug(`[ChatManager.getChat] Found file path for ID ${id} in hierarchy: ${actualFilePath}`);
         } else {
-          this.logger.warn(`[ChatManager.getChat] File path for ID ${id} NOT found in hierarchy.`);
         }
       } catch (hierarchyError) {
         this.logger.error(`[ChatManager.getChat] Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
