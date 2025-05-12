@@ -1638,15 +1638,16 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     let contentWithoutThinkTags = thinkDetection.contentWithoutTags;
     const hasTextualToolCallTags = contentWithoutThinkTags.includes("<tool_call>");
     const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
-    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Initial checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags} (after think stripping: "${contentWithoutThinkTags.substring(0, 100)}..."), hasNativeToolCalls=${hasNativeToolCalls}.`);
+    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Initial checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags} (in content after think stripping: "${contentWithoutThinkTags.substring(0, 100)}..."), hasNativeToolCalls=${hasNativeToolCalls}.`);
     if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls)) {
       this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Preparing display content.`);
       let usingToolMessageText = "( ";
       const toolNamesCalled = [];
-      let accompanyingText = contentWithoutThinkTags;
+      let accompanyingText = "";
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
         this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
+        accompanyingText = contentWithoutThinkTags;
       } else if (hasTextualToolCallTags) {
         this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from (content without think tags): "${contentWithoutThinkTags.substring(0, 150)}..."`);
         const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
@@ -1671,7 +1672,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         usingToolMessageText += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
       } else {
         usingToolMessageText += "Attempting to use tool(s)... ";
-        this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted. Displaying generic 'Attempting to use...' message.`);
+        this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names extracted. Displaying generic message.`);
       }
       usingToolMessageText += ")";
       if (accompanyingText && accompanyingText.trim().length > 0) {
@@ -1688,11 +1689,13 @@ ${accompanyingText.trim()}`;
     }
     try {
       await renderMarkdownContent(
+        // Використовуйте вашу функцію рендерингу Markdown
         this.app,
         this.view,
         this.plugin,
         contentEl,
-        finalContentToRender || ""
+        finalContentToRender
+        // Гарантуємо, що finalContentToRender визначено
       );
     } catch (error) {
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
@@ -1707,10 +1710,6 @@ ${accompanyingText.trim()}`;
     }, 70);
     return messageGroup;
   }
-  // Статичні методи renderAssistantContent та addAssistantActionButtons 
-  // залишаються такими, як були надані в моїй попередній відповіді
-  // (де ми виправляли помилки з прапорцем 's' та CSS_CLASSES).
-  // Я включу їх сюди для повноти.
   static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
     const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
