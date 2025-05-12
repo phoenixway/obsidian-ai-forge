@@ -96,7 +96,7 @@ export class SidebarManager {
   
 public createSidebarUI(parentElement: HTMLElement): HTMLElement {
   this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
-  this.plugin.logger.debug("[SidebarUI] Creating sidebar UI structure...");
+  // this.plugin.logger.debug("[SidebarUI] Creating sidebar UI structure...");
 
   // --- Секція Чатів ---
   const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
@@ -143,7 +143,7 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
   this.view.registerDomEvent(this.rootDropZoneEl, 'dragenter', this.handleDragEnterRootZone.bind(this));
   this.view.registerDomEvent(this.rootDropZoneEl, 'dragleave', this.handleDragLeaveRootZone.bind(this));
   this.view.registerDomEvent(this.rootDropZoneEl, 'drop', this.handleDropRootZone.bind(this));
-  this.plugin.logger.debug("[SidebarUI] Root drop listeners attached to dedicated root drop zone element.");
+  // this.plugin.logger.debug("[SidebarUI] Root drop listeners attached to dedicated root drop zone element.");
   // --- КІНЕЦЬ СПЕЦІАЛЬНОЇ ЗОНИ ---
 
   // --- Секція Ролей ---
@@ -176,7 +176,7 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
 
   // Початкове заповнення списку чатів, якщо секція видима (за замовчуванням вона видима)
   if (this.isSectionVisible("chats")) {
-    this.plugin.logger.debug("[SidebarUI] Initial chat list update scheduled because 'chats' section is visible.");
+    // this.plugin.logger.debug("[SidebarUI] Initial chat list update scheduled because 'chats' section is visible.");
     this.updateChatList();
   } else {
       this.plugin.logger.debug("[SidebarUI] 'Chats' section initially collapsed, chat list update deferred.");
@@ -189,7 +189,7 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
       this.plugin.logger.debug("[SidebarUI] 'Roles' section initially collapsed, role list update deferred.");
   }
 
-  this.plugin.logger.debug("[SidebarUI] Sidebar UI creation complete.");
+  // this.plugin.logger.debug("[SidebarUI] Sidebar UI creation complete.");
   return this.containerEl;
 } // --- Кінець createSidebarUI ---
   private attachSidebarEventListeners(): void {

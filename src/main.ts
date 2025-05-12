@@ -146,7 +146,7 @@ export default class OllamaPlugin extends Plugin {
 
     // Ініціалізуємо менеджер чатів (завантажує індекс, відновлює активний чат)
     await this.chatManager.initialize();
-    this.logger.info("Chat Manager initialized.");
+    // this.logger.info("Chat Manager initialized.");
 
     // Оновлюємо налаштування логера реальними значеннями після завантаження
     this.logger.updateSettings({
@@ -160,7 +160,7 @@ export default class OllamaPlugin extends Plugin {
 
     // Реєструємо View плагіна
     this.registerView(VIEW_TYPE_OLLAMA_PERSONAS, leaf => {
-      this.logger.info("Creating OllamaView instance.");
+      // this.logger.info("Creating OllamaView instance.");
       this.view = new OllamaView(leaf, this);
       return this.view;
     });
@@ -387,7 +387,7 @@ export default class OllamaPlugin extends Plugin {
       this.taskCheckInterval = setInterval(() => this.checkAndProcessTaskUpdate(), 5000);
       this.registerInterval(this.taskCheckInterval as any); // Реєструємо інтервал для авто-очищення
     }
-    this.logger.info("AI Forge Plugin loaded successfully.");
+    // this.logger.info("AI Forge Plugin loaded successfully.");
   } // --- кінець onload ---
 
   registerVaultListeners(): void {

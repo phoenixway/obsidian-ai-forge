@@ -282,7 +282,7 @@ export class Chat {
             const data = JSON.parse(json) as ChatData;
 
             if (data?.metadata?.id && Array.isArray(data.messages)) {
-                logger.debug(`[Chat] Successfully parsed data, creating Chat instance for ID: ${data.metadata.id}`); // Використовуємо logger
+                // logger.debug(`[Chat] Successfully parsed data, creating Chat instance for ID: ${data.metadata.id}`); // Використовуємо logger
                 // --- ВИПРАВЛЕННЯ: Передаємо logger в конструктор ---
                 return new Chat(adapter, settings, data, normPath, logger);
                 // ----------------------------------------------

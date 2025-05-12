@@ -2022,7 +2022,6 @@ var SidebarManager = class {
   }
   createSidebarUI(parentElement) {
     this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
-    this.plugin.logger.debug("[SidebarUI] Creating sidebar UI structure...");
     const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
     this.chatPanelHeaderEl = chatPanel.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
@@ -2054,7 +2053,6 @@ var SidebarManager = class {
     this.view.registerDomEvent(this.rootDropZoneEl, "dragenter", this.handleDragEnterRootZone.bind(this));
     this.view.registerDomEvent(this.rootDropZoneEl, "dragleave", this.handleDragLeaveRootZone.bind(this));
     this.view.registerDomEvent(this.rootDropZoneEl, "drop", this.handleDropRootZone.bind(this));
-    this.plugin.logger.debug("[SidebarUI] Root drop listeners attached to dedicated root drop zone element.");
     const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL });
     this.rolePanelHeaderEl = rolePanel.createDiv({
       cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
@@ -2076,7 +2074,6 @@ var SidebarManager = class {
     }
     this.attachSidebarEventListeners();
     if (this.isSectionVisible("chats")) {
-      this.plugin.logger.debug("[SidebarUI] Initial chat list update scheduled because 'chats' section is visible.");
       this.updateChatList();
     } else {
       this.plugin.logger.debug("[SidebarUI] 'Chats' section initially collapsed, chat list update deferred.");
@@ -2087,7 +2084,6 @@ var SidebarManager = class {
     } else {
       this.plugin.logger.debug("[SidebarUI] 'Roles' section initially collapsed, role list update deferred.");
     }
-    this.plugin.logger.debug("[SidebarUI] Sidebar UI creation complete.");
     return this.containerEl;
   }
   // --- Кінець createSidebarUI ---
@@ -4651,7 +4647,6 @@ This action cannot be undone.`,
   }
   // src/OllamaView.ts
   async onOpen() {
-    this.plugin.logger.info("[OllamaView] onOpen START");
     this.createUIElements();
     const savedWidth = this.plugin.settings.sidebarWidth;
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === "number" && savedWidth > 50) {
@@ -4687,7 +4682,6 @@ This action cannot be undone.`,
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(initialModelName);
       this.updateTemperatureIndicator(initialTemperature);
-      this.plugin.logger.debug("[OllamaView] Initial UI elements updated in onOpen (using defaults/settings).");
     } catch (error) {
       this.plugin.logger.error("[OllamaView] Error during initial UI element update in onOpen:", error);
     }
@@ -7369,7 +7363,7 @@ Summary:`;
     ).open();
   }
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     this.plugin.logger.debug(
       `[OllamaView] loadAndDisplayActiveChat START for activeId: ${(_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId()}`
     );
@@ -7388,25 +7382,22 @@ Summary:`;
       let errorOccurredLoadingData = false;
       try {
         activeChat = await ((_b = this.plugin.chatManager) == null ? void 0 : _b.getActiveChat()) || null;
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Active chat fetched: ${(_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.id) != null ? _d : "null"}`
-        );
         availableModels = await this.plugin.ollamaService.getModels();
-        finalRolePath = ((_e = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _e.selectedRolePath) !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
+        finalRolePath = ((_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
         this.plugin.logger.error("[loadAndDisplayActiveChat] Error loading initial chat data or models:", error);
         new import_obsidian15.Notice("Error connecting to Ollama or loading chat data.", 5e3);
         errorOccurredLoadingData = true;
         availableModels = availableModels || [];
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_d = availableModels[0]) != null ? _d : null;
         finalTemperature = this.plugin.settings.temperature;
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
         activeChat = null;
       }
       if (!errorOccurredLoadingData && activeChat) {
-        let preferredModel = ((_g = activeChat.metadata) == null ? void 0 : _g.modelName) || this.plugin.settings.modelName;
+        let preferredModel = ((_e = activeChat.metadata) == null ? void 0 : _e.modelName) || this.plugin.settings.modelName;
         if (availableModels.length > 0) {
           if (preferredModel && availableModels.includes(preferredModel)) {
             finalModelName = preferredModel;
@@ -7439,14 +7430,14 @@ Summary:`;
             this.plugin.logger.error(`[loadAndDisplayActiveChat] Error awaiting chat model metadata update for chat "${activeChat.metadata.name}":`, updateError);
           }
         }
-        finalTemperature = (_i = (_h = activeChat.metadata) == null ? void 0 : _h.temperature) != null ? _i : this.plugin.settings.temperature;
+        finalTemperature = (_g = (_f = activeChat.metadata) == null ? void 0 : _f.temperature) != null ? _g : this.plugin.settings.temperature;
       } else if (!errorOccurredLoadingData && !activeChat) {
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_j = availableModels[0]) != null ? _j : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_h = availableModels[0]) != null ? _h : null;
         finalTemperature = this.plugin.settings.temperature;
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       }
-      if (activeChat && !errorOccurredLoadingData && ((_k = activeChat.messages) == null ? void 0 : _k.length) > 0) {
+      if (activeChat && !errorOccurredLoadingData && ((_i = activeChat.messages) == null ? void 0 : _i.length) > 0) {
         this.hideEmptyState();
         this.currentMessages = [...activeChat.messages];
         this.lastRenderedMessageDate = null;
@@ -7481,7 +7472,7 @@ Summary:`;
                 break;
               default:
                 this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role in history: ${message == null ? void 0 : message.role}`);
-                const unknownRoleGroup = (_l = this.chatContainer) == null ? void 0 : _l.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
+                const unknownRoleGroup = (_j = this.chatContainer) == null ? void 0 : _j.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
                 if (unknownRoleGroup && this.chatContainer) {
                   renderAvatar(this.app, this.plugin, unknownRoleGroup, false);
                   const wrapper = unknownRoleGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
@@ -7519,7 +7510,7 @@ Summary:`;
         }, 150);
       } else {
         this.showEmptyState();
-        (_m = this.scrollToBottomButton) == null ? void 0 : _m.classList.remove(CSS_CLASSES.VISIBLE || "visible");
+        (_k = this.scrollToBottomButton) == null ? void 0 : _k.classList.remove(CSS_CLASSES.VISIBLE || "visible");
       }
       this.updateInputPlaceholder(finalRoleName);
       this.updateRoleDisplay(finalRoleName);
@@ -7542,9 +7533,6 @@ Summary:`;
         }
         this.updateSendButtonState();
       }
-      this.plugin.logger.debug(
-        `[OllamaView] loadAndDisplayActiveChat FINISHED. Metadata was updated: ${metadataUpdated}`
-      );
     } catch (error) {
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL OUTER ERROR XXX", error);
       this.clearChatContainerInternal();
@@ -8879,7 +8867,6 @@ var Chat = class {
       const json = await adapter.read(normPath);
       const data = JSON.parse(json);
       if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && Array.isArray(data.messages)) {
-        logger.debug(`[Chat] Successfully parsed data, creating Chat instance for ID: ${data.metadata.id}`);
         return new Chat(adapter, settings, data, normPath, logger);
       } else {
         logger.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
@@ -10675,7 +10662,6 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     this.agentManager = new AgentManager(this);
     this.agentManager.registerAgent(new SimpleFileAgent());
     await this.chatManager.initialize();
-    this.logger.info("Chat Manager initialized.");
     this.logger.updateSettings({
       consoleLogLevel: this.settings.consoleLogLevel,
       fileLoggingEnabled: this.settings.fileLoggingEnabled,
@@ -10685,7 +10671,6 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       logFileMaxSizeMB: this.settings.logFileMaxSizeMB
     });
     this.registerView(VIEW_TYPE_OLLAMA_PERSONAS, (leaf) => {
-      this.logger.info("Creating OllamaView instance.");
       this.view = new OllamaView(leaf, this);
       return this.view;
     });
@@ -10859,7 +10844,6 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       this.taskCheckInterval = setInterval(() => this.checkAndProcessTaskUpdate(), 5e3);
       this.registerInterval(this.taskCheckInterval);
     }
-    this.logger.info("AI Forge Plugin loaded successfully.");
   }
   // --- кінець onload ---
   registerVaultListeners() {

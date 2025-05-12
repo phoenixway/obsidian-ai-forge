@@ -211,7 +211,7 @@ export class OllamaView extends ItemView {
   // src/OllamaView.ts
 
   async onOpen(): Promise<void> {
-    this.plugin.logger.info("[OllamaView] onOpen START");
+    // this.plugin.logger.info("[OllamaView] onOpen START");
 
     // Спочатку створюємо UI, включаючи роздільник
     this.createUIElements();
@@ -261,7 +261,7 @@ export class OllamaView extends ItemView {
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(initialModelName);
       this.updateTemperatureIndicator(initialTemperature);
-      this.plugin.logger.debug("[OllamaView] Initial UI elements updated in onOpen (using defaults/settings).");
+      // this.plugin.logger.debug("[OllamaView] Initial UI elements updated in onOpen (using defaults/settings).");
     } catch (error) {
       this.plugin.logger.error("[OllamaView] Error during initial UI element update in onOpen:", error);
     }
@@ -4391,9 +4391,9 @@ export class OllamaView extends ItemView {
       // --- Завантаження даних ---
       try {
         activeChat = (await this.plugin.chatManager?.getActiveChat()) || null;
-        this.plugin.logger.debug(
-          `[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`
-        );
+        // this.plugin.logger.debug(
+        //   `[loadAndDisplayActiveChat] Active chat fetched: ${activeChat?.metadata?.id ?? "null"}`
+        // );
         availableModels = await this.plugin.ollamaService.getModels();
         
         // Визначаємо шлях до ролі: або з метаданих чату, або з глобальних налаштувань
@@ -4576,9 +4576,9 @@ export class OllamaView extends ItemView {
           this.updateSendButtonState();
       }
 
-      this.plugin.logger.debug(
-        `[OllamaView] loadAndDisplayActiveChat FINISHED. Metadata was updated: ${metadataUpdated}`
-      );
+      // this.plugin.logger.debug(
+      //   `[OllamaView] loadAndDisplayActiveChat FINISHED. Metadata was updated: ${metadataUpdated}`
+      // );
 
     } catch (error) {
        this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL OUTER ERROR XXX", error);
