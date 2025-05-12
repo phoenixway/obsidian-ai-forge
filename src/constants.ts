@@ -48,7 +48,7 @@ export const CSS_CLASSES = {
     STOP_BUTTON: "stop-generating-button",
     SCROLL_BOTTOM_BUTTON: "scroll-to-bottom-button",
 
-    // States & Modifiers
+   // States & Modifiers
     TRANSLATION_PENDING: "translation-pending", // For translate button maybe?
     RECORDING: "recording", // For voice button
 
@@ -60,5 +60,8 @@ export const CSS_CLASSES = {
     TOOL_MESSAGE_GROUP: "tool-message-group", // Клас для обгортки групи повідомлення інструменту
     MESSAGE_WRAPPER: "message-wrapper"   ,   // Клас для внутрішньої обгортки повідомлення (між аватаром та вмістом)
     SYSTEM_MESSAGE_TEXT: "system-message-text", // <--- ДОДАЙТЕ ЦЕЙ КЛАС для тексту всередині
+
+    MESSAGE_ACTIONS: "message-actions-wrapper", // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
+    MESSAGE_ACTION_BUTTON: "message-action-button", // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
 };
 export const SCROLL_THRESHOLD = 150;

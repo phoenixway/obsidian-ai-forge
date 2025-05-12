@@ -1186,8 +1186,12 @@ var CSS_CLASSES = {
   // Клас для обгортки групи повідомлення інструменту
   MESSAGE_WRAPPER: "message-wrapper",
   // Клас для внутрішньої обгортки повідомлення (між аватаром та вмістом)
-  SYSTEM_MESSAGE_TEXT: "system-message-text"
+  SYSTEM_MESSAGE_TEXT: "system-message-text",
   // <--- ДОДАЙТЕ ЦЕЙ КЛАС для тексту всередині
+  MESSAGE_ACTIONS: "message-actions-wrapper",
+  // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
+  MESSAGE_ACTION_BUTTON: "message-action-button"
+  // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
 };
 
 // src/MessageRendererUtils.ts
@@ -1448,78 +1452,122 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
 // src/renderers/AssistantMessageRenderer.ts
 var import_obsidian9 = require("obsidian");
 var AssistantMessageRenderer = class extends BaseMessageRenderer {
+  // У конструкторі ми очікуємо AssistantMessage, щоб мати доступ до message.tool_calls
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
     if (message.role !== "assistant") {
       throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
     }
   }
-  // Метод render залишається методом екземпляра, бо викликає статичні та protected методи
   async render() {
-    const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
+    const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
     this.addAvatar(messageGroup, false);
-    const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
+    const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
     messageWrapper.style.order = "2";
-    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
-    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
+    const { messageEl, contentEl } = this.createMessageBubble(
+      messageWrapper,
+      [CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"]
+    );
+    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
+    let contentToRender = this.message.content;
+    const assistantMessage = this.message;
+    const hasTextualToolCallTags = contentToRender.includes("<tool_call>");
+    const hasNativeToolCalls = assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
+    if (this.plugin.settings.enableToolUse && hasTextualToolCallTags && !hasNativeToolCalls) {
+      this.plugin.logger.debug(`[AssistantMessageRenderer] Message (ts: ${this.message.timestamp.getTime()}) contains textual tool call tags. Preparing display content.`);
+      let strippedContent = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+      if (strippedContent.startsWith("***")) {
+        strippedContent = strippedContent.substring(3).trim();
+      }
+      if (strippedContent.endsWith("***")) {
+        strippedContent = strippedContent.substring(0, strippedContent.length - 3).trim();
+      }
+      const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
+      let match;
+      const toolNamesCalled = [];
+      toolCallRegex.lastIndex = 0;
+      while ((match = toolCallRegex.exec(contentToRender)) !== null) {
+        if (match[1])
+          toolNamesCalled.push(match[1]);
+      }
+      let usingToolMessage = "( ";
+      if (toolNamesCalled.length > 0) {
+        usingToolMessage += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
+      } else {
+        usingToolMessage += "Attempting to use a tool... ";
+      }
+      usingToolMessage += ")";
+      contentToRender = strippedContent ? `${usingToolMessage}
+
+${strippedContent}` : usingToolMessage;
+      this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after stripping tags: "${contentToRender}"`);
+    } else if (this.plugin.settings.enableToolUse && hasNativeToolCalls) {
+      let usingToolMessage = "( ";
+      if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+        usingToolMessage += `Using tool${assistantMessage.tool_calls.length > 1 ? "s" : ""}: ${assistantMessage.tool_calls.map((tc) => tc.function.name).join(", ")}... `;
+      } else {
+        usingToolMessage += "Using tools... ";
+      }
+      usingToolMessage += ")";
+      contentToRender = contentToRender.trim() ? `${usingToolMessage}
+
+${contentToRender}` : usingToolMessage;
+      this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls present. Content to render: "${contentToRender}"`);
+    }
     try {
       await AssistantMessageRenderer.renderAssistantContent(
         contentEl,
-        this.message.content,
+        contentToRender,
+        // <--- Передаємо оброблений contentToRender
         this.app,
         this.plugin,
         this.view
       );
     } catch (error) {
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
-      throw error;
+      this.plugin.logger.error("[AssistantMessageRenderer] Error in render -> renderAssistantContent:", error);
     }
-    AssistantMessageRenderer.addAssistantActionButtons(messageWrapper, contentEl, this.message, this.plugin, this.view);
+    AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, this.message, this.plugin, this.view);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     setTimeout(() => {
-      if (messageEl.isConnected)
+      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`))
         this.view.checkMessageForCollapsing(messageEl);
     }, 50);
     return messageGroup;
   }
-  /**
-   * Статичний метод для рендерингу контенту асистента (Markdown, код, емодзі).
-   * Тепер обережніше видаляє індикатор завантаження.
-      * @param contentEl - DOM-елемент для рендерингу.
-      * @param markdownText - Текст у форматі Markdown для рендерингу.
-      * @param app - Екземпляр App.
-      * @param plugin - Екземпляр OllamaPlugin.
-      * @param view - Екземпляр OllamaView.
-   */
   static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
     const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
     if (markdownText.trim().length > 0 && dotsEl) {
       dotsEl.remove();
-    } else if (!dotsEl && contentEl.hasChildNodes()) {
+    } else if (!dotsEl && contentEl.hasChildNodes() && markdownText.trim().length > 0) {
       contentEl.empty();
     } else if (!dotsEl && !contentEl.hasChildNodes()) {
-    } else {
     }
     let processedMarkdown = markdownText;
     try {
       const decoded = decodeHtmlEntities(markdownText);
       const thinkDetection = detectThinkingTags(decoded);
       processedMarkdown = thinkDetection.contentWithoutTags;
-      if (thinkDetection.hasThinkingTags) {
-      }
     } catch (e) {
       plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e);
     }
-    if (processedMarkdown.trim().length === 0) {
+    if (processedMarkdown.trim().length === 0 && !contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`)) {
+      if (contentEl.innerHTML.trim() === "") {
+        const dots = contentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+        for (let i = 0; i < 3; i++)
+          dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+      }
       return;
     }
     try {
+      if (dotsEl)
+        dotsEl.remove();
+      contentEl.empty();
       await import_obsidian9.MarkdownRenderer.render(app, processedMarkdown, contentEl, (_b = (_a = plugin.app.vault.getRoot()) == null ? void 0 : _a.path) != null ? _b : "", view);
     } catch (error) {
       plugin.logger.error("[renderAssistantContent STAT] <<< MARKDOWN RENDER FAILED >>>:", error);
       contentEl.setText(`[Error rendering Markdown: ${error instanceof Error ? error.message : String(error)}]`);
-      throw error;
     }
     try {
       enhanceCodeBlocks(contentEl, view);
@@ -1534,28 +1582,20 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       }
     }
   }
-  /**
-   * Статичний метод для додавання кнопок дій асистента.
-      * @param messageWrapper - Обгортка повідомлення.
-      * @param contentEl - Елемент контенту (для перекладу).
-      * @param message - Об'єкт повідомлення (для видалення).
-      * @param plugin - Екземпляр OllamaPlugin (для налаштувань).
-      * @param view - Екземпляр OllamaView (для обробників подій).
-   */
-  static addAssistantActionButtons(messageWrapper, contentEl, message, plugin, view) {
-    if (messageWrapper.querySelector(".message-actions-wrapper")) {
+  static addAssistantActionButtons(messageElement, contentEl, message, plugin, view) {
+    if (messageElement.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`)) {
       return;
     }
-    const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
+    const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
     const finalContent = message.content;
-    const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+    const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Copy", title: "Copy" } });
     (0, import_obsidian9.setIcon)(copyBtn, "copy");
     view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
       view.handleCopyClick(finalContent, copyBtn);
     });
-    if (plugin.settings.enableTranslation && plugin.settings.googleTranslationApiKey && finalContent.trim()) {
-      const translateBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.TRANSLATE_BUTTON, attr: { "aria-label": "Translate", title: "Translate" } });
+    if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && finalContent && finalContent.trim()) {
+      const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Translate", title: "Translate" } });
       (0, import_obsidian9.setIcon)(translateBtn, "languages");
       view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
@@ -1566,22 +1606,29 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         }
       });
     }
-    if (plugin.settings.summarizationModelName && finalContent.trim()) {
-      const summarizeBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.SUMMARIZE_BUTTON, attr: { title: "Summarize message" } });
+    if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && finalContent && finalContent.trim()) {
+      const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { title: "Summarize message" } });
       (0, import_obsidian9.setIcon)(summarizeBtn, "scroll-text");
       view.registerDomEvent(summarizeBtn, "click", (e) => {
         e.stopPropagation();
         view.handleSummarizeClick(finalContent, summarizeBtn);
       });
     }
-    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+    if (!message.tool_calls || message.tool_calls.length === 0) {
+      const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Regenerate response", title: "Regenerate Response" } });
+      (0, import_obsidian9.setIcon)(regenerateBtn, "refresh-cw");
+      view.registerDomEvent(regenerateBtn, "click", (e) => {
+        e.stopPropagation();
+        view.handleRegenerateClick(message);
+      });
+    }
+    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION, CSS_CLASSES.MESSAGE_ACTION_BUTTON], attr: { "aria-label": "Delete message", title: "Delete Message" } });
     (0, import_obsidian9.setIcon)(deleteBtn, "trash");
     view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
       view.handleDeleteMessageClick(message);
     });
   }
-  // --- КІНЕЦЬ СТАТИЧНОГО МЕТОДУ ---
 };
 
 // src/renderers/SystemMessageRenderer.ts
@@ -7336,10 +7383,6 @@ Summary:`;
       }
     ).open();
   }
-  // src/OllamaView.ts
-  // Переконайтесь, що властивості isChatListUpdateScheduled та chatListUpdateTimeoutId
-  // та метод scheduleSidebarChatListUpdate визначені у класі OllamaView, як було показано раніше.
-  // src/OllamaView.ts
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     this.plugin.logger.debug(
@@ -7348,8 +7391,6 @@ Summary:`;
     let metadataUpdated = false;
     try {
       this.clearChatContainerInternal();
-      this.currentMessages = [];
-      this.lastRenderedMessageDate = null;
       this.lastMessageElement = null;
       this.consecutiveErrorMessages = [];
       this.errorGroupElement = null;
@@ -7359,75 +7400,68 @@ Summary:`;
       let finalRolePath = void 0;
       let finalRoleName = "None";
       let finalTemperature = void 0;
-      let errorOccurred = false;
+      let errorOccurredLoadingData = false;
       try {
         activeChat = await ((_b = this.plugin.chatManager) == null ? void 0 : _b.getActiveChat()) || null;
         this.plugin.logger.debug(
           `[loadAndDisplayActiveChat] Active chat fetched: ${(_d = (_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.id) != null ? _d : "null"}`
         );
         availableModels = await this.plugin.ollamaService.getModels();
-        finalRolePath = (_f = (_e = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _e.selectedRolePath) != null ? _f : this.plugin.settings.selectedRolePath;
+        finalRolePath = ((_e = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _e.selectedRolePath) !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
         this.plugin.logger.error("[loadAndDisplayActiveChat] Error loading initial chat data or models:", error);
         new import_obsidian15.Notice("Error connecting to Ollama or loading chat data.", 5e3);
-        errorOccurred = true;
+        errorOccurredLoadingData = true;
         availableModels = availableModels || [];
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_g = availableModels[0]) != null ? _g : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
         finalTemperature = this.plugin.settings.temperature;
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
         activeChat = null;
       }
-      if (!errorOccurred && activeChat) {
-        let preferredModel = ((_h = activeChat.metadata) == null ? void 0 : _h.modelName) || this.plugin.settings.modelName;
+      if (!errorOccurredLoadingData && activeChat) {
+        let preferredModel = ((_g = activeChat.metadata) == null ? void 0 : _g.modelName) || this.plugin.settings.modelName;
         if (availableModels.length > 0) {
           if (preferredModel && availableModels.includes(preferredModel)) {
             finalModelName = preferredModel;
           } else {
             finalModelName = availableModels[0];
             this.plugin.logger.warn(
-              `[loadAndDisplayActiveChat] Preferred model "${preferredModel}" not found in available models [${availableModels.join(
-                ", "
-              )}]. Using first available: "${finalModelName}".`
+              `[loadAndDisplayActiveChat] Preferred model "${preferredModel}" for chat "${activeChat.metadata.name}" not found in available models [${availableModels.join(", ")}]. Using first available: "${finalModelName}".`
             );
           }
         } else {
           finalModelName = null;
-          this.plugin.logger.error(`[loadAndDisplayActiveChat] No available models detected.`);
+          this.plugin.logger.error(`[loadAndDisplayActiveChat] No available Ollama models detected. Cannot set model for chat "${activeChat.metadata.name}".`);
         }
         if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
           this.plugin.logger.debug(
-            `[OllamaView] loadAndDisplayActiveChat: Aligning model name in metadata (AWAITING)... Old: ${activeChat.metadata.modelName}, New: ${finalModelName}`
+            `[OllamaView] loadAndDisplayActiveChat: Aligning model name in metadata for chat "${activeChat.metadata.name}"... Old: ${activeChat.metadata.modelName}, New: ${finalModelName}`
           );
           try {
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
               metadataUpdated = true;
-              this.plugin.logger.debug(
-                `[OllamaView] loadAndDisplayActiveChat: Metadata alignment finished (success). metadataUpdated = true.`
-              );
+              this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat: Model metadata for chat "${activeChat.metadata.name}" alignment finished (success). metadataUpdated = true.`);
               const potentiallyUpdatedChat = await this.plugin.chatManager.getChat(activeChat.metadata.id);
               if (potentiallyUpdatedChat)
                 activeChat = potentiallyUpdatedChat;
             } else {
-              this.plugin.logger.debug(
-                `[OllamaView] loadAndDisplayActiveChat: Metadata alignment finished (no change needed). metadataUpdated = false.`
-              );
+              this.plugin.logger.debug(`[OllamaView] loadAndDisplayActiveChat: Model metadata for chat "${activeChat.metadata.name}" alignment not needed or failed silently.`);
             }
           } catch (updateError) {
-            this.plugin.logger.error(
-              "[loadAndDisplayActiveChat] Error awaiting chat model metadata update:",
-              updateError
-            );
+            this.plugin.logger.error(`[loadAndDisplayActiveChat] Error awaiting chat model metadata update for chat "${activeChat.metadata.name}":`, updateError);
           }
         }
-        finalTemperature = (_j = (_i = activeChat.metadata) == null ? void 0 : _i.temperature) != null ? _j : this.plugin.settings.temperature;
-      } else if (!errorOccurred && !activeChat) {
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_k = availableModels[0]) != null ? _k : null;
+        finalTemperature = (_i = (_h = activeChat.metadata) == null ? void 0 : _h.temperature) != null ? _i : this.plugin.settings.temperature;
+      } else if (!errorOccurredLoadingData && !activeChat) {
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_j = availableModels[0]) != null ? _j : null;
         finalTemperature = this.plugin.settings.temperature;
+        finalRolePath = this.plugin.settings.selectedRolePath;
+        finalRoleName = await this.findRoleNameByPath(finalRolePath);
       }
-      if (activeChat !== null && !errorOccurred && ((_l = activeChat.messages) == null ? void 0 : _l.length) > 0) {
+      if (activeChat && !errorOccurredLoadingData && ((_k = activeChat.messages) == null ? void 0 : _k.length) > 0) {
         this.hideEmptyState();
         this.currentMessages = [...activeChat.messages];
         this.lastRenderedMessageDate = null;
@@ -7436,7 +7470,7 @@ Summary:`;
           const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
           const isFirstMessageInContainer = this.chatContainer.children.length === 0;
           if (isNewDay || isFirstMessageInContainer) {
-            if (isNewDay) {
+            if (isNewDay && this.chatContainer.children.length > 0) {
               this.renderDateSeparator(message.timestamp);
             }
             this.lastRenderedMessageDate = message.timestamp;
@@ -7455,42 +7489,52 @@ Summary:`;
                 break;
               case "error":
                 this.handleErrorMessage(message);
-                continue;
+                messageGroupEl = this.errorGroupElement;
+                break;
+              case "tool":
+                renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
+                break;
               default:
-                this.plugin.logger.warn(
-                  `[loadAndDisplayActiveChat] Unknown message role found in history: ${message == null ? void 0 : message.role}`
-                );
-                continue;
+                this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role in history: ${message == null ? void 0 : message.role}`);
+                const unknownRoleGroup = (_l = this.chatContainer) == null ? void 0 : _l.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
+                if (unknownRoleGroup && this.chatContainer) {
+                  renderAvatar(this.app, this.plugin, unknownRoleGroup, false);
+                  const wrapper = unknownRoleGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
+                  const msgBubble = wrapper.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.SYSTEM_MESSAGE}` });
+                  msgBubble.createDiv({ cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text", text: `Unknown message role: ${message.role}` });
+                  BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
+                  this.chatContainer.appendChild(unknownRoleGroup);
+                  messageGroupEl = unknownRoleGroup;
+                }
+                break;
             }
-            if (renderer) {
+            if (renderer && message.role !== "error") {
               const result = renderer.render();
               messageGroupEl = result instanceof Promise ? await result : result;
             }
           } catch (renderError) {
-            this.plugin.logger.error(
-              "[loadAndDisplayActiveChat] Error rendering message during load:",
-              renderError,
-              message
-            );
-            const errorDiv = this.chatContainer.createDiv({ cls: "render-error" });
+            this.plugin.logger.error("[loadAndDisplayActiveChat] Error rendering message during load:", renderError, message);
+            const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" });
             errorDiv.setText(`Error rendering message (role: ${message.role})`);
             messageGroupEl = errorDiv;
           }
           if (messageGroupEl) {
-            this.chatContainer.appendChild(messageGroupEl);
+            if (messageGroupEl.parentElement !== this.chatContainer) {
+              this.chatContainer.appendChild(messageGroupEl);
+            }
             this.lastMessageElement = messageGroupEl;
           }
         }
         setTimeout(() => this.checkAllMessagesForCollapsing(), 100);
         setTimeout(() => {
-          this.guaranteedScrollToBottom(100, false);
+          this.guaranteedScrollToBottom(100, true);
           setTimeout(() => {
             this.updateScrollStateAndIndicators();
           }, 150);
         }, 150);
       } else {
         this.showEmptyState();
-        (_m = this.scrollToBottomButton) == null ? void 0 : _m.classList.remove(CSS_CLASSES.VISIBLE);
+        (_m = this.scrollToBottomButton) == null ? void 0 : _m.classList.remove(CSS_CLASSES.VISIBLE || "visible");
       }
       this.updateInputPlaceholder(finalRoleName);
       this.updateRoleDisplay(finalRoleName);
@@ -7503,7 +7547,7 @@ Summary:`;
         }
         if (this.sendButton) {
           this.sendButton.disabled = true;
-          this.sendButton.classList.add(CSS_CLASSES.DISABLED);
+          this.sendButton.classList.add(CSS_CLASSES.DISABLED || "disabled");
         }
         if (this.isProcessing)
           this.setLoadingState(false);
@@ -7517,13 +7561,12 @@ Summary:`;
         `[OllamaView] loadAndDisplayActiveChat FINISHED. Metadata was updated: ${metadataUpdated}`
       );
     } catch (error) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL ERROR XXX", error);
+      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL OUTER ERROR XXX", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
-      const errorMsg = this.chatContainer.createDiv({
-        cls: "fatal-error-message",
-        text: "Failed to load chat content."
-      });
+      if (this.chatContainer) {
+        this.chatContainer.createDiv({ cls: "fatal-error-message", text: "Failed to load chat content. Please check console." });
+      }
       return { metadataUpdated: false };
     } finally {
     }
