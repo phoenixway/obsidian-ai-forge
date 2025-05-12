@@ -1622,7 +1622,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   async render() {
     var _a;
     const messageTimestampLog = this.message.timestamp.getTime();
-    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] render() called. Original content preview: "${(_a = this.message.content) == null ? void 0 : _a.substring(0, 100)}..."`);
+    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] render() called. Original content: "${(_a = this.message.content) == null ? void 0 : _a.substring(0, 150)}..."`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
     renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
@@ -1632,33 +1632,35 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       [CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"]
     );
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
-    let contentToRender = this.message.content;
+    let rawContentFromLlm = this.message.content || "";
     const assistantMessage = this.message;
-    const hasTextualToolCallTags = typeof contentToRender === "string" && contentToRender.includes("<tool_call>");
+    const thinkDetection = detectThinkingTags(decodeHtmlEntities(rawContentFromLlm));
+    let contentAfterThinkProcessing = thinkDetection.contentWithoutTags;
+    const hasTextualToolCallTags = contentAfterThinkProcessing.includes("<tool_call>");
     const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
-    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Initial checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags}, hasNativeToolCalls=${hasNativeToolCalls}`);
+    let finalContentToRender = contentAfterThinkProcessing;
+    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags} (after think stripping), hasNativeToolCalls=${hasNativeToolCalls}. Content after think stripping: "${contentAfterThinkProcessing.substring(0, 100)}..."`);
     if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls)) {
-      this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Preparing display content.`);
+      this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Modifying display content.`);
       let usingToolMessageText = "( ";
       const toolNamesCalled = [];
       let accompanyingText = "";
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
         this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
-        accompanyingText = contentToRender || "";
-      } else if (hasTextualToolCallTags && typeof contentToRender === "string") {
-        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags. Original contentToRender: "${contentToRender.substring(0, 150)}..."`);
+        accompanyingText = contentAfterThinkProcessing;
+      } else if (hasTextualToolCallTags) {
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from: "${contentAfterThinkProcessing.substring(0, 150)}..."`);
         const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
         let match;
         toolCallRegex.lastIndex = 0;
-        const originalContentForNameExtraction = this.message.content || "";
-        while ((match = toolCallRegex.exec(originalContentForNameExtraction)) !== null) {
+        while ((match = toolCallRegex.exec(contentAfterThinkProcessing)) !== null) {
           if (match[1]) {
             toolNamesCalled.push(match[1]);
-            this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Extracted tool name: ${match[1]}`);
+            this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Extracted tool name from textual call: ${match[1]}`);
           }
         }
-        accompanyingText = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+        accompanyingText = contentAfterThinkProcessing.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
         if (accompanyingText.startsWith("***")) {
           accompanyingText = accompanyingText.substring(3).trim();
         }
@@ -1669,30 +1671,29 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       }
       if (toolNamesCalled.length > 0) {
         usingToolMessageText += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
-      } else if (hasTextualToolCallTags || hasNativeToolCalls) {
+      } else {
         usingToolMessageText += "Attempting to use tool(s)... ";
-        this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were successfully extracted. Displaying generic message.`);
+        this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted. Displaying generic 'Attempting to use...' message.`);
       }
       usingToolMessageText += ")";
       if (accompanyingText && accompanyingText.trim().length > 0) {
-        contentToRender = `${usingToolMessageText}
+        finalContentToRender = `${usingToolMessageText}
 
 ${accompanyingText.trim()}`;
       } else {
-        contentToRender = usingToolMessageText;
+        finalContentToRender = usingToolMessageText;
       }
-      this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Final contentToRender after processing tool indicators: "${contentToRender}"`);
+      this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Final contentToRender for display: "${finalContentToRender}"`);
     } else {
-      this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering original content: "${contentToRender == null ? void 0 : contentToRender.substring(0, 100)}..."`);
+      this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering processed content as is: "${finalContentToRender.substring(0, 100)}..."`);
     }
     try {
       await renderMarkdownContent(
-        // Використовуємо перейменовану функцію з MessageRendererUtils
         this.app,
         this.view,
         this.plugin,
         contentEl,
-        contentToRender || ""
+        finalContentToRender || ""
       );
     } catch (error) {
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
