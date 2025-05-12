@@ -4,7 +4,7 @@ import OllamaPlugin, { ACTIVE_CHAT_ID_KEY, CHAT_INDEX_KEY } from "./main";
 import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat";
 import { MessageRole } from "./OllamaView"; // Припускаємо, що типи тут
 import { v4 as uuidv4 } from "uuid";
-import { Message } from "./types";
+import { Message, ToolCall } from "./types";
 import { Logger } from "./Logger";
 
 // --- ТИПИ ДЛЯ ІЄРАРХІЇ ---
@@ -613,6 +613,56 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
 
   // src/ChatManager.ts
 
+  public async getActiveChatOrFail(): Promise<Chat> {
+    const chat = await this.getActiveChat();
+    if (!chat) {
+      this.logger.error("[ChatManager] getActiveChatOrFail: No active chat found or failed to load!");
+      // Можна кинути більш специфічну помилку, або просто Error
+      throw new Error("No active chat found or it failed to load.");
+    }
+    return chat;
+  }
+
+  public async addMessageToActiveChatPayload(messagePayload: Message, emitEvent: boolean = true): Promise<Message | null> {
+    let activeChatInstance = await this.getActiveChat(); // Використовуємо getActiveChat
+
+    if (!activeChatInstance) {
+      this.logger.warn("[ChatManager.addMessagePayload] No active chat. Attempting to create a new one for the message.");
+      // Спроба створити новий чат, якщо повідомлення важливе і немає активного чату
+      activeChatInstance = await this.createNewChat(); // createNewChat вже викликає setActiveChat
+      if (activeChatInstance) {
+        this.logger.info(`[ChatManager.addMessagePayload] Created a new chat (ID: ${activeChatInstance.metadata.id}) as no active chat was found.`);
+      } else {
+        this.logger.error("[ChatManager.addMessagePayload] Failed to create a new chat for the message payload. Message cannot be added.");
+        new Notice("Error: Could not add message. No active or new chat available.");
+        return null;
+      }
+    }
+
+    // Переконуємось, що timestamp встановлено, якщо його немає
+    if (!messagePayload.timestamp) {
+        messagePayload.timestamp = new Date();
+    }
+
+    activeChatInstance.messages.push(messagePayload);
+    activeChatInstance.updateMetadata({}); // Оновлюємо lastModified та потенційно інші метадані
+
+    const saveAndUpdateIndexSuccess = await this.saveChatAndUpdateIndex(activeChatInstance);
+    if (!saveAndUpdateIndexSuccess) {
+        this.logger.error(`[ChatManager.addMessagePayload] Failed to save chat or update index for chat ${activeChatInstance.metadata.id}. Message was added to in-memory object but might not persist.`);
+        // Залежно від вашої логіки, ви можете або повернути помилку, або продовжити з емітуванням події
+    }
+
+    if (emitEvent) {
+      // Переконуємося, що activeChatId синхронізований з activeChatInstance.metadata.id
+      // Це важливо, якщо createNewChat щойно встановив новий активний чат.
+      const currentActiveChatIdForEvent = this.activeChatId || activeChatInstance.metadata.id;
+      this.plugin.emit("message-added", { chatId: currentActiveChatIdForEvent, message: messagePayload });
+      this.logger.debug(`[ChatManager.addMessagePayload] Emitted 'message-added' for chat ${currentActiveChatIdForEvent}, msg ts: ${messagePayload.timestamp.getTime()}`);
+    }
+    return messagePayload;
+  }
+
 async getChat(id: string, filePath?: string): Promise<Chat | null> {
   if (this.loadedChats[id]) {
       this.logger.trace(`[ChatManager.getChat] Returning cached chat for ID: ${id}`);
@@ -811,30 +861,31 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
     role: MessageRole,
     content: string,
     timestamp?: Date,
-    emitEvent: boolean = true
+    emitEvent: boolean = true,
+    tool_calls?: ToolCall[],
+    tool_call_id?: string,
+    name?: string
   ): Promise<Message | null> {
-    const activeChat = await this.getActiveChat();
-    if (!activeChat) {
-      this.logger.error("Cannot add message: No active chat.");
-      return null;
-    }
-
     const messageTimestamp = timestamp || new Date();
-    const newMessage: Message = { role, content, timestamp: messageTimestamp };
+    const newMessage: Message = {
+        role,
+        content,
+        timestamp: messageTimestamp,
+    };
 
-    activeChat.messages.push(newMessage);
-    const metadataChanged = activeChat.updateMetadata({});
-
-    const indexUpdated = await this.saveChatAndUpdateIndex(activeChat);
-
-    if (emitEvent && indexUpdated) {
-      const eventData = { chatId: this.activeChatId, message: newMessage };
-
-      this.plugin.emit("message-added", { chatId: activeChat.metadata.id, message: newMessage });
-    } else if (emitEvent && !indexUpdated) {
+    // Додаємо опціональні поля, якщо вони надані
+    if (tool_calls && tool_calls.length > 0) {
+      newMessage.tool_calls = tool_calls;
     }
+    if (tool_call_id) {
+      newMessage.tool_call_id = tool_call_id;
+    }
+    if (name) {
+      newMessage.name = name;
+    }
+    // Можливо, додати поле 'images', якщо воно використовується при створенні повідомлення тут
 
-    return newMessage;
+    return await this.addMessageToActiveChatPayload(newMessage, emitEvent);
   }
 
   async clearActiveChatMessages(): Promise<void> {
