@@ -19,98 +19,87 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
 
     public async render(): Promise<HTMLElement> {
         const messageTimestampLog = this.message.timestamp.getTime();
-        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] render() called. Original content: "${this.message.content?.substring(0, 150)}..."`);
-    
+        const originalMessageContent = this.message.content || ""; 
+
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] render() called. Original content preview: "${originalMessageContent.substring(0, 150)}..."`);
+
         const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
+        
         RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'assistant');
+
         const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
-        messageWrapper.style.order = "2";
+        messageWrapper.style.order = "2"; 
         const { messageEl, contentEl } = this.createMessageBubble(
-            messageWrapper,
+            messageWrapper, 
             [CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"]
         );
         contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
-    
-        let rawContentFromLlm = this.message.content || ""; // Початковий контент від LLM
-        const assistantMessage = this.message as AssistantMessage;
-    
-        // Спочатку обробляємо теги <think>
-        const thinkDetection = RendererUtils.detectThinkingTags(RendererUtils.decodeHtmlEntities(rawContentFromLlm));
-        let contentAfterThinkProcessing = thinkDetection.contentWithoutTags; // Контент БЕЗ <think> тегів
-    
-        // Тепер перевіряємо наявність tool_call тегів у контенті, що залишився
-        const hasTextualToolCallTags = contentAfterThinkProcessing.includes("<tool_call>");
+
+        let finalContentToRender: string; // Оголошуємо тут
+        const assistantMessage = this.message as AssistantMessage; 
+
+        const thinkDetection = RendererUtils.detectThinkingTags(RendererUtils.decodeHtmlEntities(originalMessageContent));
+        let contentWithoutThinkTags = thinkDetection.contentWithoutTags;
+        
+        const hasTextualToolCallTags = contentWithoutThinkTags.includes("<tool_call>");
         const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
-    
-        let finalContentToRender = contentAfterThinkProcessing; // За замовчуванням, показуємо контент без <think>
-    
-        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags} (after think stripping), hasNativeToolCalls=${hasNativeToolCalls}. Content after think stripping: "${contentAfterThinkProcessing.substring(0,100)}..."`);
-    
-        if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls)) {
-            this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Modifying display content.`);
+
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Initial checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags} (after think stripping: "${contentWithoutThinkTags.substring(0,100)}..."), hasNativeToolCalls=${hasNativeToolCalls}.`);
+
+        if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls) ) {
+            this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Preparing display content.`);
             
             let usingToolMessageText = "( ";
             const toolNamesCalled: string[] = [];
-            let accompanyingText = ""; // Текст, що НЕ є частиною <tool_call> тегів
-    
-            if (hasNativeToolCalls && assistantMessage.tool_calls) {
+            let accompanyingText = contentWithoutThinkTags; 
+
+            if (hasNativeToolCalls && assistantMessage.tool_calls) { 
                 this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
                 assistantMessage.tool_calls.forEach(tc => toolNamesCalled.push(tc.function.name));
-                // Для нативних викликів, contentAfterThinkProcessing - це те, що було в оригінальному message.content (вже без <think>)
-                // Модель може надати текст разом з нативними tool_calls.
-                accompanyingText = contentAfterThinkProcessing; 
-            } else if (hasTextualToolCallTags) {
-                // Якщо нативних немає, але є текстові теги (в contentAfterThinkProcessing)
-                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from: "${contentAfterThinkProcessing.substring(0,150)}..."`);
+                // accompanyingText тут - це contentWithoutThinkTags (оригінальний контент асистента без <think>)
+            } else if (hasTextualToolCallTags) { 
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from (content without think tags): "${contentWithoutThinkTags.substring(0,150)}..."`);
                 
                 const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
                 let match;
                 toolCallRegex.lastIndex = 0;
-                // Шукаємо імена в контенті, який вже пройшов обробку <think>
-                while((match = toolCallRegex.exec(contentAfterThinkProcessing)) !== null) {
+                // Парсимо імена з contentWithoutThinkTags, оскільки <think> вже видалено
+                while((match = toolCallRegex.exec(contentWithoutThinkTags)) !== null) {
                     if (match[1]) {
                         toolNamesCalled.push(match[1]);
-                        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Extracted tool name from textual call: ${match[1]}`);
                     }
                 }
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Extracted tool names from textual calls: ${toolNamesCalled.join(', ')}`);
                 
-                // Видаляємо <tool_call> теги з contentAfterThinkProcessing, щоб отримати супровідний текст
-                accompanyingText = contentAfterThinkProcessing.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+                accompanyingText = contentWithoutThinkTags.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
                 
-                // Видаляємо можливі артефакти Markdown, якщо вони оточували блок <tool_call>
-                if (accompanyingText.startsWith("***")) { 
-                    accompanyingText = accompanyingText.substring(3).trim();
-                }
-                if (accompanyingText.endsWith("***")) {
-                    accompanyingText = accompanyingText.substring(0, accompanyingText.length - 3).trim();
-                }
-                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Accompanying text after stripping tool_call tags: "${accompanyingText}"`);
+                if (accompanyingText.startsWith("***")) { accompanyingText = accompanyingText.substring(3).trim(); }
+                if (accompanyingText.endsWith("***")) { accompanyingText = accompanyingText.substring(0, accompanyingText.length - 3).trim(); }
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Accompanying text after stripping all tags: "${accompanyingText}"`);
             }
-    
-            // Формуємо повідомлення про використання інструменту
+
             if (toolNamesCalled.length > 0) {
                 usingToolMessageText += `Using tool${toolNamesCalled.length > 1 ? 's' : ''}: ${toolNamesCalled.join(', ')}... `;
             } else { 
-                // Спрацює, якщо hasTextualToolCallTags або hasNativeToolCalls були true, але імена не витяглися
                 usingToolMessageText += "Attempting to use tool(s)... ";
                 this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted. Displaying generic 'Attempting to use...' message.`);
             }
             usingToolMessageText += ")";
             
-            // Збираємо фінальний контент для відображення
             if (accompanyingText && accompanyingText.trim().length > 0) {
                 finalContentToRender = `${usingToolMessageText}\n\n${accompanyingText.trim()}`;
             } else {
                 finalContentToRender = usingToolMessageText;
             }
             
-            this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Final contentToRender for display: "${finalContentToRender}"`);
+            this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Final contentToRender for display (with tool indicators): "${finalContentToRender}"`);
         } else {
-            this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering processed content as is: "${finalContentToRender.substring(0,100)}..."`);
+            // ---> ВИПРАВЛЕННЯ ТУТ: ініціалізуємо finalContentToRender <---
+            finalContentToRender = contentWithoutThinkTags; 
+            this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering content (after think stripping): "${finalContentToRender.substring(0,100)}..."`);
         }
         
         try {
-            // Передаємо finalContentToRender, який вже оброблений
             await RendererUtils.renderMarkdownContent(
                 this.app, 
                 this.view,
@@ -122,7 +111,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
              contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
              this.plugin.logger.error(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Error in render -> renderMarkdownContent:`, error);
         }
-    
+
         AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
         BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
         
@@ -131,9 +120,10 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
                 this.view.checkMessageForCollapsing(messageEl);
             }
         }, 70);
-    
+
         return messageGroup;
     }
+    
 
 
 
