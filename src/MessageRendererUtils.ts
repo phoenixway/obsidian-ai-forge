@@ -1,332 +1,151 @@
 // src/MessageRendererUtils.ts
-import { App, MarkdownRenderer, Notice, setIcon, TFile,normalizePath } from "obsidian";
-import { OllamaView } from "./OllamaView"; // May need view context for registerDomEvent
-import OllamaPlugin from "./main"; // For settings, logger
-import { CSS_CLASSES } from "./constants"; // Import shared constants
+import { App, MarkdownRenderer, Notice, setIcon, TFile, normalizePath } from "obsidian";
+import { OllamaView } from "./OllamaView"; 
+import OllamaPlugin from "./main"; 
+import { CSS_CLASSES } from "./constants"; 
+import { AvatarType } from "./settings"; 
 
-// --- Constants from OllamaView related to rendering ---
-const CSS_CLASS_THINKING_BLOCK = "thinking-block";
-const CSS_CLASS_THINKING_HEADER = "thinking-header";
-const CSS_CLASS_THINKING_TOGGLE = "thinking-toggle";
-const CSS_CLASS_THINKING_TITLE = "thinking-title";
-const CSS_CLASS_THINKING_CONTENT = "thinking-content";
-const CSS_CLASS_CODE_BLOCK_COPY_BUTTON = "code-block-copy-button";
-const CSS_CLASS_CODE_BLOCK_LANGUAGE = "code-block-language";
 
-const CSS_CLASS_AVATAR = "message-group-avatar";
-const CSS_CLASS_AVATAR_AI = "ai-avatar";
-const CSS_CLASS_AVATAR_USER = "user-avatar";
+// CODE_BLOCK_COPY_BUTTON та CODE_BLOCK_LANGUAGE тепер очікуються з CSS_CLASSES
 
 export interface ThinkDetectionResult {
     hasThinkingTags: boolean;
-    contentWithoutTags: string; // Додано: Контент БЕЗ тегів <think>
+    contentWithoutTags: string; 
     format: string;
 }
 
-/** Decodes HTML entities in a string */
 export function decodeHtmlEntities(text: string): string {
-	if (typeof document === "undefined") {
-		// Fallback for non-browser environments if needed
-		return text
-			.replace(/&amp;/g, "&")
-			.replace(/&lt;/g, "<")
-			.replace(/&gt;/g, ">")
-			.replace(/&quot;/g, '"')
-			.replace(/&#39;/g, "'");
-	}
-	const ta = document.createElement("textarea");
-	ta.innerHTML = text;
-	return ta.value;
+    if (typeof document === "undefined") {
+        return text
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'");
+    }
+    const ta = document.createElement("textarea");
+    ta.innerHTML = text;
+    return ta.value;
 }
 
 export function detectThinkingTags(content: string): ThinkDetectionResult {
-    const thinkTagRegex = /<think>[\s\S]*?<\/think>/gi; // g - global, i - case-insensitive
+    const thinkTagRegex = /<think>[\s\S]*?<\/think>/gi; 
     const hasThinkingTags = thinkTagRegex.test(content);
-    let processedContent = content; // За замовчуванням - оригінальний контент
+    let processedContent = content; 
 
     if (hasThinkingTags) {
-        // Замінюємо всі входження тегу та його вмісту на порожній рядок і обрізаємо пробіли
         processedContent = content.replace(thinkTagRegex, '').trim();
     }
-
-    // Визначаємо формат (спрощено)
     const format = /<[a-z][\s\S]*>/i.test(processedContent) ? 'html' : 'text';
-
-    return {
-        hasThinkingTags,
-        contentWithoutTags: processedContent, // Повертаємо оброблений (або оригінальний) контент
-        format
-    };
+    return { hasThinkingTags, contentWithoutTags: processedContent, format };
 }
 
-/** Renders Markdown to HTML */
 export async function markdownToHtml(
-	app: App,
-	view: any, // Pass the view instance for context
-	markdown: string,
+    app: App,
+    view: any, 
+    markdown: string,
 ): Promise<string> {
-	if (!markdown?.trim()) return "";
-	const div = document.createElement("div");
-	try {
-		// Use the render function available since Obsidian 1.5.x
-		await MarkdownRenderer.render(
-			app,
-			markdown,
-			div,
-			app.vault.getRoot()?.path ?? "", // sourcePath is required
-			view, // Component context is required
-		);
-	} catch (error) {
-		console.error("Markdown rendering error, falling back to text:", error);
-		div.textContent = markdown; // Fallback to plain text on error
-	}
-	return div.innerHTML;
+    if (!markdown?.trim()) return "";
+    const div = document.createElement("div");
+    try {
+        await MarkdownRenderer.render(
+            app,
+            markdown,
+            div,
+            app.vault.getRoot()?.path ?? "", 
+            view, 
+        );
+    } catch (error) {
+        console.error("Markdown rendering error, falling back to text:", error);
+        div.textContent = markdown; 
+    }
+    return div.innerHTML;
 }
 
-/** Processes content with <think> tags into HTML */
 export async function processThinkingTags(
-	app: App,
-	view: any,
-	content: string,
+    app: App,
+    view: any, // OllamaView
+    content: string,
 ): Promise<string> {
-	const thinkTagRegex = /<think>([\s\S]*?)<\/think>/g;
-	const parts: string[] = [];
-	let lastIndex = 0;
-	let match;
+    const thinkTagRegex = /<think>([\s\S]*?)<\/think>/g;
+    const parts: string[] = [];
+    let lastIndex = 0;
+    let match;
 
-	while ((match = thinkTagRegex.exec(content)) !== null) {
-		// Process text before the tag
-		if (match.index > lastIndex) {
-			const normalText = content.substring(lastIndex, match.index);
-			parts.push(await markdownToHtml(app, view, normalText));
-		}
+    while ((match = thinkTagRegex.exec(content)) !== null) {
+        if (match.index > lastIndex) {
+            const normalText = content.substring(lastIndex, match.index);
+            parts.push(await markdownToHtml(app, view, normalText));
+        }
 
-		// Process the <think> block content
-		const thinkContent = match[1];
-		const renderedThinkContent = await markdownToHtml(app, view, thinkContent);
-		const headerHtml = `<div class="${CSS_CLASS_THINKING_HEADER}" data-fold-state="folded"><div class="${CSS_CLASS_THINKING_TOGGLE}">►</div><div class="${CSS_CLASS_THINKING_TITLE}">Thinking</div></div>`;
-		const contentHtml = `<div class="${CSS_CLASS_THINKING_CONTENT}" style="display: none;">${renderedThinkContent}</div>`;
-		parts.push(`<div class="${CSS_CLASS_THINKING_BLOCK}">${headerHtml}${contentHtml}</div>`);
+        const thinkContent = match[1];
+        const renderedThinkContent = await markdownToHtml(app, view, thinkContent);
+        // Використовуйте CSS_CLASSES для цих класів, якщо вони визначені глобально
+        const headerHtml = `<div class="${CSS_CLASSES.THINKING_HEADER || "thinking-header"}" data-fold-state="folded"><div class="${CSS_CLASSES.THINKING_TOGGLE || "thinking-toggle"}">►</div><div class="${CSS_CLASSES.THINKING_TITLE || "thinking-title"}">Thinking</div></div>`;
+        const contentHtml = `<div class="${CSS_CLASSES.THINKING_CONTENT || "thinking-content"}" style="display: none;">${renderedThinkContent}</div>`;
+        parts.push(`<div class="${CSS_CLASSES.THINKING_BLOCK || "thinking-block"}">${headerHtml}${contentHtml}</div>`);
 
-		lastIndex = thinkTagRegex.lastIndex;
-	}
+        lastIndex = thinkTagRegex.lastIndex;
+    }
 
-	// Process any remaining text after the last tag
-	if (lastIndex < content.length) {
-		const remainingText = content.substring(lastIndex);
-		parts.push(await markdownToHtml(app, view, remainingText));
-	}
+    if (lastIndex < content.length) {
+        const remainingText = content.substring(lastIndex);
+        parts.push(await markdownToHtml(app, view, remainingText));
+    }
 
-	return parts.join("");
+    return parts.join("");
 }
 
-/** Adds toggle listeners to thinking blocks */
 export function addThinkingToggleListeners(
-	view: OllamaView, // Need view to register events
-	contentEl: HTMLElement,
+    view: OllamaView, 
+    contentEl: HTMLElement,
 ): void {
-	const headers = contentEl.querySelectorAll<HTMLElement>(`.${CSS_CLASS_THINKING_HEADER}`);
-	headers.forEach(header => {
-		// Check if listener already attached (simple guard)
-		if ((header as any)._listenerAttached) return;
+    const headers = contentEl.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.THINKING_HEADER || "thinking-header"}`);
+    headers.forEach(header => {
+        if ((header as any)._listenerAttached) return;
 
-		view.registerDomEvent(header, "click", () => {
-			const content = header.nextElementSibling as HTMLElement;
-			const toggle = header.querySelector<HTMLElement>(`.${CSS_CLASS_THINKING_TOGGLE}`);
-			if (!content || !toggle) return;
+        view.registerDomEvent(header, "click", () => {
+            const content = header.nextElementSibling as HTMLElement;
+            const toggle = header.querySelector<HTMLElement>(`.${CSS_CLASSES.THINKING_TOGGLE || "thinking-toggle"}`);
+            if (!content || !toggle) return;
 
-			const isFolded = header.getAttribute("data-fold-state") === "folded";
-			if (isFolded) {
-				content.style.display = "block";
-				toggle.textContent = "▼";
-				header.setAttribute("data-fold-state", "expanded");
-			} else {
-				content.style.display = "none";
-				toggle.textContent = "►";
-				header.setAttribute("data-fold-state", "folded");
-			}
-		});
-		(header as any)._listenerAttached = true; // Mark as attached
-	});
+            const isFolded = header.getAttribute("data-fold-state") === "folded";
+            if (isFolded) {
+                content.style.display = "block";
+                toggle.textContent = "▼";
+                header.setAttribute("data-fold-state", "expanded");
+            } else {
+                content.style.display = "none";
+                toggle.textContent = "►";
+                header.setAttribute("data-fold-state", "folded");
+            }
+        });
+        (header as any)._listenerAttached = true; 
+    });
 }
 
-/** Adds copy buttons and language badges to code blocks */
-export function addCodeBlockEnhancements(
-	view: OllamaView, // Need view to register events
-	contentEl: HTMLElement,
-): void {
-	contentEl.querySelectorAll("pre").forEach(pre => {
-		// Prevent adding enhancements multiple times
-		if (pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_COPY_BUTTON}`)) return;
-		if (pre.classList.contains("enhanced")) return; // Add marker class
-
-		const code = pre.querySelector("code");
-		if (!code) return;
-
-		const codeText = code.textContent || "";
-		pre.classList.add("enhanced"); // Mark as enhanced
-
-		// Add language identifier badge
-		const langClass = Array.from(code.classList).find(cls => cls.startsWith("language-"));
-		if (langClass) {
-			const lang = langClass.replace("language-", "");
-			if (lang && !pre.querySelector(`.${CSS_CLASS_CODE_BLOCK_LANGUAGE}`)) {
-				pre.createEl("span", {
-					cls: CSS_CLASS_CODE_BLOCK_LANGUAGE,
-					text: lang,
-				});
-			}
-		}
-
-		// Add copy button
-		const copyBtn = pre.createEl("button", {
-			cls: CSS_CLASS_CODE_BLOCK_COPY_BUTTON,
-		});
-		setIcon(copyBtn, "copy");
-		copyBtn.setAttribute("title", "Copy Code");
-		copyBtn.setAttribute("aria-label", "Copy code block");
-
-		view.registerDomEvent(copyBtn, "click", e => {
-			e.stopPropagation();
-			navigator.clipboard
-				.writeText(codeText)
-				.then(() => {
-					setIcon(copyBtn, "check");
-					copyBtn.setAttribute("title", "Copied!");
-					setTimeout(() => {
-						setIcon(copyBtn, "copy");
-						copyBtn.setAttribute("title", "Copy Code");
-					}, 1500);
-				})
-				.catch(err => {
-					console.error("Code block copy failed:", err);
-					new Notice("Failed to copy code.");
-				});
-		});
-	});
-}
-
-
-
-/** Renders assistant message content (handling Markdown, thinking tags, etc.) */
-export async function renderAssistantContent(
-	app: App,
-	view: OllamaView, // Pass view for context/listeners
-	plugin: OllamaPlugin, // Pass plugin for logging
-	containerEl: HTMLElement,
-	content: string,
-): Promise<void> {
-	try {
-		const decodedContent = decodeHtmlEntities(content);
-		const thinkingInfo = detectThinkingTags(decodedContent);
-
-		containerEl.empty(); // Clear previous content
-
-		if (thinkingInfo.hasThinkingTags) {
-			const processedHtml = await processThinkingTags(app, view, decodedContent);
-			containerEl.innerHTML = processedHtml;
-			fixBrokenTwemojiImages(containerEl);
-			addThinkingToggleListeners(view, containerEl);
-			addCodeBlockEnhancements(view, containerEl);
-		} else {
-			// Use markdownToHtml which handles MarkdownRenderer.render
-			const htmlContent = await markdownToHtml(app, view, decodedContent);
-			containerEl.innerHTML = htmlContent;
-			fixBrokenTwemojiImages(containerEl);
-			addCodeBlockEnhancements(view, containerEl);
-		}
-	} catch (error) {
-		plugin.logger.error(
-			"[MessageRendererUtils] Error rendering assistant content:",
-			error,
-			"Content:",
-			content.substring(0, 500),
-		);
-		// Fallback: display raw decoded content
-		containerEl.textContent = decodeHtmlEntities(content);
-		fixBrokenTwemojiImages(containerEl); // Still try to fix emojis
-	}
-}
-
-export function RendererUtils(app: App, plugin: OllamaPlugin, messageGroup: HTMLElement, arg3: boolean) {
-  throw new Error("Function not implemented.");
-}
-
-export function renderAvatar(
-	app: App,
-	plugin: OllamaPlugin, // Need plugin for settings
-	groupEl: HTMLElement,
-	isUser: boolean
-  ): void {
-	const settings = plugin.settings; // Get settings from plugin
-	const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
-	const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
-	const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
-  
-	const avatarEl = groupEl.createDiv({ cls: [CSS_CLASS_AVATAR, avatarClass] });
-	avatarEl.empty();
-  
-	try {
-	  if (avatarType === "image" && avatarContent) {
-		const imagePath = normalizePath(avatarContent); // Use imported normalizePath
-		// -------------------------
-		// const imageFile = app.vault.getAbstractFileByPath(imagePath); // Returns TAbstractFile | null
-		// const imagePath = app.vault.adapter.normalizePath(avatarContent);
-		const imageFile = app.vault.getAbstractFileByPath(imagePath);
-  
-		// Use instanceof check consistent with Obsidian API (might need TFile type import)
-		if (imageFile instanceof TFile) {
-		  const imageUrl = app.vault.getResourcePath(imageFile);
-		  avatarEl.createEl("img", {
-			attr: { src: imageUrl, alt: isUser ? "User Avatar" : "AI Avatar" },
-			cls: "ollama-avatar-image",
-		  });
-		  avatarEl.title = `Avatar from: ${imagePath}`;
-		} else {
-		   throw new Error("Invalid image path or not a file.");
-		}
-	  } else if (avatarType === "icon" && avatarContent) {
-		setIcon(avatarEl, avatarContent);
-	  } else {
-		// Initials or fallback
-		avatarEl.textContent = avatarContent?.substring(0, 2) || (isUser ? "U" : "AI");
-	  }
-	} catch (e) {
-	  plugin.logger.warn(`Failed to render avatar (type: ${avatarType}, content: ${avatarContent}):`, e);
-	  avatarEl.textContent = isUser ? "U" : "AI"; // Fallback
-	  avatarEl.title = "Failed to load avatar";
-	}
-
-
-	
-  }
-
-  export function enhanceCodeBlocks(contentEl: HTMLElement, view: OllamaView): void {
-    // Додамо перевірку на view та view.plugin
+export function enhanceCodeBlocks(contentEl: HTMLElement, view: OllamaView): void {
     if (!view || !view.plugin) {
-        console.error("enhanceCodeBlocks: Missing view or plugin context!");
+        view.plugin.logger.error("[enhanceCodeBlocks] Missing view or plugin context!");
         return;
     }
-    // view.plugin.logger.debug("[enhanceCodeBlocks] Enhancing code blocks..."); // ЛОГ ВХОДУ
     try {
         const codeBlocks = contentEl.querySelectorAll<HTMLElement>("pre > code");
         codeBlocks.forEach((codeElement) => {
             const preElement = codeElement.parentElement as HTMLPreElement;
             if (!preElement) return;
 
-             // Уникаємо повторного додавання кнопки
-             if (preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON}`)) { // Перевірте ім'я константи
+             if (preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON}`)) {
                 return;
              }
+             preElement.classList.add("enhanced"); // Додайте маркерний клас, щоб уникнути повторної обробки
 
-            // --- Додавання кнопки копіювання ---
             const copyButton = preElement.createEl("button", {
-                 cls: `${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON} clickable-icon`, // Перевірте імена констант
+                 cls: `${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON} clickable-icon`,
                  attr: { "aria-label": "Copy code", title: "Copy code" },
              });
             setIcon(copyButton, "copy");
 
-            // Додаємо обробник через view.registerDomEvent для коректного очищення
             view.registerDomEvent(copyButton, "click", (event) => {
                  event.stopPropagation();
                  const codeToCopy = codeElement.textContent || "";
@@ -339,54 +158,179 @@ export function renderAvatar(
                  });
              });
 
-            // --- Додавання назви мови ---
-            const language = codeElement.className.replace("language-", "");
-            if (language && !preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_LANGUAGE}`)) { // Перевірте ім'я константи
+            const language = Array.from(codeElement.classList).find(cls => cls.startsWith("language-"))?.replace("language-", "");
+            if (language && !preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_LANGUAGE}`)) { 
                 preElement.createDiv({
-                    cls: CSS_CLASSES.CODE_BLOCK_LANGUAGE, // Перевірте ім'я константи
+                    cls: CSS_CLASSES.CODE_BLOCK_LANGUAGE,
                     text: language,
                 });
             }
-
-             // Стилізація батьківського pre елемента для позиціонування
-             preElement.style.position = "relative"; // Потрібно для абсолютно позиціонованих дочірніх елементів
+             preElement.style.position = "relative"; 
         });
-        // view.plugin.logger.debug("[enhanceCodeBlocks] Finished enhancing code blocks."); // ЛОГ ВИХОДУ
     } catch (error) {
-         // Логуємо помилку, але не зупиняємо решту рендерингу
-        //  view.plugin.logger.error("[enhanceCodeBlocks] Error processing code blocks:", error);
+         view.plugin.logger.error("[MessageRendererUtils.enhanceCodeBlocks] Error processing code blocks:", error);
     }
 }
 
-// Додайте аналогічне логування та try/catch до fixBrokenTwemojiImages, якщо вона використовується
 export function fixBrokenTwemojiImages(contentEl: HTMLElement): void {
-    //  console.debug("[fixBrokenTwemojiImages] Checking for broken Twemoji...");
      try {
         contentEl.querySelectorAll('img.emoji[alt][src*="twemoji.maxcdn.com"]').forEach((img: HTMLImageElement) => {
             const alt = img.getAttribute('alt');
-            if (alt && !img.getAttribute('data-fixed')) { // Перевіряємо, чи ще не виправлено
-                // Простий варіант: замінити на текст
-                // img.replaceWith(document.createTextNode(alt));
-
-                // Складніший варіант: спробувати завантажити з іншого CDN (наприклад, jsdelivr)
+            if (alt && !img.getAttribute('data-fixed')) { 
                  const emojiHex = alt.codePointAt(0)?.toString(16);
                  if (emojiHex) {
                      img.src = `https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/${emojiHex}.svg`;
-                     img.setAttribute('data-fixed', 'true'); // Позначаємо як виправлене
-                     img.onerror = () => { // Якщо і це не спрацювало, замінюємо на текст
+                     img.setAttribute('data-fixed', 'true'); 
+                     img.onerror = () => { 
                           console.warn(`Failed to load emoji from jsdelivr: ${alt}`);
-                         if (img.parentNode) { // Перевірка перед заміною
+                         if (img.parentNode) { 
                              img.replaceWith(document.createTextNode(alt));
                          }
                      };
                  } else if (img.parentNode) {
-                    // Якщо не вдалося отримати hex, просто замінюємо на текст
                     img.replaceWith(document.createTextNode(alt));
                  }
             }
         });
-        // console.debug("[fixBrokenTwemojiImages] Finished checking Twemoji.");
      } catch (error) {
-        //   console.error("[fixBrokenTwemojiImages] Error fixing Twemoji:", error);
+          console.error("[MessageRendererUtils.fixBrokenTwemojiImages] Error fixing Twemoji:", error);
      }
 }
+
+export async function renderMarkdownContent( 
+    app: App,
+    view: OllamaView,
+    plugin: OllamaPlugin,
+    containerEl: HTMLElement,
+    markdownText: string,
+): Promise<void> {
+    try {
+        containerEl.empty();
+        const decodedContent = decodeHtmlEntities(markdownText);
+        const thinkingInfo = detectThinkingTags(decodedContent);
+
+        if (thinkingInfo.hasThinkingTags) {
+            const processedHtml = await processThinkingTags(app, view, decodedContent);
+            containerEl.innerHTML = processedHtml;
+            addThinkingToggleListeners(view, containerEl);
+        } else {
+            await MarkdownRenderer.render(app, decodedContent, containerEl, plugin.app.vault.getRoot()?.path ?? "", view);
+        }
+        
+        enhanceCodeBlocks(containerEl, view);
+        if (plugin.settings.fixBrokenEmojis) {
+            fixBrokenTwemojiImages(containerEl);
+        }
+    } catch (error) {
+        plugin.logger.error(
+            "[MessageRendererUtils.renderMarkdownContent] Error rendering content:",
+            error, "Content Preview:", markdownText.substring(0, 200),
+        );
+        containerEl.empty(); 
+        containerEl.setText(`[Error rendering content. Please check console.]`);
+    }
+}
+
+export function renderAvatar(
+    app: App,
+    plugin: OllamaPlugin,
+    groupEl: HTMLElement,
+    isUser: boolean,
+    avatarRoleType?: 'user' | 'assistant' | 'system' | 'tool' | 'error' | string 
+): void {
+    const settings = plugin.settings;
+    
+    let avatarTypeToUse: AvatarType;
+    let avatarContentToUse: string;
+    let specificIcon: string | null = null;
+    const defaultAiIcon = "bot"; 
+
+    if (isUser) {
+        avatarTypeToUse = settings.userAvatarType;
+        avatarContentToUse = settings.userAvatarContent;
+    } else {
+        avatarTypeToUse = settings.aiAvatarType;   
+        avatarContentToUse = settings.aiAvatarContent; 
+
+        if (avatarTypeToUse === 'icon') { // Тільки якщо AI аватар - іконка, визначаємо специфічну
+            switch (avatarRoleType) {
+                case 'system':
+                    specificIcon = "info";
+                    break;
+                case 'tool':
+                    specificIcon = "wrench"; // <--- ВИПРАВЛЕНО ЗАЙВУ КОМУ
+                    break;
+                case 'error':
+                    specificIcon = "alert-circle";
+                    break;
+                case 'assistant': 
+                default:
+                    specificIcon = avatarContentToUse || defaultAiIcon; 
+                    break;
+            }
+            if (specificIcon) { // Якщо specificIcon визначено, він стає контентом для іконки
+                avatarContentToUse = specificIcon;
+            }
+        }
+    }
+    
+    // Використовуємо константи, які, як ми очікуємо, є у вашому файлі constants.ts
+    const mainAvatarContainerClass = CSS_CLASSES.AVATAR_CONTAINER || "avatar-container";
+    const specificAvatarRoleClass = isUser ? (CSS_CLASSES.AVATAR_USER_SPECIFIC || "user-avatar") : (CSS_CLASSES.AVATAR_AI_SPECIFIC || "ai-avatar");
+  
+    let avatarEl = groupEl.querySelector<HTMLElement>(`.${mainAvatarContainerClass.split(" ")[0]}`); // Беремо перший клас, якщо їх декілька
+    if (!avatarEl) {
+        avatarEl = groupEl.createDiv({ cls: [mainAvatarContainerClass, specificAvatarRoleClass] });
+    } else {
+        avatarEl.className = ""; 
+        avatarEl.classList.add(mainAvatarContainerClass, specificAvatarRoleClass);
+    }
+    avatarEl.empty(); 
+  
+    try {
+      if (avatarTypeToUse === "image" && avatarContentToUse) {
+        const imagePath = normalizePath(avatarContentToUse);
+        const imageFile = app.vault.getAbstractFileByPath(imagePath);
+  
+        if (imageFile instanceof TFile) {
+          const imageUrl = app.vault.getResourcePath(imageFile);
+          avatarEl.createEl("img", {
+            attr: { src: imageUrl, alt: isUser ? "User Avatar" : (avatarRoleType || "AI") + " Avatar" },
+            cls: CSS_CLASSES.AVATAR_IMAGE || "avatar-image", // Використовуємо константу
+          });
+          avatarEl.title = `Avatar from: ${imagePath}`;
+        } else {
+           plugin.logger.warn(`Avatar image file not found or not a TFile: ${imagePath}. Using fallback.`);
+           throw new Error("Invalid image path or not a file.");
+        }
+      } else if (avatarTypeToUse === "icon" && avatarContentToUse) { 
+        setIcon(avatarEl.createSpan({ cls: CSS_CLASSES.AVATAR_ICON || "avatar-icon" }), avatarContentToUse); // Використовуємо константу
+        avatarEl.title = `Icon: ${avatarContentToUse}`;
+      } else { // Initials or fallback
+        let initials = avatarContentToUse?.substring(0, 2).toUpperCase();
+        if (!initials) { // Якщо avatarContentToUse порожній або undefined
+            if (isUser) {
+                initials = "U";
+            } else {
+                // Для AI/system/tool, якщо specificIcon був null (наприклад, тип аватара AI - initials, але контент порожній)
+                initials = avatarRoleType ? avatarRoleType.substring(0,1).toUpperCase() : "AI";
+                if (initials.length > 2) initials = initials.substring(0,2); // Обрізаємо, якщо роль довга
+                if (!initials) initials = "AI"; // Останній fallback
+            }
+        }
+        avatarEl.createDiv({cls: CSS_CLASSES.AVATAR_INITIALS || "avatar-initials", text: initials}); // Використовуємо константу
+        avatarEl.title = `Initials: ${initials}`;
+      }
+    } catch (e: any) {
+      plugin.logger.warn(`Failed to render avatar (type: ${avatarTypeToUse}, content: ${avatarContentToUse}, roleType: ${avatarRoleType}):`, e.message);
+      const fallbackIcon = isUser ? "user-circle" : (specificIcon || defaultAiIcon);
+      avatarEl.empty(); 
+      setIcon(avatarEl.createSpan({ cls: CSS_CLASSES.AVATAR_ICON || "avatar-icon" }), fallbackIcon); // Використовуємо константу
+      avatarEl.title = `Fallback Avatar (Icon: ${fallbackIcon})`;
+    }
+}
+
+// Видалено неправильну функцію RendererUtils
+// export function RendererUtils(app: App, plugin: OllamaPlugin, messageGroup: HTMLElement, arg3: boolean) {
+//   throw new Error("Function not implemented.");
+// }

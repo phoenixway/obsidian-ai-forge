@@ -63,5 +63,21 @@ export const CSS_CLASSES = {
 
     MESSAGE_ACTIONS: "message-actions-wrapper", // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
     MESSAGE_ACTION_BUTTON: "message-action-button", // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
+
+     // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ АВАТАРІВ ---
+     AVATAR_CONTAINER: "avatar-container",         // Головний контейнер аватара
+     AVATAR_USER_SPECIFIC: "user-avatar",      // Специфічний клас для аватара користувача
+     AVATAR_AI_SPECIFIC: "ai-avatar",          // Специфічний клас для аватара AI
+     AVATAR_IMAGE: "avatar-image",             // Для <img> аватара
+     AVATAR_ICON: "avatar-icon",               // Для <span> з іконкою аватара
+     AVATAR_INITIALS: "avatar-initials",       // Для <div> з ініціалами
+ 
+     THINKING_BLOCK: "thinking-block",
+     THINKING_HEADER: "thinking-header",
+     THINKING_TOGGLE:  "thinking-toggle",
+     THINKING_TITLE: "thinking-title",
+     THINKING_CONTENT: "thinking-content",
+
+     // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };
 export const SCROLL_THRESHOLD = 150;

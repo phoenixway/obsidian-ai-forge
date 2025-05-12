@@ -1190,15 +1190,31 @@ var CSS_CLASSES = {
   // <--- ДОДАЙТЕ ЦЕЙ КЛАС для тексту всередині
   MESSAGE_ACTIONS: "message-actions-wrapper",
   // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
-  MESSAGE_ACTION_BUTTON: "message-action-button"
+  MESSAGE_ACTION_BUTTON: "message-action-button",
   // <--- ДОДАЙТЕ/ПЕРЕВІРТЕ ЦЕЙ
+  // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ АВАТАРІВ ---
+  AVATAR_CONTAINER: "avatar-container",
+  // Головний контейнер аватара
+  AVATAR_USER_SPECIFIC: "user-avatar",
+  // Специфічний клас для аватара користувача
+  AVATAR_AI_SPECIFIC: "ai-avatar",
+  // Специфічний клас для аватара AI
+  AVATAR_IMAGE: "avatar-image",
+  // Для <img> аватара
+  AVATAR_ICON: "avatar-icon",
+  // Для <span> з іконкою аватара
+  AVATAR_INITIALS: "avatar-initials",
+  // Для <div> з ініціалами
+  THINKING_BLOCK: "thinking-block",
+  THINKING_HEADER: "thinking-header",
+  THINKING_TOGGLE: "thinking-toggle",
+  THINKING_TITLE: "thinking-title",
+  THINKING_CONTENT: "thinking-content"
+  // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };
 
 // src/MessageRendererUtils.ts
 var import_obsidian6 = require("obsidian");
-var CSS_CLASS_AVATAR = "message-group-avatar";
-var CSS_CLASS_AVATAR_AI = "ai-avatar";
-var CSS_CLASS_AVATAR_USER = "user-avatar";
 function decodeHtmlEntities(text) {
   if (typeof document === "undefined") {
     return text.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
@@ -1215,62 +1231,26 @@ function detectThinkingTags(content) {
     processedContent = content.replace(thinkTagRegex, "").trim();
   }
   const format = /<[a-z][\s\S]*>/i.test(processedContent) ? "html" : "text";
-  return {
-    hasThinkingTags,
-    contentWithoutTags: processedContent,
-    // Повертаємо оброблений (або оригінальний) контент
-    format
-  };
-}
-function renderAvatar(app, plugin, groupEl, isUser) {
-  const settings = plugin.settings;
-  const avatarType = isUser ? settings.userAvatarType : settings.aiAvatarType;
-  const avatarContent = isUser ? settings.userAvatarContent : settings.aiAvatarContent;
-  const avatarClass = isUser ? CSS_CLASS_AVATAR_USER : CSS_CLASS_AVATAR_AI;
-  const avatarEl = groupEl.createDiv({ cls: [CSS_CLASS_AVATAR, avatarClass] });
-  avatarEl.empty();
-  try {
-    if (avatarType === "image" && avatarContent) {
-      const imagePath = (0, import_obsidian6.normalizePath)(avatarContent);
-      const imageFile = app.vault.getAbstractFileByPath(imagePath);
-      if (imageFile instanceof import_obsidian6.TFile) {
-        const imageUrl = app.vault.getResourcePath(imageFile);
-        avatarEl.createEl("img", {
-          attr: { src: imageUrl, alt: isUser ? "User Avatar" : "AI Avatar" },
-          cls: "ollama-avatar-image"
-        });
-        avatarEl.title = `Avatar from: ${imagePath}`;
-      } else {
-        throw new Error("Invalid image path or not a file.");
-      }
-    } else if (avatarType === "icon" && avatarContent) {
-      (0, import_obsidian6.setIcon)(avatarEl, avatarContent);
-    } else {
-      avatarEl.textContent = (avatarContent == null ? void 0 : avatarContent.substring(0, 2)) || (isUser ? "U" : "AI");
-    }
-  } catch (e) {
-    plugin.logger.warn(`Failed to render avatar (type: ${avatarType}, content: ${avatarContent}):`, e);
-    avatarEl.textContent = isUser ? "U" : "AI";
-    avatarEl.title = "Failed to load avatar";
-  }
+  return { hasThinkingTags, contentWithoutTags: processedContent, format };
 }
 function enhanceCodeBlocks(contentEl, view) {
   if (!view || !view.plugin) {
-    console.error("enhanceCodeBlocks: Missing view or plugin context!");
+    view.plugin.logger.error("[enhanceCodeBlocks] Missing view or plugin context!");
     return;
   }
   try {
     const codeBlocks = contentEl.querySelectorAll("pre > code");
     codeBlocks.forEach((codeElement) => {
+      var _a;
       const preElement = codeElement.parentElement;
       if (!preElement)
         return;
       if (preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON}`)) {
         return;
       }
+      preElement.classList.add("enhanced");
       const copyButton = preElement.createEl("button", {
         cls: `${CSS_CLASSES.CODE_BLOCK_COPY_BUTTON} clickable-icon`,
-        // Перевірте імена констант
         attr: { "aria-label": "Copy code", title: "Copy code" }
       });
       (0, import_obsidian6.setIcon)(copyButton, "copy");
@@ -1285,17 +1265,17 @@ function enhanceCodeBlocks(contentEl, view) {
           new import_obsidian6.Notice("Failed to copy code to clipboard.");
         });
       });
-      const language = codeElement.className.replace("language-", "");
+      const language = (_a = Array.from(codeElement.classList).find((cls) => cls.startsWith("language-"))) == null ? void 0 : _a.replace("language-", "");
       if (language && !preElement.querySelector(`.${CSS_CLASSES.CODE_BLOCK_LANGUAGE}`)) {
         preElement.createDiv({
           cls: CSS_CLASSES.CODE_BLOCK_LANGUAGE,
-          // Перевірте ім'я константи
           text: language
         });
       }
       preElement.style.position = "relative";
     });
   } catch (error) {
+    view.plugin.logger.error("[MessageRendererUtils.enhanceCodeBlocks] Error processing code blocks:", error);
   }
 }
 function fixBrokenTwemojiImages(contentEl) {
@@ -1320,6 +1300,93 @@ function fixBrokenTwemojiImages(contentEl) {
       }
     });
   } catch (error) {
+    console.error("[MessageRendererUtils.fixBrokenTwemojiImages] Error fixing Twemoji:", error);
+  }
+}
+function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
+  const settings = plugin.settings;
+  let avatarTypeToUse;
+  let avatarContentToUse;
+  let specificIcon = null;
+  const defaultAiIcon = "bot";
+  if (isUser) {
+    avatarTypeToUse = settings.userAvatarType;
+    avatarContentToUse = settings.userAvatarContent;
+  } else {
+    avatarTypeToUse = settings.aiAvatarType;
+    avatarContentToUse = settings.aiAvatarContent;
+    if (avatarTypeToUse === "icon") {
+      switch (avatarRoleType) {
+        case "system":
+          specificIcon = "info";
+          break;
+        case "tool":
+          specificIcon = "wrench";
+          break;
+        case "error":
+          specificIcon = "alert-circle";
+          break;
+        case "assistant":
+        default:
+          specificIcon = avatarContentToUse || defaultAiIcon;
+          break;
+      }
+      if (specificIcon) {
+        avatarContentToUse = specificIcon;
+      }
+    }
+  }
+  const mainAvatarContainerClass = CSS_CLASSES.AVATAR_CONTAINER || "avatar-container";
+  const specificAvatarRoleClass = isUser ? CSS_CLASSES.AVATAR_USER_SPECIFIC || "user-avatar" : CSS_CLASSES.AVATAR_AI_SPECIFIC || "ai-avatar";
+  let avatarEl = groupEl.querySelector(`.${mainAvatarContainerClass.split(" ")[0]}`);
+  if (!avatarEl) {
+    avatarEl = groupEl.createDiv({ cls: [mainAvatarContainerClass, specificAvatarRoleClass] });
+  } else {
+    avatarEl.className = "";
+    avatarEl.classList.add(mainAvatarContainerClass, specificAvatarRoleClass);
+  }
+  avatarEl.empty();
+  try {
+    if (avatarTypeToUse === "image" && avatarContentToUse) {
+      const imagePath = (0, import_obsidian6.normalizePath)(avatarContentToUse);
+      const imageFile = app.vault.getAbstractFileByPath(imagePath);
+      if (imageFile instanceof import_obsidian6.TFile) {
+        const imageUrl = app.vault.getResourcePath(imageFile);
+        avatarEl.createEl("img", {
+          attr: { src: imageUrl, alt: isUser ? "User Avatar" : (avatarRoleType || "AI") + " Avatar" },
+          cls: CSS_CLASSES.AVATAR_IMAGE || "avatar-image"
+          // Використовуємо константу
+        });
+        avatarEl.title = `Avatar from: ${imagePath}`;
+      } else {
+        plugin.logger.warn(`Avatar image file not found or not a TFile: ${imagePath}. Using fallback.`);
+        throw new Error("Invalid image path or not a file.");
+      }
+    } else if (avatarTypeToUse === "icon" && avatarContentToUse) {
+      (0, import_obsidian6.setIcon)(avatarEl.createSpan({ cls: CSS_CLASSES.AVATAR_ICON || "avatar-icon" }), avatarContentToUse);
+      avatarEl.title = `Icon: ${avatarContentToUse}`;
+    } else {
+      let initials = avatarContentToUse == null ? void 0 : avatarContentToUse.substring(0, 2).toUpperCase();
+      if (!initials) {
+        if (isUser) {
+          initials = "U";
+        } else {
+          initials = avatarRoleType ? avatarRoleType.substring(0, 1).toUpperCase() : "AI";
+          if (initials.length > 2)
+            initials = initials.substring(0, 2);
+          if (!initials)
+            initials = "AI";
+        }
+      }
+      avatarEl.createDiv({ cls: CSS_CLASSES.AVATAR_INITIALS || "avatar-initials", text: initials });
+      avatarEl.title = `Initials: ${initials}`;
+    }
+  } catch (e) {
+    plugin.logger.warn(`Failed to render avatar (type: ${avatarTypeToUse}, content: ${avatarContentToUse}, roleType: ${avatarRoleType}):`, e.message);
+    const fallbackIcon = isUser ? "user-circle" : specificIcon || defaultAiIcon;
+    avatarEl.empty();
+    (0, import_obsidian6.setIcon)(avatarEl.createSpan({ cls: CSS_CLASSES.AVATAR_ICON || "avatar-icon" }), fallbackIcon);
+    avatarEl.title = `Fallback Avatar (Icon: ${fallbackIcon})`;
   }
 }
 
@@ -1459,8 +1526,11 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     }
   }
   async render() {
+    var _a;
+    const messageTimestampLog = this.message.timestamp.getTime();
+    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] render() called. Original content preview: "${(_a = this.message.content) == null ? void 0 : _a.substring(0, 70)}..."`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
-    renderAvatar(this.app, this.plugin, messageGroup, false);
+    renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
     messageWrapper.style.order = "2";
     const { messageEl, contentEl } = this.createMessageBubble(
@@ -1472,15 +1542,17 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     const assistantMessage = this.message;
     const hasTextualToolCallTags = typeof contentToRender === "string" && contentToRender.includes("<tool_call>");
     const hasNativeToolCalls = assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
+    this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Initial checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags}, hasNativeToolCalls=${hasNativeToolCalls}`);
     if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls)) {
-      this.plugin.logger.debug(`[AssistantMessageRenderer] Message (ts: ${this.message.timestamp.getTime()}) contains tool call indicators. Preparing display content.`);
+      this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Preparing display content.`);
       let usingToolMessage = "( ";
       const toolNamesCalled = [];
+      let originalContentWithoutToolCallTags = contentToRender || "";
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls found: ${assistantMessage.tool_calls.length}`);
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Native tool_calls found: ${assistantMessage.tool_calls.length}. Names: ${assistantMessage.tool_calls.map((tc) => tc.function.name).join(", ")}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
       } else if (hasTextualToolCallTags && typeof contentToRender === "string") {
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found in content: "${contentToRender.substring(0, 100)}..."`);
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Textual tool_call tags found. Original contentToRender: "${contentToRender.substring(0, 150)}..."`);
         const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
         let match;
         toolCallRegex.lastIndex = 0;
@@ -1488,24 +1560,29 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
           if (match[1])
             toolNamesCalled.push(match[1]);
         }
-        contentToRender = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-        if (contentToRender.startsWith("***")) {
-          contentToRender = contentToRender.substring(3).trim();
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Parsed tool names from textual calls: ${toolNamesCalled.join(", ")}`);
+        originalContentWithoutToolCallTags = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+        if (originalContentWithoutToolCallTags.startsWith("***")) {
+          originalContentWithoutToolCallTags = originalContentWithoutToolCallTags.substring(3).trim();
         }
-        if (contentToRender.endsWith("***")) {
-          contentToRender = contentToRender.substring(0, contentToRender.length - 3).trim();
+        if (originalContentWithoutToolCallTags.endsWith("***")) {
+          originalContentWithoutToolCallTags = originalContentWithoutToolCallTags.substring(0, originalContentWithoutToolCallTags.length - 3).trim();
         }
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Content after stripping tool_call tags: "${originalContentWithoutToolCallTags}"`);
       }
       if (toolNamesCalled.length > 0) {
         usingToolMessage += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
       } else if (hasTextualToolCallTags || hasNativeToolCalls) {
         usingToolMessage += "Attempting to use tool(s)... ";
+        this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted. Displaying generic message.`);
       }
       usingToolMessage += ")";
-      contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}
+      contentToRender = originalContentWithoutToolCallTags && originalContentWithoutToolCallTags.trim() ? `${usingToolMessage}
 
-${contentToRender.trim()}` : usingToolMessage;
-      this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after processing tool indicators: "${contentToRender}"`);
+${originalContentWithoutToolCallTags.trim()}` : usingToolMessage;
+      this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Final contentToRender after processing tool indicators: "${contentToRender}"`);
+    } else {
+      this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering content as is.`);
     }
     try {
       await AssistantMessageRenderer.renderAssistantContent(
@@ -1517,7 +1594,7 @@ ${contentToRender.trim()}` : usingToolMessage;
       );
     } catch (error) {
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
-      this.plugin.logger.error("[AssistantMessageRenderer] Error in render -> renderAssistantContent:", error);
+      this.plugin.logger.error(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Error in render -> renderAssistantContent:`, error);
     }
     AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);

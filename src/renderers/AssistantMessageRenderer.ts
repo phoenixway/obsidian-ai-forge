@@ -18,11 +18,14 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
     }
 
     public async render(): Promise<HTMLElement> {
+        const messageTimestampLog = this.message.timestamp.getTime(); // Для логування
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] render() called. Original content preview: "${this.message.content?.substring(0, 70)}..."`);
+
         const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
         
-        // Додаємо аватар для асистента.
-        // Якщо ваш RendererUtils.renderAvatar приймає 5-й аргумент для типу ролі (рекомендовано):
-        RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false);
+        // Аватар
+        // Якщо ваш RendererUtils.renderAvatar приймає 5-й аргумент для типу ролі:
+        RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'assistant');
         // Або якщо він приймає лише 4 аргументи:
         // this.addAvatar(messageGroup, false); 
 
@@ -35,64 +38,67 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         );
         contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
 
-        // Початковий контент повідомлення
-        let contentToRender = this.message.content;
+        let contentToRender = this.message.content; 
         const assistantMessage = this.message as AssistantMessage; 
 
-        // Перевіряємо, чи є текстові теги <tool_call> або нативні tool_calls
         const hasTextualToolCallTags = typeof contentToRender === 'string' && contentToRender.includes("<tool_call>");
         const hasNativeToolCalls = assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
 
+        this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Initial checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTags}, hasNativeToolCalls=${hasNativeToolCalls}`);
+
         if (this.plugin.settings.enableToolUse && (hasTextualToolCallTags || hasNativeToolCalls) ) {
-            this.plugin.logger.debug(`[AssistantMessageRenderer] Message (ts: ${this.message.timestamp.getTime()}) contains tool call indicators. Preparing display content.`);
+            this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators present. Preparing display content.`);
             
             let usingToolMessage = "( ";
             const toolNamesCalled: string[] = [];
+            let originalContentWithoutToolCallTags = contentToRender || ""; // Зберігаємо оригінальний контент для вилучення супровідного тексту
 
             if (hasNativeToolCalls && assistantMessage.tool_calls) { 
-                // Якщо є нативні tool_calls, беремо імена з них
-                this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls found: ${assistantMessage.tool_calls.length}`);
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Native tool_calls found: ${assistantMessage.tool_calls.length}. Names: ${assistantMessage.tool_calls.map(tc => tc.function.name).join(', ')}`);
                 assistantMessage.tool_calls.forEach(tc => toolNamesCalled.push(tc.function.name));
-                // Для нативних викликів, message.content - це зазвичай текст *перед* tool_calls, або null/порожній.
-                // Ми його просто відобразимо як є, додавши повідомлення про інструменти.
-                // contentToRender вже містить this.message.content.
+                // Для нативних викликів, message.content (тобто contentToRender тут) - це текст *перед* або *разом* з інструкцією викликати інструмент.
+                // Ми не будемо його змінювати, просто додамо usingToolMessage.
             } else if (hasTextualToolCallTags && typeof contentToRender === 'string') { 
-                // Якщо нативних немає, але є текстові теги, парсимо їх
-                this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found in content: "${contentToRender.substring(0, 100)}..."`);
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Textual tool_call tags found. Original contentToRender: "${contentToRender.substring(0,150)}..."`);
                 const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g; // 's' видалено
                 let match;
                 toolCallRegex.lastIndex = 0; 
-                // Парсимо імена з оригінального this.message.content, щоб не залежати від попередніх replace
-                while((match = toolCallRegex.exec(this.message.content)) !== null) {
+                // Парсимо імена з оригінального this.message.content
+                while((match = toolCallRegex.exec(this.message.content)) !== null) { // Важливо використовувати this.message.content для парсингу
                     if (match[1]) toolNamesCalled.push(match[1]);
                 }
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Parsed tool names from textual calls: ${toolNamesCalled.join(', ')}`);
                 
                 // Видаляємо теги <tool_call>...</tool_call> для відображення,
                 // залишаючи лише супровідний текст, якщо він є.
-                contentToRender = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim(); 
-                if (contentToRender.startsWith("***")) { 
-                    contentToRender = contentToRender.substring(3).trim();
+                originalContentWithoutToolCallTags = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim(); 
+                
+                if (originalContentWithoutToolCallTags.startsWith("***")) { 
+                    originalContentWithoutToolCallTags = originalContentWithoutToolCallTags.substring(3).trim();
                 }
-                if (contentToRender.endsWith("***")) {
-                    contentToRender = contentToRender.substring(0, contentToRender.length - 3).trim();
+                if (originalContentWithoutToolCallTags.endsWith("***")) {
+                    originalContentWithoutToolCallTags = originalContentWithoutToolCallTags.substring(0, originalContentWithoutToolCallTags.length - 3).trim();
                 }
+                this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Content after stripping tool_call tags: "${originalContentWithoutToolCallTags}"`);
             }
 
-            // Формуємо повідомлення про використання інструменту
             if (toolNamesCalled.length > 0) {
                 usingToolMessage += `Using tool${toolNamesCalled.length > 1 ? 's' : ''}: ${toolNamesCalled.join(', ')}... `;
             } else if (hasTextualToolCallTags || hasNativeToolCalls) { 
-                // Якщо індикатори були, але імена не витяглися (малоймовірно, але можливо)
+                // Цей випадок спрацює, якщо теги є, але імена не витяглися (напр. помилка в regex або форматі JSON всередині тегів)
                 usingToolMessage += "Attempting to use tool(s)... ";
+                this.plugin.logger.warn(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted. Displaying generic message.`);
             }
             usingToolMessage += ")";
             
             // Якщо після видалення тегів (для textual fallback) залишився супровідний текст, додаємо його.
             // Інакше, показуємо тільки повідомлення про використання інструменту.
-            // Для native tool_calls, contentToRender - це оригінальний контент повідомлення.
-            contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}\n\n${contentToRender.trim()}` : usingToolMessage;
+            // Для native tool_calls, originalContentWithoutToolCallTags - це оригінальний contentToRender.
+            contentToRender = originalContentWithoutToolCallTags && originalContentWithoutToolCallTags.trim() ? `${usingToolMessage}\n\n${originalContentWithoutToolCallTags.trim()}` : usingToolMessage;
             
-            this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after processing tool indicators: "${contentToRender}"`);
+            this.plugin.logger.info(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Final contentToRender after processing tool indicators: "${contentToRender}"`);
+        } else {
+            this.plugin.logger.debug(`[AssistantMessageRenderer][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering content as is.`);
         }
         
         try {
@@ -105,10 +111,10 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
             );
         } catch (error) {
              contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
-             this.plugin.logger.error("[AssistantMessageRenderer] Error in render -> renderAssistantContent:", error);
+             this.plugin.logger.error(`[AssistantMessageRenderer][ts:${messageTimestampLog}] Error in render -> renderAssistantContent:`, error);
         }
 
-        // Додаємо кнопки до messageEl, а не messageWrapper, щоб вони були частиною бульбашки
+        // Переконуємось, що assistantMessage має правильний тип для addAssistantActionButtons
         AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
         BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
         
@@ -120,6 +126,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
 
         return messageGroup;
     }
+
 
     // Статичні методи renderAssistantContent та addAssistantActionButtons 
     // залишаються такими, як були надані в моїй попередній відповіді
