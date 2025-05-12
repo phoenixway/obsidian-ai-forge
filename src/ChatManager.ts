@@ -621,7 +621,7 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
 
   let actualFilePath: string | undefined = filePath;
   if (!actualFilePath) {
-      this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
+      // this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
       try {
           const hierarchy = await this.getChatHierarchy();
           actualFilePath = this.findChatPathInHierarchy(id, hierarchy) ?? undefined;

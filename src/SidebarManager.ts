@@ -1069,50 +1069,57 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
     this.folderExpansionState.clear();
   }
 
-  // src/SidebarManager.ts
+  private handleDragStart(event: DragEvent, node: HierarchyNode): void {
+    // Ваш лог для відстеження, який вузол ініціював перетягування
+    this.plugin.logger.error( 
+        `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${
+        node.type === 'folder' ? node.name : node.metadata.name
+        }, Path: ${node.type === 'folder' ? node.path : node.filePath}`
+    );
 
-private handleDragStart(event: DragEvent, node: HierarchyNode): void {
-  // --- ДУЖЕ ВАЖЛИВИЙ ЛОГ ---
-  this.plugin.logger.error( // Використовуємо error для легкої фільтрації в консолі
-      `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${
-      node.type === 'folder' ? node.name : node.metadata.name
-      }, Path: ${node.type === 'folder' ? node.path : node.filePath}`
-  );
-  // --- КІНЕЦЬ ВАЖЛИВОГО ЛОГУ ---
+    if (!event.dataTransfer) {
+        this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
+        return;
+    }
 
-  if (!event.dataTransfer) {
-      this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
-      return;
-  }
+    // Якщо ця перевірка вам потрібна для дуже складних випадків вкладеності,
+    // її можна залишити, але stopPropagation має бути ефективнішим.
+    // if (this.draggedItemData && event.currentTarget !== event.target) {
+    //     this.plugin.logger.debug("[DragStart] Event currentTarget is different from target, possibly a parent. Current draggedItemData preserved if set by child.");
+    //     // Не перезаписуємо, якщо вже встановлено для більш глибокого елемента
+    //     // (це може бути не зовсім надійно без додаткової логіки)
+    // }
 
-  let id: string;
-  let path: string;
-  let name: string;
+    let id: string;
+    let path: string;
+    let name: string;
 
-  if (node.type === 'chat') {
-      id = node.metadata.id;
-      path = node.filePath; // Використовуємо filePath для чатів
-      name = node.metadata.name;
-  } else { // node.type === 'folder'
-      // Для папок, `id` може бути таким самим, як `path` для унікальності в контексті drag-n-drop
-      id = node.path; 
-      path = node.path; // Власний шлях папки
-      name = node.name;
-  }
+    if (node.type === 'chat') {
+        id = node.metadata.id;
+        path = node.filePath;
+        name = node.metadata.name;
+    } else { // node.type === 'folder'
+        id = node.path; // Використовуємо path як "ID" для папки в контексті DND
+        path = node.path;
+        name = node.name;
+    }
 
-  this.draggedItemData = { type: node.type, id: id, path: path, name: name };
+    // Встановлюємо дані про перетягуваний елемент
+    this.draggedItemData = { type: node.type, id: id, path: path, name: name };
 
-  event.dataTransfer.setData('text/plain', JSON.stringify(this.draggedItemData));
-  event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', JSON.stringify(this.draggedItemData));
+    event.dataTransfer.effectAllowed = 'move';
 
-  // Додаємо клас до елемента, який перетягуємо
-  if (event.target instanceof HTMLElement) {
-    event.target.addClass('is-dragging');
-    // Можна також встановити напівпрозорість, якщо бажаєте
-    // event.target.style.opacity = '0.5';
-  }
-  this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData set to: ${JSON.stringify(this.draggedItemData)}`);
+    if (event.target instanceof HTMLElement) {
+      event.target.addClass('is-dragging');
+    }
+    this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
+
+    // --- ВАЖЛИВО: Зупиняємо подальше спливання події dragstart ---
+    event.stopPropagation();
+    this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
 }
+
 
   private handleDragEnd(event: DragEvent): void {
     // Очищаємо дані та стилі

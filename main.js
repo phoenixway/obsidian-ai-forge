@@ -2567,10 +2567,8 @@ var SidebarManager = class {
     (_a = this.containerEl) == null ? void 0 : _a.remove();
     this.folderExpansionState.clear();
   }
-  // src/SidebarManager.ts
   handleDragStart(event, node) {
     this.plugin.logger.error(
-      // Використовуємо error для легкої фільтрації в консолі
       `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${node.type === "folder" ? node.name : node.metadata.name}, Path: ${node.type === "folder" ? node.path : node.filePath}`
     );
     if (!event.dataTransfer) {
@@ -2595,7 +2593,9 @@ var SidebarManager = class {
     if (event.target instanceof HTMLElement) {
       event.target.addClass("is-dragging");
     }
-    this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData set to: ${JSON.stringify(this.draggedItemData)}`);
+    this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
+    event.stopPropagation();
+    this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
   }
   handleDragEnd(event) {
     if (event.target instanceof HTMLElement) {
@@ -8564,7 +8564,6 @@ var ChatManager = class {
     }
     let actualFilePath = filePath;
     if (!actualFilePath) {
-      this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
       try {
         const hierarchy = await this.getChatHierarchy();
         actualFilePath = (_a = this.findChatPathInHierarchy(id, hierarchy)) != null ? _a : void 0;
