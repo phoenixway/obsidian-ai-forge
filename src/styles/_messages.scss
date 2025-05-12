@@ -502,3 +502,93 @@
   // Опціонально: Додаємо ледь помітну рамку
   // border: 1px solid var(--background-modifier-border-hover);
 }
+
+
+// styles.scss або main.scss
+
+// --- Стилі для Аватарок ---
+$avatar-size: 28px; // Бажаний розмір аватара (наприклад, 28px, 30px, 32px)
+$avatar-font-size: calc($avatar-size * 0.5); // Розмір шрифту для ініціалів
+$avatar-icon-size: calc($avatar-size * 0.65); // Розмір іконки всередині аватара
+
+// Головний контейнер аватара
+.avatar-container { // Або CSS_CLASSES.AVATAR_CONTAINER, якщо ви так генеруєте класи
+  width: $avatar-size;
+  height: $avatar-size;
+  min-width: $avatar-size; // Важливо для flex-контейнерів
+  min-height: $avatar-size;
+  border-radius: 50%; // Робимо його круглим
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; // Обрізаємо все, що виходить за межі
+  background-color: var(--background-modifier-hover); // Фоновий колір для ініціалів/іконок
+  margin-right: 8px; // Відступ від повідомлення (якщо аватар зліва)
+  // Якщо аватар користувача має бути справа, додайте відповідні стилі
+  // наприклад, через .message-group.user-message .avatar-container { margin-left: 8px; margin-right: 0; }
+
+  // Аватар-зображення
+  &.avatar-image, // Якщо цей клас додається до самого контейнера
+  img.avatar-image { // Або якщо це клас для <img> всередині
+    width: 100%;
+    height: 100%;
+    object-fit: cover; // Зберігає пропорції зображення, заповнюючи контейнер
+    border-radius: 50%; // Забезпечуємо круглість, навіть якщо саме зображення квадратне
+  }
+
+  // Аватар-іконка
+  &.avatar-icon, // Якщо цей клас додається до самого контейнера
+  .avatar-icon {  // Або якщо це клас для <span> всередині
+    svg { // Стилізуємо SVG всередині (Obsidian setIcon використовує SVG)
+      width: $avatar-icon-size;
+      height: $avatar-icon-size;
+      display: block; // Прибирає зайві відступи
+    }
+  }
+
+  // Аватар-ініціали
+  &.avatar-initials, // Якщо цей клас додається до самого контейнера
+  div.avatar-initials { // Або якщо це клас для <div> всередині
+    font-size: $avatar-font-size;
+    font-weight: 600;
+    color: var(--text-muted); // Колір ініціалів
+    line-height: $avatar-size; // Центруємо вертикально (якщо одна літера)
+    text-align: center;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+// Специфічні стилі, якщо ви розрізняєте user/ai аватари за класами на контейнері
+.user-avatar { // Або CSS_CLASSES.AVATAR_USER_SPECIFIC
+  // Можна додати, наприклад, інший фоновий колір
+  // background-color: var(--interactive-accent);
+  // color: var(--text-on-accent); // для ініціалів
+}
+
+.ai-avatar { // Або CSS_CLASSES.AVATAR_AI_SPECIFIC
+  // background-color: var(--background-modifier-success); // Приклад
+}
+
+// Розміщення аватара відносно групи повідомлень
+// Це приклад, якщо ваш .message-group є flex-контейнером
+.message-group {
+  display: flex;
+  align-items: flex-start; // Або flex-end, якщо аватар має бути внизу довгого повідомлення
+  margin-bottom: var(--size-2-2); // Приклад відступу між повідомленнями
+
+  // Якщо повідомлення користувача, і аватар справа
+  &.user-message { // Припускаючи, що ви додаєте клас user-message до message-group
+    flex-direction: row-reverse;
+    .avatar-container { // Або ваш клас для аватара
+      margin-right: 0;
+      margin-left: 8px;
+    }
+    .message-wrapper { // Припускаючи, що це обгортка для бульбашки
+        align-self: flex-end; // Вирівнюємо саму бульбашку по правому краю
+    }
+  }
+}
