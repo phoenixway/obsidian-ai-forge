@@ -85,7 +85,8 @@ const CSS_CLASS_MENU_BUTTON = "menu-button";
 const CSS_CLASS_RESIZER_HANDLE = "ollama-resizer-handle"; // Новий клас для роздільника
 const CSS_CLASS_RESIZING = "is-resizing"; // Клас для body під час перетягування
 
-export type MessageRole = "user" | "assistant" | "system" | "error";
+// На початку OllamaView.ts
+export type MessageRole = "user" | "assistant" | "system" | "error" | "tool";
 
 export class OllamaView extends ItemView {
   private sidebarManager!: SidebarManager;
