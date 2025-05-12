@@ -1126,133 +1126,120 @@ export class OllamaView extends ItemView {
     }
   };
 
-  // src/OllamaView.ts
-
-// ... (початок класу OllamaView та інші методи) ...
-
-private async addMessageStandard(message: Message): Promise<void> {
-  const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
-  if (isNewDay) {
-    this.renderDateSeparator(message.timestamp);
-    this.lastRenderedMessageDate = message.timestamp;
-  } else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) {
-    // Встановлюємо дату для першого повідомлення, навіть якщо не новий день, щоб наступні могли порівнювати
-    this.lastRenderedMessageDate = message.timestamp;
-  }
-  this.hideEmptyState();
-
-  let messageGroupEl: HTMLElement | null = null;
-  try {
-    let renderer:
-      | UserMessageRenderer
-      | SystemMessageRenderer
-      | AssistantMessageRenderer
-      | ErrorMessageRenderer // Залишаємо на випадок прямого використання, хоча зазвичай error обробляється handleErrorMessage
-      | ToolMessageRenderer
-      | null = null;
-
-    switch (message.role) {
-      case "user":
-        renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
-        break;
-      case "assistant":
-        // AssistantMessageRenderer має обробляти наявність message.tool_calls
-        // для можливого спеціального відображення (напр., іконки "використовую інструмент")
-        // Також він рендерить message.content, де можуть бути текстові <tool_call> теги,
-        // якщо ви не прибираєте їх перед рендерингом.
-        renderer = new AssistantMessageRenderer(this.app, this.plugin, message as AssistantMessage, this); // Типізуємо як AssistantMessage
-        break;
-      case "system":
-        renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
-        break;
-      case "error":
-        // handleErrorMessage зазвичай сам додає елемент до DOM або керує групуванням помилок.
-        this.handleErrorMessage(message); 
-        return; // Виходимо, оскільки handleErrorMessage вже виконав рендеринг/додавання.
-      
-      case "tool":
-        this.plugin.logger.info(`[addMessageStandard] Creating ToolMessageRenderer for tool: ${message.name}, Content preview: "${message.content.substring(0, 70)}..."`);
-        renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
-        break;
-        
-      default:
-        // Обробка невідомої ролі
-        const exhaustiveCheck: never = message.role; // Допомагає TypeScript відстежити всі варіанти
-        this.plugin.logger.warn(`[addMessageStandard] Unknown message role encountered in switch: '${(message as any)?.role}'. Content: "${message.content.substring(0, 70)}"`);
-        
-        // Створюємо DOM елемент для невідомої ролі, щоб уникнути повної відсутності повідомлення
-        const unknownRoleGroup = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
-        if (unknownRoleGroup && this.chatContainer) { 
-            RendererUtils.renderAvatar(this.app, this.plugin, unknownRoleGroup, false); // <--- ВИПРАВЛЕНО: 4 аргументи            
-            const wrapper = unknownRoleGroup.createDiv({cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper"}); // Додано || "message-wrapper" як fallback
-            const msgBubble = wrapper.createDiv({cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.SYSTEM_MESSAGE}`}); // Стилізуємо як системне
-            msgBubble.createDiv({cls: "system-message-text", text: `Internal Plugin Error: Unknown message role received by renderer: '${message.role}'. Message content was logged.`});
-            BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this); // <--- ВИПРАВЛЕНО: this замість this.view
-            this.chatContainer.appendChild(unknownRoleGroup);
-
-            this.lastMessageElement = unknownRoleGroup; // Оновлюємо останній елемент
-        }
-        return; 
+  private async addMessageStandard(message: Message): Promise<void> {
+    const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
+    if (isNewDay) {
+      this.renderDateSeparator(message.timestamp);
+      this.lastRenderedMessageDate = message.timestamp;
+    } else if (!this.lastRenderedMessageDate && this.chatContainer?.children.length === 0) {
+      this.lastRenderedMessageDate = message.timestamp;
     }
+    this.hideEmptyState();
 
-    if (renderer) {
-      const result = renderer.render(); // render() в BaseMessageRenderer тепер не abstract
-      messageGroupEl = result instanceof Promise ? await result : result;
-    } else {
-        // Це не мало б статися, якщо switch обробляє всі відомі ролі, а error/default роблять return
-        this.plugin.logger.warn(`[addMessageStandard] Renderer was not created for role: ${message.role}. This indicates a logic issue.`);
-        return;
-    }
-
-    if (messageGroupEl && this.chatContainer) {
-      this.chatContainer.appendChild(messageGroupEl);
-      this.lastMessageElement = messageGroupEl; // Оновлюємо посилання на останній елемент
-      if (!messageGroupEl.isConnected) {
-        // Це серйозна проблема, якщо DOM елемент не додається
-        this.plugin.logger.error(`[addMessageStandard] CRITICAL: Message group node for role ${message.role} was not connected to DOM after append!`);
-      }
-
-      messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"); // Додано fallback
-      setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"), 500);
-
-      const isUserMessage = message.role === "user";
-      // Логіка прокрутки та індикатора нових повідомлень
-      if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
-        this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE || "visible");  // Додано fallback
-      } else if (!this.userScrolledUp) {
-        // Плавна прокрутка, якщо користувач внизу, або швидка, якщо йде обробка
-        const scrollDelay = this.isProcessing && message.role === 'assistant' ? 30 : (isUserMessage ? 50 : 100);
-        const forceScroll = this.isProcessing ? true : !isUserMessage; // Форсуємо прокрутку для відповідей асистента під час обробки
-        this.guaranteedScrollToBottom(scrollDelay, forceScroll);
-      }
-      // Оновлюємо стан кнопок прокрутки з невеликою затримкою, щоб врахувати анімацію/прокрутку
-      setTimeout(() => this.updateScrollStateAndIndicators(), 150);
-    } else if (renderer) {
-        // Якщо рендерер був, але messageGroupEl не створено (що малоймовірно, якщо render() працює)
-        this.plugin.logger.warn(`[addMessageStandard] Renderer was created for role ${message.role}, but messageGroupEl was not generated or chatContainer is missing.`);
-    }
-  } catch (error: any) {
-    this.plugin.logger.error(
-      `[addMessageStandard] Unexpected error during message rendering. Role: ${
-        message?.role || "unknown"
-      }, Content Preview: "${message?.content?.substring(0, 100) || "N/A"}"`,
-      error
-    );
-    // Спроба відобразити повідомлення про помилку рендерингу в самому чаті
+    let messageGroupEl: HTMLElement | null = null;
     try {
-        const errorNotice = `Failed to render message (Role: ${message?.role}). Check console for details.`;
-        const errorMsgObject: Message = {
-            role: 'error', // Використовуємо роль 'error'
-            content: errorNotice,
-            timestamp: new Date()
-        };
-        this.handleErrorMessage(errorMsgObject); // Використовуємо існуючий обробник помилок
-    } catch (criticalError){
-        this.plugin.logger.error("[addMessageStandard] CRITICAL: Failed even to display a render error message.", criticalError);
-        new Notice("Critical error displaying message. Check console.");
+      let renderer:
+        | UserMessageRenderer
+        | SystemMessageRenderer
+        | AssistantMessageRenderer
+        | ToolMessageRenderer 
+        | ErrorMessageRenderer // Залишаємо, хоча помилки обробляються handleErrorMessage
+        | null = null;
+
+      switch (message.role) {
+        case "user":
+          renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
+          break;
+        case "assistant":
+          // AssistantMessageRenderer має сам вирішувати, як рендерити message.content,
+          // що може містити <tool_call> теги або звичайний текст.
+          // Також він може перевіряти message.tool_calls для відображення індикатора використання інструменту.
+          renderer = new AssistantMessageRenderer(this.app, this.plugin, message as AssistantMessage, this);
+          break;
+        case "system":
+          renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
+          break;
+        case "error":
+          this.handleErrorMessage(message); 
+          return; 
+        
+        case "tool":
+          this.plugin.logger.info(`[addMessageStandard] Creating ToolMessageRenderer for tool: ${message.name}, Content preview: "${message.content.substring(0, 70)}..."`);
+          renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
+          break;
+          
+        default:
+          // Допомагає TypeScript відстежити всі варіанти, якщо message.role є строгим union
+          // const _exhaustiveCheck: never = message.role; 
+          this.plugin.logger.warn(`[addMessageStandard] Unknown message role encountered in switch: '${(message as any)?.role}'. Content: "${message.content.substring(0, 70)}"`);
+          
+          const unknownRoleGroup = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
+          if (unknownRoleGroup && this.chatContainer) { 
+            RendererUtils.renderAvatar(this.app, this.plugin, unknownRoleGroup, false);
+                          const wrapper = unknownRoleGroup.createDiv({cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper"}); 
+              const msgBubble = wrapper.createDiv({cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.SYSTEM_MESSAGE}`}); 
+              msgBubble.createDiv({cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text", text: `Internal Plugin Error: Unknown message role received by renderer: '${message.role}'. Message content was logged.`});
+              BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this); 
+              this.chatContainer.appendChild(unknownRoleGroup);
+              this.lastMessageElement = unknownRoleGroup; 
+          }
+          return; 
+      }
+
+      if (renderer) {
+        const result = renderer.render(); 
+        messageGroupEl = result instanceof Promise ? await result : result;
+      } else {
+          this.plugin.logger.warn(`[addMessageStandard] Renderer was not created for role: ${message.role}. This indicates a logic issue.`);
+          return; // Якщо рендерер не створено, нічого додавати
+      }
+
+      if (messageGroupEl && this.chatContainer) {
+        this.chatContainer.appendChild(messageGroupEl);
+        this.lastMessageElement = messageGroupEl; 
+        if (!messageGroupEl.isConnected) {
+          this.plugin.logger.error(`[addMessageStandard] CRITICAL: Message group node for role ${message.role} was not connected to DOM after append!`);
+        }
+
+        messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"); 
+        setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"), 500);
+
+        const isUserMessage = message.role === "user";
+        if (!isUserMessage && this.userScrolledUp && this.newMessagesIndicatorEl) {
+          this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE || "visible");  
+        } else if (!this.userScrolledUp) {
+          const scrollDelay = this.isProcessing && message.role === 'assistant' ? 30 : (isUserMessage ? 50 : 100);
+          // Якщо це повідомлення інструменту, воно не є "відповіддю асистента" в тому сенсі, що воно не генерується LLM в реальному часі.
+          // Тому, можливо, не варто форсувати прокрутку так агресивно, як для відповіді асистента.
+          const forceScroll = (this.isProcessing && message.role === 'assistant') || message.role === 'tool' ? true : !isUserMessage;
+          this.guaranteedScrollToBottom(scrollDelay, forceScroll);
+        }
+        setTimeout(() => this.updateScrollStateAndIndicators(), 150);
+      } else if (renderer) {
+          this.plugin.logger.warn(`[addMessageStandard] Renderer was created for role ${message.role}, but messageGroupEl was not generated or chatContainer is missing.`);
+      }
+    } catch (error: any) {
+      this.plugin.logger.error(
+        `[addMessageStandard] Unexpected error during message rendering. Role: ${
+          message?.role || "unknown"
+        }, Content Preview: "${message?.content?.substring(0, 100) || "N/A"}"`,
+        error
+      );
+      try {
+          const errorNotice = `Failed to render message (Role: ${message?.role}). Check console for details.`;
+          // Створюємо об'єкт Message, сумісний з ErrorMessageRenderer або handleErrorMessage
+          const errorMsgObject: Message = { 
+              role: 'error', 
+              content: errorNotice,
+              timestamp: message.timestamp || new Date() // Використовуємо timestamp оригінального повідомлення, якщо є
+          };
+          this.handleErrorMessage(errorMsgObject); 
+      } catch (criticalError){
+          this.plugin.logger.error("[addMessageStandard] CRITICAL: Failed even to display a render error message.", criticalError);
+          new Notice("Critical error displaying message. Check console.");
+      }
     }
   }
-}
 
 // ... (решта вашого класу OllamaView) ...
 
@@ -3809,288 +3796,204 @@ private async addMessageStandard(message: Message): Promise<void> {
     this.saveWidthDebounced();
   };
 
-  // OllamaView.ts
-
   private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
     const messageForLog = data?.message;
     const messageTimestampForLog = messageForLog?.timestamp?.getTime();
     const messageRoleForLog = messageForLog?.role;
-    const hmaEntryId = Date.now();
+    const hmaEntryId = Date.now(); 
 
     let resolverForThisMessage: (() => void) | undefined;
     let resolverFoundInMap = false;
 
     if (messageTimestampForLog) {
-      resolverForThisMessage = this.messageAddedResolvers.get(messageTimestampForLog);
-      if (resolverForThisMessage) {
-        resolverFoundInMap = true;
-        this.messageAddedResolvers.delete(messageTimestampForLog);
-        this.plugin.logger.error(
-          `[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`
-        );
-      } else {
-        this.plugin.logger.debug(
-          `[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`
-        );
-      }
+        resolverForThisMessage = this.messageAddedResolvers.get(messageTimestampForLog);
+        if (resolverForThisMessage) {
+            resolverFoundInMap = true;
+            this.messageAddedResolvers.delete(messageTimestampForLog);
+            // Логування рівня ERROR тут може бути надмірним, якщо це очікувана частина потоку.
+            // Розгляньте зміну на INFO або DEBUG для таких повідомлень.
+            this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`);
+        } else {
+            this.plugin.logger.trace(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`);
+        }
     } else {
-      this.plugin.logger.warn(
-        `[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map.`
-      );
+        this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map.`);
     }
 
-    this.plugin.logger.error(
-      `[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${
-        resolverFoundInMap ? "FOUND" : "NOT_FOUND"
-      }. Active placeholder ts: ${this.activePlaceholder?.timestamp}`
+    this.plugin.logger.debug( // Змінив рівень логування на DEBUG
+        `[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? 'FOUND' : 'NOT_FOUND'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`
     );
 
     try {
-      if (!data || !data.message) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received.`,
-          data
-        );
-        if (resolverForThisMessage) {
-          this.plugin.logger.warn(
-            `[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage (invalid data).`
-          );
-          resolverForThisMessage();
+        if (!data || !data.message) {
+            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received.`, data);
+            if (resolverForThisMessage) {
+                this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage (invalid data).`);
+                resolverForThisMessage();
+            }
+            return;
         }
-        return;
-      }
 
-      const { chatId: eventChatId, message } = data;
-      const messageTimestampMs = message.timestamp.getTime();
+        const { chatId: eventChatId, message } = data;
+        const messageTimestampMs = message.timestamp.getTime();
 
-      if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing!`
-        );
-        if (resolverForThisMessage) {
-          this.plugin.logger.warn(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context).`
-          );
-          resolverForThisMessage();
+        if (!this.chatContainer || !this.plugin.chatManager) {
+            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing! ChatContainer: ${!!this.chatContainer}, ChatManager: ${!!this.plugin.chatManager}`);
+            if (resolverForThisMessage) {
+                this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context).`);
+                resolverForThisMessage();
+            }
+            return;
         }
-        return;
-      }
 
-      const activeChatId = this.plugin.chatManager.getActiveChatId();
-      if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId}.`
-        );
-        if (resolverForThisMessage) {
-          this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat).`
-          );
-          resolverForThisMessage();
+        const activeChatId = this.plugin.chatManager.getActiveChatId();
+        if (eventChatId !== activeChatId) {
+            this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId} (current is ${activeChatId}).`);
+            if (resolverForThisMessage) {
+                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat).`);
+                resolverForThisMessage();
+            }
+            return;
         }
-        return;
-      }
 
-      const existingRenderedMessage = this.chatContainer.querySelector(
-        `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
-      );
-      if (existingRenderedMessage) {
-        this.plugin.logger.warn(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message already rendered (not placeholder). Role: ${message.role}.`
-        );
-        if (resolverForThisMessage) {
-          this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered).`
-          );
-          resolverForThisMessage();
+        const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
+        if (existingRenderedMessage) {
+            this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message already rendered (not placeholder). Role: ${message.role}.`);
+            if (resolverForThisMessage) {
+                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered).`);
+                resolverForThisMessage();
+            }
+            return;
         }
-        return;
-      }
 
-      const alreadyInLogicCache = this.currentMessages.some(
-        m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
-      );
-      const isPotentiallyAssistantForPlaceholder =
-        message.role === "assistant" && this.activePlaceholder?.timestamp === messageTimestampMs;
-
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`
-      );
-
-      if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.warn(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): In cache and NOT assistant for active placeholder. Role: ${message.role}.`
+        const alreadyInLogicCache = this.currentMessages.some(
+            m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content // Додав перевірку контенту
         );
-        if (resolverForThisMessage) {
-          this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match).`
-          );
-          resolverForThisMessage();
+        
+        const isPotentiallyAssistantForPlaceholder =
+            message.role === 'assistant' &&
+            this.activePlaceholder?.timestamp === messageTimestampMs;
+
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
+
+        if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
+            this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message identical to one in cache and NOT assistant for active placeholder. Role: ${message.role}.`);
+            if (resolverForThisMessage) {
+                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match).`);
+                resolverForThisMessage();
+            }
+            return;
         }
-        return;
-      }
-      if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.info(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS assistant for active placeholder. Proceeding.`
-        );
-      }
+        if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
+            this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS assistant for active placeholder. Proceeding to update placeholder.`);
+        }
 
-      // Додаємо повідомлення в кеш this.currentMessages, ЯКЩО його там ще немає.
-      if (!alreadyInLogicCache) {
-        this.currentMessages.push(message);
-        this.plugin.logger.debug(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. Count: ${this.currentMessages.length}`
-        );
-      }
+        if (!alreadyInLogicCache) {
+            this.currentMessages.push(message);
+            this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. Count: ${this.currentMessages.length}`);
+        }
 
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`
-      );
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`);
 
-      if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating.`
-        );
-        const placeholderToUpdate = this.activePlaceholder;
-
-        if (
-          placeholderToUpdate.groupEl &&
-          placeholderToUpdate.groupEl.isConnected &&
-          placeholderToUpdate.contentEl &&
-          placeholderToUpdate.messageWrapper
-        ) {
-          this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder DOM elements are valid for update.`
-          );
-          placeholderToUpdate.groupEl.classList.remove("placeholder");
-          placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
-          placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
-          const messageDomElement = placeholderToUpdate.groupEl.querySelector(
-            `.${CSS_CLASSES.MESSAGE}`
-          ) as HTMLElement | null;
-
-          if (!messageDomElement) {
-            this.plugin.logger.error(
-              `[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`
+        if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
+            this.plugin.logger.info( // Змінив рівень логування на INFO
+                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating placeholder.`
             );
-            if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
-            this.activePlaceholder = null;
-            await this.addMessageStandard(message);
-            // currentMessages вже оновлено вище, якщо потрібно
-          } else {
-            placeholderToUpdate.contentEl.classList.remove("streaming-text");
-            const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-            if (dotsEl) {
-              dotsEl.remove();
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);
-            }
-            try {
-              this.plugin.logger.debug(
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering final assistant content into placeholder.`
-              );
-              await AssistantMessageRenderer.renderAssistantContent(
-                placeholderToUpdate.contentEl,
-                message.content,
-                this.app,
-                this.plugin,
-                this
-              );
-              AssistantMessageRenderer.addAssistantActionButtons(
-                placeholderToUpdate.messageWrapper,
-                placeholderToUpdate.contentEl,
-                message,
-                this.plugin,
-                this
-              );
-              BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
-              this.lastMessageElement = placeholderToUpdate.groupEl;
-              this.hideEmptyState();
-              this.activePlaceholder = null;
-              this.plugin.logger.error(
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated. activePlaceholder CLEARED.`
-              );
+            const placeholderToUpdate = this.activePlaceholder;
 
-              const finalMessageGroupElement = placeholderToUpdate.groupEl;
-              setTimeout(() => {
-                if (finalMessageGroupElement && finalMessageGroupElement.isConnected) {
-                  this.plugin.logger.debug(
-                    `[HMA id:${messageTimestampMs}] Calling checkMessageForCollapsing for finalized message group (was placeholder).`
-                  );
-                  this.checkMessageForCollapsing(finalMessageGroupElement);
+            if ( placeholderToUpdate.groupEl?.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper ) {
+                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder DOM elements are valid for update.`);
+                placeholderToUpdate.groupEl.classList.remove("placeholder");
+                placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
+                placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
+                
+                const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
+
+                if (!messageDomElement) {
+                    this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
+                    if(placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
+                    this.activePlaceholder = null;
+                    await this.addMessageStandard(message);
+                } else {
+                    placeholderToUpdate.contentEl.classList.remove("streaming-text");
+                    const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+                    if (dotsEl) { dotsEl.remove(); this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);}
+                    
+                    try {
+                        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering final assistant content into placeholder.`);
+                        await AssistantMessageRenderer.renderAssistantContent( placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this );
+                        AssistantMessageRenderer.addAssistantActionButtons( placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message as AssistantMessage, this.plugin, this );
+                        BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
+                        
+                        this.lastMessageElement = placeholderToUpdate.groupEl;
+                        this.hideEmptyState();
+                        
+                        const finalMessageGroupElement = placeholderToUpdate.groupEl;
+                        this.activePlaceholder = null; // Очищаємо ПІСЛЯ всіх операцій з ним
+                        this.plugin.logger.info( // Змінив рівень логування
+                            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated and CLEARED. Message content: "${message.content.substring(0,50)}..."`
+                        );
+
+                        setTimeout(() => {
+                            if(finalMessageGroupElement && finalMessageGroupElement.isConnected) {
+                                this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Calling checkMessageForCollapsing for finalized message group (was placeholder).`);
+                                this.checkMessageForCollapsing(finalMessageGroupElement);
+                            }
+                        }, 70);
+                        this.guaranteedScrollToBottom(100, true); // Форсуємо прокрутку, бо це відповідь асистента
+                    } catch (renderError: any) {
+                        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
+                        if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
+                        this.activePlaceholder = null;
+                        this.handleErrorMessage({ role: "error", content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
+                    }
                 }
-              }, 70);
-              this.guaranteedScrollToBottom(100, false);
-            } catch (renderError: any) {
-              this.plugin.logger.error(
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`,
-                renderError
-              );
-              if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
-              this.activePlaceholder = null;
-              this.handleErrorMessage({
-                role: "error",
-                content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`,
-                timestamp: new Date(),
-              });
+            } else {
+                 this.plugin.logger.error( `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but its DOM elements are invalid or not connected. Adding normally.` );
+                 this.activePlaceholder = null;
+                 await this.addMessageStandard(message);
             }
-          }
-        } else {
-          this.plugin.logger.error(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM elements invalid. Adding normally.`
-          );
-          this.activePlaceholder = null;
-          await this.addMessageStandard(message);
+        } else { // Немає відповідного плейсхолдера, або це не повідомлення асистента
+            this.plugin.logger.debug(
+                `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not an assistant message for placeholder. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}. Adding normally.`
+            );
+            await this.addMessageStandard(message); // <--- ОСНОВНИЙ ВИКЛИК ДЛЯ ЗВИЧАЙНИХ ПОВІДОМЛЕНЬ
         }
-      } else {
         this.plugin.logger.debug(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR non-assistant/non-matching. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}. Adding normally.`
+            `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
         );
-        await this.addMessageStandard(message);
-      }
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
-      );
     } catch (outerError: any) {
-      this.plugin.logger.error(
-        `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`,
-        outerError,
-        data
-      );
-      this.handleErrorMessage({
-        role: "error",
-        content: `Internal error in HMA for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
-        timestamp: new Date(),
-      });
+        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
+        this.handleErrorMessage({
+            role: "error",
+            content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
+            timestamp: new Date(),
+        });
     } finally {
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${
-          resolverForThisMessage ? "EXISTS" : "is NULL (or was not found for this specific ts)"
-        }.`
-      );
-      if (resolverForThisMessage) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`
+        this.plugin.logger.debug(
+            `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? 'EXISTS' : 'is NULL'}.`
         );
-        try {
-          resolverForThisMessage();
-        } catch (resolverError) {
-          this.plugin.logger.error(
-            `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`,
-            resolverError
-          );
+        if (resolverForThisMessage) {
+            this.plugin.logger.debug( // Змінив рівень логування
+                `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`
+            );
+            try {
+                resolverForThisMessage();
+            } catch (resolverError) {
+                this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
+            }
+            this.plugin.logger.debug( // Змінив рівень логування
+                `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`
+            );
+        } else {
+            this.plugin.logger.trace(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found or already used.`);
         }
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`
+        this.plugin.logger.debug(
+            `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}. Map size: ${this.messageAddedResolvers.size}`
         );
-      } else {
-        this.plugin.logger.warn(
-          `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found for this message instance, or already used/deleted from map earlier.`
-        );
-      }
-      this.plugin.logger.debug(
-        `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}. Map size: ${this.messageAddedResolvers.size}`
-      );
     }
   }
+
 
   // OllamaView.ts
 

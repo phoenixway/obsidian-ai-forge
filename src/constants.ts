@@ -58,6 +58,7 @@ export const CSS_CLASSES = {
     TOOL_RESULT_CONTENT: "tool-result-content", // Клас для контенту результату інструменту
 
     TOOL_MESSAGE_GROUP: "tool-message-group", // Клас для обгортки групи повідомлення інструменту
-    MESSAGE_WRAPPER: "message-wrapper"      // Клас для внутрішньої обгортки повідомлення (між аватаром та вмістом)
+    MESSAGE_WRAPPER: "message-wrapper"   ,   // Клас для внутрішньої обгортки повідомлення (між аватаром та вмістом)
+    SYSTEM_MESSAGE_TEXT: "system-message-text", // <--- ДОДАЙТЕ ЦЕЙ КЛАС для тексту всередині
 };
 export const SCROLL_THRESHOLD = 150;
