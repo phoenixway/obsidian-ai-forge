@@ -179,6 +179,7 @@ export interface OllamaPluginSettings extends LoggerSettings {
   ollamaTranslationModel: string; // Модель Ollama для перекладу
   ragAutoIndexOnStartup: boolean; // <--- ДОДАНО ТУТ
   sidebarWidth?: number; // Опціональна властивість для збереженої ширини сайдбару
+  enableToolUse: boolean;
 }
 
 // --- Значення за замовчуванням ---
@@ -249,6 +250,7 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   translationProvider: 'ollama', // За замовчуванням вимкнено
   ollamaTranslationModel: '',
   sidebarWidth: undefined, // Або null. Означає, що ширина не встановлена користувачем
+  enableToolUse: true,
 };
 
 // --- Клас вкладки налаштувань ---
@@ -407,6 +409,18 @@ export class OllamaSettingTab extends PluginSettingTab {
             const num = parseInt(value.trim(), 10);
             this.plugin.settings.contextWindow = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.contextWindow;
             await this.plugin.saveSettings();
+          })
+      );
+
+      new Setting(containerEl)
+      .setName("Enable Tool Use (Experimental)")
+      .setDesc("Allow AI models to use registered tools/agents to perform actions. Requires compatible models (e.g., Llama 3.1, some Mistral models).")
+      .addToggle(toggle =>
+        toggle.setValue(this.plugin.settings.enableToolUse)
+          .onChange(async (value) => {
+            this.plugin.settings.enableToolUse = value;
+            await this.plugin.saveSettings();
+            // Можливо, потрібно сповістити OllamaService або PromptService про зміну
           })
       );
 

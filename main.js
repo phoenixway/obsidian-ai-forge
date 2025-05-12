@@ -30,7 +30,7 @@ __export(main_exports, {
   default: () => OllamaPlugin2
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian20 = require("obsidian");
+var import_obsidian21 = require("obsidian");
 
 // src/OllamaView.ts
 var import_obsidian14 = require("obsidian");
@@ -400,8 +400,9 @@ var DEFAULT_SETTINGS = {
   translationProvider: "ollama",
   // За замовчуванням вимкнено
   ollamaTranslationModel: "",
-  sidebarWidth: void 0
+  sidebarWidth: void 0,
   // Або null. Означає, що ширина не встановлена користувачем
+  enableToolUse: true
 };
 var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
@@ -515,6 +516,12 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
       (text) => text.setPlaceholder(DEFAULT_SETTINGS.contextWindow.toString()).setValue(this.plugin.settings.contextWindow.toString()).onChange(async (value) => {
         const num = parseInt(value.trim(), 10);
         this.plugin.settings.contextWindow = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.contextWindow;
+        await this.plugin.saveSettings();
+      })
+    );
+    new import_obsidian4.Setting(containerEl).setName("Enable Tool Use (Experimental)").setDesc("Allow AI models to use registered tools/agents to perform actions. Requires compatible models (e.g., Llama 3.1, some Mistral models).").addToggle(
+      (toggle) => toggle.setValue(this.plugin.settings.enableToolUse).onChange(async (value) => {
+        this.plugin.settings.enableToolUse = value;
         await this.plugin.saveSettings();
       })
     );
@@ -7233,6 +7240,7 @@ var OllamaService = class {
     this.plugin = plugin;
     if (!plugin.promptService) {
       const errorMsg = "[OllamaService] CRITICAL: PromptService not available on plugin instance during OllamaService construction!";
+      this.plugin.logger.error(errorMsg);
       throw new Error(errorMsg);
     }
     this.promptService = plugin.promptService;
@@ -7256,34 +7264,35 @@ var OllamaService = class {
         try {
           handler(data);
         } catch (e) {
-          console.error(`Error in OllamaService event handler for ${event}:`, e);
+          this.plugin.logger.error(`Error in OllamaService event handler for ${event}:`, e);
         }
       });
   }
   // ------------------------------------------
-  setBaseUrl(url) {
-  }
   /**
-   * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
-   * @param chat Поточний об'єкт чату.
-   * @param signal AbortSignal для можливості переривання запиту.
-   * @returns Асинхронний ітератор, що видає OllamaStreamChunk.
-   */
+  * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
+  * @param chat Поточний об'єкт чату.
+  * @param signal AbortSignal для можливості переривання запиту.
+  * @returns Асинхронний ітератор, що видає StreamChunk.
+  */
   async *generateChatResponseStream(chat, signal) {
-    var _a;
+    var _a, _b, _c, _d, _e, _f;
     if (!chat) {
-      yield { error: "Chat object is null." };
+      this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat object.");
+      yield { type: "error", error: "Chat object is null.", done: true };
       return;
     }
     if (!this.promptService) {
-      yield { error: "Prompt service is unavailable." };
+      this.plugin.logger.error("[OllamaService] PromptService is unavailable.");
+      yield { type: "error", error: "Prompt service is unavailable.", done: true };
       return;
     }
     const currentSettings = this.plugin.settings;
     const modelName = chat.metadata.modelName || currentSettings.modelName;
     const temperature = (_a = chat.metadata.temperature) != null ? _a : currentSettings.temperature;
     if (!modelName) {
-      yield { error: "No Ollama model selected." };
+      this.plugin.logger.error("[OllamaService] No Ollama model selected for chat.", chat.metadata);
+      yield { type: "error", error: "No Ollama model selected.", done: true };
       return;
     }
     const url = `${this.plugin.settings.ollamaServerUrl}/api/generate`;
@@ -7293,24 +7302,38 @@ var OllamaService = class {
       const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
       const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
       if (promptBody === null || promptBody === void 0) {
-        yield { error: "Could not generate prompt body." };
+        this.plugin.logger.error("[OllamaService] Could not generate prompt body for chat.", chat.metadata);
+        yield { type: "error", error: "Could not generate prompt body.", done: true };
         return;
       }
       const requestBody = {
         model: modelName,
         prompt: promptBody,
         stream: true,
-        // <--- ВАЖЛИВО: Вмикаємо стрімінг
         temperature,
         options: { num_ctx: currentSettings.contextWindow },
         ...systemPrompt && { system: systemPrompt }
       };
+      if (this.plugin.agentManager && this.plugin.settings.enableToolUse) {
+        const agentTools = this.plugin.agentManager.getAllToolDefinitions();
+        if (agentTools && agentTools.length > 0) {
+          const modelDetails = await this.getModelDetails(modelName);
+          const seemsToSupportTools = ((_c = (_b = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _b.family) == null ? void 0 : _c.toLowerCase().includes("llama3")) || ((_e = (_d = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _d.family) == null ? void 0 : _e.toLowerCase().includes("mistral")) || // Додайте інші відомі сім'ї
+          ((_f = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _f.parameter_size) && parseFloat(modelDetails.details.parameter_size.replace("B", "")) >= 7;
+          if (seemsToSupportTools) {
+            requestBody.tools = agentTools.map((tool) => ({ type: "function", function: tool }));
+            this.plugin.logger.info(`[OllamaService] Tools provided to Ollama for model ${modelName}:`, agentTools.map((t) => t.name));
+          } else {
+            this.plugin.logger.info(`[OllamaService] Model ${modelName} might not natively support tool calling (or check failed). Tools not explicitly sent via 'tools' parameter. Relying on prompt-based fallback if implemented.`);
+          }
+        }
+      }
+      this.plugin.logger.debug(`[OllamaService] Sending request to ${url} for model ${modelName}. System prompt length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}, Body prompt length: ${promptBody.length}`);
       const response = await fetch(url, {
         method: "POST",
         headers,
         body: JSON.stringify(requestBody),
         signal
-        // <--- Передаємо AbortSignal
       });
       if (!response.ok) {
         let errorText = `Ollama API error! Status: ${response.status}`;
@@ -7320,12 +7343,15 @@ var OllamaService = class {
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
+        this.plugin.logger.error(`[OllamaService] API Error: ${errorText}`, requestBody);
         this.emit("connection-error", new Error(errorText));
-        yield { error: errorText };
+        yield { type: "error", error: errorText, done: true };
         return;
       }
       if (!response.body) {
-        throw new Error("Response body is null");
+        this.plugin.logger.error("[OllamaService] Response body is null.");
+        yield { type: "error", error: "Response body is null.", done: true };
+        return;
       }
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -7333,62 +7359,128 @@ var OllamaService = class {
       while (true) {
         const { done, value } = await reader.read();
         if (signal == null ? void 0 : signal.aborted) {
+          this.plugin.logger.info("[OllamaService] Stream generation aborted by user signal.");
           reader.cancel("Aborted by user");
-          yield { error: "Generation aborted by user.", done: true };
+          yield { type: "error", error: "Generation aborted by user.", done: true };
           return;
         }
         if (done) {
+          this.plugin.logger.info("[OllamaService] Stream reader marked as done.");
           if (buffer.trim()) {
             try {
               const jsonChunk = JSON.parse(buffer.trim());
-              yield jsonChunk;
+              if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
+                yield { type: "tool_calls", calls: jsonChunk.message.tool_calls, assistant_message_with_calls: jsonChunk.message, model: jsonChunk.model, created_at: jsonChunk.created_at };
+              } else if (typeof jsonChunk.response === "string") {
+                yield { type: "content", response: jsonChunk.response, done: jsonChunk.done || false, model: jsonChunk.model, created_at: jsonChunk.created_at };
+              } else if (jsonChunk.error) {
+                yield { type: "error", error: jsonChunk.error, done: true };
+              }
             } catch (e) {
+              this.plugin.logger.warn(`[OllamaService] Failed to parse final buffer content: "${buffer.trim()}". Error: ${e.message}`);
             }
           }
           break;
         }
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (line.trim() === "")
+        let eolIndex;
+        while ((eolIndex = buffer.indexOf("\n")) >= 0) {
+          const line = buffer.substring(0, eolIndex).trim();
+          buffer = buffer.substring(eolIndex + 1);
+          if (line === "")
             continue;
           try {
-            const jsonChunk = JSON.parse(line.trim());
-            yield jsonChunk;
-            if (jsonChunk.done) {
-              reader.cancel("Stream finished by Ollama");
+            const jsonChunk = JSON.parse(line);
+            if (jsonChunk.error) {
+              this.plugin.logger.error(`[OllamaService] Error chunk from Ollama: ${jsonChunk.error}`);
+              yield { type: "error", error: jsonChunk.error, done: true };
+              reader.cancel("Error received from Ollama stream");
               return;
             }
+            if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
+              this.plugin.logger.info("[OllamaService] Yielding tool_calls chunk:", jsonChunk.message.tool_calls);
+              yield {
+                type: "tool_calls",
+                calls: jsonChunk.message.tool_calls,
+                assistant_message_with_calls: jsonChunk.message,
+                model: jsonChunk.model,
+                created_at: jsonChunk.created_at
+              };
+              if (jsonChunk.done === true) {
+                this.plugin.logger.info("[OllamaService] Stream finished (done:true received with tool_calls chunk).");
+                yield {
+                  type: "done",
+                  model: jsonChunk.model,
+                  created_at: jsonChunk.created_at,
+                  context: jsonChunk.context,
+                  // та інші метрики, якщо є
+                  total_duration: jsonChunk.total_duration,
+                  load_duration: jsonChunk.load_duration,
+                  prompt_eval_count: jsonChunk.prompt_eval_count,
+                  prompt_eval_duration: jsonChunk.prompt_eval_duration,
+                  eval_count: jsonChunk.eval_count,
+                  eval_duration: jsonChunk.eval_duration
+                };
+                return;
+              }
+            } else if (typeof jsonChunk.response === "string") {
+              yield {
+                type: "content",
+                response: jsonChunk.response,
+                done: jsonChunk.done || false,
+                // done може бути true тут, якщо це останній текстовий чанк
+                model: jsonChunk.model,
+                created_at: jsonChunk.created_at
+              };
+              if (jsonChunk.done === true) {
+                this.plugin.logger.info("[OllamaService] Stream finished (done:true received with content chunk).");
+              }
+            } else if (jsonChunk.done === true) {
+              this.plugin.logger.info("[OllamaService] Stream finished (final done:true chunk with metrics).");
+              yield {
+                type: "done",
+                model: jsonChunk.model,
+                created_at: jsonChunk.created_at,
+                context: jsonChunk.context,
+                total_duration: jsonChunk.total_duration,
+                load_duration: jsonChunk.load_duration,
+                prompt_eval_count: jsonChunk.prompt_eval_count,
+                prompt_eval_duration: jsonChunk.prompt_eval_duration,
+                eval_count: jsonChunk.eval_count,
+                eval_duration: jsonChunk.eval_duration
+              };
+              return;
+            } else if (jsonChunk.message && (jsonChunk.message.content === null || jsonChunk.message.content === "") && !jsonChunk.message.tool_calls) {
+            }
           } catch (e) {
+            this.plugin.logger.warn(`[OllamaService] Failed to parse JSON chunk: "${line}". Error: ${e.message}. Skipping chunk.`);
           }
         }
       }
     } catch (error) {
       if (error.name === "AbortError") {
-        yield { error: "Generation aborted by user.", done: true };
+        this.plugin.logger.info("[OllamaService] Stream generation aborted by user (caught AbortError).");
+        yield { type: "error", error: "Generation aborted by user.", done: true };
       } else {
         let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
         if (errorMessage.includes("connect") || errorMessage.includes("fetch") || errorMessage.includes("NetworkError") || errorMessage.includes("Failed to fetch")) {
           errorMessage = `Connection Error: Failed to reach Ollama at ${this.plugin.settings.ollamaServerUrl}. Is it running?`;
           this.emit("connection-error", new Error(errorMessage));
         }
-        yield { error: errorMessage };
+        this.plugin.logger.error(`[OllamaService] Error during stream generation: ${errorMessage}`, error);
+        yield { type: "error", error: errorMessage, done: true };
       }
+    } finally {
+      this.plugin.logger.info("[OllamaService] generateChatResponseStream finished or terminated.");
     }
   }
-  // --- Інші методи (getModels, getModelDetails, generateEmbeddings, generateRaw, _ollamaFetch) ---
-  // Важливо: _ollamaFetch ТЕПЕР НЕ ПОТРІБЕН для generateChatResponseStream,
-  // але може бути корисним для інших запитів (embeddings, tags, show), якщо вони не потребують стрімінгу.
-  // Якщо ви їх не використовуєте або можете адаптувати generateChatResponseStream для них, то _ollamaFetch можна видалити.
-  // Залишимо його поки що, але переконайтесь, що generateRaw та інші використовують його коректно (як було в запиті).
-  /**
-   * Sends a non-streaming request body to the Ollama /api/generate endpoint.
-   * (Залишаємо для можливої сумісності або інших потреб)
-   */
+  // ... (інші ваші методи: generateRaw, generateEmbeddings, getModels, getModelDetails) ...
+  // Переконайтеся, що вони адаптовані для використання this.plugin.logger замість console.error/log
+  // і this.emit('connection-error', ...) для помилок з'єднання.
   async generateRaw(requestBody) {
     var _a;
     if (!requestBody.model || !requestBody.prompt) {
+      this.plugin.logger.error("[OllamaService] generateRaw called without 'model' or 'prompt'.");
       throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
     }
     requestBody.stream = false;
@@ -7402,34 +7494,33 @@ var OllamaService = class {
         method: "POST",
         headers,
         body: JSON.stringify(requestBody)
-        // Не передаємо signal тут, бо запит не потоковий і не має сенсу його переривати
       });
       if (!response.ok) {
-        let errorText = `Ollama API error! Status: ${response.status}`;
+        let errorText = `Ollama API error (generateRaw)! Status: ${response.status}`;
         try {
           const errorJson = await response.json();
           errorText += `: ${(errorJson == null ? void 0 : errorJson.error) || response.statusText || "No details"}`;
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
+        this.plugin.logger.error(`[OllamaService] API Error (generateRaw): ${errorText}`, requestBody);
         this.emit("connection-error", new Error(errorText));
         throw new Error(errorText);
       }
-      if (!response.body)
-        throw new Error("Response body is null");
+      if (!response.body) {
+        this.plugin.logger.error("[OllamaService] Response body is null (generateRaw).");
+        throw new Error("Response body is null (generateRaw)");
+      }
       return await response.json();
     } catch (error) {
-      const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: /api/generate)`;
+      const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: /api/generate, non-streamed)`;
       if (!((_a = error.message) == null ? void 0 : _a.includes("Ollama API error"))) {
+        this.plugin.logger.error(`[OllamaService] Connection/Fetch Error (generateRaw): ${connectionErrorMsg}`, error);
         this.emit("connection-error", new Error(connectionErrorMsg));
       }
       throw new Error(error.message || connectionErrorMsg);
     }
   }
-  /**
-   * Generates embeddings for a list of text prompts.
-   * (Залишаємо без змін, використовує fetch)
-   */
   async generateEmbeddings(prompts, model) {
     if (!prompts || prompts.length === 0)
       return [];
@@ -7440,9 +7531,8 @@ var OllamaService = class {
     try {
       for (const prompt of prompts) {
         const trimmedPrompt = prompt.trim();
-        if (!trimmedPrompt) {
+        if (!trimmedPrompt)
           continue;
-        }
         const requestBody = JSON.stringify({ model, prompt: trimmedPrompt });
         try {
           const response = await fetch(url, { method: "POST", headers, body: requestBody });
@@ -7453,26 +7543,26 @@ var OllamaService = class {
               errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
             } catch (e) {
             }
-            throw new Error(errorText);
+            this.plugin.logger.warn(`[OllamaService] Embeddings API Error for prompt "${trimmedPrompt.substring(0, 30)}...": ${errorText}`);
+            continue;
           }
           const embeddingResponse = await response.json();
           if (embeddingResponse && embeddingResponse.embedding) {
             embeddingsList.push(embeddingResponse.embedding);
           } else {
+            this.plugin.logger.warn(`[OllamaService] Valid response but no embedding found for prompt "${trimmedPrompt.substring(0, 30)}..."`);
           }
         } catch (singleError) {
-          this.emit("connection-error", new Error(singleError.message || "Embedding generation failed"));
+          this.plugin.logger.error(`[OllamaService] Error generating embedding for prompt "${trimmedPrompt.substring(0, 30)}...": ${singleError.message}`, singleError);
+          this.emit("connection-error", new Error(singleError.message || "Embedding generation failed for a prompt"));
         }
       }
       return embeddingsList.length > 0 ? embeddingsList : null;
     } catch (error) {
+      this.plugin.logger.error(`[OllamaService] Outer error in generateEmbeddings: ${error.message}`, error);
       return null;
     }
   }
-  /**
-  * Gets list of available models.
-  * (Залишаємо без змін, використовує fetch)
-  */
   async getModels(forceRefresh = false) {
     var _a;
     const endpoint = "/api/tags";
@@ -7487,26 +7577,26 @@ var OllamaService = class {
           errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
         } catch (e) {
         }
+        this.plugin.logger.error(`[OllamaService] Tags API Error: ${errorText}`);
         this.emit("connection-error", new Error(errorText));
-        throw new Error(errorText);
+        return [];
       }
       const data = await response.json();
       if (data && Array.isArray(data.models)) {
-        const modelNames = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
-        modelListResult = modelNames;
+        modelListResult = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
       } else {
+        this.plugin.logger.warn("[OllamaService] Received unexpected data format from /api/tags", data);
       }
     } catch (e) {
+      const connectionErrorMsg = `Failed to connect or fetch models from Ollama server at ${this.plugin.settings.ollamaServerUrl}. (Endpoint: /api/tags)`;
       if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
-        this.emit("connection-error", new Error(e.message || "Failed to fetch models"));
+        this.plugin.logger.error(`[OllamaService] Connection/Fetch Error (getModels): ${connectionErrorMsg}`, e);
+        this.emit("connection-error", new Error(e.message || connectionErrorMsg));
       }
+      return [];
     }
     return modelListResult;
   }
-  /**
-   * Gets details for a specific model.
-   * (Залишаємо без змін, використовує fetch)
-   */
   async getModelDetails(modelName) {
     var _a;
     const endpoint = "/api/show";
@@ -7515,28 +7605,29 @@ var OllamaService = class {
     try {
       const response = await fetch(url, { method: "POST", headers, body: JSON.stringify({ name: modelName }) });
       if (!response.ok) {
-        let errorText = `Ollama Show API error! Status: ${response.status}`;
+        let errorText = `Ollama Show API error for model ${modelName}! Status: ${response.status}`;
         try {
           const errJson = await response.json();
           errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
         } catch (e) {
         }
-        this.emit("connection-error", new Error(errorText));
-        throw new Error(errorText);
+        this.plugin.logger.error(`[OllamaService] Show API Error: ${errorText}`);
+        if (response.status !== 404) {
+          this.emit("connection-error", new Error(errorText));
+        }
+        return null;
       }
       const data = await response.json();
       return data;
     } catch (e) {
+      const connectionErrorMsg = `Failed to connect or get details for model ${modelName} from Ollama server at ${this.plugin.settings.ollamaServerUrl}. (Endpoint: /api/show)`;
       if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
-        this.emit("connection-error", new Error(e.message || `Failed to get details for ${modelName}`));
+        this.plugin.logger.error(`[OllamaService] Connection/Fetch Error (getModelDetails): ${connectionErrorMsg}`, e);
+        this.emit("connection-error", new Error(e.message || connectionErrorMsg));
       }
       return null;
     }
   }
-  // _ollamaFetch більше не потрібен, оскільки всі запити тепер використовують fetch напряму.
-  // Можна його видалити.
-  // ВИДАЛЕНО МЕТОД generateChatResponse (старий, не потоковий)
-  // Всі виклики мають тепер використовувати generateChatResponseStream
 };
 
 // src/PromptService.ts
@@ -9591,11 +9682,170 @@ Translated Text:`;
   }
 };
 
+// src/examples/SimpleFileAgent.ts
+var import_obsidian20 = require("obsidian");
+var SimpleFileAgent = class {
+  constructor() {
+    this.id = "simple-file-agent";
+    this.name = "Simple File Agent";
+    this.description = "An agent that can read and list files in the vault.";
+  }
+  getTools() {
+    return [
+      {
+        name: "readFileContent",
+        description: "Reads the content of a specified file in the Obsidian vault.",
+        parameters: {
+          type: "object",
+          properties: {
+            filePath: {
+              type: "string",
+              description: "The full path to the file within the Obsidian vault (e.g., 'Notes/MyFile.md')."
+            }
+          },
+          required: ["filePath"]
+        }
+      },
+      {
+        name: "listFiles",
+        description: "Lists files in a specified folder of the Obsidian vault. Lists root if no path specified.",
+        parameters: {
+          type: "object",
+          properties: {
+            folderPath: {
+              type: "string",
+              description: "Optional. The path to the folder (e.g., 'Attachments/Images'). If omitted, lists root."
+            }
+          }
+        }
+      }
+    ];
+  }
+  async executeTool(toolName, args, plugin) {
+    switch (toolName) {
+      case "readFileContent":
+        if (!args.filePath || typeof args.filePath !== "string") {
+          return "Error: 'filePath' argument is missing or not a string.";
+        }
+        try {
+          const normalized = (0, import_obsidian20.normalizePath)(args.filePath);
+          const file = plugin.app.vault.getAbstractFileByPath(normalized);
+          if (file instanceof import_obsidian20.TFile) {
+            const content = await plugin.app.vault.read(file);
+            new import_obsidian20.Notice(`Agent read file: ${file.basename}`);
+            return `Content of "${args.filePath}":
+${content}`;
+          } else {
+            return `Error: File not found or is not a regular file at path: ${args.filePath}`;
+          }
+        } catch (e) {
+          plugin.logger.error(`[SimpleFileAgent] Error reading file ${args.filePath}:`, e);
+          return `Error reading file "${args.filePath}": ${e.message}`;
+        }
+      case "listFiles":
+        try {
+          const pathToList = args.folderPath ? (0, import_obsidian20.normalizePath)(args.folderPath) : "/";
+          const folder = plugin.app.vault.getAbstractFileByPath(pathToList);
+          if (folder && folder instanceof import_obsidian20.TFolder) {
+            const files = folder.children.filter((f) => f instanceof import_obsidian20.TFile).map((f) => f.name);
+            return `Files in "${pathToList}":
+${files.join("\n")}`;
+          } else if (pathToList === "/") {
+            const files = plugin.app.vault.getFiles().map((f) => f.path);
+            return `Files in vault root:
+${files.join("\n")}`;
+          } else {
+            return `Error: Folder not found at path: ${args.folderPath || "(root)"}`;
+          }
+        } catch (e) {
+          plugin.logger.error(`[SimpleFileAgent] Error listing files in ${args.folderPath || "(root)"}:`, e);
+          return `Error listing files: ${e.message}`;
+        }
+      default:
+        return `Error: Unknown tool "${toolName}" for SimpleFileAgent.`;
+    }
+  }
+};
+
+// src/agents/AgentManager.ts
+var AgentManager = class {
+  constructor(plugin) {
+    this.agents = /* @__PURE__ */ new Map();
+    this.plugin = plugin;
+    this.registerDefaultAgents();
+  }
+  registerDefaultAgents() {
+    const fileAgent = new SimpleFileAgent();
+    this.registerAgent(fileAgent);
+  }
+  registerAgent(agent) {
+    if (this.agents.has(agent.id)) {
+      this.plugin.logger.warn(`[AgentManager] Agent with ID "${agent.id}" is already registered. Overwriting.`);
+    }
+    this.agents.set(agent.id, agent);
+    this.plugin.logger.info(`[AgentManager] Registered agent: ${agent.name} (ID: ${agent.id})`);
+  }
+  getAgent(id) {
+    return this.agents.get(id);
+  }
+  /**
+   * Збирає визначення всіх інструментів від усіх зареєстрованих агентів.
+   */
+  getAllToolDefinitions() {
+    let allTools = [];
+    this.agents.forEach((agent) => {
+      try {
+        const agentTools = agent.getTools();
+        if (Array.isArray(agentTools)) {
+          allTools = allTools.concat(agentTools);
+        } else {
+          this.plugin.logger.warn(`[AgentManager] Agent "${agent.name}" did not return a valid array from getTools().`);
+        }
+      } catch (error) {
+        this.plugin.logger.error(`[AgentManager] Error getting tools from agent "${agent.name}":`, error);
+      }
+    });
+    const toolNames = /* @__PURE__ */ new Set();
+    const uniqueTools = allTools.filter((tool) => {
+      if (toolNames.has(tool.name)) {
+        this.plugin.logger.warn(`[AgentManager] Duplicate tool name found: "${tool.name}". Only the first instance will be used.`);
+        return false;
+      }
+      toolNames.add(tool.name);
+      return true;
+    });
+    return uniqueTools;
+  }
+  /**
+   * Виконує інструмент, знаходячи відповідний агент.
+   * @param toolName Назва інструменту.
+   * @param args Аргументи для інструменту (вже розпарсені з JSON-рядка).
+   */
+  async executeTool(toolName, args) {
+    for (const agent of this.agents.values()) {
+      const agentTool = agent.getTools().find((t) => t.name === toolName);
+      if (agentTool) {
+        try {
+          this.plugin.logger.info(`[AgentManager] Executing tool "<span class="math-inline">{toolName}" from agent "</span>{agent.name}" with args:`, args);
+          const result = await agent.executeTool(toolName, args, this.plugin);
+          this.plugin.logger.info(`[AgentManager] Tool "${toolName}" executed successfully. Result: ${typeof result === "string" ? result.substring(0, 100) : "[non-string result]"}...`);
+          return { success: true, result: typeof result === "string" ? result : JSON.stringify(result) };
+        } catch (e) {
+          this.plugin.logger.error(`[AgentManager] Error executing tool "<span class="math-inline">{toolName}" in agent "</span>{agent.name}":`, e);
+          return { success: false, result: "", error: e.message || "Unknown error during tool execution." };
+        }
+      }
+    }
+    this.plugin.logger.warn(`[AgentManager] Tool "${toolName}" not found across all registered agents.`);
+    return { success: false, result: "", error: `Tool "${toolName}" not found.` };
+  }
+};
+
 // src/main.ts
 var SESSIONS_INDEX_KEY = "chatIndex_v2";
 var ACTIVE_CHAT_ID_KEY = "activeChatId_v2";
 var CHAT_INDEX_KEY = "chatIndex_v2";
-var OllamaPlugin2 = class extends import_obsidian20.Plugin {
+var OllamaPlugin2 = class extends import_obsidian21.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -9608,7 +9858,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.taskFileNeedsUpdate = false;
     this.taskCheckInterval = null;
     // Debounced функція оновлення для Vault Events
-    this.debouncedIndexAndUIRebuild = (0, import_obsidian20.debounce)(
+    this.debouncedIndexAndUIRebuild = (0, import_obsidian21.debounce)(
       async () => {
         if (this.chatManager) {
           await this.chatManager.rebuildIndexFromFiles();
@@ -9665,6 +9915,8 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     this.translationService = new TranslationService(this);
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this);
+    this.agentManager = new AgentManager(this);
+    this.agentManager.registerAgent(new SimpleFileAgent());
     await this.chatManager.initialize();
     this.logger.info("Chat Manager initialized.");
     this.logger.updateSettings({
@@ -9689,7 +9941,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         if (this.chatManager) {
           await this.chatManager.addMessageToActiveChat("error", `Ollama Connection Error: ${message}`, new Date());
         } else {
-          new import_obsidian20.Notice(`Ollama Connection Error: ${message}`);
+          new import_obsidian21.Notice(`Ollama Connection Error: ${message}`);
         }
       })
     );
@@ -9732,7 +9984,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         if (this.settings.ragEnabled) {
           await this.ragService.indexDocuments();
         } else {
-          new import_obsidian20.Notice("RAG is disabled in settings.");
+          new import_obsidian21.Notice("RAG is disabled in settings.");
         }
       }
     });
@@ -9749,7 +10001,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       callback: async () => {
         await this.listRoleFiles(true);
         this.emit("roles-updated");
-        new import_obsidian20.Notice("Role list refreshed.");
+        new import_obsidian21.Notice("Role list refreshed.");
       }
     });
     this.addCommand({
@@ -9758,9 +10010,9 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       callback: async () => {
         const newChat = await this.chatManager.createNewChat();
         if (newChat) {
-          new import_obsidian20.Notice(`Created new chat: ${newChat.metadata.name}`);
+          new import_obsidian21.Notice(`Created new chat: ${newChat.metadata.name}`);
         } else {
-          new import_obsidian20.Notice("Failed to create new chat.");
+          new import_obsidian21.Notice("Failed to create new chat.");
         }
       }
     });
@@ -9798,14 +10050,14 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       }
     });
     this.registerVaultListeners();
-    const debouncedRoleClear = (0, import_obsidian20.debounce)(() => {
+    const debouncedRoleClear = (0, import_obsidian21.debounce)(() => {
       var _a, _b;
       this.roleListCache = null;
       (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
       this.emit("roles-updated");
     }, 1500, true);
     const handleModifyEvent = (file) => {
-      if (file instanceof import_obsidian20.TFile) {
+      if (file instanceof import_obsidian21.TFile) {
         this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
         this.handleTaskFileModify(file);
       }
@@ -9857,15 +10109,15 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     const handleFileCreateDelete = (file) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
-      const historyPath = (0, import_obsidian20.normalizePath)(this.settings.chatHistoryFolderPath);
-      if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian20.TFolder)) {
+      const historyPath = (0, import_obsidian21.normalizePath)(this.settings.chatHistoryFolderPath);
+      if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian21.TFolder)) {
         this.debouncedIndexAndUIRebuild();
       }
     };
     const handleFileRename = (file, oldPath) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
-      const historyPath = (0, import_obsidian20.normalizePath)(this.settings.chatHistoryFolderPath);
+      const historyPath = (0, import_obsidian21.normalizePath)(this.settings.chatHistoryFolderPath);
       const isInHistoryNew = file.path.startsWith(historyPath + "/");
       const isInHistoryOld = oldPath.startsWith(historyPath + "/");
       if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
@@ -9881,7 +10133,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     var _a, _b, _c;
     const folderPath = (_a = this.settings.ragFolderPath) == null ? void 0 : _a.trim();
     const fileName = (_b = this.settings.dailyTaskFileName) == null ? void 0 : _b.trim();
-    const newPath = folderPath && fileName ? (0, import_obsidian20.normalizePath)(`${folderPath}/${fileName}`) : null;
+    const newPath = folderPath && fileName ? (0, import_obsidian21.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
       this.dailyTaskFilePath = newPath;
       this.taskFileContentCache = null;
@@ -9980,9 +10232,9 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   // --- Кінець логіки файлу завдань ---
   // Обробник змін для ролей та RAG
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear, isDeletion = false) {
-    const normPath = (0, import_obsidian20.normalizePath)(changedPath);
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian20.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian20.normalizePath)(`${this.manifest.dir}/roles`) : null;
+    const normPath = (0, import_obsidian21.normalizePath)(changedPath);
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian21.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian21.normalizePath)(`${this.manifest.dir}/roles`) : null;
     let isRoleFile = false;
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/")) {
@@ -10001,7 +10253,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     if (isRoleFile) {
       debouncedRoleClear();
     }
-    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian20.normalizePath)(this.settings.ragFolderPath) : null;
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian21.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && (normPath.startsWith(ragFolderPath + "/") || normPath === ragFolderPath)) {
       if (normPath !== this.dailyTaskFilePath) {
         this.debounceIndexUpdate();
@@ -10071,11 +10323,11 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         try {
           await leaf.setViewState({ type: viewType, active: true });
         } catch (e) {
-          new import_obsidian20.Notice("Error opening AI Forge view.");
+          new import_obsidian21.Notice("Error opening AI Forge view.");
           return;
         }
       } else {
-        new import_obsidian20.Notice("Could not open AI Forge view.");
+        new import_obsidian21.Notice("Could not open AI Forge view.");
         return;
       }
     }
@@ -10120,19 +10372,19 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
   }
   async clearMessageHistoryWithConfirmation() {
     if (!this.chatManager) {
-      new import_obsidian20.Notice("Error: Chat Manager not ready.");
+      new import_obsidian21.Notice("Error: Chat Manager not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (activeChat && activeChat.messages.length > 0) {
       new ConfirmModal(this.app, "Clear History", `Clear messages in "${activeChat.metadata.name}"?`, async () => {
         await this.chatManager.clearActiveChatMessages();
-        new import_obsidian20.Notice(`History cleared for "${activeChat.metadata.name}".`);
+        new import_obsidian21.Notice(`History cleared for "${activeChat.metadata.name}".`);
       }).open();
     } else if (activeChat) {
-      new import_obsidian20.Notice("Chat history is already empty.");
+      new import_obsidian21.Notice("Chat history is already empty.");
     } else {
-      new import_obsidian20.Notice("No active chat to clear.");
+      new import_obsidian21.Notice("No active chat to clear.");
     }
   }
   async listRoleFiles(forceRefresh = false) {
@@ -10147,7 +10399,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     const builtInRoleFileName = "Productivity_Assistant.md";
     let builtInRolePath = null;
     if (pluginDir) {
-      builtInRolePath = (0, import_obsidian20.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+      builtInRolePath = (0, import_obsidian21.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
       try {
         if (await adapter.exists(builtInRolePath)) {
           const stat = await adapter.stat(builtInRolePath);
@@ -10159,7 +10411,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       } catch (error) {
       }
     }
-    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian20.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian21.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
       try {
         const folderExists = await adapter.exists(userRolesFolderPath);
@@ -10191,7 +10443,7 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       return { stdout: "", stderr: "Empty command.", error: new Error("Empty command.") };
     }
     if (typeof process === "undefined" || !((_a = process == null ? void 0 : process.versions) == null ? void 0 : _a.node)) {
-      new import_obsidian20.Notice("Cannot execute system command: Node.js environment is required.");
+      new import_obsidian21.Notice("Cannot execute system command: Node.js environment is required.");
       return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required.") };
     }
     return new Promise((resolve) => {
@@ -10204,16 +10456,16 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
     });
   }
   async showChatSwitcher() {
-    new import_obsidian20.Notice("Switch Chat UI not implemented yet.");
+    new import_obsidian21.Notice("Switch Chat UI not implemented yet.");
   }
   async renameActiveChat() {
     if (!this.chatManager) {
-      new import_obsidian20.Notice("Error: Chat manager is not ready.");
+      new import_obsidian21.Notice("Error: Chat manager is not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      new import_obsidian20.Notice("No active chat to rename.");
+      new import_obsidian21.Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
@@ -10225,20 +10477,20 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
         if (!success) {
         }
       } else if (newName === null || trimmedName === "") {
-        new import_obsidian20.Notice("Rename cancelled or invalid name entered.");
+        new import_obsidian21.Notice("Rename cancelled or invalid name entered.");
       } else {
-        new import_obsidian20.Notice("Name unchanged.");
+        new import_obsidian21.Notice("Name unchanged.");
       }
     }).open();
   }
   async deleteActiveChatWithConfirmation() {
     if (!this.chatManager) {
-      new import_obsidian20.Notice("Error: Chat manager is not ready.");
+      new import_obsidian21.Notice("Error: Chat manager is not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      new import_obsidian20.Notice("No active chat to delete.");
+      new import_obsidian21.Notice("No active chat to delete.");
       return;
     }
     const chatName = activeChat.metadata.name;

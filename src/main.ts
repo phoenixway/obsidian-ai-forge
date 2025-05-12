@@ -26,6 +26,8 @@ import { TranslationService } from "./TranslationService";
 import { PromptModal } from "./PromptModal";
 import { ConfirmModal } from "./ConfirmModal";
 import { Logger, LogLevel, LoggerSettings } from "./Logger";
+import { AgentManager } from "./agents/AgentManager"; // Адаптуйте шлях
+import { SimpleFileAgent } from "./examples/SimpleFileAgent";
 
 // --- КОНСТАНТИ ДЛЯ ЗБЕРЕЖЕННЯ ---
 export const SESSIONS_INDEX_KEY = "chatIndex_v2"; // Використовуємо v2
@@ -49,6 +51,7 @@ export default class OllamaPlugin extends Plugin {
   view: OllamaView | null = null;
 
   ragService!: RagService;
+  agentManager!: AgentManager; 
   ollamaService!: OllamaService;
   promptService!: PromptService;
   chatManager!: ChatManager;
@@ -135,6 +138,11 @@ export default class OllamaPlugin extends Plugin {
     this.translationService = new TranslationService(this);
     this.ragService = new RagService(this);
     this.chatManager = new ChatManager(this);
+
+
+    this.agentManager = new AgentManager(this); // <--- ІНІЦІАЛІЗАЦІЯ
+    // Тут можна зареєструвати початкових агентів, якщо вони є
+    this.agentManager.registerAgent(new SimpleFileAgent());
 
     // Ініціалізуємо менеджер чатів (завантажує індекс, відновлює активний чат)
     await this.chatManager.initialize();

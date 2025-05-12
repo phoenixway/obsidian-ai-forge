@@ -40,16 +40,20 @@ export interface RoleInfo {
     isCustom: boolean;
 }
 
-// --- Chat ---
 export interface Message {
     role: MessageRole;
     content: string;
     timestamp: Date;
-    type?: 'warning' | 'error' | 'info'; // Add the optional 'type' property
+    type?: 'warning' | 'error' | 'info'; // Це поле вже є у вас
+
+    // ---> ДОДАЙТЕ/ОНОВІТЬ ЦІ ОПЦІОНАЛЬНІ ПОЛЯ <---
+    images?: string[];      // Якщо ви підтримуєте зображення (з вашого коду OllamaView)
+    tool_call_id?: string;  // Для відповідей від інструментів, зв'язує з ToolCall.id
+    name?: string;          // Для відповідей від інструментів (ім'я інструменту, що був викликаний)
+    tool_calls?: ToolCall[];// Для повідомлень асистента, що містять виклики інструментів
 }
 
-export type MessageRole = "user" | "assistant" | "system" | "error";
-
+export type MessageRole = "user" | "assistant" | "system" | "error" | "tool"; // "tool" було додано для відповідей інструментів
 export interface ChatMetadata {
     id: string;
     name: string;
@@ -65,15 +69,20 @@ export interface ChatData {
 }
 export type ChatConstructorSettings = Pick<import("./settings").OllamaPluginSettings, 'temperature' | 'modelName' | 'contextWindow'>; // Example
 
+// ---> ДОДАЙТЕ ІНТЕРФЕЙС AssistantMessage <---
+export interface AssistantMessage extends Message {
+    role: "assistant";
+    tool_calls?: ToolCall[];
+  }
 
 // --- Settings ---
 export type AvatarType = 'initials' | 'icon';
 
-// --- Інтерфейси Відповідей API Ollama (можна винести в types.ts) ---
+// --- Інтерфейси Відповідей API Ollama ---
 export interface OllamaGenerateResponse {
     model: string;
     created_at: string;
-    response: string;
+    response?: string; // Може бути відсутнім, якщо є tool_calls
     done: boolean;
     context?: number[];
     total_duration?: number;
@@ -82,6 +91,7 @@ export interface OllamaGenerateResponse {
     prompt_eval_duration?: number;
     eval_count?: number;
     eval_duration?: number;
+    message?: AssistantMessage; // <--- ДОДАЙТЕ/ПЕРЕКОНАЙТЕСЬ, ЩО ЦЕЙ ТИП ОНОВЛЕНО
 }
 
 export interface OllamaShowResponse {
@@ -123,3 +133,14 @@ export interface OllamaErrorChunk {
 
 /** Тип, що об'єднує успішний чанк та помилку */
 export type OllamaStreamChunk = OllamaGenerateChunk | OllamaErrorChunk;
+
+export interface ToolCallFunction {
+    name: string;
+    arguments: string; // JSON рядок аргументів
+  }
+  
+  export interface ToolCall {
+    type: "function"; // Наразі Ollama підтримує тільки 'function'
+    id?: string;     // ID для зіставлення з відповіддю інструмента (не завжди є в Ollama)
+    function: ToolCallFunction;
+  }
