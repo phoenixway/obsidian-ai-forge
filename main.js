@@ -2574,6 +2574,8 @@ var SidebarManager = class {
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "move";
     }
+    event.stopPropagation();
+    this.plugin.logger.trace("[DragOver FolderItem] Event fired and propagation stopped.");
   }
   handleDragEnter(event, targetNode) {
     event.preventDefault();

@@ -1088,12 +1088,14 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
   }
 
   private handleDragOver(event: DragEvent): void {
-    // Дозволяємо скидання тут
-    event.preventDefault();
+    event.preventDefault(); // Дозволяємо скидання
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
-  }
+    // Зупиняємо спливання події, щоб вона не дійшла до батьківських елементів (наприклад, chatPanelListContainerEl)
+    event.stopPropagation();
+    this.plugin.logger.trace("[DragOver FolderItem] Event fired and propagation stopped.");
+}
 
   private handleDragEnter(event: DragEvent, targetNode: FolderNode): void {
     event.preventDefault(); // Важливо для деяких браузерів
