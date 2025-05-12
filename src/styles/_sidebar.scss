@@ -237,3 +237,23 @@ body.is-resizing {
   /* ... ваші існуючі стилі ... */
   padding-bottom: 20px; /* Додайте відступ знизу для зони скидання */
 }
+
+.ollama-root-drop-zone {
+  padding: 10px;
+  margin-top: 8px; /* Невеликий відступ від списку */
+  border: 2px dashed var(--background-modifier-border-hover); /* Пунктирна рамка */
+  border-radius: var(--radius-m);
+  text-align: center;
+  color: var(--text-faint);
+  min-height: 40px; /* Мінімальна висота для зручного скидання */
+  display: flex; /* Для центрування тексту, якщо він є */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease-out, border-color 0.2s ease-out;
+}
+
+.ollama-root-drop-zone.drag-over-root-target { /* Клас для підсвічування */
+  background-color: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}

@@ -316,7 +316,7 @@ export default class OllamaPlugin extends Plugin {
     // --- Реєстрація слухачів для папки РОЛЕЙ та RAG ---
     // Ці слухачі НЕ повинні викликати повний rebuild індексу чатів
     const debouncedRoleClear = debounce( () => {
-        this.logger.debug("Debounced role cache clear triggered.");
+        // this.logger.debug("Debounced role cache clear triggered.");
         this.roleListCache = null; // Скидаємо кеш списку ролей
         this.promptService?.clearRoleCache?.(); // Скидаємо кеш контенту ролей
         this.emit("roles-updated"); // Сповіщаємо про необхідність оновити списки ролей в UI
