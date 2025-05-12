@@ -11,9 +11,8 @@ import { IMessageRenderer } from "./IMessageRenderer";
 export class AssistantMessageRenderer extends BaseMessageRenderer implements IMessageRenderer {
 
     constructor(app: App, plugin: OllamaPlugin, message: AssistantMessage, view: OllamaView) {
-        super(app, plugin, message, view); // message тут вже має тип AssistantMessage, BaseMessageRenderer прийме його
+        super(app, plugin, message, view); 
         if (message.role !== "assistant") {
-            // Ця перевірка може бути зайвою, якщо TypeScript вже гарантує тип AssistantMessage
             throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
         }
     }
@@ -21,11 +20,11 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
     public async render(): Promise<HTMLElement> {
         const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
         
-        // Додаємо аватар для асистента
-        // Якщо ваш RendererUtils.renderAvatar приймає 5-й аргумент для типу ролі:
-        // RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'assistant');
-        // Інакше (якщо він приймає лише 4 аргументи):
-        this.addAvatar(messageGroup, false); 
+        // Додаємо аватар для асистента.
+        // Якщо ваш RendererUtils.renderAvatar приймає 5-й аргумент для типу ролі (рекомендовано):
+        RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false);
+        // Або якщо він приймає лише 4 аргументи:
+        // this.addAvatar(messageGroup, false); 
 
         const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
         messageWrapper.style.order = "2"; 
@@ -36,9 +35,11 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         );
         contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
 
-        let contentToRender = this.message.content; // Початковий контент
-        const assistantMessage = this.message as AssistantMessage; // Впевнені, що це AssistantMessage
+        // Початковий контент повідомлення
+        let contentToRender = this.message.content;
+        const assistantMessage = this.message as AssistantMessage; 
 
+        // Перевіряємо, чи є текстові теги <tool_call> або нативні tool_calls
         const hasTextualToolCallTags = typeof contentToRender === 'string' && contentToRender.includes("<tool_call>");
         const hasNativeToolCalls = assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0;
 
@@ -48,22 +49,27 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
             let usingToolMessage = "( ";
             const toolNamesCalled: string[] = [];
 
-            if (hasNativeToolCalls && assistantMessage.tool_calls) { // Пріоритет нативним, якщо є
+            if (hasNativeToolCalls && assistantMessage.tool_calls) { 
+                // Якщо є нативні tool_calls, беремо імена з них
                 this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls found: ${assistantMessage.tool_calls.length}`);
                 assistantMessage.tool_calls.forEach(tc => toolNamesCalled.push(tc.function.name));
-                // Для нативних викликів, message.content - це зазвичай текст *перед* викликом, або null.
+                // Для нативних викликів, message.content - це зазвичай текст *перед* tool_calls, або null/порожній.
                 // Ми його просто відобразимо як є, додавши повідомлення про інструменти.
-            } else if (hasTextualToolCallTags && typeof contentToRender === 'string') { // Текстовий fallback
-                this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found.`);
-                const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g; // Видалено 's'
+                // contentToRender вже містить this.message.content.
+            } else if (hasTextualToolCallTags && typeof contentToRender === 'string') { 
+                // Якщо нативних немає, але є текстові теги, парсимо їх
+                this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found in content: "${contentToRender.substring(0, 100)}..."`);
+                const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g; // 's' видалено
                 let match;
-                // Скидаємо lastIndex для глобального регулярного виразу перед новим використанням
                 toolCallRegex.lastIndex = 0; 
-                while((match = toolCallRegex.exec(contentToRender)) !== null) {
+                // Парсимо імена з оригінального this.message.content, щоб не залежати від попередніх replace
+                while((match = toolCallRegex.exec(this.message.content)) !== null) {
                     if (match[1]) toolNamesCalled.push(match[1]);
                 }
-                // Видаляємо теги <tool_call>...</tool_call> для відображення
-                contentToRender = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+                
+                // Видаляємо теги <tool_call>...</tool_call> для відображення,
+                // залишаючи лише супровідний текст, якщо він є.
+                contentToRender = contentToRender.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim(); 
                 if (contentToRender.startsWith("***")) { 
                     contentToRender = contentToRender.substring(3).trim();
                 }
@@ -72,22 +78,27 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
                 }
             }
 
+            // Формуємо повідомлення про використання інструменту
             if (toolNamesCalled.length > 0) {
                 usingToolMessage += `Using tool${toolNamesCalled.length > 1 ? 's' : ''}: ${toolNamesCalled.join(', ')}... `;
-            } else if (hasTextualToolCallTags || hasNativeToolCalls) { // Якщо індикатори є, але імена не витягли
+            } else if (hasTextualToolCallTags || hasNativeToolCalls) { 
+                // Якщо індикатори були, але імена не витяглися (малоймовірно, але можливо)
                 usingToolMessage += "Attempting to use tool(s)... ";
             }
             usingToolMessage += ")";
             
-            contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}\n\n${contentToRender}` : usingToolMessage;
-            this.plugin.logger.debug(`[AssistantMessageRenderer] toolNamesCalled: "${toolNamesCalled}"`);
+            // Якщо після видалення тегів (для textual fallback) залишився супровідний текст, додаємо його.
+            // Інакше, показуємо тільки повідомлення про використання інструменту.
+            // Для native tool_calls, contentToRender - це оригінальний контент повідомлення.
+            contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}\n\n${contentToRender.trim()}` : usingToolMessage;
+            
             this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after processing tool indicators: "${contentToRender}"`);
         }
         
         try {
             await AssistantMessageRenderer.renderAssistantContent(
                 contentEl, 
-                contentToRender || "", // Передаємо порожній рядок, якщо contentToRender став null/undefined
+                contentToRender || "", 
                 this.app, 
                 this.plugin, 
                 this.view
@@ -97,6 +108,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
              this.plugin.logger.error("[AssistantMessageRenderer] Error in render -> renderAssistantContent:", error);
         }
 
+        // Додаємо кнопки до messageEl, а не messageWrapper, щоб вони були частиною бульбашки
         AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
         BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
         
@@ -104,38 +116,38 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
             if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP || "message-group"}`)) {
                 this.view.checkMessageForCollapsing(messageEl);
             }
-        }, 70); // Збільшив трохи затримку
+        }, 70);
 
         return messageGroup;
     }
-    
+
+    // Статичні методи renderAssistantContent та addAssistantActionButtons 
+    // залишаються такими, як були надані в моїй попередній відповіді
+    // (де ми виправляли помилки з прапорцем 's' та CSS_CLASSES).
+    // Я включу їх сюди для повноти.
+
     public static async renderAssistantContent(
         contentEl: HTMLElement, markdownText: string, app: App, plugin: OllamaPlugin, view: OllamaView
     ): Promise<void> {
         
         const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-        if (dotsEl) { // Якщо крапки ще є, видаляємо їх
+        if (dotsEl) { 
             dotsEl.remove();
         }
-        // Завжди очищуємо перед рендерингом нового повного контенту,
-        // оскільки markdownText - це вже накопичений повний текст для поточного стану.
         contentEl.empty(); 
 
         let processedMarkdown = markdownText;
         try {
-            const decoded = RendererUtils.decodeHtmlEntities(markdownText); // Виконуємо decode завжди
+            const decoded = RendererUtils.decodeHtmlEntities(markdownText); 
             const thinkDetection = RendererUtils.detectThinkingTags(decoded);
             processedMarkdown = thinkDetection.contentWithoutTags;
-            // if (thinkDetection.hasThinkingTags) { plugin.logger.debug("[renderAssistantContent STAT] Thinking tags detected and stripped."); }
         } catch (e) { plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e); }
 
         if (processedMarkdown.trim().length === 0) {
-            // plugin.logger.debug("[renderAssistantContent STAT] Processed markdown is empty after stripping tags.");
-            // Якщо після обробки нічого не залишилося і це був не порожній вхідний markdownText,
-            // можливо, варто показати індикатор очікування, якщо це стрімінг.
-            // Оскільки цей метод може викликатися для фінального рендерингу,
-            // краще не додавати тут крапки, якщо текст справді порожній.
-            // Залишаємо contentEl порожнім.
+            if (contentEl.innerHTML.trim() === "") { 
+                 const dots = contentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+                 for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+            }
             return; 
         }
         
@@ -162,16 +174,12 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         plugin: OllamaPlugin, 
         view: OllamaView
     ): void {
-         // Перевіряємо, чи контейнер для кнопок вже існує
          if (messageElement.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`)) {
-             // Якщо кнопки вже є, можна або вийти, або оновити їх (складніше).
-             // Для простоти, поки що виходимо, щоб уникнути дублювання.
-             // plugin.logger.trace("[addAssistantActionButtons] Actions wrapper already exists, skipping add.");
              return;
          }
          
          const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-         const finalContent = message.content; // Використовуємо передане повідомлення
+         const finalContent = message.content; 
 
          const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Copy", title: "Copy" } });
          setIcon(copyBtn, "copy");
@@ -193,17 +201,12 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
              view.registerDomEvent(summarizeBtn, "click", e => { e.stopPropagation(); view.handleSummarizeClick(finalContent || "", summarizeBtn); });
          }
         
-         // Кнопка регенерації НЕ повинна з'являтися для повідомлень, які САМІ є запитом на виклик інструменту
-         // (тобто, якщо assistantMessage.tool_calls заповнене, або якщо isTextualFallbackUsed було true для цього контенту)
-         // Поточний message.tool_calls стосується нативних викликів.
-         // Якщо це був текстовий виклик, то message.tool_calls буде порожнім.
-         // Отже, перевіряємо, чи НЕ є це повідомлення з текстовим викликом (тобто не містить "<tool_call>" тегів).
          const contentContainsTextualToolCall = typeof finalContent === 'string' && finalContent.includes("<tool_call>");
 
          if ((!message.tool_calls || message.tool_calls.length === 0) && !contentContainsTextualToolCall) {
             const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Regenerate response", title: "Regenerate Response"}});
             setIcon(regenerateBtn, "refresh-cw");
-            view.registerDomEvent(regenerateBtn, "click", (e) => { e.stopPropagation(); view.handleRegenerateClick(message); }); // message тут вже AssistantMessage
+            view.registerDomEvent(regenerateBtn, "click", (e) => { e.stopPropagation(); view.handleRegenerateClick(message); }); 
          }
 
          const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button", CSS_CLASSES.DANGER_OPTION || "danger-option", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Delete message", title: "Delete Message" } });

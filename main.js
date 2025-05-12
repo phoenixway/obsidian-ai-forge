@@ -1460,7 +1460,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   }
   async render() {
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
-    this.addAvatar(messageGroup, false);
+    renderAvatar(this.app, this.plugin, messageGroup, false);
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
     messageWrapper.style.order = "2";
     const { messageEl, contentEl } = this.createMessageBubble(
@@ -1480,11 +1480,11 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         this.plugin.logger.debug(`[AssistantMessageRenderer] Native tool_calls found: ${assistantMessage.tool_calls.length}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
       } else if (hasTextualToolCallTags && typeof contentToRender === "string") {
-        this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found.`);
+        this.plugin.logger.debug(`[AssistantMessageRenderer] Textual tool_call tags found in content: "${contentToRender.substring(0, 100)}..."`);
         const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
         let match;
         toolCallRegex.lastIndex = 0;
-        while ((match = toolCallRegex.exec(contentToRender)) !== null) {
+        while ((match = toolCallRegex.exec(this.message.content)) !== null) {
           if (match[1])
             toolNamesCalled.push(match[1]);
         }
@@ -1504,15 +1504,13 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       usingToolMessage += ")";
       contentToRender = contentToRender && contentToRender.trim() ? `${usingToolMessage}
 
-${contentToRender}` : usingToolMessage;
-      this.plugin.logger.debug(`[AssistantMessageRenderer] toolNamesCalled: "${toolNamesCalled}"`);
+${contentToRender.trim()}` : usingToolMessage;
       this.plugin.logger.debug(`[AssistantMessageRenderer] Content to render after processing tool indicators: "${contentToRender}"`);
     }
     try {
       await AssistantMessageRenderer.renderAssistantContent(
         contentEl,
         contentToRender || "",
-        // Передаємо порожній рядок, якщо contentToRender став null/undefined
         this.app,
         this.plugin,
         this.view
@@ -1530,6 +1528,10 @@ ${contentToRender}` : usingToolMessage;
     }, 70);
     return messageGroup;
   }
+  // Статичні методи renderAssistantContent та addAssistantActionButtons 
+  // залишаються такими, як були надані в моїй попередній відповіді
+  // (де ми виправляли помилки з прапорцем 's' та CSS_CLASSES).
+  // Я включу їх сюди для повноти.
   static async renderAssistantContent(contentEl, markdownText, app, plugin, view) {
     var _a, _b;
     const dotsEl = contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
@@ -1546,6 +1548,11 @@ ${contentToRender}` : usingToolMessage;
       plugin.logger.error("[renderAssistantContent STAT] Error decoding/removing tags:", e);
     }
     if (processedMarkdown.trim().length === 0) {
+      if (contentEl.innerHTML.trim() === "") {
+        const dots = contentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+        for (let i = 0; i < 3; i++)
+          dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+      }
       return;
     }
     try {
