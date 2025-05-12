@@ -1218,146 +1218,143 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
   }
 
   private handleDragOverRoot(event: DragEvent): void {
-    // Дозволяємо скидання тут
     event.preventDefault();
     if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move';
+        event.dataTransfer.dropEffect = 'move';
     }
-  }
 
-  private handleDragEnterRoot(event: DragEvent): void {
-    
-    event.preventDefault();
-    const targetElement = event.currentTarget as HTMLElement;
-    this.plugin.logger.debug(`[DragEnterRoot] Event fired for target: ${targetElement.className}`);
-    // Перевіряємо, чи щось перетягується
-    if (!this.draggedItemData) return;
+    // Оскільки папки зупиняють спливання, цей event.target буде самим chatPanelListContainerEl
+    // або дочірнім елементом, який НЕ є папкою (наприклад, чатом, який не є drop target).
+    // Якщо event.target - це чат, то ми все одно хочемо, щоб корінь був ціллю.
 
-    // Додаємо клас для візуального фідбеку, ТІЛЬКИ ЯКЩО курсор дійсно над контейнером,
-    // а не над його дочірнім елементом, який є папкою (і вже має свій drag-enter).
-    // event.target тут - це сам chatPanelListContainerEl.
-    if (targetElement === this.chatPanelListContainerEl) {
-        // Додатково перевіряємо, чи не намагаємося скинути елемент сам на себе (якщо він вже в корені)
-        const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
-        const sourceParentPath = this.draggedItemData.path.substring(0, this.draggedItemData.path.lastIndexOf('/')) || '/';
-
-        if (this.draggedItemData.type === 'chat' && normalizePath(sourceParentPath) === rootFolderPath) {
-            // Чат вже в кореневій папці, не підсвічуємо
-            return;
-        }
-        if (this.draggedItemData.type === 'folder' && normalizePath(sourceParentPath) === rootFolderPath) {
-            // Папка вже в кореневій папці (тобто її батько - це рут)
-             // Це трохи складніше, бо sourceParentPath для папки 'a/b' буде 'a', а для 'b' буде '/'.
-             // Для папки в корені, її path буде "FolderName", а sourceParentPath буде "/".
-             if (this.draggedItemData.path.includes('/') === false && rootFolderPath === '/') {
-                return; // Папка вже в корені
-             }
-             // Якщо chatsFolderPath не "/", то
-             if (rootFolderPath !== '/' && this.draggedItemData.path.startsWith(rootFolderPath) &&
-                 this.draggedItemData.path.substring(rootFolderPath.length + 1).indexOf('/') === -1) {
-                 return; // Папка вже в корені
-             }
-        }
-        targetElement.addClass('drag-over-root-target'); // Новий CSS клас для кореневої цілі
-        this.plugin.logger.trace(`Drag Enter Root: Target container, Can Drop (basic check)`);
-    }
-  }
-
-  private handleDragLeaveRoot(event: DragEvent): void {
-    const targetElement = event.currentTarget as HTMLElement;
-    const relatedTarget = event.relatedTarget as Node | null;
-
-    // Прибираємо клас підсвічування, тільки якщо курсор покинув контейнер,
-    // а не перейшов на дочірній елемент всередині нього.
-    if (targetElement && (!relatedTarget || !targetElement.contains(relatedTarget))) {
-        targetElement.removeClass('drag-over-root-target');
-        this.plugin.logger.trace(`Drag Leave Root: Target container`);
-    }
-  }
-
-  private async handleDropRoot(event: DragEvent): Promise<void> {
-    event.preventDefault();
-    const targetElement = event.currentTarget as HTMLElement;
-    targetElement.removeClass('drag-over-root-target'); // Прибираємо підсвічування
-
-    if (!this.draggedItemData || !event.dataTransfer) {
-        this.plugin.logger.warn("Root Drop event occurred without draggedItemData.");
-        this.draggedItemData = null;
+    if (!this.draggedItemData) {
+        (event.currentTarget as HTMLElement).removeClass('drag-over-root-target');
         return;
     }
 
-    const draggedData = this.draggedItemData;
-    this.draggedItemData = null; // Очищаємо
-
+    // Валідація: чи не перетягуємо елемент, що вже в корені, у корінь?
     const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
-    this.plugin.logger.debug(`Root Drop Event: Dragged=${JSON.stringify(draggedData)}, Target Root Folder=${rootFolderPath}`);
+    const draggedPath = this.draggedItemData.path;
+    let sourceParentPath = normalizePath(draggedPath.substring(0, draggedPath.lastIndexOf('/')) || '/');
 
-    // --- ВАЛІДАЦІЯ ---
-    // Перевіряємо, чи елемент вже не знаходиться в кореневій папці
-    const sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
-
-    if (draggedData.type === 'chat') {
-        if (sourceParentPath === rootFolderPath) {
-            this.plugin.logger.debug("Root Drop skipped: Chat is already in the root folder.");
-            return;
-        }
-    } else if (draggedData.type === 'folder') {
-        // Для папки в корені: її path не містить '/' (якщо rootFolderPath='/'),
-        // або її path є прямим нащадком rootFolderPath.
-        const isAlreadyAtRoot = (rootFolderPath === '/' && !draggedData.path.includes('/')) ||
-                                (rootFolderPath !== '/' && draggedData.path.startsWith(rootFolderPath + '/') &&
-                                 draggedData.path.substring(rootFolderPath.length + 1).indexOf('/') === -1);
-
-        if (isAlreadyAtRoot || sourceParentPath === rootFolderPath) { // Додаткова перевірка sourceParentPath
-            this.plugin.logger.debug(`Root Drop skipped: Folder '${draggedData.name}' is already in the root folder.`);
-            return;
-        }
+    // Спеціальна обробка для папок, що знаходяться безпосередньо в корені "/"
+    if (this.draggedItemData.type === 'folder' && rootFolderPath === '/' && !draggedPath.includes('/')) {
+        sourceParentPath = '/'; // Їхній батько - це корінь
     }
 
-    // --- ВИКОНАННЯ ДІЇ ---
-    let success = false;
-    const notice = new Notice(`Moving ${draggedData.type} to root...`, 0);
 
-    try {
-        if (draggedData.type === 'chat') {
-            this.plugin.logger.info(`Calling moveChat (to root): id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${rootFolderPath}`);
-            success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, rootFolderPath);
-        } else if (draggedData.type === 'folder') {
-            const folderName = draggedData.name;
-            const newPathAtRoot = normalizePath(rootFolderPath === '/' ? folderName : `${rootFolderPath}/${folderName}`);
-            this.plugin.logger.info(`Calling renameFolder (move to root): oldPath=${draggedData.path}, newPath=${newPathAtRoot}`);
-
-            if (draggedData.path === newPathAtRoot) { // Подвійна перевірка, хоча вище вже мало б відсіяти
-                 this.plugin.logger.debug("Root Drop (folder): Source and target path are identical after normalization.");
-                 success = true; // Вважаємо успіхом, нічого не робимо
-            } else {
-                const exists = await this.app.vault.adapter.exists(newPathAtRoot);
-                if (exists) {
-                    new Notice(`An item named "${folderName}" already exists at the root.`);
-                    this.plugin.logger.warn(`Root Drop prevented: Target ${newPathAtRoot} already exists.`);
-                } else {
-                    success = await this.plugin.chatManager.renameFolder(draggedData.path, newPathAtRoot);
-                    if (success && this.folderExpansionState.has(draggedData.path)) {
-                        const wasExpanded = this.folderExpansionState.get(draggedData.path);
-                        this.folderExpansionState.delete(draggedData.path);
-                        this.folderExpansionState.set(newPathAtRoot, wasExpanded!);
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        this.plugin.logger.error(`Error during root drop operation (moving ${draggedData.type}):`, error);
-        new Notice(`Error moving ${draggedData.type} to root. Check console.`);
-        success = false;
-    } finally {
-        notice.hide();
-        if (success) {
-            this.plugin.logger.info(`Root Drop successful: Moved ${draggedData.type} '${draggedData.name}' to root. UI update pending event.`);
-        } else {
-            this.plugin.logger.warn(`Root Drop failed or was prevented for ${draggedData.type} '${draggedData.name}'.`);
-        }
-        // Оновлення UI відбудеться через події від ChatManager
+    if (sourceParentPath === rootFolderPath) {
+        (event.currentTarget as HTMLElement).removeClass('drag-over-root-target');
+        this.plugin.logger.trace("[DragOverRoot] Item already at root, no highlight for root.");
+    } else {
+        (event.currentTarget as HTMLElement).addClass('drag-over-root-target');
+        this.plugin.logger.trace("[DragOverRoot] Over root empty space/non-folder child, item not at root. Added root highlight.");
     }
+}
+
+// Цей метод викликається, коли миша ВХОДИТЬ в межі chatPanelListContainerEl
+// Може бути менш важливим, якщо handleDragOverRoot все коректно обробляє.
+private handleDragEnterRoot(event: DragEvent): void {
+  event.preventDefault(); // Потрібно для консистентності
+  // Логіку підсвічування тепер краще перенести в handleDragOverRoot,
+  // оскільки dragenter спрацьовує один раз, а dragover - постійно.
+  // Можна просто логувати тут для відстеження.
+  this.plugin.logger.trace(`[DragEnterRoot] Mouse entered root container bounds.`);
+  // Спробуємо викликати логіку handleDragOverRoot, щоб встановити початковий стан підсвічування
+  this.handleDragOverRoot(event);
+}
+  
+private handleDragLeaveRoot(event: DragEvent): void {
+  const listeningElement = event.currentTarget as HTMLElement;
+  // relatedTarget - це елемент, на який переходить курсор.
+  // Якщо курсор покинув контейнер повністю (relatedTarget не є дочірнім або null),
+  // тоді прибираємо підсвічування.
+  if (!event.relatedTarget || !(listeningElement.contains(event.relatedTarget as Node))) {
+      listeningElement.removeClass('drag-over-root-target');
+      this.plugin.logger.debug("[DragLeaveRoot] Mouse left root container bounds. Removed 'drag-over-root-target'.");
+  } else {
+       this.plugin.logger.trace("[DragLeaveRoot] Mouse moved to a child within root. Highlight persists or handled by child.");
   }
+}
+
+  
+// handleDropRoot залишається в основному таким самим, як у попередній відповіді,
+// але переконайтеся, що валідація "чи елемент вже в корені" використовує ту ж логіку, що й handleDragOverRoot.
+private async handleDropRoot(event: DragEvent): Promise<void> {
+  event.preventDefault();
+  const targetElement = event.currentTarget as HTMLElement;
+  targetElement.removeClass('drag-over-root-target');
+  this.plugin.logger.debug("[DropRoot] Event fired.");
+
+  if (!this.draggedItemData) {
+      this.plugin.logger.warn("[DropRoot] No draggedItemData available on drop. Aborting.");
+      return;
+  }
+
+  const draggedData = { ...this.draggedItemData };
+  this.draggedItemData = null;
+
+  const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
+  this.plugin.logger.info(`[DropRoot] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
+
+  // --- ВАЛІДАЦІЯ ---
+  let sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
+  if (draggedData.type === 'folder' && rootFolderPath === '/' && !draggedData.path.includes('/')) {
+      sourceParentPath = '/';
+  }
+
+  if (sourceParentPath === rootFolderPath) {
+      this.plugin.logger.info(`[DropRoot] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
+      return;
+  }
+
+  // --- ВИКОНАННЯ ДІЇ --- (решта коду як у попередній відповіді)
+  let success = false;
+  const notice = new Notice(`Moving ${draggedData.type} to root...`, 0);
+
+  try {
+      if (draggedData.type === 'chat') {
+          // ... (виклик moveChat) ...
+          this.plugin.logger.info(`Calling moveChat (to root): id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${rootFolderPath}`);
+          success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, rootFolderPath);
+      } else if (draggedData.type === 'folder') {
+          const folderName = draggedData.name;
+          const newPathAtRoot = normalizePath(rootFolderPath === '/' ? folderName : `${rootFolderPath}/${folderName}`);
+          // ... (перевірка на існування та виклик renameFolder) ...
+           this.plugin.logger.info(`Calling renameFolder (move to root): oldPath=${draggedData.path}, newPath=${newPathAtRoot}`);
+          if (draggedData.path === newPathAtRoot) {
+               success = true;
+          } else {
+              const exists = await this.app.vault.adapter.exists(newPathAtRoot);
+              if (exists) {
+                  new Notice(`An item named "${folderName}" already exists at the root.`);
+                  this.plugin.logger.warn(`Root Drop prevented: Target ${newPathAtRoot} already exists.`);
+              } else {
+                  success = await this.plugin.chatManager.renameFolder(draggedData.path, newPathAtRoot);
+                  // ... (оновлення folderExpansionState) ...
+                   if (success && this.folderExpansionState.has(draggedData.path)) {
+                      const wasExpanded = this.folderExpansionState.get(draggedData.path);
+                      this.folderExpansionState.delete(draggedData.path);
+                      this.folderExpansionState.set(newPathAtRoot, wasExpanded!);
+                  }
+              }
+          }
+      }
+  } catch (error) {
+      // ... (обробка помилок) ...
+      this.plugin.logger.error(`[DropRoot] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
+      new Notice(`Error moving ${draggedData.type} to root. Check console.`);
+      success = false;
+  } finally {
+      notice.hide();
+      // ... (логування успіху/невдачі) ...
+       if (success) {
+          this.plugin.logger.info(`[DropRoot] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
+      } else {
+          this.plugin.logger.warn(`[DropRoot] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
+      }
+  }
+}
+  
 
 } // End of SidebarManager class

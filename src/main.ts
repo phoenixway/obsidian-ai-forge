@@ -124,7 +124,6 @@ export default class OllamaPlugin extends Plugin {
       logFileMaxSizeMB: initialSettingsData.logFileMaxSizeMB,
     };
     this.logger = new Logger(this, loggerSettings);
-    this.logger.info("AI Forge Plugin loading...");
     // ---
 
     // Завантажуємо налаштування та виконуємо міграцію, якщо потрібно

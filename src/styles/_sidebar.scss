@@ -232,3 +232,8 @@ body.is-resizing {
   outline: 2px dashed var(--interactive-accent-hover);
   outline-offset: -2px; /* Щоб рамка була всередині */
 }
+
+.ollama-chat-list-container {
+  /* ... ваші існуючі стилі ... */
+  padding-bottom: 20px; /* Додайте відступ знизу для зони скидання */
+}
