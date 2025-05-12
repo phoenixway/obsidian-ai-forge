@@ -211,7 +211,7 @@ export class OllamaView extends ItemView {
   // src/OllamaView.ts
 
   async onOpen(): Promise<void> {
-    // this.plugin.logger.info("[OllamaView] onOpen START");
+    // 
 
     // Спочатку створюємо UI, включаючи роздільник
     this.createUIElements();
@@ -221,7 +221,7 @@ export class OllamaView extends ItemView {
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === "number" && savedWidth > 50) {
       this.sidebarRootEl.style.width = `${savedWidth}px`;
       this.sidebarRootEl.style.minWidth = `${savedWidth}px`;
-      this.plugin.logger.debug(`[OllamaView] Applied saved sidebar width: ${savedWidth}px`);
+      
     } else if (this.sidebarRootEl) {
       // Встановлюємо дефолтну ширину, якщо збереженої немає або вона невалідна
       let defaultWidth = 250; // Значення за замовчуванням
@@ -232,7 +232,7 @@ export class OllamaView extends ItemView {
           const parsedWidth = parseInt(cssVarWidth, 10);
           if (!isNaN(parsedWidth) && parsedWidth > 50) {
             defaultWidth = parsedWidth;
-            this.plugin.logger.debug(`[OllamaView] Used sidebar width from CSS variable: ${defaultWidth}px`);
+            
           }
         }
       } catch (e) {
@@ -241,7 +241,7 @@ export class OllamaView extends ItemView {
       this.sidebarRootEl.style.width = `${defaultWidth}px`;
       this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
       if (!savedWidth) {
-        this.plugin.logger.debug(`[OllamaView] Applied default sidebar width: ${defaultWidth}px`);
+        
       }
     }
     // --- Кінець застосування ширини ---
@@ -280,7 +280,7 @@ export class OllamaView extends ItemView {
       // може виправити метадані (що викличе події 'chat-list-updated' -> scheduleSidebarChatListUpdate),
       // але БІЛЬШЕ НЕ ОНОВЛЮЄ САЙДБАР НАПРЯМУ.
       await this.loadAndDisplayActiveChat();
-      this.plugin.logger.debug("[OllamaView] onOpen: loadAndDisplayActiveChat finished.");
+      
 
       // --- ВИДАЛЕНО ЯВНЕ ОНОВЛЕННЯ СПИСКІВ САЙДБАРУ ---
       // Тепер покладаємося на події:
@@ -305,7 +305,7 @@ export class OllamaView extends ItemView {
       // Додаткова перевірка, чи view все ще активне/існує і видиме користувачу
       if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
         this.inputEl.focus();
-        this.plugin.logger.debug("[OllamaView] Input focused via onOpen timeout.");
+        
       } else {
         this.plugin.logger.debug(
           "[OllamaView] Input focus skipped in onOpen timeout (view not active/visible or input missing)."
@@ -317,7 +317,7 @@ export class OllamaView extends ItemView {
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
     }
-    this.plugin.logger.info("[OllamaView] onOpen END");
+    
   } // --- Кінець методу onOpen ---
 
   async onClose(): Promise<void> {
@@ -1190,7 +1190,7 @@ export class OllamaView extends ItemView {
         const result = renderer.render(); 
         messageGroupEl = result instanceof Promise ? await result : result;
       } else {
-          this.plugin.logger.warn(`[addMessageStandard] Renderer was not created for role: ${message.role}. This indicates a logic issue.`);
+          
           return; // Якщо рендерер не створено, нічого додавати
       }
 
@@ -1216,7 +1216,7 @@ export class OllamaView extends ItemView {
         }
         setTimeout(() => this.updateScrollStateAndIndicators(), 150);
       } else if (renderer) {
-          this.plugin.logger.warn(`[addMessageStandard] Renderer was created for role ${message.role}, but messageGroupEl was not generated or chatContainer is missing.`);
+          
       }
     } catch (error: any) {
       this.plugin.logger.error(
@@ -1438,7 +1438,7 @@ export class OllamaView extends ItemView {
         if (parsedJson && typeof parsedJson.name === 'string' && 
             (typeof parsedJson.arguments === 'object' || parsedJson.arguments === undefined || parsedJson.arguments === null) // arguments можуть бути відсутніми або null
            ) {
-          this.plugin.logger.info("[OllamaView.parseTextForToolCall] Successfully parsed textual tool call:", parsedJson);
+          
           return { name: parsedJson.name, arguments: parsedJson.arguments || {} }; // Повертаємо {} якщо arguments відсутні
         } else {
           this.plugin.logger.error(
@@ -1506,7 +1506,7 @@ export class OllamaView extends ItemView {
   // Модифікуємо handleActiveChatChanged
   // src/OllamaView.ts
   private handleChatListUpdated = (): void => {
-    this.plugin.logger.debug(`[OllamaView] handleChatListUpdated: Event received. Scheduling sidebar list update.`);
+    
     this.scheduleSidebarChatListUpdate();
 
     if (this.dropdownMenuManager) {
@@ -3231,7 +3231,7 @@ export class OllamaView extends ItemView {
 
     let activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat) {
-      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] No active chat. Attempting to create a new one.`);
+      
       activeChat = await this.plugin.chatManager?.createNewChat();
       if (!activeChat) {
         new Notice("Error: No active chat session found and could not create a new one.");
@@ -3252,7 +3252,7 @@ export class OllamaView extends ItemView {
     this.clearInputField();
 
     this.currentAbortController = new AbortController();
-    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] currentAbortController CREATED.`);
+    
 
     this.setLoadingState(true);
     this.hideEmptyState();
@@ -3817,7 +3817,7 @@ export class OllamaView extends ItemView {
             this.plugin.logger.trace(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`);
         }
     } else {
-        this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map for message:`, messageForLog);
+        
     }
 
     this.plugin.logger.debug( 
@@ -3828,7 +3828,7 @@ export class OllamaView extends ItemView {
         if (!data || !data.message) {
             this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received in handleMessageAdded. Data:`, data);
             if (resolverForThisMessage) {
-                this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage due to invalid data.`);
+                
                 resolverForThisMessage();
             }
             return;
@@ -3840,7 +3840,7 @@ export class OllamaView extends ItemView {
         if (!this.chatContainer || !this.plugin.chatManager) {
             this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing! ChatContainer: ${!!this.chatContainer}, ChatManager: ${!!this.plugin.chatManager}`);
             if (resolverForThisMessage) {
-                this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage due to missing context.`);
+                
                 resolverForThisMessage();
             }
             return;
@@ -3850,7 +3850,7 @@ export class OllamaView extends ItemView {
         if (eventChatId !== activeChatId) {
             this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId} (current active is ${activeChatId}).`);
             if (resolverForThisMessage) {
-                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage due to non-active chat.`);
+                
                 resolverForThisMessage();
             }
             return;
@@ -3861,7 +3861,7 @@ export class OllamaView extends ItemView {
         if (existingRenderedMessage) {
             this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) with this timestamp already rendered (and is not a placeholder). Skipping.`);
             if (resolverForThisMessage) {
-                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage as message was already rendered.`);
+                
                 resolverForThisMessage();
             }
             return;
@@ -3877,7 +3877,7 @@ export class OllamaView extends ItemView {
             message.role === 'assistant' &&
             this.activePlaceholder?.timestamp === messageTimestampMs;
 
-        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache/Placeholder checks: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
+        
 
         if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
             this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) identical to one in currentMessages cache and NOT an assistant message for active placeholder. Skipping addMessageStandard.`);
