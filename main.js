@@ -1616,14 +1616,70 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
     if (message.role !== "assistant") {
+      plugin.logger.error("[AssistantMessageRenderer] Constructor error: Message role is not 'assistant'. Received:", message.role);
       throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
     }
   }
+  // Статичний метод для підготовки контенту, який може викликатися з різних місць
+  static prepareDisplayContent(originalContent, assistantMessage, plugin) {
+    const messageTimestampLog = assistantMessage.timestamp.getTime();
+    let finalContentToDisplay = originalContent;
+    const thinkDetection = detectThinkingTags(decodeHtmlEntities(originalContent));
+    let contentWithoutThinkTags = thinkDetection.contentWithoutTags;
+    const hasTextualToolCallTagsInStrippedContent = contentWithoutThinkTags.includes("<tool_call>");
+    const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
+    plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Checks: enableToolUse=${plugin.settings.enableToolUse}, hasTextualToolCallTags=${hasTextualToolCallTagsInStrippedContent}, hasNativeToolCalls=${hasNativeToolCalls}.`);
+    if (plugin.settings.enableToolUse && (hasTextualToolCallTagsInStrippedContent || hasNativeToolCalls)) {
+      plugin.logger.info(`[ARender STATIC PREP][ts:${messageTimestampLog}] Tool call indicators present. Preparing user-friendly display content.`);
+      let usingToolMessageText = "( ";
+      const toolNamesCalled = [];
+      let accompanyingText = contentWithoutThinkTags;
+      if (hasNativeToolCalls && assistantMessage.tool_calls) {
+        plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
+        assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
+      } else if (hasTextualToolCallTagsInStrippedContent) {
+        plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from (content without think tags): "${contentWithoutThinkTags.substring(0, 150)}..."`);
+        const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
+        let match;
+        toolCallRegex.lastIndex = 0;
+        while ((match = toolCallRegex.exec(contentWithoutThinkTags)) !== null) {
+          if (match[1]) {
+            toolNamesCalled.push(match[1]);
+          }
+        }
+        plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Extracted tool names from textual calls: ${toolNamesCalled.join(", ")}`);
+        accompanyingText = contentWithoutThinkTags.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+        if (accompanyingText.startsWith("***")) {
+          accompanyingText = accompanyingText.substring(3).trim();
+        }
+        if (accompanyingText.endsWith("***")) {
+          accompanyingText = accompanyingText.substring(0, accompanyingText.length - 3).trim();
+        }
+      }
+      if (toolNamesCalled.length > 0) {
+        usingToolMessageText += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
+      } else {
+        usingToolMessageText += "Attempting to use tool(s)... ";
+        plugin.logger.warn(`[ARender STATIC PREP][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted/available.`);
+      }
+      usingToolMessageText += ")";
+      if (accompanyingText && accompanyingText.trim().length > 0) {
+        finalContentToDisplay = `${usingToolMessageText}
+
+${accompanyingText.trim()}`;
+      } else {
+        finalContentToDisplay = usingToolMessageText;
+      }
+    } else {
+      finalContentToDisplay = contentWithoutThinkTags;
+    }
+    plugin.logger.info(`[ARender STATIC PREP][ts:${messageTimestampLog}] Prepared display content: "${finalContentToDisplay}"`);
+    return finalContentToDisplay;
+  }
   async render() {
+    var _a;
     const messageTimestampLog = this.message.timestamp.getTime();
-    const originalMessageContent = this.message.content || "";
-    this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] === START RENDER ===`);
-    this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Original content (first 150 chars): "${originalMessageContent.substring(0, 150)}"`);
+    this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] render() called. Original content preview: "${(_a = this.message.content) == null ? void 0 : _a.substring(0, 150)}..."`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
     renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
@@ -1633,78 +1689,25 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       [CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"]
     );
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
-    let finalContentToRender;
     const assistantMessage = this.message;
-    const decodedOriginalContent = decodeHtmlEntities(originalMessageContent);
-    const thinkDetection = detectThinkingTags(decodedOriginalContent);
-    let contentWithoutThinkTags = thinkDetection.contentWithoutTags;
-    this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Content after HTML decode & think stripping: "${contentWithoutThinkTags.substring(0, 150)}..."`);
-    if (thinkDetection.hasThinkingTags) {
-      this.plugin.logger.info(`[ARender][ts:${messageTimestampLog}] <think> tags were present and stripped.`);
-    }
-    const hasTextualToolCallTagsInStrippedContent = contentWithoutThinkTags.includes("<tool_call>");
-    const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
-    this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Tool Checks: enableToolUse=${this.plugin.settings.enableToolUse}, hasTextualToolCallTagsInStrippedContent=${hasTextualToolCallTagsInStrippedContent}, hasNativeToolCalls=${hasNativeToolCalls}.`);
-    if (this.plugin.settings.enableToolUse && (hasTextualToolCallTagsInStrippedContent || hasNativeToolCalls)) {
-      this.plugin.logger.info(`[ARender][ts:${messageTimestampLog}] Tool call indicators detected. Preparing user-friendly display content.`);
-      let usingToolMessageText = "( ";
-      const toolNamesCalled = [];
-      let accompanyingText = "";
-      if (hasNativeToolCalls && assistantMessage.tool_calls) {
-        this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
-        assistantMessage.tool_calls.forEach((tc) => toolNamesCalled.push(tc.function.name));
-        accompanyingText = contentWithoutThinkTags;
-      } else if (hasTextualToolCallTagsInStrippedContent) {
-        this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from (content without think tags): "${contentWithoutThinkTags.substring(0, 150)}..."`);
-        const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
-        let match;
-        toolCallRegex.lastIndex = 0;
-        while ((match = toolCallRegex.exec(contentWithoutThinkTags)) !== null) {
-          if (match[1]) {
-            toolNamesCalled.push(match[1]);
-          }
-        }
-        this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Extracted tool names from textual calls: ${toolNamesCalled.join(", ")}`);
-        accompanyingText = contentWithoutThinkTags.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-        if (accompanyingText.startsWith("***")) {
-          accompanyingText = accompanyingText.substring(3).trim();
-        }
-        if (accompanyingText.endsWith("***")) {
-          accompanyingText = accompanyingText.substring(0, accompanyingText.length - 3).trim();
-        }
-        this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] Accompanying text after stripping <tool_call> tags: "${accompanyingText}"`);
-      }
-      if (toolNamesCalled.length > 0) {
-        usingToolMessageText += `Using tool${toolNamesCalled.length > 1 ? "s" : ""}: ${toolNamesCalled.join(", ")}... `;
-      } else {
-        usingToolMessageText += "Attempting to use tool(s)... ";
-        this.plugin.logger.warn(`[ARender][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted/available. Displaying generic message.`);
-      }
-      usingToolMessageText += ")";
-      if (accompanyingText && accompanyingText.trim().length > 0) {
-        finalContentToRender = `${usingToolMessageText}
-
-${accompanyingText.trim()}`;
-      } else {
-        finalContentToRender = usingToolMessageText;
-      }
-      this.plugin.logger.info(`[ARender][ts:${messageTimestampLog}] Final contentToRender for display (with tool indicators): "${finalContentToRender}"`);
-    } else {
-      finalContentToRender = contentWithoutThinkTags;
-      this.plugin.logger.debug(`[ARender][ts:${messageTimestampLog}] No tool call indicators, or tool use disabled. Rendering content (after think stripping only): "${finalContentToRender.substring(0, 100)}..."`);
-    }
+    const displayContent = AssistantMessageRenderer.prepareDisplayContent(
+      this.message.content || "",
+      assistantMessage,
+      this.plugin
+    );
+    this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] Content prepared for display by static method: "${displayContent.substring(0, 150)}..."`);
     try {
       await renderMarkdownContent(
+        // Припускаємо, що цей метод у RendererUtils
         this.app,
         this.view,
         this.plugin,
         contentEl,
-        finalContentToRender
-        // Тепер гарантовано ініціалізовано
+        displayContent
       );
     } catch (error) {
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
-      this.plugin.logger.error(`[ARender][ts:${messageTimestampLog}] Error in render -> renderMarkdownContent:`, error);
+      this.plugin.logger.error(`[ARender INSTANCE][ts:${messageTimestampLog}] Error in render -> renderMarkdownContent:`, error);
     }
     AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
@@ -1762,35 +1765,35 @@ ${accompanyingText.trim()}`;
       return;
     }
     const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-    const finalContent = message.content;
+    const originalLlMRawContent = message.content || "";
     const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Copy", title: "Copy" } });
     (0, import_obsidian9.setIcon)(copyBtn, "copy");
     view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
-      view.handleCopyClick(finalContent || "", copyBtn);
+      view.handleCopyClick(originalLlMRawContent, copyBtn);
     });
-    if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && finalContent && finalContent.trim()) {
+    if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && originalLlMRawContent && originalLlMRawContent.trim()) {
       const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON || "translate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Translate", title: "Translate" } });
       (0, import_obsidian9.setIcon)(translateBtn, "languages");
       view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
         if (contentEl.isConnected) {
-          view.handleTranslateClick(finalContent || "", contentEl, translateBtn);
+          view.handleTranslateClick(originalLlMRawContent, contentEl, translateBtn);
         } else {
           new import_obsidian9.Notice("Cannot translate: message content element not found.");
         }
       });
     }
-    if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && finalContent && finalContent.trim()) {
+    if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && originalLlMRawContent && originalLlMRawContent.trim()) {
       const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { title: "Summarize message" } });
       (0, import_obsidian9.setIcon)(summarizeBtn, "scroll-text");
       view.registerDomEvent(summarizeBtn, "click", (e) => {
         e.stopPropagation();
-        view.handleSummarizeClick(finalContent || "", summarizeBtn);
+        view.handleSummarizeClick(originalLlMRawContent, summarizeBtn);
       });
     }
-    const contentContainsTextualToolCall = typeof finalContent === "string" && finalContent.includes("<tool_call>");
-    if ((!message.tool_calls || message.tool_calls.length === 0) && !contentContainsTextualToolCall) {
+    const originalContentContainsTextualToolCall = typeof originalLlMRawContent === "string" && originalLlMRawContent.includes("<tool_call>");
+    if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
       const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Regenerate response", title: "Regenerate Response" } });
       (0, import_obsidian9.setIcon)(regenerateBtn, "refresh-cw");
       view.registerDomEvent(regenerateBtn, "click", (e) => {
@@ -7095,22 +7098,24 @@ Summary:`;
       if (resolverForThisMessage) {
         resolverFoundInMap = true;
         this.messageAddedResolvers.delete(messageTimestampForLog);
-        this.plugin.logger.debug(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`);
+        this.plugin.logger.debug(
+          // Змінено рівень логування на DEBUG
+          `[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`
+        );
       } else {
         this.plugin.logger.trace(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`);
       }
     } else {
-      this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map.`);
+      this.plugin.logger.warn(`[HMA ENTRY ${hmaEntryId}] messageTimestampForLog is undefined. Cannot get/delete resolver from map for message:`, messageForLog);
     }
     this.plugin.logger.debug(
-      // Змінив рівень логування на DEBUG
       `[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? "FOUND" : "NOT_FOUND"}. Active placeholder ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}`
     );
     try {
       if (!data || !data.message) {
-        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received.`, data);
+        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received in handleMessageAdded. Data:`, data);
         if (resolverForThisMessage) {
-          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage (invalid data).`);
+          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] Calling resolverForThisMessage due to invalid data.`);
           resolverForThisMessage();
         }
         return;
@@ -7120,55 +7125,53 @@ Summary:`;
       if (!this.chatContainer || !this.plugin.chatManager) {
         this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing! ChatContainer: ${!!this.chatContainer}, ChatManager: ${!!this.plugin.chatManager}`);
         if (resolverForThisMessage) {
-          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (missing context).`);
+          this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage due to missing context.`);
           resolverForThisMessage();
         }
         return;
       }
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId} (current is ${activeChatId}).`);
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId} (current active is ${activeChatId}).`);
         if (resolverForThisMessage) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (non-active chat).`);
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage due to non-active chat.`);
           resolverForThisMessage();
         }
         return;
       }
       const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
       if (existingRenderedMessage) {
-        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message already rendered (not placeholder). Role: ${message.role}.`);
+        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) with this timestamp already rendered (and is not a placeholder). Skipping.`);
         if (resolverForThisMessage) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (already rendered).`);
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage as message was already rendered.`);
           resolverForThisMessage();
         }
         return;
       }
       const alreadyInLogicCache = this.currentMessages.some(
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
-        // Додав перевірку контенту
       );
       const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache check: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
+      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache/Placeholder checks: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
       if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message identical to one in cache and NOT assistant for active placeholder. Role: ${message.role}.`);
+        this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) identical to one in currentMessages cache and NOT an assistant message for active placeholder. Skipping addMessageStandard.`);
         if (resolverForThisMessage) {
-          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (in cache, not placeholder match).`);
+          this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (message in cache, not placeholder match).`);
           resolverForThisMessage();
         }
         return;
       }
       if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS assistant for active placeholder. Proceeding to update placeholder.`);
+        this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role: ${message.role}) already in currentMessages cache, BUT IS an assistant message matching active placeholder. Proceeding to update placeholder.`);
       }
       if (!alreadyInLogicCache) {
         this.currentMessages.push(message);
-        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. Count: ${this.currentMessages.length}`);
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. New count: ${this.currentMessages.length}`);
       }
-      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial/cache checks. Role: ${message.role}. Active placeholder ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}`);
+      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Passed initial checks. Role: ${message.role}. Active placeholder ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}`);
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
         this.plugin.logger.info(
-          // Змінив рівень логування на INFO
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message MATCHES active placeholder. Updating placeholder.`
+          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message (ts: ${messageTimestampMs}) MATCHES active placeholder (ts: ${this.activePlaceholder.timestamp}). Updating placeholder.`
         );
         const placeholderToUpdate = this.activePlaceholder;
         if (((_e = placeholderToUpdate.groupEl) == null ? void 0 : _e.isConnected) && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
@@ -7178,7 +7181,7 @@ Summary:`;
           placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
           const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
           if (!messageDomElement) {
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] .message element NOT FOUND in placeholder. Removing placeholder, adding normally.`);
+            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] CRITICAL: .message element NOT FOUND in placeholder structure. Removing placeholder and attempting standard add.`);
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
             this.activePlaceholder = null;
@@ -7188,20 +7191,39 @@ Summary:`;
             const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
             if (dotsEl) {
               dotsEl.remove();
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);
+              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed from placeholder.`);
             }
             try {
-              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering final assistant content into placeholder.`);
-              await AssistantMessageRenderer.renderAssistantContent(placeholderToUpdate.contentEl, message.content, this.app, this.plugin, this);
-              AssistantMessageRenderer.addAssistantActionButtons(placeholderToUpdate.messageWrapper, placeholderToUpdate.contentEl, message, this.plugin, this);
+              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Preparing display content for placeholder update. Original message content: "${message.content.substring(0, 100)}..."`);
+              const displayContent = AssistantMessageRenderer.prepareDisplayContent(
+                message.content || "",
+                message,
+                this.plugin
+              );
+              this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering prepared display content into placeholder: "${displayContent.substring(0, 100)}..."`);
+              placeholderToUpdate.contentEl.empty();
+              await renderMarkdownContent(
+                this.app,
+                this,
+                this.plugin,
+                placeholderToUpdate.contentEl,
+                displayContent
+              );
+              AssistantMessageRenderer.addAssistantActionButtons(
+                messageDomElement,
+                // Передаємо саму бульбашку для додавання кнопок
+                placeholderToUpdate.contentEl,
+                message,
+                this.plugin,
+                this
+              );
               BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
               this.activePlaceholder = null;
               this.plugin.logger.info(
-                // Змінив рівень логування
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated and CLEARED. Message content: "${message.content.substring(0, 50)}..."`
+                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated and CLEARED. Final display content preview: "${displayContent.substring(0, 50)}..."`
               );
               setTimeout(() => {
                 if (finalMessageGroupElement && finalMessageGroupElement.isConnected) {
@@ -7219,13 +7241,13 @@ Summary:`;
             }
           }
         } else {
-          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but its DOM elements are invalid or not connected. Adding normally.`);
+          this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but its DOM elements are invalid or not connected. Adding message via addMessageStandard.`);
           this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
       } else {
         this.plugin.logger.debug(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not an assistant message for placeholder. Role: ${message.role}. Active placeholder ts: ${(_f = this.activePlaceholder) == null ? void 0 : _f.timestamp}. Adding normally.`
+          `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not an assistant message for placeholder. Role: ${message.role}. Active placeholder ts: ${(_f = this.activePlaceholder) == null ? void 0 : _f.timestamp}. Adding normally via addMessageStandard.`
         );
         await this.addMessageStandard(message);
       }
@@ -7245,7 +7267,6 @@ Summary:`;
       );
       if (resolverForThisMessage) {
         this.plugin.logger.debug(
-          // Змінив рівень логування
           `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`
         );
         try {
@@ -7254,7 +7275,6 @@ Summary:`;
           this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
         }
         this.plugin.logger.debug(
-          // Змінив рівень логування
           `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`
         );
       } else {

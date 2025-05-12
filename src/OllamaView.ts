@@ -3929,21 +3929,25 @@ export class OllamaView extends ItemView {
                     }
                     
                     try {
+                      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Preparing display content for placeholder update. Original message content: "${message.content.substring(0,100)}..."`);
                         // --- ВИКОРИСТАННЯ prepareDisplayContent ---
                         const displayContent = AssistantMessageRenderer.prepareDisplayContent(
-                            message.content || "", 
-                            message as AssistantMessage, 
-                            this.plugin
-                        );
-                        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering prepared display content into placeholder: "${displayContent.substring(0,100)}..."`);
-
-                        await RendererUtils.renderMarkdownContent(
-                            this.app, 
-                            this, // 'this' є екземпляром OllamaView
-                            this.plugin,
-                            placeholderToUpdate.contentEl, 
-                            displayContent 
-                        );
+                          message.content || "", 
+                          message as AssistantMessage, 
+                          this.plugin
+                      );
+                      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering prepared display content into placeholder: "${displayContent.substring(0,100)}..."`);
+              
+                      // Очищаємо плейсхолдер перед рендерингом НОВОГО підготовленого контенту
+                      placeholderToUpdate.contentEl.empty(); 
+              
+                      await RendererUtils.renderMarkdownContent(
+                          this.app, 
+                          this, 
+                          this.plugin,
+                          placeholderToUpdate.contentEl, 
+                          displayContent 
+                      );
                         
                         AssistantMessageRenderer.addAssistantActionButtons( 
                             messageDomElement, // Передаємо саму бульбашку для додавання кнопок

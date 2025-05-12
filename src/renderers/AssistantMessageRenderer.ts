@@ -13,19 +13,19 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
     constructor(app: App, plugin: OllamaPlugin, message: AssistantMessage, view: OllamaView) {
         super(app, plugin, message, view); 
         if (message.role !== "assistant") {
+            plugin.logger.error("[AssistantMessageRenderer] Constructor error: Message role is not 'assistant'. Received:", message.role);
             throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
         }
     }
 
-    
-      // НОВИЙ СТАТИЧНИЙ МЕТОД для підготовки контенту
-      public static prepareDisplayContent(
+    // Статичний метод для підготовки контенту, який може викликатися з різних місць
+    public static prepareDisplayContent(
         originalContent: string, 
         assistantMessage: AssistantMessage, // Для доступу до native tool_calls
-        plugin: OllamaPlugin
+        plugin: OllamaPlugin // Для логування та доступу до налаштувань
     ): string {
-        const messageTimestampLog = assistantMessage.timestamp.getTime(); // Для логів
-        let finalContentToDisplay = originalContent;
+        const messageTimestampLog = assistantMessage.timestamp.getTime();
+        let finalContentToDisplay = originalContent; // За замовчуванням
 
         const thinkDetection = RendererUtils.detectThinkingTags(RendererUtils.decodeHtmlEntities(originalContent));
         let contentWithoutThinkTags = thinkDetection.contentWithoutTags;
@@ -40,38 +40,48 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
             
             let usingToolMessageText = "( ";
             const toolNamesCalled: string[] = [];
-            let accompanyingText = contentWithoutThinkTags;
+            // Текст, що залишиться ПІСЛЯ видалення <tool_call> тегів з contentWithoutThinkTags
+            let accompanyingText = contentWithoutThinkTags; 
 
-            if (hasNativeToolCalls && assistantMessage.tool_calls) {
+            if (hasNativeToolCalls && assistantMessage.tool_calls) { 
                 plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
                 assistantMessage.tool_calls.forEach(tc => toolNamesCalled.push(tc.function.name));
-                // accompanyingText вже є contentWithoutThinkTags
-            } else if (hasTextualToolCallTagsInStrippedContent) {
-                plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from: "${contentWithoutThinkTags.substring(0,150)}..."`);
+                // accompanyingText тут - це contentWithoutThinkTags.
+            } else if (hasTextualToolCallTagsInStrippedContent) { 
+                plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from (content without think tags): "${contentWithoutThinkTags.substring(0,150)}..."`);
+                
                 const toolCallRegex = /<tool_call>\s*{\s*"name"\s*:\s*"([^"]+)"[\s\S]*?}\s*<\/tool_call>/g;
                 let match;
                 toolCallRegex.lastIndex = 0;
-                while((match = toolCallRegex.exec(contentWithoutThinkTags)) !== null) { // Парсимо з contentWithoutThinkTags
-                    if (match[1]) toolNamesCalled.push(match[1]);
+                // Шукаємо імена в contentWithoutThinkTags (вже без <think>)
+                while((match = toolCallRegex.exec(contentWithoutThinkTags)) !== null) {
+                    if (match[1]) {
+                        toolNamesCalled.push(match[1]);
+                    }
                 }
                 plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Extracted tool names from textual calls: ${toolNamesCalled.join(', ')}`);
+                
                 accompanyingText = contentWithoutThinkTags.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+                
                 if (accompanyingText.startsWith("***")) { accompanyingText = accompanyingText.substring(3).trim(); }
                 if (accompanyingText.endsWith("***")) { accompanyingText = accompanyingText.substring(0, accompanyingText.length - 3).trim(); }
             }
 
             if (toolNamesCalled.length > 0) {
                 usingToolMessageText += `Using tool${toolNamesCalled.length > 1 ? 's' : ''}: ${toolNamesCalled.join(', ')}... `;
-            } else {
+            } else { 
                 usingToolMessageText += "Attempting to use tool(s)... ";
+                plugin.logger.warn(`[ARender STATIC PREP][ts:${messageTimestampLog}] Tool call indicators were present, but no tool names were extracted/available.`);
             }
             usingToolMessageText += ")";
             
-            finalContentToDisplay = (accompanyingText && accompanyingText.trim()) 
-                                 ? `${usingToolMessageText}\n\n${accompanyingText.trim()}` 
-                                 : usingToolMessageText;
+            if (accompanyingText && accompanyingText.trim().length > 0) {
+                finalContentToDisplay = `${usingToolMessageText}\n\n${accompanyingText.trim()}`;
+            } else {
+                finalContentToDisplay = usingToolMessageText;
+            }
         } else {
-            finalContentToDisplay = contentWithoutThinkTags;
+            finalContentToDisplay = contentWithoutThinkTags; // Якщо інструменти не використовуються, показуємо текст без <think>
         }
         plugin.logger.info(`[ARender STATIC PREP][ts:${messageTimestampLog}] Prepared display content: "${finalContentToDisplay}"`);
         return finalContentToDisplay;
@@ -79,27 +89,34 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
 
     public async render(): Promise<HTMLElement> {
         const messageTimestampLog = this.message.timestamp.getTime();
-        this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] render() called.`);
+        this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] render() called. Original content preview: "${this.message.content?.substring(0, 150)}..."`);
 
         const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
+        
         RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'assistant');
+
         const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
-        messageWrapper.style.order = "2";
+        messageWrapper.style.order = "2"; 
         const { messageEl, contentEl } = this.createMessageBubble(
-            messageWrapper,
+            messageWrapper, 
             [CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"]
         );
         contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
 
-        // Використовуємо новий статичний метод для підготовки контенту
+        const assistantMessage = this.message as AssistantMessage; 
+        
+        // Використовуємо статичний метод для підготовки контенту
         const displayContent = AssistantMessageRenderer.prepareDisplayContent(
             this.message.content || "", 
-            this.message as AssistantMessage, 
+            assistantMessage, 
             this.plugin
         );
         
+        this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] Content prepared for display by static method: "${displayContent.substring(0,150)}..."`);
+        
         try {
-            await RendererUtils.renderMarkdownContent(
+            // Передаємо підготовлений displayContent на рендеринг
+            await RendererUtils.renderMarkdownContent( // Припускаємо, що цей метод у RendererUtils
                 this.app, 
                 this.view,
                 this.plugin,
@@ -111,7 +128,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
              this.plugin.logger.error(`[ARender INSTANCE][ts:${messageTimestampLog}] Error in render -> renderMarkdownContent:`, error);
         }
 
-        AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, this.message as AssistantMessage, this.plugin, this.view);
+        AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
         BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
         
         setTimeout(() => { 
@@ -121,9 +138,8 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         }, 70);
 
         return messageGroup;
-    }
-
-
+    }      
+    
     public static async renderAssistantContent(
         contentEl: HTMLElement, markdownText: string, app: App, plugin: OllamaPlugin, view: OllamaView
     ): Promise<void> {
@@ -172,43 +188,49 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         plugin: OllamaPlugin, 
         view: OllamaView
     ): void {
-         if (messageElement.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`)) {
-             return;
-         }
-         
-         const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-         const finalContent = message.content; 
-
-         const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Copy", title: "Copy" } });
-         setIcon(copyBtn, "copy");
-         view.registerDomEvent(copyBtn, "click", e => { e.stopPropagation(); view.handleCopyClick(finalContent || "", copyBtn); });
-
-         if ( plugin.settings.enableTranslation && 
-              (plugin.settings.translationProvider === 'google' && plugin.settings.googleTranslationApiKey || 
-               plugin.settings.translationProvider === 'ollama' && plugin.settings.ollamaTranslationModel) &&
-              finalContent && finalContent.trim() 
-            ) {
-             const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON || "translate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Translate", title: "Translate" } });
-             setIcon(translateBtn, "languages");
-             view.registerDomEvent(translateBtn, "click", e => { e.stopPropagation(); if (contentEl.isConnected) { view.handleTranslateClick(finalContent || "", contentEl, translateBtn); } else { new Notice("Cannot translate: message content element not found."); } });
-         }
-
-         if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && finalContent && finalContent.trim()) {
-             const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { title: "Summarize message" } });
-             setIcon(summarizeBtn, "scroll-text");
-             view.registerDomEvent(summarizeBtn, "click", e => { e.stopPropagation(); view.handleSummarizeClick(finalContent || "", summarizeBtn); });
-         }
+        if (messageElement.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`)) {
+            return;
+        }
         
-         const contentContainsTextualToolCall = typeof finalContent === 'string' && finalContent.includes("<tool_call>");
+        const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+        // Для кнопок Копіювати, Перекласти, Сумаризувати використовуємо ОРИГІНАЛЬНИЙ контент повідомлення,
+        // оскільки він може містити теги <tool_call> або <think>, які користувач може хотіти скопіювати.
+        const originalLlMRawContent = message.content || ""; 
 
-         if ((!message.tool_calls || message.tool_calls.length === 0) && !contentContainsTextualToolCall) {
-            const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Regenerate response", title: "Regenerate Response"}});
-            setIcon(regenerateBtn, "refresh-cw");
-            view.registerDomEvent(regenerateBtn, "click", (e) => { e.stopPropagation(); view.handleRegenerateClick(message); }); 
-         }
+        const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Copy", title: "Copy" } });
+        setIcon(copyBtn, "copy");
+        view.registerDomEvent(copyBtn, "click", e => { e.stopPropagation(); view.handleCopyClick(originalLlMRawContent, copyBtn); });
 
-         const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button", CSS_CLASSES.DANGER_OPTION || "danger-option", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Delete message", title: "Delete Message" } });
-         setIcon(deleteBtn, "trash");
-         view.registerDomEvent(deleteBtn, "click", e => { e.stopPropagation(); view.handleDeleteMessageClick(message); });
+        if ( plugin.settings.enableTranslation && 
+             (plugin.settings.translationProvider === 'google' && plugin.settings.googleTranslationApiKey || 
+              plugin.settings.translationProvider === 'ollama' && plugin.settings.ollamaTranslationModel) &&
+             originalLlMRawContent && originalLlMRawContent.trim() 
+           ) {
+            const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON || "translate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Translate", title: "Translate" } });
+            setIcon(translateBtn, "languages");
+            view.registerDomEvent(translateBtn, "click", e => { e.stopPropagation(); if (contentEl.isConnected) { view.handleTranslateClick(originalLlMRawContent, contentEl, translateBtn); } else { new Notice("Cannot translate: message content element not found."); } });
+        }
+
+        if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && originalLlMRawContent && originalLlMRawContent.trim()) {
+            const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { title: "Summarize message" } });
+            setIcon(summarizeBtn, "scroll-text");
+            view.registerDomEvent(summarizeBtn, "click", e => { e.stopPropagation(); view.handleSummarizeClick(originalLlMRawContent, summarizeBtn); });
+        }
+       
+        // Кнопка "Regenerate" не з'являється, якщо це повідомлення з нативними tool_calls 
+        // АБО якщо ОРИГІНАЛЬНИЙ контент містить текстові теги <tool_call>
+        const originalContentContainsTextualToolCall = typeof originalLlMRawContent === 'string' && originalLlMRawContent.includes("<tool_call>");
+
+        if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
+           const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Regenerate response", title: "Regenerate Response"}});
+           setIcon(regenerateBtn, "refresh-cw");
+           // Передаємо саме `message` (яке є AssistantMessage) до handleRegenerateClick
+           // handleRegenerateClick має сам знайти попереднє повідомлення користувача
+           view.registerDomEvent(regenerateBtn, "click", (e) => { e.stopPropagation(); view.handleRegenerateClick(message); }); 
+        }
+
+        const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button", CSS_CLASSES.DANGER_OPTION || "danger-option", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+        setIcon(deleteBtn, "trash");
+        view.registerDomEvent(deleteBtn, "click", e => { e.stopPropagation(); view.handleDeleteMessageClick(message); });
     }
 }
