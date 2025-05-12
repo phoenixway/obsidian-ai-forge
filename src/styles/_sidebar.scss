@@ -237,22 +237,38 @@ body.is-resizing {
   /* ... ваші існуючі стилі ... */
   padding-bottom: 20px; /* Додайте відступ знизу для зони скидання */
 }
+/* styles.css або ваш файл стилів плагіна */
+
+/* ... ваші існуючі стилі ... */
 
 .ollama-root-drop-zone {
+  /* Початковий стан: невидимий і не займає місця */
+  display: none;
+  opacity: 0; /* Починаємо з прозорості 0 для плавного з'явлення */
+  
+  /* Стилі для видимого стану (будуть застосовані, коли display зміниться на flex/block) */
   padding: 10px;
-  margin-top: 8px; /* Невеликий відступ від списку */
-  border: 2px dashed var(--background-modifier-border-hover); /* Пунктирна рамка */
+  margin-top: 8px;
+  border: 2px dashed var(--background-modifier-border-hover);
   border-radius: var(--radius-m);
   text-align: center;
   color: var(--text-faint);
-  min-height: 40px; /* Мінімальна висота для зручного скидання */
-  display: flex; /* Для центрування тексту, якщо він є */
-  align-items: center;
-  justify-content: center;
-  transition: background-color 0.2s ease-out, border-color 0.2s ease-out;
+  min-height: 40px;
+  align-items: center; /* Для центрування тексту, якщо він є і display: flex */
+  justify-content: center; /* Для центрування тексту, якщо він є і display: flex */
+  transition: background-color 0.2s ease-out, border-color 0.2s ease-out, opacity 0.2s ease-out;
 }
 
-.ollama-root-drop-zone.drag-over-root-target { /* Клас для підсвічування */
+/* Стан, коли будь-яке перетягування активне ВСЕРЕДИНІ САЙДБАРУ */
+/* Ми додамо клас 'sidebar-drag-active' до this.containerEl (який має клас CSS_SIDEBAR_CONTAINER) */
+.ollama-sidebar-container.sidebar-drag-active .ollama-root-drop-zone {
+  display: flex; /* Або 'block', залежно від того, як ви хочете стилізувати вміст */
+  opacity: 1;    /* Робимо видимим */
+}
+
+/* Стиль для rootDropZoneEl, коли курсор знаходиться НАД ним (підсвічування) */
+/* Цей клас додається/видаляється JavaScript-ом (handleDragEnterRootZone/handleDragLeaveRootZone) */
+.ollama-root-drop-zone.drag-over-root-target {
   background-color: var(--background-modifier-hover);
   border-color: var(--interactive-accent);
   color: var(--text-normal);
