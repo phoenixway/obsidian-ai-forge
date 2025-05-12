@@ -6574,501 +6574,142 @@ Summary:`;
     }
   }
   async sendMessage() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b;
     const userInputText = this.inputEl.value.trim();
-    const requestTimestampId = new Date().getTime();
-    this.plugin.logger.debug(
-      `[sendMessage START id:${requestTimestampId}] User input: "${userInputText.substring(0, 50)}...", isProcessing: ${this.isProcessing}, currentAbortController: ${this.currentAbortController ? "active" : "null"}`
-    );
+    const requestTimestampId = Date.now();
+    this.plugin.logger.debug(`[sendMessage START id:${requestTimestampId}] User input: "${userInputText.substring(0, 50)}...", isProcessing: ${this.isProcessing}, currentAbortController: ${this.currentAbortController ? "active" : "null"}`);
     if (!userInputText || this.isProcessing || this.currentAbortController) {
-      this.plugin.logger.warn(
-        `[sendMessage id:${requestTimestampId}] Aborted. ContentEmpty: ${!userInputText}, isProcessing: ${this.isProcessing}, AbortCtrlActive: ${!!this.currentAbortController}`
-      );
-      if (this.isProcessing || this.currentAbortController) {
-        new import_obsidian15.Notice("Please wait for the current response to complete or cancel it.", 3e3);
-      }
+      this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Aborted early. Empty: ${!userInputText}, Processing: ${this.isProcessing}, AbortCtrl: ${!!this.currentAbortController}`);
+      if (this.isProcessing || this.currentAbortController)
+        new import_obsidian15.Notice("Please wait or cancel current operation.", 3e3);
       return;
     }
-    let activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    let activeChat = await this.plugin.chatManager.getActiveChat();
     if (!activeChat) {
-      activeChat = await ((_b = this.plugin.chatManager) == null ? void 0 : _b.createNewChat());
+      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] No active chat. Creating new.`);
+      activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
-        new import_obsidian15.Notice("Error: No active chat session found and could not create a new one.");
-        this.plugin.logger.error(
-          `[sendMessage id:${requestTimestampId}] No active chat and failed to create a new one.`
-        );
-        this.setLoadingState(false);
+        new import_obsidian15.Notice("Error: No active chat and could not create one.");
+        this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] Failed to get/create active chat.`);
         return;
       }
       new import_obsidian15.Notice(`Started new chat: ${activeChat.metadata.name}`);
     }
     const chatId = activeChat.metadata.id;
-    const userMessageContent = this.inputEl.value;
     const userMessageTimestamp = new Date();
-    const userMessageTimestampMs = userMessageTimestamp.getTime();
     this.clearInputField();
     this.currentAbortController = new AbortController();
+    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] AbortController CREATED.`);
     this.setLoadingState(true);
     this.hideEmptyState();
-    let accumulatedAssistantResponseContent = "";
-    const llmResponseStartTime = new Date();
-    const llmResponseStartTimeMs = llmResponseStartTime.getTime();
+    const llmResponseStartTimeMs = Date.now();
     let streamErrorOccurred = null;
-    let currentMessagesForLlmTurn;
     let continueConversation = true;
     const maxTurns = 5;
     let turns = 0;
-    let currentTurnLlmResponseTsForCatch = null;
+    let currentTurnLlmResponseTsForCatch = llmResponseStartTimeMs;
     try {
-      this.plugin.logger.debug(
-        `[sendMessage id:${requestTimestampId}] Setting up resolver for UserMessage (ts: ${userMessageTimestampMs}).`
-      );
-      let userMessageProcessedPromise = new Promise((resolve, reject) => {
-        this.messageAddedResolvers.set(userMessageTimestampMs, resolve);
-        setTimeout(() => {
-          if (this.messageAddedResolvers.has(userMessageTimestampMs)) {
-            this.plugin.logger.warn(
-              `[sendMessage id:${requestTimestampId}] Timeout waiting for HMA for UserMessage (ts: ${userMessageTimestampMs}). Rejecting promise.`
-            );
-            this.messageAddedResolvers.delete(userMessageTimestampMs);
-            reject(
-              new Error(
-                `Timeout waiting for UserMessage (ts: ${userMessageTimestampMs}) to be processed by handleMessageAdded.`
-              )
-            );
-          }
-        }, 1e4);
-      });
-      await this.plugin.chatManager.addMessageToActiveChat(
-        "user",
-        userMessageContent,
-        userMessageTimestamp,
-        true
-      );
-      await userMessageProcessedPromise;
-      this.plugin.logger.info(
-        `[sendMessage id:${requestTimestampId}] UserMessage (ts: ${userMessageTimestampMs}) processed by HMA.`
-      );
-      const initialChatState = await this.plugin.chatManager.getActiveChatOrFail();
-      currentMessagesForLlmTurn = [...initialChatState.messages];
+      await this._processAndRenderUserMessage(userInputText, userMessageTimestamp, requestTimestampId);
       while (continueConversation && turns < maxTurns && !this.currentAbortController.signal.aborted) {
         turns++;
-        this.plugin.logger.debug(
-          `[sendMessage id:${requestTimestampId}] Orchestrator Turn ${turns}/${maxTurns}. Messages for LLM: ${currentMessagesForLlmTurn.length}`
-        );
-        accumulatedAssistantResponseContent = "";
-        const currentTurnLlmResponseTs = turns === 1 ? llmResponseStartTimeMs : new Date().getTime();
+        const currentTurnLlmResponseTs = turns === 1 ? llmResponseStartTimeMs : Date.now();
         currentTurnLlmResponseTsForCatch = currentTurnLlmResponseTs;
-        if (this.activePlaceholder && this.activePlaceholder.timestamp !== currentTurnLlmResponseTs) {
-          if (this.activePlaceholder.groupEl.classList.contains("placeholder")) {
-            this.plugin.logger.debug(
-              `[sendMessage id:${requestTimestampId}] Removing stale placeholder from previous turn (ts: ${this.activePlaceholder.timestamp})`
-            );
-            if (this.activePlaceholder.groupEl.isConnected)
-              this.activePlaceholder.groupEl.remove();
-          }
-          this.activePlaceholder = null;
-        }
-        if (!this.activePlaceholder) {
-          this.plugin.logger.debug(
-            `[sendMessage id:${requestTimestampId}] Creating/Re-creating placeholder for assistant response (expected ts: ${currentTurnLlmResponseTs}).`
-          );
-          const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
-          });
-          assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", currentTurnLlmResponseTs.toString());
-          renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
-          const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-          messageWrapperEl.style.order = "2";
-          const assistantMessageElement = messageWrapperEl.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`
-          });
-          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-          const assistantContentEl = contentContainer.createDiv({
-            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`
-          });
-          assistantContentEl.empty();
-          const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-          for (let i = 0; i < 3; i++)
-            dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-          this.activePlaceholder = {
-            timestamp: currentTurnLlmResponseTs,
-            groupEl: assistantPlaceholderGroupEl,
-            contentEl: assistantContentEl,
-            messageWrapper: messageWrapperEl
-          };
-          assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-          setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-          this.guaranteedScrollToBottom(50, true);
-        } else {
-          this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Reusing active placeholder for new turn (ts: ${currentTurnLlmResponseTs}). Clearing content.`);
-          this.activePlaceholder.contentEl.empty();
-          const dots = this.activePlaceholder.contentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-          for (let i = 0; i < 3; i++)
-            dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-          this.activePlaceholder.contentEl.classList.add("streaming-text");
-          this.activePlaceholder.timestamp = currentTurnLlmResponseTs;
-          this.activePlaceholder.groupEl.setAttribute(
-            "data-placeholder-timestamp",
-            currentTurnLlmResponseTs.toString()
-          );
-        }
-        const currentChatStateForStream = await this.plugin.chatManager.getChat(chatId);
-        if (!currentChatStateForStream) {
-          this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] Active chat (ID: ${chatId}) disappeared mid-turn ${turns}.`);
-          throw new Error(`Active chat (ID: ${chatId}) disappeared mid-turn.`);
-        }
-        currentMessagesForLlmTurn = [...currentChatStateForStream.messages];
-        const stream = this.plugin.ollamaService.generateChatResponseStream(
-          currentChatStateForStream,
+        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Orchestrator Turn ${turns}/${maxTurns}.`);
+        this._managePlaceholder(currentTurnLlmResponseTs, requestTimestampId);
+        const chatStateForStream = await this.plugin.chatManager.getActiveChatOrFail();
+        const llmStream = this.plugin.ollamaService.generateChatResponseStream(
+          chatStateForStream,
           this.currentAbortController.signal
         );
-        let firstChunkForTurn = true;
-        let pendingNativeToolCalls = null;
-        let assistantMessageObjectWithNativeCalls = null;
-        for await (const chunk of stream) {
-          if (this.currentAbortController.signal.aborted)
-            throw new Error("aborted by user");
-          if (chunk.type === "error") {
-            this.plugin.logger.error(
-              `[sendMessage id:${requestTimestampId}] Error from OllamaService stream: ${chunk.error}`
-            );
-            throw new Error(chunk.error);
-          }
-          if (((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) !== currentTurnLlmResponseTs) {
-            this.plugin.logger.warn(
-              `[sendMessage id:${requestTimestampId}] Stale placeholder detected during stream processing (active_ts: ${(_d = this.activePlaceholder) == null ? void 0 : _d.timestamp}, current_turn_ts: ${currentTurnLlmResponseTs}). Chunk for current_turn_ts might be ignored by placeholder update.`
-            );
-            if (chunk.type === "done")
-              break;
-            continue;
-          }
-          if (chunk.type === "content") {
-            if ((_e = this.activePlaceholder) == null ? void 0 : _e.contentEl) {
-              if (firstChunkForTurn) {
-                const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                if (thinkingDots)
-                  thinkingDots.remove();
-                firstChunkForTurn = false;
-              }
-              accumulatedAssistantResponseContent += chunk.response;
-              await AssistantMessageRenderer.renderAssistantContent(
-                this.activePlaceholder.contentEl,
-                accumulatedAssistantResponseContent,
-                this.app,
-                this.plugin,
-                this
-              );
-              this.guaranteedScrollToBottom(30, true);
-            }
-          } else if (chunk.type === "tool_calls") {
-            this.plugin.logger.info(
-              `[sendMessage id:${requestTimestampId}] Orchestrator: Native TOOL_CALLS received from chunk:`,
-              chunk.calls
-            );
-            pendingNativeToolCalls = chunk.calls;
-            assistantMessageObjectWithNativeCalls = chunk.assistant_message_with_calls;
-            if (assistantMessageObjectWithNativeCalls.content && !accumulatedAssistantResponseContent.includes(assistantMessageObjectWithNativeCalls.content)) {
-              if (firstChunkForTurn && ((_f = this.activePlaceholder) == null ? void 0 : _f.contentEl)) {
-                const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                if (thinkingDots)
-                  thinkingDots.remove();
-                firstChunkForTurn = false;
-              }
-              accumulatedAssistantResponseContent += assistantMessageObjectWithNativeCalls.content;
-              if ((_g = this.activePlaceholder) == null ? void 0 : _g.contentEl) {
-                await AssistantMessageRenderer.renderAssistantContent(
-                  this.activePlaceholder.contentEl,
-                  accumulatedAssistantResponseContent,
-                  this.app,
-                  this.plugin,
-                  this
-                );
-              }
-            }
-          } else if (chunk.type === "done") {
-            this.plugin.logger.info(
-              `[sendMessage id:${requestTimestampId}] Orchestrator: LLM stream turn ${turns} done (received 'done' chunk).`
-            );
-            break;
-          }
-        }
+        const { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls } = await this._processLlmStream(llmStream, currentTurnLlmResponseTs, requestTimestampId);
         if (this.currentAbortController.signal.aborted)
           throw new Error("aborted by user");
-        let processedToolCallsThisTurn = pendingNativeToolCalls;
-        let assistantMessageContentForHistory = accumulatedAssistantResponseContent;
-        let assistantMessageObjectForHistory = assistantMessageObjectWithNativeCalls;
-        let isTextualFallbackUsed = false;
-        if (!processedToolCallsThisTurn || processedToolCallsThisTurn.length === 0) {
-          this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] No native tool_calls. Checking for textual tool_calls in accumulated response (length: ${accumulatedAssistantResponseContent.length})`);
-          const parsedTextualCalls = this.parseAllTextualToolCalls(accumulatedAssistantResponseContent);
-          if (parsedTextualCalls.length > 0) {
-            this.plugin.logger.info(
-              `[sendMessage id:${requestTimestampId}] Orchestrator: Fallback textual tool_calls parsed (count: ${parsedTextualCalls.length}) for turn ${turns}:`,
-              parsedTextualCalls
-            );
-            isTextualFallbackUsed = true;
-            processedToolCallsThisTurn = parsedTextualCalls.map((tc, index) => ({
-              type: "function",
-              id: `texttool-${currentTurnLlmResponseTs}-${index}`,
-              function: {
-                name: tc.name,
-                arguments: JSON.stringify(tc.arguments || {})
-              }
-            }));
-            assistantMessageObjectForHistory = {
-              role: "assistant",
-              content: accumulatedAssistantResponseContent,
-              timestamp: new Date(currentTurnLlmResponseTs)
-            };
-            assistantMessageContentForHistory = accumulatedAssistantResponseContent;
-          }
-        }
-        if (processedToolCallsThisTurn && processedToolCallsThisTurn.length > 0) {
-          this.plugin.logger.info(
-            `[sendMessage id:${requestTimestampId}] Orchestrator: Executing ${processedToolCallsThisTurn.length} tools (type: ${isTextualFallbackUsed ? "textual_fallback" : "native"}) for turn ${turns}.`
+        const toolCallCheckResult = this._determineToolCalls(
+          nativeToolCalls,
+          assistantMessageWithNativeCalls,
+          accumulatedContent,
+          currentTurnLlmResponseTs,
+          requestTimestampId
+        );
+        if (toolCallCheckResult.processedToolCallsThisTurn && toolCallCheckResult.processedToolCallsThisTurn.length > 0) {
+          await this._executeAndRenderToolCycle(
+            toolCallCheckResult.processedToolCallsThisTurn,
+            toolCallCheckResult.assistantMessageForHistory,
+            requestTimestampId
           );
-          if (!assistantMessageObjectForHistory) {
-            assistantMessageObjectForHistory = {
-              role: "assistant",
-              content: assistantMessageContentForHistory,
-              timestamp: new Date(currentTurnLlmResponseTs),
-              tool_calls: isTextualFallbackUsed ? void 0 : processedToolCallsThisTurn
-            };
-          } else {
-            assistantMessageObjectForHistory.content = assistantMessageContentForHistory;
-            if (!isTextualFallbackUsed) {
-              assistantMessageObjectForHistory.tool_calls = processedToolCallsThisTurn;
-            } else {
-              delete assistantMessageObjectForHistory.tool_calls;
-            }
-          }
-          const assistantMsgTsMs = assistantMessageObjectForHistory.timestamp.getTime();
-          this.plugin.logger.debug(
-            `[sendMessage id:${requestTimestampId}] Adding assistant message (intent to call tools) to ChatManager (ts: ${assistantMsgTsMs}). Content: "${(_h = assistantMessageObjectForHistory.content) == null ? void 0 : _h.substring(0, 100)}..."`
-          );
-          let assistantMsgProcessedPromise = new Promise((resolve, reject) => {
-            this.messageAddedResolvers.set(assistantMsgTsMs, resolve);
-            setTimeout(() => {
-              if (this.messageAddedResolvers.has(assistantMsgTsMs)) {
-                this.messageAddedResolvers.delete(assistantMsgTsMs);
-                reject(new Error(`Timeout HMA for assistant msg with tool intent (ts: ${assistantMsgTsMs})`));
-              }
-            }, 1e4);
-          });
-          await this.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageObjectForHistory, true);
-          await assistantMsgProcessedPromise;
-          this.plugin.logger.info(
-            `[sendMessage id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`
-          );
-          if (((_i = this.activePlaceholder) == null ? void 0 : _i.timestamp) === currentTurnLlmResponseTs) {
-            this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${currentTurnLlmResponseTs}) as assistant message with tool intent was processed by HMA.`);
-            this.activePlaceholder = null;
-          }
-          for (const call of processedToolCallsThisTurn) {
-            if (this.currentAbortController.signal.aborted)
-              throw new Error("aborted by user");
-            if (call.type === "function") {
-              const toolName = call.function.name;
-              let toolArgs = {};
-              try {
-                toolArgs = JSON.parse(call.function.arguments || "{}");
-              } catch (e) {
-                const errorResultMsgContent = `Error: Could not parse arguments for tool ${toolName}. Invalid JSON: ${e.message}. Arguments string: "${call.function.arguments}"`;
-                const errorToolTimestamp = new Date();
-                const errorToolMsg = { role: "tool", tool_call_id: call.id, name: toolName, content: errorResultMsgContent, timestamp: errorToolTimestamp };
-                let toolErrorMsgProcessedPromise = new Promise((resolve, reject) => {
-                  this.messageAddedResolvers.set(errorToolMsg.timestamp.getTime(), resolve);
-                  setTimeout(() => {
-                    if (this.messageAddedResolvers.has(errorToolMsg.timestamp.getTime())) {
-                      this.messageAddedResolvers.delete(errorToolMsg.timestamp.getTime());
-                      reject(new Error("HMA timeout for tool error"));
-                    }
-                  }, 1e4);
-                });
-                await this.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
-                try {
-                  await toolErrorMsgProcessedPromise;
-                } catch (e_hma) {
-                  this.plugin.logger.error("HMA error/timeout for tool error message", e_hma);
-                }
-                ;
-                continue;
-              }
-              this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Executing tool: ${toolName} with args:`, toolArgs);
-              const executionResult = await this.plugin.agentManager.executeTool(toolName, toolArgs);
-              const toolResultContent = executionResult.success ? executionResult.result : `Error executing tool ${toolName}: ${executionResult.error || "Unknown tool error"}`;
-              const toolResultTimestamp = new Date();
-              const toolResponseMessage = { role: "tool", tool_call_id: call.id, name: toolName, content: toolResultContent, timestamp: toolResultTimestamp };
-              let toolMsgProcessedPromise = new Promise((resolve, reject) => {
-                this.messageAddedResolvers.set(toolResponseMessage.timestamp.getTime(), resolve);
-                setTimeout(() => {
-                  if (this.messageAddedResolvers.has(toolResponseMessage.timestamp.getTime())) {
-                    this.messageAddedResolvers.delete(toolResponseMessage.timestamp.getTime());
-                    reject(new Error(`Timeout HMA for tool result: ${toolName}`));
-                  }
-                }, 1e4);
-              });
-              await this.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMessage, true);
-              await toolMsgProcessedPromise;
-              this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Tool result message (ts: ${toolResponseMessage.timestamp.getTime()}) for ${toolName} processed by HMA.`);
-            }
-          }
-          const updatedChatAfterToolsLoop = await this.plugin.chatManager.getActiveChatOrFail();
-          currentMessagesForLlmTurn = [...updatedChatAfterToolsLoop.messages];
           continueConversation = true;
         } else {
-          this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Orchestrator: No native or textual tool calls for turn ${turns}. This is a final text response.`);
-          if (accumulatedAssistantResponseContent.trim()) {
-            const finalAssistantMessageTimestamp = new Date(currentTurnLlmResponseTs);
-            const finalAssistantMessage = {
-              role: "assistant",
-              content: accumulatedAssistantResponseContent,
-              timestamp: finalAssistantMessageTimestamp
-            };
-            this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Adding final assistant message to ChatManager (ts: ${finalAssistantMessage.timestamp.getTime()}).`);
-            let finalAssistantMsgProcessedPromise = new Promise((resolve, reject) => {
-              this.messageAddedResolvers.set(finalAssistantMessage.timestamp.getTime(), resolve);
-              setTimeout(() => {
-                if (this.messageAddedResolvers.has(finalAssistantMessage.timestamp.getTime())) {
-                  this.messageAddedResolvers.delete(finalAssistantMessage.timestamp.getTime());
-                  reject(new Error(`Timeout HMA for final assistant message (ts: ${finalAssistantMessage.timestamp.getTime()})`));
-                }
-              }, 1e4);
-            });
-            await this.plugin.chatManager.addMessageToActiveChatPayload(finalAssistantMessage, true);
-            await finalAssistantMsgProcessedPromise;
-            this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Final assistant message (ts: ${finalAssistantMessage.timestamp.getTime()}) processed by HMA.`);
-          } else if (!this.currentAbortController.signal.aborted) {
-            this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Assistant provided an empty final response (not aborted).`);
-            if (((_j = this.activePlaceholder) == null ? void 0 : _j.timestamp) === currentTurnLlmResponseTs && this.activePlaceholder.groupEl.isConnected && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
-              this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Removing placeholder (ts: ${currentTurnLlmResponseTs}) due to empty final response.`);
-              this.activePlaceholder.groupEl.remove();
-            }
-            const emptyResponseMsgTimestamp = new Date();
-            const emptyResponseMsg = { role: "system", content: "Assistant provided an empty response.", timestamp: emptyResponseMsgTimestamp };
-            let emptyResponseMsgProcessedPromise = new Promise((resolve, reject) => {
-              this.messageAddedResolvers.set(emptyResponseMsg.timestamp.getTime(), resolve);
-              setTimeout(() => {
-                if (this.messageAddedResolvers.has(emptyResponseMsg.timestamp.getTime())) {
-                  this.messageAddedResolvers.delete(emptyResponseMsg.timestamp.getTime());
-                  reject(new Error("HMA timeout for empty sys msg"));
-                }
-              }, 1e4);
-            });
-            await this.plugin.chatManager.addMessageToActiveChatPayload(emptyResponseMsg, true);
-            try {
-              await emptyResponseMsgProcessedPromise;
-            } catch (e_hma) {
-              this.plugin.logger.error("HMA error/timeout for empty response system message", e_hma);
-            }
-          }
-          if (((_k = this.activePlaceholder) == null ? void 0 : _k.timestamp) === currentTurnLlmResponseTs) {
-            this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${currentTurnLlmResponseTs}) after final assistant message was processed by HMA (or empty response).`);
-            this.activePlaceholder = null;
-          }
+          await this._renderFinalAssistantText(
+            accumulatedContent,
+            // Це фінальний текст, якщо інструменти не викликались
+            currentTurnLlmResponseTs,
+            requestTimestampId
+          );
           continueConversation = false;
         }
       }
       if (turns >= maxTurns) {
-        this.plugin.logger.warn(
-          `[sendMessage id:${requestTimestampId}] Max turns (${maxTurns}) reached for tool processing.`
-        );
-        const maxTurnsMsgTimestamp = new Date();
-        const maxTurnsMsg = {
-          role: "system",
-          content: "Max processing turns reached. If the task is not complete, please try rephrasing or breaking it down.",
-          timestamp: maxTurnsMsgTimestamp
-        };
-        let maxTurnsMsgProcessedPromise = new Promise((resolve, reject) => {
+        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Max turns (${maxTurns}) reached.`);
+        const maxTurnsMsg = { role: "system", content: "Max processing turns reached.", timestamp: new Date() };
+        let hmaPromise = new Promise((resolve, reject) => {
           this.messageAddedResolvers.set(maxTurnsMsg.timestamp.getTime(), resolve);
-          setTimeout(() => {
-            if (this.messageAddedResolvers.has(maxTurnsMsg.timestamp.getTime())) {
-              this.messageAddedResolvers.delete(maxTurnsMsg.timestamp.getTime());
-              reject(new Error("HMA timeout for max turns"));
-            }
-          }, 1e4);
+          setTimeout(() => reject(new Error("HMA timeout for max turns msg")), 1e4);
         });
         await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
         try {
-          await maxTurnsMsgProcessedPromise;
+          await hmaPromise;
         } catch (e_hma) {
           this.plugin.logger.error("HMA error/timeout for max turns system message", e_hma);
         }
       }
     } catch (error) {
       streamErrorOccurred = error;
-      this.plugin.logger.error(
-        `[sendMessage id:${requestTimestampId}] CATCH (Outer): Error during sendMessage process:`,
-        error
-      );
+      this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] CATCH (Outer):`, error.message, error);
       if (this.activePlaceholder && (this.activePlaceholder.timestamp === llmResponseStartTimeMs || currentTurnLlmResponseTsForCatch !== null && this.activePlaceholder.timestamp === currentTurnLlmResponseTsForCatch) && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
-        this.plugin.logger.debug(
-          `[sendMessage id:${requestTimestampId}] CATCH: Removing active placeholder (ts: ${this.activePlaceholder.timestamp}) due to error.`
-        );
         if (this.activePlaceholder.groupEl.isConnected)
           this.activePlaceholder.groupEl.remove();
         this.activePlaceholder = null;
       }
-      this.messageAddedResolvers.delete(userMessageTimestampMs);
+      this.messageAddedResolvers.delete(userMessageTimestamp.getTime());
       this.messageAddedResolvers.delete(llmResponseStartTimeMs);
-      if (currentTurnLlmResponseTsForCatch !== null) {
+      if (currentTurnLlmResponseTsForCatch !== null)
         this.messageAddedResolvers.delete(currentTurnLlmResponseTsForCatch);
-      }
       let errorMsgForChat;
       let errorMsgRole = "error";
-      if (error.name === "AbortError" || ((_l = error.message) == null ? void 0 : _l.includes("aborted by user"))) {
+      if (error.name === "AbortError" || ((_a = error.message) == null ? void 0 : _a.includes("aborted by user"))) {
         errorMsgForChat = "Message generation stopped.";
         errorMsgRole = "system";
       } else {
-        errorMsgForChat = `Message generation failed: ${error.message || "Unknown error"}`;
+        errorMsgForChat = `Error: ${error.message || "Unknown error during processing."}`;
         new import_obsidian15.Notice(errorMsgForChat, 7e3);
       }
-      const errorTimestamp = new Date();
-      const errorDisplayMsg = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorTimestamp };
-      let errorDisplayMsgProcessedPromise = new Promise((resolve, reject) => {
+      const errorDisplayMsg = { role: errorMsgRole, content: errorMsgForChat, timestamp: new Date() };
+      let hmaPromise = new Promise((resolve, reject) => {
         this.messageAddedResolvers.set(errorDisplayMsg.timestamp.getTime(), resolve);
-        setTimeout(() => {
-          if (this.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())) {
-            this.messageAddedResolvers.delete(errorDisplayMsg.timestamp.getTime());
-            reject(new Error("HMA timeout for error display"));
-          }
-        }, 1e4);
+        setTimeout(() => reject(new Error("HMA timeout for error display msg")), 1e4);
       });
       await this.plugin.chatManager.addMessageToActiveChatPayload(errorDisplayMsg, true);
       try {
-        await errorDisplayMsgProcessedPromise;
+        await hmaPromise;
       } catch (e_hma) {
-        this.plugin.logger.error("[sendMessage] Timeout/Error waiting for HMA of error display message", e_hma);
+        this.plugin.logger.error("HMA error/timeout for error display message", e_hma);
       }
     } finally {
-      this.plugin.logger.debug(
-        `[sendMessage id:${requestTimestampId}] FINALLY (START). AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder.ts: ${(_m = this.activePlaceholder) == null ? void 0 : _m.timestamp}, Resolvers map size: ${this.messageAddedResolvers.size}`
-      );
-      this.messageAddedResolvers.delete(userMessageTimestampMs);
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY. AbortCtrl: ${this.currentAbortController ? "active" : "null"}, isProcessing: ${this.isProcessing}, activePlaceholder: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}, Resolvers: ${this.messageAddedResolvers.size}`);
+      this.messageAddedResolvers.delete(userMessageTimestamp.getTime());
       this.messageAddedResolvers.delete(llmResponseStartTimeMs);
-      if (currentTurnLlmResponseTsForCatch !== null) {
+      if (currentTurnLlmResponseTsForCatch)
         this.messageAddedResolvers.delete(currentTurnLlmResponseTsForCatch);
+      if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] FINALLY: Active placeholder (ts: ${this.activePlaceholder.timestamp}) is still a placeholder. Removing.`);
+        if (this.activePlaceholder.groupEl.isConnected)
+          this.activePlaceholder.groupEl.remove();
       }
-      if (this.activePlaceholder) {
-        if (this.activePlaceholder.groupEl.classList.contains("placeholder")) {
-          this.plugin.logger.warn(
-            `[sendMessage id:${requestTimestampId}] FINALLY: Active placeholder (ts: ${this.activePlaceholder.timestamp}) was not finalized or removed AND is still a placeholder. Removing now.`
-          );
-          if (this.activePlaceholder.groupEl.isConnected)
-            this.activePlaceholder.groupEl.remove();
-        }
-        this.activePlaceholder = null;
-      }
-      const prevAbortCtrl = this.currentAbortController;
+      this.activePlaceholder = null;
       this.currentAbortController = null;
-      this.plugin.logger.debug(
-        `[sendMessage id:${requestTimestampId}] FINALLY: currentAbortController set to null. Was: ${prevAbortCtrl ? "active" : "null"}.`
-      );
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY: currentAbortController set to null.`);
       this.setLoadingState(false);
-      requestAnimationFrame(() => {
-        this.updateSendButtonState();
-      });
+      requestAnimationFrame(() => this.updateSendButtonState());
       this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] FINALLY (END). Chat interaction finished.`);
       this.focusInput();
     }
@@ -7779,6 +7420,262 @@ Summary:`;
     return calls;
   }
   // --- Кінець методу handleActiveChatChanged ---
+  async _processAndRenderUserMessage(content, timestamp, requestTimestampId) {
+    const timestampMs = timestamp.getTime();
+    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Setting up resolver for UserMessage (ts: ${timestampMs}).`);
+    const promise = new Promise((resolve, reject) => {
+      this.messageAddedResolvers.set(timestampMs, resolve);
+      setTimeout(() => {
+        if (this.messageAddedResolvers.has(timestampMs)) {
+          this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Timeout HMA for UserMessage (ts: ${timestampMs}).`);
+          this.messageAddedResolvers.delete(timestampMs);
+          reject(new Error(`Timeout HMA for UserMessage (ts: ${timestampMs}).`));
+        }
+      }, 1e4);
+    });
+    await this.plugin.chatManager.addMessageToActiveChat("user", content, timestamp, true);
+    await promise;
+    this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] UserMessage (ts: ${timestampMs}) processed by HMA.`);
+  }
+  _managePlaceholder(turnTimestamp, requestTimestampId) {
+    if (this.activePlaceholder && this.activePlaceholder.timestamp !== turnTimestamp) {
+      if (this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Removing stale placeholder (ts: ${this.activePlaceholder.timestamp}) for new turn (ts: ${turnTimestamp}).`);
+        if (this.activePlaceholder.groupEl.isConnected)
+          this.activePlaceholder.groupEl.remove();
+      }
+      this.activePlaceholder = null;
+    }
+    if (!this.activePlaceholder) {
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Creating placeholder for assistant response (expected ts: ${turnTimestamp}).`);
+      const placeholderGroupEl = this.chatContainer.createDiv({ cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder` });
+      placeholderGroupEl.setAttribute("data-placeholder-timestamp", turnTimestamp.toString());
+      renderAvatar(this.app, this.plugin, placeholderGroupEl, false, "assistant");
+      const wrapperEl = placeholderGroupEl.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
+      wrapperEl.style.order = "2";
+      const msgEl = wrapperEl.createDiv({ cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}` });
+      const contentContainerEl = msgEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
+      const contentPlaceholderEl = contentContainerEl.createDiv({ cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text` });
+      contentPlaceholderEl.empty();
+      const dots = contentPlaceholderEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+      for (let i = 0; i < 3; i++)
+        dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+      this.activePlaceholder = { timestamp: turnTimestamp, groupEl: placeholderGroupEl, contentEl: contentPlaceholderEl, messageWrapper: wrapperEl };
+      placeholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving");
+      setTimeout(() => placeholderGroupEl == null ? void 0 : placeholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"), 500);
+      this.guaranteedScrollToBottom(50, true);
+    } else {
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Reusing active placeholder for new turn (ts: ${turnTimestamp}). Clearing content.`);
+      this.activePlaceholder.contentEl.empty();
+      const dots = this.activePlaceholder.contentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
+      for (let i = 0; i < 3; i++)
+        dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
+      this.activePlaceholder.contentEl.classList.add("streaming-text");
+      this.activePlaceholder.timestamp = turnTimestamp;
+      this.activePlaceholder.groupEl.setAttribute("data-placeholder-timestamp", turnTimestamp.toString());
+    }
+  }
+  async _processLlmStream(stream, currentTurnLlmResponseTs, requestTimestampId) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    let accumulatedContent = "";
+    let nativeToolCalls = null;
+    let assistantMessageWithNativeCalls = null;
+    let firstChunkForTurn = true;
+    for await (const chunk of stream) {
+      if ((_a = this.currentAbortController) == null ? void 0 : _a.signal.aborted)
+        throw new Error("aborted by user");
+      if (chunk.type === "error")
+        throw new Error(chunk.error);
+      if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) !== currentTurnLlmResponseTs) {
+        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}][_processLlmStream] Stale placeholder detected. Current placeholder ts: ${(_c = this.activePlaceholder) == null ? void 0 : _c.timestamp}, expected for this stream: ${currentTurnLlmResponseTs}. Chunk ignored.`);
+        if (chunk.type === "done")
+          break;
+        continue;
+      }
+      if (chunk.type === "content") {
+        if ((_d = this.activePlaceholder) == null ? void 0 : _d.contentEl) {
+          if (firstChunkForTurn) {
+            const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+            if (thinkingDots)
+              thinkingDots.remove();
+            firstChunkForTurn = false;
+          }
+          accumulatedContent += chunk.response;
+          if (chunk.type === "content") {
+            if ((_e = this.activePlaceholder) == null ? void 0 : _e.contentEl) {
+              accumulatedContent += chunk.response;
+              await renderMarkdownContent(
+                // Або AssistantMessageRenderer.renderAssistantContent
+                this.app,
+                this,
+                // <--- Правильно: передаємо екземпляр OllamaView
+                this.plugin,
+                this.activePlaceholder.contentEl,
+                // <--- Правильно: HTML елемент для контенту
+                accumulatedContent
+                // <--- Правильно: рядок з контентом
+              );
+              this.guaranteedScrollToBottom(30, true);
+            }
+          }
+          this.guaranteedScrollToBottom(30, true);
+        }
+      } else if (chunk.type === "tool_calls") {
+        nativeToolCalls = chunk.calls;
+        assistantMessageWithNativeCalls = chunk.assistant_message_with_calls;
+        if (assistantMessageWithNativeCalls.content && !accumulatedContent.includes(assistantMessageWithNativeCalls.content)) {
+          if (firstChunkForTurn && ((_f = this.activePlaceholder) == null ? void 0 : _f.contentEl)) {
+            const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+            if (thinkingDots)
+              thinkingDots.remove();
+            firstChunkForTurn = false;
+          }
+          accumulatedContent += assistantMessageWithNativeCalls.content;
+          if ((_g = this.activePlaceholder) == null ? void 0 : _g.contentEl) {
+            await renderMarkdownContent(this.app, this, this.plugin, this.activePlaceholder.contentEl, accumulatedContent);
+          }
+        }
+      } else if (chunk.type === "done") {
+        break;
+      }
+    }
+    return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
+  }
+  _determineToolCalls(nativeToolCalls, assistantMessageWithNativeCalls, accumulatedLlmContent, currentTurnLlmResponseTs, requestTimestampId) {
+    let processedToolCallsThisTurn = nativeToolCalls;
+    let isTextualFallbackUsed = false;
+    let assistantMessageForHistory;
+    if (!processedToolCallsThisTurn || processedToolCallsThisTurn.length === 0) {
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] No native tool_calls. Checking textual. Content length: ${accumulatedLlmContent.length}`);
+      const parsedTextualCalls = this.parseAllTextualToolCalls(accumulatedLlmContent);
+      if (parsedTextualCalls.length > 0) {
+        isTextualFallbackUsed = true;
+        processedToolCallsThisTurn = parsedTextualCalls.map((tc, index) => ({
+          type: "function",
+          id: `texttool-${currentTurnLlmResponseTs}-${index}`,
+          function: { name: tc.name, arguments: JSON.stringify(tc.arguments || {}) }
+        }));
+        assistantMessageForHistory = {
+          role: "assistant",
+          content: accumulatedLlmContent,
+          // Весь сирий текст від LLM
+          timestamp: new Date(currentTurnLlmResponseTs)
+        };
+        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Orchestrator: Fallback textual tool_calls parsed (count: ${processedToolCallsThisTurn.length}).`);
+      } else {
+        assistantMessageForHistory = {
+          role: "assistant",
+          content: accumulatedLlmContent,
+          timestamp: new Date(currentTurnLlmResponseTs)
+        };
+        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Orchestrator: No native or textual tool calls. Final text response.`);
+      }
+    } else {
+      assistantMessageForHistory = assistantMessageWithNativeCalls || {
+        role: "assistant",
+        content: accumulatedLlmContent,
+        // Може бути порожнім, якщо тільки tool_calls
+        timestamp: new Date(currentTurnLlmResponseTs),
+        tool_calls: processedToolCallsThisTurn
+      };
+      assistantMessageForHistory.content = accumulatedLlmContent;
+      assistantMessageForHistory.tool_calls = processedToolCallsThisTurn;
+      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Orchestrator: Native tool_calls detected (count: ${processedToolCallsThisTurn.length}).`);
+    }
+    return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
+  }
+  async _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId) {
+    var _a, _b;
+    this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] [_executeAndRenderToolCycle] Executing ${toolsToExecute.length} tools.`);
+    const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
+    let hmaPromise = new Promise((resolve, reject) => {
+      this.messageAddedResolvers.set(assistantMsgTsMs, resolve);
+      setTimeout(() => {
+        if (this.messageAddedResolvers.has(assistantMsgTsMs)) {
+          this.messageAddedResolvers.delete(assistantMsgTsMs);
+          reject(new Error(`HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs})`));
+        }
+      }, 1e4);
+    });
+    await this.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
+    await hmaPromise;
+    this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`);
+    if (((_a = this.activePlaceholder) == null ? void 0 : _a.timestamp) === assistantMsgTsMs) {
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${assistantMsgTsMs}) as HMA processed the assistant message.`);
+      this.activePlaceholder = null;
+    }
+    for (const call of toolsToExecute) {
+      if ((_b = this.currentAbortController) == null ? void 0 : _b.signal.aborted)
+        throw new Error("aborted by user");
+      if (call.type === "function") {
+        const toolName = call.function.name;
+        let toolArgs = {};
+        try {
+          toolArgs = JSON.parse(call.function.arguments || "{}");
+        } catch (e) {
+          const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
+          this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] ${errorContent}`, e);
+          const errorToolMsg = { role: "tool", tool_call_id: call.id, name: toolName, content: errorContent, timestamp: new Date() };
+          hmaPromise = new Promise((resolve, reject) => {
+            this.messageAddedResolvers.set(errorToolMsg.timestamp.getTime(), resolve);
+            setTimeout(() => reject(new Error("HMA timeout for tool error msg")), 1e4);
+          });
+          await this.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
+          try {
+            await hmaPromise;
+          } catch (e_hma) {
+            this.plugin.logger.error("HMA error/timeout for tool error message", e_hma);
+          }
+          continue;
+        }
+        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Executing tool: ${toolName} with args:`, toolArgs);
+        const execResult = await this.plugin.agentManager.executeTool(toolName, toolArgs);
+        const toolResultContent = execResult.success ? execResult.result : `Error: ${execResult.error || "Unknown tool error"}`;
+        const toolResponseMsg = { role: "tool", tool_call_id: call.id, name: toolName, content: toolResultContent, timestamp: new Date() };
+        hmaPromise = new Promise((resolve, reject) => {
+          this.messageAddedResolvers.set(toolResponseMsg.timestamp.getTime(), resolve);
+          setTimeout(() => reject(new Error(`HMA Timeout for tool result: ${toolName}`)), 1e4);
+        });
+        await this.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
+        await hmaPromise;
+        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Tool result for ${toolName} (ts: ${toolResponseMsg.timestamp.getTime()}) processed by HMA.`);
+      }
+    }
+  }
+  async _renderFinalAssistantText(finalContent, responseTimestampMs, requestTimestampId) {
+    var _a, _b, _c;
+    if (finalContent.trim()) {
+      const finalAssistantMsg = { role: "assistant", content: finalContent, timestamp: new Date(responseTimestampMs) };
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Adding final assistant message to ChatManager (ts: ${responseTimestampMs}).`);
+      let hmaPromise = new Promise((resolve, reject) => {
+        this.messageAddedResolvers.set(responseTimestampMs, resolve);
+        setTimeout(() => reject(new Error("HMA Timeout for final assistant message")), 1e4);
+      });
+      await this.plugin.chatManager.addMessageToActiveChatPayload(finalAssistantMsg, true);
+      await hmaPromise;
+      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Final assistant message (ts: ${responseTimestampMs}) processed by HMA.`);
+    } else if (!((_a = this.currentAbortController) == null ? void 0 : _a.signal.aborted)) {
+      this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Assistant provided an empty final response (not aborted).`);
+      if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) === responseTimestampMs && this.activePlaceholder.groupEl.isConnected && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+        this.activePlaceholder.groupEl.remove();
+      }
+      const emptyResponseMsg = { role: "system", content: "Assistant provided an empty response.", timestamp: new Date() };
+      let hmaPromise = new Promise((resolve, reject) => {
+        this.messageAddedResolvers.set(emptyResponseMsg.timestamp.getTime(), resolve);
+        setTimeout(() => reject(new Error("HMA Timeout for empty system message")), 1e4);
+      });
+      await this.plugin.chatManager.addMessageToActiveChatPayload(emptyResponseMsg, true);
+      try {
+        await hmaPromise;
+      } catch (e_hma) {
+        this.plugin.logger.error("HMA error/timeout for empty response system message", e_hma);
+      }
+    }
+    if (((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === responseTimestampMs) {
+      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${responseTimestampMs}) after final assistant message/empty response.`);
+      this.activePlaceholder = null;
+    }
+  }
 };
 
 // src/ragService.ts
