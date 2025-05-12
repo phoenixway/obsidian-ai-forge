@@ -1667,6 +1667,10 @@ var ErrorMessageRenderer = class extends BaseMessageRenderer {
 
 // src/SidebarManager.ts
 var import_obsidian12 = require("obsidian");
+var CSS_SIDEBAR_CONTAINER = "ollama-sidebar-container";
+var CSS_ROLE_PANEL = "ollama-role-panel";
+var CSS_CHAT_PANEL = "ollama-chat-panel";
+var CSS_ROLE_PANEL_LIST = "ollama-role-panel-list";
 var CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item";
 var CSS_ROLE_PANEL_ITEM_ICON = "ollama-role-panel-item-icon";
 var CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
@@ -1674,10 +1678,15 @@ var CSS_ROLE_PANEL_ITEM_ACTIVE = "is-active";
 var CSS_ROLE_PANEL_ITEM_CUSTOM = "is-custom";
 var CSS_ROLE_PANEL_ITEM_NONE = "ollama-role-panel-item-none";
 var CSS_CLASS_MENU_OPTION = "menu-option";
+var CSS_SIDEBAR_SECTION_HEADER = "ollama-sidebar-section-header";
+var CSS_SIDEBAR_SECTION_CONTENT = "ollama-sidebar-section-content";
 var CSS_SECTION_TOGGLE_CHEVRON = "ollama-section-toggle-chevron";
+var CSS_SIDEBAR_HEADER_ACTIONS = "ollama-sidebar-header-actions";
 var CSS_SIDEBAR_HEADER_BUTTON = "ollama-sidebar-header-button";
+var CSS_SIDEBAR_HEADER_LEFT = "ollama-sidebar-header-left";
 var CSS_SIDEBAR_SECTION_CONTENT_HIDDEN = "ollama-sidebar-section-content-hidden";
 var CSS_EXPANDED_CLASS = "is-expanded";
+var CSS_CHAT_LIST_CONTAINER = "ollama-chat-list-container";
 var CSS_HIERARCHY_ITEM = "ollama-hierarchy-item";
 var CSS_FOLDER_ITEM = "ollama-folder-item";
 var CSS_CHAT_ITEM = "ollama-chat-item";
@@ -1959,52 +1968,72 @@ var SidebarManager = class {
     this.app = app;
     this.view = view;
   }
+  // src/SidebarManager.ts
   createSidebarUI(parentElement) {
-    this.containerEl = parentElement.createDiv({ cls: "ollama-sidebar-container" });
-    const chatPanel = this.containerEl.createDiv({ cls: "ollama-chat-panel" });
+    this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
+    this.plugin.logger.debug("[SidebarUI] Creating sidebar UI structure...");
+    const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
     this.chatPanelHeaderEl = chatPanel.createDiv({
-      cls: ["ollama-sidebar-section-header", "menu-option"],
+      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "chats", "data-collapsed": "false" }
+      // За замовчуванням розгорнуто
     });
-    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
     (0, import_obsidian12.setIcon)(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), CHATS_SECTION_ICON);
     chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
-    const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
+    const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
     this.newFolderSidebarButton = chatHeaderActions.createDiv({
-      cls: ["ollama-sidebar-header-button", "clickable-icon"],
+      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
       attr: { "aria-label": "New Folder", title: "New Folder" }
     });
     (0, import_obsidian12.setIcon)(this.newFolderSidebarButton, "lucide-folder-plus");
     this.newChatSidebarButton = chatHeaderActions.createDiv({
-      cls: ["ollama-sidebar-header-button", "clickable-icon"],
+      cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
       attr: { "aria-label": "New Chat", title: "New Chat" }
     });
     (0, import_obsidian12.setIcon)(this.newChatSidebarButton, "lucide-plus-circle");
     const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
     (0, import_obsidian12.setIcon)(chatChevron, EXPAND_ICON_ACCORDION);
     this.chatPanelListContainerEl = chatPanel.createDiv({
-      cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"]
+      cls: [CSS_CHAT_LIST_CONTAINER, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS]
+      // Починаємо з розгорнутого стану
     });
-    this.view.registerDomEvent(this.chatPanelListContainerEl, "dragover", this.handleDragOverRoot.bind(this));
-    this.view.registerDomEvent(this.chatPanelListContainerEl, "dragenter", this.handleDragEnterRoot.bind(this));
-    this.view.registerDomEvent(this.chatPanelListContainerEl, "dragleave", this.handleDragLeaveRoot.bind(this));
-    this.view.registerDomEvent(this.chatPanelListContainerEl, "drop", this.handleDropRoot.bind(this));
-    const rolePanel = this.containerEl.createDiv({ cls: "ollama-role-panel" });
+    this.view.registerDomEvent(chatPanel, "dragover", this.handleDragOverRootParent.bind(this));
+    this.view.registerDomEvent(chatPanel, "dragenter", this.handleDragEnterRootParent.bind(this));
+    this.view.registerDomEvent(chatPanel, "dragleave", this.handleDragLeaveRootParent.bind(this));
+    this.view.registerDomEvent(chatPanel, "drop", this.handleDropRootParent.bind(this));
+    this.plugin.logger.debug("[SidebarUI] Root drop listeners attached to chatPanel.");
+    const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL });
     this.rolePanelHeaderEl = rolePanel.createDiv({
-      cls: ["ollama-sidebar-section-header", "menu-option"],
+      cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
       attr: { "data-section-type": "roles", "data-collapsed": "true" }
+      // За замовчуванням згорнуто
     });
-    const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
+    const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
     (0, import_obsidian12.setIcon)(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), ROLES_SECTION_ICON);
     roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
-    const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
+    const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
     const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
     (0, import_obsidian12.setIcon)(roleChevron, COLLAPSE_ICON_ACCORDION);
-    this.rolePanelListEl = rolePanel.createDiv({ cls: ["ollama-role-panel-list", "ollama-sidebar-section-content"] });
+    this.rolePanelListEl = rolePanel.createDiv({
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT]
+      // За замовчуванням приховано через відсутність CSS_EXPANDED_CLASS
+    });
+    if (this.rolePanelHeaderEl.getAttribute("data-collapsed") === "true") {
+      this.rolePanelListEl.addClass(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+    }
     this.attachSidebarEventListeners();
     if (this.isSectionVisible("chats")) {
+      this.plugin.logger.debug("[SidebarUI] Initial chat list update scheduled.");
       this.updateChatList();
+    } else {
+      this.plugin.logger.debug("[SidebarUI] Chats section initially collapsed, chat list update deferred.");
     }
+    if (this.isSectionVisible("roles")) {
+      this.plugin.logger.debug("[SidebarUI] Roles section initially visible (unexpected default), role list update scheduled.");
+      this.updateRoleList();
+    }
+    this.plugin.logger.debug("[SidebarUI] Sidebar UI creation complete.");
     return this.containerEl;
   }
   // --- Кінець createSidebarUI ---
@@ -2575,7 +2604,6 @@ var SidebarManager = class {
       event.dataTransfer.dropEffect = "move";
     }
     event.stopPropagation();
-    this.plugin.logger.trace("[DragOver FolderItem] Event fired and propagation stopped.");
   }
   handleDragEnter(event, targetNode) {
     event.preventDefault();
@@ -2602,151 +2630,202 @@ var SidebarManager = class {
       targetElement.removeClass("drag-over-target");
     }
   }
-  async handleDrop(event, targetNode) {
-    event.preventDefault();
-    const targetElement = event.currentTarget;
-    targetElement.removeClass("drag-over-target");
-    if (!this.draggedItemData || !event.dataTransfer) {
-      this.plugin.logger.warn("Drop event occurred without draggedItemData.");
-      this.draggedItemData = null;
-      return;
-    }
-    const draggedData = this.draggedItemData;
-    this.draggedItemData = null;
-    const targetFolderPath = targetNode.path;
-    this.plugin.logger.debug(`Drop Event: Dragged=${JSON.stringify(draggedData)}, Target Folder=${targetFolderPath}`);
-    const sourceParentPath = draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/";
-    if (draggedData.type === "folder" && draggedData.path === targetFolderPath) {
-      this.plugin.logger.debug("Drop skipped: Cannot drop folder onto itself.");
-      return;
-    }
-    if (draggedData.type === "chat" && sourceParentPath === (0, import_obsidian12.normalizePath)(targetFolderPath)) {
-      this.plugin.logger.debug("Drop skipped: Chat is already in the target folder.");
-      return;
-    }
-    if (draggedData.type === "folder" && targetFolderPath.startsWith(draggedData.path + "/")) {
-      new import_obsidian12.Notice("Cannot move a folder inside itself.");
-      this.plugin.logger.warn("Drop prevented: Cannot move folder into descendant.");
-      return;
-    }
-    let success = false;
-    const notice = new import_obsidian12.Notice(`Moving ${draggedData.type}...`, 0);
-    try {
-      if (draggedData.type === "chat") {
-        this.plugin.logger.info(`Calling moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
-        success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
-      } else if (draggedData.type === "folder") {
-        const folderName = draggedData.name;
-        const newPath = (0, import_obsidian12.normalizePath)(`${targetFolderPath}/${folderName}`);
-        this.plugin.logger.info(`Calling renameFolder (move): oldPath=${draggedData.path}, newPath=${newPath}`);
-        const exists = await this.app.vault.adapter.exists(newPath);
-        if (exists) {
-          new import_obsidian12.Notice(`A folder named "${folderName}" already exists in the target location.`);
-          this.plugin.logger.warn(`Drop prevented: Target folder ${newPath} already exists.`);
-        } else {
-          success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
-          if (success && this.folderExpansionState.has(draggedData.path)) {
-            const wasExpanded = this.folderExpansionState.get(draggedData.path);
-            this.folderExpansionState.delete(draggedData.path);
-            this.folderExpansionState.set(newPath, wasExpanded);
-          }
-        }
-      }
-    } catch (error) {
-      this.plugin.logger.error(`Error during drop operation (moving ${draggedData.type}):`, error);
-      new import_obsidian12.Notice(`Error moving ${draggedData.type}. Check console.`);
-      success = false;
-    } finally {
-      notice.hide();
-      if (success) {
-        this.plugin.logger.info(`Drop successful: Moved ${draggedData.type} '${draggedData.name}' to '${targetFolderPath}'. UI update pending event.`);
-      } else {
-        this.plugin.logger.warn(`Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to '${targetFolderPath}'.`);
-      }
-    }
-  }
   handleDragOverRoot(event) {
     event.preventDefault();
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "move";
     }
+    if (!this.draggedItemData) {
+      event.currentTarget.removeClass("drag-over-root-target");
+      return;
+    }
+    const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
+    const draggedPath = this.draggedItemData.path;
+    let sourceParentPath = (0, import_obsidian12.normalizePath)(draggedPath.substring(0, draggedPath.lastIndexOf("/")) || "/");
+    if (this.draggedItemData.type === "folder" && rootFolderPath === "/" && !draggedPath.includes("/")) {
+      sourceParentPath = "/";
+    }
+    if (sourceParentPath === rootFolderPath) {
+      event.currentTarget.removeClass("drag-over-root-target");
+      this.plugin.logger.trace("[DragOverRoot] Item already at root, no highlight for root.");
+    } else {
+      event.currentTarget.addClass("drag-over-root-target");
+      this.plugin.logger.trace("[DragOverRoot] Over root empty space/non-folder child, item not at root. Added root highlight.");
+    }
   }
+  // Цей метод викликається, коли миша ВХОДИТЬ в межі chatPanelListContainerEl
+  // Може бути менш важливим, якщо handleDragOverRoot все коректно обробляє.
   handleDragEnterRoot(event) {
     event.preventDefault();
-    const targetElement = event.currentTarget;
-    this.plugin.logger.debug(`[DragEnterRoot] Event fired for target: ${targetElement.className}`);
-    if (!this.draggedItemData)
-      return;
-    if (targetElement === this.chatPanelListContainerEl) {
-      const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
-      const sourceParentPath = this.draggedItemData.path.substring(0, this.draggedItemData.path.lastIndexOf("/")) || "/";
-      if (this.draggedItemData.type === "chat" && (0, import_obsidian12.normalizePath)(sourceParentPath) === rootFolderPath) {
-        return;
-      }
-      if (this.draggedItemData.type === "folder" && (0, import_obsidian12.normalizePath)(sourceParentPath) === rootFolderPath) {
-        if (this.draggedItemData.path.includes("/") === false && rootFolderPath === "/") {
-          return;
-        }
-        if (rootFolderPath !== "/" && this.draggedItemData.path.startsWith(rootFolderPath) && this.draggedItemData.path.substring(rootFolderPath.length + 1).indexOf("/") === -1) {
-          return;
-        }
-      }
-      targetElement.addClass("drag-over-root-target");
-      this.plugin.logger.trace(`Drag Enter Root: Target container, Can Drop (basic check)`);
-    }
+    this.plugin.logger.trace(`[DragEnterRoot] Mouse entered root container bounds.`);
+    this.handleDragOverRoot(event);
   }
   handleDragLeaveRoot(event) {
-    const targetElement = event.currentTarget;
-    const relatedTarget = event.relatedTarget;
-    if (targetElement && (!relatedTarget || !targetElement.contains(relatedTarget))) {
-      targetElement.removeClass("drag-over-root-target");
-      this.plugin.logger.trace(`Drag Leave Root: Target container`);
+    const listeningElement = event.currentTarget;
+    if (!event.relatedTarget || !listeningElement.contains(event.relatedTarget)) {
+      listeningElement.removeClass("drag-over-root-target");
+      this.plugin.logger.debug("[DragLeaveRoot] Mouse left root container bounds. Removed 'drag-over-root-target'.");
+    } else {
+      this.plugin.logger.trace("[DragLeaveRoot] Mouse moved to a child within root. Highlight persists or handled by child.");
     }
   }
-  async handleDropRoot(event) {
+  async handleDrop(event, targetNode) {
     event.preventDefault();
+    event.stopPropagation();
     const targetElement = event.currentTarget;
-    targetElement.removeClass("drag-over-root-target");
+    targetElement.removeClass("drag-over-target");
     if (!this.draggedItemData || !event.dataTransfer) {
-      this.plugin.logger.warn("Root Drop event occurred without draggedItemData.");
+      this.plugin.logger.warn("[FolderDrop] Drop event occurred without draggedItemData or dataTransfer. Aborting.");
       this.draggedItemData = null;
       return;
     }
-    const draggedData = this.draggedItemData;
+    const draggedData = { ...this.draggedItemData };
+    this.draggedItemData = null;
+    const targetFolderPath = targetNode.path;
+    this.plugin.logger.debug(`[FolderDrop] Event: Dragged=${JSON.stringify(draggedData)}, Target Folder Node=${targetNode.name} (Path: ${targetFolderPath})`);
+    const sourceParentPath = (0, import_obsidian12.normalizePath)(draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/");
+    if (draggedData.type === "folder" && draggedData.path === targetFolderPath) {
+      this.plugin.logger.debug("[FolderDrop] Skipped: Cannot drop folder onto itself.");
+      return;
+    }
+    if (draggedData.type === "chat" && sourceParentPath === (0, import_obsidian12.normalizePath)(targetFolderPath)) {
+      this.plugin.logger.debug("[FolderDrop] Skipped: Chat is already in the target folder.");
+      return;
+    }
+    if (draggedData.type === "folder" && targetFolderPath.startsWith(draggedData.path + "/")) {
+      new import_obsidian12.Notice("Cannot move a folder inside itself or its descendants.");
+      this.plugin.logger.warn("[FolderDrop] Prevented: Cannot move folder into its own descendant.");
+      return;
+    }
+    let success = false;
+    const noticeMessage = `Moving ${draggedData.type} "${draggedData.name}" to "${targetNode.name}"...`;
+    const notice = new import_obsidian12.Notice(noticeMessage, 0);
+    try {
+      if (draggedData.type === "chat") {
+        this.plugin.logger.info(`[FolderDrop] Calling ChatManager.moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
+        success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
+      } else if (draggedData.type === "folder") {
+        const folderName = draggedData.name;
+        const newPath = (0, import_obsidian12.normalizePath)(`${targetFolderPath}/${folderName}`);
+        this.plugin.logger.info(`[FolderDrop] Calling ChatManager.renameFolder (for move): oldPath=${draggedData.path}, newPath=${newPath}`);
+        if (draggedData.path === newPath) {
+          this.plugin.logger.debug("[FolderDrop] Folder source and target path are identical after normalization. No move needed.");
+          success = true;
+        } else {
+          const exists = await this.app.vault.adapter.exists(newPath);
+          if (exists) {
+            new import_obsidian12.Notice(`An item named "${folderName}" already exists in the folder "${targetNode.name}".`);
+            this.plugin.logger.warn(`[FolderDrop] Prevented: Target path ${newPath} for folder move already exists.`);
+          } else {
+            success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
+            if (success && this.folderExpansionState.has(draggedData.path)) {
+              const wasExpanded = this.folderExpansionState.get(draggedData.path);
+              this.folderExpansionState.delete(draggedData.path);
+              this.folderExpansionState.set(newPath, wasExpanded);
+              this.plugin.logger.debug(`[FolderDrop] Transferred expansion state for folder from '${draggedData.path}' to '${newPath}'.`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      this.plugin.logger.error(`[FolderDrop] Error during drop operation (moving ${draggedData.type} to folder ${targetNode.name}):`, error);
+      new import_obsidian12.Notice(`Error moving ${draggedData.type}. Check console.`);
+      success = false;
+    } finally {
+      notice.hide();
+      if (success) {
+        this.plugin.logger.info(`[FolderDrop] Drop successful: Moved ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'. UI update relies on events from ChatManager.`);
+      } else {
+        this.plugin.logger.warn(`[FolderDrop] Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'.`);
+      }
+    }
+  }
+  // --- Кінець handleDrop (для окремих папок) ---
+  handleDragOverRootParent(event) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+    if (!this.draggedItemData) {
+      this.chatPanelListContainerEl.removeClass("drag-over-root-target");
+      return;
+    }
+    const directTarget = event.target;
+    if (this.chatPanelHeaderEl.contains(directTarget)) {
+      this.chatPanelListContainerEl.removeClass("drag-over-root-target");
+      this.plugin.logger.trace("[DragOverRootParent] Over chat panel header. No root highlight.");
+      return;
+    }
+    const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
+    const draggedPath = this.draggedItemData.path;
+    let sourceParentPath = (0, import_obsidian12.normalizePath)(draggedPath.substring(0, draggedPath.lastIndexOf("/")) || "/");
+    if (this.draggedItemData.type === "folder" && rootFolderPath === "/" && !draggedPath.includes("/")) {
+      sourceParentPath = "/";
+    }
+    if (this.draggedItemData.type === "folder" && rootFolderPath !== "/" && draggedPath.startsWith(rootFolderPath) && draggedPath.substring(rootFolderPath.length + 1).indexOf("/") === -1 && sourceParentPath === rootFolderPath) {
+    }
+    if (sourceParentPath === rootFolderPath) {
+      this.chatPanelListContainerEl.removeClass("drag-over-root-target");
+      this.plugin.logger.trace("[DragOverRootParent] Item already at root, removing root highlight.");
+    } else {
+      this.chatPanelListContainerEl.addClass("drag-over-root-target");
+      this.plugin.logger.trace("[DragOverRootParent] Valid root drop target area. Added root highlight to list container.");
+    }
+  }
+  handleDragEnterRootParent(event) {
+    event.preventDefault();
+    this.plugin.logger.trace(`[DragEnterRootParent] Mouse entered chatPanel bounds.`);
+    this.handleDragOverRootParent(event);
+  }
+  handleDragLeaveRootParent(event) {
+    const listeningElement = event.currentTarget;
+    const relatedTarget = event.relatedTarget;
+    this.plugin.logger.trace(`[DragLeaveRootParent] Event fired from chatPanel. Related target: ${relatedTarget ? relatedTarget.className : "null"}`);
+    if (!relatedTarget || !listeningElement.contains(relatedTarget)) {
+      this.chatPanelListContainerEl.removeClass("drag-over-root-target");
+      this.plugin.logger.debug("[DragLeaveRootParent] Mouse left chatPanel bounds. Removed 'drag-over-root-target'.");
+    }
+  }
+  async handleDropRootParent(event) {
+    event.preventDefault();
+    this.chatPanelListContainerEl.removeClass("drag-over-root-target");
+    this.plugin.logger.debug("[DropRootParent] Event fired on chatPanel.");
+    if (!this.draggedItemData) {
+      this.plugin.logger.warn("[DropRootParent] No draggedItemData available. Aborting.");
+      return;
+    }
+    const directTarget = event.target;
+    if (this.chatPanelHeaderEl.contains(directTarget)) {
+      this.plugin.logger.info("[DropRootParent] Drop occurred on chat panel header. Aborting root drop.");
+      this.draggedItemData = null;
+      return;
+    }
+    const draggedData = { ...this.draggedItemData };
     this.draggedItemData = null;
     const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
-    this.plugin.logger.debug(`Root Drop Event: Dragged=${JSON.stringify(draggedData)}, Target Root Folder=${rootFolderPath}`);
-    const sourceParentPath = (0, import_obsidian12.normalizePath)(draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/");
-    if (draggedData.type === "chat") {
-      if (sourceParentPath === rootFolderPath) {
-        this.plugin.logger.debug("Root Drop skipped: Chat is already in the root folder.");
-        return;
-      }
-    } else if (draggedData.type === "folder") {
-      const isAlreadyAtRoot = rootFolderPath === "/" && !draggedData.path.includes("/") || rootFolderPath !== "/" && draggedData.path.startsWith(rootFolderPath + "/") && draggedData.path.substring(rootFolderPath.length + 1).indexOf("/") === -1;
-      if (isAlreadyAtRoot || sourceParentPath === rootFolderPath) {
-        this.plugin.logger.debug(`Root Drop skipped: Folder '${draggedData.name}' is already in the root folder.`);
-        return;
-      }
+    this.plugin.logger.info(`[DropRootParent] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
+    let sourceParentPath = (0, import_obsidian12.normalizePath)(draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/");
+    if (draggedData.type === "folder" && rootFolderPath === "/" && !draggedData.path.includes("/")) {
+      sourceParentPath = "/";
+    }
+    if (sourceParentPath === rootFolderPath) {
+      this.plugin.logger.info(`[DropRootParent] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
+      return;
     }
     let success = false;
     const notice = new import_obsidian12.Notice(`Moving ${draggedData.type} to root...`, 0);
     try {
       if (draggedData.type === "chat") {
-        this.plugin.logger.info(`Calling moveChat (to root): id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${rootFolderPath}`);
         success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, rootFolderPath);
       } else if (draggedData.type === "folder") {
         const folderName = draggedData.name;
         const newPathAtRoot = (0, import_obsidian12.normalizePath)(rootFolderPath === "/" ? folderName : `${rootFolderPath}/${folderName}`);
-        this.plugin.logger.info(`Calling renameFolder (move to root): oldPath=${draggedData.path}, newPath=${newPathAtRoot}`);
         if (draggedData.path === newPathAtRoot) {
-          this.plugin.logger.debug("Root Drop (folder): Source and target path are identical after normalization.");
           success = true;
         } else {
           const exists = await this.app.vault.adapter.exists(newPathAtRoot);
           if (exists) {
             new import_obsidian12.Notice(`An item named "${folderName}" already exists at the root.`);
-            this.plugin.logger.warn(`Root Drop prevented: Target ${newPathAtRoot} already exists.`);
           } else {
             success = await this.plugin.chatManager.renameFolder(draggedData.path, newPathAtRoot);
             if (success && this.folderExpansionState.has(draggedData.path)) {
@@ -2758,15 +2837,15 @@ var SidebarManager = class {
         }
       }
     } catch (error) {
-      this.plugin.logger.error(`Error during root drop operation (moving ${draggedData.type}):`, error);
+      this.plugin.logger.error(`[DropRootParent] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
       new import_obsidian12.Notice(`Error moving ${draggedData.type} to root. Check console.`);
       success = false;
     } finally {
       notice.hide();
       if (success) {
-        this.plugin.logger.info(`Root Drop successful: Moved ${draggedData.type} '${draggedData.name}' to root. UI update pending event.`);
+        this.plugin.logger.info(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
       } else {
-        this.plugin.logger.warn(`Root Drop failed or was prevented for ${draggedData.type} '${draggedData.name}'.`);
+        this.plugin.logger.warn(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
       }
     }
   }
@@ -9488,7 +9567,6 @@ var OllamaPlugin2 = class extends import_obsidian20.Plugin {
       logFileMaxSizeMB: initialSettingsData.logFileMaxSizeMB
     };
     this.logger = new Logger(this, loggerSettings);
-    this.logger.info("AI Forge Plugin loading...");
     await this.loadSettingsAndMigrate();
     this.promptService = new PromptService(this);
     this.ollamaService = new OllamaService(this);

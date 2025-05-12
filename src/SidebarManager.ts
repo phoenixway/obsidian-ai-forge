@@ -91,71 +91,97 @@ export class SidebarManager {
     this.app = app;
     this.view = view;
   }
-  public createSidebarUI(parentElement: HTMLElement): HTMLElement {
-    this.containerEl = parentElement.createDiv({ cls: "ollama-sidebar-container" });
+  
+// src/SidebarManager.ts
 
-    // --- Секція Чатів ---
-    const chatPanel = this.containerEl.createDiv({ cls: "ollama-chat-panel" });
-    this.chatPanelHeaderEl = chatPanel.createDiv({
-      cls: ["ollama-sidebar-section-header", "menu-option"],
-      attr: { "data-section-type": "chats", "data-collapsed": "false" },
-    });
-    // ... (код для заголовка секції чатів: іконка, текст, кнопки дій, шеврон) ...
-    const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
-    setIcon(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), CHATS_SECTION_ICON);
-    chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
+public createSidebarUI(parentElement: HTMLElement): HTMLElement {
+  this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
+  this.plugin.logger.debug("[SidebarUI] Creating sidebar UI structure...");
 
-    const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
-    this.newFolderSidebarButton = chatHeaderActions.createDiv({
-      cls: ["ollama-sidebar-header-button", "clickable-icon"],
-      attr: { "aria-label": "New Folder", title: "New Folder" },
-    });
-    setIcon(this.newFolderSidebarButton, "lucide-folder-plus");
-    this.newChatSidebarButton = chatHeaderActions.createDiv({
-      cls: ["ollama-sidebar-header-button", "clickable-icon"],
-      attr: { "aria-label": "New Chat", title: "New Chat" },
-    });
-    setIcon(this.newChatSidebarButton, "lucide-plus-circle");
-    const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
-    setIcon(chatChevron, EXPAND_ICON_ACCORDION);
+  // --- Секція Чатів ---
+  // chatPanel тепер буде основною ціллю для скидання в корінь
+  const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
+
+  // Заголовок секції чатів
+  this.chatPanelHeaderEl = chatPanel.createDiv({
+    cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+    attr: { "data-section-type": "chats", "data-collapsed": "false" }, // За замовчуванням розгорнуто
+  });
+  const chatHeaderLeft = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
+  setIcon(chatHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), CHATS_SECTION_ICON);
+  chatHeaderLeft.createSpan({ cls: "menu-option-text", text: "Chats" });
+
+  const chatHeaderActions = this.chatPanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
+  this.newFolderSidebarButton = chatHeaderActions.createDiv({
+    cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
+    attr: { "aria-label": "New Folder", title: "New Folder" },
+  });
+  setIcon(this.newFolderSidebarButton, "lucide-folder-plus");
+  this.newChatSidebarButton = chatHeaderActions.createDiv({
+    cls: [CSS_SIDEBAR_HEADER_BUTTON, "clickable-icon"],
+    attr: { "aria-label": "New Chat", title: "New Chat" },
+  });
+  setIcon(this.newChatSidebarButton, "lucide-plus-circle");
+  const chatChevron = chatHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
+  setIcon(chatChevron, EXPAND_ICON_ACCORDION); // Іконка розгорнутої секції
+
+  // Контейнер для списку чатів та папок
+  this.chatPanelListContainerEl = chatPanel.createDiv({
+    cls: [CSS_CHAT_LIST_CONTAINER, CSS_SIDEBAR_SECTION_CONTENT, CSS_EXPANDED_CLASS], // Починаємо з розгорнутого стану
+  });
+
+  // --- ДОДАНО: Обробники Drag-and-Drop для chatPanel як батьківської цілі для root drop ---
+  // Ці обробники будуть реагувати, якщо подія не була перехоплена дочірньою папкою
+  this.view.registerDomEvent(chatPanel, 'dragover', this.handleDragOverRootParent.bind(this));
+  this.view.registerDomEvent(chatPanel, 'dragenter', this.handleDragEnterRootParent.bind(this));
+  this.view.registerDomEvent(chatPanel, 'dragleave', this.handleDragLeaveRootParent.bind(this));
+  this.view.registerDomEvent(chatPanel, 'drop', this.handleDropRootParent.bind(this));
+  this.plugin.logger.debug("[SidebarUI] Root drop listeners attached to chatPanel.");
+  // --- КІНЕЦЬ ДОДАНОГО ---
+
+  // --- Секція Ролей ---
+  const rolePanel = this.containerEl.createDiv({ cls: CSS_ROLE_PANEL });
+  this.rolePanelHeaderEl = rolePanel.createDiv({
+    cls: [CSS_SIDEBAR_SECTION_HEADER, CSS_CLASS_MENU_OPTION],
+    attr: { "data-section-type": "roles", "data-collapsed": "true" }, // За замовчуванням згорнуто
+  });
+  const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_LEFT });
+  setIcon(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), ROLES_SECTION_ICON);
+  roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
+
+  const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: CSS_SIDEBAR_HEADER_ACTIONS });
+  const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
+  setIcon(roleChevron, COLLAPSE_ICON_ACCORDION); // Іконка згорнутої секції
+
+  this.rolePanelListEl = rolePanel.createDiv({
+      cls: [CSS_ROLE_PANEL_LIST, CSS_SIDEBAR_SECTION_CONTENT] // За замовчуванням приховано через відсутність CSS_EXPANDED_CLASS
+  });
+  // Застосовуємо CSS_SIDEBAR_SECTION_CONTENT_HIDDEN, якщо згорнуто (хоча is-expanded керує цим краще)
+  if (this.rolePanelHeaderEl.getAttribute("data-collapsed") === "true") {
+      this.rolePanelListEl.addClass(CSS_SIDEBAR_SECTION_CONTENT_HIDDEN);
+  }
 
 
-    this.chatPanelListContainerEl = chatPanel.createDiv({
-      cls: ["ollama-chat-list-container", "ollama-sidebar-section-content", "is-expanded"],
-    });
+  // Прив'язуємо основні слухачі подій для сайдбару (кліки на заголовки, кнопки)
+  this.attachSidebarEventListeners();
 
-    // --- ДОДАНО: Обробники Drag-and-Drop для кореневого контейнера списку чатів ---
-    this.view.registerDomEvent(this.chatPanelListContainerEl, 'dragover', this.handleDragOverRoot.bind(this));
-    this.view.registerDomEvent(this.chatPanelListContainerEl, 'dragenter', this.handleDragEnterRoot.bind(this));
-    this.view.registerDomEvent(this.chatPanelListContainerEl, 'dragleave', this.handleDragLeaveRoot.bind(this));
-    this.view.registerDomEvent(this.chatPanelListContainerEl, 'drop', this.handleDropRoot.bind(this));
-    // --- КІНЕЦЬ ДОДАНОГО ---
-
-    // --- Секція Ролей ---
-    const rolePanel = this.containerEl.createDiv({ cls: "ollama-role-panel" });
-    // ... (код для секції ролей) ...
-    this.rolePanelHeaderEl = rolePanel.createDiv({
-      cls: ["ollama-sidebar-section-header", "menu-option"],
-      attr: { "data-section-type": "roles", "data-collapsed": "true" },
-    });
-    const roleHeaderLeft = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-left" });
-    setIcon(roleHeaderLeft.createSpan({ cls: CSS_SIDEBAR_SECTION_ICON }), ROLES_SECTION_ICON);
-    roleHeaderLeft.createSpan({ cls: "menu-option-text", text: "Roles" });
-
-    const roleHeaderActions = this.rolePanelHeaderEl.createDiv({ cls: "ollama-sidebar-header-actions" });
-    const roleChevron = roleHeaderActions.createSpan({ cls: [CSS_SECTION_TOGGLE_CHEVRON, "clickable-icon"] });
-    setIcon(roleChevron, COLLAPSE_ICON_ACCORDION);
-
-    this.rolePanelListEl = rolePanel.createDiv({ cls: ["ollama-role-panel-list", "ollama-sidebar-section-content"] });
+  // Початкове заповнення списку чатів, якщо секція видима
+  if (this.isSectionVisible("chats")) {
+    this.plugin.logger.debug("[SidebarUI] Initial chat list update scheduled.");
+    this.updateChatList(); // Цей метод тепер є асинхронним
+  } else {
+      this.plugin.logger.debug("[SidebarUI] Chats section initially collapsed, chat list update deferred.");
+  }
+  // Початкове заповнення списку ролей, якщо секція видима (хоча вона згорнута за замовчуванням)
+  if (this.isSectionVisible("roles")) {
+    this.plugin.logger.debug("[SidebarUI] Roles section initially visible (unexpected default), role list update scheduled.");
+    this.updateRoleList();
+  }
 
 
-    this.attachSidebarEventListeners();
-    if (this.isSectionVisible("chats")) {
-      this.updateChatList();
-    }
-    return this.containerEl;
-  } // --- Кінець createSidebarUI ---
-
+  this.plugin.logger.debug("[SidebarUI] Sidebar UI creation complete.");
+  return this.containerEl;
+} // --- Кінець createSidebarUI ---
   private attachSidebarEventListeners(): void {
     if (
       !this.chatPanelHeaderEl ||
@@ -1088,13 +1114,12 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
   }
 
   private handleDragOver(event: DragEvent): void {
-    event.preventDefault(); // Дозволяємо скидання
+    event.preventDefault();
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
-    // Зупиняємо спливання події, щоб вона не дійшла до батьківських елементів (наприклад, chatPanelListContainerEl)
-    event.stopPropagation();
-    this.plugin.logger.trace("[DragOver FolderItem] Event fired and propagation stopped.");
+    event.stopPropagation(); // ДУЖЕ ВАЖЛИВО: зупиняємо спливання
+    // this.plugin.logger.trace("[DragOver FolderItem] Event fired and propagation stopped.");
 }
 
   private handleDragEnter(event: DragEvent, targetNode: FolderNode): void {
@@ -1134,88 +1159,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
     }
   }
 
-  private async handleDrop(event: DragEvent, targetNode: FolderNode): Promise<void> {
-    event.preventDefault();
-    const targetElement = event.currentTarget as HTMLElement;
-    targetElement.removeClass('drag-over-target'); // Прибираємо підсвічування
-
-    if (!this.draggedItemData || !event.dataTransfer) {
-         this.plugin.logger.warn("Drop event occurred without draggedItemData.");
-         this.draggedItemData = null; // Очищаємо на всяк випадок
-        return;
-    }
-
-    const draggedData = this.draggedItemData; // Зберігаємо перед очищенням
-    this.draggedItemData = null; // Очищаємо збережені дані
-
-    const targetFolderPath = targetNode.path;
-     this.plugin.logger.debug(`Drop Event: Dragged=${JSON.stringify(draggedData)}, Target Folder=${targetFolderPath}`);
-
-
-    // --- ВАЛІДАЦІЯ ---
-    // 1. Перевіряємо, чи джерело і ціль не однакові (для папок це шлях, для чатів - батьківська папка)
-    const sourceParentPath = draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/';
-    if (draggedData.type === 'folder' && draggedData.path === targetFolderPath) {
-        this.plugin.logger.debug("Drop skipped: Cannot drop folder onto itself.");
-        return;
-    }
-    if (draggedData.type === 'chat' && sourceParentPath === normalizePath(targetFolderPath)) {
-         this.plugin.logger.debug("Drop skipped: Chat is already in the target folder.");
-        return;
-    }
-    // 2. Перевірка скидання папки в себе або нащадка
-    if (draggedData.type === 'folder' && targetFolderPath.startsWith(draggedData.path + '/')) {
-        new Notice("Cannot move a folder inside itself.");
-        this.plugin.logger.warn("Drop prevented: Cannot move folder into descendant.");
-        return;
-    }
-
-    // --- ВИКОНАННЯ ДІЇ ---
-    let success = false;
-    const notice = new Notice(`Moving ${draggedData.type}...`, 0); // Показываем уведомление о процессе
-
-    try {
-        if (draggedData.type === 'chat') {
-            // Переміщуємо чат
-            this.plugin.logger.info(`Calling moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
-            success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
-        } else if (draggedData.type === 'folder') {
-            // Переміщуємо папку (використовуємо renameFolder)
-            const folderName = draggedData.name; // Ім'я папки беремо зі збережених даних
-            const newPath = normalizePath(`${targetFolderPath}/${folderName}`);
-             this.plugin.logger.info(`Calling renameFolder (move): oldPath=${draggedData.path}, newPath=${newPath}`);
-
-            // Додаткова перевірка на існування папки з таким ім'ям у цільовій директорії
-            const exists = await this.app.vault.adapter.exists(newPath);
-            if (exists) {
-                 new Notice(`A folder named "${folderName}" already exists in the target location.`);
-                 this.plugin.logger.warn(`Drop prevented: Target folder ${newPath} already exists.`);
-            } else {
-                 success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
-                 // Оновлення стану розгорнутості папки, якщо вона переміщується
-                 if (success && this.folderExpansionState.has(draggedData.path)) {
-                     const wasExpanded = this.folderExpansionState.get(draggedData.path);
-                     this.folderExpansionState.delete(draggedData.path);
-                     this.folderExpansionState.set(newPath, wasExpanded!);
-                 }
-            }
-        }
-    } catch(error) {
-        this.plugin.logger.error(`Error during drop operation (moving ${draggedData.type}):`, error);
-        new Notice(`Error moving ${draggedData.type}. Check console.`);
-        success = false; // Явно позначаємо неуспіх
-    } finally {
-        notice.hide(); // Ховаємо повідомлення про процес
-        // НЕ викликаємо updateChatList() тут напряму!
-        // ChatManager має згенерувати подію 'chat-list-updated',
-        // яка призведе до оновлення через OllamaView -> schedule -> updateChatList.
-        if (success) {
-             this.plugin.logger.info(`Drop successful: Moved ${draggedData.type} '${draggedData.name}' to '${targetFolderPath}'. UI update pending event.`);
-        } else {
-            this.plugin.logger.warn(`Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to '${targetFolderPath}'.`);
-        }
-    }
-  }
+  
 
   private handleDragOverRoot(event: DragEvent): void {
     event.preventDefault();
@@ -1277,62 +1221,225 @@ private handleDragLeaveRoot(event: DragEvent): void {
   }
 }
 
-  
-// handleDropRoot залишається в основному таким самим, як у попередній відповіді,
-// але переконайтеся, що валідація "чи елемент вже в корені" використовує ту ж логіку, що й handleDragOverRoot.
-private async handleDropRoot(event: DragEvent): Promise<void> {
-  event.preventDefault();
-  const targetElement = event.currentTarget as HTMLElement;
-  targetElement.removeClass('drag-over-root-target');
-  this.plugin.logger.debug("[DropRoot] Event fired.");
+private async handleDrop(event: DragEvent, targetNode: FolderNode): Promise<void> {
+  event.preventDefault(); // Забороняємо стандартну обробку
+  event.stopPropagation(); // ДУЖЕ ВАЖЛИВО: зупиняємо спливання події до батьківських елементів (наприклад, chatPanel)
 
-  if (!this.draggedItemData) {
-      this.plugin.logger.warn("[DropRoot] No draggedItemData available on drop. Aborting.");
+  const targetElement = event.currentTarget as HTMLElement;
+  targetElement.removeClass('drag-over-target'); // Прибираємо візуальне підсвічування цілі
+
+  // Перевіряємо, чи є дані про перетягуваний елемент
+  if (!this.draggedItemData || !event.dataTransfer) {
+      this.plugin.logger.warn("[FolderDrop] Drop event occurred without draggedItemData or dataTransfer. Aborting.");
+      this.draggedItemData = null; // Очищаємо про всяк випадок
       return;
   }
+
+  const draggedData = { ...this.draggedItemData }; // Копіюємо дані, бо оригінал зараз скинемо
+  this.draggedItemData = null; // Очищаємо дані про перетягуваний елемент
+
+  const targetFolderPath = targetNode.path; // Шлях до цільової папки
+  this.plugin.logger.debug(`[FolderDrop] Event: Dragged=${JSON.stringify(draggedData)}, Target Folder Node=${targetNode.name} (Path: ${targetFolderPath})`);
+
+  // --- ВАЛІДАЦІЯ ---
+  // 1. Визначаємо батьківську папку елемента, що перетягується
+  const sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
+
+  // 2. Не можна скидати папку саму в себе
+  if (draggedData.type === 'folder' && draggedData.path === targetFolderPath) {
+      this.plugin.logger.debug("[FolderDrop] Skipped: Cannot drop folder onto itself.");
+      return;
+  }
+  // 3. Не можна скидати чат в ту саму папку, де він вже є
+  if (draggedData.type === 'chat' && sourceParentPath === normalizePath(targetFolderPath)) {
+      this.plugin.logger.debug("[FolderDrop] Skipped: Chat is already in the target folder.");
+      return;
+  }
+  // 4. Не можна скидати папку в її власну дочірню папку
+  if (draggedData.type === 'folder' && targetFolderPath.startsWith(draggedData.path + '/')) {
+      new Notice("Cannot move a folder inside itself or its descendants.");
+      this.plugin.logger.warn("[FolderDrop] Prevented: Cannot move folder into its own descendant.");
+      return;
+  }
+
+  // --- ВИКОНАННЯ ДІЇ ---
+  let success = false;
+  const noticeMessage = `Moving ${draggedData.type} "${draggedData.name}" to "${targetNode.name}"...`;
+  const notice = new Notice(noticeMessage, 0); // Показуємо сповіщення про процес
+
+  try {
+      if (draggedData.type === 'chat') {
+          // Переміщуємо чат
+          this.plugin.logger.info(`[FolderDrop] Calling ChatManager.moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
+          success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
+      } else if (draggedData.type === 'folder') {
+          // Переміщуємо папку (використовуємо renameFolder, оскільки це зміна шляху)
+          const folderName = draggedData.name; // Ім'я папки, що перетягується
+          const newPath = normalizePath(`${targetFolderPath}/${folderName}`); // Новий повний шлях для папки
+
+          this.plugin.logger.info(`[FolderDrop] Calling ChatManager.renameFolder (for move): oldPath=${draggedData.path}, newPath=${newPath}`);
+
+          if (draggedData.path === newPath) { // Якщо шлях не змінився (мало б відфільтруватися раніше)
+               this.plugin.logger.debug("[FolderDrop] Folder source and target path are identical after normalization. No move needed.");
+               success = true;
+          } else {
+              // Перевірка на конфлікт імен у цільовій папці
+              const exists = await this.app.vault.adapter.exists(newPath);
+              if (exists) {
+                  new Notice(`An item named "${folderName}" already exists in the folder "${targetNode.name}".`);
+                  this.plugin.logger.warn(`[FolderDrop] Prevented: Target path ${newPath} for folder move already exists.`);
+              } else {
+                  success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
+                  // Оновлюємо стан розгорнутості папки, якщо вона була переміщена
+                  if (success && this.folderExpansionState.has(draggedData.path)) {
+                      const wasExpanded = this.folderExpansionState.get(draggedData.path);
+                      this.folderExpansionState.delete(draggedData.path);
+                      this.folderExpansionState.set(newPath, wasExpanded!);
+                      this.plugin.logger.debug(`[FolderDrop] Transferred expansion state for folder from '${draggedData.path}' to '${newPath}'.`);
+                  }
+              }
+          }
+      }
+  } catch(error) {
+      this.plugin.logger.error(`[FolderDrop] Error during drop operation (moving ${draggedData.type} to folder ${targetNode.name}):`, error);
+      new Notice(`Error moving ${draggedData.type}. Check console.`);
+      success = false;
+  } finally {
+      notice.hide(); // Ховаємо сповіщення
+      if (success) {
+           this.plugin.logger.info(`[FolderDrop] Drop successful: Moved ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'. UI update relies on events from ChatManager.`);
+      } else {
+          this.plugin.logger.warn(`[FolderDrop] Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'.`);
+      }
+      // Оновлення UI (списку чатів) відбудеться через подію 'chat-list-updated',
+      // яку має згенерувати ChatManager після успішної операції moveChat або renameFolder.
+  }
+} // --- Кінець handleDrop (для окремих папок) ---
+
+
+  
+private handleDragOverRootParent(event: DragEvent): void {
+  event.preventDefault(); // Завжди дозволяємо, якщо подія дійшла сюди
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+
+  if (!this.draggedItemData) {
+      this.chatPanelListContainerEl.removeClass('drag-over-root-target');
+      return;
+  }
+
+  const directTarget = event.target as HTMLElement;
+
+  // Якщо ми над заголовком секції чатів, не підсвічуємо для root drop
+  if (this.chatPanelHeaderEl.contains(directTarget)) {
+      this.chatPanelListContainerEl.removeClass('drag-over-root-target');
+      this.plugin.logger.trace("[DragOverRootParent] Over chat panel header. No root highlight.");
+      return;
+  }
+
+  // Якщо ми над папкою, її власний dragover мав зупинити спливання.
+  // Якщо ця подія все ж тут, значить ми або над порожнім місцем chatPanel,
+  // або над chatPanelListContainerEl, або над chatItem.
+
+  // Перевірка, чи елемент вже в корені (логіка з попередніх версій)
+  const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
+  const draggedPath = this.draggedItemData.path;
+  let sourceParentPath = normalizePath(draggedPath.substring(0, draggedPath.lastIndexOf('/')) || '/');
+  if (this.draggedItemData.type === 'folder' && rootFolderPath === '/' && !draggedPath.includes('/')) {
+      sourceParentPath = '/';
+  }
+  // Додаткова перевірка для папок у вкладеному корені
+  if (this.draggedItemData.type === 'folder' && rootFolderPath !== '/' &&
+      draggedPath.startsWith(rootFolderPath) &&
+      (draggedPath.substring(rootFolderPath.length+1).indexOf('/') === -1) &&
+      sourceParentPath === rootFolderPath) {
+        // isAlreadyAtRoot = true; // Для логіки нижче
+  }
+
+  if (sourceParentPath === rootFolderPath) {
+      this.chatPanelListContainerEl.removeClass('drag-over-root-target');
+      this.plugin.logger.trace("[DragOverRootParent] Item already at root, removing root highlight.");
+  } else {
+      this.chatPanelListContainerEl.addClass('drag-over-root-target');
+      this.plugin.logger.trace("[DragOverRootParent] Valid root drop target area. Added root highlight to list container.");
+  }
+}
+
+private handleDragEnterRootParent(event: DragEvent): void {
+  event.preventDefault(); // Для консистентності
+  this.plugin.logger.trace(`[DragEnterRootParent] Mouse entered chatPanel bounds.`);
+  // Викликаємо handleDragOverRootParent, щоб встановити/прибрати підсвічування
+  this.handleDragOverRootParent(event);
+}
+
+private handleDragLeaveRootParent(event: DragEvent): void {
+  const listeningElement = event.currentTarget as HTMLElement; // Це chatPanel
+  const relatedTarget = event.relatedTarget as Node | null;
+  this.plugin.logger.trace(`[DragLeaveRootParent] Event fired from chatPanel. Related target: ${relatedTarget ? (relatedTarget as HTMLElement).className : 'null'}`);
+
+  if (!relatedTarget || !listeningElement.contains(relatedTarget)) {
+      this.chatPanelListContainerEl.removeClass('drag-over-root-target');
+      this.plugin.logger.debug("[DragLeaveRootParent] Mouse left chatPanel bounds. Removed 'drag-over-root-target'.");
+  }
+}
+
+private async handleDropRootParent(event: DragEvent): Promise<void> {
+  event.preventDefault();
+  this.chatPanelListContainerEl.removeClass('drag-over-root-target'); // Прибираємо підсвічування
+  this.plugin.logger.debug("[DropRootParent] Event fired on chatPanel.");
+
+  if (!this.draggedItemData) {
+      this.plugin.logger.warn("[DropRootParent] No draggedItemData available. Aborting.");
+      return;
+  }
+
+  const directTarget = event.target as HTMLElement;
+  // Якщо скидання відбулося на заголовок, ігноруємо
+  if (this.chatPanelHeaderEl.contains(directTarget)) {
+      this.plugin.logger.info("[DropRootParent] Drop occurred on chat panel header. Aborting root drop.");
+      this.draggedItemData = null; // Очистимо, бо drop відбувся
+      return;
+  }
+  // Якщо скидання відбулося на папку, її власний обробник drop мав спрацювати і зупинити спливання.
+  // Якщо подія дійшла сюди, це означає, що скидання було не на папку (яка є drop target).
 
   const draggedData = { ...this.draggedItemData };
   this.draggedItemData = null;
 
   const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
-  this.plugin.logger.info(`[DropRoot] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
+  this.plugin.logger.info(`[DropRootParent] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
 
-  // --- ВАЛІДАЦІЯ ---
+  // --- ВАЛІДАЦІЯ (така сама, як у handleDragOverRootParent) ---
   let sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
   if (draggedData.type === 'folder' && rootFolderPath === '/' && !draggedData.path.includes('/')) {
       sourceParentPath = '/';
   }
+  // ... (додаткова перевірка для папок у вкладеному корені, якщо потрібно, але sourceParentPath має бути достатньо)
 
   if (sourceParentPath === rootFolderPath) {
-      this.plugin.logger.info(`[DropRoot] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
+      this.plugin.logger.info(`[DropRootParent] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
       return;
   }
 
-  // --- ВИКОНАННЯ ДІЇ --- (решта коду як у попередній відповіді)
+  // --- ВИКОНАННЯ ДІЇ (код такий самий, як у handleDropRoot з попередньої відповіді) ---
   let success = false;
   const notice = new Notice(`Moving ${draggedData.type} to root...`, 0);
-
   try {
       if (draggedData.type === 'chat') {
-          // ... (виклик moveChat) ...
-          this.plugin.logger.info(`Calling moveChat (to root): id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${rootFolderPath}`);
           success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, rootFolderPath);
       } else if (draggedData.type === 'folder') {
           const folderName = draggedData.name;
           const newPathAtRoot = normalizePath(rootFolderPath === '/' ? folderName : `${rootFolderPath}/${folderName}`);
-          // ... (перевірка на існування та виклик renameFolder) ...
-           this.plugin.logger.info(`Calling renameFolder (move to root): oldPath=${draggedData.path}, newPath=${newPathAtRoot}`);
           if (draggedData.path === newPathAtRoot) {
                success = true;
           } else {
               const exists = await this.app.vault.adapter.exists(newPathAtRoot);
               if (exists) {
                   new Notice(`An item named "${folderName}" already exists at the root.`);
-                  this.plugin.logger.warn(`Root Drop prevented: Target ${newPathAtRoot} already exists.`);
               } else {
                   success = await this.plugin.chatManager.renameFolder(draggedData.path, newPathAtRoot);
-                  // ... (оновлення folderExpansionState) ...
-                   if (success && this.folderExpansionState.has(draggedData.path)) {
+                  if (success && this.folderExpansionState.has(draggedData.path)) {
                       const wasExpanded = this.folderExpansionState.get(draggedData.path);
                       this.folderExpansionState.delete(draggedData.path);
                       this.folderExpansionState.set(newPathAtRoot, wasExpanded!);
@@ -1341,20 +1448,17 @@ private async handleDropRoot(event: DragEvent): Promise<void> {
           }
       }
   } catch (error) {
-      // ... (обробка помилок) ...
-      this.plugin.logger.error(`[DropRoot] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
+      this.plugin.logger.error(`[DropRootParent] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
       new Notice(`Error moving ${draggedData.type} to root. Check console.`);
       success = false;
   } finally {
       notice.hide();
-      // ... (логування успіху/невдачі) ...
-       if (success) {
-          this.plugin.logger.info(`[DropRoot] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
+      if (success) {
+          this.plugin.logger.info(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
       } else {
-          this.plugin.logger.warn(`[DropRoot] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
+          this.plugin.logger.warn(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
       }
   }
 }
-  
 
 } // End of SidebarManager class
