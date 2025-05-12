@@ -227,3 +227,8 @@ body.is-resizing {
    -webkit-user-select: none;
 }
 
+.ollama-chat-list-container.drag-over-root-target {
+  background-color: var(--background-primary-alt); /* Або інший ледь помітний колір */
+  outline: 2px dashed var(--interactive-accent-hover);
+  outline-offset: -2px; /* Щоб рамка була всередині */
+}
