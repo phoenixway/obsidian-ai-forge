@@ -1069,37 +1069,50 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
     this.folderExpansionState.clear();
   }
 
-  private handleDragStart(event: DragEvent, node: HierarchyNode): void {
-    if (!event.dataTransfer) return;
+  // src/SidebarManager.ts
 
-    let id: string;
-    let path: string;
-    let name: string;
+private handleDragStart(event: DragEvent, node: HierarchyNode): void {
+  // --- ДУЖЕ ВАЖЛИВИЙ ЛОГ ---
+  this.plugin.logger.error( // Використовуємо error для легкої фільтрації в консолі
+      `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${
+      node.type === 'folder' ? node.name : node.metadata.name
+      }, Path: ${node.type === 'folder' ? node.path : node.filePath}`
+  );
+  // --- КІНЕЦЬ ВАЖЛИВОГО ЛОГУ ---
 
-    if (node.type === 'chat') {
-        id = node.metadata.id;
-        path = node.filePath; // Використовуємо filePath для чатів
-        name = node.metadata.name;
-    } else { // node.type === 'folder'
-        id = node.path; // Використовуємо path як ID для папок у цьому контексті
-        path = node.path;
-        name = node.name;
-    }
-
-    this.draggedItemData = { type: node.type, id: id, path: path, name: name };
-
-    // Зберігаємо дані для перетягування
-    event.dataTransfer.setData('text/plain', JSON.stringify(this.draggedItemData));
-    event.dataTransfer.effectAllowed = 'move';
-
-    // Додаємо клас до елемента, який перетягуємо
-    if (event.target instanceof HTMLElement) {
-      event.target.addClass('is-dragging');
-      // Можна також встановити напівпрозорість
-      // event.target.style.opacity = '0.5';
-    }
-     this.plugin.logger.debug(`Drag Start: type=${node.type}, id=${id}, path=${path}`);
+  if (!event.dataTransfer) {
+      this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
+      return;
   }
+
+  let id: string;
+  let path: string;
+  let name: string;
+
+  if (node.type === 'chat') {
+      id = node.metadata.id;
+      path = node.filePath; // Використовуємо filePath для чатів
+      name = node.metadata.name;
+  } else { // node.type === 'folder'
+      // Для папок, `id` може бути таким самим, як `path` для унікальності в контексті drag-n-drop
+      id = node.path; 
+      path = node.path; // Власний шлях папки
+      name = node.name;
+  }
+
+  this.draggedItemData = { type: node.type, id: id, path: path, name: name };
+
+  event.dataTransfer.setData('text/plain', JSON.stringify(this.draggedItemData));
+  event.dataTransfer.effectAllowed = 'move';
+
+  // Додаємо клас до елемента, який перетягуємо
+  if (event.target instanceof HTMLElement) {
+    event.target.addClass('is-dragging');
+    // Можна також встановити напівпрозорість, якщо бажаєте
+    // event.target.style.opacity = '0.5';
+  }
+  this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData set to: ${JSON.stringify(this.draggedItemData)}`);
+}
 
   private handleDragEnd(event: DragEvent): void {
     // Очищаємо дані та стилі

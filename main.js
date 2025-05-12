@@ -2567,9 +2567,16 @@ var SidebarManager = class {
     (_a = this.containerEl) == null ? void 0 : _a.remove();
     this.folderExpansionState.clear();
   }
+  // src/SidebarManager.ts
   handleDragStart(event, node) {
-    if (!event.dataTransfer)
+    this.plugin.logger.error(
+      // Використовуємо error для легкої фільтрації в консолі
+      `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${node.type === "folder" ? node.name : node.metadata.name}, Path: ${node.type === "folder" ? node.path : node.filePath}`
+    );
+    if (!event.dataTransfer) {
+      this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
       return;
+    }
     let id;
     let path;
     let name;
@@ -2588,7 +2595,7 @@ var SidebarManager = class {
     if (event.target instanceof HTMLElement) {
       event.target.addClass("is-dragging");
     }
-    this.plugin.logger.debug(`Drag Start: type=${node.type}, id=${id}, path=${path}`);
+    this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData set to: ${JSON.stringify(this.draggedItemData)}`);
   }
   handleDragEnd(event) {
     if (event.target instanceof HTMLElement) {
