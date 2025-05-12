@@ -1702,6 +1702,7 @@ var CHATS_SECTION_ICON = "lucide-messages-square";
 var ROLES_SECTION_ICON = "lucide-users";
 var SidebarManager = class {
   constructor(plugin, app, view) {
+    this.draggedItemData = null;
     this.folderExpansionState = /* @__PURE__ */ new Map();
     this.updateCounter = 0;
     this.updateChatList = async () => {
@@ -2022,15 +2023,17 @@ var SidebarManager = class {
     const headerEl = type === "chats" ? this.chatPanelHeaderEl : this.rolePanelHeaderEl;
     return (headerEl == null ? void 0 : headerEl.getAttribute("data-collapsed")) === "false";
   }
+  // src/SidebarManager.ts
   renderHierarchyNode(node, parentElement, level, activeChatId, activeAncestorPaths, updateId) {
     var _a;
     const itemEl = parentElement.createDiv({ cls: [CSS_HIERARCHY_ITEM, `${CSS_HIERARCHY_INDENT_PREFIX}${level}`] });
-    if (node.type === "folder") {
-      itemEl.dataset.path = node.path;
-    }
     const itemContentEl = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CONTENT });
+    itemEl.setAttr("draggable", "true");
+    this.view.registerDomEvent(itemEl, "dragstart", (e) => this.handleDragStart(e, node));
+    this.view.registerDomEvent(itemEl, "dragend", (e) => this.handleDragEnd(e));
     if (node.type === "folder") {
       itemEl.addClass(CSS_FOLDER_ITEM);
+      itemEl.dataset.path = node.path;
       const isExpanded = (_a = this.folderExpansionState.get(node.path)) != null ? _a : false;
       if (!isExpanded) {
         itemEl.addClass(CSS_HIERARCHY_ITEM_COLLAPSED);
@@ -2050,12 +2053,18 @@ var SidebarManager = class {
         e.stopPropagation();
         this.showFolderContextMenu(e, node);
       });
+      this.view.registerDomEvent(itemEl, "dragover", this.handleDragOver);
+      this.view.registerDomEvent(itemEl, "dragenter", (e) => this.handleDragEnter(e, node));
+      this.view.registerDomEvent(itemEl, "dragleave", this.handleDragLeave);
+      this.view.registerDomEvent(itemEl, "drop", (e) => this.handleDrop(e, node));
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
         e.preventDefault();
         this.showFolderContextMenu(e, node);
       });
-      this.view.registerDomEvent(itemContentEl, "click", () => {
-        this.handleToggleFolder(node.path);
+      this.view.registerDomEvent(itemContentEl, "click", (e) => {
+        if (e.target instanceof Element && !e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
+          this.handleToggleFolder(node.path);
+        }
       });
       const childrenContainer = itemEl.createDiv({ cls: CSS_HIERARCHY_ITEM_CHILDREN });
       if (node.children && node.children.length > 0) {
@@ -2066,6 +2075,8 @@ var SidebarManager = class {
     } else if (node.type === "chat") {
       itemEl.addClass(CSS_CHAT_ITEM);
       const chatMeta = node.metadata;
+      itemEl.dataset.chatId = chatMeta.id;
+      itemEl.dataset.filePath = node.filePath;
       const isActive = chatMeta.id === activeChatId;
       if (isActive) {
         itemEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE);
@@ -2078,6 +2089,7 @@ var SidebarManager = class {
         const lastModifiedDate = new Date(chatMeta.lastModified);
         const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
         if (dateText === "Invalid date") {
+          this.plugin.logger.warn(`[Render] Invalid date for chat ${chatMeta.id}: ${chatMeta.lastModified}`);
         }
         detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
       } catch (e) {
@@ -2094,11 +2106,10 @@ var SidebarManager = class {
         this.showChatContextMenu(e, chatMeta);
       });
       this.view.registerDomEvent(itemContentEl, "click", async (e) => {
-        if (e.target instanceof Element && e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
-          return;
-        }
-        if (chatMeta.id !== activeChatId) {
-          await this.plugin.chatManager.setActiveChat(chatMeta.id);
+        if (e.target instanceof Element && !e.target.closest(`.${CSS_HIERARCHY_ITEM_OPTIONS}`)) {
+          if (chatMeta.id !== activeChatId) {
+            await this.plugin.chatManager.setActiveChat(chatMeta.id);
+          }
         }
       });
       this.view.registerDomEvent(itemContentEl, "contextmenu", (e) => {
@@ -2107,6 +2118,7 @@ var SidebarManager = class {
       });
     }
   }
+  // --- Кінець методу renderHierarchyNode ---
   handleToggleFolder(folderPath) {
     var _a;
     const currentState = (_a = this.folderExpansionState.get(folderPath)) != null ? _a : false;
@@ -2520,6 +2532,131 @@ var SidebarManager = class {
     var _a;
     (_a = this.containerEl) == null ? void 0 : _a.remove();
     this.folderExpansionState.clear();
+  }
+  handleDragStart(event, node) {
+    if (!event.dataTransfer)
+      return;
+    let id;
+    let path;
+    let name;
+    if (node.type === "chat") {
+      id = node.metadata.id;
+      path = node.filePath;
+      name = node.metadata.name;
+    } else {
+      id = node.path;
+      path = node.path;
+      name = node.name;
+    }
+    this.draggedItemData = { type: node.type, id, path, name };
+    event.dataTransfer.setData("text/plain", JSON.stringify(this.draggedItemData));
+    event.dataTransfer.effectAllowed = "move";
+    if (event.target instanceof HTMLElement) {
+      event.target.addClass("is-dragging");
+    }
+    this.plugin.logger.debug(`Drag Start: type=${node.type}, id=${id}, path=${path}`);
+  }
+  handleDragEnd(event) {
+    if (event.target instanceof HTMLElement) {
+      event.target.removeClass("is-dragging");
+    }
+    this.containerEl.querySelectorAll(".drag-over-target").forEach((el) => el.removeClass("drag-over-target"));
+    this.draggedItemData = null;
+    this.plugin.logger.trace("Drag End");
+  }
+  handleDragOver(event) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = "move";
+    }
+  }
+  handleDragEnter(event, targetNode) {
+    event.preventDefault();
+    const targetElement = event.currentTarget;
+    if (!targetElement || !this.draggedItemData)
+      return;
+    let canDrop = false;
+    if (this.draggedItemData.type === "chat") {
+      canDrop = true;
+    } else if (this.draggedItemData.type === "folder") {
+      const draggedPath = this.draggedItemData.path;
+      const targetPath = targetNode.path;
+      if (draggedPath !== targetPath && !targetPath.startsWith(draggedPath + "/")) {
+        canDrop = true;
+      }
+    }
+    if (canDrop) {
+      targetElement.addClass("drag-over-target");
+    }
+  }
+  handleDragLeave(event) {
+    const targetElement = event.currentTarget;
+    if (targetElement) {
+      targetElement.removeClass("drag-over-target");
+    }
+  }
+  async handleDrop(event, targetNode) {
+    event.preventDefault();
+    const targetElement = event.currentTarget;
+    targetElement.removeClass("drag-over-target");
+    if (!this.draggedItemData || !event.dataTransfer) {
+      this.plugin.logger.warn("Drop event occurred without draggedItemData.");
+      this.draggedItemData = null;
+      return;
+    }
+    const draggedData = this.draggedItemData;
+    this.draggedItemData = null;
+    const targetFolderPath = targetNode.path;
+    this.plugin.logger.debug(`Drop Event: Dragged=${JSON.stringify(draggedData)}, Target Folder=${targetFolderPath}`);
+    const sourceParentPath = draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/";
+    if (draggedData.type === "folder" && draggedData.path === targetFolderPath) {
+      this.plugin.logger.debug("Drop skipped: Cannot drop folder onto itself.");
+      return;
+    }
+    if (draggedData.type === "chat" && sourceParentPath === (0, import_obsidian12.normalizePath)(targetFolderPath)) {
+      this.plugin.logger.debug("Drop skipped: Chat is already in the target folder.");
+      return;
+    }
+    if (draggedData.type === "folder" && targetFolderPath.startsWith(draggedData.path + "/")) {
+      new import_obsidian12.Notice("Cannot move a folder inside itself.");
+      this.plugin.logger.warn("Drop prevented: Cannot move folder into descendant.");
+      return;
+    }
+    let success = false;
+    const notice = new import_obsidian12.Notice(`Moving ${draggedData.type}...`, 0);
+    try {
+      if (draggedData.type === "chat") {
+        this.plugin.logger.info(`Calling moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
+        success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
+      } else if (draggedData.type === "folder") {
+        const folderName = draggedData.name;
+        const newPath = (0, import_obsidian12.normalizePath)(`${targetFolderPath}/${folderName}`);
+        this.plugin.logger.info(`Calling renameFolder (move): oldPath=${draggedData.path}, newPath=${newPath}`);
+        const exists = await this.app.vault.adapter.exists(newPath);
+        if (exists) {
+          new import_obsidian12.Notice(`A folder named "${folderName}" already exists in the target location.`);
+          this.plugin.logger.warn(`Drop prevented: Target folder ${newPath} already exists.`);
+        } else {
+          success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
+          if (success && this.folderExpansionState.has(draggedData.path)) {
+            const wasExpanded = this.folderExpansionState.get(draggedData.path);
+            this.folderExpansionState.delete(draggedData.path);
+            this.folderExpansionState.set(newPath, wasExpanded);
+          }
+        }
+      }
+    } catch (error) {
+      this.plugin.logger.error(`Error during drop operation (moving ${draggedData.type}):`, error);
+      new import_obsidian12.Notice(`Error moving ${draggedData.type}. Check console.`);
+      success = false;
+    } finally {
+      notice.hide();
+      if (success) {
+        this.plugin.logger.info(`Drop successful: Moved ${draggedData.type} '${draggedData.name}' to '${targetFolderPath}'. UI update pending event.`);
+      } else {
+        this.plugin.logger.warn(`Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to '${targetFolderPath}'.`);
+      }
+    }
   }
 };
 
