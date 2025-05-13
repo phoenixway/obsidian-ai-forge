@@ -36,8 +36,8 @@
   }
   
   .error-message-group {
-    margin: calc(var(--chat-spacing-unit) * 4) 0 !important;
-    display: flex;
+    margin-bottom: calc(var(--chat-spacing-unit) * 10) !important; 
+        display: flex;
     flex-direction: column;
     align-items: center;
     padding: 0 calc(var(--chat-spacing-unit) * 4); // Add some horizontal padding

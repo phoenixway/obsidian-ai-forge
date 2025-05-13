@@ -9,6 +9,7 @@ $tool-code-background: var(--background-primary, #202020);
   // Можна додати відступи, якщо потрібно відрізняти від інших груп
   // margin-bottom: 5px; 
   display: flex;
+  margin-bottom: calc(var(--chat-spacing-unit) * 10); 
   flex-direction: row;
   align-items: flex-start; // Аватар зверху, якщо він багаторядковий
   
