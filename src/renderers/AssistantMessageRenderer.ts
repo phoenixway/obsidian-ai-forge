@@ -19,84 +19,89 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         }
     }
 
-    /**
-     * Статичний метод для підготовки контенту повідомлення асистента для відображення.
-     * Видаляє <think> теги.
-     * Якщо увімкнено інструменти та є індикатори їх виклику (нативні або текстові <tool_call>),
-     * замінює текстові <tool_call> на повідомлення "(Using tool...)" і додає супровідний текст.
-     */
-    public static prepareDisplayContent(
-        originalContent: string,
-        assistantMessage: AssistantMessage, // Для доступу до message.tool_calls (нативні)
-        plugin: OllamaPlugin,
-        view: OllamaView // Для виклику view.parseAllTextualToolCalls
-    ): string {
-        const messageTimestampLog = assistantMessage.timestamp.getTime();
-        plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Original content for prepareDisplayContent: "${originalContent.substring(0, 200)}..."`);
+    // В AssistantMessageRenderer.ts
+public static prepareDisplayContent(
+    originalContent: string,
+    assistantMessage: AssistantMessage,
+    plugin: OllamaPlugin,
+    view: OllamaView // Потрібен для parseAllTextualToolCalls
+): string {
+    const ts = assistantMessage.timestamp.getTime();
+    plugin.logger.debug(`[PREP][ts:${ts}] === Starting prepareDisplayContent ===`);
+    plugin.logger.debug(`[PREP][ts:${ts}] 1. Original content:\n"${originalContent}"`);
 
-        // 1. Декодуємо HTML сутності та видаляємо <think> теги
-        const decodedContent = RendererUtils.decodeHtmlEntities(originalContent);
-        const thinkDetection = RendererUtils.detectThinkingTags(decodedContent);
-        let contentToProcess = thinkDetection.contentWithoutTags;
-        plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Content after think stripping: "${contentToProcess.substring(0, 200)}..."`);
-        if (thinkDetection.hasThinkingTags) {
-            plugin.logger.info(`[ARender STATIC PREP][ts:${messageTimestampLog}] <think> tags were present and stripped.`);
-        }
+    const decodedContent = RendererUtils.decodeHtmlEntities(originalContent);
+    plugin.logger.debug(`[PREP][ts:${ts}] 2. Content after decodeHtmlEntities:\n"${decodedContent}"`);
 
-        // 2. Перевіряємо наявність індикаторів виклику інструментів
-        const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
-        const hasTextualToolCallTagsInProcessedContent = contentToProcess.includes("<tool_call>");
+    const thinkDetection = RendererUtils.detectThinkingTags(decodedContent);
+    let contentAfterThinkStripping = thinkDetection.contentWithoutTags;
+    plugin.logger.debug(`[PREP][ts:${ts}] 3. Content after detectThinkingTags (hasThink: ${thinkDetection.hasThinkingTags}):\n"${contentAfterThinkStripping}"`);
 
-        plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Tool Checks: enableToolUse=${plugin.settings.enableToolUse}, hasTextualToolCallTagsInProcessedContent=${hasTextualToolCallTagsInProcessedContent}, hasNativeToolCalls=${hasNativeToolCalls}.`);
+    const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
+    const hasTextualToolCallTagsInContentAfterThinkStripping = contentAfterThinkStripping.includes("<tool_call>");
+    plugin.logger.debug(`[PREP][ts:${ts}] 4. Tool checks: enableToolUse=${plugin.settings.enableToolUse}, hasNativeToolCalls=${hasNativeToolCalls}, hasTextualToolCallTagsInContentAfterThinkStripping=${hasTextualToolCallTagsInContentAfterThinkStripping}`);
 
-        let finalDisplayContent = contentToProcess; // За замовчуванням - контент після видалення <think>
+    let finalDisplayContent = contentAfterThinkStripping; // Початкове значення
 
-        if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInProcessedContent)) {
-            plugin.logger.info(`[ARender STATIC PREP][ts:${messageTimestampLog}] Tool call indicators detected. Formatting for display.`);
-            
-            let usingToolMessageText = "( ";
-            const toolNamesExtracted: string[] = [];
-            // Текст, що залишиться ПІСЛЯ видалення <tool_call> тегів з contentToProcess (який вже без <think>)
-            let accompanyingText = contentToProcess; 
-
-            if (hasNativeToolCalls && assistantMessage.tool_calls) {
-                plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
-                assistantMessage.tool_calls.forEach(tc => toolNamesExtracted.push(tc.function.name));
-                // accompanyingText тут - це contentToProcess (оригінальний контент асистента без <think>).
-            } else if (hasTextualToolCallTagsInProcessedContent) {
-                plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from: "${contentToProcess.substring(0,150)}..."`);
-                
-                // Використовуємо parseAllTextualToolCalls з OllamaView для отримання імен
-                const parsedTextualCalls = parseAllTextualToolCalls(contentToProcess, plugin.logger); // <--- ВИКЛИК МЕТОДУ З VIEW
-                parsedTextualCalls.forEach(ptc => toolNamesExtracted.push(ptc.name));
-                plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Extracted tool names via parseAllTextualToolCalls: ${toolNamesExtracted.join(', ')}`);
-                
-                // Видаляємо <tool_call> теги з contentToProcess для отримання супровідного тексту
-                accompanyingText = contentToProcess.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-                
-                // Очищення можливих артефактів Markdown (опціонально, якщо це проблема)
-                // if (accompanyingText.startsWith("***")) { accompanyingText = accompanyingText.substring(3).trim(); }
-                // if (accompanyingText.endsWith("***")) { accompanyingText = accompanyingText.substring(0, accompanyingText.length - 3).trim(); }
-            }
-
-            if (toolNamesExtracted.length > 0) {
-                usingToolMessageText += `Using tool${toolNamesExtracted.length > 1 ? 's' : ''}: ${toolNamesExtracted.join(', ')}... `;
-            } else { 
-                usingToolMessageText += "Attempting to use tool(s)... ";
-                plugin.logger.warn(`[ARender STATIC PREP][ts:${messageTimestampLog}] Tool call indicators were present, but NO tool names were extracted. Displaying generic 'Attempting to use...' message.`);
-            }
-            usingToolMessageText += ")";
-            
-            if (accompanyingText && accompanyingText.trim().length > 0) {
-                finalDisplayContent = `${usingToolMessageText}\n\n${accompanyingText.trim()}`;
-            } else {
-                finalDisplayContent = usingToolMessageText;
-            }
-        }
+    if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInContentAfterThinkStripping)) {
+        plugin.logger.info(`[PREP][ts:${ts}] 5. Tool call indicators detected. Formatting for display.`);
         
-        plugin.logger.info(`[ARender STATIC PREP][ts:${messageTimestampLog}] Final prepared display content: "${finalDisplayContent.substring(0,150)}..."`);
-        return finalDisplayContent;
+        let usingToolMessageText = "( ";
+        const toolNamesExtracted: string[] = [];
+        let accompanyingText = contentAfterThinkStripping; // Текст, з якого будемо видаляти <tool_call>
+
+        if (hasNativeToolCalls && assistantMessage.tool_calls) {
+            plugin.logger.debug(`[PREP][ts:${ts}] 5a. Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
+            assistantMessage.tool_calls.forEach(tc => toolNamesExtracted.push(tc.function.name));
+            // accompanyingText залишається contentAfterThinkStripping, оскільки нативні виклики не в тексті
+        } else if (hasTextualToolCallTagsInContentAfterThinkStripping) { 
+            plugin.logger.debug(`[PREP][ts:${ts}] 5b. Processing TEXTUAL tool_call tags from: "${contentAfterThinkStripping.substring(0,150)}..."`);
+            
+            // Використовуємо parseAllTextualToolCalls з OllamaView для отримання імен
+            // Важливо, що parseAllTextualToolCalls отримує текст, де ВЖЕ НЕМАЄ <think> тегів
+            const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, plugin.logger); 
+            parsedTextualCalls.forEach(ptc => toolNamesExtracted.push(ptc.name));
+            plugin.logger.debug(`[PREP][ts:${ts}] 5c. Extracted tool names via parseAllTextualToolCalls: [${toolNamesExtracted.join(', ')}]`);
+            
+            // Видаляємо <tool_call> теги з contentAfterThinkStripping для отримання супровідного тексту
+            // Цей replace може бути проблематичним, якщо теги пошкоджені
+            accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+            plugin.logger.debug(`[PREP][ts:${ts}] 5d. Accompanying text after initial <tool_call> replace: "${accompanyingText}"`);
+
+            // Додаткове "грубе" очищення, якщо попереднє не спрацювало ідеально
+            if (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>")) {
+                plugin.logger.warn(`[PREP][ts:${ts}] Accompanying text still contains tool_call tags. Attempting forceful cleanup.`);
+                let tempText = accompanyingText;
+                // Видаляємо всі відкриваючі та закриваючі теги окремо
+                tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
+                // Спробуємо видалити будь-які залишки JSON, якщо вони виглядають як початок об'єкта і не є частиною тексту
+                // Це ризиковано, може видалити легітимний текст.
+                // tempText = tempText.replace(/{\s*("name"|"arguments")\s*:[\s\S]*?}/g, "").trim();
+                accompanyingText = tempText;
+                plugin.logger.debug(`[PREP][ts:${ts}] 5e. Accompanying text after forceful cleanup: "${accompanyingText}"`);
+            }
+        }
+
+        if (toolNamesExtracted.length > 0) {
+            usingToolMessageText += `Using tool${toolNamesExtracted.length > 1 ? 's' : ''}: ${toolNamesExtracted.join(', ')}... `;
+        } else { 
+            usingToolMessageText += "Attempting to use tool(s)... ";
+            plugin.logger.warn(`[PREP][ts:${ts}] No tool names were extracted, using generic message.`);
+        }
+        usingToolMessageText += ")";
+        
+        if (accompanyingText && accompanyingText.trim().length > 0) {
+            finalDisplayContent = `${usingToolMessageText}\n\n${accompanyingText.trim()}`;
+        } else {
+            finalDisplayContent = usingToolMessageText;
+        }
     }
+    // Якщо інструменти не використовуються або немає індикаторів, 
+    // finalDisplayContent вже встановлено як contentAfterThinkStripping
+    
+    plugin.logger.info(`[PREP][ts:${ts}] === Final content for display ===:\n"${finalDisplayContent}"`);
+    return finalDisplayContent;
+}
 
     public async render(): Promise<HTMLElement> {
         const messageTimestampLog = this.message.timestamp.getTime();
