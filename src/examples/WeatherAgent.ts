@@ -4,8 +4,13 @@ import { IAgent, IToolFunction } from "@/agents/IAgent";
 import { Notice } from "obsidian"; // Можливо Notice знадобиться для повідомлень
 
 // Приклад використання OpenWeatherMap API (потрібен API ключ!)
-const OPENWEATHERMAP_API_KEY = "16771698f22a664fd02258a97d7f7fa8"; // <<< ЗАМІНІТЬ НА ВАШ СПРАВЖНІЙ API КЛЮЧ!
+// ЗАМІНІТЬ "YOUR_OPENWEATHERMAP_API_KEY" на ВАШ СПРАВЖНІЙ API КЛЮЧ!
+const OPENWEATHERMAP_API_KEY = "16771698f22a664fd02258a97d7f7fa8";
 const OPENWEATHERMAP_BASE_URL = "https://api.openweathermap.org/data/2.5";
+
+// Використовуємо окрему змінну для плейсхолдера, щоб уникнути попереджень статичного аналізу
+const PLACEHOLDER_API_KEY_VALUE: string = "YOUR_OPENWEATHERMAP_API_KEY";
+
 
 export class WeatherAgent implements IAgent {
   id = "weather-agent";
@@ -14,6 +19,7 @@ export class WeatherAgent implements IAgent {
 
   getTools(): IToolFunction[] {
     return [
+      // ... (інструменти залишаються без змін)
       {
         name: "getWeatherToday",
         description: "Gets today's weather forecast for a specified location.",
@@ -66,22 +72,20 @@ export class WeatherAgent implements IAgent {
       return "Помилка: Аргумент 'location' відсутній або не є рядком.";
     }
 
-    if (OPENWEATHERMAP_API_KEY === "16771698f22a664fd02258a97d7f7fa8") {
-         return "Помилка: Необхідно замінити 'YOUR_OPENWEATHERMAP_API_KEY' на ваш справжній ключ OpenWeatherMap у коді агента.";
+    // Перевірка на плейсхолдер API ключа, використовуючи допоміжну змінну
+    if (OPENWEATHERMAP_API_KEY === PLACEHOLDER_API_KEY_VALUE) {
+         return `Помилка: Необхідно замінити '${PLACEHOLDER_API_KEY_VALUE}' на ваш справжній ключ OpenWeatherMap у коді агента WeatherAgent.`;
     }
 
     try {
       let url = '';
       let forecastData;
 
-      // Використовуємо endpoint /forecast для всіх запитів, так як він дає дані на 5 днів з інтервалом 3 години
-      // Потім ми відфільтруємо ці дані залежно від запиту (сьогодні, завтра, 5 днів)
       url = `${OPENWEATHERMAP_BASE_URL}/forecast?q=${encodeURIComponent(location)}&units=metric&appid=${OPENWEATHERMAP_API_KEY}&lang=ua`; // Додаємо lang=ua для української мови
 
       const response = await fetch(url);
 
       if (!response.ok) {
-        // Спробуємо прочитати помилку з тіла відповіді, якщо API надає таку інформацію
          let errorBody = await response.text();
          try {
              const errorJson = JSON.parse(errorBody);
@@ -96,11 +100,9 @@ export class WeatherAgent implements IAgent {
 
       const data = await response.json();
 
-      // Перевірка на помилки, специфічні для OpenWeatherMap (наприклад, місто не знайдено)
       if (data.cod !== "200") {
            throw new Error(`Помилка API: ${data.message || 'Невідома помилка API'}`);
       }
-
 
       forecastData = data.list; // Масив прогнозів кожні 3 години
       const city = data.city.name;
@@ -113,37 +115,48 @@ export class WeatherAgent implements IAgent {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const dayAfterTomorrow = new Date(today);
-      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-
 
       switch (toolName) {
         case "getWeatherToday": {
-            // Знаходимо перший прогноз, який відповідає сьогоднішній даті
-            const todayForecast = forecastData.find((item: any) => {
-                const itemDate = new Date(item.dt * 1000); // Перетворюємо timestamp у мілісекунди
-                 itemDate.setHours(0, 0, 0, 0);
-                 return itemDate.getTime() === today.getTime();
+            // Знаходимо перший прогноз на сьогодні (може бути декілька записів за день)
+            const todayForecasts = forecastData.filter((item: any) => {
+                const itemDate = new Date(item.dt * 1000);
+                 const compareDate = new Date(); // Порівнюємо з поточною датою без часу
+                 compareDate.setHours(0,0,0,0);
+                 return itemDate.setHours(0,0,0,0) === compareDate.getTime();
             });
 
-            if (todayForecast) {
-                result += `Сьогодні (${new Date(todayForecast.dt * 1000).toLocaleDateString()}): ${todayForecast.weather[0].description}, Температура: ${todayForecast.main.temp}°C, Відчувається як: ${todayForecast.main.feels_like}°C, Вологість: ${todayForecast.main.humidity}%.`;
+            // Для "сьогодні" може бути корисно показати поточний або найближчий прогноз
+            // Або просто перший доступний на сьогодні
+             const firstTodayForecast = todayForecasts.length > 0 ? todayForecasts[0] : null;
+
+
+            if (firstTodayForecast) {
+                 const date = new Date(firstTodayForecast.dt * 1000).toLocaleDateString();
+                 const time = new Date(firstTodayForecast.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                result += `Сьогодні (${date}, ${time}): ${firstTodayForecast.weather[0].description}, Температура: ${firstTodayForecast.main.temp}°C, Відчувається як: ${firstTodayForecast.main.feels_like}°C, Вологість: ${firstTodayForecast.main.humidity}%.`;
             } else {
-                result += "Не вдалося знайти прогноз на сьогодні.";
+                result += "Не вдалося знайти прогноз на сьогодні (можливо, всі прогнози на сьогодні вже пройшли за часом).";
             }
             break;
         }
 
         case "getWeatherTomorrow": {
-             // Знаходимо перший прогноз, який відповідає завтрашній даті
-             const tomorrowForecast = forecastData.find((item: any) => {
+             // Знаходимо перший прогноз на завтра
+             const tomorrowForecasts = forecastData.filter((item: any) => {
                 const itemDate = new Date(item.dt * 1000);
-                 itemDate.setHours(0, 0, 0, 0);
-                 return itemDate.getTime() === tomorrow.getTime();
+                 const compareDate = new Date();
+                 compareDate.setDate(compareDate.getDate() + 1); // Завтра
+                 compareDate.setHours(0,0,0,0);
+                 return itemDate.setHours(0,0,0,0) === compareDate.getTime();
              });
 
-             if (tomorrowForecast) {
-                result += `Завтра (${new Date(tomorrowForecast.dt * 1000).toLocaleDateString()}): ${tomorrowForecast.weather[0].description}, Температура: ${tomorrowForecast.main.temp}°C, Відчувається як: ${tomorrowForecast.main.feels_like}°C, Вологість: ${tomorrowForecast.main.humidity}%.`;
+             const firstTomorrowForecast = tomorrowForecasts.length > 0 ? tomorrowForecasts[0] : null;
+
+             if (firstTomorrowForecast) {
+                const date = new Date(firstTomorrowForecast.dt * 1000).toLocaleDateString();
+                const time = new Date(firstTomorrowForecast.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                result += `Завтра (${date}, ${time}): ${firstTomorrowForecast.weather[0].description}, Температура: ${firstTomorrowForecast.main.temp}°C, Відчувається як: ${firstTomorrowForecast.main.feels_like}°C, Вологість: ${firstTomorrowForecast.main.humidity}%.`;
              } else {
                 result += "Не вдалося знайти прогноз на завтра. API може не надавати дані так далеко вперед або для цього міста.";
              }
@@ -153,22 +166,26 @@ export class WeatherAgent implements IAgent {
         case "getWeather5Days": {
             const dailyForecasts: { [key: string]: any } = {};
             let daysCount = 0;
-            const maxDays = 5;
+            const maxDays = 5; // OpenWeatherMap надає максимум 5 днів
 
-            // Фільтруємо прогнози, щоб отримати перший запис для кожного з наступних 5 днів (починаючи з завтра)
-             // Або включаючи сьогодні, якщо сьогоднішній запит дає повний день
-             // Для простоти візьмемо перші 5 унікальних днів, які є після сьогодні (включно або наступні)
-            for (const item of forecastData) {
+            // Групуємо прогнози по днях, беручи перший запис за день
+             for (const item of forecastData) {
                 const itemDate = new Date(item.dt * 1000);
                  const dateString = itemDate.toLocaleDateString();
 
                  // Перевіряємо, чи це вже не пройдений час сьогодні
-                 if (itemDate.getTime() < new Date().getTime() && new Date(itemDate).toDateString() === new Date().toDateString()) {
-                     continue; // Пропускаємо минулі прогнози на сьогодні
+                 if (itemDate.getTime() < new Date().getTime() && itemDate.toDateString() === new Date().toDateString()) {
+                     // Можна пропустити минулі прогнози на сьогодні, якщо ми шукаємо майбутні 5 днів
+                     // Або включити перший доступний прогноз на сьогодні, якщо він є в forecastData
+                     // Для 5 днів зазвичай беруть прогнози на наступні дні.
+                     // Якщо сьогоднішній день ще попереду, перший прогноз на сьогодні буде включено
                  }
 
-                if (!dailyForecasts[dateString]) {
-                    dailyForecasts[dateString] = item; // Беремо перший прогноз за день
+                const dayKey = new Date(item.dt * 1000).toDateString(); // Ключ для дня без часу
+
+                if (!dailyForecasts[dayKey]) {
+                    // Беремо перший доступний прогноз за цей день як представника дня
+                    dailyForecasts[dayKey] = item;
                     daysCount++;
                 }
 
@@ -178,11 +195,17 @@ export class WeatherAgent implements IAgent {
             }
 
             if (Object.keys(dailyForecasts).length > 0) {
-                 for (const dateString in dailyForecasts) {
-                    const item = dailyForecasts[dateString];
+                 // Сортуємо дні по даті для коректного виведення
+                 const sortedDays = Object.keys(dailyForecasts).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+
+                 for (const dayKey of sortedDays) {
+                    const item = dailyForecasts[dayKey];
                      const date = new Date(item.dt * 1000).toLocaleDateString();
                      const dayOfWeek = new Date(item.dt * 1000).toLocaleDateString('uk-UA', { weekday: 'long' }); // День тижня українською
-                    result += `- ${dayOfWeek}, ${date}: ${item.weather[0].description}, Темп.: ${item.main.temp}°C, Волог.: ${item.main.humidity}%\n`;
+                     // Можна додати час прогнозу, якщо це перший запис за день
+                    const time = new Date(item.dt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    result += `- ${dayOfWeek}, ${date} (${time}): ${item.weather[0].description}, Темп.: ${item.main.temp}°C, Волог.: ${item.main.humidity}%\n`;
                 }
             } else {
                 result += "Не вдалося отримати прогноз на 5 днів.";

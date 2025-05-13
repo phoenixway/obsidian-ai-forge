@@ -9884,6 +9884,7 @@ ${files.join("\n")}`;
 // src/examples/WeatherAgent.ts
 var OPENWEATHERMAP_API_KEY = "16771698f22a664fd02258a97d7f7fa8";
 var OPENWEATHERMAP_BASE_URL = "https://api.openweathermap.org/data/2.5";
+var PLACEHOLDER_API_KEY_VALUE = "YOUR_OPENWEATHERMAP_API_KEY";
 var WeatherAgent = class {
   constructor() {
     this.id = "weather-agent";
@@ -9892,6 +9893,7 @@ var WeatherAgent = class {
   }
   getTools() {
     return [
+      // ... (інструменти залишаються без змін)
       {
         name: "getWeatherToday",
         description: "Gets today's weather forecast for a specified location.",
@@ -9941,8 +9943,8 @@ var WeatherAgent = class {
     if (!location || typeof location !== "string") {
       return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u0410\u0440\u0433\u0443\u043C\u0435\u043D\u0442 'location' \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456\u0439 \u0430\u0431\u043E \u043D\u0435 \u0454 \u0440\u044F\u0434\u043A\u043E\u043C.";
     }
-    if (OPENWEATHERMAP_API_KEY === "16771698f22a664fd02258a97d7f7fa8") {
-      return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043E\u0431\u0445\u0456\u0434\u043D\u043E \u0437\u0430\u043C\u0456\u043D\u0438\u0442\u0438 'YOUR_OPENWEATHERMAP_API_KEY' \u043D\u0430 \u0432\u0430\u0448 \u0441\u043F\u0440\u0430\u0432\u0436\u043D\u0456\u0439 \u043A\u043B\u044E\u0447 OpenWeatherMap \u0443 \u043A\u043E\u0434\u0456 \u0430\u0433\u0435\u043D\u0442\u0430.";
+    if (OPENWEATHERMAP_API_KEY === PLACEHOLDER_API_KEY_VALUE) {
+      return `\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043E\u0431\u0445\u0456\u0434\u043D\u043E \u0437\u0430\u043C\u0456\u043D\u0438\u0442\u0438 '${PLACEHOLDER_API_KEY_VALUE}' \u043D\u0430 \u0432\u0430\u0448 \u0441\u043F\u0440\u0430\u0432\u0436\u043D\u0456\u0439 \u043A\u043B\u044E\u0447 OpenWeatherMap \u0443 \u043A\u043E\u0434\u0456 \u0430\u0433\u0435\u043D\u0442\u0430 WeatherAgent.`;
     }
     try {
       let url = "";
@@ -9973,30 +9975,37 @@ var WeatherAgent = class {
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const dayAfterTomorrow = new Date(today);
-      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
       switch (toolName) {
         case "getWeatherToday": {
-          const todayForecast = forecastData.find((item) => {
+          const todayForecasts = forecastData.filter((item) => {
             const itemDate = new Date(item.dt * 1e3);
-            itemDate.setHours(0, 0, 0, 0);
-            return itemDate.getTime() === today.getTime();
+            const compareDate = new Date();
+            compareDate.setHours(0, 0, 0, 0);
+            return itemDate.setHours(0, 0, 0, 0) === compareDate.getTime();
           });
-          if (todayForecast) {
-            result += `\u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (${new Date(todayForecast.dt * 1e3).toLocaleDateString()}): ${todayForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${todayForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${todayForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${todayForecast.main.humidity}%.`;
+          const firstTodayForecast = todayForecasts.length > 0 ? todayForecasts[0] : null;
+          if (firstTodayForecast) {
+            const date = new Date(firstTodayForecast.dt * 1e3).toLocaleDateString();
+            const time = new Date(firstTodayForecast.dt * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            result += `\u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (${date}, ${time}): ${firstTodayForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${firstTodayForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${firstTodayForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${firstTodayForecast.main.humidity}%.`;
           } else {
-            result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456.";
+            result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (\u043C\u043E\u0436\u043B\u0438\u0432\u043E, \u0432\u0441\u0456 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u0438 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 \u0432\u0436\u0435 \u043F\u0440\u043E\u0439\u0448\u043B\u0438 \u0437\u0430 \u0447\u0430\u0441\u043E\u043C).";
           }
           break;
         }
         case "getWeatherTomorrow": {
-          const tomorrowForecast = forecastData.find((item) => {
+          const tomorrowForecasts = forecastData.filter((item) => {
             const itemDate = new Date(item.dt * 1e3);
-            itemDate.setHours(0, 0, 0, 0);
-            return itemDate.getTime() === tomorrow.getTime();
+            const compareDate = new Date();
+            compareDate.setDate(compareDate.getDate() + 1);
+            compareDate.setHours(0, 0, 0, 0);
+            return itemDate.setHours(0, 0, 0, 0) === compareDate.getTime();
           });
-          if (tomorrowForecast) {
-            result += `\u0417\u0430\u0432\u0442\u0440\u0430 (${new Date(tomorrowForecast.dt * 1e3).toLocaleDateString()}): ${tomorrowForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${tomorrowForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${tomorrowForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${tomorrowForecast.main.humidity}%.`;
+          const firstTomorrowForecast = tomorrowForecasts.length > 0 ? tomorrowForecasts[0] : null;
+          if (firstTomorrowForecast) {
+            const date = new Date(firstTomorrowForecast.dt * 1e3).toLocaleDateString();
+            const time = new Date(firstTomorrowForecast.dt * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+            result += `\u0417\u0430\u0432\u0442\u0440\u0430 (${date}, ${time}): ${firstTomorrowForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${firstTomorrowForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${firstTomorrowForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${firstTomorrowForecast.main.humidity}%.`;
           } else {
             result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0437\u0430\u0432\u0442\u0440\u0430. API \u043C\u043E\u0436\u0435 \u043D\u0435 \u043D\u0430\u0434\u0430\u0432\u0430\u0442\u0438 \u0434\u0430\u043D\u0456 \u0442\u0430\u043A \u0434\u0430\u043B\u0435\u043A\u043E \u0432\u043F\u0435\u0440\u0435\u0434 \u0430\u0431\u043E \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u043C\u0456\u0441\u0442\u0430.";
           }
@@ -10009,11 +10018,11 @@ var WeatherAgent = class {
           for (const item of forecastData) {
             const itemDate = new Date(item.dt * 1e3);
             const dateString = itemDate.toLocaleDateString();
-            if (itemDate.getTime() < new Date().getTime() && new Date(itemDate).toDateString() === new Date().toDateString()) {
-              continue;
+            if (itemDate.getTime() < new Date().getTime() && itemDate.toDateString() === new Date().toDateString()) {
             }
-            if (!dailyForecasts[dateString]) {
-              dailyForecasts[dateString] = item;
+            const dayKey = new Date(item.dt * 1e3).toDateString();
+            if (!dailyForecasts[dayKey]) {
+              dailyForecasts[dayKey] = item;
               daysCount++;
             }
             if (daysCount >= maxDays) {
@@ -10021,11 +10030,13 @@ var WeatherAgent = class {
             }
           }
           if (Object.keys(dailyForecasts).length > 0) {
-            for (const dateString in dailyForecasts) {
-              const item = dailyForecasts[dateString];
+            const sortedDays = Object.keys(dailyForecasts).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+            for (const dayKey of sortedDays) {
+              const item = dailyForecasts[dayKey];
               const date = new Date(item.dt * 1e3).toLocaleDateString();
               const dayOfWeek = new Date(item.dt * 1e3).toLocaleDateString("uk-UA", { weekday: "long" });
-              result += `- ${dayOfWeek}, ${date}: ${item.weather[0].description}, \u0422\u0435\u043C\u043F.: ${item.main.temp}\xB0C, \u0412\u043E\u043B\u043E\u0433.: ${item.main.humidity}%
+              const time = new Date(item.dt * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              result += `- ${dayOfWeek}, ${date} (${time}): ${item.weather[0].description}, \u0422\u0435\u043C\u043F.: ${item.main.temp}\xB0C, \u0412\u043E\u043B\u043E\u0433.: ${item.main.humidity}%
 `;
             }
           } else {
