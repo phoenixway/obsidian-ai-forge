@@ -1,4 +1,4 @@
-// OllamaView.ts
+
 import {
   ItemView,
   WorkspaceLeaf,
@@ -4305,24 +4305,34 @@ export class OllamaView extends ItemView {
   private async _processLlmStream(
     stream: AsyncIterableIterator<StreamChunk>,
     currentTurnLlmResponseTs: number, 
-    requestTimestampId: number
+    requestTimestampId: number 
   ): Promise<{
     accumulatedContent: string;
     nativeToolCalls: ToolCall[] | null;
     assistantMessageWithNativeCalls: AssistantMessage | null;
   }> {
-    let accumulatedContent = "";
+    let accumulatedContent = ""; 
     let nativeToolCalls: ToolCall[] | null = null;
     let assistantMessageWithNativeCalls: AssistantMessage | null = null;
     let firstChunkForTurn = true;
 
-    for await (const chunk of stream) {
-      if (this.currentAbortController?.signal.aborted) throw new Error("aborted by user");
-      if (chunk.type === "error") throw new Error(chunk.error);
+    this.plugin.logger.debug(`[OllamaView][_processLlmStream id:${requestTimestampId}] Starting for turn ts: ${currentTurnLlmResponseTs}.`);
 
+    for await (const chunk of stream) {
+      if (this.currentAbortController?.signal.aborted) {
+          this.plugin.logger.info(`[OllamaView][_processLlmStream id:${requestTimestampId}] Aborted by user signal.`);
+          throw new Error("aborted by user");
+      }
+      if (chunk.type === "error") {
+          this.plugin.logger.error(`[OllamaView][_processLlmStream id:${requestTimestampId}] Error chunk from service: ${chunk.error}.`);
+          throw new Error(chunk.error);
+      }
+
+      
       if (this.activePlaceholder?.timestamp !== currentTurnLlmResponseTs) {
-        if (chunk.type === "done") break;
-        continue;
+        this.plugin.logger.warn(`[OllamaView][_processLlmStream id:${requestTimestampId}] Stale placeholder (active_ts: ${this.activePlaceholder?.timestamp}, stream_ts: ${currentTurnLlmResponseTs}). Chunk (type: ${chunk.type}) ignored.`);
+        if (chunk.type === "done") break; 
+        continue; 
       }
 
       if (chunk.type === "content") {
@@ -4332,56 +4342,55 @@ export class OllamaView extends ItemView {
             if (thinkingDots) thinkingDots.remove();
             firstChunkForTurn = false;
           }
-          accumulatedContent += chunk.response;
+          
+          accumulatedContent += chunk.response; 
           
           
           
-          if (chunk.type === "content") {
-            if (this.activePlaceholder?.contentEl) {
-              
-              accumulatedContent += chunk.response;
-              await RendererUtils.renderMarkdownContent(
-                
-                this.app,
-                this, 
-                this.plugin,
-                this.activePlaceholder.contentEl, 
-                accumulatedContent 
-              );
-              this.guaranteedScrollToBottom(30, true);
-            }
-          }
-
+          await RendererUtils.renderMarkdownContent(
+            this.app,
+            this, 
+            this.plugin,
+            this.activePlaceholder.contentEl, 
+            accumulatedContent 
+          );
           this.guaranteedScrollToBottom(30, true);
         }
       } else if (chunk.type === "tool_calls") {
+        this.plugin.logger.info(`[OllamaView][_processLlmStream id:${requestTimestampId}] Native tool_calls received:`, chunk.calls);
         nativeToolCalls = chunk.calls;
         assistantMessageWithNativeCalls = chunk.assistant_message_with_calls;
-        if (
-          assistantMessageWithNativeCalls.content &&
-          !accumulatedContent.includes(assistantMessageWithNativeCalls.content)
-        ) {
-          if (firstChunkForTurn && this.activePlaceholder?.contentEl) {
-            const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-            if (thinkingDots) thinkingDots.remove();
-            firstChunkForTurn = false;
-          }
-          accumulatedContent += assistantMessageWithNativeCalls.content;
-          if (this.activePlaceholder?.contentEl) {
-            await RendererUtils.renderMarkdownContent(
-              this.app,
-              this,
-              this.plugin,
-              this.activePlaceholder.contentEl,
-              accumulatedContent
-            );
-          }
+        
+        
+        if (assistantMessageWithNativeCalls?.content) { 
+            if (firstChunkForTurn && this.activePlaceholder?.contentEl) {
+                const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+                if (thinkingDots) thinkingDots.remove();
+                firstChunkForTurn = false;
+            }
+            
+            if (!accumulatedContent.endsWith(assistantMessageWithNativeCalls.content)) {
+                 accumulatedContent += assistantMessageWithNativeCalls.content;
+            }
+
+            if (this.activePlaceholder?.contentEl) {
+                await RendererUtils.renderMarkdownContent(
+                  this.app,
+                  this,
+                  this.plugin,
+                  this.activePlaceholder.contentEl,
+                  accumulatedContent
+                );
+            }
         }
       } else if (chunk.type === "done") {
-        break;
+        this.plugin.logger.debug(`[OllamaView][_processLlmStream id:${requestTimestampId}] 'Done' chunk received.`);
+        break; 
       }
-    }
-    this.plugin.logger.error(`${accumulatedContent} accumulated from LLM stream.`);
+    } 
+
+    
+    this.plugin.logger.error(`[OllamaView][_processLlmStream id:${requestTimestampId}] ACCUMULATED CONTENT AT END OF STREAM (len: ${accumulatedContent.length}): "${accumulatedContent.substring(0, 500)}..."`);
     return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
 
@@ -4643,4 +4652,3 @@ export class OllamaView extends ItemView {
     }
   }
 }
-// end of OllamaView.ts
