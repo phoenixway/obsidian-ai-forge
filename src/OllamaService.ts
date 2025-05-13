@@ -274,7 +274,11 @@ export class OllamaService {
                 return;
               }
             } else if (typeof jsonChunk.response === 'string') { // Текстовий контент
-              // this.plugin.logger.debug('[OllamaService] Yielding content chunk.');
+               this.plugin.logger.debug('[OllamaService] Yielding content chunk.');
+               this.plugin.logger.error('[OllamaService] mes:', jsonChunk.message);
+              this.plugin.logger.debug('[OllamaService] Raw content chunk:', jsonChunk.response);
+              this.plugin.logger.debug('[OllamaService] Raw content chunk (stringify):', JSON.stringify(jsonChunk.response, null, 2));
+              this.plugin.logger.debug('[OllamaService] Raw content chunk (stringify):', jsonChunk);
               yield {
                 type: 'content',
                 response: jsonChunk.response,
