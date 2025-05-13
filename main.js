@@ -8327,9 +8327,6 @@ var PromptService = class {
     if (!normalizedPath || !this.plugin.settings.followRole) {
       const definition = {
         systemPrompt: null,
-        // Тут не можемо визначити isProductivityPersona без читання файлу,
-        // але для випадку без ролі це не важливо. Якщо б логіка була іншою,
-        // треба було б додати перевірку файлу тут.
         isProductivityPersona: false
       };
       return definition;
@@ -8371,8 +8368,6 @@ var PromptService = class {
     const roleDefinition = await this.getRoleDefinition(rolePath);
     return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
   }
-  // src/PromptService.ts
-  // ... (інші імпорти та частини класу PromptService) ...
   /**
    * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції
    * та дефолтний промпт для використання інструментів, якщо іншого немає.
@@ -8388,7 +8383,9 @@ var PromptService = class {
       if (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) {
         this.plugin.logger.debug(`[PromptService] Role loaded. Prompt length: ${roleDefinition.systemPrompt.length}`);
       } else {
-        this.plugin.logger.debug(`[PromptService] Role loaded but no system prompt found in role file, or role not followed.`);
+        this.plugin.logger.debug(
+          `[PromptService] Role loaded but no system prompt found in role file, or role not followed.`
+        );
       }
     } else {
       this.plugin.logger.debug(`[PromptService] No role selected or settings.followRole is false.`);
@@ -8452,7 +8449,11 @@ Tool Name: "${tool.name}"
           toolUsageInstructions += `  Description: ${tool.description}
 `;
           toolUsageInstructions += `  Parameters Schema (JSON Schema format):
-  ${JSON.stringify(tool.parameters, null, 2).replace(/\n/g, "\n  ")}
+  ${JSON.stringify(
+            tool.parameters,
+            null,
+            2
+          ).replace(/\n/g, "\n  ")}
 `;
         });
         toolUsageInstructions += "--- End Tool Usage Guidelines ---";
@@ -8461,7 +8462,9 @@ Tool Name: "${tool.name}"
       }
       if (combinedBasePrompt.length === 0) {
         combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
-        this.plugin.logger.debug("[PromptService] No RAG/Role prompt, using default assistant prompt + tool instructions.");
+        this.plugin.logger.debug(
+          "[PromptService] No RAG/Role prompt, using default assistant prompt + tool instructions."
+        );
       } else {
         combinedBasePrompt += toolUsageInstructions;
         this.plugin.logger.debug("[PromptService] Appended tool instructions to existing RAG/Role prompt.");
@@ -8482,10 +8485,11 @@ Tool Name: "${tool.name}"
       combinedBasePrompt = combinedBasePrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
     const finalTrimmedPrompt = combinedBasePrompt.trim();
-    this.plugin.logger.debug(`[PromptService] Final system prompt length: ${finalTrimmedPrompt.length}. Content preview: "${finalTrimmedPrompt.substring(0, 100)}..."`);
+    this.plugin.logger.debug(
+      `[PromptService] Final system prompt length: ${finalTrimmedPrompt.length}. Content preview: "${finalTrimmedPrompt.substring(0, 100)}..."`
+    );
     return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
-  // ... (решта вашого класу PromptService) ...
   /**
    * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
    * Використовує оновлений `prepareContext` з `RagService`.
@@ -8550,8 +8554,6 @@ ${processedHistoryString}`);
     }
     return finalPromptBody;
   }
-  // Методи _buildSimpleContext, _buildAdvancedContext, _summarizeMessages
-  // залишаються без структурних змін (тільки логування)
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
@@ -8657,16 +8659,12 @@ ${olderContextContent.trim()}
     const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
     const requestBody = {
       model: summarizationModelName,
-      // Використовуємо визначену модель
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.3,
-      // Низька температура для консистентної сумаризації
       options: {
         num_ctx: summarizationContextWindow
-        // Можна додати stop token, якщо потрібно, наприклад ["User:", "Assistant:"]
       },
-      // Системний промпт для сумаризатора
       system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, and unresolved questions."
     };
     try {
