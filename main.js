@@ -1209,7 +1209,8 @@ var CSS_CLASSES = {
   THINKING_HEADER: "thinking-header",
   THINKING_TOGGLE: "thinking-toggle",
   THINKING_TITLE: "thinking-title",
-  THINKING_CONTENT: "thinking-content"
+  THINKING_CONTENT: "thinking-content",
+  ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator"
   // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };
 
@@ -1673,43 +1674,53 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     }
   }
   static prepareDisplayContent(originalContent, assistantMessage, plugin, view) {
+    const messageTimestampLog = assistantMessage.timestamp.getTime();
+    let toolUsagePrefix = "\u2192 ";
+    let toolMessageAction = "";
+    const logger = plugin.logger;
     const ts = assistantMessage.timestamp.getTime();
     const decodedContent = decodeHtmlEntities(originalContent);
     const thinkDetection = detectThinkingTags(decodedContent);
     let contentAfterThinkStripping = thinkDetection.contentWithoutTags;
     const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
-    const hasTextualToolCallTagsInContentAfterThinkStripping = contentAfterThinkStripping.includes("<tool_call>");
+    const hasTextualToolCallTagsInProcessedContent = contentAfterThinkStripping.includes("<tool_call>");
     let finalDisplayContent = contentAfterThinkStripping;
-    if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInContentAfterThinkStripping)) {
-      let usingToolMessageText = "( ";
+    if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInProcessedContent)) {
+      logger.info(`[ARender PREP][ts:${messageTimestampLog}] 5. Tool call indicators detected. Formatting for display.`);
+      let toolUsageIndicatorActionText = "";
       const toolNamesExtracted = [];
       let accompanyingText = contentAfterThinkStripping;
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
+        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5a. Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesExtracted.push(tc.function.name));
-      } else if (hasTextualToolCallTagsInContentAfterThinkStripping) {
-        const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, plugin.logger);
+      } else if (hasTextualToolCallTagsInProcessedContent) {
+        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5b. Processing TEXTUAL tool_call tags from (content without think tags): "${contentAfterThinkStripping.substring(0, 150)}..."`);
+        const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, logger);
         parsedTextualCalls.forEach((ptc) => toolNamesExtracted.push(ptc.name));
+        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5c. Extracted tool names via parseAllTextualToolCalls: [${toolNamesExtracted.join(", ")}]`);
         accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-        if (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>")) {
+        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5d. Accompanying text after initial <tool_call> replace: "${accompanyingText}"`);
+        if (toolNamesExtracted.length === 0 && (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>"))) {
+          logger.warn(`[ARender PREP][ts:${messageTimestampLog}] Tool names not extracted AND accompanying text still contains tool_call tags. Attempting forceful cleanup.`);
           let tempText = accompanyingText;
           tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
           accompanyingText = tempText;
+          logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5e. Accompanying text after forceful cleanup: "${accompanyingText}"`);
         }
       }
       if (toolNamesExtracted.length > 0) {
-        usingToolMessageText += `Using tool${toolNamesExtracted.length > 1 ? "s" : ""}: ${toolNamesExtracted.join(
-          ", "
-        )}... `;
+        toolUsageIndicatorActionText = `Using tool${toolNamesExtracted.length > 1 ? "s" : ""}: ${toolNamesExtracted.join(", ")}...`;
       } else {
-        usingToolMessageText += "Attempting to use tool(s)... ";
+        toolUsageIndicatorActionText = "Attempting to use tool(s)...";
+        logger.warn(`[ARender PREP][ts:${messageTimestampLog}] No tool names were extracted (e.g. due to parse error), using generic 'Attempting to use...' message.`);
       }
-      usingToolMessageText += ")";
+      const toolUsageIndicatorHTML = `<span class="${CSS_CLASSES.ASSISTANT_TOOL_USAGE_INDICATOR || "assistant-tool-usage-indicator"}">\u2192 ${toolUsageIndicatorActionText}</span>`;
       if (accompanyingText && accompanyingText.trim().length > 0) {
-        finalDisplayContent = `${usingToolMessageText}
+        finalDisplayContent = `${toolUsageIndicatorHTML}
 
 ${accompanyingText.trim()}`;
       } else {
-        finalDisplayContent = usingToolMessageText;
+        finalDisplayContent = toolUsageIndicatorHTML;
       }
     }
     return finalDisplayContent;
@@ -8860,7 +8871,6 @@ var ChatManager = class {
     const operationTimestampId = messagePayload.timestamp.getTime();
     const activeChatInstance = await this.getActiveChat();
     if (!activeChatInstance) {
-      this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Cannot add message payload: No active chat.`);
       return null;
     }
     if (!messagePayload.timestamp) {
@@ -8871,7 +8881,6 @@ var ChatManager = class {
     if (activityRecorded) {
       const saveAndUpdateIndexSuccess = await this.saveChatAndUpdateIndex(activeChatInstance);
       if (!saveAndUpdateIndexSuccess) {
-        this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Failed to update index for chat ${activeChatInstance.metadata.id} after activity.`);
       }
     }
     if (emitEvent) {
@@ -8883,7 +8892,6 @@ var ChatManager = class {
   async getChat(id, filePath) {
     var _a;
     if (this.loadedChats[id]) {
-      this.logger.trace(`[ChatManager.getChat] Returning cached chat for ID: ${id}`);
       return this.loadedChats[id];
     }
     let actualFilePath = filePath;
@@ -9616,7 +9624,6 @@ var ChatManager = class {
   async addUserMessageAndAwaitRender(content, timestamp, requestTimestampId) {
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
-      this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Cannot add message: No active chat.`);
       return null;
     }
     const messageTimestampMs = timestamp.getTime();
@@ -9636,7 +9643,6 @@ var ChatManager = class {
     });
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
-      this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Failed to add user message payload for ts: ${messageTimestampMs}.`);
       this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
       return null;
     }
@@ -9644,7 +9650,6 @@ var ChatManager = class {
       await hmaPromise;
       return userMessage;
     } catch (error) {
-      this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Error or timeout waiting for HMA for UserMessage (ts: ${messageTimestampMs}):`, error);
       return null;
     }
   }

@@ -78,6 +78,8 @@ export const CSS_CLASSES = {
      THINKING_TITLE: "thinking-title",
      THINKING_CONTENT: "thinking-content",                 
 
+
+     ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator",
      // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };
 export const SCROLL_THRESHOLD = 150;

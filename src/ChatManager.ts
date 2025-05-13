@@ -624,8 +624,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
     
     const activeChatInstance = await this.getActiveChat(); 
     if (!activeChatInstance) {
-      this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Cannot add message payload: No active chat.`);
-      
+            
       
       
       return null;
@@ -646,8 +645,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
 if (activityRecorded) { 
         const saveAndUpdateIndexSuccess = await this.saveChatAndUpdateIndex(activeChatInstance); 
         if (!saveAndUpdateIndexSuccess) {
-            this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Failed to update index for chat ${activeChatInstance.metadata.id} after activity.`);
-        }
+                    }
     }
 
     if (emitEvent) {
@@ -660,7 +658,6 @@ if (activityRecorded) {
 
 async getChat(id: string, filePath?: string): Promise<Chat | null> {
   if (this.loadedChats[id]) {
-      this.logger.trace(`[ChatManager.getChat] Returning cached chat for ID: ${id}`);
       return this.loadedChats[id];
   }
 
@@ -1644,8 +1641,7 @@ async deleteChat(id: string): Promise<boolean> {
   ): Promise<Message | null> {
     const activeChat = await this.getActiveChat(); 
     if (!activeChat) {
-      this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Cannot add message: No active chat.`);
-      return null;
+            return null;
     }
 
     const messageTimestampMs = timestamp.getTime();
@@ -1672,8 +1668,7 @@ async deleteChat(id: string): Promise<boolean> {
     
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
-        this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Failed to add user message payload for ts: ${messageTimestampMs}.`);
-        this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
+                this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
         return null;
     }
     
@@ -1682,8 +1677,7 @@ async deleteChat(id: string): Promise<boolean> {
         await hmaPromise;
                 return userMessage;
     } catch (error) {
-        this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Error or timeout waiting for HMA for UserMessage (ts: ${messageTimestampMs}):`, error);
-        
+                
         return null; 
     }
   }
