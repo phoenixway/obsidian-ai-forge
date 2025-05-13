@@ -8130,6 +8130,10 @@ var OllamaService = class {
               return;
             }
             if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
+              this.plugin.logger.error(
+                "[OllamaService] Raw tool_calls content:",
+                JSON.stringify(jsonChunk.message.tool_calls, null, 2)
+              );
               this.plugin.logger.info("[OllamaService] Yielding tool_calls chunk:", jsonChunk.message.tool_calls);
               yield {
                 type: "tool_calls",
@@ -8173,6 +8177,7 @@ var OllamaService = class {
               }
             } else if (jsonChunk.done === true) {
               this.plugin.logger.info("[OllamaService] Stream finished (final done:true chunk with metrics).");
+              this.plugin.logger.error("[OllamaService] mes:", jsonChunk.message);
               yield {
                 type: "done",
                 model: jsonChunk.model,
