@@ -576,11 +576,9 @@ export class ChatManager {
     addMessageToActiveChatPayload(messagePayload_1) {
         return __awaiter(this, arguments, void 0, function* (messagePayload, emitEvent = true) {
             const operationTimestampId = messagePayload.timestamp.getTime(); // Для логування
-            this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Attempting to add message (Role: ${messagePayload.role}) to active chat.`);
-            const activeChatInstance = yield this.getActiveChat();
+                        const activeChatInstance = yield this.getActiveChat();
             if (!activeChatInstance) {
-                this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Cannot add message payload: No active chat.`);
-                // Розгляньте можливість створення нового чату тут, якщо це бажана поведінка
+                                // Розгляньте можливість створення нового чату тут, якщо це бажана поведінка
                 // const newChat = await this.createNewChat();
                 // if (newChat) { ... } else { return null; }
                 return null;
@@ -588,24 +586,20 @@ export class ChatManager {
             // Переконуємося, що timestamp є
             if (!messagePayload.timestamp) {
                 messagePayload.timestamp = new Date();
-                this.plugin.logger.warn(`[ChatManager][addMessagePayload id:${operationTimestampId}] Message payload was missing timestamp, set to now.`);
-            }
+                            }
             activeChatInstance.messages.push(messagePayload);
             // Оновлюємо lastModified та потенційно інші метадані, якщо потрібно
             // const metadataChanged = activeChatInstance.updateMetadata({ lastModified: new Date().toISOString() }); 
             const activityRecorded = activeChatInstance.recordActivity();
-            this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Message pushed to in-memory chat. Metadata changed: ${activityRecorded}`);
-            if (activityRecorded) { // Оновлюємо індекс, тільки якщо були зміни
+                        if (activityRecorded) { // Оновлюємо індекс, тільки якщо були зміни
                 const saveAndUpdateIndexSuccess = yield this.saveChatAndUpdateIndex(activeChatInstance); // metadataChanged більше не потрібен як параметр, якщо save() в Chat.ts
                 if (!saveAndUpdateIndexSuccess) {
-                    this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Failed to update index for chat ${activeChatInstance.metadata.id} after activity.`);
-                }
+                                    }
             }
             if (emitEvent) {
                 // Переконуємося, що ID чату для події відповідає поточному активному чату
                 const currentActiveChatIdForEvent = this.activeChatId || activeChatInstance.metadata.id;
-                this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Emitting 'message-added' for chat ${currentActiveChatIdForEvent}, msg role: ${messagePayload.role}, msg_ts: ${messagePayload.timestamp.getTime()}`);
-                this.plugin.emit("message-added", { chatId: currentActiveChatIdForEvent, message: messagePayload });
+                                this.plugin.emit("message-added", { chatId: currentActiveChatIdForEvent, message: messagePayload });
             }
             return messagePayload;
         });
@@ -614,7 +608,6 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             var _a;
             if (this.loadedChats[id]) {
-                this.logger.trace(`[ChatManager.getChat] Returning cached chat for ID: ${id}`);
                 return this.loadedChats[id];
             }
             let actualFilePath = filePath;
@@ -1482,11 +1475,9 @@ export class ChatManager {
      */
     registerHMAResolver(timestampMs, resolve, reject) {
         if (this.messageAddedResolvers.has(timestampMs)) {
-            this.plugin.logger.warn(`[ChatManager] HMA Resolver for timestamp ${timestampMs} already exists. Overwriting.`);
-        }
+                    }
         this.messageAddedResolvers.set(timestampMs, { resolve, reject });
-        this.plugin.logger.debug(`[ChatManager] HMA Resolver registered for timestamp ${timestampMs}. Map size: ${this.messageAddedResolvers.size}`);
-    }
+            }
     /**
      * Викликає та видаляє резолвер для події message-added.
      * Цей метод викликатиметься з OllamaView.handleMessageAdded.
@@ -1494,20 +1485,16 @@ export class ChatManager {
     invokeHMAResolver(timestampMs) {
         const resolverPair = this.messageAddedResolvers.get(timestampMs);
         if (resolverPair) {
-            this.plugin.logger.debug(`[ChatManager] Invoking HMA Resolver for timestamp ${timestampMs}.`);
-            resolverPair.resolve();
+                        resolverPair.resolve();
             this.messageAddedResolvers.delete(timestampMs);
-            this.plugin.logger.debug(`[ChatManager] HMA Resolver for timestamp ${timestampMs} invoked and deleted. Map size: ${this.messageAddedResolvers.size}`);
-        }
+                    }
         else {
-            this.plugin.logger.warn(`[ChatManager] No HMA Resolver found to invoke for timestamp ${timestampMs}. Map size: ${this.messageAddedResolvers.size}`);
-        }
+                    }
     }
     rejectAndClearHMAResolver(timestampMs, reason) {
         const resolverPair = this.messageAddedResolvers.get(timestampMs);
         if (resolverPair) {
-            this.plugin.logger.warn(`[ChatManager] Rejecting HMA Resolver for ts ${timestampMs} due to: ${reason}`);
-            resolverPair.reject(new Error(reason));
+                        resolverPair.reject(new Error(reason));
             this.messageAddedResolvers.delete(timestampMs);
         }
     }
@@ -1525,8 +1512,7 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const activeChat = yield this.getActiveChat(); // Припускаємо, що getActiveChat повертає Chat | null
             if (!activeChat) {
-                this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Cannot add message: No active chat.`);
-                return null;
+                                return null;
             }
             const messageTimestampMs = timestamp.getTime();
             const userMessage = {
@@ -1534,16 +1520,14 @@ export class ChatManager {
                 content,
                 timestamp,
             };
-            this.plugin.logger.debug(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Setting up HMA Promise for UserMessage (ts: ${messageTimestampMs}).`);
-            const hmaPromise = new Promise((resolve, reject) => {
+                        const hmaPromise = new Promise((resolve, reject) => {
                 // Реєструємо резолвер в ChatManager, щоб OllamaView.handleMessageAdded міг його викликати
                 this.registerHMAResolver(messageTimestampMs, resolve, reject);
                 // Таймаут для HMA
                 setTimeout(() => {
                     if (this.messageAddedResolvers.has(messageTimestampMs)) { // Перевіряємо, чи резолвер ще там
                         const reason = `HMA Timeout for UserMessage (ts: ${messageTimestampMs}) in ChatManager.`;
-                        this.plugin.logger.warn(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] ${reason}`);
-                        this.rejectAndClearHMAResolver(messageTimestampMs, reason);
+                                                this.rejectAndClearHMAResolver(messageTimestampMs, reason);
                     }
                 }, 10000); // 10 секунд таймаут
             });
@@ -1551,19 +1535,15 @@ export class ChatManager {
             // addMessageToActiveChatPayload має дбати про збереження та емітування події "message-added"
             const addedMessage = yield this.addMessageToActiveChatPayload(userMessage, true);
             if (!addedMessage) {
-                this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Failed to add user message payload for ts: ${messageTimestampMs}.`);
-                this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
+                                this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
                 return null;
             }
-            this.plugin.logger.debug(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] UserMessage (ts: ${messageTimestampMs}) added to ChatManager. Waiting for HMA completion.`);
-            try {
+                        try {
                 yield hmaPromise;
-                this.plugin.logger.info(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] HMA completed for UserMessage (ts: ${messageTimestampMs}).`);
-                return userMessage;
+                                return userMessage;
             }
             catch (error) {
-                this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Error or timeout waiting for HMA for UserMessage (ts: ${messageTimestampMs}):`, error);
-                // Резолвер вже мав бути видалений rejectAndClearHMAResolver
+                                // Резолвер вже мав бути видалений rejectAndClearHMAResolver
                 return null; // Або кинути помилку далі, якщо потрібно
             }
         });
