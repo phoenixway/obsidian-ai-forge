@@ -329,4 +329,24 @@ export class Chat {
         };
       }
 
+/**
+     * Записує активність у чаті, оновлюючи мітку часу lastModified.
+     * Автоматично викликає збереження чату (з debounce).
+     * @returns {boolean} - True, якщо мітка lastModified була фактично змінена, інакше false.
+     */
+public recordActivity(): boolean {
+    const oldLastModified = this.metadata.lastModified;
+    this.metadata.lastModified = new Date().toISOString();
+    const changed = oldLastModified !== this.metadata.lastModified;
+
+    if (changed) {
+        this.logger.trace(`[Chat ${this.metadata.id}] Activity recorded. lastModified updated to ${this.metadata.lastModified}. Scheduling save.`);
+        this.save(); // Викликаємо debounce-збереження
+    } else {
+        // Це може статися, якщо recordActivity викликається кілька разів дуже швидко (в межах однієї мілісекунди)
+        this.logger.trace(`[Chat ${this.metadata.id}] recordActivity called, but lastModified did not change (called too quickly?).`);
+    }
+    return changed;
+}
+
 } // End of Chat class

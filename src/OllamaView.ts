@@ -21,6 +21,8 @@ import { RoleInfo } from "./ChatManager";
 import { Chat, ChatMetadata } from "./Chat";
 import { SummaryModal } from "./SummaryModal";
 import { AssistantMessage, Message, OllamaGenerateResponse, ToolCall } from "./types";
+import { MessageRole as MessageRoleTypeFromTypes } from "./types"; 
+
 import { CSS_CLASSES } from "./constants";
 
 import * as RendererUtils from "./MessageRendererUtils";
@@ -3210,24 +3212,25 @@ export class OllamaView extends ItemView {
   
   async sendMessage(): Promise<void> {
     const userInputText = this.inputEl.value.trim();
-    const requestTimestampId = Date.now(); // Унікальний ID для логів цього запиту
+    const requestTimestampId = Date.now(); 
 
-    this.plugin.logger.debug(`[sendMessage START id:${requestTimestampId}] User input: "${userInputText.substring(0, 50)}...", isProcessing: ${this.isProcessing}, currentAbortController: ${this.currentAbortController ? "active" : "null"}`);
+    this.plugin.logger.debug(`[OllamaView][sendMessage START id:${requestTimestampId}] User input: "${userInputText.substring(0, 50)}...", isProcessing: ${this.isProcessing}, currentAbortController: ${this.currentAbortController ? "active" : "null"}`);
 
     if (!userInputText || this.isProcessing || this.currentAbortController) {
-      this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Aborted early. Empty: ${!userInputText}, Processing: ${this.isProcessing}, AbortCtrl: ${!!this.currentAbortController}`);
+      this.plugin.logger.warn(`[OllamaView][sendMessage id:${requestTimestampId}] Aborted early. Empty: ${!userInputText}, Processing: ${this.isProcessing}, AbortCtrl: ${!!this.currentAbortController}`);
       if (this.isProcessing || this.currentAbortController) new Notice("Please wait or cancel current operation.", 3000);
       return;
     }
 
-    let activeChat = await this.plugin.chatManager.getActiveChat();
+    let activeChat = await this.plugin.chatManager.getActiveChat(); // Використовуємо getActiveChat без "OrFail" спочатку
     if (!activeChat) {
-      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] No active chat. Creating new.`);
+      this.plugin.logger.info(`[OllamaView][sendMessage id:${requestTimestampId}] No active chat. Creating new.`);
       activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
         new Notice("Error: No active chat and could not create one.");
-        this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] Failed to get/create active chat.`);
-        return; // setLoadingState(false) буде в finally
+        this.plugin.logger.error(`[OllamaView][sendMessage id:${requestTimestampId}] Failed to get/create active chat.`);
+        this.setLoadingState(false); 
+        return;
       }
       new Notice(`Started new chat: ${activeChat.metadata.name}`);
     }
@@ -3236,34 +3239,45 @@ export class OllamaView extends ItemView {
 
     this.clearInputField();
     this.currentAbortController = new AbortController();
-    this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] AbortController CREATED.`);
+    this.plugin.logger.debug(`[OllamaView][sendMessage id:${requestTimestampId}] AbortController CREATED.`);
     this.setLoadingState(true);
     this.hideEmptyState();
     
-    const llmResponseStartTimeMs = Date.now(); // Використовуємо це як базовий timestamp для першого ходу LLM
-    let streamErrorOccurred: Error | null = null;
+    const llmResponseStartTimeMs = Date.now(); 
     
-    // Змінні для циклу
     let continueConversation = true;
     const maxTurns = 5;
     let turns = 0;
-    let currentTurnLlmResponseTsForCatch: number | null = llmResponseStartTimeMs; // Ініціалізуємо для першого ходу
+    let currentTurnLlmResponseTsForCatch: number | null = llmResponseStartTimeMs;
 
     try {
-      await this._processAndRenderUserMessage(userInputText, userMessageTimestamp, requestTimestampId);
+      // Крок 1: Обробка та рендеринг повідомлення користувача
+      const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
+          userInputText, 
+          userMessageTimestamp, 
+          requestTimestampId
+      );
+      if (!userMessageAdded) {
+          throw new Error("User message processing failed in ChatManager.");
+      }
+      this.plugin.logger.info(`[OllamaView][sendMessage id:${requestTimestampId}] UserMessage (ts: ${userMessageTimestamp.getTime()}) fully processed by HMA via ChatManager.`);
+
+
+      let chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
 
       while (continueConversation && turns < maxTurns && !this.currentAbortController.signal.aborted) {
         turns++;
         const currentTurnLlmResponseTs = (turns === 1) ? llmResponseStartTimeMs : Date.now();
-        currentTurnLlmResponseTsForCatch = currentTurnLlmResponseTs; // Оновлюємо для поточного ходу
+        currentTurnLlmResponseTsForCatch = currentTurnLlmResponseTs;
 
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Orchestrator Turn ${turns}/${maxTurns}.`);
+        this.plugin.logger.debug(`[OllamaView][sendMessage id:${requestTimestampId}] Orchestrator Turn ${turns}/${maxTurns}. History length: ${chatStateForLlm.messages.length}`);
         this._managePlaceholder(currentTurnLlmResponseTs, requestTimestampId);
         
-        const chatStateForStream = await this.plugin.chatManager.getActiveChatOrFail(); // Завжди свіжий стан
+        // Завжди отримуємо найсвіжіший стан чату перед викликом LLM
+        chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail(); 
 
         const llmStream = this.plugin.ollamaService.generateChatResponseStream(
-          chatStateForStream,
+          chatStateForLlm,
           this.currentAbortController.signal
         );
 
@@ -3286,6 +3300,9 @@ export class OllamaView extends ItemView {
                 toolCallCheckResult.assistantMessageForHistory,
                 requestTimestampId
             );
+            // Після виконання інструментів та додавання їх результатів до ChatManager,
+            // оновлюємо стан чату для наступної ітерації LLM.
+            chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
             continueConversation = true;
         } else {
             await this._renderFinalAssistantText(
@@ -3293,36 +3310,44 @@ export class OllamaView extends ItemView {
                 currentTurnLlmResponseTs,
                 requestTimestampId
             );
-            continueConversation = false;
+            continueConversation = false; 
         }
-      } // End while loop
+      } 
 
-      if (turns >= maxTurns) {
-        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Max turns (${maxTurns}) reached.`);
-        const maxTurnsMsg: Message = { role: "system", content: "Max processing turns reached.", timestamp: new Date() };
-        let hmaPromise = new Promise<void>((resolve, reject) => {this.messageAddedResolvers.set(maxTurnsMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for max turns msg")), 10000);});
+      if (turns >= maxTurns) { 
+        this.plugin.logger.warn(`[OllamaView][sendMessage id:${requestTimestampId}] Max turns (${maxTurns}) reached.`);
+        const maxTurnsMsgTimestamp = new Date();
+        const maxTurnsMsg: Message = { role: "system", content: "Max processing turns reached. If the task is not complete, please try rephrasing or breaking it down.", timestamp: maxTurnsMsgTimestamp };
+        
+        const hmaPromise = new Promise<void>((resolve, reject) => {
+            this.plugin.chatManager.registerHMAResolver(maxTurnsMsg.timestamp.getTime(), resolve, reject);
+            setTimeout(() => {if(this.plugin.chatManager.messageAddedResolvers.has(maxTurnsMsg.timestamp.getTime())) {this.plugin.chatManager.rejectAndClearHMAResolver(maxTurnsMsg.timestamp.getTime(), "HMA timeout for max turns msg");}}, 10000);
+        });
         await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
-        try { await hmaPromise; } catch(e_hma){ this.plugin.logger.error("HMA error/timeout for max turns system message", e_hma); }
+        try { await hmaPromise; } catch(e_hma){ this.plugin.logger.error(`[OllamaView][sendMessage id:${requestTimestampId}] HMA error/timeout for max turns system message`, e_hma); }
       }
 
     } catch (error: any) {
-      streamErrorOccurred = error;
-      this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] CATCH (Outer):`, error.message, error);
+      this.plugin.logger.error(`[OllamaView][sendMessage id:${requestTimestampId}] CATCH (Outer): ${error.message}`, error);
 
       if (this.activePlaceholder &&
           (this.activePlaceholder.timestamp === llmResponseStartTimeMs ||
            (currentTurnLlmResponseTsForCatch !== null && this.activePlaceholder.timestamp === currentTurnLlmResponseTsForCatch)
           ) && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+        this.plugin.logger.debug(`[OllamaView][sendMessage id:${requestTimestampId}] CATCH: Removing active placeholder (ts: ${this.activePlaceholder.timestamp}) due to error.`);
         if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
-        this.activePlaceholder = null;
       }
+      this.activePlaceholder = null; // Завжди очищаємо плейсхолдер при помилці в try
       
-      this.messageAddedResolvers.delete(userMessageTimestamp.getTime());
-      this.messageAddedResolvers.delete(llmResponseStartTimeMs);
-      if (currentTurnLlmResponseTsForCatch !== null) this.messageAddedResolvers.delete(currentTurnLlmResponseTsForCatch);
+      // Очищаємо резолвери, які могли бути зареєстровані цим викликом sendMessage
+      this.plugin.chatManager.rejectAndClearHMAResolver(userMessageTimestamp.getTime(), `Outer catch in sendMessage for request ${requestTimestampId}`);
+      this.plugin.chatManager.rejectAndClearHMAResolver(llmResponseStartTimeMs, `Outer catch in sendMessage for request ${requestTimestampId}`);
+      if (currentTurnLlmResponseTsForCatch !== null) {
+          this.plugin.chatManager.rejectAndClearHMAResolver(currentTurnLlmResponseTsForCatch, `Outer catch in sendMessage for request ${requestTimestampId}`);
+      }
 
       let errorMsgForChat: string;
-      let errorMsgRole: MessageRole = "error";
+      let errorMsgRole: MessageRole = "error"; 
       if (error.name === 'AbortError' || error.message?.includes("aborted by user")) {
         errorMsgForChat = "Message generation stopped.";
         errorMsgRole = "system";
@@ -3330,32 +3355,28 @@ export class OllamaView extends ItemView {
         errorMsgForChat = `Error: ${error.message || "Unknown error during processing."}`;
         new Notice(errorMsgForChat, 7000);
       }
-      const errorDisplayMsg: Message = { role: errorMsgRole, content: errorMsgForChat, timestamp: new Date() };
-      let hmaPromise = new Promise<void>((resolve, reject) => {this.messageAddedResolvers.set(errorDisplayMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for error display msg")), 10000);});
+      const errorDisplayTimestamp = new Date();
+      const errorDisplayMsg: Message = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorDisplayTimestamp };
+      
+      const hmaErrorPromise = new Promise<void>((resolve, reject) => {this.plugin.chatManager.registerHMAResolver(errorDisplayMsg.timestamp.getTime(), resolve, reject); setTimeout(() => {if(this.plugin.chatManager.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())){this.plugin.chatManager.rejectAndClearHMAResolver(errorDisplayMsg.timestamp.getTime(), "HMA timeout for error display msg");}}, 10000);});
       await this.plugin.chatManager.addMessageToActiveChatPayload(errorDisplayMsg, true);
-      try { await hmaPromise; } catch(e_hma){ this.plugin.logger.error("HMA error/timeout for error display message", e_hma); }
+      try { await hmaErrorPromise; } catch(e_hma){ this.plugin.logger.error(`[OllamaView][sendMessage id:${requestTimestampId}] HMA error/timeout for error display message`, e_hma); }
 
     } finally {
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY. AbortCtrl: ${this.currentAbortController ? 'active' : 'null'}, isProcessing: ${this.isProcessing}, activePlaceholder: ${this.activePlaceholder?.timestamp}, Resolvers: ${this.messageAddedResolvers.size}`);
+      this.plugin.logger.debug(`[OllamaView][sendMessage id:${requestTimestampId}] FINALLY.`);
       
-      // Очищення всіх резолверів, пов'язаних з цим конкретним запитом, якщо вони ще є
-      this.messageAddedResolvers.delete(userMessageTimestamp.getTime());
-      this.messageAddedResolvers.delete(llmResponseStartTimeMs);
-      if (currentTurnLlmResponseTsForCatch) this.messageAddedResolvers.delete(currentTurnLlmResponseTsForCatch);
-      // this.messageAddedResolvers.clear(); // Або очистити всі, якщо потрібно
-
+      // Додаткове очищення плейсхолдера про всяк випадок
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
-        this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] FINALLY: Active placeholder (ts: ${this.activePlaceholder.timestamp}) is still a placeholder. Removing.`);
+        this.plugin.logger.warn(`[OllamaView][sendMessage id:${requestTimestampId}] FINALLY: Active placeholder (ts: ${this.activePlaceholder.timestamp}) is still a placeholder. Removing now.`);
         if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
       }
       this.activePlaceholder = null;
 
       this.currentAbortController = null;
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] FINALLY: currentAbortController set to null.`);
-      
+      // isRegenerating має скидатися відповідним методом (handleRegenerateClick), а не тут
       this.setLoadingState(false);
       requestAnimationFrame(() => this.updateSendButtonState());
-      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] FINALLY (END). Chat interaction finished.`);
+      this.plugin.logger.info(`[OllamaView][sendMessage id:${requestTimestampId}] FINALLY (END). Chat interaction finished.`);
       this.focusInput();
     }
   }
@@ -3458,38 +3479,17 @@ export class OllamaView extends ItemView {
   private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
     const messageForLog = data?.message;
     const messageTimestampForLog = messageForLog?.timestamp?.getTime();
-    const messageRoleForLog = messageForLog?.role as MessageRole; // Явне приведення до оновленого MessageRole
+    const messageRoleForLog = messageForLog?.role as MessageRole; 
     const hmaEntryId = Date.now(); 
 
-    let resolverForThisMessage: (() => void) | undefined;
-    let resolverFoundInMap = false;
-
-    if (messageTimestampForLog) {
-        resolverForThisMessage = this.messageAddedResolvers.get(messageTimestampForLog);
-        if (resolverForThisMessage) {
-            resolverFoundInMap = true;
-            this.messageAddedResolvers.delete(messageTimestampForLog);
-            this.plugin.logger.debug( // Змінено рівень логування на DEBUG
-                `[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Resolver FOUND in map and REMOVED. Will attempt to call in finally. Map size now: ${this.messageAddedResolvers.size}`
-            );
-        } else {
-            this.plugin.logger.trace(`[HMA ENTRY ${hmaEntryId} id:${messageTimestampForLog}] No specific resolver found in map for this timestamp. Map size: ${this.messageAddedResolvers.size}`);
-        }
-    } else {
-        
-    }
-
     this.plugin.logger.debug( 
-        `[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. resolverForThisMessage initially ${resolverFoundInMap ? 'FOUND' : 'NOT_FOUND'}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`
+        `[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. Active placeholder ts: ${this.activePlaceholder?.timestamp}`
     );
 
     try {
         if (!data || !data.message) {
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received in handleMessageAdded. Data:`, data);
-            if (resolverForThisMessage) {
-                
-                resolverForThisMessage();
-            }
+            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received. Data:`, data);
+            if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
             return;
         }
 
@@ -3497,61 +3497,44 @@ export class OllamaView extends ItemView {
         const messageTimestampMs = message.timestamp.getTime();
 
         if (!this.chatContainer || !this.plugin.chatManager) {
-            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing! ChatContainer: ${!!this.chatContainer}, ChatManager: ${!!this.plugin.chatManager}`);
-            if (resolverForThisMessage) {
-                
-                resolverForThisMessage();
-            }
+            this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing!`);
+            if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
             return;
         }
 
         const activeChatId = this.plugin.chatManager.getActiveChatId();
         if (eventChatId !== activeChatId) {
-            this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId} (current active is ${activeChatId}).`);
-            if (resolverForThisMessage) {
-                
-                resolverForThisMessage();
-            }
+            this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Event for non-active chat ${eventChatId}.`);
+            if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
             return;
         }
 
-        // Перевіряємо, чи повідомлення вже відрендерене (не як плейсхолдер)
         const existingRenderedMessage = this.chatContainer.querySelector(`.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`);
         if (existingRenderedMessage) {
-            this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) with this timestamp already rendered (and is not a placeholder). Skipping.`);
-            if (resolverForThisMessage) {
-                
-                resolverForThisMessage();
-            }
+            this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) already rendered.`);
+            if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
             return;
         }
 
-        // Перевірка на дублікати в логічному кеші this.currentMessages
         const alreadyInLogicCache = this.currentMessages.some(
             m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
         );
         
-        // Чи є це повідомлення асистента, яке має замінити активний плейсхолдер?
         const isPotentiallyAssistantForPlaceholder =
             message.role === 'assistant' &&
             this.activePlaceholder?.timestamp === messageTimestampMs;
 
-        
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Cache/Placeholder checks: alreadyInLogicCache=${alreadyInLogicCache}, isPotentiallyAssistantForPlaceholder=${isPotentiallyAssistantForPlaceholder}.`);
 
         if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-            this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message (role: ${message.role}) identical to one in currentMessages cache and NOT an assistant message for active placeholder. Skipping addMessageStandard.`);
-            if (resolverForThisMessage) {
-                this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Calling resolverForThisMessage (message in cache, not placeholder match).`);
-                resolverForThisMessage();
-            }
+            this.plugin.logger.warn(`[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): Message in cache and NOT for placeholder. Role: ${message.role}.`);
+            if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
             return;
         }
-        // Якщо повідомлення вже в кеші, АЛЕ це повідомлення асистента, яке має оновити плейсхолдер, то продовжуємо.
         if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
-            this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role: ${message.role}) already in currentMessages cache, BUT IS an assistant message matching active placeholder. Proceeding to update placeholder.`);
+            this.plugin.logger.info(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message in cache, BUT IS for placeholder. Proceeding.`);
         }
 
-        // Додаємо повідомлення до локального кешу this.currentMessages, ЯКЩО його там ще немає (або якщо це оновлення плейсхолдера, то воно вже буде там)
         if (!alreadyInLogicCache) {
             this.currentMessages.push(message);
             this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Message (role ${message.role}) PUSHED to currentMessages. New count: ${this.currentMessages.length}`);
@@ -3575,41 +3558,36 @@ export class OllamaView extends ItemView {
                 const messageDomElement = placeholderToUpdate.groupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`) as HTMLElement | null;
 
                 if (!messageDomElement) {
-                    this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] CRITICAL: .message element NOT FOUND in placeholder structure. Removing placeholder and attempting standard add.`);
+                    this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] CRITICAL: .message element NOT FOUND in placeholder. Removing placeholder and adding normally.`);
                     if(placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
-                    this.activePlaceholder = null; // Скидаємо плейсхолдер
-                    await this.addMessageStandard(message); // Пробуємо додати як звичайне повідомлення
+                    this.activePlaceholder = null; 
+                    await this.addMessageStandard(message);
                 } else {
                     placeholderToUpdate.contentEl.classList.remove("streaming-text");
                     const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                    if (dotsEl) { 
-                        dotsEl.remove(); 
-                        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed from placeholder.`);
-                    }
+                    if (dotsEl) { dotsEl.remove(); this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Thinking dots removed.`);}
                     
                     try {
-                      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Preparing display content for placeholder update. Original message content: "${message.content.substring(0,100)}..."`);
-                        // --- ВИКОРИСТАННЯ prepareDisplayContent ---
                         const displayContent = AssistantMessageRenderer.prepareDisplayContent(
-                          message.content || "", 
-                          message as AssistantMessage, 
-                          this.plugin
-                      );
-                      this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering prepared display content into placeholder: "${displayContent.substring(0,100)}..."`);
-              
-                      // Очищаємо плейсхолдер перед рендерингом НОВОГО підготовленого контенту
-                      placeholderToUpdate.contentEl.empty(); 
-              
-                      await RendererUtils.renderMarkdownContent(
-                          this.app, 
-                          this, 
-                          this.plugin,
-                          placeholderToUpdate.contentEl, 
-                          displayContent 
-                      );
+                            message.content || "", 
+                            message as AssistantMessage, 
+                            this.plugin,
+                            this // Передаємо екземпляр OllamaView
+                        );
+                        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Rendering prepared display content into placeholder: "${displayContent.substring(0,100)}..."`);
+                        
+                        placeholderToUpdate.contentEl.empty(); 
+
+                        await RendererUtils.renderMarkdownContent(
+                            this.app, 
+                            this, 
+                            this.plugin,
+                            placeholderToUpdate.contentEl, 
+                            displayContent 
+                        );
                         
                         AssistantMessageRenderer.addAssistantActionButtons( 
-                            messageDomElement, // Передаємо саму бульбашку для додавання кнопок
+                            messageDomElement, 
                             placeholderToUpdate.contentEl, 
                             message as AssistantMessage, 
                             this.plugin, 
@@ -3623,38 +3601,35 @@ export class OllamaView extends ItemView {
                         const finalMessageGroupElement = placeholderToUpdate.groupEl;
                         this.activePlaceholder = null; 
                         this.plugin.logger.info(
-                            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated and CLEARED. Final display content preview: "${displayContent.substring(0,50)}..."`
+                            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated and CLEARED. Preview: "${displayContent.substring(0,50)}..."`
                         );
 
-                        // Перевірка на згортання для фіналізованого повідомлення
                         setTimeout(() => {
                             if(finalMessageGroupElement && finalMessageGroupElement.isConnected) {
-                                this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Calling checkMessageForCollapsing for finalized message group (was placeholder).`);
+                                this.plugin.logger.debug(`[HMA id:${messageTimestampMs}] Calling checkMessageForCollapsing for finalized group.`);
                                 this.checkMessageForCollapsing(finalMessageGroupElement);
                             }
                         }, 70);
                         this.guaranteedScrollToBottom(100, true);
                     } catch (renderError: any) {
-                        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during final render/update of placeholder:`, renderError);
+                        this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during placeholder final render:`, renderError);
                         if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
                         this.activePlaceholder = null;
-                        this.handleErrorMessage({ role: "error", content: `Failed to finalize assistant display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
+                        this.handleErrorMessage({ role: "error", content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
                     }
                 }
             } else {
-                 this.plugin.logger.error( `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but its DOM elements are invalid or not connected. Adding message via addMessageStandard.` );
-                 this.activePlaceholder = null; // Скидаємо невалідний плейсхолдер
-                 await this.addMessageStandard(message); // Додаємо як звичайне нове повідомлення
+                 this.plugin.logger.error( `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM invalid. Adding via addMessageStandard.` );
+                 this.activePlaceholder = null; 
+                 await this.addMessageStandard(message);
             }
         } else { 
             this.plugin.logger.debug(
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not an assistant message for placeholder. Role: ${message.role}. Active placeholder ts: ${this.activePlaceholder?.timestamp}. Adding normally via addMessageStandard.`
+                `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not assistant. Role: ${message.role}. Adding via addMessageStandard.`
             );
-            await this.addMessageStandard(message);
+            await this.addMessageStandard(message); // Це викличе відповідний рендерер, включаючи AssistantMessageRenderer.render()
         }
-        this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`
-        );
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampMs}] <<< END OF TRY BLOCK >>> Role: ${messageRoleForLog}.`);
     } catch (outerError: any) {
         this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`, outerError, data);
         this.handleErrorMessage({
@@ -3663,27 +3638,12 @@ export class OllamaView extends ItemView {
             timestamp: new Date(),
         });
     } finally {
-        this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}. resolverForThisMessage ${resolverForThisMessage ? 'EXISTS' : 'is NULL'}.`
-        );
-        if (resolverForThisMessage) {
-            this.plugin.logger.debug( 
-                `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC >>> Calling resolverForThisMessage <<<`
-            );
-            try {
-                resolverForThisMessage();
-            } catch (resolverError) {
-                this.plugin.logger.error(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY Error calling resolverForThisMessage:`, resolverError);
-            }
-            this.plugin.logger.debug( 
-                `[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY EXEC <<< Called resolverForThisMessage <<<`
-            );
-        } else {
-            this.plugin.logger.trace(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] FINALLY SKIP: resolverForThisMessage was not found or already used.`);
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY START >>> Role: ${messageRoleForLog}.`);
+        if (messageTimestampForLog) {
+            // Тепер викликаємо invokeHMAResolver з ChatManager
+            this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog); 
         }
-        this.plugin.logger.debug(
-            `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}. Map size: ${this.messageAddedResolvers.size}`
-        );
+        this.plugin.logger.debug(`[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< FINALLY END >>> Role: ${messageRoleForLog}.`);
     }
   }
 
@@ -3856,13 +3816,13 @@ export class OllamaView extends ItemView {
                   firstChunk = false;
                 }
                 accumulatedResponse += chunk.response;
-                await AssistantMessageRenderer.renderAssistantContent(
-                  this.activePlaceholder.contentEl,
-                  accumulatedResponse,
-                  this.app,
-                  this.plugin,
-                  this
-                );
+                await RendererUtils.renderMarkdownContent(
+                  this.app,                         // app
+                  this,                            // view (екземпляр OllamaView)
+                  this.plugin,                      // plugin
+                  this.activePlaceholder.contentEl, // containerEl (куди рендерити)
+                  accumulatedResponse               // markdownText (що рендерити)
+              );
                 this.guaranteedScrollToBottom(50, true);
                 // ВИДАЛЕНО: this.checkMessageForCollapsing(this.activePlaceholder.groupEl);
               } else {
@@ -4291,7 +4251,7 @@ export class OllamaView extends ItemView {
 
   
 // В OllamaView.ts
-private parseAllTextualToolCalls(text: string): Array<{ name: string; arguments: any }> {
+public parseAllTextualToolCalls(text: string): Array<{ name: string; arguments: any }> {
   const calls: Array<{ name: string; arguments: any }> = [];
   const openTag = "<tool_call>";
   const closeTag = "</tool_call>";
@@ -4631,85 +4591,92 @@ private parseAllTextualToolCalls(text: string): Array<{ name: string; arguments:
     return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
   }
 
+  
   private async _executeAndRenderToolCycle(
     toolsToExecute: ToolCall[],
-    assistantMessageIntent: AssistantMessage, // Повідомлення асистента, що ініціювало виклики
+    assistantMessageIntent: AssistantMessage,
     requestTimestampId: number
   ): Promise<void> {
-    this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] [_executeAndRenderToolCycle] Executing ${toolsToExecute.length} tools.`);
+    const currentViewInstance = this; // Зберігаємо this для використання в колбеках
+    currentViewInstance.plugin.logger.info(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Executing ${toolsToExecute.length} tools.`);
 
-    // 1. Додаємо повідомлення асистента (з наміром викликати інструменти) до історії
     const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
-    let hmaPromise = new Promise<void>((resolve, reject) => {
-      this.messageAddedResolvers.set(assistantMsgTsMs, resolve);
-      setTimeout(() => { if (this.messageAddedResolvers.has(assistantMsgTsMs)) { this.messageAddedResolvers.delete(assistantMsgTsMs); reject(new Error(`HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs})`));}}, 10000);
+    const assistantHmaPromise = new Promise<void>((resolve, reject) => {
+      currentViewInstance.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
+      setTimeout(() => { if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(assistantMsgTsMs)) { currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(assistantMsgTsMs, `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs})`);}}, 10000);
     });
-    await this.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
-    await hmaPromise;
-    this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`);
+    await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
+    await assistantHmaPromise;
+    currentViewInstance.plugin.logger.info(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`);
     
-    // Очищаємо плейсхолдер, оскільки HMA мав його фіналізувати
-    if (this.activePlaceholder?.timestamp === assistantMsgTsMs) {
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${assistantMsgTsMs}) as HMA processed the assistant message.`);
-        this.activePlaceholder = null;
+    if (currentViewInstance.activePlaceholder?.timestamp === assistantMsgTsMs) {
+        currentViewInstance.plugin.logger.debug(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Clearing activePlaceholder (ts: ${assistantMsgTsMs}) as HMA processed the assistant message.`);
+        currentViewInstance.activePlaceholder = null; 
     }
 
-    // 2. Виконуємо інструменти та додаємо їх результати
     for (const call of toolsToExecute) {
-      if (this.currentAbortController?.signal.aborted) throw new Error("aborted by user");
+      if (currentViewInstance.currentAbortController?.signal.aborted) throw new Error("aborted by user");
       if (call.type === "function") {
         const toolName = call.function.name;
         let toolArgs = {};
         try {
-          toolArgs = JSON.parse(call.function.arguments || "{}");
+          toolArgs = JSON.parse(call.function.arguments || "{}"); 
         } catch (e: any) {
           const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
-          this.plugin.logger.error(`[sendMessage id:${requestTimestampId}] ${errorContent}`, e);
-          const errorToolMsg: Message = { role: "tool", tool_call_id: call.id, name: toolName, content: errorContent, timestamp: new Date() };
-          hmaPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(errorToolMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA timeout for tool error msg")), 10000);});
-          await this.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
-          try { await hmaPromise; } catch(e_hma) { this.plugin.logger.error("HMA error/timeout for tool error message", e_hma); }
+          currentViewInstance.plugin.logger.error(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] ${errorContent}`, e);
+          const errorToolTimestamp = new Date();
+          const errorToolMsg: Message = { role: "tool", tool_call_id: call.id, name: toolName, content: errorContent, timestamp: errorToolTimestamp };
+          
+          const toolErrorHmaPromise = new Promise<void>((resolve, reject) => { currentViewInstance.plugin.chatManager.registerHMAResolver(errorToolMsg.timestamp.getTime(), resolve, reject); setTimeout(() => {if(currentViewInstance.plugin.chatManager.messageAddedResolvers.has(errorToolMsg.timestamp.getTime())) {currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(errorToolMsg.timestamp.getTime(), "HMA timeout for tool error msg");}}, 10000); });
+          await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
+          try { await toolErrorHmaPromise; } catch(e_hma){currentViewInstance.plugin.logger.error(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] HMA error/timeout for tool error message`, e_hma);};
           continue;
         }
 
-        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Executing tool: ${toolName} with args:`, toolArgs);
-        const execResult = await this.plugin.agentManager.executeTool(toolName, toolArgs);
-        const toolResultContent = execResult.success ? execResult.result : `Error: ${execResult.error || "Unknown tool error"}`;
-        const toolResponseMsg: Message = { role: "tool", tool_call_id: call.id, name: toolName, content: toolResultContent, timestamp: new Date() };
+        currentViewInstance.plugin.logger.info(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Executing tool: ${toolName} with args:`, toolArgs);
+        const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
+        const toolResultContent = execResult.success ? execResult.result : `Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}`;
+        const toolResponseTimestamp = new Date();
+        const toolResponseMsg: Message = { role: "tool", tool_call_id: call.id, name: toolName, content: toolResultContent, timestamp: toolResponseTimestamp };
         
-        hmaPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(toolResponseMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error(`HMA Timeout for tool result: ${toolName}`)), 10000);});
-        await this.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
-        await hmaPromise;
-        this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Tool result for ${toolName} (ts: ${toolResponseMsg.timestamp.getTime()}) processed by HMA.`);
+        const toolResultHmaPromise = new Promise<void>((resolve, reject) => { currentViewInstance.plugin.chatManager.registerHMAResolver(toolResponseMsg.timestamp.getTime(), resolve, reject); setTimeout(() => { if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(toolResponseMsg.timestamp.getTime())) { currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(toolResponseMsg.timestamp.getTime(), `HMA Timeout for tool result: ${toolName}`);}}, 10000);});
+        await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
+        await toolResultHmaPromise;
+        currentViewInstance.plugin.logger.info(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Tool result for ${toolName} (ts: ${toolResponseMsg.timestamp.getTime()}) processed by HMA.`);
       }
     }
+    currentViewInstance.plugin.logger.info(`[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Finished executing all tools for this turn.`);
   }
+
 
   private async _renderFinalAssistantText(
     finalContent: string,
     responseTimestampMs: number,
     requestTimestampId: number
   ): Promise<void> {
+    const currentViewInstance = this; // Зберігаємо this
+    currentViewInstance.plugin.logger.debug(`[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Processing final text response (length: ${finalContent.length}).`);
+    
     if (finalContent.trim()) {
       const finalAssistantMsg: Message = { role: "assistant", content: finalContent, timestamp: new Date(responseTimestampMs) };
-      this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Adding final assistant message to ChatManager (ts: ${responseTimestampMs}).`);
-      let hmaPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(responseTimestampMs, resolve); setTimeout(() => reject(new Error("HMA Timeout for final assistant message")), 10000);});
-      await this.plugin.chatManager.addMessageToActiveChatPayload(finalAssistantMsg, true);
+      currentViewInstance.plugin.logger.debug(`[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Adding final assistant message to ChatManager (ts: ${responseTimestampMs}).`);
+      
+      const hmaPromise = new Promise<void>((resolve, reject) => { currentViewInstance.plugin.chatManager.registerHMAResolver(responseTimestampMs, resolve, reject); setTimeout(() => { if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(responseTimestampMs)) { currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(responseTimestampMs, "HMA Timeout for final assistant message");}}, 10000);});
+      await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(finalAssistantMsg, true);
       await hmaPromise;
-      this.plugin.logger.info(`[sendMessage id:${requestTimestampId}] Final assistant message (ts: ${responseTimestampMs}) processed by HMA.`);
-    } else if (!this.currentAbortController?.signal.aborted) {
-      this.plugin.logger.warn(`[sendMessage id:${requestTimestampId}] Assistant provided an empty final response (not aborted).`);
-      if (this.activePlaceholder?.timestamp === responseTimestampMs && this.activePlaceholder.groupEl.isConnected && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
-        this.activePlaceholder.groupEl.remove();
-      }
-      const emptyResponseMsg: Message = { role: "system", content: "Assistant provided an empty response.", timestamp: new Date() };
-      let hmaPromise = new Promise<void>((resolve, reject) => { this.messageAddedResolvers.set(emptyResponseMsg.timestamp.getTime(), resolve); setTimeout(() => reject(new Error("HMA Timeout for empty system message")), 10000);});
-      await this.plugin.chatManager.addMessageToActiveChatPayload(emptyResponseMsg, true);
-      try { await hmaPromise; } catch(e_hma){ this.plugin.logger.error("HMA error/timeout for empty response system message", e_hma); }
+      currentViewInstance.plugin.logger.info(`[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Final assistant message (ts: ${responseTimestampMs}) processed by HMA.`);
+    } else if (!currentViewInstance.currentAbortController?.signal.aborted) {
+      // ... (обробка порожньої відповіді, аналогічно з використанням registerHMAResolver)
+      const emptyResponseMsgTimestamp = new Date();
+      const emptyResponseMsg: Message = {role: "system", content: "Assistant provided an empty response.", timestamp: emptyResponseMsgTimestamp};
+      const hmaPromise = new Promise<void>((resolve, reject) => {currentViewInstance.plugin.chatManager.registerHMAResolver(emptyResponseMsg.timestamp.getTime(), resolve, reject); setTimeout(() => {if(currentViewInstance.plugin.chatManager.messageAddedResolvers.has(emptyResponseMsg.timestamp.getTime())) {currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(emptyResponseMsg.timestamp.getTime(), "HMA timeout for empty sys msg");}}, 10000);});
+      await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(emptyResponseMsg, true);
+      try { await hmaPromise; } catch(e_hma){ currentViewInstance.plugin.logger.error(`[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] HMA error/timeout for empty response system message`, e_hma); }
     }
-    if (this.activePlaceholder?.timestamp === responseTimestampMs) {
-        this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] Clearing activePlaceholder (ts: ${responseTimestampMs}) after final assistant message/empty response.`);
-        this.activePlaceholder = null;
+
+    if (currentViewInstance.activePlaceholder?.timestamp === responseTimestampMs) {
+        currentViewInstance.plugin.logger.debug(`[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Clearing activePlaceholder (ts: ${responseTimestampMs}) after final assistant message/empty response.`);
+        currentViewInstance.activePlaceholder = null;
     }
   }
 
