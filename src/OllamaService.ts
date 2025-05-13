@@ -17,6 +17,7 @@ import {
 import { PromptService } from './PromptService';
 import { Chat, ChatMetadata } from './Chat'; // Припускаючи, що ChatMetadata існує
 import { IToolFunction } from './agents/IAgent'; // Інтерфейс для визначення інструментів
+import { Logger } from './Logger';
 
 // Визначимо типи чанків, які буде повертати наш потік
 export type StreamChunk =
@@ -30,6 +31,7 @@ export class OllamaService {
   private plugin: OllamaPlugin;
   private promptService: PromptService;
   private eventHandlers: Record<string, Array<(data: any) => any>> = {};
+  logger: Logger;
 
   constructor(plugin: OllamaPlugin) {
     this.plugin = plugin;
@@ -39,6 +41,7 @@ export class OllamaService {
       throw new Error(errorMsg);
     }
     this.promptService = plugin.promptService;
+    this.logger = plugin.logger; // Використовуємо логер плагіна
   }
 
   // --- Event Emitter (залишаємо без змін) ---
@@ -67,6 +70,8 @@ export class OllamaService {
     chat: Chat, // Залишаємо chat, оскільки PromptService потребує ChatMetadata
     signal?: AbortSignal
   ): AsyncIterableIterator<StreamChunk> {
+    const requestTimestampId = Date.now(); // Для логування
+    this.logger.debug(`[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`);
     if (!chat) {
       this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat object.");
       yield { type: 'error', error: "Chat object is null.", done: true };
@@ -138,6 +143,9 @@ export class OllamaService {
       // this.plugin.logger.debug(`[OllamaService] Request body: ${JSON.stringify(requestBody, null, 2)}`);
 
 
+      this.logger.debug(`[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${promptBody.length}. System part length: ${systemPrompt?.length || 0}`);
+      this.logger.trace(`[OllamaService][id:${requestTimestampId}] Request body:`, requestBody);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: headers,
@@ -168,7 +176,7 @@ export class OllamaService {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-
+      let rawResponseAccumulator = ""; 
       while (true) {
         const { done, value } = await reader.read();
 
@@ -178,9 +186,19 @@ export class OllamaService {
           yield { type: 'error', error: "Generation aborted by user.", done: true };
           return;
         }
+        const decodedChunk = decoder.decode(value, { stream: !done });
+        // --- ЛОГУВАННЯ СИРОГО ПОТОКУ ---
+        rawResponseAccumulator += decodedChunk;
 
         if (done) {
           this.plugin.logger.info("[OllamaService] Stream reader marked as done.");
+          this.logger.debug(`[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`);
+          // --- ЛОГУВАННЯ ПОВНОЇ СИРОЇ ВІДПОВІДІ ---
+          this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) START ===`);
+          this.logger.debug(rawResponseAccumulator);
+          this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) END === Length: ${rawResponseAccumulator.length}`);
+          buffer += decodedChunk; //CHECKIT
+          // -------------------------------------------
           // Обробка залишку буфера, якщо він не порожній і є валідним JSON
           if (buffer.trim()) {
             try {
@@ -247,6 +265,10 @@ export class OllamaService {
                     eval_count: jsonChunk.eval_count,
                     eval_duration: jsonChunk.eval_duration
                 };
+                this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) START ===`);
+              this.logger.debug(rawResponseAccumulator);
+              this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) END === Length: ${rawResponseAccumulator.length}`);
+              // -------------------------------------------
                 return;
               }
             } else if (typeof jsonChunk.response === 'string') { // Текстовий контент

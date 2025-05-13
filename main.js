@@ -7963,6 +7963,7 @@ var OllamaService = class {
       throw new Error(errorMsg);
     }
     this.promptService = plugin.promptService;
+    this.logger = plugin.logger;
   }
   // --- Event Emitter (залишаємо без змін) ---
   on(event, callback) {
@@ -7996,6 +7997,8 @@ var OllamaService = class {
   */
   async *generateChatResponseStream(chat, signal) {
     var _a, _b, _c, _d, _e, _f;
+    const requestTimestampId = Date.now();
+    this.logger.debug(`[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`);
     if (!chat) {
       this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat object.");
       yield { type: "error", error: "Chat object is null.", done: true };
@@ -8048,6 +8051,8 @@ var OllamaService = class {
         }
       }
       this.plugin.logger.debug(`[OllamaService] Sending request to ${url} for model ${modelName}. System prompt length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}, Body prompt length: ${promptBody.length}`);
+      this.logger.debug(`[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${promptBody.length}. System part length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}`);
+      this.logger.trace(`[OllamaService][id:${requestTimestampId}] Request body:`, requestBody);
       const response = await fetch(url, {
         method: "POST",
         headers,
@@ -8075,6 +8080,7 @@ var OllamaService = class {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let rawResponseAccumulator = "";
       while (true) {
         const { done, value } = await reader.read();
         if (signal == null ? void 0 : signal.aborted) {
@@ -8083,8 +8089,15 @@ var OllamaService = class {
           yield { type: "error", error: "Generation aborted by user.", done: true };
           return;
         }
+        const decodedChunk = decoder.decode(value, { stream: !done });
+        rawResponseAccumulator += decodedChunk;
         if (done) {
           this.plugin.logger.info("[OllamaService] Stream reader marked as done.");
+          this.logger.debug(`[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`);
+          this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) START ===`);
+          this.logger.debug(rawResponseAccumulator);
+          this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) END === Length: ${rawResponseAccumulator.length}`);
+          buffer += decodedChunk;
           if (buffer.trim()) {
             try {
               const jsonChunk = JSON.parse(buffer.trim());
@@ -8140,6 +8153,9 @@ var OllamaService = class {
                   eval_count: jsonChunk.eval_count,
                   eval_duration: jsonChunk.eval_duration
                 };
+                this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) START ===`);
+                this.logger.debug(rawResponseAccumulator);
+                this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) END === Length: ${rawResponseAccumulator.length}`);
                 return;
               }
             } else if (typeof jsonChunk.response === "string") {
