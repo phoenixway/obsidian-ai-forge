@@ -1684,48 +1684,32 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   }
   static prepareDisplayContent(originalContent, assistantMessage, plugin, view) {
     const ts = assistantMessage.timestamp.getTime();
-    plugin.logger.debug(`[PREP][ts:${ts}] === Starting prepareDisplayContent ===`);
-    plugin.logger.debug(`[PREP][ts:${ts}] 1. Original content:
-"${originalContent}"`);
     const decodedContent = decodeHtmlEntities(originalContent);
-    plugin.logger.debug(`[PREP][ts:${ts}] 2. Content after decodeHtmlEntities:
-"${decodedContent}"`);
     const thinkDetection = detectThinkingTags(decodedContent);
     let contentAfterThinkStripping = thinkDetection.contentWithoutTags;
-    plugin.logger.debug(`[PREP][ts:${ts}] 3. Content after detectThinkingTags (hasThink: ${thinkDetection.hasThinkingTags}):
-"${contentAfterThinkStripping}"`);
     const hasNativeToolCalls = !!(assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0);
     const hasTextualToolCallTagsInContentAfterThinkStripping = contentAfterThinkStripping.includes("<tool_call>");
-    plugin.logger.debug(`[PREP][ts:${ts}] 4. Tool checks: enableToolUse=${plugin.settings.enableToolUse}, hasNativeToolCalls=${hasNativeToolCalls}, hasTextualToolCallTagsInContentAfterThinkStripping=${hasTextualToolCallTagsInContentAfterThinkStripping}`);
     let finalDisplayContent = contentAfterThinkStripping;
     if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInContentAfterThinkStripping)) {
-      plugin.logger.info(`[PREP][ts:${ts}] 5. Tool call indicators detected. Formatting for display.`);
       let usingToolMessageText = "( ";
       const toolNamesExtracted = [];
       let accompanyingText = contentAfterThinkStripping;
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
-        plugin.logger.debug(`[PREP][ts:${ts}] 5a. Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesExtracted.push(tc.function.name));
       } else if (hasTextualToolCallTagsInContentAfterThinkStripping) {
-        plugin.logger.debug(`[PREP][ts:${ts}] 5b. Processing TEXTUAL tool_call tags from: "${contentAfterThinkStripping.substring(0, 150)}..."`);
         const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, plugin.logger);
         parsedTextualCalls.forEach((ptc) => toolNamesExtracted.push(ptc.name));
-        plugin.logger.debug(`[PREP][ts:${ts}] 5c. Extracted tool names via parseAllTextualToolCalls: [${toolNamesExtracted.join(", ")}]`);
         accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-        plugin.logger.debug(`[PREP][ts:${ts}] 5d. Accompanying text after initial <tool_call> replace: "${accompanyingText}"`);
         if (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>")) {
-          plugin.logger.warn(`[PREP][ts:${ts}] Accompanying text still contains tool_call tags. Attempting forceful cleanup.`);
           let tempText = accompanyingText;
           tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
           accompanyingText = tempText;
-          plugin.logger.debug(`[PREP][ts:${ts}] 5e. Accompanying text after forceful cleanup: "${accompanyingText}"`);
         }
       }
       if (toolNamesExtracted.length > 0) {
         usingToolMessageText += `Using tool${toolNamesExtracted.length > 1 ? "s" : ""}: ${toolNamesExtracted.join(", ")}... `;
       } else {
         usingToolMessageText += "Attempting to use tool(s)... ";
-        plugin.logger.warn(`[PREP][ts:${ts}] No tool names were extracted, using generic message.`);
       }
       usingToolMessageText += ")";
       if (accompanyingText && accompanyingText.trim().length > 0) {
@@ -1736,8 +1720,6 @@ ${accompanyingText.trim()}`;
         finalDisplayContent = usingToolMessageText;
       }
     }
-    plugin.logger.info(`[PREP][ts:${ts}] === Final content for display ===:
-"${finalDisplayContent}"`);
     return finalDisplayContent;
   }
   async render() {
