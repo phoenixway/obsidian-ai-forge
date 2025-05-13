@@ -16,8 +16,7 @@
    // Відступи для аватара
    &.user-message-group .message-wrapper { margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 26+6 = 32px
    &.ollama-message-group .message-wrapper { margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); } // 26+6 = 32px
-   margin-bottom: calc(var(--chat-spacing-unit) * 2.5); // 7.5px - ще менше
-}
+   margin-bottom: calc(var(--chat-spacing-unit) * 6);}
 
 .message {
   font-size: var(--font-ui-small); // Звичайний малий шрифт UI
