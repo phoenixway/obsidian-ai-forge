@@ -38,7 +38,6 @@ const logger = plugin.logger; // Для зручності
 
     let finalDisplayContent = contentAfterThinkStripping;
     if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInProcessedContent)) {
-        logger.info(`[ARender PREP][ts:${messageTimestampLog}] 5. Tool call indicators detected. Formatting for display.`);
         
         let toolUsageIndicatorActionText = "";
         const toolNamesExtracted: string[] = [];
@@ -46,33 +45,27 @@ const logger = plugin.logger; // Для зручності
         let accompanyingText = contentAfterThinkStripping; 
 
         if (hasNativeToolCalls && assistantMessage.tool_calls) {
-            logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5a. Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
             assistantMessage.tool_calls.forEach(tc => toolNamesExtracted.push(tc.function.name));
             // Для нативних викликів, `accompanyingText` (який є `contentToProcess`)
             // це текст, що міг бути разом з нативними tool_calls (вже без <think>).
             // Ми не видаляємо з нього нічого додатково на цьому етапі.
         } else if (hasTextualToolCallTagsInProcessedContent) { 
-            logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5b. Processing TEXTUAL tool_call tags from (content without think tags): "${contentAfterThinkStripping.substring(0,150)}..."`);
             
             // Використовуємо parseAllTextualToolCalls з OllamaView для отримання імен
             // Важливо, що parseAllTextualToolCalls отримує текст, де ВЖЕ НЕМАЄ <think> тегів
             const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, logger); 
             parsedTextualCalls.forEach(ptc => toolNamesExtracted.push(ptc.name));
-            logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5c. Extracted tool names via parseAllTextualToolCalls: [${toolNamesExtracted.join(', ')}]`);
             
             // Видаляємо <tool_call> теги з contentToProcess для отримання супровідного тексту
             // Цей replace може бути проблематичним, якщо теги пошкоджені
             accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-            logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5d. Accompanying text after initial <tool_call> replace: "${accompanyingText}"`);
 
             // Додаткове "грубе" очищення, якщо попереднє не спрацювало ідеально
             // і якщо імена не були витягнуті (що може вказувати на проблеми з тегами)
             if (toolNamesExtracted.length === 0 && (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>"))) {
-                logger.warn(`[ARender PREP][ts:${messageTimestampLog}] Tool names not extracted AND accompanying text still contains tool_call tags. Attempting forceful cleanup.`);
                 let tempText = accompanyingText;
                 tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
                 accompanyingText = tempText;
-                logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5e. Accompanying text after forceful cleanup: "${accompanyingText}"`);
             }
         }
 
@@ -81,7 +74,6 @@ const logger = plugin.logger; // Для зручності
             toolUsageIndicatorActionText = `Using tool${toolNamesExtracted.length > 1 ? 's' : ''}: ${toolNamesExtracted.join(', ')}...`;
         } else { 
             toolUsageIndicatorActionText = "Attempting to use tool(s)...";
-            logger.warn(`[ARender PREP][ts:${messageTimestampLog}] No tool names were extracted (e.g. due to parse error), using generic 'Attempting to use...' message.`);
         }
         
         // Обгортаємо індикатор в span зі спеціальним класом

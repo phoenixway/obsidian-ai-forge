@@ -1686,33 +1686,25 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     const hasTextualToolCallTagsInProcessedContent = contentAfterThinkStripping.includes("<tool_call>");
     let finalDisplayContent = contentAfterThinkStripping;
     if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInProcessedContent)) {
-      logger.info(`[ARender PREP][ts:${messageTimestampLog}] 5. Tool call indicators detected. Formatting for display.`);
       let toolUsageIndicatorActionText = "";
       const toolNamesExtracted = [];
       let accompanyingText = contentAfterThinkStripping;
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
-        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5a. Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
         assistantMessage.tool_calls.forEach((tc) => toolNamesExtracted.push(tc.function.name));
       } else if (hasTextualToolCallTagsInProcessedContent) {
-        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5b. Processing TEXTUAL tool_call tags from (content without think tags): "${contentAfterThinkStripping.substring(0, 150)}..."`);
         const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, logger);
         parsedTextualCalls.forEach((ptc) => toolNamesExtracted.push(ptc.name));
-        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5c. Extracted tool names via parseAllTextualToolCalls: [${toolNamesExtracted.join(", ")}]`);
         accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-        logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5d. Accompanying text after initial <tool_call> replace: "${accompanyingText}"`);
         if (toolNamesExtracted.length === 0 && (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>"))) {
-          logger.warn(`[ARender PREP][ts:${messageTimestampLog}] Tool names not extracted AND accompanying text still contains tool_call tags. Attempting forceful cleanup.`);
           let tempText = accompanyingText;
           tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
           accompanyingText = tempText;
-          logger.debug(`[ARender PREP][ts:${messageTimestampLog}] 5e. Accompanying text after forceful cleanup: "${accompanyingText}"`);
         }
       }
       if (toolNamesExtracted.length > 0) {
         toolUsageIndicatorActionText = `Using tool${toolNamesExtracted.length > 1 ? "s" : ""}: ${toolNamesExtracted.join(", ")}...`;
       } else {
         toolUsageIndicatorActionText = "Attempting to use tool(s)...";
-        logger.warn(`[ARender PREP][ts:${messageTimestampLog}] No tool names were extracted (e.g. due to parse error), using generic 'Attempting to use...' message.`);
       }
       const toolUsageIndicatorHTML = `<span class="${CSS_CLASSES.ASSISTANT_TOOL_USAGE_INDICATOR || "assistant-tool-usage-indicator"}">\u2192 ${toolUsageIndicatorActionText}</span>`;
       if (accompanyingText && accompanyingText.trim().length > 0) {
