@@ -451,10 +451,8 @@ export class ChatManager {
       if (indexNeedsUpdate) {
         this.chatIndex[meta.id] = storedMeta;
         await this.saveChatIndex();
-        this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from saveChatAndUpdateIndex for ID: ${meta.id}`);
-        this.plugin.emit("chat-list-updated");
-        this.logger.debug(`Chat index updated for ${meta.id} after save trigger.`);
-      } else {
+                this.plugin.emit("chat-list-updated");
+              } else {
         this.logger.trace(`Index for chat ${meta.id} unchanged after save trigger, skipping index save/event.`);
       }
       return true;
@@ -516,8 +514,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
           delete this.chatIndex[newId];
           await this.saveChatIndex();
           
-          this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from createNewChat (saveImmediately FAILED) for ID: ${newId}`);
-          this.plugin.emit("chat-list-updated");
+                    this.plugin.emit("chat-list-updated");
 
           new Notice("Error: Failed to save new chat file.");
           return null;
@@ -530,8 +527,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
 
       return newChat;
   } catch (error) {
-      this.logger.error("Error creating new chat:", error);
-      new Notice("Error creating new chat session.");
+            new Notice("Error creating new chat session.");
       return null;
   }
 }
@@ -541,8 +537,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
 
     const normalized = normalizePath(folderPath);
     if (normalized.startsWith("..") || normalized.includes("\0")) {
-      this.logger.error(`Attempted to ensure invalid folder path: ${normalized}`);
-      throw new Error("Invalid folder path specified.");
+            throw new Error("Invalid folder path specified.");
     }
 
     try {
@@ -552,13 +547,11 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
       } else {
         const stat = await this.adapter.stat(normalized);
         if (stat?.type !== "folder") {
-          this.logger.error(`Path exists but is not a folder: ${normalized}`);
-          throw new Error(`Target path ${normalized} is not a folder.`);
+                    throw new Error(`Target path ${normalized} is not a folder.`);
         }
       }
     } catch (error) {
-      this.logger.error(`Error creating/checking target folder '${normalized}':`, error);
-      throw new Error(
+            throw new Error(
         `Failed to ensure target folder ${normalized} exists: ${error instanceof Error ? error.message : String(error)}`
       );
     }
@@ -620,8 +613,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
   public async getActiveChatOrFail(): Promise<Chat> {
     const chat = await this.getActiveChat();
     if (!chat) {
-      this.logger.error("[ChatManager] getActiveChatOrFail: No active chat found or failed to load!");
-      
+            
       throw new Error("No active chat found or it failed to load.");
     }
     return chat;
@@ -684,15 +676,13 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
               
           }
       } catch (hierarchyError) {
-          this.logger.error(`[ChatManager.getChat] Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
-          actualFilePath = undefined; 
+                    actualFilePath = undefined; 
       }
   }
 
   
   if (!actualFilePath && this.chatIndex[id]) {
-      this.logger.error(`[ChatManager.getChat] Chat ID ${id} exists in index but its file path could not be determined. Chat may be orphaned or index is stale.`);
-      
+            
       
       
       
@@ -705,8 +695,7 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
 
   
   if (!this.chatIndex[id] && !actualFilePath) {
-      this.logger.warn(`[ChatManager.getChat] Chat ID ${id} not found in index and no file path available.`);
-      return null;
+            return null;
   }
 
   
@@ -714,8 +703,7 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
   
 
   if (!actualFilePath) { 
-       this.logger.error(`[ChatManager.getChat] CRITICAL: actualFilePath is still undefined for chat ID ${id} when it should be known or chat should be considered non-existent.`);
-       return null;
+              return null;
   }
 
 
@@ -740,35 +728,27 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
               storedMeta.contextWindow !== currentMeta.contextWindow;
 
           if (indexNeedsUpdate) {
-              this.logger.debug(`[ChatManager.getChat] Index needs update for chat ${id}. Calling saveChatAndUpdateIndex.`);
-              
+                            
               await this.saveChatAndUpdateIndex(chat);
           }
           return chat;
       } else {
           
-          this.logger.error(
-          `[ChatManager.getChat] Chat.loadFromFile returned null for ID ${id} at path ${actualFilePath}. Removing from index if present.`
-          );
-          
+                    
           await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); 
           
           if (this.activeChatId === id) {
-              this.logger.warn(`[ChatManager.getChat] Active chat ${id} failed to load, setting active chat to null.`);
-              await this.setActiveChat(null); 
+                            await this.setActiveChat(null); 
           }
           return null;
       }
   } catch (error: any) {
-      this.logger.error(`[ChatManager.getChat] Unexpected error during getChat for ID ${id} from ${actualFilePath}:`, error);
-      if (error.code === "ENOENT") { 
-          this.logger.warn(`[ChatManager.getChat] File not found (ENOENT) for chat ${id} at ${actualFilePath}. Cleaning up index.`);
-          
+            if (error.code === "ENOENT") { 
+                    
           await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); 
           
           if (this.activeChatId === id) {
-              this.logger.warn(`[ChatManager.getChat] Active chat ${id} file not found, setting active chat to null.`);
-              await this.setActiveChat(null); 
+                            await this.setActiveChat(null); 
           }
       }
       
@@ -826,13 +806,9 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
     }
 
     if (id && !this.chatIndex[id]) {
-      this.logger.error(`Attempted to set active chat to non-existent ID in index: ${id}. Rebuilding index...`);
-      await this.rebuildIndexFromFiles();
+            await this.rebuildIndexFromFiles();
       if (!this.chatIndex[id]) {
-        this.logger.error(
-          `Chat ID ${id} still not found after index reload. Aborting setActiveChat. Keeping previous active chat: ${previousActiveId}`
-        );
-        new Notice(`Error: Chat with ID ${id} not found. Cannot activate.`);
+                new Notice(`Error: Chat with ID ${id} not found. Cannot activate.`);
         return;
       }
     }
@@ -845,10 +821,7 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
     if (id) {
       loadedChat = await this.getChat(id);
       if (!loadedChat) {
-        this.logger.error(
-          `CRITICAL: Failed to load chat ${id} via getChat even after index check. Resetting active chat to null.`
-        );
-        this.activeChatId = null;
+                this.activeChatId = null;
         await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
         id = null;
       } else {
@@ -914,19 +887,16 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
       new Notice("No active chat to update metadata for.");
       return false;
     }
-    this.logger.debug(`Attempting to update metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
-    if (Object.keys(metadataUpdate).length === 0) {
+        if (Object.keys(metadataUpdate).length === 0) {
       return false;
     }
-    this.logger.debug(`Attempting to update metadata for active chat ${activeChat!.metadata.id}:`, metadataUpdate);
-    const oldRolePath = activeChat.metadata.selectedRolePath;
+        const oldRolePath = activeChat.metadata.selectedRolePath;
     const oldModelName = activeChat.metadata.modelName;
 
     const changed = activeChat.updateMetadata(metadataUpdate);
 
     if (changed) {
-        this.logger.debug(`Metadata updated in Chat object for ${activeChat!.metadata.id}. Save scheduled by Chat.updateMetadata.`);
-      await this.saveChatAndUpdateIndex(activeChat);
+              await this.saveChatAndUpdateIndex(activeChat);
 
       const newMeta = activeChat.metadata;
       let roleChanged = false;
@@ -946,15 +916,13 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
           this.plugin.emit("role-changed", newRoleName ?? "None");
           this.plugin.promptService?.clearRoleCache?.();
         } catch (e) {
-          this.logger.error("Error finding role name or emitting role-changed:", e);
-        }
+                  }
       }
       if (modelChanged) {
         this.plugin.emit("model-changed", newMeta.modelName || "");
         this.plugin.promptService?.clearModelDetailsCache?.();
       }
-      this.logger.error(`[ChatManager] >>> Emitting 'active-chat-changed' from updateActiveChatMetadata for ID: ${this.activeChatId}`);
-      this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
+            this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
       return true;
     } else {
       return false;
@@ -982,16 +950,13 @@ private async deleteChatFileAndIndexEntry_NoEmit(
   
   if (this.loadedChats[id]) {
       delete this.loadedChats[id];
-      this.logger.debug(`[deleteHelper] Removed chat ${id} from loadedChats cache.`);
-  }
+        }
   
   if (this.chatIndex[id]) {
       delete this.chatIndex[id];
       indexChanged = true; 
-      this.logger.debug(`[deleteHelper] Removed chat ${id} from chatIndex.`);
-  } else {
-      this.logger.debug(`[deleteHelper] Chat ${id} was not in chatIndex.`);
-  }
+        } else {
+        }
 
   
   if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
@@ -1001,28 +966,22 @@ private async deleteChatFileAndIndexEntry_NoEmit(
               const stat = await this.adapter.stat(filePath);
               if (stat?.type === "file") {
                   await this.adapter.remove(filePath);
-                  this.logger.debug(`[deleteHelper] Removed chat file: ${filePath}`);
-              } else {
-                   this.logger.error(`[deleteHelper] Attempted to remove a non-file path: ${filePath}`);
-              }
+                                } else {
+                                 }
           } else {
-               this.logger.warn(`[deleteHelper] Chat file not found for removal: ${filePath}`);
-          }
+                         }
       } catch (e: any) {
-          this.logger.error(`[deleteHelper] Error removing chat file ${filePath}:`, e);
-          new Notice(`Error deleting file: ${filePath.split('/').pop()}`);
+                    new Notice(`Error deleting file: ${filePath.split('/').pop()}`);
           
       }
   } else if (deleteFile && filePath) {
        
-       this.logger.warn(`[deleteHelper] Invalid file path provided for deletion: ${filePath}`);
-  }
+         }
 
   
   if (indexChanged) {
       await this.saveChatIndex();
-      this.logger.debug(`[deleteHelper] Saved updated chatIndex after removing ${id}.`);
-  }
+        }
   return indexChanged; 
 }
 
@@ -1031,25 +990,21 @@ private async deleteChatFileAndIndexEntry_NoEmit(
 async deleteChat(id: string): Promise<boolean> {
   const chatExistedInIndex = !!this.chatIndex[id];
   const wasActive = id === this.activeChatId;
-  this.logger.debug(`[deleteChat] Deleting chat ${id}. Was active: ${wasActive}. Existed in index: ${chatExistedInIndex}.`);
-
+  
   let filePath: string | null = null;
   try {
       
       const hierarchy = await this.getChatHierarchy();
       filePath = this.findChatPathInHierarchy(id, hierarchy);
       if (!filePath && chatExistedInIndex) {
-           this.logger.warn(`[deleteChat] File path for chat ${id} not found in hierarchy, but chat exists in index. Will only remove from index.`);
-      }
+                 }
   } catch (hierarchyError) {
-      this.logger.error(`Error getting hierarchy during delete operation for ${id}:`, hierarchyError);
-      
+            
   }
 
   
   if (!filePath && !chatExistedInIndex) {
-      this.logger.warn(`[deleteChat] Chat ${id} not found in index or hierarchy. Nothing to delete.`);
-      return false; 
+            return false; 
   }
 
   let success = true;
@@ -1059,17 +1014,14 @@ async deleteChat(id: string): Promise<boolean> {
   try {
       
       const indexWasChanged = await this.deleteChatFileAndIndexEntry_NoEmit(id, filePath, true);
-      this.logger.debug(`[deleteChat] deleteChatFileAndIndexEntry_NoEmit finished. Index changed: ${indexWasChanged}`);
-
+      
       
       if (wasActive) {
-          this.logger.debug(`[deleteChat] Deleted chat was active. Finding and setting next active chat...`);
-          
+                    
           const newHierarchy = await this.getChatHierarchy(); 
           const firstChat = this.findFirstChatInHierarchy(newHierarchy);
           const nextActiveId = firstChat ? firstChat.metadata.id : null;
-          this.logger.debug(`[deleteChat] Next active chat will be: ${nextActiveId}`);
-
+          
           
           
           await this.setActiveChat(nextActiveId);
@@ -1078,13 +1030,11 @@ async deleteChat(id: string): Promise<boolean> {
       } else if (indexWasChanged) {
           
           
-          this.logger.debug(`[deleteChat] Non-active chat deleted and index changed. Setting 'chat-list-updated' to be emitted.`);
-          eventToEmit = { name: "chat-list-updated", data: undefined };
+                    eventToEmit = { name: "chat-list-updated", data: undefined };
       }
 
   } catch (error) {
-      this.logger.error(`Error during deletion process for chat ${id}:`, error);
-      new Notice(`Error deleting chat ${id}. Check console.`);
+            new Notice(`Error deleting chat ${id}. Check console.`);
       success = false;
       
       await this.rebuildIndexFromFiles();
@@ -1093,21 +1043,16 @@ async deleteChat(id: string): Promise<boolean> {
   } finally {
       
       if (eventToEmit) {
-           this.logger.debug(`[deleteChat] Emitting final event: ${eventToEmit.name}`);
-           this.plugin.emit(eventToEmit.name, eventToEmit.data);
+                      this.plugin.emit(eventToEmit.name, eventToEmit.data);
       } else if (wasActive) {
-           this.logger.debug(`[deleteChat] No final event emitted from deleteChat itself (relied on setActiveChat).`);
-      } else {
-           this.logger.debug(`[deleteChat] No final event emitted (non-active deleted, index unchanged, or error without rebuild).`);
-      }
+                 } else {
+                 }
 
       
       if (success && chatExistedInIndex) {
           new Notice(`Chat deleted.`);
-          this.logger.info(`Chat ${id} deleted successfully.`);
-      } else if (!chatExistedInIndex) {
-           this.logger.info(`Chat ${id} deletion attempt - chat did not exist in index.`);
-      }
+                } else if (!chatExistedInIndex) {
+                 }
   }
   
   return success && chatExistedInIndex;
@@ -1119,20 +1064,17 @@ async deleteChat(id: string): Promise<boolean> {
       const hierarchy = await this.getChatHierarchy();
       originalFilePath = this.findChatPathInHierarchy(chatIdToClone, hierarchy);
     } catch (hierarchyError) {
-      this.logger.error(`Error getting hierarchy during clone operation for ${chatIdToClone}:`, hierarchyError);
-      new Notice("Error finding original chat for cloning.");
+            new Notice("Error finding original chat for cloning.");
       return null;
     }
 
     if (!originalFilePath) {
-      this.logger.error(`Cannot clone: File path for original chat ${chatIdToClone} not found.`);
-      new Notice("Original chat file path not found.");
+            new Notice("Original chat file path not found.");
       return null;
     }
     const originalChat = await this.getChat(chatIdToClone, originalFilePath);
     if (!originalChat) {
-      this.logger.error(`Cannot clone: Original chat ${chatIdToClone} could not be loaded from ${originalFilePath}.`);
-      new Notice("Original chat could not be loaded.");
+            new Notice("Original chat could not be loaded.");
       return null;
     }
 
@@ -1182,8 +1124,7 @@ async deleteChat(id: string): Promise<boolean> {
         delete this.chatIndex[newId];
         await this.saveChatIndex();
         this.plugin.emit("chat-list-updated");
-        this.logger.error(`Failed to save the cloned chat file for ${newId} at ${newFilePath}. Removed from index.`);
-        new Notice("Error: Failed to save the cloned chat file.");
+                new Notice("Error: Failed to save the cloned chat file.");
         return null;
       }
 
@@ -1192,8 +1133,7 @@ async deleteChat(id: string): Promise<boolean> {
 
       return clonedChat;
     } catch (error) {
-      this.logger.error("Error cloning chat:", error);
-      new Notice("An error occurred while cloning the chat.");
+            new Notice("An error occurred while cloning the chat.");
       return null;
     }
   }
@@ -1201,8 +1141,7 @@ async deleteChat(id: string): Promise<boolean> {
   async deleteMessagesAfter(chatId: string, messageIndexToDeleteAfter: number): Promise<boolean> {
     const chat = await this.getChat(chatId);
     if (!chat) {
-      this.logger.error(`Cannot delete messages: Chat ${chatId} not found.`);
-      return false;
+            return false;
     }
 
     if (messageIndexToDeleteAfter >= chat.messages.length - 1) {
@@ -1232,8 +1171,7 @@ async deleteChat(id: string): Promise<boolean> {
   async deleteMessageByTimestamp(chatId: string, timestampToDelete: Date): Promise<boolean> {
     const chat = await this.getChat(chatId);
     if (!chat) {
-      this.logger.error(`Cannot delete message: Chat ${chatId} not found.`);
-      new Notice(`Error: Chat ${chatId} not found.`);
+            new Notice(`Error: Chat ${chatId} not found.`);
       return false;
     }
 
@@ -1263,10 +1201,7 @@ async deleteChat(id: string): Promise<boolean> {
     const chatId = chat.metadata.id;
     try {
       if (messageIndex < 0 || messageIndex >= chat.messages.length) {
-        this.logger.error(
-          `Invalid message index ${messageIndex} provided to _performDeleteMessageByIndex for chat ${chatId}.`
-        );
-        return false;
+                return false;
       }
 
       const deletedMessage = chat.messages.splice(messageIndex, 1)[0];
@@ -1286,8 +1221,7 @@ async deleteChat(id: string): Promise<boolean> {
 
       return true;
     } catch (error) {
-      this.logger.error(`Error during message deletion by index ${messageIndex} for chat ${chatId}:`, error);
-      new Notice("Error deleting message.");
+            new Notice("Error deleting message.");
       return false;
     }
   }
@@ -1295,8 +1229,7 @@ async deleteChat(id: string): Promise<boolean> {
   async clearChatMessagesById(chatId: string): Promise<boolean> {
     const chat = await this.getChat(chatId);
     if (!chat) {
-      this.logger.error(`Cannot clear messages: Chat ${chatId} not found.`);
-      new Notice(`Error: Chat ${chatId} not found.`);
+            new Notice(`Error: Chat ${chatId} not found.`);
       return false;
     }
 
@@ -1317,8 +1250,7 @@ async deleteChat(id: string): Promise<boolean> {
       new Notice(`Messages cleared for chat "${chat.metadata.name}".`);
       return true;
     } catch (error) {
-      this.logger.error(`Error during message clearing process for chat ${chatId}:`, error);
-      new Notice("Error clearing messages.");
+            new Notice("Error clearing messages.");
       return false;
     }
   }
@@ -1337,8 +1269,7 @@ async deleteChat(id: string): Promise<boolean> {
     const chat = await this.getChat(chatId);
 
     if (!chat) {
-      this.logger.error(`Cannot rename: Chat ${chatId} not found.`);
-      new Notice("Chat not found.");
+            new Notice("Chat not found.");
       return false;
     }
 
@@ -1362,8 +1293,7 @@ async deleteChat(id: string): Promise<boolean> {
         return false;
       }
     } catch (error) {
-      this.logger.error(`Error renaming chat ${chatId}:`, error);
-      new Notice("An error occurred while renaming the chat.");
+            new Notice("An error occurred while renaming the chat.");
       return false;
     }
   }
@@ -1380,13 +1310,11 @@ async deleteChat(id: string): Promise<boolean> {
 
     
     if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
-      this.logger.error("Cannot create folder at root or with empty/dot path.");
-      new Notice("Invalid folder path.");
+            new Notice("Invalid folder path.");
       return false;
     }
     if (normalizedPath.startsWith("..") || normalizedPath.includes("\0")) {
-      this.logger.error(`Attempted to create folder with invalid path: ${normalizedPath}`);
-      new Notice("Invalid characters or path traversal detected.");
+            new Notice("Invalid characters or path traversal detected.");
       return false;
     }
 
@@ -1403,11 +1331,9 @@ async deleteChat(id: string): Promise<boolean> {
       return true;
     } catch (error: any) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        this.logger.error(`Permission error creating folder ${normalizedPath}:`, error);
-        new Notice(`Permission error creating folder.`);
+                new Notice(`Permission error creating folder.`);
       } else {
-        this.logger.error(`Error creating folder ${normalizedPath}:`, error);
-        new Notice(`Failed to create folder: ${error.message || "Unknown error"}`);
+                new Notice(`Failed to create folder: ${error.message || "Unknown error"}`);
       }
       return false;
     }
@@ -1428,37 +1354,32 @@ async deleteChat(id: string): Promise<boolean> {
 
     
     if (!normOldPath || normOldPath === "/" || !normNewPath || normNewPath === "/") {
-      this.logger.error("Invalid paths provided for rename operation.");
-      new Notice("Cannot rename root folder or use empty path.");
+            new Notice("Cannot rename root folder or use empty path.");
       return false;
     }
     if (normOldPath === normNewPath) {
       return true; 
     }
     if (normNewPath.startsWith(normOldPath + "/")) {
-      this.logger.error(`Cannot move folder "${normOldPath}" inside itself ("${normNewPath}").`);
-      new Notice("Cannot move a folder inside itself.");
+            new Notice("Cannot move a folder inside itself.");
       return false;
     }
 
     try {
       const oldExists = await this.adapter.exists(normOldPath);
       if (!oldExists) {
-        this.logger.error(`Source folder for rename does not exist: ${normOldPath}`);
-        new Notice("Folder to rename not found.");
+                new Notice("Folder to rename not found.");
         return false;
       }
       const oldStat = await this.adapter.stat(normOldPath);
       if (oldStat?.type !== "folder") {
-        this.logger.error(`Source path is not a folder: ${normOldPath}`);
-        new Notice("Item to rename is not a folder.");
+                new Notice("Item to rename is not a folder.");
         return false;
       }
 
       const newExists = await this.adapter.exists(normNewPath);
       if (newExists) {
-        this.logger.error(`Target path for rename already exists: ${normNewPath}`);
-        new Notice(`"${normNewPath.split("/").pop()}" already exists.`);
+                new Notice(`"${normNewPath.split("/").pop()}" already exists.`);
         return false;
       }
 
@@ -1479,11 +1400,9 @@ async deleteChat(id: string): Promise<boolean> {
       return true;
     } catch (error: any) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        this.logger.error(`Permission error renaming folder ${normOldPath} to ${normNewPath}:`, error);
-        new Notice(`Permission error renaming folder.`);
+                new Notice(`Permission error renaming folder.`);
       } else {
-        this.logger.error(`Error renaming folder ${normOldPath} to ${normNewPath}:`, error);
-        new Notice(`Failed to rename folder: ${error.message || "Unknown error"}`);
+                new Notice(`Failed to rename folder: ${error.message || "Unknown error"}`);
       }
       return false;
     }
@@ -1499,14 +1418,12 @@ async deleteChat(id: string): Promise<boolean> {
 
     
     if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
-      this.logger.error(`Attempted to delete root or invalid folder path: ${normalizedPath}`);
-      new Notice("Cannot delete this folder.");
+            new Notice("Cannot delete this folder.");
       return false;
     }
     
     if (normalizedPath === this.chatsFolderPath) {
-      this.logger.error(`Attempted to delete the main chat history folder: ${normalizedPath}`);
-      new Notice("Cannot delete the main chat history folder set in settings.");
+            new Notice("Cannot delete the main chat history folder set in settings.");
       return false;
     }
 
@@ -1518,8 +1435,7 @@ async deleteChat(id: string): Promise<boolean> {
       }
       const stat = await this.adapter.stat(normalizedPath);
       if (stat?.type !== "folder") {
-        this.logger.error(`Path to delete is not a folder: ${normalizedPath}`);
-        new Notice("Item to delete is not a folder.");
+                new Notice("Item to delete is not a folder.");
         return false;
       }
 
@@ -1544,8 +1460,7 @@ async deleteChat(id: string): Promise<boolean> {
             await collectChatIds(folder); 
           }
         } catch (listError) {
-          this.logger.error(`Error listing folder ${currentPath} during pre-delete cleanup:`, listError);
-        }
+                  }
       };
       await collectChatIds(normalizedPath); 
 
@@ -1585,11 +1500,9 @@ async deleteChat(id: string): Promise<boolean> {
       return true;
     } catch (error: any) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        this.logger.error(`Permission error deleting folder ${normalizedPath}:`, error);
-        new Notice(`Permission error deleting folder.`);
+                new Notice(`Permission error deleting folder.`);
       } else {
-        this.logger.error(`Error deleting folder ${normalizedPath}:`, error);
-        new Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
+                new Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
       }
       
       await this.rebuildIndexFromFiles();
@@ -1601,45 +1514,39 @@ async deleteChat(id: string): Promise<boolean> {
     async moveChat(chatId: string, oldFilePath: string, newFolderPath: string): Promise<boolean> {
       const normOldPath = normalizePath(oldFilePath);
       const normNewFolderPath = normalizePath(newFolderPath);
-      this.logger.info(`Attempting to move chat ${chatId} from "${normOldPath}" to folder "${normNewFolderPath}"`);
-
+      
       
       let newFilePath: string | null = null;
       
 
       
       if (!chatId || !oldFilePath || !newFolderPath) {
-          this.logger.error("Move chat failed: Invalid arguments provided.");
-          new Notice("Move chat failed: Invalid data.");
+                    new Notice("Move chat failed: Invalid data.");
           return false;
       }
 
       try {
           
           if (!(await this.adapter.exists(normOldPath))) {
-              this.logger.error(`Move chat failed: Source file does not exist: ${normOldPath}`);
-              new Notice("Move chat failed: Source file not found.");
+                            new Notice("Move chat failed: Source file not found.");
                await this.rebuildIndexFromFiles();
                this.plugin.emit('chat-list-updated');
               return false;
           }
            const oldStat = await this.adapter.stat(normOldPath);
            if(oldStat?.type !== 'file'){
-                this.logger.error(`Move chat failed: Source path is not a file: ${normOldPath}`);
-                new Notice("Move chat failed: Source is not a file.");
+                                new Notice("Move chat failed: Source is not a file.");
                 return false;
            }
 
           
           if (!(await this.adapter.exists(normNewFolderPath))) {
-              this.logger.error(`Move chat failed: Target folder does not exist: ${normNewFolderPath}`);
-              new Notice("Move chat failed: Target folder not found.");
+                            new Notice("Move chat failed: Target folder not found.");
               return false;
           }
            const newStat = await this.adapter.stat(normNewFolderPath);
            if(newStat?.type !== 'folder'){
-                this.logger.error(`Move chat failed: Target path is not a folder: ${normNewFolderPath}`);
-                new Notice("Move chat failed: Target is not a folder.");
+                                new Notice("Move chat failed: Target is not a folder.");
                 return false;
            }
 
@@ -1651,26 +1558,21 @@ async deleteChat(id: string): Promise<boolean> {
 
           
           if (normOldPath === newFilePath) {
-              this.logger.warn(`Move chat skipped: Source and target paths are the same: ${normOldPath}`);
-              return true;
+                            return true;
           }
 
           
           if (await this.adapter.exists(newFilePath)) {
-              this.logger.error(`Move chat failed: File already exists at target path: ${newFilePath}`);
-              new Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
+                            new Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
               return false;
           }
 
           
-          this.logger.debug(`Executing adapter.rename from "${normOldPath}" to "${newFilePath}"`);
-          await this.adapter.rename(normOldPath, newFilePath);
-          this.logger.info(`Chat file moved successfully to ${newFilePath}`);
-
+                    await this.adapter.rename(normOldPath, newFilePath);
+          
           
           if (this.loadedChats[chatId] && newFilePath) { 
-              this.logger.debug(`Updating file path in loadedChats cache for ${chatId} to ${newFilePath}`);
-              this.loadedChats[chatId].filePath = newFilePath;
+                            this.loadedChats[chatId].filePath = newFilePath;
           }
 
           
@@ -1682,12 +1584,10 @@ async deleteChat(id: string): Promise<boolean> {
            
            const targetPathDesc = newFilePath ?? normNewFolderPath; 
            if (error.code === 'EPERM' || error.code === 'EACCES') {
-               this.logger.error(`Permission error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
-               new Notice(`Permission error moving chat file.`);
+                              new Notice(`Permission error moving chat file.`);
            } else {
                
-               this.logger.error(`Error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
-               new Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
+                              new Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
            }
            
            await this.rebuildIndexFromFiles();

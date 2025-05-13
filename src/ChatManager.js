@@ -407,10 +407,8 @@ export class ChatManager {
                 if (indexNeedsUpdate) {
                     this.chatIndex[meta.id] = storedMeta;
                     yield this.saveChatIndex();
-                    this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from saveChatAndUpdateIndex for ID: ${meta.id}`);
-                    this.plugin.emit("chat-list-updated");
-                    this.logger.debug(`Chat index updated for ${meta.id} after save trigger.`);
-                }
+                                        this.plugin.emit("chat-list-updated");
+                                    }
                 else {
                     this.logger.trace(`Index for chat ${meta.id} unchanged after save trigger, skipping index save/event.`);
                 }
@@ -469,8 +467,7 @@ export class ChatManager {
                     delete this.chatIndex[newId];
                     yield this.saveChatIndex();
                     // Ця емісія може залишитися, оскільки це шлях обробки помилки/очищення
-                    this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from createNewChat (saveImmediately FAILED) for ID: ${newId}`);
-                    this.plugin.emit("chat-list-updated");
+                                        this.plugin.emit("chat-list-updated");
                     new Notice("Error: Failed to save new chat file.");
                     return null;
                 }
@@ -481,8 +478,7 @@ export class ChatManager {
                 return newChat;
             }
             catch (error) {
-                this.logger.error("Error creating new chat:", error);
-                new Notice("Error creating new chat session.");
+                                new Notice("Error creating new chat session.");
                 return null;
             }
         });
@@ -493,8 +489,7 @@ export class ChatManager {
                 return;
             const normalized = normalizePath(folderPath);
             if (normalized.startsWith("..") || normalized.includes("\0")) {
-                this.logger.error(`Attempted to ensure invalid folder path: ${normalized}`);
-                throw new Error("Invalid folder path specified.");
+                                throw new Error("Invalid folder path specified.");
             }
             try {
                 const exists = yield this.adapter.exists(normalized);
@@ -504,14 +499,12 @@ export class ChatManager {
                 else {
                     const stat = yield this.adapter.stat(normalized);
                     if ((stat === null || stat === void 0 ? void 0 : stat.type) !== "folder") {
-                        this.logger.error(`Path exists but is not a folder: ${normalized}`);
-                        throw new Error(`Target path ${normalized} is not a folder.`);
+                                                throw new Error(`Target path ${normalized} is not a folder.`);
                     }
                 }
             }
             catch (error) {
-                this.logger.error(`Error creating/checking target folder '${normalized}':`, error);
-                throw new Error(`Failed to ensure target folder ${normalized} exists: ${error instanceof Error ? error.message : String(error)}`);
+                                throw new Error(`Failed to ensure target folder ${normalized} exists: ${error instanceof Error ? error.message : String(error)}`);
             }
         });
     }
@@ -574,8 +567,7 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const chat = yield this.getActiveChat();
             if (!chat) {
-                this.logger.error("[ChatManager] getActiveChatOrFail: No active chat found or failed to load!");
-                // Можна кинути більш специфічну помилку, або просто Error
+                                // Можна кинути більш специфічну помилку, або просто Error
                 throw new Error("No active chat found or it failed to load.");
             }
             return chat;
@@ -627,46 +619,38 @@ export class ChatManager {
             }
             let actualFilePath = filePath;
             if (!actualFilePath) {
-                // this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
                 try {
                     const hierarchy = yield this.getChatHierarchy();
                     actualFilePath = (_a = this.findChatPathInHierarchy(id, hierarchy)) !== null && _a !== void 0 ? _a : undefined;
                     if (actualFilePath) {
-                        // this.logger.debug(`[ChatManager.getChat] Found file path for ID ${id} in hierarchy: ${actualFilePath}`);
                     }
                     else {
-                        // this.logger.warn(`[ChatManager.getChat] File path for ID ${id} NOT found in hierarchy.`);
                     }
                 }
                 catch (hierarchyError) {
-                    this.logger.error(`[ChatManager.getChat] Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
-                    actualFilePath = undefined; // Забезпечуємо, що undefined, якщо була помилка
+                                        actualFilePath = undefined; // Забезпечуємо, що undefined, якщо була помилка
                 }
             }
             // Якщо шлях так і не визначено, але чат є в індексі, це проблема з консистентністю
             if (!actualFilePath && this.chatIndex[id]) {
-                this.logger.error(`[ChatManager.getChat] Chat ID ${id} exists in index but its file path could not be determined. Chat may be orphaned or index is stale.`);
-                // Можливо, варто спробувати перебудувати індекс тут, або просто повернути null
+                                // Можливо, варто спробувати перебудувати індекс тут, або просто повернути null
                 // await this.rebuildIndexFromFiles(); // Обережно: може бути рекурсивно, якщо getChat викликається з rebuildIndex
                 // if (!this.chatIndex[id]) return null; // Якщо після rebuild його немає
                 // actualFilePath = this.findChatPathInHierarchy(id, await this.getChatHierarchy()) ?? undefined;
                 // if (!actualFilePath) {
-                //     this.logger.error(`[ChatManager.getChat] Still no path after potential index rebuild for ${id}.`);
-                //     return null;
+                //                     //     return null;
                 // }
                 return null; // Поки що просто повертаємо null, якщо шлях не знайдено
             }
             // Якщо чату немає в індексі і шлях не надано/не знайдено, то чату немає
             if (!this.chatIndex[id] && !actualFilePath) {
-                this.logger.warn(`[ChatManager.getChat] Chat ID ${id} not found in index and no file path available.`);
-                return null;
+                                return null;
             }
             // Якщо шлях є, але чату немає в індексі -> спробувати завантажити, потім оновити індекс
             // Якщо чат є в індексі, але шлях не надано -> ми вже спробували його знайти
             // Якщо і шлях є, і в індексі є -> завантажуємо
             if (!actualFilePath) { // Ця умова тепер має бути рідкісною, якщо логіка вище відпрацювала
-                this.logger.error(`[ChatManager.getChat] CRITICAL: actualFilePath is still undefined for chat ID ${id} when it should be known or chat should be considered non-existent.`);
-                return null;
+                                return null;
             }
             try {
                 // actualFilePath тут точно має бути string
@@ -685,35 +669,29 @@ export class ChatManager {
                         storedMeta.temperature !== currentMeta.temperature ||
                         storedMeta.contextWindow !== currentMeta.contextWindow;
                     if (indexNeedsUpdate) {
-                        this.logger.debug(`[ChatManager.getChat] Index needs update for chat ${id}. Calling saveChatAndUpdateIndex.`);
-                        // saveChatAndUpdateIndex оновить індекс і згенерує 'chat-list-updated', якщо потрібно
+                                                // saveChatAndUpdateIndex оновить індекс і згенерує 'chat-list-updated', якщо потрібно
                         yield this.saveChatAndUpdateIndex(chat);
                     }
                     return chat;
                 }
                 else {
                     // Chat.loadFromFile повернув null (файл пошкоджений або невалідний)
-                    this.logger.error(`[ChatManager.getChat] Chat.loadFromFile returned null for ID ${id} at path ${actualFilePath}. Removing from index if present.`);
-                    // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
+                                        // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
                     yield this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); // false - не намагаємось видалити файл, бо він або не існує, або пошкоджений
                     // ---
                     if (this.activeChatId === id) {
-                        this.logger.warn(`[ChatManager.getChat] Active chat ${id} failed to load, setting active chat to null.`);
-                        yield this.setActiveChat(null); // Згенерує 'active-chat-changed'
+                                                yield this.setActiveChat(null); // Згенерує 'active-chat-changed'
                     }
                     return null;
                 }
             }
             catch (error) {
-                this.logger.error(`[ChatManager.getChat] Unexpected error during getChat for ID ${id} from ${actualFilePath}:`, error);
-                if (error.code === "ENOENT") { // Файл не знайдено
-                    this.logger.warn(`[ChatManager.getChat] File not found (ENOENT) for chat ${id} at ${actualFilePath}. Cleaning up index.`);
-                    // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
+                                if (error.code === "ENOENT") { // Файл не знайдено
+                                        // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
                     yield this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); // false - файл і так не знайдено
                     // ---
                     if (this.activeChatId === id) {
-                        this.logger.warn(`[ChatManager.getChat] Active chat ${id} file not found, setting active chat to null.`);
-                        yield this.setActiveChat(null); // Згенерує 'active-chat-changed'
+                                                yield this.setActiveChat(null); // Згенерує 'active-chat-changed'
                     }
                 }
                 // Для інших помилок, можливо, не варто видаляти з індексу одразу,
@@ -768,11 +746,9 @@ export class ChatManager {
                 return;
             }
             if (id && !this.chatIndex[id]) {
-                this.logger.error(`Attempted to set active chat to non-existent ID in index: ${id}. Rebuilding index...`);
-                yield this.rebuildIndexFromFiles();
+                                yield this.rebuildIndexFromFiles();
                 if (!this.chatIndex[id]) {
-                    this.logger.error(`Chat ID ${id} still not found after index reload. Aborting setActiveChat. Keeping previous active chat: ${previousActiveId}`);
-                    new Notice(`Error: Chat with ID ${id} not found. Cannot activate.`);
+                                        new Notice(`Error: Chat with ID ${id} not found. Cannot activate.`);
                     return;
                 }
             }
@@ -783,8 +759,7 @@ export class ChatManager {
             if (id) {
                 loadedChat = yield this.getChat(id);
                 if (!loadedChat) {
-                    this.logger.error(`CRITICAL: Failed to load chat ${id} via getChat even after index check. Resetting active chat to null.`);
-                    this.activeChatId = null;
+                                        this.activeChatId = null;
                     yield this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
                     id = null;
                 }
@@ -841,17 +816,14 @@ export class ChatManager {
                 new Notice("No active chat to update metadata for.");
                 return false;
             }
-            this.logger.debug(`Attempting to update metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
-            if (Object.keys(metadataUpdate).length === 0) {
+                        if (Object.keys(metadataUpdate).length === 0) {
                 return false;
             }
-            this.logger.debug(`Attempting to update metadata for active chat ${activeChat.metadata.id}:`, metadataUpdate);
-            const oldRolePath = activeChat.metadata.selectedRolePath;
+                        const oldRolePath = activeChat.metadata.selectedRolePath;
             const oldModelName = activeChat.metadata.modelName;
             const changed = activeChat.updateMetadata(metadataUpdate);
             if (changed) {
-                this.logger.debug(`Metadata updated in Chat object for ${activeChat.metadata.id}. Save scheduled by Chat.updateMetadata.`);
-                yield this.saveChatAndUpdateIndex(activeChat);
+                                yield this.saveChatAndUpdateIndex(activeChat);
                 const newMeta = activeChat.metadata;
                 let roleChanged = false;
                 let modelChanged = false;
@@ -869,15 +841,13 @@ export class ChatManager {
                         (_c = (_b = this.plugin.promptService) === null || _b === void 0 ? void 0 : _b.clearRoleCache) === null || _c === void 0 ? void 0 : _c.call(_b);
                     }
                     catch (e) {
-                        this.logger.error("Error finding role name or emitting role-changed:", e);
-                    }
+                                            }
                 }
                 if (modelChanged) {
                     this.plugin.emit("model-changed", newMeta.modelName || "");
                     (_e = (_d = this.plugin.promptService) === null || _d === void 0 ? void 0 : _d.clearModelDetailsCache) === null || _e === void 0 ? void 0 : _e.call(_d);
                 }
-                this.logger.error(`[ChatManager] >>> Emitting 'active-chat-changed' from updateActiveChatMetadata for ID: ${this.activeChatId}`);
-                this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
+                                this.plugin.emit("active-chat-changed", { chatId: this.activeChatId, chat: activeChat });
                 return true;
             }
             else {
@@ -901,17 +871,14 @@ export class ChatManager {
             // Видалення з кешу завантажених чатів
             if (this.loadedChats[id]) {
                 delete this.loadedChats[id];
-                this.logger.debug(`[deleteHelper] Removed chat ${id} from loadedChats cache.`);
-            }
+                            }
             // Видалення з індексу
             if (this.chatIndex[id]) {
                 delete this.chatIndex[id];
                 indexChanged = true; // Помічаємо, що індекс змінився
-                this.logger.debug(`[deleteHelper] Removed chat ${id} from chatIndex.`);
-            }
+                            }
             else {
-                this.logger.debug(`[deleteHelper] Chat ${id} was not in chatIndex.`);
-            }
+                            }
             // Видалення файлу, якщо потрібно і можливо
             if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
                 try {
@@ -920,31 +887,25 @@ export class ChatManager {
                         const stat = yield this.adapter.stat(filePath);
                         if ((stat === null || stat === void 0 ? void 0 : stat.type) === "file") {
                             yield this.adapter.remove(filePath);
-                            this.logger.debug(`[deleteHelper] Removed chat file: ${filePath}`);
-                        }
+                                                    }
                         else {
-                            this.logger.error(`[deleteHelper] Attempted to remove a non-file path: ${filePath}`);
-                        }
+                                                    }
                     }
                     else {
-                        this.logger.warn(`[deleteHelper] Chat file not found for removal: ${filePath}`);
-                    }
+                                            }
                 }
                 catch (e) {
-                    this.logger.error(`[deleteHelper] Error removing chat file ${filePath}:`, e);
-                    new Notice(`Error deleting file: ${filePath.split('/').pop()}`);
+                                        new Notice(`Error deleting file: ${filePath.split('/').pop()}`);
                     // Не перериваємо процес через помилку видалення файлу, індекс важливіший
                 }
             }
             else if (deleteFile && filePath) {
                 // Логуємо, якщо шлях некоректний для видалення
-                this.logger.warn(`[deleteHelper] Invalid file path provided for deletion: ${filePath}`);
-            }
+                            }
             // Зберігаємо індекс, ТІЛЬКИ якщо він змінився
             if (indexChanged) {
                 yield this.saveChatIndex();
-                this.logger.debug(`[deleteHelper] Saved updated chatIndex after removing ${id}.`);
-            }
+                            }
             return indexChanged; // Повертаємо статус зміни індексу
         });
     }
@@ -953,24 +914,20 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const chatExistedInIndex = !!this.chatIndex[id];
             const wasActive = id === this.activeChatId;
-            this.logger.debug(`[deleteChat] Deleting chat ${id}. Was active: ${wasActive}. Existed in index: ${chatExistedInIndex}.`);
-            let filePath = null;
+                        let filePath = null;
             try {
                 // Знаходимо шлях до файлу (найкраще через ієрархію)
                 const hierarchy = yield this.getChatHierarchy();
                 filePath = this.findChatPathInHierarchy(id, hierarchy);
                 if (!filePath && chatExistedInIndex) {
-                    this.logger.warn(`[deleteChat] File path for chat ${id} not found in hierarchy, but chat exists in index. Will only remove from index.`);
-                }
+                                    }
             }
             catch (hierarchyError) {
-                this.logger.error(`Error getting hierarchy during delete operation for ${id}:`, hierarchyError);
-                // Продовжуємо без шляху, якщо чат є в індексі
+                                // Продовжуємо без шляху, якщо чат є в індексі
             }
             // Якщо чату немає ні в індексі, ні шлях не знайдено (якщо він був потрібен)
             if (!filePath && !chatExistedInIndex) {
-                this.logger.warn(`[deleteChat] Chat ${id} not found in index or hierarchy. Nothing to delete.`);
-                return false; // Чату не існує
+                                return false; // Чату не існує
             }
             let success = true;
             // Змінна для події, яку потрібно згенерувати ПІСЛЯ всіх операцій
@@ -978,16 +935,13 @@ export class ChatManager {
             try {
                 // Викликаємо новий допоміжний метод, який НЕ генерує подій
                 const indexWasChanged = yield this.deleteChatFileAndIndexEntry_NoEmit(id, filePath, true);
-                this.logger.debug(`[deleteChat] deleteChatFileAndIndexEntry_NoEmit finished. Index changed: ${indexWasChanged}`);
-                // Визначаємо, яку подію генерувати (або жодної)
+                                // Визначаємо, яку подію генерувати (або жодної)
                 if (wasActive) {
-                    this.logger.debug(`[deleteChat] Deleted chat was active. Finding and setting next active chat...`);
-                    // Визначаємо наступний активний чат
+                                        // Визначаємо наступний активний чат
                     const newHierarchy = yield this.getChatHierarchy(); // Отримуємо оновлену ієрархію
                     const firstChat = this.findFirstChatInHierarchy(newHierarchy);
                     const nextActiveId = firstChat ? firstChat.metadata.id : null;
-                    this.logger.debug(`[deleteChat] Next active chat will be: ${nextActiveId}`);
-                    // Викликаємо setActiveChat. Він сам згенерує 'active-chat-changed'.
+                                        // Викликаємо setActiveChat. Він сам згенерує 'active-chat-changed'.
                     // Ця подія має бути достатньою для оновлення UI (включаючи список).
                     yield this.setActiveChat(nextActiveId);
                     // Немає потреби генерувати 'chat-list-updated' окремо тут.
@@ -995,13 +949,11 @@ export class ChatManager {
                 else if (indexWasChanged) {
                     // Якщо видалено НЕактивний чат, але індекс змінився,
                     // нам ПОТРІБНА подія 'chat-list-updated', щоб список оновився.
-                    this.logger.debug(`[deleteChat] Non-active chat deleted and index changed. Setting 'chat-list-updated' to be emitted.`);
-                    eventToEmit = { name: "chat-list-updated", data: undefined };
+                                        eventToEmit = { name: "chat-list-updated", data: undefined };
                 }
             }
             catch (error) {
-                this.logger.error(`Error during deletion process for chat ${id}:`, error);
-                new Notice(`Error deleting chat ${id}. Check console.`);
+                                new Notice(`Error deleting chat ${id}. Check console.`);
                 success = false;
                 // Спробуємо відновити консистентність індексу при помилці
                 yield this.rebuildIndexFromFiles();
@@ -1011,23 +963,18 @@ export class ChatManager {
             finally {
                 // Генеруємо подію, якщо вона була запланована
                 if (eventToEmit) {
-                    this.logger.debug(`[deleteChat] Emitting final event: ${eventToEmit.name}`);
-                    this.plugin.emit(eventToEmit.name, eventToEmit.data);
+                                        this.plugin.emit(eventToEmit.name, eventToEmit.data);
                 }
                 else if (wasActive) {
-                    this.logger.debug(`[deleteChat] No final event emitted from deleteChat itself (relied on setActiveChat).`);
-                }
+                                    }
                 else {
-                    this.logger.debug(`[deleteChat] No final event emitted (non-active deleted, index unchanged, or error without rebuild).`);
-                }
+                                    }
                 // Показуємо сповіщення, тільки якщо видалення було успішним і чат існував
                 if (success && chatExistedInIndex) {
                     new Notice(`Chat deleted.`);
-                    this.logger.info(`Chat ${id} deleted successfully.`);
-                }
+                                    }
                 else if (!chatExistedInIndex) {
-                    this.logger.info(`Chat ${id} deletion attempt - chat did not exist in index.`);
-                }
+                                    }
             }
             // Повертаємо true, якщо чат існував і операція (принаймні оновлення індексу) пройшла успішно
             return success && chatExistedInIndex;
@@ -1041,19 +988,16 @@ export class ChatManager {
                 originalFilePath = this.findChatPathInHierarchy(chatIdToClone, hierarchy);
             }
             catch (hierarchyError) {
-                this.logger.error(`Error getting hierarchy during clone operation for ${chatIdToClone}:`, hierarchyError);
-                new Notice("Error finding original chat for cloning.");
+                                new Notice("Error finding original chat for cloning.");
                 return null;
             }
             if (!originalFilePath) {
-                this.logger.error(`Cannot clone: File path for original chat ${chatIdToClone} not found.`);
-                new Notice("Original chat file path not found.");
+                                new Notice("Original chat file path not found.");
                 return null;
             }
             const originalChat = yield this.getChat(chatIdToClone, originalFilePath);
             if (!originalChat) {
-                this.logger.error(`Cannot clone: Original chat ${chatIdToClone} could not be loaded from ${originalFilePath}.`);
-                new Notice("Original chat could not be loaded.");
+                                new Notice("Original chat could not be loaded.");
                 return null;
             }
             const targetFolder = originalFilePath.substring(0, originalFilePath.lastIndexOf("/")) || "/";
@@ -1097,8 +1041,7 @@ export class ChatManager {
                     delete this.chatIndex[newId];
                     yield this.saveChatIndex();
                     this.plugin.emit("chat-list-updated");
-                    this.logger.error(`Failed to save the cloned chat file for ${newId} at ${newFilePath}. Removed from index.`);
-                    new Notice("Error: Failed to save the cloned chat file.");
+                                        new Notice("Error: Failed to save the cloned chat file.");
                     return null;
                 }
                 this.loadedChats[newId] = clonedChat;
@@ -1106,8 +1049,7 @@ export class ChatManager {
                 return clonedChat;
             }
             catch (error) {
-                this.logger.error("Error cloning chat:", error);
-                new Notice("An error occurred while cloning the chat.");
+                                new Notice("An error occurred while cloning the chat.");
                 return null;
             }
         });
@@ -1116,8 +1058,7 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const chat = yield this.getChat(chatId);
             if (!chat) {
-                this.logger.error(`Cannot delete messages: Chat ${chatId} not found.`);
-                return false;
+                                return false;
             }
             if (messageIndexToDeleteAfter >= chat.messages.length - 1) {
                 return true;
@@ -1141,8 +1082,7 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const chat = yield this.getChat(chatId);
             if (!chat) {
-                this.logger.error(`Cannot delete message: Chat ${chatId} not found.`);
-                new Notice(`Error: Chat ${chatId} not found.`);
+                                new Notice(`Error: Chat ${chatId} not found.`);
                 return false;
             }
             const timeTarget = timestampToDelete.getTime();
@@ -1170,8 +1110,7 @@ export class ChatManager {
             const chatId = chat.metadata.id;
             try {
                 if (messageIndex < 0 || messageIndex >= chat.messages.length) {
-                    this.logger.error(`Invalid message index ${messageIndex} provided to _performDeleteMessageByIndex for chat ${chatId}.`);
-                    return false;
+                                        return false;
                 }
                 const deletedMessage = chat.messages.splice(messageIndex, 1)[0];
                 chat.updateMetadata({});
@@ -1186,8 +1125,7 @@ export class ChatManager {
                 return true;
             }
             catch (error) {
-                this.logger.error(`Error during message deletion by index ${messageIndex} for chat ${chatId}:`, error);
-                new Notice("Error deleting message.");
+                                new Notice("Error deleting message.");
                 return false;
             }
         });
@@ -1196,8 +1134,7 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const chat = yield this.getChat(chatId);
             if (!chat) {
-                this.logger.error(`Cannot clear messages: Chat ${chatId} not found.`);
-                new Notice(`Error: Chat ${chatId} not found.`);
+                                new Notice(`Error: Chat ${chatId} not found.`);
                 return false;
             }
             if (chat.messages.length === 0) {
@@ -1215,8 +1152,7 @@ export class ChatManager {
                 return true;
             }
             catch (error) {
-                this.logger.error(`Error during message clearing process for chat ${chatId}:`, error);
-                new Notice("Error clearing messages.");
+                                new Notice("Error clearing messages.");
                 return false;
             }
         });
@@ -1234,8 +1170,7 @@ export class ChatManager {
             }
             const chat = yield this.getChat(chatId);
             if (!chat) {
-                this.logger.error(`Cannot rename: Chat ${chatId} not found.`);
-                new Notice("Chat not found.");
+                                new Notice("Chat not found.");
                 return false;
             }
             if (chat.metadata.name === trimmedName) {
@@ -1257,8 +1192,7 @@ export class ChatManager {
                 }
             }
             catch (error) {
-                this.logger.error(`Error renaming chat ${chatId}:`, error);
-                new Notice("An error occurred while renaming the chat.");
+                                new Notice("An error occurred while renaming the chat.");
                 return false;
             }
         });
@@ -1274,13 +1208,11 @@ export class ChatManager {
             const normalizedPath = normalizePath(folderPath);
             // Перевірка базових правил
             if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
-                this.logger.error("Cannot create folder at root or with empty/dot path.");
-                new Notice("Invalid folder path.");
+                                new Notice("Invalid folder path.");
                 return false;
             }
             if (normalizedPath.startsWith("..") || normalizedPath.includes("\0")) {
-                this.logger.error(`Attempted to create folder with invalid path: ${normalizedPath}`);
-                new Notice("Invalid characters or path traversal detected.");
+                                new Notice("Invalid characters or path traversal detected.");
                 return false;
             }
             try {
@@ -1295,12 +1227,10 @@ export class ChatManager {
             }
             catch (error) {
                 if (error.code === "EPERM" || error.code === "EACCES") {
-                    this.logger.error(`Permission error creating folder ${normalizedPath}:`, error);
-                    new Notice(`Permission error creating folder.`);
+                                        new Notice(`Permission error creating folder.`);
                 }
                 else {
-                    this.logger.error(`Error creating folder ${normalizedPath}:`, error);
-                    new Notice(`Failed to create folder: ${error.message || "Unknown error"}`);
+                                        new Notice(`Failed to create folder: ${error.message || "Unknown error"}`);
                 }
                 return false;
             }
@@ -1321,35 +1251,30 @@ export class ChatManager {
             const normNewPath = normalizePath(newPath);
             // Перевірки
             if (!normOldPath || normOldPath === "/" || !normNewPath || normNewPath === "/") {
-                this.logger.error("Invalid paths provided for rename operation.");
-                new Notice("Cannot rename root folder or use empty path.");
+                                new Notice("Cannot rename root folder or use empty path.");
                 return false;
             }
             if (normOldPath === normNewPath) {
                 return true; // Вважаємо успіхом, бо цільовий стан досягнуто
             }
             if (normNewPath.startsWith(normOldPath + "/")) {
-                this.logger.error(`Cannot move folder "${normOldPath}" inside itself ("${normNewPath}").`);
-                new Notice("Cannot move a folder inside itself.");
+                                new Notice("Cannot move a folder inside itself.");
                 return false;
             }
             try {
                 const oldExists = yield this.adapter.exists(normOldPath);
                 if (!oldExists) {
-                    this.logger.error(`Source folder for rename does not exist: ${normOldPath}`);
-                    new Notice("Folder to rename not found.");
+                                        new Notice("Folder to rename not found.");
                     return false;
                 }
                 const oldStat = yield this.adapter.stat(normOldPath);
                 if ((oldStat === null || oldStat === void 0 ? void 0 : oldStat.type) !== "folder") {
-                    this.logger.error(`Source path is not a folder: ${normOldPath}`);
-                    new Notice("Item to rename is not a folder.");
+                                        new Notice("Item to rename is not a folder.");
                     return false;
                 }
                 const newExists = yield this.adapter.exists(normNewPath);
                 if (newExists) {
-                    this.logger.error(`Target path for rename already exists: ${normNewPath}`);
-                    new Notice(`"${normNewPath.split("/").pop()}" already exists.`);
+                                        new Notice(`"${normNewPath.split("/").pop()}" already exists.`);
                     return false;
                 }
                 // Виконуємо перейменування/переміщення
@@ -1367,12 +1292,10 @@ export class ChatManager {
             }
             catch (error) {
                 if (error.code === "EPERM" || error.code === "EACCES") {
-                    this.logger.error(`Permission error renaming folder ${normOldPath} to ${normNewPath}:`, error);
-                    new Notice(`Permission error renaming folder.`);
+                                        new Notice(`Permission error renaming folder.`);
                 }
                 else {
-                    this.logger.error(`Error renaming folder ${normOldPath} to ${normNewPath}:`, error);
-                    new Notice(`Failed to rename folder: ${error.message || "Unknown error"}`);
+                                        new Notice(`Failed to rename folder: ${error.message || "Unknown error"}`);
                 }
                 return false;
             }
@@ -1388,14 +1311,12 @@ export class ChatManager {
             const normalizedPath = normalizePath(folderPath);
             // Перевірка, чи шлях валідний і не є коренем сховища або основною папкою чатів
             if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
-                this.logger.error(`Attempted to delete root or invalid folder path: ${normalizedPath}`);
-                new Notice("Cannot delete this folder.");
+                                new Notice("Cannot delete this folder.");
                 return false;
             }
             // Додаткова перевірка на основну папку чатів
             if (normalizedPath === this.chatsFolderPath) {
-                this.logger.error(`Attempted to delete the main chat history folder: ${normalizedPath}`);
-                new Notice("Cannot delete the main chat history folder set in settings.");
+                                new Notice("Cannot delete the main chat history folder set in settings.");
                 return false;
             }
             try {
@@ -1406,8 +1327,7 @@ export class ChatManager {
                 }
                 const stat = yield this.adapter.stat(normalizedPath);
                 if ((stat === null || stat === void 0 ? void 0 : stat.type) !== "folder") {
-                    this.logger.error(`Path to delete is not a folder: ${normalizedPath}`);
-                    new Notice("Item to delete is not a folder.");
+                                        new Notice("Item to delete is not a folder.");
                     return false;
                 }
                 // --- Очищення індексу та кешу ПЕРЕД видаленням ---
@@ -1431,8 +1351,7 @@ export class ChatManager {
                         }
                     }
                     catch (listError) {
-                        this.logger.error(`Error listing folder ${currentPath} during pre-delete cleanup:`, listError);
-                    }
+                                            }
                 });
                 yield collectChatIds(normalizedPath); // Збираємо ID
                 let activeChatWasDeleted = false;
@@ -1469,12 +1388,10 @@ export class ChatManager {
             }
             catch (error) {
                 if (error.code === "EPERM" || error.code === "EACCES") {
-                    this.logger.error(`Permission error deleting folder ${normalizedPath}:`, error);
-                    new Notice(`Permission error deleting folder.`);
+                                        new Notice(`Permission error deleting folder.`);
                 }
                 else {
-                    this.logger.error(`Error deleting folder ${normalizedPath}:`, error);
-                    new Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
+                                        new Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
                 }
                 // Спробуємо перебудувати індекс, щоб виправити можливу розсинхронізацію
                 yield this.rebuildIndexFromFiles();
@@ -1487,41 +1404,35 @@ export class ChatManager {
         return __awaiter(this, void 0, void 0, function* () {
             const normOldPath = normalizePath(oldFilePath);
             const normNewFolderPath = normalizePath(newFolderPath);
-            this.logger.info(`Attempting to move chat ${chatId} from "${normOldPath}" to folder "${normNewFolderPath}"`);
-            // --- Оголошуємо newFilePath тут, поза try ---
+                        // --- Оголошуємо newFilePath тут, поза try ---
             let newFilePath = null;
             // ----------------------------------------
             // 1. Валідація
             if (!chatId || !oldFilePath || !newFolderPath) {
-                this.logger.error("Move chat failed: Invalid arguments provided.");
-                new Notice("Move chat failed: Invalid data.");
+                                new Notice("Move chat failed: Invalid data.");
                 return false;
             }
             try {
                 // Перевірка існування джерела
                 if (!(yield this.adapter.exists(normOldPath))) {
-                    this.logger.error(`Move chat failed: Source file does not exist: ${normOldPath}`);
-                    new Notice("Move chat failed: Source file not found.");
+                                        new Notice("Move chat failed: Source file not found.");
                     yield this.rebuildIndexFromFiles();
                     this.plugin.emit('chat-list-updated');
                     return false;
                 }
                 const oldStat = yield this.adapter.stat(normOldPath);
                 if ((oldStat === null || oldStat === void 0 ? void 0 : oldStat.type) !== 'file') {
-                    this.logger.error(`Move chat failed: Source path is not a file: ${normOldPath}`);
-                    new Notice("Move chat failed: Source is not a file.");
+                                        new Notice("Move chat failed: Source is not a file.");
                     return false;
                 }
                 // Перевірка існування цільової папки
                 if (!(yield this.adapter.exists(normNewFolderPath))) {
-                    this.logger.error(`Move chat failed: Target folder does not exist: ${normNewFolderPath}`);
-                    new Notice("Move chat failed: Target folder not found.");
+                                        new Notice("Move chat failed: Target folder not found.");
                     return false;
                 }
                 const newStat = yield this.adapter.stat(normNewFolderPath);
                 if ((newStat === null || newStat === void 0 ? void 0 : newStat.type) !== 'folder') {
-                    this.logger.error(`Move chat failed: Target path is not a folder: ${normNewFolderPath}`);
-                    new Notice("Move chat failed: Target is not a folder.");
+                                        new Notice("Move chat failed: Target is not a folder.");
                     return false;
                 }
                 // 2. Визначення нового шляху
@@ -1531,23 +1442,18 @@ export class ChatManager {
                 // ------------------------------------------
                 // Перевірка, чи файл вже в цільовій папці
                 if (normOldPath === newFilePath) {
-                    this.logger.warn(`Move chat skipped: Source and target paths are the same: ${normOldPath}`);
-                    return true;
+                                        return true;
                 }
                 // 3. Перевірка на конфлікт імен
                 if (yield this.adapter.exists(newFilePath)) {
-                    this.logger.error(`Move chat failed: File already exists at target path: ${newFilePath}`);
-                    new Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
+                                        new Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
                     return false;
                 }
                 // 4. Переміщення файлу
-                this.logger.debug(`Executing adapter.rename from "${normOldPath}" to "${newFilePath}"`);
-                yield this.adapter.rename(normOldPath, newFilePath);
-                this.logger.info(`Chat file moved successfully to ${newFilePath}`);
-                // 5. Оновлення кешу завантажених чатів
+                                yield this.adapter.rename(normOldPath, newFilePath);
+                                // 5. Оновлення кешу завантажених чатів
                 if (this.loadedChats[chatId] && newFilePath) { // Перевіряємо, що newFilePath не null
-                    this.logger.debug(`Updating file path in loadedChats cache for ${chatId} to ${newFilePath}`);
-                    this.loadedChats[chatId].filePath = newFilePath;
+                                        this.loadedChats[chatId].filePath = newFilePath;
                 }
                 // 6. Оновлення UI (Індекс оновиться пізніше через Vault Event)
                 this.plugin.emit('chat-list-updated');
@@ -1557,13 +1463,11 @@ export class ChatManager {
                 // --- Тепер newFilePath доступний тут (може бути null, якщо помилка сталася до присвоєння) ---
                 const targetPathDesc = newFilePath !== null && newFilePath !== void 0 ? newFilePath : normNewFolderPath; // Використовуємо папку, якщо шлях файлу ще не визначено
                 if (error.code === 'EPERM' || error.code === 'EACCES') {
-                    this.logger.error(`Permission error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
-                    new Notice(`Permission error moving chat file.`);
+                                        new Notice(`Permission error moving chat file.`);
                 }
                 else {
                     // Використовуємо targetPathDesc в логуванні
-                    this.logger.error(`Error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
-                    new Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
+                                        new Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
                 }
                 // ---
                 yield this.rebuildIndexFromFiles();
