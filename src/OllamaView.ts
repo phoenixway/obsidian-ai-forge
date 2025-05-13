@@ -3898,18 +3898,10 @@ export class OllamaView extends ItemView {
           try {
             await toolErrorHmaPromise;
           } catch (e_hma) {
-            currentViewInstance.plugin.logger.error(
-              `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] HMA error/timeout for tool error message`,
-              e_hma
-            );
           }
           continue;
         }
 
-        currentViewInstance.plugin.logger.info(
-          `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Executing tool: ${toolName} with args:`,
-          toolArgs
-        );
         const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
         const toolResultContent = execResult.success
           ? execResult.result
