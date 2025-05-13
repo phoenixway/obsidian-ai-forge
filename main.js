@@ -343,30 +343,34 @@ var DEFAULT_SETTINGS = {
   temperature: 0.7,
   contextWindow: 4096,
   // Roles
-  userRolesFolderPath: "/etc/ai-forge/roles",
-  // Приклад шляху
+  userRolesFolderPath: "ai-forge/roles",
+  // Кращий шлях за замовчуванням у Vault
   selectedRolePath: "",
   followRole: true,
   // Storage & History
   saveMessageHistory: true,
-  chatHistoryFolderPath: "/etc/ai-forge/chats",
-  // Приклад шляху
-  chatExportFolderPath: "/etc/ai-forge/xports",
-  // Приклад шляху
+  chatHistoryFolderPath: "ai-forge/chats",
+  // Кращий шлях за замовчуванням у Vault
+  chatExportFolderPath: "ai-forge/exports",
+  // Кращий шлях за замовчуванням у Vault
   // View Behavior
   openChatInTab: false,
   maxMessageHeight: 300,
+  sidebarWidth: void 0,
+  // Або null. Означає, що ширина не встановлена користувачем
   // Appearance
   userAvatarType: "initials",
   userAvatarContent: "U",
   aiAvatarType: "icon",
   aiAvatarContent: "bot",
+  fixBrokenEmojis: true,
   // RAG
   ragEnabled: false,
-  ragFolderPath: "etc/ai-forge/rag",
-  // Приклад шляху
+  ragFolderPath: "ai-forge/rag",
+  // Кращий шлях за замовчуванням у Vault
   ragEnableSemanticSearch: true,
   ragEmbeddingModel: "nomic-embed-text",
+  // Популярна модель для вбудовувань
   ragChunkSize: 512,
   ragSimilarityThreshold: 0.5,
   ragTopK: 3,
@@ -375,18 +379,38 @@ var DEFAULT_SETTINGS = {
   // Productivity
   enableProductivityFeatures: false,
   dailyTaskFileName: "Tasks_Today.md",
+  // Advanced Context Management (Summarization)
   useAdvancedContextStrategy: false,
   enableSummarization: false,
   summarizationPrompt: "Summarize the key points discussed so far in this conversation:\n\n{text_to_summarize}",
   keepLastNMessagesBeforeSummary: 10,
   summarizationChunkSize: 1500,
   summarizationModelName: "",
+  // Залишаємо порожнім, вимагає вибору
+  fallbackSummarizationModelName: "gemma2:2b",
+  // Приклад fallback моделі
   // Speech & Translation
   googleApiKey: "",
+  // Speech-to-Text
   speechLanguage: "uk-UA",
+  // Ukrainian
   enableTranslation: false,
+  // Застаріле поле, буде контролюватись translationProvider
   translationTargetLanguage: "uk",
+  // Ukrainian
   googleTranslationApiKey: "",
+  // Google Translate
+  translationProvider: "none",
+  // За замовчуванням вимкнено
+  ollamaTranslationModel: "",
+  // Залишаємо порожнім
+  // Tools/Agents
+  enableToolUse: true,
+  // Weather Agent Settings (ЗНАЧЕННЯ ЗА ЗАМОВЧУВАННЯМ ДЛЯ НОВИХ ПОЛІВ!)
+  openWeatherMapApiKey: "YOUR_OPENWEATHERMAP_API_KEY",
+  // Плейсхолдер!
+  weatherDefaultLocation: "Kyiv",
+  // Приклад локації за замовчуванням
   // Logger Settings
   consoleLogLevel: "INFO",
   fileLoggingEnabled: false,
@@ -394,73 +418,56 @@ var DEFAULT_SETTINGS = {
   logCallerInfo: false,
   logFilePath: "",
   // Logger сам підставить шлях до папки плагіна
-  logFileMaxSizeMB: 5,
-  fallbackSummarizationModelName: "gemma3:4b",
-  fixBrokenEmojis: true,
-  translationProvider: "ollama",
-  // За замовчуванням вимкнено
-  ollamaTranslationModel: "",
-  sidebarWidth: void 0,
-  // Або null. Означає, що ширина не встановлена користувачем
-  enableToolUse: true
+  logFileMaxSizeMB: 5
 };
 var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
-    this.debouncedUpdateChatPath = (0, import_obsidian4.debounce)(
-      async () => {
-        this.plugin.logger.debug("Debounced: Updating chat path and ensuring folder exists...");
-        if (this.plugin.chatManager) {
-          this.plugin.chatManager.updateChatsFolderPath();
-          await this.plugin.chatManager.ensureFoldersExist();
-        }
-      },
-      1e3,
-      true
-    );
-    this.debouncedUpdateRolePath = (0, import_obsidian4.debounce)(
-      async () => {
-        this.plugin.logger.debug("Debounced: Refreshing role list due to path change...");
-        await this.plugin.listRoleFiles(true);
-        this.plugin.emit("roles-updated");
-      },
-      1e3,
-      true
-    );
-    this.debouncedUpdateRagPath = (0, import_obsidian4.debounce)(
-      async () => {
-        this.plugin.logger.debug("Debounced: Re-indexing RAG due to path change...");
-        if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
-          await this.plugin.ragService.indexDocuments();
-        }
-      },
-      1e3,
-      true
-    );
+    this.debouncedUpdateChatPath = (0, import_obsidian4.debounce)(async () => {
+      this.plugin.logger.debug("Debounced: Updating chat path and ensuring folder exists...");
+      if (this.plugin.chatManager) {
+        this.plugin.chatManager.updateChatsFolderPath();
+        await this.plugin.chatManager.ensureFoldersExist();
+      }
+    }, 1e3, true);
+    this.debouncedUpdateRolePath = (0, import_obsidian4.debounce)(async () => {
+      this.plugin.logger.debug("Debounced: Refreshing role list due to path change...");
+      await this.plugin.listRoleFiles(true);
+      this.plugin.emit("roles-updated");
+    }, 1e3, true);
+    this.debouncedUpdateRagPath = (0, import_obsidian4.debounce)(async () => {
+      this.plugin.logger.debug("Debounced: Re-indexing RAG due to path change...");
+      if (this.plugin.settings.ragEnabled && this.plugin.ragService) {
+        await this.plugin.ragService.indexDocuments();
+      }
+    }, 1e3, true);
   }
   // Допоміжна функція для створення заголовків секцій
   createSectionHeader(text) {
     this.containerEl.createEl("h3", { text }).addClass("ai-forge-settings-header");
   }
+  // Нова допоміжна функція для створення підзаголовків груп
+  createGroupHeader(text) {
+    this.containerEl.createEl("h4", { text }).addClass("ai-forge-settings-group-header");
+  }
   display() {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "AI Forge Settings" });
-    this.createSectionHeader("Connection & Model Defaults");
-    new import_obsidian4.Setting(containerEl).setName("Ollama Server URL").setDesc("The URL of your running Ollama server (e.g., http://localhost:11434 or http://192.168.X.X:11434).").addText(
-      (text) => text.setPlaceholder(DEFAULT_SETTINGS.ollamaServerUrl).setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
-        let url = value.trim();
-        if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
-          url = "http://" + url;
-        }
-        if (url.endsWith("/")) {
-          url = url.slice(0, -1);
-        }
-        this.plugin.settings.ollamaServerUrl = url || DEFAULT_SETTINGS.ollamaServerUrl;
-        await this.plugin.saveSettings();
-      })
-    );
+    this.createSectionHeader("General");
+    this.createGroupHeader("Connection & Model Defaults");
+    new import_obsidian4.Setting(containerEl).setName("Ollama Server URL").setDesc("The URL of your running Ollama server (e.g., http://localhost:11434 or http://192.168.X.X:11434).").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.ollamaServerUrl).setValue(this.plugin.settings.ollamaServerUrl).onChange(async (value) => {
+      let url = value.trim();
+      if (url && !url.startsWith("http://") && !url.startsWith("https://")) {
+        url = "http://" + url;
+      }
+      if (url.endsWith("/")) {
+        url = url.slice(0, -1);
+      }
+      this.plugin.settings.ollamaServerUrl = url || DEFAULT_SETTINGS.ollamaServerUrl;
+      await this.plugin.saveSettings();
+    }));
     let modelDropdown = null;
     const updateOptions = async (dropdown, button) => {
       if (!dropdown)
@@ -506,195 +513,139 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
         new import_obsidian4.Notice("Model list refreshed!");
       });
     });
-    new import_obsidian4.Setting(containerEl).setName("Default Temperature").setDesc("Controls randomness (0.0 = deterministic, >1.0 = creative).").addSlider(
-      (slider) => slider.setLimits(0, 2, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
-        this.plugin.settings.temperature = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian4.Setting(containerEl).setName("Context Window Size (Tokens)").setDesc("Max tokens model considers. Requires restart/reload if changed while model is loaded.").addText(
-      (text) => text.setPlaceholder(DEFAULT_SETTINGS.contextWindow.toString()).setValue(this.plugin.settings.contextWindow.toString()).onChange(async (value) => {
-        const num = parseInt(value.trim(), 10);
-        this.plugin.settings.contextWindow = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.contextWindow;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian4.Setting(containerEl).setName("Enable Tool Use (Experimental)").setDesc("Allow AI models to use registered tools/agents to perform actions. Requires compatible models (e.g., Llama 3.1, some Mistral models).").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.enableToolUse).onChange(async (value) => {
-        this.plugin.settings.enableToolUse = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    this.createSectionHeader("View Behavior");
-    new import_obsidian4.Setting(containerEl).setName("Open Chat in Main Tab").setDesc("ON: Open in a main tab. OFF: Open in the right sidebar.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.openChatInTab).onChange(async (value) => {
-        this.plugin.settings.openChatInTab = value;
-        await this.plugin.saveSettings();
-        new import_obsidian4.Notice("Chat view location setting saved. Re-open the view to apply.", 5e3);
-      })
-    );
-    new import_obsidian4.Setting(containerEl).setName("Max Message Height (pixels)").setDesc("Collapse longer messages with 'Show More'. 0 disables.").addText(
-      (text) => text.setPlaceholder("Example: 300").setValue(this.plugin.settings.maxMessageHeight.toString()).onChange(async (value) => {
-        var _a, _b;
-        const num = parseInt(value.trim(), 10);
-        this.plugin.settings.maxMessageHeight = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.maxMessageHeight;
-        await this.plugin.saveSettings();
-        (_b = (_a = this.plugin.view) == null ? void 0 : _a.checkAllMessagesForCollapsing) == null ? void 0 : _b.call(_a);
-      })
-    );
-    this.createSectionHeader("Appearance");
-    new import_obsidian4.Setting(containerEl).setName("User Avatar Style").addDropdown(
-      (dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").addOption("image", "Image (Vault Path)").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
-        this.plugin.settings.userAvatarType = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
+    new import_obsidian4.Setting(containerEl).setName("Default Temperature").setDesc("Controls randomness (0.0 = deterministic, >1.0 = creative).").addSlider((slider) => slider.setLimits(0, 2, 0.1).setValue(this.plugin.settings.temperature).setDynamicTooltip().onChange(async (value) => {
+      this.plugin.settings.temperature = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Context Window Size (Tokens)").setDesc("Max tokens model considers. Requires restart/reload if changed while model is loaded.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.contextWindow.toString()).setValue(this.plugin.settings.contextWindow.toString()).onChange(async (value) => {
+      const num = parseInt(value.trim(), 10);
+      this.plugin.settings.contextWindow = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.contextWindow;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Enable Tool Use (Experimental)").setDesc("Allow AI models to use registered tools/agents to perform actions. Requires compatible models (e.g., Llama 3.1, some Mistral models).").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableToolUse).onChange(async (value) => {
+      this.plugin.settings.enableToolUse = value;
+      await this.plugin.saveSettings();
+    }));
+    this.createGroupHeader("View Behavior");
+    new import_obsidian4.Setting(containerEl).setName("Open Chat in Main Tab").setDesc("ON: Open in a main tab. OFF: Open in the right sidebar.").addToggle((toggle) => toggle.setValue(this.plugin.settings.openChatInTab).onChange(async (value) => {
+      this.plugin.settings.openChatInTab = value;
+      await this.plugin.saveSettings();
+      new import_obsidian4.Notice("Chat view location setting saved. Re-open the view to apply.", 5e3);
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Max Message Height (pixels)").setDesc("Collapse longer messages with 'Show More'. 0 disables.").addText((text) => text.setPlaceholder("Example: 300").setValue(this.plugin.settings.maxMessageHeight.toString()).onChange(async (value) => {
+      var _a, _b;
+      const num = parseInt(value.trim(), 10);
+      this.plugin.settings.maxMessageHeight = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.maxMessageHeight;
+      await this.plugin.saveSettings();
+      (_b = (_a = this.plugin.view) == null ? void 0 : _a.checkAllMessagesForCollapsing) == null ? void 0 : _b.call(_a);
+    }));
+    this.createGroupHeader("Appearance");
+    new import_obsidian4.Setting(containerEl).setName("User Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").addOption("image", "Image (Vault Path)").setValue(this.plugin.settings.userAvatarType).onChange(async (value) => {
+      this.plugin.settings.userAvatarType = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
     const userAvatarSetting = new import_obsidian4.Setting(containerEl).setDesc(" ");
     userAvatarSetting.controlEl.addClass("ai-forge-avatar-content-setting");
     if (this.plugin.settings.userAvatarType === "initials") {
       userAvatarSetting.setName("User Initials").setDesc("Max 2 chars.");
-      userAvatarSetting.addText(
-        (text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
-          this.plugin.settings.userAvatarContent = value.trim().substring(0, 2) || DEFAULT_SETTINGS.userAvatarContent;
-          await this.plugin.saveSettings();
-        })
-      );
+      userAvatarSetting.addText((text) => text.setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+        this.plugin.settings.userAvatarContent = value.trim().substring(0, 2) || DEFAULT_SETTINGS.userAvatarContent;
+        await this.plugin.saveSettings();
+      }));
     } else if (this.plugin.settings.userAvatarType === "icon") {
       userAvatarSetting.setName("User Icon ID").setDesc('Obsidian icon ID (e.g., "user").');
-      userAvatarSetting.addText(
-        (text) => text.setPlaceholder("user").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
-          this.plugin.settings.userAvatarContent = value.trim() || "user";
-          await this.plugin.saveSettings();
-        })
-      );
+      userAvatarSetting.addText((text) => text.setPlaceholder("user").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+        this.plugin.settings.userAvatarContent = value.trim() || "user";
+        await this.plugin.saveSettings();
+      }));
     } else if (this.plugin.settings.userAvatarType === "image") {
       userAvatarSetting.setName("User Avatar Image Path");
       userAvatarSetting.setDesc("Full path to the image file (png/jpeg/jpg) within your vault.");
-      userAvatarSetting.addText(
-        (text) => text.setPlaceholder("e.g., Assets/Images/user.png").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
-          const normalizedPath = (0, import_obsidian4.normalizePath)(value.trim());
-          if (normalizedPath === "" || /\.(png|jpg|jpeg)$/i.test(normalizedPath)) {
-            this.plugin.settings.userAvatarContent = normalizedPath;
-          } else {
-            new import_obsidian4.Notice("Invalid path. Please provide a path to a .png or .jpeg/jpg file, or leave empty.");
-            text.setValue(this.plugin.settings.userAvatarContent);
-            return;
-          }
-          await this.plugin.saveSettings();
-        })
-      );
-    }
-    new import_obsidian4.Setting(containerEl).setName("AI Avatar Style").addDropdown(
-      (dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").addOption("image", "Image (Vault Path)").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
-        this.plugin.settings.aiAvatarType = value;
+      userAvatarSetting.addText((text) => text.setPlaceholder("e.g., Assets/Images/user.png").setValue(this.plugin.settings.userAvatarContent).onChange(async (value) => {
+        const normalizedPath = (0, import_obsidian4.normalizePath)(value.trim());
+        if (normalizedPath === "" || /\.(png|jpg|jpeg)$/i.test(normalizedPath)) {
+          this.plugin.settings.userAvatarContent = normalizedPath;
+        } else {
+          new import_obsidian4.Notice("Invalid path. Please provide a path to a .png or .jpeg/jpg file, or leave empty.");
+          text.setValue(this.plugin.settings.userAvatarContent);
+          return;
+        }
         await this.plugin.saveSettings();
-        this.display();
-      })
-    );
+      }));
+    }
+    new import_obsidian4.Setting(containerEl).setName("AI Avatar Style").addDropdown((dropdown) => dropdown.addOption("initials", "Initials").addOption("icon", "Icon").addOption("image", "Image (Vault Path)").setValue(this.plugin.settings.aiAvatarType).onChange(async (value) => {
+      this.plugin.settings.aiAvatarType = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
     const aiAvatarSetting = new import_obsidian4.Setting(containerEl).setDesc(" ");
     aiAvatarSetting.controlEl.addClass("ai-forge-avatar-content-setting");
     if (this.plugin.settings.aiAvatarType === "initials") {
       aiAvatarSetting.setName("AI Initials").setDesc("Max 2 chars.");
-      aiAvatarSetting.addText(
-        (text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
-          this.plugin.settings.aiAvatarContent = value.trim().substring(0, 2) || DEFAULT_SETTINGS.aiAvatarContent;
-          await this.plugin.saveSettings();
-        })
-      );
+      aiAvatarSetting.addText((text) => text.setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+        this.plugin.settings.aiAvatarContent = value.trim().substring(0, 2) || DEFAULT_SETTINGS.aiAvatarContent;
+        await this.plugin.saveSettings();
+      }));
     } else if (this.plugin.settings.aiAvatarType === "icon") {
       aiAvatarSetting.setName("AI Icon ID").setDesc('Obsidian icon ID (e.g., "bot").');
-      aiAvatarSetting.addText(
-        (text) => text.setPlaceholder("bot").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
-          this.plugin.settings.aiAvatarContent = value.trim() || "bot";
-          await this.plugin.saveSettings();
-        })
-      );
+      aiAvatarSetting.addText((text) => text.setPlaceholder("bot").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+        this.plugin.settings.aiAvatarContent = value.trim() || "bot";
+        await this.plugin.saveSettings();
+      }));
     } else if (this.plugin.settings.aiAvatarType === "image") {
       aiAvatarSetting.setName("AI Avatar Image Path");
       aiAvatarSetting.setDesc("Full path to the image file (png/jpeg/jpg) within your vault.");
-      aiAvatarSetting.addText(
-        (text) => text.setPlaceholder("e.g., Assets/Images/ai.png").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
-          const normalizedPath = (0, import_obsidian4.normalizePath)(value.trim());
-          if (normalizedPath === "" || /\.(png|jpg|jpeg)$/i.test(normalizedPath)) {
-            this.plugin.settings.aiAvatarContent = normalizedPath;
-          } else {
-            new import_obsidian4.Notice("Invalid path. Please provide a path to a .png or .jpeg/jpg file, or leave empty.");
-            text.setValue(this.plugin.settings.aiAvatarContent);
-            return;
-          }
-          await this.plugin.saveSettings();
-        })
-      );
+      aiAvatarSetting.addText((text) => text.setPlaceholder("e.g., Assets/Images/ai.png").setValue(this.plugin.settings.aiAvatarContent).onChange(async (value) => {
+        const normalizedPath = (0, import_obsidian4.normalizePath)(value.trim());
+        if (normalizedPath === "" || /\.(png|jpg|jpeg)$/i.test(normalizedPath)) {
+          this.plugin.settings.aiAvatarContent = normalizedPath;
+        } else {
+          new import_obsidian4.Notice("Invalid path. Please provide a path to a .png or .jpeg/jpg file, or leave empty.");
+          text.setValue(this.plugin.settings.aiAvatarContent);
+          return;
+        }
+        await this.plugin.saveSettings();
+      }));
     }
-    this.createSectionHeader("Roles & Personas");
-    new import_obsidian4.Setting(containerEl).setName("Custom Roles Folder Path").setDesc("Folder with custom role (.md) files.").addText(
-      (text) => text.setPlaceholder(DEFAULT_SETTINGS.userRolesFolderPath).setValue(this.plugin.settings.userRolesFolderPath).onChange(async (value) => {
-        this.plugin.settings.userRolesFolderPath = (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.userRolesFolderPath;
-        await this.plugin.saveSettings();
-        this.debouncedUpdateRolePath();
-      })
-    );
-    new import_obsidian4.Setting(containerEl).setName("Always Apply Selected Role").setDesc("Always use the selected role as system prompt.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
-        this.plugin.settings.followRole = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    this.createSectionHeader("Storage & History");
-    new import_obsidian4.Setting(containerEl).setName("Save Message History").setDesc("Save chat conversations to files.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
-        this.plugin.settings.saveMessageHistory = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
-    if (this.plugin.settings.saveMessageHistory) {
-      new import_obsidian4.Setting(containerEl).setName("Chat History Folder Path").setDesc('Folder to store chat history (.json files). Use "/" for vault root.').addText(
-        (text) => text.setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath).setValue(this.plugin.settings.chatHistoryFolderPath).onChange(async (value) => {
-          this.plugin.settings.chatHistoryFolderPath = value.trim() === "/" ? "/" : (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.chatHistoryFolderPath;
-          await this.plugin.saveSettings();
-          this.debouncedUpdateChatPath();
-        })
-      );
-    }
-    new import_obsidian4.Setting(containerEl).setName("Chat Export Folder Path").setDesc("Default folder for exported Markdown chats.").addText(
-      (text) => text.setPlaceholder(DEFAULT_SETTINGS.chatExportFolderPath || "Vault Root").setValue(this.plugin.settings.chatExportFolderPath).onChange(async (value) => {
-        this.plugin.settings.chatExportFolderPath = (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.chatExportFolderPath;
-        await this.plugin.saveSettings();
-        if (this.plugin.chatManager)
-          await this.plugin.chatManager.ensureFoldersExist();
-      })
-    );
-    this.createSectionHeader("Retrieval-Augmented Generation (RAG)");
-    new import_obsidian4.Setting(containerEl).setName("Enable RAG").setDesc("Allow retrieving info from notes for context.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
-        this.plugin.settings.ragEnabled = value;
-        await this.plugin.saveSettings();
-        this.display();
-        if (value)
-          this.debouncedUpdateRagPath();
-      })
-    );
+    new import_obsidian4.Setting(containerEl).setName("Fix Broken Emojis").setDesc("Replace certain emoji sequences that models might break (e.g., \u{1F916}).").addToggle((toggle) => toggle.setValue(this.plugin.settings.fixBrokenEmojis).onChange(async (value) => {
+      this.plugin.settings.fixBrokenEmojis = value;
+      await this.plugin.saveSettings();
+    }));
+    this.createSectionHeader("Content & Knowledge");
+    this.createGroupHeader("Roles & Personas");
+    new import_obsidian4.Setting(containerEl).setName("Custom Roles Folder Path").setDesc("Folder with custom role (.md) files.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.userRolesFolderPath).setValue(this.plugin.settings.userRolesFolderPath).onChange(async (value) => {
+      this.plugin.settings.userRolesFolderPath = (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.userRolesFolderPath;
+      await this.plugin.saveSettings();
+      this.debouncedUpdateRolePath();
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Always Apply Selected Role").setDesc("Always use the selected role as system prompt.").addToggle((toggle) => toggle.setValue(this.plugin.settings.followRole).onChange(async (value) => {
+      this.plugin.settings.followRole = value;
+      await this.plugin.saveSettings();
+    }));
+    this.createGroupHeader("Retrieval-Augmented Generation (RAG)");
+    new import_obsidian4.Setting(containerEl).setName("Enable RAG").setDesc("Allow retrieving info from notes for context.").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnabled).onChange(async (value) => {
+      this.plugin.settings.ragEnabled = value;
+      await this.plugin.saveSettings();
+      this.display();
+      if (value)
+        this.debouncedUpdateRagPath();
+    }));
     if (this.plugin.settings.ragEnabled) {
-      new import_obsidian4.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder with notes for RAG.").addText(
-        (text) => text.setPlaceholder(DEFAULT_SETTINGS.ragFolderPath).setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
-          var _a, _b, _c, _d;
-          this.plugin.settings.ragFolderPath = (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.ragFolderPath;
-          await this.plugin.saveSettings();
-          this.debouncedUpdateRagPath();
-          (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
-          (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
-        })
-      );
-      new import_obsidian4.Setting(containerEl).setName("Enable Semantic Search").setDesc("Use embeddings (more accurate). If OFF, uses keyword search.").addToggle(
-        (toggle) => toggle.setValue(this.plugin.settings.ragEnableSemanticSearch).onChange(async (value) => {
-          this.plugin.settings.ragEnableSemanticSearch = value;
-          await this.plugin.saveSettings();
-          this.display();
-          this.debouncedUpdateRagPath();
-        })
-      );
+      new import_obsidian4.Setting(containerEl).setName("RAG Documents Folder Path").setDesc("Folder with notes for RAG.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.ragFolderPath).setValue(this.plugin.settings.ragFolderPath).onChange(async (value) => {
+        var _a, _b, _c, _d;
+        this.plugin.settings.ragFolderPath = (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.ragFolderPath;
+        await this.plugin.saveSettings();
+        this.debouncedUpdateRagPath();
+        (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
+        (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
+      }));
+      new import_obsidian4.Setting(containerEl).setName("Enable Semantic Search").setDesc("Use embeddings (more accurate). If OFF, uses keyword search.").addToggle((toggle) => toggle.setValue(this.plugin.settings.ragEnableSemanticSearch).onChange(async (value) => {
+        this.plugin.settings.ragEnableSemanticSearch = value;
+        await this.plugin.saveSettings();
+        this.display();
+        this.debouncedUpdateRagPath();
+      }));
       if (this.plugin.settings.ragEnableSemanticSearch) {
         let embeddingDropdown = null;
         const updateEmbeddingOptions = async (dropdown, button) => {
@@ -752,160 +703,141 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
             new import_obsidian4.Notice("Model list refreshed!");
           });
         });
-        new import_obsidian4.Setting(containerEl).setName("Chunk Size (Characters)").setDesc("Size of text chunks for indexing.").addText(
-          (text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragChunkSize)).setValue(String(this.plugin.settings.ragChunkSize)).onChange(async (value) => {
-            const num = parseInt(value.trim(), 10);
-            this.plugin.settings.ragChunkSize = !isNaN(num) && num > 50 ? num : DEFAULT_SETTINGS.ragChunkSize;
-            await this.plugin.saveSettings();
-            this.debouncedUpdateRagPath();
-          })
-        );
-        new import_obsidian4.Setting(containerEl).setName("Similarity Threshold").setDesc("Min relevance score (0.0-1.0). Higher = stricter matching.").addSlider(
-          (slider) => slider.setLimits(0, 1, 0.05).setValue(this.plugin.settings.ragSimilarityThreshold).setDynamicTooltip().onChange(async (value) => {
-            this.plugin.settings.ragSimilarityThreshold = value;
-            await this.plugin.saveSettings();
-          })
-        );
-        new import_obsidian4.Setting(containerEl).setName("Top K Results").setDesc("Max number of relevant chunks to retrieve.").addText(
-          (text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragTopK)).setValue(String(this.plugin.settings.ragTopK)).onChange(async (value) => {
-            const num = parseInt(value.trim(), 10);
-            this.plugin.settings.ragTopK = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.ragTopK;
-            await this.plugin.saveSettings();
-          })
-        );
-      }
-      new import_obsidian4.Setting(containerEl).setName("Max Chars Per Document (During Context Build)").setDesc("Limits characters included per retrieved document in the final prompt (0=no limit).").addText(
-        (text) => text.setPlaceholder(String(DEFAULT_SETTINGS.maxCharsPerDoc)).setValue(String(this.plugin.settings.maxCharsPerDoc)).onChange(async (value) => {
+        new import_obsidian4.Setting(containerEl).setName("Chunk Size (Characters)").setDesc("Size of text chunks for indexing.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragChunkSize)).setValue(String(this.plugin.settings.ragChunkSize)).onChange(async (value) => {
           const num = parseInt(value.trim(), 10);
-          this.plugin.settings.maxCharsPerDoc = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.maxCharsPerDoc;
+          this.plugin.settings.ragChunkSize = !isNaN(num) && num > 50 ? num : DEFAULT_SETTINGS.ragChunkSize;
           await this.plugin.saveSettings();
-        })
-      );
+          this.debouncedUpdateRagPath();
+        }));
+        new import_obsidian4.Setting(containerEl).setName("Similarity Threshold").setDesc("Min relevance score (0.0-1.0). Higher = stricter matching.").addSlider((slider) => slider.setLimits(0, 1, 0.05).setValue(this.plugin.settings.ragSimilarityThreshold).setDynamicTooltip().onChange(async (value) => {
+          this.plugin.settings.ragSimilarityThreshold = value;
+          await this.plugin.saveSettings();
+        }));
+        new import_obsidian4.Setting(containerEl).setName("Top K Results").setDesc("Max number of relevant chunks to retrieve.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.ragTopK)).setValue(String(this.plugin.settings.ragTopK)).onChange(async (value) => {
+          const num = parseInt(value.trim(), 10);
+          this.plugin.settings.ragTopK = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.ragTopK;
+          await this.plugin.saveSettings();
+        }));
+      }
+      new import_obsidian4.Setting(containerEl).setName("Max Chars Per Document (During Context Build)").setDesc("Limits characters included per retrieved document in the final prompt (0=no limit).").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.maxCharsPerDoc)).setValue(String(this.plugin.settings.maxCharsPerDoc)).onChange(async (value) => {
+        const num = parseInt(value.trim(), 10);
+        this.plugin.settings.maxCharsPerDoc = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.maxCharsPerDoc;
+        await this.plugin.saveSettings();
+      }));
     }
-    this.createSectionHeader("Advanced Context Management");
-    new import_obsidian4.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enable automatic chat summarization and message chunking for long conversations.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
-        this.plugin.settings.useAdvancedContextStrategy = value;
+    this.createSectionHeader("Features");
+    this.createGroupHeader("Advanced Context Management (Summarization)");
+    new import_obsidian4.Setting(containerEl).setName("Use Advanced Context Strategy").setDesc("Enable automatic chat summarization and message chunking for long conversations.").addToggle((toggle) => toggle.setValue(this.plugin.settings.useAdvancedContextStrategy).onChange(async (value) => {
+      this.plugin.settings.useAdvancedContextStrategy = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    if (this.plugin.settings.useAdvancedContextStrategy) {
+      new import_obsidian4.Setting(containerEl).setName("Enable Context Summarization").setDesc("Automatically summarize older parts of the conversation.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
+        this.plugin.settings.enableSummarization = value;
         await this.plugin.saveSettings();
         this.display();
-      })
-    );
-    if (this.plugin.settings.useAdvancedContextStrategy) {
-      new import_obsidian4.Setting(containerEl).setName("Enable Context Summarization").setDesc("Automatically summarize older parts of the conversation.").addToggle(
-        (toggle) => toggle.setValue(this.plugin.settings.enableSummarization).onChange(async (value) => {
-          this.plugin.settings.enableSummarization = value;
-          await this.plugin.saveSettings();
-          this.display();
-        })
-      );
+      }));
       if (this.plugin.settings.enableSummarization) {
-        new import_obsidian4.Setting(containerEl).setName("Summarization Prompt").setDesc("Prompt used for summarization. Use {text_to_summarize} placeholder.").addTextArea(
-          (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
-            this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
-            await this.plugin.saveSettings();
-          }).inputEl.setAttrs({ rows: 4 })
-        );
-      }
-      let summarizationModelDropdown = null;
-      const updateSummarizationOptions = async (dropdown, button) => {
-        if (!dropdown)
-          return;
-        const currentVal = this.plugin.settings.summarizationModelName;
-        dropdown.selectEl.innerHTML = "";
-        dropdown.addOption("", "Loading models...");
-        dropdown.setDisabled(true);
-        button == null ? void 0 : button.setDisabled(true).setIcon("loader");
-        try {
-          const models = await this.plugin.ollamaService.getModels();
-          dropdown.selectEl.innerHTML = "";
-          dropdown.addOption("", "-- Select Summarization Model --");
-          if (models && models.length > 0) {
-            models.forEach((modelName) => {
-              dropdown.addOption(modelName, modelName);
-            });
-            dropdown.setValue(models.includes(currentVal) ? currentVal : "");
-          } else {
-            dropdown.addOption("", "No models found");
-            dropdown.setValue("");
-          }
-        } catch (error) {
-          this.plugin.logger.error("Error fetching models for summarization settings:", error);
-          dropdown.selectEl.innerHTML = "";
-          dropdown.addOption("", "Error loading models!");
-          dropdown.setValue("");
-        } finally {
-          dropdown.setDisabled(false);
-          button == null ? void 0 : button.setDisabled(false).setIcon("refresh-cw");
-        }
-      };
-      new import_obsidian4.Setting(containerEl).setName("Summarization Model").setDesc("Model used for summarizing chat history and individual messages.").addDropdown(async (dropdown) => {
-        summarizationModelDropdown = dropdown;
-        dropdown.onChange(async (value) => {
-          this.plugin.settings.summarizationModelName = value;
+        new import_obsidian4.Setting(containerEl).setName("Summarization Prompt").setDesc("Prompt used for summarization. Use {text_to_summarize} placeholder.").addTextArea((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationPrompt).setValue(this.plugin.settings.summarizationPrompt).onChange(async (value) => {
+          this.plugin.settings.summarizationPrompt = value || DEFAULT_SETTINGS.summarizationPrompt;
           await this.plugin.saveSettings();
+        }).inputEl.setAttrs({ rows: 4 }));
+        let summarizationModelDropdown = null;
+        const updateSummarizationOptions = async (dropdown, button) => {
+          if (!dropdown)
+            return;
+          const currentVal = this.plugin.settings.summarizationModelName;
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "Loading models...");
+          dropdown.setDisabled(true);
+          button == null ? void 0 : button.setDisabled(true).setIcon("loader");
+          try {
+            const models = await this.plugin.ollamaService.getModels();
+            dropdown.selectEl.innerHTML = "";
+            dropdown.addOption("", "-- Select Summarization Model --");
+            if (models && models.length > 0) {
+              models.forEach((modelName) => {
+                dropdown.addOption(modelName, modelName);
+              });
+              dropdown.setValue(models.includes(currentVal) ? currentVal : "");
+            } else {
+              dropdown.addOption("", "No models found");
+              dropdown.setValue("");
+            }
+          } catch (error) {
+            this.plugin.logger.error("Error fetching models for summarization settings:", error);
+            dropdown.selectEl.innerHTML = "";
+            dropdown.addOption("", "Error loading models!");
+            dropdown.setValue("");
+          } finally {
+            dropdown.setDisabled(false);
+            button == null ? void 0 : button.setDisabled(false).setIcon("refresh-cw");
+          }
+        };
+        new import_obsidian4.Setting(containerEl).setName("Summarization Model").setDesc("Model used for summarizing chat history and individual messages.").addDropdown(async (dropdown) => {
+          summarizationModelDropdown = dropdown;
+          dropdown.onChange(async (value) => {
+            this.plugin.settings.summarizationModelName = value;
+            await this.plugin.saveSettings();
+          });
+          await updateSummarizationOptions(dropdown);
+        }).addExtraButton((button) => {
+          button.setIcon("refresh-cw").setTooltip("Refresh model list").onClick(async () => {
+            await updateSummarizationOptions(summarizationModelDropdown, button);
+            new import_obsidian4.Notice("Model list refreshed!");
+          });
         });
-        await updateSummarizationOptions(dropdown);
-      }).addExtraButton((button) => {
-        button.setIcon("refresh-cw").setTooltip("Refresh model list").onClick(async () => {
-          await updateSummarizationOptions(summarizationModelDropdown, button);
-          new import_obsidian4.Notice("Model list refreshed!");
-        });
-      });
-      new import_obsidian4.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages excluded from summarization.").addText(
-        (text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
+        new import_obsidian4.Setting(containerEl).setName("Keep Last N Messages Before Summary").setDesc("Number of recent messages excluded from summarization.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary.toString()).setValue(this.plugin.settings.keepLastNMessagesBeforeSummary.toString()).onChange(async (value) => {
           const num = parseInt(value.trim(), 10);
           this.plugin.settings.keepLastNMessagesBeforeSummary = !isNaN(num) && num >= 0 ? num : DEFAULT_SETTINGS.keepLastNMessagesBeforeSummary;
           await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian4.Setting(containerEl).setName("Fallback Summarization Model").setDesc(
-        "Optional. Model to use if the primary summarization model is not set or not found. Uses the main Ollama server."
-      ).addText(
-        (text) => text.setPlaceholder("e.g., orca-mini or leave empty").setValue(this.plugin.settings.fallbackSummarizationModelName).onChange(async (value) => {
+        }));
+        new import_obsidian4.Setting(containerEl).setName("Fallback Summarization Model").setDesc("Optional. Model to use if the primary summarization model is not set or not found. Uses the main Ollama server.").addText((text) => text.setPlaceholder("e.g., orca-mini or leave empty").setValue(this.plugin.settings.fallbackSummarizationModelName).onChange(async (value) => {
           this.plugin.settings.fallbackSummarizationModelName = value.trim();
           await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian4.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate size of text chunks passed to the summarization model.").addText(
-        (text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
+        }));
+        new import_obsidian4.Setting(containerEl).setName("Summarization Chunk Size (Tokens)").setDesc("Approximate size of text chunks passed to the summarization model.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.summarizationChunkSize.toString()).setValue(this.plugin.settings.summarizationChunkSize.toString()).onChange(async (value) => {
           const num = parseInt(value.trim(), 10);
           this.plugin.settings.summarizationChunkSize = !isNaN(num) && num > 100 ? num : DEFAULT_SETTINGS.summarizationChunkSize;
           await this.plugin.saveSettings();
-        })
-      );
+        }));
+      }
     }
-    this.createSectionHeader("Productivity Assistant Features");
-    new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate daily task integration.").addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
+    this.createGroupHeader("Productivity Assistant Features");
+    new import_obsidian4.Setting(containerEl).setName("Enable Productivity Features").setDesc("Activate daily task integration.").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableProductivityFeatures).onChange(async (value) => {
+      var _a, _b, _c, _d;
+      this.plugin.settings.enableProductivityFeatures = value;
+      await this.plugin.saveSettings();
+      this.display();
+      (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
+      (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
+    }));
+    if (this.plugin.settings.enableProductivityFeatures) {
+      new import_obsidian4.Setting(containerEl).setName("Daily Task File Name").setDesc("Filename within the RAG folder used for daily tasks.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.dailyTaskFileName).setValue(this.plugin.settings.dailyTaskFileName).onChange(async (value) => {
         var _a, _b, _c, _d;
-        this.plugin.settings.enableProductivityFeatures = value;
+        this.plugin.settings.dailyTaskFileName = value.trim() || DEFAULT_SETTINGS.dailyTaskFileName;
         await this.plugin.saveSettings();
-        this.display();
         (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
         (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
-      })
-    );
-    if (this.plugin.settings.enableProductivityFeatures) {
-      new import_obsidian4.Setting(containerEl).setName("Daily Task File Name").setDesc("Filename within the RAG folder used for daily tasks.").addText(
-        (text) => text.setPlaceholder(DEFAULT_SETTINGS.dailyTaskFileName).setValue(this.plugin.settings.dailyTaskFileName).onChange(async (value) => {
-          var _a, _b, _c, _d;
-          this.plugin.settings.dailyTaskFileName = value.trim() || DEFAULT_SETTINGS.dailyTaskFileName;
-          await this.plugin.saveSettings();
-          (_b = (_a = this.plugin).updateDailyTaskFilePath) == null ? void 0 : _b.call(_a);
-          (_d = (_c = this.plugin).loadAndProcessInitialTasks) == null ? void 0 : _d.call(_c);
-        })
-      );
+      }));
     }
-    this.createSectionHeader("Speech & Translation");
-    this.plugin.settings.enableTranslation = this.plugin.settings.translationProvider !== "none";
-    new import_obsidian4.Setting(containerEl).setName("Translation Provider").setDesc("Select the service for message and input translation.").addDropdown(
-      (dropdown) => dropdown.addOption("none", "Disabled").addOption("google", "Google Translate API").addOption("ollama", "Ollama (Local Model)").setValue(this.plugin.settings.translationProvider).onChange(async (value) => {
-        this.plugin.settings.translationProvider = value;
-        this.plugin.settings.enableTranslation = value !== "none";
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
+    this.createGroupHeader("Weather Agent Settings");
+    new import_obsidian4.Setting(containerEl).setName("OpenWeatherMap API Key").setDesc("Your API key from OpenWeatherMap. Required for weather forecasts. Keep confidential.").addText((text) => text.setPlaceholder("YOUR_OPENWEATHERMAP_API_KEY").setValue(this.plugin.settings.openWeatherMapApiKey).onChange(async (value) => {
+      this.plugin.settings.openWeatherMapApiKey = value.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Default Location").setDesc("Default city or location for weather forecasts if not specified in the query.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.weatherDefaultLocation).setValue(this.plugin.settings.weatherDefaultLocation).onChange(async (value) => {
+      this.plugin.settings.weatherDefaultLocation = value.trim();
+      await this.plugin.saveSettings();
+    }));
+    this.createGroupHeader("Speech & Translation");
+    new import_obsidian4.Setting(containerEl).setName("Translation Provider").setDesc("Select the service for message and input translation.").addDropdown((dropdown) => dropdown.addOption("none", "Disabled").addOption("google", "Google Translate API").addOption("ollama", "Ollama (Local Model)").setValue(this.plugin.settings.translationProvider).onChange(async (value) => {
+      this.plugin.settings.translationProvider = value;
+      this.plugin.settings.enableTranslation = value !== "none";
+      await this.plugin.saveSettings();
+      this.display();
+    }));
     if (this.plugin.settings.translationProvider === "google") {
       new import_obsidian4.Setting(containerEl).setName("Target Translation Language (Google)").setDesc("Translate messages/input into this language using Google.").addDropdown((dropdown) => {
         for (const code in LANGUAGES) {
@@ -916,79 +848,77 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
-      new import_obsidian4.Setting(containerEl).setName("Google Cloud Translation API Key").setDesc("Required for Google translation feature. Keep confidential.").addText(
-        (text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleTranslationApiKey).onChange(async (value) => {
-          this.plugin.settings.googleTranslationApiKey = value.trim();
-          await this.plugin.saveSettings();
-        })
-      );
-    }
-    if (this.plugin.settings.enableTranslation) {
-      if (this.plugin.settings.translationProvider === "ollama") {
-        let ollamaTranslationModelDropdown = null;
-        const updateOllamaTranslationOptions = async (dropdown, button) => {
-          if (!dropdown)
-            return;
-          const currentVal = this.plugin.settings.ollamaTranslationModel;
-          dropdown.selectEl.innerHTML = "";
-          dropdown.addOption("", "Loading models...");
-          dropdown.setDisabled(true);
-          button == null ? void 0 : button.setDisabled(true).setIcon("loader");
-          try {
-            const models = await this.plugin.ollamaService.getModels();
-            dropdown.selectEl.innerHTML = "";
-            dropdown.addOption("", "-- Select Ollama Translation Model --");
-            if (models && models.length > 0) {
-              models.forEach((m) => dropdown.addOption(m, m));
-              dropdown.setValue(models.includes(currentVal) ? currentVal : "");
-            } else {
-              dropdown.addOption("", "No models found");
-              dropdown.setValue("");
-            }
-          } catch (error) {
-            this.plugin.logger.error("Error fetching models for Ollama translation settings:", error);
-            dropdown.selectEl.innerHTML = "";
-            dropdown.addOption("", "Error loading models!");
-            dropdown.setValue("");
-          } finally {
-            dropdown.setDisabled(false);
-            button == null ? void 0 : button.setDisabled(false).setIcon("refresh-cw");
-          }
-        };
-        new import_obsidian4.Setting(containerEl).setName("Ollama Translation Model").setDesc("Ollama model to use for translation tasks.").addDropdown(async (dropdown) => {
-          ollamaTranslationModelDropdown = dropdown;
-          dropdown.onChange(async (value) => {
-            this.plugin.settings.ollamaTranslationModel = value;
-            await this.plugin.saveSettings();
-          });
-          await updateOllamaTranslationOptions(dropdown);
-        }).addExtraButton((button) => {
-          button.setIcon("refresh-cw").setTooltip("Refresh model list").onClick(async () => {
-            await updateOllamaTranslationOptions(ollamaTranslationModelDropdown, button);
-            new import_obsidian4.Notice("Model list refreshed!");
-          });
-        });
-        new import_obsidian4.Setting(containerEl).setName("Target Translation Language (Ollama)").setDesc("Translate messages/input into this language using Ollama.").addDropdown((dropdown) => {
-          for (const code in LANGUAGES) {
-            dropdown.addOption(code, LANGUAGES[code]);
-          }
-          dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async (value) => {
-            this.plugin.settings.translationTargetLanguage = value;
-            await this.plugin.saveSettings();
-          });
-        });
-      }
-    }
-    new import_obsidian4.Setting(containerEl).setName("Google API Key (Speech-to-Text)").setDesc("Required for voice input. Keep confidential.").addText(
-      (text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
-        this.plugin.settings.googleApiKey = value.trim();
+      new import_obsidian4.Setting(containerEl).setName("Google Cloud Translation API Key").setDesc("Required for Google translation feature. Keep confidential.").addText((text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleTranslationApiKey).onChange(async (value) => {
+        this.plugin.settings.googleTranslationApiKey = value.trim();
         await this.plugin.saveSettings();
-      })
-    );
+      }));
+    }
+    if (this.plugin.settings.translationProvider === "ollama") {
+      let ollamaTranslationModelDropdown = null;
+      const updateOllamaTranslationOptions = async (dropdown, button) => {
+        if (!dropdown)
+          return;
+        const currentVal = this.plugin.settings.ollamaTranslationModel;
+        dropdown.selectEl.innerHTML = "";
+        dropdown.addOption("", "Loading models...");
+        dropdown.setDisabled(true);
+        button == null ? void 0 : button.setDisabled(true).setIcon("loader");
+        try {
+          const models = await this.plugin.ollamaService.getModels();
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "-- Select Ollama Translation Model --");
+          if (models && models.length > 0) {
+            models.forEach((m) => dropdown.addOption(m, m));
+            dropdown.setValue(models.includes(currentVal) ? currentVal : "");
+          } else {
+            dropdown.addOption("", "No models found");
+            dropdown.setValue("");
+          }
+        } catch (error) {
+          this.plugin.logger.error("Error fetching models for Ollama translation settings:", error);
+          dropdown.selectEl.innerHTML = "";
+          dropdown.addOption("", "Error loading models!");
+          dropdown.setValue("");
+        } finally {
+          dropdown.setDisabled(false);
+          button == null ? void 0 : button.setDisabled(false).setIcon("refresh-cw");
+        }
+      };
+      new import_obsidian4.Setting(containerEl).setName("Ollama Translation Model").setDesc("Ollama model to use for translation tasks.").addDropdown(async (dropdown) => {
+        ollamaTranslationModelDropdown = dropdown;
+        dropdown.onChange(async (value) => {
+          this.plugin.settings.ollamaTranslationModel = value;
+          await this.plugin.saveSettings();
+        });
+        await updateOllamaTranslationOptions(dropdown);
+      }).addExtraButton((button) => {
+        button.setIcon("refresh-cw").setTooltip("Refresh model list").onClick(async () => {
+          await updateOllamaTranslationOptions(ollamaTranslationModelDropdown, button);
+          new import_obsidian4.Notice("Model list refreshed!");
+        });
+      });
+      new import_obsidian4.Setting(containerEl).setName("Target Translation Language (Ollama)").setDesc("Translate messages/input into this language using Ollama.").addDropdown((dropdown) => {
+        for (const code in LANGUAGES) {
+          dropdown.addOption(code, LANGUAGES[code]);
+        }
+        dropdown.setValue(this.plugin.settings.translationTargetLanguage).onChange(async (value) => {
+          this.plugin.settings.translationTargetLanguage = value;
+          await this.plugin.saveSettings();
+        });
+      });
+    }
+    new import_obsidian4.Setting(containerEl).setName("Google API Key (Speech-to-Text)").setDesc("Required for voice input. Keep confidential.").addText((text) => text.setPlaceholder("Enter API Key").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+      this.plugin.settings.googleApiKey = value.trim();
+      await this.plugin.saveSettings();
+    }));
     new import_obsidian4.Setting(containerEl).setName("Speech Recognition Language").setDesc("Language for voice input (e.g., en-US, uk-UA).").addDropdown((dropdown) => {
       const speechLangs = {
         "uk-UA": "Ukrainian",
-        "en-US": "English (US)"
+        "en-US": "English (US)",
+        /* ... add more if needed ... */
+        "en-GB": "English (UK)",
+        "es-ES": "Spanish (Spain)"
+        // Додайте інші мови за потреби
       };
       for (const code in speechLangs) {
         dropdown.addOption(code, speechLangs[code]);
@@ -998,42 +928,57 @@ var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
         await this.plugin.saveSettings();
       });
     });
-    this.createSectionHeader("Logging");
+    this.createSectionHeader("Technical & Data");
+    this.createGroupHeader("Storage & History");
+    new import_obsidian4.Setting(containerEl).setName("Save Message History").setDesc("Save chat conversations to files.").addToggle((toggle) => toggle.setValue(this.plugin.settings.saveMessageHistory).onChange(async (value) => {
+      this.plugin.settings.saveMessageHistory = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    if (this.plugin.settings.saveMessageHistory) {
+      new import_obsidian4.Setting(containerEl).setName("Chat History Folder Path").setDesc('Folder to store chat history (.json files). Use "/" for vault root.').addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.chatHistoryFolderPath).setValue(this.plugin.settings.chatHistoryFolderPath).onChange(async (value) => {
+        this.plugin.settings.chatHistoryFolderPath = value.trim() === "/" ? "/" : (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.chatHistoryFolderPath;
+        await this.plugin.saveSettings();
+        this.debouncedUpdateChatPath();
+      }));
+    }
+    new import_obsidian4.Setting(containerEl).setName("Chat Export Folder Path").setDesc("Default folder for exported Markdown chats.").addText((text) => text.setPlaceholder(DEFAULT_SETTINGS.chatExportFolderPath || "Vault Root").setValue(this.plugin.settings.chatExportFolderPath).onChange(async (value) => {
+      this.plugin.settings.chatExportFolderPath = (0, import_obsidian4.normalizePath)(value.trim()) || DEFAULT_SETTINGS.chatExportFolderPath;
+      await this.plugin.saveSettings();
+      if (this.plugin.chatManager)
+        await this.plugin.chatManager.ensureFoldersExist();
+    }));
+    this.createGroupHeader("Logging");
     const logLevelOptions = {};
     Object.keys(LogLevel).forEach((key) => {
       if (isNaN(Number(key))) {
         logLevelOptions[key] = key;
       }
     });
-    new import_obsidian4.Setting(containerEl).setName("Console Log Level").setDesc("Minimum level for developer console.").addDropdown(
-      (dropdown) => dropdown.addOptions(logLevelOptions).setValue(this.plugin.settings.consoleLogLevel || "INFO").onChange(async (value) => {
-        this.plugin.settings.consoleLogLevel = value;
-        await this.plugin.saveSettings();
-      })
-    );
-    new import_obsidian4.Setting(containerEl).setName("Enable File Logging").setDesc(`Log to ${this.plugin.logger.getLogFilePath()} (for debugging).`).addToggle(
-      (toggle) => toggle.setValue(this.plugin.settings.fileLoggingEnabled).onChange(async (value) => {
-        this.plugin.settings.fileLoggingEnabled = value;
-        await this.plugin.saveSettings();
-        this.display();
-      })
-    );
+    new import_obsidian4.Setting(containerEl).setName("Console Log Level").setDesc("Minimum level for developer console.").addDropdown((dropdown) => dropdown.addOptions(logLevelOptions).setValue(this.plugin.settings.consoleLogLevel || "INFO").onChange(async (value) => {
+      this.plugin.settings.consoleLogLevel = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Enable File Logging").setDesc(`Log to ${this.plugin.logger.getLogFilePath()} (for debugging).`).addToggle((toggle) => toggle.setValue(this.plugin.settings.fileLoggingEnabled).onChange(async (value) => {
+      this.plugin.settings.fileLoggingEnabled = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
     if (this.plugin.settings.fileLoggingEnabled) {
-      new import_obsidian4.Setting(containerEl).setName("File Log Level").setDesc("Minimum level for log file.").addDropdown(
-        (dropdown) => dropdown.addOptions(logLevelOptions).setValue(this.plugin.settings.fileLogLevel || "WARN").onChange(async (value) => {
-          this.plugin.settings.fileLogLevel = value;
-          await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian4.Setting(containerEl).setName("Log Caller Method Name").setDesc("Include [MethodName] in logs. May slightly impact performance.").addToggle(
-        (toggle) => toggle.setValue(this.plugin.settings.logCallerInfo).onChange(async (value) => {
-          this.plugin.settings.logCallerInfo = value;
-          await this.plugin.saveSettings();
-        })
-      );
-      new import_obsidian4.Setting(containerEl).setName("Log File Path").setDesc("Current location of the log file.").addText(
-        (text) => text.setValue(this.plugin.logger.getLogFilePath()).setDisabled(true)
-      );
+      new import_obsidian4.Setting(containerEl).setName("File Log Level").setDesc("Minimum level for log file.").addDropdown((dropdown) => dropdown.addOptions(logLevelOptions).setValue(this.plugin.settings.fileLogLevel || "WARN").onChange(async (value) => {
+        this.plugin.settings.fileLogLevel = value;
+        await this.plugin.saveSettings();
+      }));
+      new import_obsidian4.Setting(containerEl).setName("Log Caller Method Name").setDesc("Include [MethodName] in logs. May slightly impact performance.").addToggle((toggle) => toggle.setValue(this.plugin.settings.logCallerInfo).onChange(async (value) => {
+        this.plugin.settings.logCallerInfo = value;
+        await this.plugin.saveSettings();
+      }));
+      new import_obsidian4.Setting(containerEl).setName("Log File Path").setDesc("Current location of the log file.").addText((text) => text.setValue(this.plugin.logger.getLogFilePath()).setDisabled(true));
+      new import_obsidian4.Setting(containerEl).setName("Log File Max Size (MB)").setDesc("Maximum size of the log file before it is rotated.").addText((text) => text.setPlaceholder(String(DEFAULT_SETTINGS.logFileMaxSizeMB)).setValue(String(this.plugin.settings.logFileMaxSizeMB)).onChange(async (value) => {
+        const num = parseInt(value.trim(), 10);
+        this.plugin.settings.logFileMaxSizeMB = !isNaN(num) && num > 0 ? num : DEFAULT_SETTINGS.logFileMaxSizeMB;
+        await this.plugin.saveSettings();
+      }));
     }
   }
 };
@@ -9882,9 +9827,7 @@ ${files.join("\n")}`;
 };
 
 // src/examples/WeatherAgent.ts
-var OPENWEATHERMAP_API_KEY = "16771698f22a664fd02258a97d7f7fa8";
 var OPENWEATHERMAP_BASE_URL = "https://api.openweathermap.org/data/2.5";
-var PLACEHOLDER_API_KEY_VALUE = "YOUR_OPENWEATHERMAP_API_KEY";
 var WeatherAgent = class {
   constructor() {
     this.id = "weather-agent";
@@ -9893,7 +9836,6 @@ var WeatherAgent = class {
   }
   getTools() {
     return [
-      // ... (інструменти залишаються без змін)
       {
         name: "getWeatherToday",
         description: "Gets today's weather forecast for a specified location.",
@@ -9939,17 +9881,22 @@ var WeatherAgent = class {
     ];
   }
   async executeTool(toolName, args, plugin) {
-    const location = args.location;
-    if (!location || typeof location !== "string") {
-      return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u0410\u0440\u0433\u0443\u043C\u0435\u043D\u0442 'location' \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456\u0439 \u0430\u0431\u043E \u043D\u0435 \u0454 \u0440\u044F\u0434\u043A\u043E\u043C.";
+    const apiKey = plugin.settings.openWeatherMapApiKey;
+    let location = args.location;
+    if (!apiKey || apiKey === "YOUR_OPENWEATHERMAP_API_KEY") {
+      return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043E\u0431\u0445\u0456\u0434\u043D\u043E \u043D\u0430\u0434\u0430\u0442\u0438 API \u043A\u043B\u044E\u0447 OpenWeatherMap \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u043F\u043B\u0430\u0433\u0456\u043D\u0430 Weather Agent.";
     }
-    if (OPENWEATHERMAP_API_KEY === PLACEHOLDER_API_KEY_VALUE) {
-      return `\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043E\u0431\u0445\u0456\u0434\u043D\u043E \u0437\u0430\u043C\u0456\u043D\u0438\u0442\u0438 '${PLACEHOLDER_API_KEY_VALUE}' \u043D\u0430 \u0432\u0430\u0448 \u0441\u043F\u0440\u0430\u0432\u0436\u043D\u0456\u0439 \u043A\u043B\u044E\u0447 OpenWeatherMap \u0443 \u043A\u043E\u0434\u0456 \u0430\u0433\u0435\u043D\u0442\u0430 WeatherAgent.`;
+    if (!location || typeof location !== "string") {
+      location = plugin.settings.weatherDefaultLocation;
+      if (!location) {
+        return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u0410\u0440\u0433\u0443\u043C\u0435\u043D\u0442 'location' \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456\u0439 \u0456 \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.";
+      }
     }
     try {
       let url = "";
+      let result = "";
       let forecastData;
-      url = `${OPENWEATHERMAP_BASE_URL}/forecast?q=${encodeURIComponent(location)}&units=metric&appid=${OPENWEATHERMAP_API_KEY}&lang=ua`;
+      url = `${OPENWEATHERMAP_BASE_URL}/forecast?q=${encodeURIComponent(location)}&units=metric&appid=${apiKey}&lang=ua`;
       const response = await fetch(url);
       if (!response.ok) {
         let errorBody = await response.text();
@@ -9968,44 +9915,42 @@ var WeatherAgent = class {
       }
       forecastData = data.list;
       const city = data.city.name;
-      let result = `\u041F\u0440\u043E\u0433\u043D\u043E\u0437 \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F ${city}:
+      result = `\u041F\u0440\u043E\u0433\u043D\u043E\u0437 \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F ${city}:
 
 `;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
+      const dateOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
+      const timeOptions = { hour: "2-digit", minute: "2-digit", hour12: false };
+      const dayOfWeekOptions = { weekday: "long" };
       switch (toolName) {
         case "getWeatherToday": {
-          const todayForecasts = forecastData.filter((item) => {
+          const todayForecast = forecastData.find((item) => {
             const itemDate = new Date(item.dt * 1e3);
-            const compareDate = new Date();
-            compareDate.setHours(0, 0, 0, 0);
-            return itemDate.setHours(0, 0, 0, 0) === compareDate.getTime();
-          });
-          const firstTodayForecast = todayForecasts.length > 0 ? todayForecasts[0] : null;
-          if (firstTodayForecast) {
-            const date = new Date(firstTodayForecast.dt * 1e3).toLocaleDateString();
-            const time = new Date(firstTodayForecast.dt * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-            result += `\u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (${date}, ${time}): ${firstTodayForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${firstTodayForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${firstTodayForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${firstTodayForecast.main.humidity}%.`;
+            return itemDate >= now && itemDate.toDateString() === now.toDateString();
+          }) || forecastData.find((item) => new Date(item.dt * 1e3).toDateString() === now.toDateString());
+          if (todayForecast) {
+            const date = new Date(todayForecast.dt * 1e3);
+            const formattedDate = date.toLocaleDateString("uk-UA", dateOptions);
+            const formattedTime = date.toLocaleTimeString("uk-UA", timeOptions);
+            result += `\u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (${formattedDate}, ${formattedTime}): ${todayForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${todayForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${todayForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${todayForecast.main.humidity}%.`;
           } else {
             result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (\u043C\u043E\u0436\u043B\u0438\u0432\u043E, \u0432\u0441\u0456 \u043F\u0440\u043E\u0433\u043D\u043E\u0437\u0438 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456 \u0432\u0436\u0435 \u043F\u0440\u043E\u0439\u0448\u043B\u0438 \u0437\u0430 \u0447\u0430\u0441\u043E\u043C).";
           }
           break;
         }
         case "getWeatherTomorrow": {
-          const tomorrowForecasts = forecastData.filter((item) => {
+          const tomorrowForecast = forecastData.find((item) => {
             const itemDate = new Date(item.dt * 1e3);
-            const compareDate = new Date();
-            compareDate.setDate(compareDate.getDate() + 1);
-            compareDate.setHours(0, 0, 0, 0);
-            return itemDate.setHours(0, 0, 0, 0) === compareDate.getTime();
+            return itemDate.toDateString() === tomorrow.toDateString();
           });
-          const firstTomorrowForecast = tomorrowForecasts.length > 0 ? tomorrowForecasts[0] : null;
-          if (firstTomorrowForecast) {
-            const date = new Date(firstTomorrowForecast.dt * 1e3).toLocaleDateString();
-            const time = new Date(firstTomorrowForecast.dt * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-            result += `\u0417\u0430\u0432\u0442\u0440\u0430 (${date}, ${time}): ${firstTomorrowForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${firstTomorrowForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${firstTomorrowForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${firstTomorrowForecast.main.humidity}%.`;
+          if (tomorrowForecast) {
+            const date = new Date(tomorrowForecast.dt * 1e3);
+            const formattedDate = date.toLocaleDateString("uk-UA", dateOptions);
+            const formattedTime = date.toLocaleTimeString("uk-UA", timeOptions);
+            result += `\u0417\u0430\u0432\u0442\u0440\u0430 (${formattedDate}, ${formattedTime}): ${tomorrowForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${tomorrowForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${tomorrowForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${tomorrowForecast.main.humidity}%.`;
           } else {
             result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0437\u0430\u0432\u0442\u0440\u0430. API \u043C\u043E\u0436\u0435 \u043D\u0435 \u043D\u0430\u0434\u0430\u0432\u0430\u0442\u0438 \u0434\u0430\u043D\u0456 \u0442\u0430\u043A \u0434\u0430\u043B\u0435\u043A\u043E \u0432\u043F\u0435\u0440\u0435\u0434 \u0430\u0431\u043E \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u043C\u0456\u0441\u0442\u0430.";
           }
@@ -10013,16 +9958,19 @@ var WeatherAgent = class {
         }
         case "getWeather5Days": {
           const dailyForecasts = {};
+          const processedDays = /* @__PURE__ */ new Set();
+          const now2 = new Date();
           let daysCount = 0;
           const maxDays = 5;
           for (const item of forecastData) {
             const itemDate = new Date(item.dt * 1e3);
-            const dateString = itemDate.toLocaleDateString();
-            if (itemDate.getTime() < new Date().getTime() && itemDate.toDateString() === new Date().toDateString()) {
+            const dayKey = itemDate.toDateString();
+            if (itemDate.getTime() < now2.getTime() && itemDate.toDateString() === now2.toDateString() && processedDays.has(dayKey)) {
+              continue;
             }
-            const dayKey = new Date(item.dt * 1e3).toDateString();
-            if (!dailyForecasts[dayKey]) {
+            if (!processedDays.has(dayKey)) {
               dailyForecasts[dayKey] = item;
+              processedDays.add(dayKey);
               daysCount++;
             }
             if (daysCount >= maxDays) {
@@ -10033,10 +9981,10 @@ var WeatherAgent = class {
             const sortedDays = Object.keys(dailyForecasts).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
             for (const dayKey of sortedDays) {
               const item = dailyForecasts[dayKey];
-              const date = new Date(item.dt * 1e3).toLocaleDateString();
-              const dayOfWeek = new Date(item.dt * 1e3).toLocaleDateString("uk-UA", { weekday: "long" });
-              const time = new Date(item.dt * 1e3).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-              result += `- ${dayOfWeek}, ${date} (${time}): ${item.weather[0].description}, \u0422\u0435\u043C\u043F.: ${item.main.temp}\xB0C, \u0412\u043E\u043B\u043E\u0433.: ${item.main.humidity}%
+              const date = new Date(item.dt * 1e3);
+              const formattedDate = date.toLocaleDateString("uk-UA", dateOptions);
+              const dayOfWeek = date.toLocaleDateString("uk-UA", dayOfWeekOptions);
+              result += `- ${dayOfWeek}, ${formattedDate}: ${item.weather[0].description}, \u0422\u0435\u043C\u043F.: ${item.main.temp}\xB0C, \u0412\u043E\u043B\u043E\u0433.: ${item.main.humidity}%
 `;
             }
           } else {
