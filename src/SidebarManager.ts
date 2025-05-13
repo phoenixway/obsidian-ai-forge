@@ -96,7 +96,6 @@ export class SidebarManager {
   
 public createSidebarUI(parentElement: HTMLElement): HTMLElement {
   this.containerEl = parentElement.createDiv({ cls: CSS_SIDEBAR_CONTAINER });
-  // this.plugin.logger.debug("[SidebarUI] Creating sidebar UI structure...");
 
   // --- Секція Чатів ---
   const chatPanel = this.containerEl.createDiv({ cls: CSS_CHAT_PANEL });
@@ -143,7 +142,6 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
   this.view.registerDomEvent(this.rootDropZoneEl, 'dragenter', this.handleDragEnterRootZone.bind(this));
   this.view.registerDomEvent(this.rootDropZoneEl, 'dragleave', this.handleDragLeaveRootZone.bind(this));
   this.view.registerDomEvent(this.rootDropZoneEl, 'drop', this.handleDropRootZone.bind(this));
-  // this.plugin.logger.debug("[SidebarUI] Root drop listeners attached to dedicated root drop zone element.");
   // --- КІНЕЦЬ СПЕЦІАЛЬНОЇ ЗОНИ ---
 
   // --- Секція Ролей ---
@@ -176,20 +174,15 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
 
   // Початкове заповнення списку чатів, якщо секція видима (за замовчуванням вона видима)
   if (this.isSectionVisible("chats")) {
-    // this.plugin.logger.debug("[SidebarUI] Initial chat list update scheduled because 'chats' section is visible.");
-    this.updateChatList();
+   this.updateChatList();
   } else {
-      this.plugin.logger.debug("[SidebarUI] 'Chats' section initially collapsed, chat list update deferred.");
-  }
+        }
   // Початкове заповнення списку ролей, якщо секція видима (за замовчуванням вона згорнута)
   if (this.isSectionVisible("roles")) {
-    this.plugin.logger.debug("[SidebarUI] 'Roles' section initially visible, role list update scheduled.");
-    this.updateRoleList();
+        this.updateRoleList();
   } else {
-      this.plugin.logger.debug("[SidebarUI] 'Roles' section initially collapsed, role list update deferred.");
-  }
+        }
 
-  // this.plugin.logger.debug("[SidebarUI] Sidebar UI creation complete.");
   return this.containerEl;
 } // --- Кінець createSidebarUI ---
   private attachSidebarEventListeners(): void {
@@ -199,8 +192,7 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
       !this.newChatSidebarButton ||
       !this.newFolderSidebarButton
     ) {
-      this.plugin.logger.error("[SidebarManager] Cannot attach listeners: UI elements missing.");
-      return;
+            return;
     }
     // Клік на весь заголовок (включаючи шеврон) тепер перемикає секцію
     this.view.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSection(this.chatPanelHeaderEl));
@@ -229,10 +221,7 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
     if (!container || !this.plugin.chatManager) {
       return;
     }
-    this.plugin.logger.info(
-      // `[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`
-    );
-    container.classList.add("is-loading"); // Додаємо клас завантаження
+        container.classList.add("is-loading"); // Додаємо клас завантаження
     const currentScrollTop = container.scrollTop;
     container.empty();
     try {
@@ -263,10 +252,8 @@ public createSidebarUI(parentElement: HTMLElement): HTMLElement {
           this.renderHierarchyNode(node, container, 0, currentActiveChatId, activeAncestorPaths, currentUpdateId)
         );
       }
-      // this.plugin.logger.info(`[Update #${currentUpdateId}] <<<<< FINISHED updateChatList (rendering done)`);
     } catch (error) {
-      this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
-      container.empty();
+            container.empty();
       container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
     } finally {
       container.classList.remove("is-loading");
@@ -387,12 +374,10 @@ private renderHierarchyNode(
           ? this.formatRelativeDate(lastModifiedDate) // Використовуємо відносну дату
           : "Invalid date";
           if (dateText === "Invalid date") {
-               this.plugin.logger.warn(`[Render] Invalid date for chat ${chatMeta.id}: ${chatMeta.lastModified}`);
-          }
+                         }
           detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
       } catch (e) {
-          this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
-          detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
+                    detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
       }
 
       // Кнопка "..." (опції чату)
@@ -485,8 +470,7 @@ private renderHierarchyNode(
 
     // Перевірка, чи всі необхідні елементи знайдено
     if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
-      return; // Виходимо, якщо щось не знайдено
+            return; // Виходимо, якщо щось не знайдено
     }
 
     // Прив'язуємо контекст 'this' до функції оновлення для подальшого виклику
@@ -530,8 +514,7 @@ private renderHierarchyNode(
         });
       } catch (error) {
         // Обробка помилки під час оновлення вмісту
-        this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
-        contentEl.setText(`Error loading ${sectionType}.`); // Показуємо повідомлення про помилку
+                contentEl.setText(`Error loading ${sectionType}.`); // Показуємо повідомлення про помилку
         // Все одно додаємо клас, щоб показати помилку
         requestAnimationFrame(() => {
           if (contentEl?.isConnected && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
@@ -591,10 +574,7 @@ private renderHierarchyNode(
     if (!container || !this.plugin.chatManager) {
       return;
     }
-    this.plugin.logger.debug(
-      `[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`
-    );
-    const currentScrollTop = container.scrollTop;
+        const currentScrollTop = container.scrollTop;
     container.empty();
     try {
       const roles = await this.plugin.listRoleFiles(true);
@@ -620,8 +600,7 @@ private renderHierarchyNode(
         );
       });
     } catch (error) {
-      this.plugin.logger.error("[SidebarManager.updateRoleList] Error rendering:", error);
-      container.empty();
+            container.empty();
       container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
     } finally {
       requestAnimationFrame(() => {
@@ -651,8 +630,7 @@ private renderHierarchyNode(
         }
         this.updateRoleList();
       } catch (error) {
-        this.plugin.logger.error(`[SidebarManager] Error setting role to ${newRolePath}:`, error);
-        new Notice("Failed to set the role.");
+                new Notice("Failed to set the role.");
       }
     } else {
     }
@@ -682,8 +660,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
       // яку ChatManager.createNewChat() має згенерувати, а OllamaView обробити.
     }
   } catch (error) {
-    this.plugin.logger.error("[SidebarManager] Error creating new chat:", error);
-    new Notice(`Error creating new chat: ${error instanceof Error ? error.message : "Unknown error"}`);
+        new Notice(`Error creating new chat: ${error instanceof Error ? error.message : "Unknown error"}`);
   }
 };
   
@@ -712,8 +689,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
           // this.updateChatList();
         }
       } catch (error) {
-        this.plugin.logger.error(`[SidebarManager] Error creating folder ${newFolderPath}:`, error);
-        new Notice(`Error creating folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+                new Notice(`Error creating folder: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }).open();
   };
@@ -750,11 +726,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
           // this.updateChatList();
         }
       } catch (error) {
-        this.plugin.logger.error(
-          `[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`,
-          error
-        );
-        new Notice(`Error renaming folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+                new Notice(`Error renaming folder: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     }).open();
   };
@@ -779,8 +751,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
             // this.updateChatList();
           }
         } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
-          new Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
+                    new Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
         } finally {
           notice.hide();
         }
@@ -834,8 +805,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
         this.plugin.emit("focus-input-request");
       }
     } catch (e) {
-      this.plugin.logger.error(`Clone error:`, e);
-    } finally {
+          } finally {
       notice.hide();
     }
   }
@@ -881,8 +851,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
               throw new Error("Failed to get created folder.");
             }
           } catch (err) {
-            this.plugin.logger.error("Folder creation error during export:", err);
-            new Notice(`Export folder error. Saving to vault root.`);
+                        new Notice(`Export folder error. Saving to vault root.`);
             fFolder = this.app.vault.getRoot();
           }
         } else if (af instanceof TFolder) {
@@ -895,8 +864,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
         fFolder = this.app.vault.getRoot();
       }
       if (!fFolder) {
-        this.plugin.logger.error("Target folder for export could not be determined.");
-        new Notice("Export folder error.");
+                new Notice("Export folder error.");
         notice.hide();
         return;
       }
@@ -904,8 +872,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
       const file = await this.app.vault.create(filePath, md);
       new Notice(`Chat exported to ${file.path}`);
     } catch (e) {
-      this.plugin.logger.error(`Chat export error:`, e);
-      new Notice("Chat export failed.");
+            new Notice("Chat export failed.");
     } finally {
       notice.hide();
     }
@@ -916,8 +883,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
       try {
         const success = await this.plugin.chatManager.clearChatMessagesById(chatId);
       } catch (e) {
-        this.plugin.logger.error(`Clear messages error:`, e);
-        new Notice("Failed to clear messages.");
+                new Notice("Failed to clear messages.");
       } finally {
         notice.hide();
       }
@@ -929,8 +895,7 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
       try {
         const success = await this.plugin.chatManager.deleteChat(chatId);
       } catch (e) {
-        this.plugin.logger.error(`Delete chat error:`, e);
-        new Notice("Failed to delete chat.");
+                new Notice("Failed to delete chat.");
       } finally {
         notice.hide();
       }
@@ -1082,15 +1047,9 @@ private handleNewChatClick = async (targetFolderPath?: string): Promise<void> =>
   // src/SidebarManager.ts
 
 private handleDragStart(event: DragEvent, node: HierarchyNode): void {
-  this.plugin.logger.error(
-      `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${
-      node.type === 'folder' ? node.name : node.metadata.name
-      }, Path: ${node.type === 'folder' ? node.path : node.filePath}`
-  );
-
+  
   if (!event.dataTransfer) {
-      this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
-      return;
+            return;
   }
 
   let id: string;
@@ -1115,18 +1074,15 @@ private handleDragStart(event: DragEvent, node: HierarchyNode): void {
   if (event.target instanceof HTMLElement) {
     event.target.addClass('is-dragging');
   }
-  this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
-
+  
   // --- ДОДАНО: Робимо rootDropZone видимою ---
   if (this.containerEl) { // Переконуємось, що головний контейнер існує
       this.containerEl.classList.add('sidebar-drag-active');
-      this.plugin.logger.debug("[DragStart] Added 'sidebar-drag-active' to main container.");
-  }
+        }
   // --- КІНЕЦЬ ДОДАНОГО ---
 
   event.stopPropagation();
-  this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
-}
+  }
 
 
   // src/SidebarManager.ts
@@ -1135,8 +1091,7 @@ private handleDragEnd(event: DragEvent): void {
   // --- ДОДАНО: Ховаємо rootDropZone ---
   if (this.containerEl) { // Переконуємось, що головний контейнер існує
       this.containerEl.classList.remove('sidebar-drag-active');
-      this.plugin.logger.debug("[DragEnd] Removed 'sidebar-drag-active' from main container.");
-  }
+        }
   // Також прибираємо підсвічування з самої зони, якщо воно було
   if (this.rootDropZoneEl) {
       this.rootDropZoneEl.removeClass('drag-over-root-target');
@@ -1258,8 +1213,7 @@ private handleDragLeaveRoot(event: DragEvent): void {
   // тоді прибираємо підсвічування.
   if (!event.relatedTarget || !(listeningElement.contains(event.relatedTarget as Node))) {
       listeningElement.removeClass('drag-over-root-target');
-      this.plugin.logger.debug("[DragLeaveRoot] Mouse left root container bounds. Removed 'drag-over-root-target'.");
-  } else {
+        } else {
        this.plugin.logger.trace("[DragLeaveRoot] Mouse moved to a child within root. Highlight persists or handled by child.");
   }
 }
@@ -1273,8 +1227,7 @@ private async handleDrop(event: DragEvent, targetNode: FolderNode): Promise<void
 
   // Перевіряємо, чи є дані про перетягуваний елемент
   if (!this.draggedItemData || !event.dataTransfer) {
-      this.plugin.logger.warn("[FolderDrop] Drop event occurred without draggedItemData or dataTransfer. Aborting.");
-      this.draggedItemData = null; // Очищаємо про всяк випадок
+            this.draggedItemData = null; // Очищаємо про всяк випадок
       return;
   }
 
@@ -1282,27 +1235,23 @@ private async handleDrop(event: DragEvent, targetNode: FolderNode): Promise<void
   this.draggedItemData = null; // Очищаємо дані про перетягуваний елемент
 
   const targetFolderPath = targetNode.path; // Шлях до цільової папки
-  this.plugin.logger.debug(`[FolderDrop] Event: Dragged=${JSON.stringify(draggedData)}, Target Folder Node=${targetNode.name} (Path: ${targetFolderPath})`);
-
+  
   // --- ВАЛІДАЦІЯ ---
   // 1. Визначаємо батьківську папку елемента, що перетягується
   const sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
 
   // 2. Не можна скидати папку саму в себе
   if (draggedData.type === 'folder' && draggedData.path === targetFolderPath) {
-      this.plugin.logger.debug("[FolderDrop] Skipped: Cannot drop folder onto itself.");
-      return;
+            return;
   }
   // 3. Не можна скидати чат в ту саму папку, де він вже є
   if (draggedData.type === 'chat' && sourceParentPath === normalizePath(targetFolderPath)) {
-      this.plugin.logger.debug("[FolderDrop] Skipped: Chat is already in the target folder.");
-      return;
+            return;
   }
   // 4. Не можна скидати папку в її власну дочірню папку
   if (draggedData.type === 'folder' && targetFolderPath.startsWith(draggedData.path + '/')) {
       new Notice("Cannot move a folder inside itself or its descendants.");
-      this.plugin.logger.warn("[FolderDrop] Prevented: Cannot move folder into its own descendant.");
-      return;
+            return;
   }
 
   // --- ВИКОНАННЯ ДІЇ ---
@@ -1313,47 +1262,39 @@ private async handleDrop(event: DragEvent, targetNode: FolderNode): Promise<void
   try {
       if (draggedData.type === 'chat') {
           // Переміщуємо чат
-          this.plugin.logger.info(`[FolderDrop] Calling ChatManager.moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
-          success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
+                    success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
       } else if (draggedData.type === 'folder') {
           // Переміщуємо папку (використовуємо renameFolder, оскільки це зміна шляху)
           const folderName = draggedData.name; // Ім'я папки, що перетягується
           const newPath = normalizePath(`${targetFolderPath}/${folderName}`); // Новий повний шлях для папки
 
-          this.plugin.logger.info(`[FolderDrop] Calling ChatManager.renameFolder (for move): oldPath=${draggedData.path}, newPath=${newPath}`);
-
+          
           if (draggedData.path === newPath) { // Якщо шлях не змінився (мало б відфільтруватися раніше)
-               this.plugin.logger.debug("[FolderDrop] Folder source and target path are identical after normalization. No move needed.");
-               success = true;
+                              success = true;
           } else {
               // Перевірка на конфлікт імен у цільовій папці
               const exists = await this.app.vault.adapter.exists(newPath);
               if (exists) {
                   new Notice(`An item named "${folderName}" already exists in the folder "${targetNode.name}".`);
-                  this.plugin.logger.warn(`[FolderDrop] Prevented: Target path ${newPath} for folder move already exists.`);
-              } else {
+                                } else {
                   success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
                   // Оновлюємо стан розгорнутості папки, якщо вона була переміщена
                   if (success && this.folderExpansionState.has(draggedData.path)) {
                       const wasExpanded = this.folderExpansionState.get(draggedData.path);
                       this.folderExpansionState.delete(draggedData.path);
                       this.folderExpansionState.set(newPath, wasExpanded!);
-                      this.plugin.logger.debug(`[FolderDrop] Transferred expansion state for folder from '${draggedData.path}' to '${newPath}'.`);
-                  }
+                                        }
               }
           }
       }
   } catch(error) {
-      this.plugin.logger.error(`[FolderDrop] Error during drop operation (moving ${draggedData.type} to folder ${targetNode.name}):`, error);
-      new Notice(`Error moving ${draggedData.type}. Check console.`);
+            new Notice(`Error moving ${draggedData.type}. Check console.`);
       success = false;
   } finally {
       notice.hide(); // Ховаємо сповіщення
       if (success) {
-           this.plugin.logger.info(`[FolderDrop] Drop successful: Moved ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'. UI update relies on events from ChatManager.`);
-      } else {
-          this.plugin.logger.warn(`[FolderDrop] Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'.`);
-      }
+                 } else {
+                }
       // Оновлення UI (списку чатів) відбудеться через подію 'chat-list-updated',
       // яку має згенерувати ChatManager після успішної операції moveChat або renameFolder.
   }
@@ -1423,25 +1364,21 @@ private handleDragLeaveRootParent(event: DragEvent): void {
 
   if (!relatedTarget || !listeningElement.contains(relatedTarget)) {
       this.chatPanelListContainerEl.removeClass('drag-over-root-target');
-      this.plugin.logger.debug("[DragLeaveRootParent] Mouse left chatPanel bounds. Removed 'drag-over-root-target'.");
-  }
+        }
 }
 
 private async handleDropRootParent(event: DragEvent): Promise<void> {
   event.preventDefault();
   this.chatPanelListContainerEl.removeClass('drag-over-root-target'); // Прибираємо підсвічування
-  this.plugin.logger.debug("[DropRootParent] Event fired on chatPanel.");
-
+  
   if (!this.draggedItemData) {
-      this.plugin.logger.warn("[DropRootParent] No draggedItemData available. Aborting.");
-      return;
+            return;
   }
 
   const directTarget = event.target as HTMLElement;
   // Якщо скидання відбулося на заголовок, ігноруємо
   if (this.chatPanelHeaderEl.contains(directTarget)) {
-      this.plugin.logger.info("[DropRootParent] Drop occurred on chat panel header. Aborting root drop.");
-      this.draggedItemData = null; // Очистимо, бо drop відбувся
+            this.draggedItemData = null; // Очистимо, бо drop відбувся
       return;
   }
   // Якщо скидання відбулося на папку, її власний обробник drop мав спрацювати і зупинити спливання.
@@ -1451,8 +1388,7 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
   this.draggedItemData = null;
 
   const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
-  this.plugin.logger.info(`[DropRootParent] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
-
+  
   // --- ВАЛІДАЦІЯ (така сама, як у handleDragOverRootParent) ---
   let sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
   if (draggedData.type === 'folder' && rootFolderPath === '/' && !draggedData.path.includes('/')) {
@@ -1461,8 +1397,7 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
   // ... (додаткова перевірка для папок у вкладеному корені, якщо потрібно, але sourceParentPath має бути достатньо)
 
   if (sourceParentPath === rootFolderPath) {
-      this.plugin.logger.info(`[DropRootParent] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
-      return;
+            return;
   }
 
   // --- ВИКОНАННЯ ДІЇ (код такий самий, як у handleDropRoot з попередньої відповіді) ---
@@ -1491,16 +1426,13 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
           }
       }
   } catch (error) {
-      this.plugin.logger.error(`[DropRootParent] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
-      new Notice(`Error moving ${draggedData.type} to root. Check console.`);
+            new Notice(`Error moving ${draggedData.type} to root. Check console.`);
       success = false;
   } finally {
       notice.hide();
       if (success) {
-          this.plugin.logger.info(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
-      } else {
-          this.plugin.logger.warn(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
-      }
+                } else {
+                }
   }
 }
 
@@ -1518,11 +1450,9 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
   private handleDragEnterRootZone(event: DragEvent): void {
     event.preventDefault();
     const targetElement = event.currentTarget as HTMLElement; // Це this.rootDropZoneEl
-    this.plugin.logger.debug(`[DragEnterRootZone] Event fired for target: ${targetElement.className}`);
-
+    
     if (!this.draggedItemData) {
-      this.plugin.logger.warn("[DragEnterRootZone] No draggedItemData available.");
-      return;
+            return;
     }
 
     // Валідація: чи не перетягуємо елемент, що вже в корені
@@ -1534,14 +1464,12 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
     }
 
     if (sourceParentPath === rootFolderPath) {
-        this.plugin.logger.debug(`[DragEnterRootZone] Item '${this.draggedItemData.name}' is already in the root folder. No highlight.`);
-        targetElement.removeClass('drag-over-root-target'); // Забираємо, якщо випадково було
+                targetElement.removeClass('drag-over-root-target'); // Забираємо, якщо випадково було
         return;
     }
 
     targetElement.addClass('drag-over-root-target');
-    this.plugin.logger.debug("[DragEnterRootZone] Added 'drag-over-root-target' to root drop zone.");
-  }
+      }
 
   private handleDragLeaveRootZone(event: DragEvent): void {
     const targetElement = event.currentTarget as HTMLElement; // Це this.rootDropZoneEl
@@ -1553,19 +1481,16 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
     event.preventDefault();
     const targetElement = event.currentTarget as HTMLElement; // Це this.rootDropZoneEl
     targetElement.removeClass('drag-over-root-target');
-    this.plugin.logger.debug("[DropRootZone] Event fired on dedicated root drop zone.");
-
+    
     if (!this.draggedItemData) {
-        this.plugin.logger.warn("[DropRootZone] No draggedItemData available on drop. Aborting.");
-        return;
+                return;
     }
 
     const draggedData = { ...this.draggedItemData };
     this.draggedItemData = null; // Очищаємо
 
     const rootFolderPath = normalizePath(this.plugin.chatManager.chatsFolderPath);
-    this.plugin.logger.info(`[DropRootZone] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
-
+    
     // --- ВАЛІДАЦІЯ (чи елемент вже в корені) ---
     let sourceParentPath = normalizePath(draggedData.path.substring(0, draggedData.path.lastIndexOf('/')) || '/');
     if (draggedData.type === 'folder' && rootFolderPath === '/' && !draggedData.path.includes('/')) {
@@ -1573,8 +1498,7 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
     }
 
     if (sourceParentPath === rootFolderPath) {
-        this.plugin.logger.info(`[DropRootZone] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
-        return;
+                return;
     }
 
     // --- ВИКОНАННЯ ДІЇ (логіка така сама, як у handleDropRootParent) ---
@@ -1603,16 +1527,13 @@ private async handleDropRootParent(event: DragEvent): Promise<void> {
             }
         }
     } catch (error) {
-        this.plugin.logger.error(`[DropRootZone] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
-        new Notice(`Error moving ${draggedData.type} to root. Check console.`);
+                new Notice(`Error moving ${draggedData.type} to root. Check console.`);
         success = false;
     } finally {
         notice.hide();
         if (success) {
-            this.plugin.logger.info(`[DropRootZone] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
-        } else {
-            this.plugin.logger.warn(`[DropRootZone] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
-        }
+                    } else {
+                    }
     }
   }
 

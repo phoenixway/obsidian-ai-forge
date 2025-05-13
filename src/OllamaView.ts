@@ -3942,9 +3942,6 @@ export class OllamaView extends ItemView {
     requestTimestampId: number
   ): Promise<void> {
     const currentViewInstance = this;
-    currentViewInstance.plugin.logger.debug(
-      `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Processing final text response (length: ${finalContent.length}).`
-    );
 
     if (finalContent.trim()) {
       const finalAssistantMsg: Message = {

@@ -1983,9 +1983,6 @@ var SidebarManager = class {
       if (!container || !this.plugin.chatManager) {
         return;
       }
-      this.plugin.logger.info(
-        // `[Update #${currentUpdateId}] >>>>> STARTING updateChatList (visible: ${this.isSectionVisible("chats")})`
-      );
       container.classList.add("is-loading");
       const currentScrollTop = container.scrollTop;
       container.empty();
@@ -2018,7 +2015,6 @@ var SidebarManager = class {
           );
         }
       } catch (error) {
-        this.plugin.logger.error(`[Update #${currentUpdateId}] Error rendering hierarchy:`, error);
         container.empty();
         container.createDiv({ text: "Error loading chat structure.", cls: "menu-error-text" });
       } finally {
@@ -2036,9 +2032,6 @@ var SidebarManager = class {
       if (!container || !this.plugin.chatManager) {
         return;
       }
-      this.plugin.logger.debug(
-        `[SidebarManager.updateRoleList] Updating role list content (visible: ${this.isSectionVisible("roles")})...`
-      );
       const currentScrollTop = container.scrollTop;
       container.empty();
       try {
@@ -2070,7 +2063,6 @@ var SidebarManager = class {
           );
         });
       } catch (error) {
-        this.plugin.logger.error("[SidebarManager.updateRoleList] Error rendering:", error);
         container.empty();
         container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
       } finally {
@@ -2099,7 +2091,6 @@ var SidebarManager = class {
           }
           this.updateRoleList();
         } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error setting role to ${newRolePath}:`, error);
           new import_obsidian12.Notice("Failed to set the role.");
         }
       } else {
@@ -2122,7 +2113,6 @@ var SidebarManager = class {
           }
         }
       } catch (error) {
-        this.plugin.logger.error("[SidebarManager] Error creating new chat:", error);
         new import_obsidian12.Notice(`Error creating new chat: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
     };
@@ -2151,7 +2141,6 @@ var SidebarManager = class {
             }
           }
         } catch (error) {
-          this.plugin.logger.error(`[SidebarManager] Error creating folder ${newFolderPath}:`, error);
           new import_obsidian12.Notice(`Error creating folder: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       }).open();
@@ -2189,10 +2178,6 @@ var SidebarManager = class {
             }
           }
         } catch (error) {
-          this.plugin.logger.error(
-            `[SidebarManager] Error renaming folder ${folderNode.path} to ${newFolderPath}:`,
-            error
-          );
           new import_obsidian12.Notice(`Error renaming folder: ${error instanceof Error ? error.message : "Unknown error"}`);
         }
       }).open();
@@ -2217,7 +2202,6 @@ var SidebarManager = class {
               keysToDelete.forEach((key) => this.folderExpansionState.delete(key));
             }
           } catch (error) {
-            this.plugin.logger.error(`[SidebarManager] Error deleting folder ${folderPath}:`, error);
             new import_obsidian12.Notice(`Error deleting folder: ${error instanceof Error ? error.message : "Unknown error"}`);
           } finally {
             notice.hide();
@@ -2285,20 +2269,16 @@ var SidebarManager = class {
     if (this.isSectionVisible("chats")) {
       this.updateChatList();
     } else {
-      this.plugin.logger.debug("[SidebarUI] 'Chats' section initially collapsed, chat list update deferred.");
     }
     if (this.isSectionVisible("roles")) {
-      this.plugin.logger.debug("[SidebarUI] 'Roles' section initially visible, role list update scheduled.");
       this.updateRoleList();
     } else {
-      this.plugin.logger.debug("[SidebarUI] 'Roles' section initially collapsed, role list update deferred.");
     }
     return this.containerEl;
   }
   // --- Кінець createSidebarUI ---
   attachSidebarEventListeners() {
     if (!this.chatPanelHeaderEl || !this.rolePanelHeaderEl || !this.newChatSidebarButton || !this.newFolderSidebarButton) {
-      this.plugin.logger.error("[SidebarManager] Cannot attach listeners: UI elements missing.");
       return;
     }
     this.view.registerDomEvent(this.chatPanelHeaderEl, "click", () => this.toggleSection(this.chatPanelHeaderEl));
@@ -2382,11 +2362,9 @@ var SidebarManager = class {
         const lastModifiedDate = new Date(chatMeta.lastModified);
         const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
         if (dateText === "Invalid date") {
-          this.plugin.logger.warn(`[Render] Invalid date for chat ${chatMeta.id}: ${chatMeta.lastModified}`);
         }
         detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: dateText });
       } catch (e) {
-        this.plugin.logger.error(`Error formatting date for chat ${chatMeta.id}: `, e);
         detailsWrapper.createDiv({ cls: CSS_CHAT_ITEM_DATE, text: "Date error" });
       }
       const optionsBtn = itemContentEl.createEl("button", {
@@ -2458,7 +2436,6 @@ var SidebarManager = class {
       otherSectionType = "chats";
     }
     if (!contentEl || !iconEl || !updateFunction || !otherHeaderEl || !otherContentEl || !otherSectionType) {
-      this.plugin.logger.error("Could not find all required elements for sidebar accordion toggle:", sectionType);
       return;
     }
     const boundUpdateFunction = updateFunction.bind(this);
@@ -2486,7 +2463,6 @@ var SidebarManager = class {
           }
         });
       } catch (error) {
-        this.plugin.logger.error(`Error updating sidebar section ${sectionType}:`, error);
         contentEl.setText(`Error loading ${sectionType}.`);
         requestAnimationFrame(() => {
           if ((contentEl == null ? void 0 : contentEl.isConnected) && clickedHeaderEl.getAttribute("data-collapsed") === "false") {
@@ -2555,7 +2531,6 @@ var SidebarManager = class {
         this.plugin.emit("focus-input-request");
       }
     } catch (e) {
-      this.plugin.logger.error(`Clone error:`, e);
     } finally {
       notice.hide();
     }
@@ -2604,7 +2579,6 @@ var SidebarManager = class {
               throw new Error("Failed to get created folder.");
             }
           } catch (err) {
-            this.plugin.logger.error("Folder creation error during export:", err);
             new import_obsidian12.Notice(`Export folder error. Saving to vault root.`);
             fFolder = this.app.vault.getRoot();
           }
@@ -2618,7 +2592,6 @@ var SidebarManager = class {
         fFolder = this.app.vault.getRoot();
       }
       if (!fFolder) {
-        this.plugin.logger.error("Target folder for export could not be determined.");
         new import_obsidian12.Notice("Export folder error.");
         notice.hide();
         return;
@@ -2627,7 +2600,6 @@ var SidebarManager = class {
       const file = await this.app.vault.create(filePath, md);
       new import_obsidian12.Notice(`Chat exported to ${file.path}`);
     } catch (e) {
-      this.plugin.logger.error(`Chat export error:`, e);
       new import_obsidian12.Notice("Chat export failed.");
     } finally {
       notice.hide();
@@ -2639,7 +2611,6 @@ var SidebarManager = class {
       try {
         const success = await this.plugin.chatManager.clearChatMessagesById(chatId);
       } catch (e) {
-        this.plugin.logger.error(`Clear messages error:`, e);
         new import_obsidian12.Notice("Failed to clear messages.");
       } finally {
         notice.hide();
@@ -2652,7 +2623,6 @@ var SidebarManager = class {
       try {
         const success = await this.plugin.chatManager.deleteChat(chatId);
       } catch (e) {
-        this.plugin.logger.error(`Delete chat error:`, e);
         new import_obsidian12.Notice("Failed to delete chat.");
       } finally {
         notice.hide();
@@ -2828,11 +2798,7 @@ var SidebarManager = class {
   }
   // src/SidebarManager.ts
   handleDragStart(event, node) {
-    this.plugin.logger.error(
-      `[DragStart CAPTURED NODE] Type: ${node.type}, Name: ${node.type === "folder" ? node.name : node.metadata.name}, Path: ${node.type === "folder" ? node.path : node.filePath}`
-    );
     if (!event.dataTransfer) {
-      this.plugin.logger.warn("[DragStart] No dataTransfer object in event.");
       return;
     }
     let id;
@@ -2853,20 +2819,16 @@ var SidebarManager = class {
     if (event.target instanceof HTMLElement) {
       event.target.addClass("is-dragging");
     }
-    this.plugin.logger.debug(`[DragStart SET DATA] draggedItemData now set to: ${JSON.stringify(this.draggedItemData)}`);
     if (this.containerEl) {
       this.containerEl.classList.add("sidebar-drag-active");
-      this.plugin.logger.debug("[DragStart] Added 'sidebar-drag-active' to main container.");
     }
     event.stopPropagation();
-    this.plugin.logger.debug("[DragStart] Propagation stopped for this event.");
   }
   // src/SidebarManager.ts
   handleDragEnd(event) {
     var _a;
     if (this.containerEl) {
       this.containerEl.classList.remove("sidebar-drag-active");
-      this.plugin.logger.debug("[DragEnd] Removed 'sidebar-drag-active' from main container.");
     }
     if (this.rootDropZoneEl) {
       this.rootDropZoneEl.removeClass("drag-over-root-target");
@@ -2944,7 +2906,6 @@ var SidebarManager = class {
     const listeningElement = event.currentTarget;
     if (!event.relatedTarget || !listeningElement.contains(event.relatedTarget)) {
       listeningElement.removeClass("drag-over-root-target");
-      this.plugin.logger.debug("[DragLeaveRoot] Mouse left root container bounds. Removed 'drag-over-root-target'.");
     } else {
       this.plugin.logger.trace("[DragLeaveRoot] Mouse moved to a child within root. Highlight persists or handled by child.");
     }
@@ -2955,26 +2916,21 @@ var SidebarManager = class {
     const targetElement = event.currentTarget;
     targetElement.removeClass("drag-over-target");
     if (!this.draggedItemData || !event.dataTransfer) {
-      this.plugin.logger.warn("[FolderDrop] Drop event occurred without draggedItemData or dataTransfer. Aborting.");
       this.draggedItemData = null;
       return;
     }
     const draggedData = { ...this.draggedItemData };
     this.draggedItemData = null;
     const targetFolderPath = targetNode.path;
-    this.plugin.logger.debug(`[FolderDrop] Event: Dragged=${JSON.stringify(draggedData)}, Target Folder Node=${targetNode.name} (Path: ${targetFolderPath})`);
     const sourceParentPath = (0, import_obsidian12.normalizePath)(draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/");
     if (draggedData.type === "folder" && draggedData.path === targetFolderPath) {
-      this.plugin.logger.debug("[FolderDrop] Skipped: Cannot drop folder onto itself.");
       return;
     }
     if (draggedData.type === "chat" && sourceParentPath === (0, import_obsidian12.normalizePath)(targetFolderPath)) {
-      this.plugin.logger.debug("[FolderDrop] Skipped: Chat is already in the target folder.");
       return;
     }
     if (draggedData.type === "folder" && targetFolderPath.startsWith(draggedData.path + "/")) {
       new import_obsidian12.Notice("Cannot move a folder inside itself or its descendants.");
-      this.plugin.logger.warn("[FolderDrop] Prevented: Cannot move folder into its own descendant.");
       return;
     }
     let success = false;
@@ -2982,41 +2938,33 @@ var SidebarManager = class {
     const notice = new import_obsidian12.Notice(noticeMessage, 0);
     try {
       if (draggedData.type === "chat") {
-        this.plugin.logger.info(`[FolderDrop] Calling ChatManager.moveChat: id=${draggedData.id}, oldPath=${draggedData.path}, newFolder=${targetFolderPath}`);
         success = await this.plugin.chatManager.moveChat(draggedData.id, draggedData.path, targetFolderPath);
       } else if (draggedData.type === "folder") {
         const folderName = draggedData.name;
         const newPath = (0, import_obsidian12.normalizePath)(`${targetFolderPath}/${folderName}`);
-        this.plugin.logger.info(`[FolderDrop] Calling ChatManager.renameFolder (for move): oldPath=${draggedData.path}, newPath=${newPath}`);
         if (draggedData.path === newPath) {
-          this.plugin.logger.debug("[FolderDrop] Folder source and target path are identical after normalization. No move needed.");
           success = true;
         } else {
           const exists = await this.app.vault.adapter.exists(newPath);
           if (exists) {
             new import_obsidian12.Notice(`An item named "${folderName}" already exists in the folder "${targetNode.name}".`);
-            this.plugin.logger.warn(`[FolderDrop] Prevented: Target path ${newPath} for folder move already exists.`);
           } else {
             success = await this.plugin.chatManager.renameFolder(draggedData.path, newPath);
             if (success && this.folderExpansionState.has(draggedData.path)) {
               const wasExpanded = this.folderExpansionState.get(draggedData.path);
               this.folderExpansionState.delete(draggedData.path);
               this.folderExpansionState.set(newPath, wasExpanded);
-              this.plugin.logger.debug(`[FolderDrop] Transferred expansion state for folder from '${draggedData.path}' to '${newPath}'.`);
             }
           }
         }
       }
     } catch (error) {
-      this.plugin.logger.error(`[FolderDrop] Error during drop operation (moving ${draggedData.type} to folder ${targetNode.name}):`, error);
       new import_obsidian12.Notice(`Error moving ${draggedData.type}. Check console.`);
       success = false;
     } finally {
       notice.hide();
       if (success) {
-        this.plugin.logger.info(`[FolderDrop] Drop successful: Moved ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'. UI update relies on events from ChatManager.`);
       } else {
-        this.plugin.logger.warn(`[FolderDrop] Drop failed or was prevented for ${draggedData.type} '${draggedData.name}' to folder '${targetNode.name}'.`);
       }
     }
   }
@@ -3063,33 +3011,27 @@ var SidebarManager = class {
     this.plugin.logger.trace(`[DragLeaveRootParent] Event fired from chatPanel. Related target: ${relatedTarget ? relatedTarget.className : "null"}`);
     if (!relatedTarget || !listeningElement.contains(relatedTarget)) {
       this.chatPanelListContainerEl.removeClass("drag-over-root-target");
-      this.plugin.logger.debug("[DragLeaveRootParent] Mouse left chatPanel bounds. Removed 'drag-over-root-target'.");
     }
   }
   async handleDropRootParent(event) {
     event.preventDefault();
     this.chatPanelListContainerEl.removeClass("drag-over-root-target");
-    this.plugin.logger.debug("[DropRootParent] Event fired on chatPanel.");
     if (!this.draggedItemData) {
-      this.plugin.logger.warn("[DropRootParent] No draggedItemData available. Aborting.");
       return;
     }
     const directTarget = event.target;
     if (this.chatPanelHeaderEl.contains(directTarget)) {
-      this.plugin.logger.info("[DropRootParent] Drop occurred on chat panel header. Aborting root drop.");
       this.draggedItemData = null;
       return;
     }
     const draggedData = { ...this.draggedItemData };
     this.draggedItemData = null;
     const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
-    this.plugin.logger.info(`[DropRootParent] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
     let sourceParentPath = (0, import_obsidian12.normalizePath)(draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/");
     if (draggedData.type === "folder" && rootFolderPath === "/" && !draggedData.path.includes("/")) {
       sourceParentPath = "/";
     }
     if (sourceParentPath === rootFolderPath) {
-      this.plugin.logger.info(`[DropRootParent] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
       return;
     }
     let success = false;
@@ -3117,15 +3059,12 @@ var SidebarManager = class {
         }
       }
     } catch (error) {
-      this.plugin.logger.error(`[DropRootParent] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
       new import_obsidian12.Notice(`Error moving ${draggedData.type} to root. Check console.`);
       success = false;
     } finally {
       notice.hide();
       if (success) {
-        this.plugin.logger.info(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
       } else {
-        this.plugin.logger.warn(`[DropRootParent] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
       }
     }
   }
@@ -3139,9 +3078,7 @@ var SidebarManager = class {
   handleDragEnterRootZone(event) {
     event.preventDefault();
     const targetElement = event.currentTarget;
-    this.plugin.logger.debug(`[DragEnterRootZone] Event fired for target: ${targetElement.className}`);
     if (!this.draggedItemData) {
-      this.plugin.logger.warn("[DragEnterRootZone] No draggedItemData available.");
       return;
     }
     const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
@@ -3151,12 +3088,10 @@ var SidebarManager = class {
       sourceParentPath = "/";
     }
     if (sourceParentPath === rootFolderPath) {
-      this.plugin.logger.debug(`[DragEnterRootZone] Item '${this.draggedItemData.name}' is already in the root folder. No highlight.`);
       targetElement.removeClass("drag-over-root-target");
       return;
     }
     targetElement.addClass("drag-over-root-target");
-    this.plugin.logger.debug("[DragEnterRootZone] Added 'drag-over-root-target' to root drop zone.");
   }
   handleDragLeaveRootZone(event) {
     const targetElement = event.currentTarget;
@@ -3167,21 +3102,17 @@ var SidebarManager = class {
     event.preventDefault();
     const targetElement = event.currentTarget;
     targetElement.removeClass("drag-over-root-target");
-    this.plugin.logger.debug("[DropRootZone] Event fired on dedicated root drop zone.");
     if (!this.draggedItemData) {
-      this.plugin.logger.warn("[DropRootZone] No draggedItemData available on drop. Aborting.");
       return;
     }
     const draggedData = { ...this.draggedItemData };
     this.draggedItemData = null;
     const rootFolderPath = (0, import_obsidian12.normalizePath)(this.plugin.chatManager.chatsFolderPath);
-    this.plugin.logger.info(`[DropRootZone] Attempting to drop: ${JSON.stringify(draggedData)} into root: ${rootFolderPath}`);
     let sourceParentPath = (0, import_obsidian12.normalizePath)(draggedData.path.substring(0, draggedData.path.lastIndexOf("/")) || "/");
     if (draggedData.type === "folder" && rootFolderPath === "/" && !draggedData.path.includes("/")) {
       sourceParentPath = "/";
     }
     if (sourceParentPath === rootFolderPath) {
-      this.plugin.logger.info(`[DropRootZone] Item '${draggedData.name}' is already in the root folder. Drop cancelled.`);
       return;
     }
     let success = false;
@@ -3209,15 +3140,12 @@ var SidebarManager = class {
         }
       }
     } catch (error) {
-      this.plugin.logger.error(`[DropRootZone] Error during operation for ${draggedData.type} '${draggedData.name}':`, error);
       new import_obsidian12.Notice(`Error moving ${draggedData.type} to root. Check console.`);
       success = false;
     } finally {
       notice.hide();
       if (success) {
-        this.plugin.logger.info(`[DropRootZone] Operation for ${draggedData.type} '${draggedData.name}' to root was successful. UI update relies on events.`);
       } else {
-        this.plugin.logger.warn(`[DropRootZone] Operation for ${draggedData.type} '${draggedData.name}' to root failed or was prevented.`);
       }
     }
   }
@@ -7162,9 +7090,6 @@ Summary:`;
   async _renderFinalAssistantText(finalContent, responseTimestampMs, requestTimestampId) {
     var _a, _b;
     const currentViewInstance = this;
-    currentViewInstance.plugin.logger.debug(
-      `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Processing final text response (length: ${finalContent.length}).`
-    );
     if (finalContent.trim()) {
       const finalAssistantMsg = {
         role: "assistant",
