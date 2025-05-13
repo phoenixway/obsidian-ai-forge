@@ -282,6 +282,8 @@ export class OllamaService {
               };
               if (jsonChunk.done === true) { // Якщо це останній текстовий чанк і done=true
                 this.plugin.logger.info('[OllamaService] Stream finished (done:true received with content chunk).');
+                this.plugin.logger.error('[OllamaService] Final chunk with metrics:', jsonChunk);
+
                  // Не відправляємо окремий 'done' чанк, бо інформація вже в цьому.
                  // Однак, фінальний 'done' чанк від Ollama зазвичай містить більше метрик.
                  // Якщо це не фінальний чанк з метриками, тоді очікуємо його.
@@ -290,7 +292,6 @@ export class OllamaService {
               }
             } else if (jsonChunk.done === true) { // Фінальний чанк "done" з метриками
               this.plugin.logger.info('[OllamaService] Stream finished (final done:true chunk with metrics).');
-              this.plugin.logger.error('[OllamaService] Final chunk with metrics:', jsonChunk);
               yield {
                 type: 'done',
                 model: jsonChunk.model,
