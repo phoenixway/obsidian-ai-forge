@@ -230,7 +230,7 @@ export class OllamaService {
 
           try {
             const jsonChunk = JSON.parse(line);
-            // this.plugin.logger.debug('[OllamaService] Raw chunk received:', JSON.stringify(jsonChunk));
+            this.plugin.logger.debug('[OllamaService] Raw chunk received:', JSON.stringify(jsonChunk));
 
             if (jsonChunk.error) {
               this.plugin.logger.error(`[OllamaService] Error chunk from Ollama: ${jsonChunk.error}`);
