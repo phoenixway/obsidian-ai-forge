@@ -8172,6 +8172,7 @@ var OllamaService = class {
               }
             } else if (jsonChunk.done === true) {
               this.plugin.logger.info("[OllamaService] Stream finished (final done:true chunk with metrics).");
+              this.plugin.logger.error("[OllamaService] Final chunk with metrics:", jsonChunk);
               yield {
                 type: "done",
                 model: jsonChunk.model,
