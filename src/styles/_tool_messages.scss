@@ -30,12 +30,13 @@ $tool-code-background: var(--background-primary, #202020);
   max-width: 85%; // Щоб не займало всю ширину
   align-self: flex-start; // Розташування бульбашки в message-wrapper
 
+
   .tool-result-header {
     display: flex;
     align-items: center;
     font-weight: bold;
     color: $tool-message-header-color;
-    margin-bottom: 6px;
+    margin-bottom: 60px;
     font-size: var(--font-ui-small, 0.9em);
 
     .tool-result-icon {
