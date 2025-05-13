@@ -1225,13 +1225,23 @@ function decodeHtmlEntities(text) {
 }
 function detectThinkingTags(content) {
   const thinkTagRegex = /<think>[\s\S]*?<\/think>/gi;
-  const hasThinkingTags = thinkTagRegex.test(content);
-  let processedContent = content;
-  if (hasThinkingTags) {
-    processedContent = content.replace(thinkTagRegex, "").trim();
-  }
-  const format = /<[a-z][\s\S]*>/i.test(processedContent) ? "html" : "text";
-  return { hasThinkingTags, contentWithoutTags: processedContent, format };
+  let contentWithoutTags = content;
+  let hasThinkingTags = false;
+  let previousContent;
+  do {
+    previousContent = contentWithoutTags;
+    contentWithoutTags = contentWithoutTags.replace(thinkTagRegex, "");
+    if (previousContent !== contentWithoutTags) {
+      hasThinkingTags = true;
+    }
+  } while (previousContent !== contentWithoutTags && contentWithoutTags.includes("<think>"));
+  contentWithoutTags = contentWithoutTags.trim();
+  const format = /<[a-z][\s\S]*>/i.test(contentWithoutTags) ? "html" : "text";
+  return {
+    hasThinkingTags,
+    contentWithoutTags,
+    format
+  };
 }
 async function markdownToHtml(app, view, markdown) {
   var _a, _b;

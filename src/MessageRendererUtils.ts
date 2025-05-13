@@ -29,15 +29,29 @@ export function decodeHtmlEntities(text: string): string {
 }
 
 export function detectThinkingTags(content: string): ThinkDetectionResult {
+    // Цей регулярний вираз має знаходити найкоротше співпадіння між <think> та </think>
     const thinkTagRegex = /<think>[\s\S]*?<\/think>/gi; 
-    const hasThinkingTags = thinkTagRegex.test(content);
-    let processedContent = content; 
+    let contentWithoutTags = content;
+    let hasThinkingTags = false;
 
-    if (hasThinkingTags) {
-        processedContent = content.replace(thinkTagRegex, '').trim();
-    }
-    const format = /<[a-z][\s\S]*>/i.test(processedContent) ? 'html' : 'text';
-    return { hasThinkingTags, contentWithoutTags: processedContent, format };
+    // Видаляємо всі входження ітеративно, щоб впоратися з потенційною вкладеністю або проблемами regex
+    let previousContent;
+    do {
+        previousContent = contentWithoutTags;
+        contentWithoutTags = contentWithoutTags.replace(thinkTagRegex, '');
+        if (previousContent !== contentWithoutTags) {
+            hasThinkingTags = true;
+        }
+    } while (previousContent !== contentWithoutTags && contentWithoutTags.includes("<think>")); // Повторюємо, доки є зміни та теги
+
+    contentWithoutTags = contentWithoutTags.trim();
+    const format = /<[a-z][\s\S]*>/i.test(contentWithoutTags) ? 'html' : 'text';
+
+    return {
+        hasThinkingTags,
+        contentWithoutTags: contentWithoutTags,
+        format
+    };
 }
 
 export async function markdownToHtml(
