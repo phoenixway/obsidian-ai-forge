@@ -7875,7 +7875,6 @@ var OllamaService = class {
     this.promptService = plugin.promptService;
     this.logger = plugin.logger;
   }
-  // --- Event Emitter (залишаємо без змін) ---
   on(event, callback) {
     if (!this.eventHandlers[event])
       this.eventHandlers[event] = [];
@@ -7898,17 +7897,18 @@ var OllamaService = class {
         }
       });
   }
-  // ------------------------------------------
   /**
-  * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
-  * @param chat Поточний об'єкт чату.
-  * @param signal AbortSignal для можливості переривання запиту.
-  * @returns Асинхронний ітератор, що видає StreamChunk.
-  */
+   * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
+   * @param chat Поточний об'єкт чату.
+   * @param signal AbortSignal для можливості переривання запиту.
+   * @returns Асинхронний ітератор, що видає StreamChunk.
+   */
   async *generateChatResponseStream(chat, signal) {
     var _a, _b, _c, _d, _e, _f;
     const requestTimestampId = Date.now();
-    this.logger.debug(`[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`);
+    this.logger.debug(
+      `[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`
+    );
     if (!chat) {
       this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat object.");
       yield { type: "error", error: "Chat object is null.", done: true };
@@ -7950,18 +7950,26 @@ var OllamaService = class {
         const agentTools = this.plugin.agentManager.getAllToolDefinitions();
         if (agentTools && agentTools.length > 0) {
           const modelDetails = await this.getModelDetails(modelName);
-          const seemsToSupportTools = ((_c = (_b = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _b.family) == null ? void 0 : _c.toLowerCase().includes("llama3")) || ((_e = (_d = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _d.family) == null ? void 0 : _e.toLowerCase().includes("mistral")) || // Додайте інші відомі сім'ї
-          ((_f = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _f.parameter_size) && parseFloat(modelDetails.details.parameter_size.replace("B", "")) >= 7;
+          const seemsToSupportTools = ((_c = (_b = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _b.family) == null ? void 0 : _c.toLowerCase().includes("llama3")) || ((_e = (_d = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _d.family) == null ? void 0 : _e.toLowerCase().includes("mistral")) || ((_f = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _f.parameter_size) && parseFloat(modelDetails.details.parameter_size.replace("B", "")) >= 7;
           if (seemsToSupportTools) {
             requestBody.tools = agentTools.map((tool) => ({ type: "function", function: tool }));
-            this.plugin.logger.info(`[OllamaService] Tools provided to Ollama for model ${modelName}:`, agentTools.map((t) => t.name));
+            this.plugin.logger.info(
+              `[OllamaService] Tools provided to Ollama for model ${modelName}:`,
+              agentTools.map((t) => t.name)
+            );
           } else {
-            this.plugin.logger.info(`[OllamaService] Model ${modelName} might not natively support tool calling (or check failed). Tools not explicitly sent via 'tools' parameter. Relying on prompt-based fallback if implemented.`);
+            this.plugin.logger.info(
+              `[OllamaService] Model ${modelName} might not natively support tool calling (or check failed). Tools not explicitly sent via 'tools' parameter. Relying on prompt-based fallback if implemented.`
+            );
           }
         }
       }
-      this.plugin.logger.debug(`[OllamaService] Sending request to ${url} for model ${modelName}. System prompt length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}, Body prompt length: ${promptBody.length}`);
-      this.logger.debug(`[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${promptBody.length}. System part length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}`);
+      this.plugin.logger.debug(
+        `[OllamaService] Sending request to ${url} for model ${modelName}. System prompt length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}, Body prompt length: ${promptBody.length}`
+      );
+      this.logger.debug(
+        `[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${promptBody.length}. System part length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}`
+      );
       this.logger.trace(`[OllamaService][id:${requestTimestampId}] Request body:`, requestBody);
       const response = await fetch(url, {
         method: "POST",
@@ -8003,23 +8011,43 @@ var OllamaService = class {
         rawResponseAccumulator += decodedChunk;
         if (done) {
           this.plugin.logger.info("[OllamaService] Stream reader marked as done.");
-          this.logger.debug(`[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`);
-          this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) START ===`);
+          this.logger.debug(
+            `[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`
+          );
+          this.logger.debug(
+            `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) START ===`
+          );
           this.logger.debug(rawResponseAccumulator);
-          this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) END === Length: ${rawResponseAccumulator.length}`);
+          this.logger.debug(
+            `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) END === Length: ${rawResponseAccumulator.length}`
+          );
           buffer += decodedChunk;
           if (buffer.trim()) {
             try {
               const jsonChunk = JSON.parse(buffer.trim());
               if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
-                yield { type: "tool_calls", calls: jsonChunk.message.tool_calls, assistant_message_with_calls: jsonChunk.message, model: jsonChunk.model, created_at: jsonChunk.created_at };
+                yield {
+                  type: "tool_calls",
+                  calls: jsonChunk.message.tool_calls,
+                  assistant_message_with_calls: jsonChunk.message,
+                  model: jsonChunk.model,
+                  created_at: jsonChunk.created_at
+                };
               } else if (typeof jsonChunk.response === "string") {
-                yield { type: "content", response: jsonChunk.response, done: jsonChunk.done || false, model: jsonChunk.model, created_at: jsonChunk.created_at };
+                yield {
+                  type: "content",
+                  response: jsonChunk.response,
+                  done: jsonChunk.done || false,
+                  model: jsonChunk.model,
+                  created_at: jsonChunk.created_at
+                };
               } else if (jsonChunk.error) {
                 yield { type: "error", error: jsonChunk.error, done: true };
               }
             } catch (e) {
-              this.plugin.logger.warn(`[OllamaService] Failed to parse final buffer content: "${buffer.trim()}". Error: ${e.message}`);
+              this.plugin.logger.warn(
+                `[OllamaService] Failed to parse final buffer content: "${buffer.trim()}". Error: ${e.message}`
+              );
             }
           }
           break;
@@ -8060,7 +8088,6 @@ var OllamaService = class {
                   model: jsonChunk.model,
                   created_at: jsonChunk.created_at,
                   context: jsonChunk.context,
-                  // та інші метрики, якщо є
                   total_duration: jsonChunk.total_duration,
                   load_duration: jsonChunk.load_duration,
                   prompt_eval_count: jsonChunk.prompt_eval_count,
@@ -8068,22 +8095,28 @@ var OllamaService = class {
                   eval_count: jsonChunk.eval_count,
                   eval_duration: jsonChunk.eval_duration
                 };
-                this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) START ===`);
+                this.logger.debug(
+                  `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) START ===`
+                );
                 this.logger.debug(rawResponseAccumulator);
-                this.logger.debug(`[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) END === Length: ${rawResponseAccumulator.length}`);
+                this.logger.debug(
+                  `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) END === Length: ${rawResponseAccumulator.length}`
+                );
                 return;
               }
             } else if (typeof jsonChunk.response === "string") {
               this.plugin.logger.debug("[OllamaService] Yielding content chunk.");
               this.plugin.logger.error("[OllamaService] mes:", jsonChunk.message);
               this.plugin.logger.debug("[OllamaService] Raw content chunk:", jsonChunk.response);
-              this.plugin.logger.debug("[OllamaService] Raw content chunk (stringify):", JSON.stringify(jsonChunk.response, null, 2));
+              this.plugin.logger.debug(
+                "[OllamaService] Raw content chunk (stringify):",
+                JSON.stringify(jsonChunk.response, null, 2)
+              );
               this.plugin.logger.debug("[OllamaService] Raw content chunk (stringify):", jsonChunk);
               yield {
                 type: "content",
                 response: jsonChunk.response,
                 done: jsonChunk.done || false,
-                // done може бути true тут, якщо це останній текстовий чанк
                 model: jsonChunk.model,
                 created_at: jsonChunk.created_at
               };
@@ -8110,7 +8143,9 @@ var OllamaService = class {
             } else if (jsonChunk.message && (jsonChunk.message.content === null || jsonChunk.message.content === "") && !jsonChunk.message.tool_calls) {
             }
           } catch (e) {
-            this.plugin.logger.warn(`[OllamaService] Failed to parse JSON chunk: "${line}". Error: ${e.message}. Skipping chunk.`);
+            this.plugin.logger.warn(
+              `[OllamaService] Failed to parse JSON chunk: "${line}". Error: ${e.message}. Skipping chunk.`
+            );
           }
         }
       }
@@ -8131,9 +8166,6 @@ var OllamaService = class {
       this.plugin.logger.info("[OllamaService] generateChatResponseStream finished or terminated.");
     }
   }
-  // ... (інші ваші методи: generateRaw, generateEmbeddings, getModels, getModelDetails) ...
-  // Переконайтеся, що вони адаптовані для використання this.plugin.logger замість console.error/log
-  // і this.emit('connection-error', ...) для помилок з'єднання.
   async generateRaw(requestBody) {
     var _a;
     if (!requestBody.model || !requestBody.prompt) {
@@ -8200,17 +8232,24 @@ var OllamaService = class {
               errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
             } catch (e) {
             }
-            this.plugin.logger.warn(`[OllamaService] Embeddings API Error for prompt "${trimmedPrompt.substring(0, 30)}...": ${errorText}`);
+            this.plugin.logger.warn(
+              `[OllamaService] Embeddings API Error for prompt "${trimmedPrompt.substring(0, 30)}...": ${errorText}`
+            );
             continue;
           }
           const embeddingResponse = await response.json();
           if (embeddingResponse && embeddingResponse.embedding) {
             embeddingsList.push(embeddingResponse.embedding);
           } else {
-            this.plugin.logger.warn(`[OllamaService] Valid response but no embedding found for prompt "${trimmedPrompt.substring(0, 30)}..."`);
+            this.plugin.logger.warn(
+              `[OllamaService] Valid response but no embedding found for prompt "${trimmedPrompt.substring(0, 30)}..."`
+            );
           }
         } catch (singleError) {
-          this.plugin.logger.error(`[OllamaService] Error generating embedding for prompt "${trimmedPrompt.substring(0, 30)}...": ${singleError.message}`, singleError);
+          this.plugin.logger.error(
+            `[OllamaService] Error generating embedding for prompt "${trimmedPrompt.substring(0, 30)}...": ${singleError.message}`,
+            singleError
+          );
           this.emit("connection-error", new Error(singleError.message || "Embedding generation failed for a prompt"));
         }
       }
