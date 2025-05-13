@@ -1669,7 +1669,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
     if (message.role !== "assistant") {
-      plugin.logger.error("[AssistantMessageRenderer] Constructor error: Message role is not 'assistant'. Received:", message.role);
       throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
     }
   }
@@ -1698,7 +1697,9 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         }
       }
       if (toolNamesExtracted.length > 0) {
-        usingToolMessageText += `Using tool${toolNamesExtracted.length > 1 ? "s" : ""}: ${toolNamesExtracted.join(", ")}... `;
+        usingToolMessageText += `Using tool${toolNamesExtracted.length > 1 ? "s" : ""}: ${toolNamesExtracted.join(
+          ", "
+        )}... `;
       } else {
         usingToolMessageText += "Attempting to use tool(s)... ";
       }
@@ -1719,10 +1720,9 @@ ${accompanyingText.trim()}`;
     renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
     messageWrapper.style.order = "2";
-    const { messageEl, contentEl } = this.createMessageBubble(
-      messageWrapper,
-      [CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"]
-    );
+    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [
+      CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"
+    ]);
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
     const assistantMessage = this.message;
     const displayContent = AssistantMessageRenderer.prepareDisplayContent(
@@ -1732,16 +1732,11 @@ ${accompanyingText.trim()}`;
       this.view
     );
     try {
-      await renderMarkdownContent(
-        this.app,
-        this.view,
-        this.plugin,
-        contentEl,
-        displayContent
-      );
+      await renderMarkdownContent(this.app, this.view, this.plugin, contentEl, displayContent);
     } catch (error) {
-      contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
-      this.plugin.logger.error(`[ARender INSTANCE][ts:${messageTimestampLog}] Error in render -> renderMarkdownContent:`, error);
+      contentEl.setText(
+        `[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`
+      );
     }
     AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
@@ -1758,14 +1753,23 @@ ${accompanyingText.trim()}`;
     }
     const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
     const originalLlMRawContent = message.content || "";
-    const copyBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Copy", title: "Copy" } });
+    const copyBtn = buttonsWrapper.createEl("button", {
+      cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"],
+      attr: { "aria-label": "Copy", title: "Copy" }
+    });
     (0, import_obsidian9.setIcon)(copyBtn, "copy");
     view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
       view.handleCopyClick(originalLlMRawContent, copyBtn);
     });
     if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && originalLlMRawContent && originalLlMRawContent.trim()) {
-      const translateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.TRANSLATE_BUTTON || "translate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Translate", title: "Translate" } });
+      const translateBtn = buttonsWrapper.createEl("button", {
+        cls: [
+          CSS_CLASSES.TRANSLATE_BUTTON || "translate-button",
+          CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
+        ],
+        attr: { "aria-label": "Translate", title: "Translate" }
+      });
       (0, import_obsidian9.setIcon)(translateBtn, "languages");
       view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
@@ -1777,7 +1781,13 @@ ${accompanyingText.trim()}`;
       });
     }
     if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && originalLlMRawContent && originalLlMRawContent.trim()) {
-      const summarizeBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { title: "Summarize message" } });
+      const summarizeBtn = buttonsWrapper.createEl("button", {
+        cls: [
+          CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button",
+          CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
+        ],
+        attr: { title: "Summarize message" }
+      });
       (0, import_obsidian9.setIcon)(summarizeBtn, "scroll-text");
       view.registerDomEvent(summarizeBtn, "click", (e) => {
         e.stopPropagation();
@@ -1786,14 +1796,27 @@ ${accompanyingText.trim()}`;
     }
     const originalContentContainsTextualToolCall = typeof originalLlMRawContent === "string" && originalLlMRawContent.includes("<tool_call>");
     if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
-      const regenerateBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Regenerate response", title: "Regenerate Response" } });
+      const regenerateBtn = buttonsWrapper.createEl("button", {
+        cls: [
+          CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button",
+          CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
+        ],
+        attr: { "aria-label": "Regenerate response", title: "Regenerate Response" }
+      });
       (0, import_obsidian9.setIcon)(regenerateBtn, "refresh-cw");
       view.registerDomEvent(regenerateBtn, "click", (e) => {
         e.stopPropagation();
         view.handleRegenerateClick(message);
       });
     }
-    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button", CSS_CLASSES.DANGER_OPTION || "danger-option", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+    const deleteBtn = buttonsWrapper.createEl("button", {
+      cls: [
+        CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button",
+        CSS_CLASSES.DANGER_OPTION || "danger-option",
+        CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
+      ],
+      attr: { "aria-label": "Delete message", title: "Delete Message" }
+    });
     (0, import_obsidian9.setIcon)(deleteBtn, "trash");
     view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
@@ -4281,7 +4304,6 @@ This action cannot be undone.`,
     this.handleMessagesCleared = (chatId) => {
       var _a;
       if (chatId === ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId())) {
-        console.log("[OllamaView] Messages cleared event received.");
         this.clearChatContainerInternal();
         this.currentMessages = [];
         this.showEmptyState();
@@ -7050,9 +7072,6 @@ Summary:`;
   async _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId) {
     var _a, _b;
     const currentViewInstance = this;
-    currentViewInstance.plugin.logger.info(
-      `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Executing ${toolsToExecute.length} tools.`
-    );
     const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
     const assistantHmaPromise = new Promise((resolve, reject) => {
       currentViewInstance.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
@@ -7067,13 +7086,7 @@ Summary:`;
     });
     await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
     await assistantHmaPromise;
-    currentViewInstance.plugin.logger.info(
-      `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`
-    );
     if (((_a = currentViewInstance.activePlaceholder) == null ? void 0 : _a.timestamp) === assistantMsgTsMs) {
-      currentViewInstance.plugin.logger.debug(
-        `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Clearing activePlaceholder (ts: ${assistantMsgTsMs}) as HMA processed the assistant message.`
-      );
       currentViewInstance.activePlaceholder = null;
     }
     for (const call of toolsToExecute) {
@@ -7086,10 +7099,6 @@ Summary:`;
           toolArgs = JSON.parse(call.function.arguments || "{}");
         } catch (e) {
           const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
-          currentViewInstance.plugin.logger.error(
-            `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] ${errorContent}`,
-            e
-          );
           const errorToolTimestamp = new Date();
           const errorToolMsg = {
             role: "tool",
@@ -7155,14 +7164,8 @@ Summary:`;
         });
         await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
         await toolResultHmaPromise;
-        currentViewInstance.plugin.logger.info(
-          `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Tool result for ${toolName} (ts: ${toolResponseMsg.timestamp.getTime()}) processed by HMA.`
-        );
       }
     }
-    currentViewInstance.plugin.logger.info(
-      `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Finished executing all tools for this turn.`
-    );
   }
   async _renderFinalAssistantText(finalContent, responseTimestampMs, requestTimestampId) {
     var _a, _b;
@@ -7176,9 +7179,6 @@ Summary:`;
         content: finalContent,
         timestamp: new Date(responseTimestampMs)
       };
-      currentViewInstance.plugin.logger.debug(
-        `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Adding final assistant message to ChatManager (ts: ${responseTimestampMs}).`
-      );
       const hmaPromise = new Promise((resolve, reject) => {
         currentViewInstance.plugin.chatManager.registerHMAResolver(responseTimestampMs, resolve, reject);
         setTimeout(() => {
@@ -7192,9 +7192,6 @@ Summary:`;
       });
       await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(finalAssistantMsg, true);
       await hmaPromise;
-      currentViewInstance.plugin.logger.info(
-        `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Final assistant message (ts: ${responseTimestampMs}) processed by HMA.`
-      );
     } else if (!((_a = currentViewInstance.currentAbortController) == null ? void 0 : _a.signal.aborted)) {
       const emptyResponseMsgTimestamp = new Date();
       const emptyResponseMsg = {
@@ -7221,16 +7218,9 @@ Summary:`;
       try {
         await hmaPromise;
       } catch (e_hma) {
-        currentViewInstance.plugin.logger.error(
-          `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] HMA error/timeout for empty response system message`,
-          e_hma
-        );
       }
     }
     if (((_b = currentViewInstance.activePlaceholder) == null ? void 0 : _b.timestamp) === responseTimestampMs) {
-      currentViewInstance.plugin.logger.debug(
-        `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Clearing activePlaceholder (ts: ${responseTimestampMs}) after final assistant message/empty response.`
-      );
       currentViewInstance.activePlaceholder = null;
     }
   }
@@ -7567,9 +7557,6 @@ var OllamaService = class {
   async *generateChatResponseStream(chat, signal) {
     var _a, _b, _c, _d, _e, _f;
     const requestTimestampId = Date.now();
-    this.logger.debug(
-      `[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`
-    );
     if (!chat) {
       yield { type: "error", error: "Chat object is null.", done: true };
       return;
@@ -7614,10 +7601,6 @@ var OllamaService = class {
           }
         }
       }
-      this.logger.debug(
-        `[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${promptBody.length}. System part length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}`
-      );
-      this.logger.trace(`[OllamaService][id:${requestTimestampId}] Request body:`, requestBody);
       const response = await fetch(url, {
         method: "POST",
         headers,
@@ -7654,16 +7637,6 @@ var OllamaService = class {
         const decodedChunk = decoder.decode(value, { stream: !done });
         rawResponseAccumulator += decodedChunk;
         if (done) {
-          this.logger.debug(
-            `[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`
-          );
-          this.logger.debug(
-            `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) START ===`
-          );
-          this.logger.debug(rawResponseAccumulator);
-          this.logger.debug(
-            `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) END === Length: ${rawResponseAccumulator.length}`
-          );
           buffer += decodedChunk;
           if (buffer.trim()) {
             try {
@@ -7727,13 +7700,6 @@ var OllamaService = class {
                   eval_count: jsonChunk.eval_count,
                   eval_duration: jsonChunk.eval_duration
                 };
-                this.logger.debug(
-                  `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) START ===`
-                );
-                this.logger.debug(rawResponseAccumulator);
-                this.logger.debug(
-                  `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) END === Length: ${rawResponseAccumulator.length}`
-                );
                 return;
               }
             } else if (typeof jsonChunk.response === "string") {
@@ -8014,9 +7980,6 @@ var PromptService = class {
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
       if (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) {
       } else {
-        this.plugin.logger.debug(
-          `[PromptService] Role loaded but no system prompt found in role file, or role not followed.`
-        );
       }
     } else {
     }
@@ -8090,9 +8053,6 @@ Tool Name: "${tool.name}"
       }
       if (combinedBasePrompt.length === 0) {
         combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
-        this.plugin.logger.debug(
-          "[PromptService] No RAG/Role prompt, using default assistant prompt + tool instructions."
-        );
       } else {
         combinedBasePrompt += toolUsageInstructions;
       }
@@ -8111,9 +8071,6 @@ Tool Name: "${tool.name}"
       combinedBasePrompt = combinedBasePrompt.replace(/\[Current Date\]/gi, formattedDate);
     }
     const finalTrimmedPrompt = combinedBasePrompt.trim();
-    this.plugin.logger.debug(
-      `[PromptService] Final system prompt length: ${finalTrimmedPrompt.length}. Content preview: "${finalTrimmedPrompt.substring(0, 100)}..."`
-    );
     return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
   /**
@@ -8136,9 +8093,6 @@ Tool Name: "${tool.name}"
         taskContext += `Other: ${taskState.regular.join(", ") || "None"}
 `;
         taskContext += "--- End Tasks Context ---";
-        this.plugin.logger.debug(
-          `[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`
-        );
       } else {
       }
     }

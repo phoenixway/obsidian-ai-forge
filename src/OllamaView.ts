@@ -217,8 +217,7 @@ export class OllamaView extends ItemView {
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(initialModelName);
       this.updateTemperatureIndicator(initialTemperature);
-    } catch (error) {
-          }
+    } catch (error) {}
 
     this.attachEventListeners();
 
@@ -227,16 +226,15 @@ export class OllamaView extends ItemView {
 
     try {
       await this.loadAndDisplayActiveChat();
-
-          } catch (error) {
-            this.showEmptyState();
+    } catch (error) {
+      this.showEmptyState();
     }
 
     setTimeout(() => {
       if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
         this.inputEl.focus();
       } else {
-              }
+      }
     }, 150);
 
     if (this.inputEl) {
@@ -283,7 +281,7 @@ export class OllamaView extends ItemView {
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (this.sidebarRootEl) {
       this.sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-          } else {
+    } else {
     }
 
     this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
@@ -362,7 +360,7 @@ export class OllamaView extends ItemView {
     if (this.resizerEl) {
       this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
     } else {
-          }
+    }
 
     if (this.inputEl) {
       this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
@@ -432,7 +430,7 @@ export class OllamaView extends ItemView {
     const currentActiveChatId = this.plugin.chatManager?.getActiveChatId();
 
     if (data.chatId !== currentActiveChatId || !this.chatContainer) {
-            return;
+      return;
     }
 
     const timestampMs = data.timestamp.getTime();
@@ -442,7 +440,6 @@ export class OllamaView extends ItemView {
       const messageGroupEl = this.chatContainer.querySelector(selector);
 
       if (messageGroupEl instanceof HTMLElement) {
-        
         const currentScrollTop = this.chatContainer.scrollTop;
         const removedHeight = messageGroupEl.offsetHeight;
         const wasAboveViewport = messageGroupEl.offsetTop < currentScrollTop;
@@ -451,23 +448,22 @@ export class OllamaView extends ItemView {
 
         const initialLength = this.currentMessages.length;
         this.currentMessages = this.currentMessages.filter(msg => msg.timestamp.getTime() !== timestampMs);
-        
+
         if (wasAboveViewport) {
           const newScrollTop = currentScrollTop - removedHeight;
           this.chatContainer.scrollTop = newScrollTop >= 0 ? newScrollTop : 0;
-                  } else {
+        } else {
           this.chatContainer.scrollTop = currentScrollTop;
-                  }
+        }
 
         if (this.currentMessages.length === 0) {
           this.showEmptyState();
         }
       } else if (messageGroupEl) {
-                this.loadAndDisplayActiveChat();
+        this.loadAndDisplayActiveChat();
       } else {
-              }
+      }
     } catch (error) {
-      
       this.loadAndDisplayActiveChat();
     }
   };
@@ -517,7 +513,7 @@ export class OllamaView extends ItemView {
         this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
       });
     } catch (error) {
-            container.empty();
+      container.empty();
       container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
     } finally {
       requestAnimationFrame(() => {
@@ -533,23 +529,22 @@ export class OllamaView extends ItemView {
     const newRolePath = roleInfo?.path ?? "";
     const roleNameForEvent = roleInfo?.name ?? "None";
 
-    
     if (newRolePath !== currentRolePath) {
       const activeChat = await this.plugin.chatManager?.getActiveChat();
       try {
         if (activeChat) {
-                    await this.plugin.chatManager.updateActiveChatMetadata({
+          await this.plugin.chatManager.updateActiveChatMetadata({
             selectedRolePath: newRolePath,
           });
         } else {
-                    this.plugin.settings.selectedRolePath = newRolePath;
+          this.plugin.settings.selectedRolePath = newRolePath;
           await this.plugin.saveSettings();
 
           this.plugin.emit("role-changed", roleNameForEvent);
           this.plugin.promptService?.clearRoleCache?.();
         }
       } catch (error) {
-                new Notice("Failed to set the role.");
+        new Notice("Failed to set the role.");
       }
     } else {
     }
@@ -712,7 +707,7 @@ export class OllamaView extends ItemView {
       } else {
       }
     } catch (error) {
-            new Notice("Input translation encountered an unexpected error.");
+      new Notice("Input translation encountered an unexpected error.");
     } finally {
       setIcon(this.translateInputButton, "languages");
 
@@ -751,11 +746,11 @@ export class OllamaView extends ItemView {
       chatId = activeChat.metadata.id;
       currentName = activeChat.metadata.name;
     }
-    
+
     this.dropdownMenuManager?.closeMenu();
 
     if (!chatId || currentName === null) {
-            new Notice("Could not initiate rename process.");
+      new Notice("Could not initiate rename process.");
       return;
     }
 
@@ -872,11 +867,11 @@ export class OllamaView extends ItemView {
             if (targetFolder) {
               new Notice(`Created export folder: ${targetFolderPath}`);
             } else {
-                            new Notice(`Error creating export folder. Saving to vault root.`);
+              new Notice(`Error creating export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
             }
           } catch (err) {
-                        new Notice(`Error creating export folder. Saving to vault root.`);
+            new Notice(`Error creating export folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
         } else if (abstractFile instanceof TFolder) {
@@ -890,7 +885,7 @@ export class OllamaView extends ItemView {
       }
 
       if (!targetFolder) {
-                new Notice("Error determining export folder. Cannot save file.");
+        new Notice("Error determining export folder. Cannot save file.");
         return;
       }
 
@@ -903,7 +898,6 @@ export class OllamaView extends ItemView {
       const file = await this.app.vault.create(filePath, markdownContent);
       new Notice(`Chat exported to ${file.path}`);
     } catch (error) {
-      
       if (error instanceof Error && error.message.includes("File already exists")) {
         new Notice("Error exporting chat: File already exists.");
       } else {
@@ -931,8 +925,7 @@ export class OllamaView extends ItemView {
       if (chat && this.currentMessages.length > 0) {
         await this.plugin.chatManager?.addMessageToActiveChat("system", `Model changed to: ${modelName}`, new Date());
       }
-    } catch (error) {
-          }
+    } catch (error) {}
   };
 
   private handleRoleChange = async (roleName: string): Promise<void> => {
@@ -949,7 +942,6 @@ export class OllamaView extends ItemView {
         new Notice(`Role set to: ${displayRole}`);
       }
     } catch (error) {
-      
       new Notice(`Role set to: ${displayRole}`);
     }
   };
@@ -1034,7 +1026,7 @@ export class OllamaView extends ItemView {
         this.chatContainer.appendChild(messageGroupEl);
         this.lastMessageElement = messageGroupEl;
         if (!messageGroupEl.isConnected) {
-                  }
+        }
 
         messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving");
         setTimeout(() => messageGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"), 500);
@@ -1053,7 +1045,7 @@ export class OllamaView extends ItemView {
       } else if (renderer) {
       }
     } catch (error: any) {
-            try {
+      try {
         const errorNotice = `Failed to render message (Role: ${message?.role}). Check console for details.`;
 
         const errorMsgObject: Message = {
@@ -1063,14 +1055,13 @@ export class OllamaView extends ItemView {
         };
         this.handleErrorMessage(errorMsgObject);
       } catch (criticalError) {
-                new Notice("Critical error displaying message. Check console.");
+        new Notice("Critical error displaying message. Check console.");
       }
     }
   }
 
   private handleMessagesCleared = (chatId: string): void => {
     if (chatId === this.plugin.chatManager?.getActiveChatId()) {
-      console.log("[OllamaView] Messages cleared event received.");
       this.clearChatContainerInternal();
       this.currentMessages = [];
       this.showEmptyState();
@@ -1316,7 +1307,7 @@ export class OllamaView extends ItemView {
         messageToDelete.content.length > 100 ? "..." : ""
       }"\n\nThis action cannot be undone.`,
       async () => {
-                try {
+        try {
           const deleteSuccess = await this.plugin.chatManager.deleteMessageByTimestamp(
             activeChat.metadata.id,
             messageToDelete.timestamp
@@ -1326,9 +1317,9 @@ export class OllamaView extends ItemView {
             new Notice("Message deleted.");
           } else {
             new Notice("Failed to delete message.");
-                      }
+          }
         } catch (error) {
-                    new Notice("An error occurred while deleting the message.");
+          new Notice("An error occurred while deleting the message.");
         }
       }
     ).open();
@@ -1389,7 +1380,7 @@ export class OllamaView extends ItemView {
         return;
       }
     } catch (error) {
-            new Notice("Failed to prepare text for translation.");
+      new Notice("Failed to prepare text for translation.");
       return;
     }
 
@@ -1407,7 +1398,6 @@ export class OllamaView extends ItemView {
       const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
 
       if (!contentEl || !contentEl.isConnected) {
-        
         return;
       }
 
@@ -1435,7 +1425,7 @@ export class OllamaView extends ItemView {
         this.guaranteedScrollToBottom(50, false);
       }
     } catch (error) {
-          } finally {
+    } finally {
       if (buttonEl?.isConnected) {
         setIcon(buttonEl, originalIcon);
         buttonEl.disabled = false;
@@ -2074,7 +2064,7 @@ export class OllamaView extends ItemView {
           this.updateTemperatureIndicator(newTemp);
           new Notice(`Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`);
         } catch (error) {
-                    new Notice("Error setting temperature.");
+          new Notice("Error setting temperature.");
         }
       }
     ).open();
@@ -2130,10 +2120,10 @@ export class OllamaView extends ItemView {
         return foundRole.name;
       } else {
         const fileName = rolePath.split("/").pop()?.replace(".md", "");
-                return fileName || "Unknown Role";
+        return fileName || "Unknown Role";
       }
     } catch (error) {
-            return "Error";
+      return "Error";
     }
   }
 
@@ -2178,7 +2168,7 @@ export class OllamaView extends ItemView {
             ? this.formatRelativeDate(lastModifiedDate)
             : "Invalid date";
           if (dateText === "Invalid date") {
-                      }
+          }
           textWrapper.createDiv({ cls: "chat-panel-item-date", text: dateText });
 
           const optionsBtn = chatOptionEl.createEl("button", {
@@ -2204,7 +2194,7 @@ export class OllamaView extends ItemView {
         });
       }
     } catch (error) {
-            container.empty();
+      container.empty();
       container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
     } finally {
       requestAnimationFrame(() => {
@@ -2249,8 +2239,7 @@ export class OllamaView extends ItemView {
         .onClick(() => this.handleContextMenuClear(chatMeta.id, chatMeta.name));
       try {
         (item as any).el.addClass("danger-option");
-      } catch (e) {
-              }
+      } catch (e) {}
     });
 
     menu.addItem(item => {
@@ -2260,8 +2249,7 @@ export class OllamaView extends ItemView {
         .onClick(() => this.handleContextMenuDelete(chatMeta.id, chatMeta.name));
       try {
         (item as any).el.addClass("danger-option");
-      } catch (e) {
-              }
+      } catch (e) {}
     });
 
     menu.showAtMouseEvent(event);
@@ -2276,7 +2264,7 @@ export class OllamaView extends ItemView {
       } else {
       }
     } catch (error) {
-            new Notice("Error cloning chat.");
+      new Notice("Error cloning chat.");
     } finally {
       cloningNotice.hide();
     }
@@ -2309,7 +2297,7 @@ export class OllamaView extends ItemView {
             targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath) as TFolder;
             if (targetFolder) new Notice(`Created export folder: ${targetFolderPath}`);
           } catch (err) {
-                        new Notice(`Error creating export folder. Saving to vault root.`);
+            new Notice(`Error creating export folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
         } else if (abstractFile instanceof TFolder) {
@@ -2336,7 +2324,7 @@ export class OllamaView extends ItemView {
       const file = await this.app.vault.create(filePath, markdownContent);
       new Notice(`Chat exported to ${file.path}`);
     } catch (error) {
-            new Notice("An error occurred during chat export.");
+      new Notice("An error occurred during chat export.");
     } finally {
       exportingNotice.hide();
     }
@@ -2358,7 +2346,7 @@ export class OllamaView extends ItemView {
             new Notice(`Failed to clear messages for chat "${chatName}".`);
           }
         } catch (error) {
-                    new Notice("Error clearing messages.");
+          new Notice("Error clearing messages.");
         } finally {
           clearingNotice.hide();
         }
@@ -2380,7 +2368,7 @@ export class OllamaView extends ItemView {
           } else {
           }
         } catch (error) {
-                    new Notice("Error deleting chat.");
+          new Notice("Error deleting chat.");
         } finally {
           deletingNotice.hide();
         }
@@ -2554,7 +2542,7 @@ export class OllamaView extends ItemView {
         throw new Error("Received empty response from summarization model.");
       }
     } catch (error: any) {
-            let userMessage = "Summarization failed: ";
+      let userMessage = "Summarization failed: ";
       if (error instanceof Error) {
         if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
           userMessage += `Model '${summarizationModel}' not found.`;
@@ -2601,7 +2589,6 @@ export class OllamaView extends ItemView {
       if (contentContainer) {
         contentContainer.empty();
       } else {
-        
         return;
       }
       this.updateErrorGroupTimestamp(groupEl, lastError.timestamp);
@@ -2628,7 +2615,7 @@ export class OllamaView extends ItemView {
         }
       }
     } else {
-          }
+    }
 
     this.guaranteedScrollToBottom(50, true);
   }
@@ -2663,7 +2650,6 @@ export class OllamaView extends ItemView {
       const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`) as HTMLElement;
 
       if (!contentContainer || !contentContainer.isConnected) {
-        
         return;
       }
 
@@ -2672,10 +2658,10 @@ export class OllamaView extends ItemView {
       if (summary) {
         contentContainer.setText(`Multiple errors occurred. Summary:\n${summary}`);
       } else {
-                this.displayErrorListFallback(targetGroupElement, errors);
+        this.displayErrorListFallback(targetGroupElement, errors);
       }
     } catch (error) {
-            this.displayErrorListFallback(targetGroupElement, errors);
+      this.displayErrorListFallback(targetGroupElement, errors);
     } finally {
       this.isSummarizingErrors = false;
     }
@@ -2737,14 +2723,14 @@ export class OllamaView extends ItemView {
     };
 
     try {
-            const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
+      const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && responseData.response) {
         return responseData.response.trim();
       } else {
         return null;
       }
     } catch (error) {
-            return null;
+      return null;
     }
   }
 
@@ -2761,7 +2747,7 @@ export class OllamaView extends ItemView {
     try {
       this.renderOrUpdateErrorGroup(isContinuingError);
     } catch (error) {
-            try {
+      try {
       } catch {}
     }
   }
@@ -2781,7 +2767,7 @@ export class OllamaView extends ItemView {
       activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
         new Notice("Error: No active chat and could not create one.");
-                this.setLoadingState(false);
+        this.setLoadingState(false);
         return;
       }
       new Notice(`Started new chat: ${activeChat.metadata.name}`);
@@ -2883,11 +2869,9 @@ export class OllamaView extends ItemView {
         await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
         try {
           await hmaPromise;
-        } catch (e_hma) {
-                  }
+        } catch (e_hma) {}
       }
     } catch (error: any) {
-      
       if (
         this.activePlaceholder &&
         (this.activePlaceholder.timestamp === llmResponseStartTimeMs ||
@@ -2944,8 +2928,7 @@ export class OllamaView extends ItemView {
       await this.plugin.chatManager.addMessageToActiveChatPayload(errorDisplayMsg, true);
       try {
         await hmaErrorPromise;
-      } catch (e_hma) {
-              }
+      } catch (e_hma) {}
     } finally {
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
@@ -3024,10 +3007,9 @@ export class OllamaView extends ItemView {
     const messageRoleForLog = messageForLog?.role as MessageRole;
     const hmaEntryId = Date.now();
 
-    
     try {
       if (!data || !data.message) {
-                if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
 
@@ -3035,7 +3017,7 @@ export class OllamaView extends ItemView {
       const messageTimestampMs = message.timestamp.getTime();
 
       if (!this.chatContainer || !this.plugin.chatManager) {
-                if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
 
@@ -3072,7 +3054,7 @@ export class OllamaView extends ItemView {
       }
 
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-                const placeholderToUpdate = this.activePlaceholder;
+        const placeholderToUpdate = this.activePlaceholder;
 
         if (
           placeholderToUpdate.groupEl?.isConnected &&
@@ -3088,7 +3070,7 @@ export class OllamaView extends ItemView {
           ) as HTMLElement | null;
 
           if (!messageDomElement) {
-                        if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
+            if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
             this.activePlaceholder = null;
             await this.addMessageStandard(message);
           } else {
@@ -3130,7 +3112,7 @@ export class OllamaView extends ItemView {
 
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
               this.activePlaceholder = null;
-              
+
               setTimeout(() => {
                 if (finalMessageGroupElement && finalMessageGroupElement.isConnected) {
                   this.checkMessageForCollapsing(finalMessageGroupElement);
@@ -3138,7 +3120,7 @@ export class OllamaView extends ItemView {
               }, 70);
               this.guaranteedScrollToBottom(100, true);
             } catch (renderError: any) {
-                            if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
+              if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
               this.activePlaceholder = null;
               this.handleErrorMessage({
                 role: "error",
@@ -3148,14 +3130,14 @@ export class OllamaView extends ItemView {
             }
           }
         } else {
-                    this.activePlaceholder = null;
+          this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
       } else {
-                await this.addMessageStandard(message);
+        await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
-            this.handleErrorMessage({
+      this.handleErrorMessage({
         role: "error",
         content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
         timestamp: new Date(),
@@ -3174,7 +3156,7 @@ export class OllamaView extends ItemView {
     }
 
     if (this.currentAbortController) {
-            new Notice("Previous generation process is still active or finishing. Please wait.", 4000);
+      new Notice("Previous generation process is still active or finishing. Please wait.", 4000);
       return;
     }
 
@@ -3189,7 +3171,7 @@ export class OllamaView extends ItemView {
     );
 
     if (messageIndex === -1) {
-            new Notice("Error: Could not find the message to regenerate from.");
+      new Notice("Error: Could not find the message to regenerate from.");
       return;
     }
 
@@ -3204,7 +3186,7 @@ export class OllamaView extends ItemView {
       async () => {
         this.isRegenerating = true;
         const regenerationRequestTimestamp = new Date().getTime();
-        
+
         this.currentAbortController = new AbortController();
         let accumulatedResponse = "";
         const responseStartTime = new Date();
@@ -3216,18 +3198,17 @@ export class OllamaView extends ItemView {
         let mainAssistantMessageProcessedPromise: Promise<void> | undefined;
 
         try {
-          
           if (hasMessagesAfter) {
             const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
             if (!deleteSuccess) {
-                            throw new Error("Failed to delete subsequent messages for regeneration.");
+              throw new Error("Failed to delete subsequent messages for regeneration.");
             }
           }
 
           await this.loadAndDisplayActiveChat();
           this.guaranteedScrollToBottom(50, true);
 
-                    const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
+          const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
             cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`,
           });
           assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", responseStartTimeMs.toString());
@@ -3252,8 +3233,8 @@ export class OllamaView extends ItemView {
               contentEl: assistantContentEl,
               messageWrapper: messageWrapperEl,
             };
-                      } else {
-                        throw new Error("Failed to create placeholder elements for regeneration.");
+          } else {
+            throw new Error("Failed to create placeholder elements for regeneration.");
           }
           assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
           setTimeout(() => assistantPlaceholderGroupEl?.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
@@ -3261,10 +3242,9 @@ export class OllamaView extends ItemView {
 
           const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
           if (!chatForStreaming) {
-                        throw new Error("Failed to get updated chat context for streaming regeneration.");
+            throw new Error("Failed to get updated chat context for streaming regeneration.");
           }
 
-          
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             chatForStreaming,
             this.currentAbortController.signal
@@ -3273,13 +3253,13 @@ export class OllamaView extends ItemView {
           let firstChunk = true;
           for await (const chunk of stream) {
             if (this.currentAbortController.signal.aborted) {
-                            throw new Error("aborted by user");
+              throw new Error("aborted by user");
             }
             if ("error" in chunk && chunk.error) {
               if (!chunk.error.includes("aborted by user")) {
-                                throw new Error(chunk.error);
+                throw new Error(chunk.error);
               } else {
-                                throw new Error("aborted by user");
+                throw new Error("aborted by user");
               }
             }
             if ("response" in chunk && chunk.response) {
@@ -3299,24 +3279,21 @@ export class OllamaView extends ItemView {
                 );
                 this.guaranteedScrollToBottom(50, true);
               } else {
-                                accumulatedResponse += chunk.response;
+                accumulatedResponse += chunk.response;
               }
             }
             if ("done" in chunk && chunk.done) {
-                            break;
+              break;
             }
           }
 
-          
           if (accumulatedResponse.trim()) {
-            
             mainAssistantMessageProcessedPromise = new Promise<void>(resolve => {
               this.messageAddedResolvers.set(responseStartTimeMs, resolve);
-                          });
+            });
 
             this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
 
-            
             const timeoutDuration = 10000;
             const timeoutPromise = new Promise<void>((_, reject) =>
               setTimeout(
@@ -3329,22 +3306,22 @@ export class OllamaView extends ItemView {
             );
             try {
               await Promise.race([mainAssistantMessageProcessedPromise, timeoutPromise]);
-                          } catch (awaitPromiseError: any) {
-                            streamErrorOccurred = streamErrorOccurred || awaitPromiseError;
+            } catch (awaitPromiseError: any) {
+              streamErrorOccurred = streamErrorOccurred || awaitPromiseError;
               if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-                                this.messageAddedResolvers.delete(responseStartTimeMs);
+                this.messageAddedResolvers.delete(responseStartTimeMs);
               }
             }
           } else if (!this.currentAbortController.signal.aborted) {
-                        if (
+            if (
               this.activePlaceholder?.timestamp === responseStartTimeMs &&
               this.activePlaceholder.groupEl?.isConnected
             ) {
-                            this.activePlaceholder.groupEl.remove();
+              this.activePlaceholder.groupEl.remove();
             }
             if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
               this.activePlaceholder = null;
-                          }
+            }
             this.plugin.chatManager.addMessageToActiveChat(
               "system",
               "Assistant provided an empty response during regeneration.",
@@ -3432,7 +3409,7 @@ export class OllamaView extends ItemView {
   };
 
   async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
-        let metadataUpdated = false;
+    let metadataUpdated = false;
 
     try {
       this.clearChatContainerInternal();
@@ -3459,7 +3436,7 @@ export class OllamaView extends ItemView {
             : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
-                new Notice("Error connecting to Ollama or loading chat data.", 5000);
+        new Notice("Error connecting to Ollama or loading chat data.", 5000);
         errorOccurredLoadingData = true;
 
         availableModels = availableModels || [];
@@ -3479,13 +3456,13 @@ export class OllamaView extends ItemView {
             finalModelName = preferredModel;
           } else {
             finalModelName = availableModels[0];
-                      }
+          }
         } else {
           finalModelName = null;
-                  }
+        }
 
         if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-                    try {
+          try {
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
               metadataUpdated = true;
@@ -3494,8 +3471,7 @@ export class OllamaView extends ItemView {
               if (potentiallyUpdatedChat) activeChat = potentiallyUpdatedChat;
             } else {
             }
-          } catch (updateError) {
-                      }
+          } catch (updateError) {}
         }
         finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
       } else if (!errorOccurredLoadingData && !activeChat) {
@@ -3575,7 +3551,7 @@ export class OllamaView extends ItemView {
               messageGroupEl = result instanceof Promise ? await result : result;
             }
           } catch (renderError) {
-                        const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" });
+            const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" });
             errorDiv.setText(`Error rendering message (role: ${message.role})`);
             messageGroupEl = errorDiv;
           }
@@ -3622,7 +3598,7 @@ export class OllamaView extends ItemView {
         this.updateSendButtonState();
       }
     } catch (error) {
-            this.clearChatContainerInternal();
+      this.clearChatContainerInternal();
       this.showEmptyState();
       if (this.chatContainer) {
         this.chatContainer.createDiv({
@@ -3638,9 +3614,8 @@ export class OllamaView extends ItemView {
   }
 
   private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
-    
     if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
-            this.lastProcessedChatId = data.chatId;
+      this.lastProcessedChatId = data.chatId;
       return;
     }
 
@@ -3648,12 +3623,12 @@ export class OllamaView extends ItemView {
     let metadataWasUpdatedByLoad = false;
 
     if (chatSwitched || (data.chatId !== null && data.chat === null)) {
-            this.lastProcessedChatId = data.chatId;
+      this.lastProcessedChatId = data.chatId;
 
       const result = await this.loadAndDisplayActiveChat();
       metadataWasUpdatedByLoad = result.metadataUpdated;
     } else if (data.chatId !== null && data.chat !== null) {
-            this.lastProcessedChatId = data.chatId;
+      this.lastProcessedChatId = data.chatId;
       const chat = data.chat;
 
       const currentRolePath = chat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
@@ -3669,14 +3644,13 @@ export class OllamaView extends ItemView {
       this.lastProcessedChatId = null;
       this.clearDisplayAndState();
     } else {
-            this.lastProcessedChatId = data.chatId;
+      this.lastProcessedChatId = data.chatId;
     }
 
     if (!metadataWasUpdatedByLoad) {
-
       this.scheduleSidebarChatListUpdate();
     } else {
-          }
+    }
 
     if (this.sidebarManager?.isSectionVisible("roles")) {
       this.sidebarManager
@@ -3689,8 +3663,7 @@ export class OllamaView extends ItemView {
         .updateRoleListIfVisible()
         .catch(e => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
     }
-
-      };
+  };
 
   private _managePlaceholder(turnTimestamp: number, requestTimestampId: number): void {
     if (this.activePlaceholder && this.activePlaceholder.timestamp !== turnTimestamp) {
@@ -3754,7 +3727,7 @@ export class OllamaView extends ItemView {
         throw new Error("aborted by user");
       }
       if (chunk.type === "error") {
-                throw new Error(chunk.error);
+        throw new Error(chunk.error);
       }
 
       if (this.activePlaceholder?.timestamp !== currentTurnLlmResponseTs) {
@@ -3811,7 +3784,7 @@ export class OllamaView extends ItemView {
       }
     }
 
-        return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
+    return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
 
   private _determineToolCalls(
@@ -3870,10 +3843,6 @@ export class OllamaView extends ItemView {
     requestTimestampId: number
   ): Promise<void> {
     const currentViewInstance = this;
-    currentViewInstance.plugin.logger.info(
-      `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Executing ${toolsToExecute.length} tools.`
-    );
-
     const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
     const assistantHmaPromise = new Promise<void>((resolve, reject) => {
       currentViewInstance.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
@@ -3888,14 +3857,7 @@ export class OllamaView extends ItemView {
     });
     await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
     await assistantHmaPromise;
-    currentViewInstance.plugin.logger.info(
-      `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Assistant message with tool intent (ts: ${assistantMsgTsMs}) processed by HMA.`
-    );
-
     if (currentViewInstance.activePlaceholder?.timestamp === assistantMsgTsMs) {
-      currentViewInstance.plugin.logger.debug(
-        `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Clearing activePlaceholder (ts: ${assistantMsgTsMs}) as HMA processed the assistant message.`
-      );
       currentViewInstance.activePlaceholder = null;
     }
 
@@ -3908,10 +3870,6 @@ export class OllamaView extends ItemView {
           toolArgs = JSON.parse(call.function.arguments || "{}");
         } catch (e: any) {
           const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
-          currentViewInstance.plugin.logger.error(
-            `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] ${errorContent}`,
-            e
-          );
           const errorToolTimestamp = new Date();
           const errorToolMsg: Message = {
             role: "tool",
@@ -3982,14 +3940,8 @@ export class OllamaView extends ItemView {
         });
         await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
         await toolResultHmaPromise;
-        currentViewInstance.plugin.logger.info(
-          `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Tool result for ${toolName} (ts: ${toolResponseMsg.timestamp.getTime()}) processed by HMA.`
-        );
-      }
+     }
     }
-    currentViewInstance.plugin.logger.info(
-      `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Finished executing all tools for this turn.`
-    );
   }
 
   private async _renderFinalAssistantText(
@@ -4008,10 +3960,6 @@ export class OllamaView extends ItemView {
         content: finalContent,
         timestamp: new Date(responseTimestampMs),
       };
-      currentViewInstance.plugin.logger.debug(
-        `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Adding final assistant message to ChatManager (ts: ${responseTimestampMs}).`
-      );
-
       const hmaPromise = new Promise<void>((resolve, reject) => {
         currentViewInstance.plugin.chatManager.registerHMAResolver(responseTimestampMs, resolve, reject);
         setTimeout(() => {
@@ -4025,9 +3973,6 @@ export class OllamaView extends ItemView {
       });
       await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(finalAssistantMsg, true);
       await hmaPromise;
-      currentViewInstance.plugin.logger.info(
-        `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Final assistant message (ts: ${responseTimestampMs}) processed by HMA.`
-      );
     } else if (!currentViewInstance.currentAbortController?.signal.aborted) {
       const emptyResponseMsgTimestamp = new Date();
       const emptyResponseMsg: Message = {
@@ -4054,17 +3999,10 @@ export class OllamaView extends ItemView {
       try {
         await hmaPromise;
       } catch (e_hma) {
-        currentViewInstance.plugin.logger.error(
-          `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] HMA error/timeout for empty response system message`,
-          e_hma
-        );
-      }
+     }
     }
 
     if (currentViewInstance.activePlaceholder?.timestamp === responseTimestampMs) {
-      currentViewInstance.plugin.logger.debug(
-        `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Clearing activePlaceholder (ts: ${responseTimestampMs}) after final assistant message/empty response.`
-      );
       currentViewInstance.activePlaceholder = null;
     }
   }

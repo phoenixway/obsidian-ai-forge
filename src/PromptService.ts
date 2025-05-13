@@ -119,10 +119,7 @@ export class PromptService {
             roleDefinition = await this.getRoleDefinition(selectedRolePath);
       if (roleDefinition?.systemPrompt) {
               } else {
-        this.plugin.logger.debug(
-          `[PromptService] Role loaded but no system prompt found in role file, or role not followed.`
-        );
-      }
+              }
     } else {
           }
 
@@ -203,10 +200,7 @@ General Rules for BOTH Context Sections:
 
       if (combinedBasePrompt.length === 0) {
         combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
-        this.plugin.logger.debug(
-          "[PromptService] No RAG/Role prompt, using default assistant prompt + tool instructions."
-        );
-      } else {
+              } else {
         combinedBasePrompt += toolUsageInstructions;
               }
     } else if (combinedBasePrompt.length === 0) {
@@ -226,12 +220,7 @@ General Rules for BOTH Context Sections:
     }
 
     const finalTrimmedPrompt = combinedBasePrompt.trim();
-    this.plugin.logger.debug(
-      `[PromptService] Final system prompt length: ${
-        finalTrimmedPrompt.length
-      }. Content preview: "${finalTrimmedPrompt.substring(0, 100)}..."`
-    );
-
+    
     return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
 
@@ -257,10 +246,7 @@ General Rules for BOTH Context Sections:
         taskContext += `Urgent: ${taskState.urgent.join(", ") || "None"}\n`;
         taskContext += `Other: ${taskState.regular.join(", ") || "None"}\n`;
         taskContext += "--- End Tasks Context ---";
-        this.plugin.logger.debug(
-          `[PromptService] Injecting task context (Urgent: ${taskState.urgent.length}, Regular: ${taskState.regular.length})`
-        );
-      } else {
+              } else {
       }
     }
 

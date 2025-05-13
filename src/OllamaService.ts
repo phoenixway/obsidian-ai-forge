@@ -1,9 +1,6 @@
 import OllamaPlugin from "./main";
 
 import {
-  OllamaGenerateChunk,
-  OllamaErrorChunk,
-  Message,
   OllamaEmbeddingsResponse,
   OllamaGenerateResponse,
   OllamaShowResponse,
@@ -12,7 +9,7 @@ import {
 } from "./types";
 
 import { PromptService } from "./PromptService";
-import { Chat, ChatMetadata } from "./Chat";
+import { Chat } from "./Chat";
 import { IToolFunction } from "./agents/IAgent";
 import { Logger } from "./Logger";
 
@@ -50,7 +47,7 @@ export class OllamaService {
     if (!plugin.promptService) {
       const errorMsg =
         "[OllamaService] CRITICAL: PromptService not available on plugin instance during OllamaService construction!";
-            throw new Error(errorMsg);
+      throw new Error(errorMsg);
     }
     this.promptService = plugin.promptService;
     this.logger = plugin.logger;
@@ -71,8 +68,7 @@ export class OllamaService {
       h.slice().forEach(handler => {
         try {
           handler(data);
-        } catch (e) {
-                  }
+        } catch (e) {}
       });
   }
 
@@ -84,15 +80,12 @@ export class OllamaService {
    */
   async *generateChatResponseStream(chat: Chat, signal?: AbortSignal): AsyncIterableIterator<StreamChunk> {
     const requestTimestampId = Date.now();
-    this.logger.debug(
-      `[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`
-    );
     if (!chat) {
-            yield { type: "error", error: "Chat object is null.", done: true };
+      yield { type: "error", error: "Chat object is null.", done: true };
       return;
     }
     if (!this.promptService) {
-            yield { type: "error", error: "Prompt service is unavailable.", done: true };
+      yield { type: "error", error: "Prompt service is unavailable.", done: true };
       return;
     }
 
@@ -101,7 +94,7 @@ export class OllamaService {
     const temperature = chat.metadata.temperature ?? currentSettings.temperature;
 
     if (!modelName) {
-            yield { type: "error", error: "No Ollama model selected.", done: true };
+      yield { type: "error", error: "No Ollama model selected.", done: true };
       return;
     }
 
@@ -114,7 +107,7 @@ export class OllamaService {
       const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
 
       if (promptBody === null || promptBody === undefined) {
-                yield { type: "error", error: "Could not generate prompt body.", done: true };
+        yield { type: "error", error: "Could not generate prompt body.", done: true };
         return;
       }
 
@@ -139,18 +132,10 @@ export class OllamaService {
 
           if (seemsToSupportTools) {
             requestBody.tools = agentTools.map(tool => ({ type: "function", function: tool }));
-                      } else {
-                      }
+          } else {
+          }
         }
       }
-
-      
-      this.logger.debug(
-        `[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${
-          promptBody.length
-        }. System part length: ${systemPrompt?.length || 0}`
-      );
-      this.logger.trace(`[OllamaService][id:${requestTimestampId}] Request body:`, requestBody);
 
       const response = await fetch(url, {
         method: "POST",
@@ -167,13 +152,13 @@ export class OllamaService {
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
-                this.emit("connection-error", new Error(errorText));
+        this.emit("connection-error", new Error(errorText));
         yield { type: "error", error: errorText, done: true };
         return;
       }
 
       if (!response.body) {
-                yield { type: "error", error: "Response body is null.", done: true };
+        yield { type: "error", error: "Response body is null.", done: true };
         return;
       }
 
@@ -185,7 +170,7 @@ export class OllamaService {
         const { done, value } = await reader.read();
 
         if (signal?.aborted) {
-                    reader.cancel("Aborted by user");
+          reader.cancel("Aborted by user");
           yield { type: "error", error: "Generation aborted by user.", done: true };
           return;
         }
@@ -194,17 +179,6 @@ export class OllamaService {
         rawResponseAccumulator += decodedChunk;
 
         if (done) {
-                    this.logger.debug(
-            `[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`
-          );
-
-          this.logger.debug(
-            `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) START ===`
-          );
-          this.logger.debug(rawResponseAccumulator);
-          this.logger.debug(
-            `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService) END === Length: ${rawResponseAccumulator.length}`
-          );
           buffer += decodedChunk;
 
           if (buffer.trim()) {
@@ -230,8 +204,7 @@ export class OllamaService {
               } else if (jsonChunk.error) {
                 yield { type: "error", error: jsonChunk.error, done: true };
               }
-            } catch (e: any) {
-                          }
+            } catch (e: any) {}
           }
           break;
         }
@@ -247,15 +220,15 @@ export class OllamaService {
 
           try {
             const jsonChunk = JSON.parse(line);
-            
+
             if (jsonChunk.error) {
-                            yield { type: "error", error: jsonChunk.error, done: true };
+              yield { type: "error", error: jsonChunk.error, done: true };
               reader.cancel("Error received from Ollama stream");
               return;
             }
 
             if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
-                                          yield {
+              yield {
                 type: "tool_calls",
                 calls: jsonChunk.message.tool_calls,
                 assistant_message_with_calls: jsonChunk.message as AssistantMessage,
@@ -264,7 +237,7 @@ export class OllamaService {
               };
 
               if (jsonChunk.done === true) {
-                                yield {
+                yield {
                   type: "done",
                   model: jsonChunk.model,
                   created_at: jsonChunk.created_at,
@@ -276,18 +249,11 @@ export class OllamaService {
                   eval_count: jsonChunk.eval_count,
                   eval_duration: jsonChunk.eval_duration,
                 };
-                this.logger.debug(
-                  `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) START ===`
-                );
-                this.logger.debug(rawResponseAccumulator);
-                this.logger.debug(
-                  `[OllamaService][id:${requestTimestampId}] === RAW FULL STREAM RESPONSE (from OllamaService after final done) END === Length: ${rawResponseAccumulator.length}`
-                );
 
                 return;
               }
             } else if (typeof jsonChunk.response === "string") {
-                                                                                    yield {
+              yield {
                 type: "content",
                 response: jsonChunk.response,
                 done: jsonChunk.done || false,
@@ -295,9 +261,9 @@ export class OllamaService {
                 created_at: jsonChunk.created_at,
               };
               if (jsonChunk.done === true) {
-                                              }
+              }
             } else if (jsonChunk.done === true) {
-                                          yield {
+              yield {
                 type: "done",
                 model: jsonChunk.model,
                 created_at: jsonChunk.created_at,
@@ -316,13 +282,12 @@ export class OllamaService {
               !jsonChunk.message.tool_calls
             ) {
             }
-          } catch (e: any) {
-                      }
+          } catch (e: any) {}
         }
       }
     } catch (error: any) {
       if (error.name === "AbortError") {
-                yield { type: "error", error: "Generation aborted by user.", done: true };
+        yield { type: "error", error: "Generation aborted by user.", done: true };
       } else {
         let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
         if (
@@ -334,15 +299,15 @@ export class OllamaService {
           errorMessage = `Connection Error: Failed to reach Ollama at ${this.plugin.settings.ollamaServerUrl}. Is it running?`;
           this.emit("connection-error", new Error(errorMessage));
         }
-                yield { type: "error", error: errorMessage, done: true };
+        yield { type: "error", error: errorMessage, done: true };
       }
     } finally {
-          }
+    }
   }
 
   async generateRaw(requestBody: any): Promise<OllamaGenerateResponse> {
     if (!requestBody.model || !requestBody.prompt) {
-            throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
+      throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
     }
     requestBody.stream = false;
     if (!requestBody.system) {
@@ -366,17 +331,17 @@ export class OllamaService {
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
-                this.emit("connection-error", new Error(errorText));
+        this.emit("connection-error", new Error(errorText));
         throw new Error(errorText);
       }
       if (!response.body) {
-                throw new Error("Response body is null (generateRaw)");
+        throw new Error("Response body is null (generateRaw)");
       }
       return (await response.json()) as OllamaGenerateResponse;
     } catch (error: any) {
       const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: /api/generate, non-streamed)`;
       if (!error.message?.includes("Ollama API error")) {
-                this.emit("connection-error", new Error(connectionErrorMsg));
+        this.emit("connection-error", new Error(connectionErrorMsg));
       }
       throw new Error(error.message || connectionErrorMsg);
     }
@@ -403,21 +368,21 @@ export class OllamaService {
               const errJson = await response.json();
               errorText += `: ${errJson?.error || "Details unavailable"}`;
             } catch {}
-            
+
             continue;
           }
           const embeddingResponse = (await response.json()) as OllamaEmbeddingsResponse;
           if (embeddingResponse && embeddingResponse.embedding) {
             embeddingsList.push(embeddingResponse.embedding);
           } else {
-                      }
+          }
         } catch (singleError: any) {
-                    this.emit("connection-error", new Error(singleError.message || "Embedding generation failed for a prompt"));
+          this.emit("connection-error", new Error(singleError.message || "Embedding generation failed for a prompt"));
         }
       }
       return embeddingsList.length > 0 ? embeddingsList : null;
     } catch (error: any) {
-            return null;
+      return null;
     }
   }
 
@@ -434,7 +399,7 @@ export class OllamaService {
           const errJson = await response.json();
           errorText += `: ${errJson?.error || "Details unavailable"}`;
         } catch {}
-                this.emit("connection-error", new Error(errorText));
+        this.emit("connection-error", new Error(errorText));
 
         return [];
       }
@@ -447,11 +412,11 @@ export class OllamaService {
           .filter((name): name is string => typeof name === "string" && name.length > 0)
           .sort();
       } else {
-              }
+      }
     } catch (e: any) {
       const connectionErrorMsg = `Failed to connect or fetch models from Ollama server at ${this.plugin.settings.ollamaServerUrl}. (Endpoint: /api/tags)`;
       if (!e.message?.includes("API error")) {
-                this.emit("connection-error", new Error(e.message || connectionErrorMsg));
+        this.emit("connection-error", new Error(e.message || connectionErrorMsg));
       }
 
       return [];
@@ -471,7 +436,7 @@ export class OllamaService {
           const errJson = await response.json();
           errorText += `: ${errJson?.error || "Details unavailable"}`;
         } catch {}
-                if (response.status !== 404) {
+        if (response.status !== 404) {
           this.emit("connection-error", new Error(errorText));
         }
         return null;
@@ -481,7 +446,7 @@ export class OllamaService {
     } catch (e: any) {
       const connectionErrorMsg = `Failed to connect or get details for model ${modelName} from Ollama server at ${this.plugin.settings.ollamaServerUrl}. (Endpoint: /api/show)`;
       if (!e.message?.includes("API error")) {
-                this.emit("connection-error", new Error(e.message || connectionErrorMsg));
+        this.emit("connection-error", new Error(e.message || connectionErrorMsg));
       }
       return null;
     }
