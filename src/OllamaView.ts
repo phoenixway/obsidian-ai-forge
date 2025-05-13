@@ -4489,6 +4489,7 @@ export class OllamaView extends ItemView {
         break;
       }
     }
+    this.plugin.logger.error(`${accumulatedContent} accumulated from LLM stream.`);
     return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
 

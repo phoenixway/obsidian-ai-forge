@@ -7505,6 +7505,7 @@ Summary:`;
         break;
       }
     }
+    this.plugin.logger.error(`${accumulatedContent} accumulated from LLM stream.`);
     return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
   _determineToolCalls(nativeToolCalls, assistantMessageWithNativeCalls, accumulatedLlmContent, currentTurnLlmResponseTs, requestTimestampId) {
