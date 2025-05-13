@@ -23,7 +23,7 @@
 .message-group {
   display: flex;
   width: 100%; // Takes width of the centered container now
-  margin-bottom: calc(var(--chat-spacing-unit) * 10) !important; // Vertical space between groups
+  margin-bottom: calc(var(--chat-spacing-unit) * 10); // Vertical space between groups
   position: relative; // Context for potential absolute elements if ever needed
   box-sizing: border-box;
 
