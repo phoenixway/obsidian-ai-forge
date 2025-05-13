@@ -116,18 +116,15 @@ export class PromptService {
 
     let roleDefinition: RoleDefinition | null = null;
     if (selectedRolePath && settings.followRole) {
-      this.plugin.logger.debug(`[PromptService] Attempting to load role from: ${selectedRolePath}`);
-      roleDefinition = await this.getRoleDefinition(selectedRolePath);
+            roleDefinition = await this.getRoleDefinition(selectedRolePath);
       if (roleDefinition?.systemPrompt) {
-        this.plugin.logger.debug(`[PromptService] Role loaded. Prompt length: ${roleDefinition.systemPrompt.length}`);
-      } else {
+              } else {
         this.plugin.logger.debug(
           `[PromptService] Role loaded but no system prompt found in role file, or role not followed.`
         );
       }
     } else {
-      this.plugin.logger.debug(`[PromptService] No role selected or settings.followRole is false.`);
-    }
+          }
 
     const roleSystemPrompt = roleDefinition?.systemPrompt || null;
     const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
@@ -157,13 +154,11 @@ General Rules for BOTH Context Sections:
     let systemPromptParts: string[] = [];
 
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-      this.plugin.logger.debug("[PromptService] RAG is enabled, adding RAG instructions.");
-      systemPromptParts.push(ragInstructions);
+            systemPromptParts.push(ragInstructions);
     }
 
     if (roleSystemPrompt) {
-      this.plugin.logger.debug("[PromptService] Role system prompt exists, adding it.");
-      systemPromptParts.push(roleSystemPrompt.trim());
+            systemPromptParts.push(roleSystemPrompt.trim());
     }
 
     let combinedBasePrompt = systemPromptParts.join("\n\n").trim();
@@ -213,14 +208,12 @@ General Rules for BOTH Context Sections:
         );
       } else {
         combinedBasePrompt += toolUsageInstructions;
-        this.plugin.logger.debug("[PromptService] Appended tool instructions to existing RAG/Role prompt.");
-      }
+              }
     } else if (combinedBasePrompt.length === 0) {
     }
 
     if (isProductivityActive && combinedBasePrompt && settings.enableProductivityFeatures) {
-      this.plugin.logger.debug("[PromptService] Productivity features active, injecting date/time.");
-      const now = new Date();
+            const now = new Date();
       const formattedDate = now.toLocaleDateString(undefined, {
         weekday: "long",
         year: "numeric",

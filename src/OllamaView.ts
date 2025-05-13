@@ -1,4 +1,3 @@
-
 import {
   ItemView,
   WorkspaceLeaf,
@@ -55,8 +54,6 @@ const CSS_CLASS_VISIBLE = "visible";
 const CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
 const CSS_CLASS_MENU_OPTION = "menu-option";
 
-
-
 const CSS_ROLE_PANEL_ITEM = "ollama-role-panel-item";
 const CSS_ROLE_PANEL_ITEM_ICON = "ollama-role-panel-item-icon";
 const CSS_ROLE_PANEL_ITEM_TEXT = "ollama-role-panel-item-text";
@@ -67,9 +64,8 @@ const CSS_SIDEBAR_SECTION_ICON = "ollama-sidebar-section-icon";
 const CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 const CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
 
-const CSS_CLASS_RESIZER_HANDLE = "ollama-resizer-handle"; 
-const CSS_CLASS_RESIZING = "is-resizing"; 
-
+const CSS_CLASS_RESIZER_HANDLE = "ollama-resizer-handle";
+const CSS_CLASS_RESIZING = "is-resizing";
 
 export type MessageRole = "user" | "assistant" | "system" | "error" | "tool";
 
@@ -126,7 +122,7 @@ export class OllamaView extends ItemView {
   private errorGroupElement: HTMLElement | null = null;
   private isSummarizingErrors = false;
 
-  private isRegenerating: boolean = false; 
+  private isRegenerating: boolean = false;
   private messageAddedResolvers: Map<number, () => void> = new Map();
 
   private isChatListUpdateScheduled = false;
@@ -139,16 +135,14 @@ export class OllamaView extends ItemView {
     messageWrapper: HTMLElement;
   } | null = null;
 
-  
-  private sidebarRootEl!: HTMLElement; 
-  private resizerEl!: HTMLElement; 
+  private sidebarRootEl!: HTMLElement;
+  private resizerEl!: HTMLElement;
   private isResizing = false;
   private initialMouseX = 0;
   private initialSidebarWidth = 0;
-  private boundOnDragMove: (event: MouseEvent) => void; 
-  private boundOnDragEnd: (event: MouseEvent) => void; 
-  private saveWidthDebounced: () => void; 
-  
+  private boundOnDragMove: (event: MouseEvent) => void;
+  private boundOnDragEnd: (event: MouseEvent) => void;
+  private saveWidthDebounced: () => void;
 
   constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
@@ -169,14 +163,14 @@ export class OllamaView extends ItemView {
     this.saveWidthDebounced = debounce(() => {
       if (this.sidebarRootEl) {
         const newWidth = this.sidebarRootEl.offsetWidth;
-        
+
         if (newWidth > 0 && newWidth !== this.plugin.settings.sidebarWidth) {
           this.plugin.settings.sidebarWidth = newWidth;
-          
+
           this.plugin.saveSettings();
         }
       }
-    }, 800); 
+    }, 800);
   }
 
   getViewType(): string {
@@ -189,24 +183,16 @@ export class OllamaView extends ItemView {
     return "brain-circuit";
   }
 
-  
-
   async onOpen(): Promise<void> {
-    
-
-    
     this.createUIElements();
 
-    
     const savedWidth = this.plugin.settings.sidebarWidth;
     if (this.sidebarRootEl && savedWidth && typeof savedWidth === "number" && savedWidth > 50) {
       this.sidebarRootEl.style.width = `${savedWidth}px`;
       this.sidebarRootEl.style.minWidth = `${savedWidth}px`;
     } else if (this.sidebarRootEl) {
-      
-      let defaultWidth = 250; 
+      let defaultWidth = 250;
       try {
-        
         const cssVarWidth = getComputedStyle(this.sidebarRootEl).getPropertyValue("--ai-forge-sidebar-width").trim();
         if (cssVarWidth && cssVarWidth.endsWith("px")) {
           const parsedWidth = parseInt(cssVarWidth, 10);
@@ -220,19 +206,13 @@ export class OllamaView extends ItemView {
       if (!savedWidth) {
       }
     }
-    
 
-    
-    
-    
     try {
-      
       const initialRolePath = this.plugin.settings.selectedRolePath;
-      const initialRoleName = await this.findRoleNameByPath(initialRolePath); 
+      const initialRoleName = await this.findRoleNameByPath(initialRolePath);
       const initialModelName = this.plugin.settings.modelName;
       const initialTemperature = this.plugin.settings.temperature;
 
-      
       this.updateInputPlaceholder(initialRoleName);
       this.updateRoleDisplay(initialRoleName);
       this.updateModelDisplay(initialModelName);
@@ -241,41 +221,23 @@ export class OllamaView extends ItemView {
       this.plugin.logger.error("[OllamaView] Error during initial UI element update in onOpen:", error);
     }
 
-    
-    this.attachEventListeners(); 
+    this.attachEventListeners();
 
-    
-    this.autoResizeTextarea(); 
-    this.updateSendButtonState(); 
+    this.autoResizeTextarea();
+    this.updateSendButtonState();
 
-    
     try {
-      
-      
-      
       await this.loadAndDisplayActiveChat();
 
-      
-      
-      
-      
-      
-      
-      
       this.plugin.logger.debug(
         "[OllamaView] onOpen: Skipping explicit sidebar panel update. Relying on event handlers and scheduler."
       );
     } catch (error) {
-      
       this.plugin.logger.error("[OllamaView] Error during initial chat load or processing in onOpen:", error);
-      this.showEmptyState(); 
-      
-      
+      this.showEmptyState();
     }
 
-    
     setTimeout(() => {
-      
       if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
         this.inputEl.focus();
       } else {
@@ -283,59 +245,51 @@ export class OllamaView extends ItemView {
           "[OllamaView] Input focus skipped in onOpen timeout (view not active/visible or input missing)."
         );
       }
-    }, 150); 
+    }, 150);
 
-    
     if (this.inputEl) {
       this.inputEl.dispatchEvent(new Event("input"));
     }
-  } 
+  }
 
   async onClose(): Promise<void> {
-    
     document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });
     document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
-    
+
     if (document.body.classList.contains(CSS_CLASS_RESIZING)) {
-      document.body.style.cursor = ""; 
+      document.body.style.cursor = "";
       document.body.classList.remove(CSS_CLASS_RESIZING);
     }
-    this.isResizing = false; 
-    
+    this.isResizing = false;
 
-    
     if (this.speechWorker) {
       this.speechWorker.terminate();
       this.speechWorker = null;
     }
-    this.stopVoiceRecording(false); 
+    this.stopVoiceRecording(false);
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(t => t.stop());
       this.audioStream = null;
     }
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
     if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-    this.sidebarManager?.destroy(); 
-    this.dropdownMenuManager?.destroy(); 
+    this.sidebarManager?.destroy();
+    this.dropdownMenuManager?.destroy();
   }
 
   private createUIElements(): void {
-    this.contentEl.empty(); 
-    
-    const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" }); 
+    this.contentEl.empty();
 
-    
+    const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" });
+
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
     const isDesktop = Platform.isDesktop;
 
-    
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
-    this.sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer); 
+    this.sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
 
-    
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (this.sidebarRootEl) {
-      
       this.sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
       this.plugin.logger.debug(
         `[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${
@@ -345,19 +299,15 @@ export class OllamaView extends ItemView {
     } else {
     }
 
-    
     this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
     this.resizerEl.title = "Drag to resize sidebar";
-    
-    this.resizerEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-    
 
-    
-    this.mainChatAreaEl = flexContainer.createDiv({ cls: "ollama-main-chat-area" }); 
-    
+    this.resizerEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
+
+    this.mainChatAreaEl = flexContainer.createDiv({ cls: "ollama-main-chat-area" });
+
     this.mainChatAreaEl.classList.toggle("full-width", !shouldShowInternalSidebar);
 
-    
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: "ollama-chat-container" });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: "new-message-indicator" });
@@ -393,7 +343,7 @@ export class OllamaView extends ItemView {
     this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
       cls: ["stop-generating-button", "danger-option"],
       attr: { "aria-label": "Stop Generation", title: "Stop Generation" },
-    }); 
+    });
     setIcon(this.stopGeneratingButton, "square");
     this.stopGeneratingButton.hide();
     this.sendButton = this.buttonsContainer.createEl("button", { cls: "send-button", attr: { "aria-label": "Send" } });
@@ -409,7 +359,7 @@ export class OllamaView extends ItemView {
     });
     this.menuButton = this.buttonsContainer.createEl("button", { cls: "menu-button", attr: { "aria-label": "Menu" } });
     setIcon(this.menuButton, "more-vertical");
-    this.updateToggleLocationButton(); 
+    this.updateToggleLocationButton();
     this.dropdownMenuManager = new DropdownMenuManager(
       this.plugin,
       this.app,
@@ -422,16 +372,12 @@ export class OllamaView extends ItemView {
   }
 
   private attachEventListeners(): void {
-    
     if (this.resizerEl) {
-      
       this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
     } else {
       this.plugin.logger.error("Resizer element (resizerEl) not found during listener attachment!");
     }
-    
 
-    
     if (this.inputEl) {
       this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
       this.registerDomEvent(this.inputEl, "input", this.handleInputForResize);
@@ -486,23 +432,14 @@ export class OllamaView extends ItemView {
     this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
     this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
     this.register(this.plugin.on("message-deleted", data => this.handleMessageDeleted(data)));
-    this.register(
-      this.plugin.on("ollama-connection-error", () => {
-        
-      })
-    );
+    this.register(this.plugin.on("ollama-connection-error", () => {}));
   }
 
   private cancelGeneration = (): void => {
     if (this.currentAbortController) {
-      this.currentAbortController.abort(); 
-      
-
-      
-      
+      this.currentAbortController.abort();
     } else {
     }
-    
   };
 
   private handleMessageDeleted = (data: { chatId: string; timestamp: Date }): void => {
@@ -1112,7 +1049,7 @@ export class OllamaView extends ItemView {
         | SystemMessageRenderer
         | AssistantMessageRenderer
         | ToolMessageRenderer
-        | ErrorMessageRenderer 
+        | ErrorMessageRenderer
         | null = null;
 
       switch (message.role) {
@@ -1120,9 +1057,6 @@ export class OllamaView extends ItemView {
           renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
           break;
         case "assistant":
-          
-          
-          
           renderer = new AssistantMessageRenderer(this.app, this.plugin, message as AssistantMessage, this);
           break;
         case "system":
@@ -1137,9 +1071,6 @@ export class OllamaView extends ItemView {
           break;
 
         default:
-          
-          
-
           const unknownRoleGroup = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
           if (unknownRoleGroup && this.chatContainer) {
             RendererUtils.renderAvatar(this.app, this.plugin, unknownRoleGroup, false);
@@ -1160,7 +1091,7 @@ export class OllamaView extends ItemView {
         const result = renderer.render();
         messageGroupEl = result instanceof Promise ? await result : result;
       } else {
-        return; 
+        return;
       }
 
       if (messageGroupEl && this.chatContainer) {
@@ -1180,8 +1111,7 @@ export class OllamaView extends ItemView {
           this.newMessagesIndicatorEl.classList.add(CSS_CLASSES.VISIBLE || "visible");
         } else if (!this.userScrolledUp) {
           const scrollDelay = this.isProcessing && message.role === "assistant" ? 30 : isUserMessage ? 50 : 100;
-          
-          
+
           const forceScroll =
             (this.isProcessing && message.role === "assistant") || message.role === "tool" ? true : !isUserMessage;
           this.guaranteedScrollToBottom(scrollDelay, forceScroll);
@@ -1198,11 +1128,11 @@ export class OllamaView extends ItemView {
       );
       try {
         const errorNotice = `Failed to render message (Role: ${message?.role}). Check console for details.`;
-        
+
         const errorMsgObject: Message = {
           role: "error",
           content: errorNotice,
-          timestamp: message.timestamp || new Date(), 
+          timestamp: message.timestamp || new Date(),
         };
         this.handleErrorMessage(errorMsgObject);
       } catch (criticalError) {
@@ -1214,8 +1144,6 @@ export class OllamaView extends ItemView {
       }
     }
   }
-
-  
 
   private handleMessagesCleared = (chatId: string): void => {
     if (chatId === this.plugin.chatManager?.getActiveChatId()) {
@@ -1325,16 +1253,6 @@ export class OllamaView extends ItemView {
     }
   }
 
-  
-  
-
-  
-  
-  
-
-  
-  
-
   private updateSendButtonState(): void {
     if (!this.inputEl || !this.sendButton || !this.stopGeneratingButton) {
       return;
@@ -1346,11 +1264,11 @@ export class OllamaView extends ItemView {
     if (generationInProgress) {
       this.stopGeneratingButton.show();
       this.sendButton.hide();
-      this.sendButton.disabled = true; 
+      this.sendButton.disabled = true;
     } else {
       this.stopGeneratingButton.hide();
       this.sendButton.show();
-      
+
       const sendShouldBeDisabled = isInputEmpty || this.isProcessing;
       this.sendButton.disabled = sendShouldBeDisabled;
       this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, sendShouldBeDisabled);
@@ -1381,21 +1299,10 @@ export class OllamaView extends ItemView {
     }
   }
 
-
   public setLoadingState(isLoading: boolean): void {
-    
     this.isProcessing = isLoading;
-    
-    
-    
-    
-    
-    
-    
 
     if (this.inputEl) this.inputEl.disabled = isLoading;
-
-    
 
     this.updateSendButtonState();
 
@@ -1415,24 +1322,20 @@ export class OllamaView extends ItemView {
     if (this.chatContainer) {
       if (isLoading) {
         this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach(button => {
-          button.style.display = "none"; 
+          button.style.display = "none";
         });
       } else {
-        
         this.checkAllMessagesForCollapsing();
       }
     }
   }
 
-
-  
-  
   private handleChatListUpdated = (): void => {
     this.scheduleSidebarChatListUpdate();
 
     if (this.dropdownMenuManager) {
       this.dropdownMenuManager
-        .updateChatListIfVisible() 
+        .updateChatListIfVisible()
         .catch(e => this.plugin.logger.error("Error updating chat dropdown list:", e));
     }
   };
@@ -1523,45 +1426,6 @@ export class OllamaView extends ItemView {
       }
     ).open();
   }
-
-  
-  
-  
-
-  
-  
-  
-  
-
-  
-  
-
-  
-  
-  
-  
-  
-
-  
-  
-
-  
-  
-  
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
 
   public handleCopyClick(content: string, buttonEl: HTMLElement): void {
     let textToCopy = content;
@@ -1690,7 +1554,6 @@ export class OllamaView extends ItemView {
 
   private initSpeechWorker(): void {
     try {
-
       const workerCode = `
              
              self.onmessage = async (event) => {
@@ -2459,7 +2322,6 @@ export class OllamaView extends ItemView {
     }
   };
 
-
   private showChatContextMenu(event: MouseEvent, chatMeta: ChatMetadata): void {
     event.preventDefault();
     const menu = new Menu();
@@ -2663,8 +2525,6 @@ export class OllamaView extends ItemView {
     }
   }
 
-  
-
   public checkMessageForCollapsing(messageElOrGroupEl: HTMLElement): void {
     const messageGroupEl = messageElOrGroupEl.classList.contains(CSS_CLASSES.MESSAGE_GROUP)
       ? messageElOrGroupEl
@@ -2676,11 +2536,9 @@ export class OllamaView extends ItemView {
 
     const contentCollapsible = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
 
-    
     const messageEl = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE}`);
 
     if (!contentCollapsible || !messageEl) {
-      
       return;
     }
 
@@ -2693,7 +2551,6 @@ export class OllamaView extends ItemView {
       contentCollapsible.classList.contains("streaming-text");
 
     if (isStreamingNow) {
-      
       const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       existingButton?.remove();
       contentCollapsible.style.maxHeight = "";
@@ -2718,7 +2575,6 @@ export class OllamaView extends ItemView {
       )
         return;
 
-      
       let existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
 
       const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
@@ -2726,23 +2582,16 @@ export class OllamaView extends ItemView {
       const scrollHeight = contentCollapsible.scrollHeight;
 
       if (existingButton && previousMaxHeightStyle && !existingButton.classList.contains("explicitly-expanded")) {
-        
         contentCollapsible.style.maxHeight = previousMaxHeightStyle;
       }
 
       if (scrollHeight > maxH) {
         if (!existingButton) {
-          
           existingButton = messageEl.createEl("button", {
             cls: CSS_CLASSES.SHOW_MORE_BUTTON,
           });
-          
-          
-          
-          
 
           this.registerDomEvent(existingButton, "click", () => {
-            
             if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
               existingButton!.classList.add("explicitly-expanded");
             } else {
@@ -2769,11 +2618,6 @@ export class OllamaView extends ItemView {
       }
     });
   }
-
-  
-  
-  
-  
 
   public async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
     const summarizationModel = this.plugin.settings.summarizationModelName;
@@ -3061,7 +2905,7 @@ export class OllamaView extends ItemView {
       return;
     }
 
-    let activeChat = await this.plugin.chatManager.getActiveChat(); 
+    let activeChat = await this.plugin.chatManager.getActiveChat();
     if (!activeChat) {
       activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
@@ -3089,7 +2933,6 @@ export class OllamaView extends ItemView {
     let currentTurnLlmResponseTsForCatch: number | null = llmResponseStartTimeMs;
 
     try {
-      
       const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
         userInputText,
         userMessageTimestamp,
@@ -3108,7 +2951,6 @@ export class OllamaView extends ItemView {
 
         this._managePlaceholder(currentTurnLlmResponseTs, requestTimestampId);
 
-        
         chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
 
         const llmStream = this.plugin.ollamaService.generateChatResponseStream(
@@ -3141,16 +2983,11 @@ export class OllamaView extends ItemView {
             toolCallCheckResult.assistantMessageForHistory,
             requestTimestampId
           );
-          
-          
+
           chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
           continueConversation = true;
         } else {
-          await this._renderFinalAssistantText(
-            accumulatedContent, 
-            currentTurnLlmResponseTs,
-            requestTimestampId
-          );
+          await this._renderFinalAssistantText(accumulatedContent, currentTurnLlmResponseTs, requestTimestampId);
           continueConversation = false;
         }
       }
@@ -3200,9 +3037,8 @@ export class OllamaView extends ItemView {
       ) {
         if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
       }
-      this.activePlaceholder = null; 
+      this.activePlaceholder = null;
 
-      
       this.plugin.chatManager.rejectAndClearHMAResolver(
         userMessageTimestamp.getTime(),
         `Outer catch in sendMessage for request ${requestTimestampId}`
@@ -3255,63 +3091,35 @@ export class OllamaView extends ItemView {
         );
       }
     } finally {
-      
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
       }
       this.activePlaceholder = null;
 
       this.currentAbortController = null;
-      
+
       this.setLoadingState(false);
       requestAnimationFrame(() => this.updateSendButtonState());
       this.focusInput();
     }
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
-  
-  
-  
-  
-  
-  
-  
-  
-  
-
   private handleMenuButtonClick = (e: MouseEvent): void => {
     this.dropdownMenuManager?.toggleMenu(e);
   };
 
-  
   private onDragStart = (event: MouseEvent): void => {
-    if (event.button !== 0) return; 
+    if (event.button !== 0) return;
 
     this.isResizing = true;
     this.initialMouseX = event.clientX;
-    
-    this.initialSidebarWidth = this.sidebarRootEl?.offsetWidth || 250; 
+
+    this.initialSidebarWidth = this.sidebarRootEl?.offsetWidth || 250;
 
     event.preventDefault();
     event.stopPropagation();
 
-    
-    document.addEventListener("mousemove", this.boundOnDragMove, { capture: true }); 
+    document.addEventListener("mousemove", this.boundOnDragMove, { capture: true });
     document.addEventListener("mouseup", this.boundOnDragEnd, { capture: true });
 
     document.body.style.cursor = "ew-resize";
@@ -3321,43 +3129,34 @@ export class OllamaView extends ItemView {
   private onDragMove = (event: MouseEvent): void => {
     if (!this.isResizing || !this.sidebarRootEl) return;
 
-    
     requestAnimationFrame(() => {
-      
       if (!this.isResizing || !this.sidebarRootEl) return;
 
       const currentMouseX = event.clientX;
       const deltaX = currentMouseX - this.initialMouseX;
       let newWidth = this.initialSidebarWidth + deltaX;
 
-      
-      const minWidth = 150; 
+      const minWidth = 150;
       const containerWidth = this.contentEl.offsetWidth;
-      
+
       const maxWidth = Math.max(minWidth + 50, containerWidth * 0.6);
 
       if (newWidth < minWidth) newWidth = minWidth;
       if (newWidth > maxWidth) newWidth = maxWidth;
 
-      
       this.sidebarRootEl.style.width = `${newWidth}px`;
-      this.sidebarRootEl.style.minWidth = `${newWidth}px`; 
-
-      
-      
+      this.sidebarRootEl.style.minWidth = `${newWidth}px`;
     });
   };
 
   private onDragEnd = (): void => {
-    
     if (!this.isResizing) return;
 
     this.isResizing = false;
 
-    
     document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });
     document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
-    document.body.style.cursor = ""; 
+    document.body.style.cursor = "";
     document.body.classList.remove(CSS_CLASS_RESIZING);
 
     this.saveWidthDebounced();
@@ -3464,7 +3263,7 @@ export class OllamaView extends ItemView {
                 message.content || "",
                 message as AssistantMessage,
                 this.plugin,
-                this 
+                this
               );
 
               placeholderToUpdate.contentEl.empty();
@@ -3529,7 +3328,7 @@ export class OllamaView extends ItemView {
         this.plugin.logger.debug(
           `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not assistant. Role: ${message.role}. Adding via addMessageStandard.`
         );
-        await this.addMessageStandard(message); 
+        await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
       this.plugin.logger.error(
@@ -3544,13 +3343,10 @@ export class OllamaView extends ItemView {
       });
     } finally {
       if (messageTimestampForLog) {
-        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       }
     }
   }
-
-  
 
   public async handleRegenerateClick(userMessage: Message): Promise<void> {
     if (this.isRegenerating) {
@@ -3644,7 +3440,7 @@ export class OllamaView extends ItemView {
           const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
           const assistantContentEl = contentContainer.createDiv({
             cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`,
-          }); 
+          });
           assistantContentEl.empty();
           const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
           for (let i = 0; i < 3; i++) dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
@@ -3714,14 +3510,13 @@ export class OllamaView extends ItemView {
                 }
                 accumulatedResponse += chunk.response;
                 await RendererUtils.renderMarkdownContent(
-                  this.app, 
-                  this, 
-                  this.plugin, 
-                  this.activePlaceholder.contentEl, 
-                  accumulatedResponse 
+                  this.app,
+                  this,
+                  this.plugin,
+                  this.activePlaceholder.contentEl,
+                  accumulatedResponse
                 );
                 this.guaranteedScrollToBottom(50, true);
-                
               } else {
                 this.plugin.logger.warn(
                   `[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder mismatch during stream. Current.ts: ${this.activePlaceholder?.timestamp}, expected: ${responseStartTimeMs}.`
@@ -3814,10 +3609,8 @@ export class OllamaView extends ItemView {
           }
         } catch (error: any) {
           streamErrorOccurred = error;
-          
 
           if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-            
             if (this.activePlaceholder.groupEl?.isConnected) this.activePlaceholder.groupEl.remove();
             this.activePlaceholder = null;
           }
@@ -3849,7 +3642,6 @@ export class OllamaView extends ItemView {
           }
 
           if (this.activePlaceholder?.timestamp === responseStartTimeMs) {
-            
             if (this.activePlaceholder.groupEl?.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
@@ -3875,13 +3667,11 @@ export class OllamaView extends ItemView {
   private scheduleSidebarChatListUpdate = (delay: number = 50): void => {
     if (this.chatListUpdateTimeoutId) {
       clearTimeout(this.chatListUpdateTimeoutId);
-      
     } else {
-      
       if (this.isChatListUpdateScheduled) {
-        return; 
+        return;
       }
-      this.isChatListUpdateScheduled = true; 
+      this.isChatListUpdateScheduled = true;
     }
 
     this.chatListUpdateTimeoutId = setTimeout(() => {
@@ -3890,7 +3680,7 @@ export class OllamaView extends ItemView {
           .updateChatList()
           .catch(e => this.plugin.logger.error("Error updating chat panel list via scheduleSidebarChatListUpdate:", e));
       }
-      
+
       this.chatListUpdateTimeoutId = null;
       this.isChatListUpdateScheduled = false;
     }, delay);
@@ -3903,33 +3693,29 @@ export class OllamaView extends ItemView {
     let metadataUpdated = false;
 
     try {
-      this.clearChatContainerInternal(); 
-      
-      
+      this.clearChatContainerInternal();
+
       this.lastMessageElement = null;
       this.consecutiveErrorMessages = [];
       this.errorGroupElement = null;
-      
 
       let activeChat: Chat | null = null;
       let availableModels: string[] = [];
       let finalModelName: string | null = null;
-      let finalRolePath: string | null | undefined = undefined; 
+      let finalRolePath: string | null | undefined = undefined;
       let finalRoleName: string = "None";
-      let finalTemperature: number | null | undefined = undefined; 
+      let finalTemperature: number | null | undefined = undefined;
       let errorOccurredLoadingData = false;
 
-      
       try {
         activeChat = (await this.plugin.chatManager?.getActiveChat()) || null;
         availableModels = await this.plugin.ollamaService.getModels();
 
-        
         finalRolePath =
           activeChat?.metadata?.selectedRolePath !== undefined
             ? activeChat.metadata.selectedRolePath
             : this.plugin.settings.selectedRolePath;
-        finalRoleName = await this.findRoleNameByPath(finalRolePath); 
+        finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
         this.plugin.logger.error("[loadAndDisplayActiveChat] Error loading initial chat data or models:", error);
         new Notice("Error connecting to Ollama or loading chat data.", 5000);
@@ -3940,19 +3726,18 @@ export class OllamaView extends ItemView {
           ? this.plugin.settings.modelName
           : availableModels[0] ?? null;
         finalTemperature = this.plugin.settings.temperature;
-        finalRolePath = this.plugin.settings.selectedRolePath; 
+        finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
         activeChat = null;
       }
 
-      
       if (!errorOccurredLoadingData && activeChat) {
         let preferredModel = activeChat.metadata?.modelName || this.plugin.settings.modelName;
         if (availableModels.length > 0) {
           if (preferredModel && availableModels.includes(preferredModel)) {
             finalModelName = preferredModel;
           } else {
-            finalModelName = availableModels[0]; 
+            finalModelName = availableModels[0];
             this.plugin.logger.warn(
               `[loadAndDisplayActiveChat] Preferred model "${preferredModel}" for chat "${
                 activeChat.metadata.name
@@ -3968,7 +3753,6 @@ export class OllamaView extends ItemView {
           );
         }
 
-        
         if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
           this.plugin.logger.debug(
             `[OllamaView] loadAndDisplayActiveChat: Aligning model name in metadata for chat "${activeChat.metadata.name}"... Old: ${activeChat.metadata.modelName}, New: ${finalModelName}`
@@ -3977,7 +3761,7 @@ export class OllamaView extends ItemView {
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
               metadataUpdated = true;
-              
+
               const potentiallyUpdatedChat = await this.plugin.chatManager.getChat(activeChat.metadata.id);
               if (potentiallyUpdatedChat) activeChat = potentiallyUpdatedChat;
             } else {
@@ -3990,9 +3774,7 @@ export class OllamaView extends ItemView {
           }
         }
         finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-        
       } else if (!errorOccurredLoadingData && !activeChat) {
-        
         finalModelName = availableModels.includes(this.plugin.settings.modelName)
           ? this.plugin.settings.modelName
           : availableModels[0] ?? null;
@@ -4000,9 +3782,7 @@ export class OllamaView extends ItemView {
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       }
-      
 
-      
       if (activeChat && !errorOccurredLoadingData && activeChat.messages?.length > 0) {
         this.hideEmptyState();
         this.currentMessages = [...activeChat.messages];
@@ -4017,7 +3797,6 @@ export class OllamaView extends ItemView {
 
           if (isNewDay || isFirstMessageInContainer) {
             if (isNewDay && this.chatContainer.children.length > 0) {
-              
               this.renderDateSeparator(message.timestamp);
             }
             this.lastRenderedMessageDate = message.timestamp;
@@ -4037,16 +3816,15 @@ export class OllamaView extends ItemView {
                 renderer = new UserMessageRenderer(this.app, this.plugin, message, this);
                 break;
               case "assistant":
-                renderer = new AssistantMessageRenderer(this.app, this.plugin, message as AssistantMessage, this); 
+                renderer = new AssistantMessageRenderer(this.app, this.plugin, message as AssistantMessage, this);
                 break;
               case "system":
                 renderer = new SystemMessageRenderer(this.app, this.plugin, message, this);
                 break;
               case "error":
                 this.handleErrorMessage(message);
-                
-                
-                messageGroupEl = this.errorGroupElement; 
+
+                messageGroupEl = this.errorGroupElement;
                 break;
               case "tool":
                 renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
@@ -4069,7 +3847,6 @@ export class OllamaView extends ItemView {
             }
 
             if (renderer && message.role !== "error") {
-              
               const result = renderer.render();
               messageGroupEl = result instanceof Promise ? await result : result;
             }
@@ -4086,16 +3863,15 @@ export class OllamaView extends ItemView {
 
           if (messageGroupEl) {
             if (messageGroupEl.parentElement !== this.chatContainer) {
-              
               this.chatContainer.appendChild(messageGroupEl);
             }
             this.lastMessageElement = messageGroupEl;
           }
-        } 
+        }
 
         setTimeout(() => this.checkAllMessagesForCollapsing(), 100);
         setTimeout(() => {
-          this.guaranteedScrollToBottom(100, true); 
+          this.guaranteedScrollToBottom(100, true);
           setTimeout(() => {
             this.updateScrollStateAndIndicators();
           }, 150);
@@ -4105,7 +3881,6 @@ export class OllamaView extends ItemView {
         this.scrollToBottomButton?.classList.remove(CSS_CLASSES.VISIBLE || "visible");
       }
 
-      
       this.updateInputPlaceholder(finalRoleName);
       this.updateRoleDisplay(finalRoleName);
       this.updateModelDisplay(finalModelName);
@@ -4127,31 +3902,22 @@ export class OllamaView extends ItemView {
         }
         this.updateSendButtonState();
       }
-
-      
-      
-      
     } catch (error) {
       this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL OUTER ERROR XXX", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
       if (this.chatContainer) {
-        
         this.chatContainer.createDiv({
           cls: "fatal-error-message",
           text: "Failed to load chat content. Please check console.",
         });
       }
-      return { metadataUpdated: false }; 
+      return { metadataUpdated: false };
     } finally {
-      
     }
 
     return { metadataUpdated };
   }
-
-  
-  
 
   private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
     this.plugin.logger.error(
@@ -4160,40 +3926,34 @@ export class OllamaView extends ItemView {
       }. Chat object in event is ${data.chat ? "present" : "null"}.`
     );
 
-    
     if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
       this.plugin.logger.warn(
         `[OllamaView] handleActiveChatChanged: Ignoring event for chat ${data.chatId} because regeneration is in progress.`
       );
-      this.lastProcessedChatId = data.chatId; 
+      this.lastProcessedChatId = data.chatId;
       return;
     }
 
     const chatSwitched = data.chatId !== this.lastProcessedChatId;
-    let metadataWasUpdatedByLoad = false; 
+    let metadataWasUpdatedByLoad = false;
 
-    
     if (chatSwitched || (data.chatId !== null && data.chat === null)) {
       this.plugin.logger.debug(
         `[OllamaView] handleActiveChatChanged: FULL CHAT RELOAD condition met (switched: ${chatSwitched}, data.chat === null: ${
           data.chat === null
         }).`
       );
-      this.lastProcessedChatId = data.chatId; 
+      this.lastProcessedChatId = data.chatId;
 
-      
       const result = await this.loadAndDisplayActiveChat();
       metadataWasUpdatedByLoad = result.metadataUpdated;
-    }
-    
-    else if (data.chatId !== null && data.chat !== null) {
+    } else if (data.chatId !== null && data.chat !== null) {
       this.plugin.logger.debug(
         `[OllamaView] handleActiveChatChanged: Lighter update path (chat ID same, chat data provided).`
       );
-      this.lastProcessedChatId = data.chatId; 
+      this.lastProcessedChatId = data.chatId;
       const chat = data.chat;
 
-      
       const currentRolePath = chat.metadata?.selectedRolePath ?? this.plugin.settings.selectedRolePath;
       const currentRoleName = await this.findRoleNameByPath(currentRolePath);
       const currentModelName = chat.metadata?.modelName || this.plugin.settings.modelName;
@@ -4203,50 +3963,33 @@ export class OllamaView extends ItemView {
       this.updateRoleDisplay(currentRoleName);
       this.updateInputPlaceholder(currentRoleName);
       this.updateTemperatureIndicator(currentTemperature);
-
-      
-    }
-    
-    else if (data.chatId === null) {
-      this.lastProcessedChatId = null; 
-      this.clearDisplayAndState(); 
-      
+    } else if (data.chatId === null) {
+      this.lastProcessedChatId = null;
+      this.clearDisplayAndState();
     } else {
-      
       this.plugin.logger.warn(
         `[OllamaView] handleActiveChatChanged: Unhandled case? chatId=${data.chatId}, chat=${data.chat}, chatSwitched=${chatSwitched}`
       );
-      this.lastProcessedChatId = data.chatId; 
-      
+      this.lastProcessedChatId = data.chatId;
     }
 
-    
-    
-    
-    
     if (!metadataWasUpdatedByLoad) {
       this.plugin.logger.debug(
         `[OllamaView.handleActiveChatChanged] Metadata was NOT updated by load (or light/null path); Scheduling sidebar list update.`
       );
-      this.scheduleSidebarChatListUpdate(); 
+      this.scheduleSidebarChatListUpdate();
     } else {
       this.plugin.logger.debug(
         `[OllamaView.handleActiveChatChanged] Metadata WAS updated by load; Relying on chat-list-updated event to schedule list update.`
       );
-      
     }
-    
 
-    
-
-    
     if (this.sidebarManager?.isSectionVisible("roles")) {
       this.sidebarManager
         .updateRoleList()
         .catch(e => this.plugin.logger.error("Error updating role panel list in handleActiveChatChanged:", e));
     }
 
-    
     if (this.dropdownMenuManager) {
       this.dropdownMenuManager
         .updateRoleListIfVisible()
@@ -4256,8 +3999,7 @@ export class OllamaView extends ItemView {
     this.plugin.logger.debug(
       `[OllamaView] handleActiveChatChanged: Finished processing event for chatId: ${data.chatId}. Metadata updated by load: ${metadataWasUpdatedByLoad}`
     );
-  }; 
-
+  };
 
   private _managePlaceholder(turnTimestamp: number, requestTimestampId: number): void {
     if (this.activePlaceholder && this.activePlaceholder.timestamp !== turnTimestamp) {
@@ -4304,35 +4046,32 @@ export class OllamaView extends ItemView {
 
   private async _processLlmStream(
     stream: AsyncIterableIterator<StreamChunk>,
-    currentTurnLlmResponseTs: number, 
-    requestTimestampId: number 
+    currentTurnLlmResponseTs: number,
+    requestTimestampId: number
   ): Promise<{
     accumulatedContent: string;
     nativeToolCalls: ToolCall[] | null;
     assistantMessageWithNativeCalls: AssistantMessage | null;
   }> {
-    let accumulatedContent = ""; 
+    let accumulatedContent = "";
     let nativeToolCalls: ToolCall[] | null = null;
     let assistantMessageWithNativeCalls: AssistantMessage | null = null;
     let firstChunkForTurn = true;
 
-    this.plugin.logger.debug(`[OllamaView][_processLlmStream id:${requestTimestampId}] Starting for turn ts: ${currentTurnLlmResponseTs}.`);
-
     for await (const chunk of stream) {
       if (this.currentAbortController?.signal.aborted) {
-          this.plugin.logger.info(`[OllamaView][_processLlmStream id:${requestTimestampId}] Aborted by user signal.`);
-          throw new Error("aborted by user");
+        throw new Error("aborted by user");
       }
       if (chunk.type === "error") {
-          this.plugin.logger.error(`[OllamaView][_processLlmStream id:${requestTimestampId}] Error chunk from service: ${chunk.error}.`);
-          throw new Error(chunk.error);
+        this.plugin.logger.error(
+          `[OllamaView][_processLlmStream id:${requestTimestampId}] Error chunk from service: ${chunk.error}.`
+        );
+        throw new Error(chunk.error);
       }
 
-      
       if (this.activePlaceholder?.timestamp !== currentTurnLlmResponseTs) {
-        this.plugin.logger.warn(`[OllamaView][_processLlmStream id:${requestTimestampId}] Stale placeholder (active_ts: ${this.activePlaceholder?.timestamp}, stream_ts: ${currentTurnLlmResponseTs}). Chunk (type: ${chunk.type}) ignored.`);
-        if (chunk.type === "done") break; 
-        continue; 
+        if (chunk.type === "done") break;
+        continue;
       }
 
       if (chunk.type === "content") {
@@ -4342,55 +4081,53 @@ export class OllamaView extends ItemView {
             if (thinkingDots) thinkingDots.remove();
             firstChunkForTurn = false;
           }
-          
-          accumulatedContent += chunk.response; 
-          
-          
-          
+
+          accumulatedContent += chunk.response;
+
           await RendererUtils.renderMarkdownContent(
             this.app,
-            this, 
+            this,
             this.plugin,
-            this.activePlaceholder.contentEl, 
-            accumulatedContent 
+            this.activePlaceholder.contentEl,
+            accumulatedContent
           );
           this.guaranteedScrollToBottom(30, true);
         }
       } else if (chunk.type === "tool_calls") {
-        this.plugin.logger.info(`[OllamaView][_processLlmStream id:${requestTimestampId}] Native tool_calls received:`, chunk.calls);
         nativeToolCalls = chunk.calls;
         assistantMessageWithNativeCalls = chunk.assistant_message_with_calls;
-        
-        
-        if (assistantMessageWithNativeCalls?.content) { 
-            if (firstChunkForTurn && this.activePlaceholder?.contentEl) {
-                const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                if (thinkingDots) thinkingDots.remove();
-                firstChunkForTurn = false;
-            }
-            
-            if (!accumulatedContent.endsWith(assistantMessageWithNativeCalls.content)) {
-                 accumulatedContent += assistantMessageWithNativeCalls.content;
-            }
 
-            if (this.activePlaceholder?.contentEl) {
-                await RendererUtils.renderMarkdownContent(
-                  this.app,
-                  this,
-                  this.plugin,
-                  this.activePlaceholder.contentEl,
-                  accumulatedContent
-                );
-            }
+        if (assistantMessageWithNativeCalls?.content) {
+          if (firstChunkForTurn && this.activePlaceholder?.contentEl) {
+            const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
+            if (thinkingDots) thinkingDots.remove();
+            firstChunkForTurn = false;
+          }
+
+          if (!accumulatedContent.endsWith(assistantMessageWithNativeCalls.content)) {
+            accumulatedContent += assistantMessageWithNativeCalls.content;
+          }
+
+          if (this.activePlaceholder?.contentEl) {
+            await RendererUtils.renderMarkdownContent(
+              this.app,
+              this,
+              this.plugin,
+              this.activePlaceholder.contentEl,
+              accumulatedContent
+            );
+          }
         }
       } else if (chunk.type === "done") {
-        this.plugin.logger.debug(`[OllamaView][_processLlmStream id:${requestTimestampId}] 'Done' chunk received.`);
-        break; 
+        break;
       }
-    } 
+    }
 
-    
-    this.plugin.logger.error(`[OllamaView][_processLlmStream id:${requestTimestampId}] ACCUMULATED CONTENT AT END OF STREAM (len: ${accumulatedContent.length}): "${accumulatedContent.substring(0, 500)}..."`);
+    this.plugin.logger.error(
+      `[OllamaView][_processLlmStream id:${requestTimestampId}] ACCUMULATED CONTENT AT END OF STREAM (len: ${
+        accumulatedContent.length
+      }): "${accumulatedContent.substring(0, 500)}..."`
+    );
     return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
 
@@ -4420,11 +4157,10 @@ export class OllamaView extends ItemView {
         }));
         assistantMessageForHistory = {
           role: "assistant",
-          content: accumulatedLlmContent, 
+          content: accumulatedLlmContent,
           timestamp: new Date(currentTurnLlmResponseTs),
         };
       } else {
-        
         assistantMessageForHistory = {
           role: "assistant",
           content: accumulatedLlmContent,
@@ -4432,14 +4168,13 @@ export class OllamaView extends ItemView {
         };
       }
     } else {
-      
       assistantMessageForHistory = assistantMessageWithNativeCalls || {
         role: "assistant",
-        content: accumulatedLlmContent, 
+        content: accumulatedLlmContent,
         timestamp: new Date(currentTurnLlmResponseTs),
         tool_calls: processedToolCallsThisTurn,
       };
-      
+
       assistantMessageForHistory.content = accumulatedLlmContent;
       assistantMessageForHistory.tool_calls = processedToolCallsThisTurn;
     }
@@ -4451,7 +4186,7 @@ export class OllamaView extends ItemView {
     assistantMessageIntent: AssistantMessage,
     requestTimestampId: number
   ): Promise<void> {
-    const currentViewInstance = this; 
+    const currentViewInstance = this;
     currentViewInstance.plugin.logger.info(
       `[OllamaView][_executeAndRenderToolCycle id:${requestTimestampId}] Executing ${toolsToExecute.length} tools.`
     );
@@ -4579,7 +4314,7 @@ export class OllamaView extends ItemView {
     responseTimestampMs: number,
     requestTimestampId: number
   ): Promise<void> {
-    const currentViewInstance = this; 
+    const currentViewInstance = this;
     currentViewInstance.plugin.logger.debug(
       `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Processing final text response (length: ${finalContent.length}).`
     );
@@ -4611,7 +4346,6 @@ export class OllamaView extends ItemView {
         `[OllamaView][_renderFinalAssistantText id:${requestTimestampId}] Final assistant message (ts: ${responseTimestampMs}) processed by HMA.`
       );
     } else if (!currentViewInstance.currentAbortController?.signal.aborted) {
-      
       const emptyResponseMsgTimestamp = new Date();
       const emptyResponseMsg: Message = {
         role: "system",

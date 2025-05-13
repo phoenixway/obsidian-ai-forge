@@ -1,4 +1,4 @@
-// src/renderers/AssistantMessageRenderer.ts
+
 import { App, Notice, setIcon, MarkdownRenderer } from "obsidian";
 import { AssistantMessage, Message, ToolCall } from "../types";
 import OllamaPlugin from "../main";
@@ -19,12 +19,12 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         }
     }
 
-    // В AssistantMessageRenderer.ts
+    
 public static prepareDisplayContent(
     originalContent: string,
     assistantMessage: AssistantMessage,
     plugin: OllamaPlugin,
-    view: OllamaView // Потрібен для parseAllTextualToolCalls
+    view: OllamaView 
 ): string {
     const ts = assistantMessage.timestamp.getTime();
     plugin.logger.debug(`[PREP][ts:${ts}] === Starting prepareDisplayContent ===`);
@@ -41,42 +41,42 @@ public static prepareDisplayContent(
     const hasTextualToolCallTagsInContentAfterThinkStripping = contentAfterThinkStripping.includes("<tool_call>");
     plugin.logger.debug(`[PREP][ts:${ts}] 4. Tool checks: enableToolUse=${plugin.settings.enableToolUse}, hasNativeToolCalls=${hasNativeToolCalls}, hasTextualToolCallTagsInContentAfterThinkStripping=${hasTextualToolCallTagsInContentAfterThinkStripping}`);
 
-    let finalDisplayContent = contentAfterThinkStripping; // Початкове значення
+    let finalDisplayContent = contentAfterThinkStripping; 
 
     if (plugin.settings.enableToolUse && (hasNativeToolCalls || hasTextualToolCallTagsInContentAfterThinkStripping)) {
         plugin.logger.info(`[PREP][ts:${ts}] 5. Tool call indicators detected. Formatting for display.`);
         
         let usingToolMessageText = "( ";
         const toolNamesExtracted: string[] = [];
-        let accompanyingText = contentAfterThinkStripping; // Текст, з якого будемо видаляти <tool_call>
+        let accompanyingText = contentAfterThinkStripping; 
 
         if (hasNativeToolCalls && assistantMessage.tool_calls) {
             plugin.logger.debug(`[PREP][ts:${ts}] 5a. Processing NATIVE tool_calls. Count: ${assistantMessage.tool_calls.length}`);
             assistantMessage.tool_calls.forEach(tc => toolNamesExtracted.push(tc.function.name));
-            // accompanyingText залишається contentAfterThinkStripping, оскільки нативні виклики не в тексті
+            
         } else if (hasTextualToolCallTagsInContentAfterThinkStripping) { 
             plugin.logger.debug(`[PREP][ts:${ts}] 5b. Processing TEXTUAL tool_call tags from: "${contentAfterThinkStripping.substring(0,150)}..."`);
             
-            // Використовуємо parseAllTextualToolCalls з OllamaView для отримання імен
-            // Важливо, що parseAllTextualToolCalls отримує текст, де ВЖЕ НЕМАЄ <think> тегів
+            
+            
             const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, plugin.logger); 
             parsedTextualCalls.forEach(ptc => toolNamesExtracted.push(ptc.name));
             plugin.logger.debug(`[PREP][ts:${ts}] 5c. Extracted tool names via parseAllTextualToolCalls: [${toolNamesExtracted.join(', ')}]`);
             
-            // Видаляємо <tool_call> теги з contentAfterThinkStripping для отримання супровідного тексту
-            // Цей replace може бути проблематичним, якщо теги пошкоджені
+            
+            
             accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
             plugin.logger.debug(`[PREP][ts:${ts}] 5d. Accompanying text after initial <tool_call> replace: "${accompanyingText}"`);
 
-            // Додаткове "грубе" очищення, якщо попереднє не спрацювало ідеально
+            
             if (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>")) {
                 plugin.logger.warn(`[PREP][ts:${ts}] Accompanying text still contains tool_call tags. Attempting forceful cleanup.`);
                 let tempText = accompanyingText;
-                // Видаляємо всі відкриваючі та закриваючі теги окремо
+                
                 tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
-                // Спробуємо видалити будь-які залишки JSON, якщо вони виглядають як початок об'єкта і не є частиною тексту
-                // Це ризиковано, може видалити легітимний текст.
-                // tempText = tempText.replace(/{\s*("name"|"arguments")\s*:[\s\S]*?}/g, "").trim();
+                
+                
+                
                 accompanyingText = tempText;
                 plugin.logger.debug(`[PREP][ts:${ts}] 5e. Accompanying text after forceful cleanup: "${accompanyingText}"`);
             }
@@ -96,8 +96,8 @@ public static prepareDisplayContent(
             finalDisplayContent = usingToolMessageText;
         }
     }
-    // Якщо інструменти не використовуються або немає індикаторів, 
-    // finalDisplayContent вже встановлено як contentAfterThinkStripping
+    
+    
     
     plugin.logger.info(`[PREP][ts:${ts}] === Final content for display ===:\n"${finalDisplayContent}"`);
     return finalDisplayContent;
@@ -105,8 +105,7 @@ public static prepareDisplayContent(
 
     public async render(): Promise<HTMLElement> {
         const messageTimestampLog = this.message.timestamp.getTime();
-        this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] render() called. Original message content preview: "${this.message.content?.substring(0, 150)}..."`);
-
+        
         const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
         RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'assistant');
         const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
@@ -119,16 +118,15 @@ public static prepareDisplayContent(
 
         const assistantMessage = this.message as AssistantMessage;
         
-        // Використовуємо статичний метод для підготовки контенту, передаючи this.view
+        
         const displayContent = AssistantMessageRenderer.prepareDisplayContent(
             this.message.content || "",
             assistantMessage,
             this.plugin,
-            this.view // <--- Передаємо this.view як четвертий аргумент
+            this.view 
         );
         
-        this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] Content to render (from prepareDisplayContent): "${displayContent.substring(0,150)}..."`);
-        
+                
         try {
             await RendererUtils.renderMarkdownContent(
                 this.app,

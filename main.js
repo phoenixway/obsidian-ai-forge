@@ -1682,7 +1682,6 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       throw new Error("AssistantMessageRenderer can only render messages with role 'assistant'.");
     }
   }
-  // В AssistantMessageRenderer.ts
   static prepareDisplayContent(originalContent, assistantMessage, plugin, view) {
     const ts = assistantMessage.timestamp.getTime();
     plugin.logger.debug(`[PREP][ts:${ts}] === Starting prepareDisplayContent ===`);
@@ -1742,9 +1741,7 @@ ${accompanyingText.trim()}`;
     return finalDisplayContent;
   }
   async render() {
-    var _a;
     const messageTimestampLog = this.message.timestamp.getTime();
-    this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] render() called. Original message content preview: "${(_a = this.message.content) == null ? void 0 : _a.substring(0, 150)}..."`);
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
     renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
@@ -1760,9 +1757,7 @@ ${accompanyingText.trim()}`;
       assistantMessage,
       this.plugin,
       this.view
-      // <--- Передаємо this.view як четвертий аргумент
     );
-    this.plugin.logger.debug(`[ARender INSTANCE][ts:${messageTimestampLog}] Content to render (from prepareDisplayContent): "${displayContent.substring(0, 150)}..."`);
     try {
       await renderMarkdownContent(
         this.app,
@@ -5049,10 +5044,8 @@ This action cannot be undone.`,
     this.register(this.plugin.on("chat-list-updated", () => this.handleChatListUpdated()));
     this.register(this.plugin.on("settings-updated", () => this.handleSettingsUpdated()));
     this.register(this.plugin.on("message-deleted", (data) => this.handleMessageDeleted(data)));
-    this.register(
-      this.plugin.on("ollama-connection-error", () => {
-      })
-    );
+    this.register(this.plugin.on("ollama-connection-error", () => {
+    }));
   }
   updateToggleLocationButton() {
     if (!this.toggleLocationButton)
@@ -6479,11 +6472,7 @@ Summary:`;
           chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
           continueConversation = true;
         } else {
-          await this._renderFinalAssistantText(
-            accumulatedContent,
-            currentTurnLlmResponseTs,
-            requestTimestampId
-          );
+          await this._renderFinalAssistantText(accumulatedContent, currentTurnLlmResponseTs, requestTimestampId);
           continueConversation = false;
         }
       }
@@ -7276,29 +7265,28 @@ Summary:`;
     }
   }
   async _processLlmStream(stream, currentTurnLlmResponseTs, requestTimestampId) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e;
     let accumulatedContent = "";
     let nativeToolCalls = null;
     let assistantMessageWithNativeCalls = null;
     let firstChunkForTurn = true;
-    this.plugin.logger.debug(`[OllamaView][_processLlmStream id:${requestTimestampId}] Starting for turn ts: ${currentTurnLlmResponseTs}.`);
     for await (const chunk of stream) {
       if ((_a = this.currentAbortController) == null ? void 0 : _a.signal.aborted) {
-        this.plugin.logger.info(`[OllamaView][_processLlmStream id:${requestTimestampId}] Aborted by user signal.`);
         throw new Error("aborted by user");
       }
       if (chunk.type === "error") {
-        this.plugin.logger.error(`[OllamaView][_processLlmStream id:${requestTimestampId}] Error chunk from service: ${chunk.error}.`);
+        this.plugin.logger.error(
+          `[OllamaView][_processLlmStream id:${requestTimestampId}] Error chunk from service: ${chunk.error}.`
+        );
         throw new Error(chunk.error);
       }
       if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) !== currentTurnLlmResponseTs) {
-        this.plugin.logger.warn(`[OllamaView][_processLlmStream id:${requestTimestampId}] Stale placeholder (active_ts: ${(_c = this.activePlaceholder) == null ? void 0 : _c.timestamp}, stream_ts: ${currentTurnLlmResponseTs}). Chunk (type: ${chunk.type}) ignored.`);
         if (chunk.type === "done")
           break;
         continue;
       }
       if (chunk.type === "content") {
-        if ((_d = this.activePlaceholder) == null ? void 0 : _d.contentEl) {
+        if ((_c = this.activePlaceholder) == null ? void 0 : _c.contentEl) {
           if (firstChunkForTurn) {
             const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
             if (thinkingDots)
@@ -7316,11 +7304,10 @@ Summary:`;
           this.guaranteedScrollToBottom(30, true);
         }
       } else if (chunk.type === "tool_calls") {
-        this.plugin.logger.info(`[OllamaView][_processLlmStream id:${requestTimestampId}] Native tool_calls received:`, chunk.calls);
         nativeToolCalls = chunk.calls;
         assistantMessageWithNativeCalls = chunk.assistant_message_with_calls;
         if (assistantMessageWithNativeCalls == null ? void 0 : assistantMessageWithNativeCalls.content) {
-          if (firstChunkForTurn && ((_e = this.activePlaceholder) == null ? void 0 : _e.contentEl)) {
+          if (firstChunkForTurn && ((_d = this.activePlaceholder) == null ? void 0 : _d.contentEl)) {
             const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
             if (thinkingDots)
               thinkingDots.remove();
@@ -7329,7 +7316,7 @@ Summary:`;
           if (!accumulatedContent.endsWith(assistantMessageWithNativeCalls.content)) {
             accumulatedContent += assistantMessageWithNativeCalls.content;
           }
-          if ((_f = this.activePlaceholder) == null ? void 0 : _f.contentEl) {
+          if ((_e = this.activePlaceholder) == null ? void 0 : _e.contentEl) {
             await renderMarkdownContent(
               this.app,
               this,
@@ -7340,11 +7327,12 @@ Summary:`;
           }
         }
       } else if (chunk.type === "done") {
-        this.plugin.logger.debug(`[OllamaView][_processLlmStream id:${requestTimestampId}] 'Done' chunk received.`);
         break;
       }
     }
-    this.plugin.logger.error(`[OllamaView][_processLlmStream id:${requestTimestampId}] ACCUMULATED CONTENT AT END OF STREAM (len: ${accumulatedContent.length}): "${accumulatedContent.substring(0, 500)}..."`);
+    this.plugin.logger.error(
+      `[OllamaView][_processLlmStream id:${requestTimestampId}] ACCUMULATED CONTENT AT END OF STREAM (len: ${accumulatedContent.length}): "${accumulatedContent.substring(0, 500)}..."`
+    );
     return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
   _determineToolCalls(nativeToolCalls, assistantMessageWithNativeCalls, accumulatedLlmContent, currentTurnLlmResponseTs, requestTimestampId) {
@@ -8417,17 +8405,14 @@ var PromptService = class {
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
     let roleDefinition = null;
     if (selectedRolePath && settings.followRole) {
-      this.plugin.logger.debug(`[PromptService] Attempting to load role from: ${selectedRolePath}`);
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
       if (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) {
-        this.plugin.logger.debug(`[PromptService] Role loaded. Prompt length: ${roleDefinition.systemPrompt.length}`);
       } else {
         this.plugin.logger.debug(
           `[PromptService] Role loaded but no system prompt found in role file, or role not followed.`
         );
       }
     } else {
-      this.plugin.logger.debug(`[PromptService] No role selected or settings.followRole is false.`);
     }
     const roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
     const isProductivityActive = (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
@@ -8454,11 +8439,9 @@ General Rules for BOTH Context Sections:
         `.trim();
     let systemPromptParts = [];
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-      this.plugin.logger.debug("[PromptService] RAG is enabled, adding RAG instructions.");
       systemPromptParts.push(ragInstructions);
     }
     if (roleSystemPrompt) {
-      this.plugin.logger.debug("[PromptService] Role system prompt exists, adding it.");
       systemPromptParts.push(roleSystemPrompt.trim());
     }
     let combinedBasePrompt = systemPromptParts.join("\n\n").trim();
@@ -8506,12 +8489,10 @@ Tool Name: "${tool.name}"
         );
       } else {
         combinedBasePrompt += toolUsageInstructions;
-        this.plugin.logger.debug("[PromptService] Appended tool instructions to existing RAG/Role prompt.");
       }
     } else if (combinedBasePrompt.length === 0) {
     }
     if (isProductivityActive && combinedBasePrompt && settings.enableProductivityFeatures) {
-      this.plugin.logger.debug("[PromptService] Productivity features active, injecting date/time.");
       const now = new Date();
       const formattedDate = now.toLocaleDateString(void 0, {
         weekday: "long",
@@ -8923,7 +8904,6 @@ var v4_default = v4;
 var ChatManager = class {
   constructor(plugin) {
     this.chatsFolderPath = "/";
-    // Зроблено public для доступу з SidebarManager
     this.chatIndex = {};
     this.activeChatId = null;
     this.activeChat = null;
@@ -9274,7 +9254,6 @@ var ChatManager = class {
       return false;
     }
   }
-  // src/ChatManager.ts
   async createNewChat(name, folderPath) {
     const targetFolder = folderPath ? (0, import_obsidian19.normalizePath)(folderPath) : this.chatsFolderPath;
     const finalFolderPath = targetFolder === "" || targetFolder === "." ? "/" : targetFolder;
@@ -9356,7 +9335,6 @@ var ChatManager = class {
       );
     }
   }
-  /** @deprecated Use getChatHierarchy instead. */
   listAvailableChats() {
     return Object.entries(this.chatIndex).map(([id, storedMeta]) => {
       if (!storedMeta || typeof storedMeta !== "object" || typeof storedMeta.name !== "string" || typeof storedMeta.lastModified !== "string" || typeof storedMeta.createdAt !== "string") {
@@ -9401,7 +9379,6 @@ var ChatManager = class {
   getActiveChatId() {
     return this.activeChatId;
   }
-  // src/ChatManager.ts
   async getActiveChatOrFail() {
     const chat = await this.getActiveChat();
     if (!chat) {
@@ -9412,7 +9389,6 @@ var ChatManager = class {
   }
   async addMessageToActiveChatPayload(messagePayload, emitEvent = true) {
     const operationTimestampId = messagePayload.timestamp.getTime();
-    this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Attempting to add message (Role: ${messagePayload.role}) to active chat.`);
     const activeChatInstance = await this.getActiveChat();
     if (!activeChatInstance) {
       this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Cannot add message payload: No active chat.`);
@@ -9420,11 +9396,9 @@ var ChatManager = class {
     }
     if (!messagePayload.timestamp) {
       messagePayload.timestamp = new Date();
-      this.plugin.logger.warn(`[ChatManager][addMessagePayload id:${operationTimestampId}] Message payload was missing timestamp, set to now.`);
     }
     activeChatInstance.messages.push(messagePayload);
     const activityRecorded = activeChatInstance.recordActivity();
-    this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Message pushed to in-memory chat. Metadata changed: ${activityRecorded}`);
     if (activityRecorded) {
       const saveAndUpdateIndexSuccess = await this.saveChatAndUpdateIndex(activeChatInstance);
       if (!saveAndUpdateIndexSuccess) {
@@ -9433,7 +9407,6 @@ var ChatManager = class {
     }
     if (emitEvent) {
       const currentActiveChatIdForEvent = this.activeChatId || activeChatInstance.metadata.id;
-      this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Emitting 'message-added' for chat ${currentActiveChatIdForEvent}, msg role: ${messagePayload.role}, msg_ts: ${messagePayload.timestamp.getTime()}`);
       this.plugin.emit("message-added", { chatId: currentActiveChatIdForEvent, message: messagePayload });
     }
     return messagePayload;
@@ -9475,8 +9448,7 @@ var ChatManager = class {
         this.loadedChats[id] = chat;
         const storedMeta = this.chatIndex[id];
         const currentMeta = chat.metadata;
-        const indexNeedsUpdate = !storedMeta || // Якщо чату не було в індексі (наприклад, завантажили по прямому шляху)
-        storedMeta.name !== currentMeta.name || storedMeta.lastModified !== currentMeta.lastModified || storedMeta.createdAt !== currentMeta.createdAt || storedMeta.modelName !== currentMeta.modelName || storedMeta.selectedRolePath !== currentMeta.selectedRolePath || storedMeta.temperature !== currentMeta.temperature || storedMeta.contextWindow !== currentMeta.contextWindow;
+        const indexNeedsUpdate = !storedMeta || storedMeta.name !== currentMeta.name || storedMeta.lastModified !== currentMeta.lastModified || storedMeta.createdAt !== currentMeta.createdAt || storedMeta.modelName !== currentMeta.modelName || storedMeta.selectedRolePath !== currentMeta.selectedRolePath || storedMeta.temperature !== currentMeta.temperature || storedMeta.contextWindow !== currentMeta.contextWindow;
         if (indexNeedsUpdate) {
           this.logger.debug(`[ChatManager.getChat] Index needs update for chat ${id}. Calling saveChatAndUpdateIndex.`);
           await this.saveChatAndUpdateIndex(chat);
@@ -9655,8 +9627,6 @@ var ChatManager = class {
       return false;
     }
   }
-  // src/ChatManager.ts
-  // ДОДАЙТЕ ЦЕЙ НОВИЙ ПРИВАТНИЙ МЕТОД:
   /**
    * Допоміжний метод для видалення файлу чату та запису з індексу БЕЗ генерації подій.
    * @param id ID чату для видалення.
@@ -9705,7 +9675,6 @@ var ChatManager = class {
     }
     return indexChanged;
   }
-  // src/ChatManager.ts
   async deleteChat(id) {
     const chatExistedInIndex = !!this.chatIndex[id];
     const wasActive = id === this.activeChatId;
@@ -9974,7 +9943,6 @@ var ChatManager = class {
       return false;
     }
   }
-  // --- НОВІ МЕТОДИ ДЛЯ ПАПОК ---
   /**
    * Створює нову папку за вказаним шляхом.
    * @param folderPath Повний, нормалізований шлях до папки, яку потрібно створити.
@@ -10162,7 +10130,6 @@ var ChatManager = class {
       return false;
     }
   }
-  // --- ВИПРАВЛЕНИЙ МЕТОД: Переміщення чату ---
   async moveChat(chatId, oldFilePath, newFolderPath) {
     const normOldPath = (0, import_obsidian19.normalizePath)(oldFilePath);
     const normNewFolderPath = (0, import_obsidian19.normalizePath)(newFolderPath);
@@ -10238,10 +10205,8 @@ var ChatManager = class {
    */
   registerHMAResolver(timestampMs, resolve, reject) {
     if (this.messageAddedResolvers.has(timestampMs)) {
-      this.plugin.logger.warn(`[ChatManager] HMA Resolver for timestamp ${timestampMs} already exists. Overwriting.`);
     }
     this.messageAddedResolvers.set(timestampMs, { resolve, reject });
-    this.plugin.logger.debug(`[ChatManager] HMA Resolver registered for timestamp ${timestampMs}. Map size: ${this.messageAddedResolvers.size}`);
   }
   /**
    * Викликає та видаляє резолвер для події message-added.
@@ -10250,18 +10215,14 @@ var ChatManager = class {
   invokeHMAResolver(timestampMs) {
     const resolverPair = this.messageAddedResolvers.get(timestampMs);
     if (resolverPair) {
-      this.plugin.logger.debug(`[ChatManager] Invoking HMA Resolver for timestamp ${timestampMs}.`);
       resolverPair.resolve();
       this.messageAddedResolvers.delete(timestampMs);
-      this.plugin.logger.debug(`[ChatManager] HMA Resolver for timestamp ${timestampMs} invoked and deleted. Map size: ${this.messageAddedResolvers.size}`);
     } else {
-      this.plugin.logger.warn(`[ChatManager] No HMA Resolver found to invoke for timestamp ${timestampMs}. Map size: ${this.messageAddedResolvers.size}`);
     }
   }
   rejectAndClearHMAResolver(timestampMs, reason) {
     const resolverPair = this.messageAddedResolvers.get(timestampMs);
     if (resolverPair) {
-      this.plugin.logger.warn(`[ChatManager] Rejecting HMA Resolver for ts ${timestampMs} due to: ${reason}`);
       resolverPair.reject(new Error(reason));
       this.messageAddedResolvers.delete(timestampMs);
     }
@@ -10284,17 +10245,14 @@ var ChatManager = class {
     const messageTimestampMs = timestamp.getTime();
     const userMessage = {
       role: "user",
-      // Використовуємо імпортований тип
       content,
       timestamp
     };
-    this.plugin.logger.debug(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Setting up HMA Promise for UserMessage (ts: ${messageTimestampMs}).`);
     const hmaPromise = new Promise((resolve, reject) => {
       this.registerHMAResolver(messageTimestampMs, resolve, reject);
       setTimeout(() => {
         if (this.messageAddedResolvers.has(messageTimestampMs)) {
           const reason = `HMA Timeout for UserMessage (ts: ${messageTimestampMs}) in ChatManager.`;
-          this.plugin.logger.warn(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] ${reason}`);
           this.rejectAndClearHMAResolver(messageTimestampMs, reason);
         }
       }, 1e4);
@@ -10305,10 +10263,8 @@ var ChatManager = class {
       this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
       return null;
     }
-    this.plugin.logger.debug(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] UserMessage (ts: ${messageTimestampMs}) added to ChatManager. Waiting for HMA completion.`);
     try {
       await hmaPromise;
-      this.plugin.logger.info(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] HMA completed for UserMessage (ts: ${messageTimestampMs}).`);
       return userMessage;
     } catch (error) {
       this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Error or timeout waiting for HMA for UserMessage (ts: ${messageTimestampMs}):`, error);

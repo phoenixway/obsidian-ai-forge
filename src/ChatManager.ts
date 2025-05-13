@@ -1,8 +1,8 @@
-// src/ChatManager.ts
-import { App, Notice, DataAdapter, normalizePath, TFolder, debounce, TAbstractFile } from "obsidian"; // Додано TAbstractFile
+
+import { App, Notice, DataAdapter, normalizePath, TFolder, debounce, TAbstractFile } from "obsidian"; 
 import OllamaPlugin, { ACTIVE_CHAT_ID_KEY, CHAT_INDEX_KEY } from "./main";
 import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat";
-import { MessageRole } from "./OllamaView"; // Припускаємо, що типи тут
+import { MessageRole } from "./OllamaView"; 
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "./Logger";
 import { ToolCall, Message, MessageRole as MessageRoleTypeFromTypes } from "./types"; 
@@ -10,7 +10,7 @@ import { ToolCall, Message, MessageRole as MessageRoleTypeFromTypes } from "./ty
 export type HMACompletionCallback = (messageTimestampMs: number) => void;
 export type HMAResolverRegistration = (timestampMs: number, resolve: () => void, reject: (reason?: any) => void) => void;
 
-// --- ТИПИ ДЛЯ ІЄРАРХІЇ ---
+
 export interface FolderNode {
   type: "folder";
   name: string;
@@ -26,7 +26,7 @@ export interface ChatNode {
 }
 
 export type HierarchyNode = FolderNode | ChatNode;
-// --- КІНЕЦЬ ТИПІВ ДЛЯ ІЄРАРХІЇ ---
+
 
 interface ChatSessionStored {
   name: string;
@@ -55,7 +55,7 @@ export class ChatManager {
   private plugin: OllamaPlugin;
   private app: App;
   private adapter: DataAdapter;
-  public chatsFolderPath: string = "/"; // Зроблено public для доступу з SidebarManager
+  public chatsFolderPath: string = "/"; 
   private chatIndex: ChatSessionIndex = {};
   private activeChatId: string | null = null;
   private activeChat: Chat | null = null;
@@ -80,8 +80,8 @@ export class ChatManager {
     if (savedActiveId && this.chatIndex[savedActiveId]) {
       await this.setActiveChat(savedActiveId);
     } else {
-      //  if (savedActiveId)
-      //
+      
+      
       await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
       const hierarchy = await this.getChatHierarchy();
       const firstChat = this.findFirstChatInHierarchy(hierarchy);
@@ -116,7 +116,7 @@ export class ChatManager {
     if (this.chatsFolderPath !== "/" && this.chatsFolderPath.endsWith("/")) {
       this.chatsFolderPath = this.chatsFolderPath.slice(0, -1);
     }
-    // Перевірка чи шлях не порожній після обрізки
+    
     if (!this.chatsFolderPath) {
       this.chatsFolderPath = "/";
     }
@@ -137,7 +137,7 @@ export class ChatManager {
     const checkAndCreate = async (folderPath: string | undefined | null, folderDesc: string) => {
       if (!folderPath || folderPath === "/") return;
       const normalized = normalizePath(folderPath);
-      // Додаткова перевірка на безпеку шляху
+      
       if (normalized.startsWith("..") || normalized.includes("\0")) {
         new Notice(`Error: Invalid path for ${folderDesc}.`);
         return;
@@ -463,7 +463,7 @@ export class ChatManager {
     }
   }
 
-  // src/ChatManager.ts
+  
 async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
   const targetFolder = folderPath ? normalizePath(folderPath) : this.chatsFolderPath;
   const finalFolderPath = targetFolder === "" || targetFolder === "." ? "/" : targetFolder;
@@ -471,7 +471,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
   try {
       await this.ensureSpecificFolderExists(finalFolderPath);
   } catch (folderError) {
-      // Повідомлення про помилку вже є в ensureSpecificFolderExists або вище
+      
       new Notice(`Failed to ensure target folder exists: ${finalFolderPath}`);
       return null;
   }
@@ -508,14 +508,14 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
       };
       this.chatIndex[newId] = storedMeta;
       await this.saveChatIndex();
-      // ВИДАЛЕНО: this.plugin.emit("chat-list-updated");
-      // Покладаємося на 'active-chat-changed' з setActiveChat для оновлення UI.
+      
+      
 
       const savedImmediately = await newChat.saveImmediately();
       if (!savedImmediately) {
           delete this.chatIndex[newId];
           await this.saveChatIndex();
-          // Ця емісія може залишитися, оскільки це шлях обробки помилки/очищення
+          
           this.logger.error(`[ChatManager] >>> Emitting 'chat-list-updated' from createNewChat (saveImmediately FAILED) for ID: ${newId}`);
           this.plugin.emit("chat-list-updated");
 
@@ -524,8 +524,8 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
       }
 
       this.loadedChats[newId] = newChat;
-      // setActiveChat згенерує 'active-chat-changed', що має оновити OllamaView,
-      // включаючи виклик sidebarManager.updateChatList() через loadAndDisplayActiveChat.
+      
+      
       await this.setActiveChat(newId);
 
       return newChat;
@@ -564,7 +564,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
     }
   }
 
-  /** @deprecated Use getChatHierarchy instead. */
+  
   listAvailableChats(): ChatMetadata[] {
     return Object.entries(this.chatIndex)
       .map(([id, storedMeta]): ChatMetadata | null => {
@@ -615,57 +615,53 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
     return this.activeChatId;
   }
 
-  // src/ChatManager.ts
+  
 
   public async getActiveChatOrFail(): Promise<Chat> {
     const chat = await this.getActiveChat();
     if (!chat) {
       this.logger.error("[ChatManager] getActiveChatOrFail: No active chat found or failed to load!");
-      // Можна кинути більш специфічну помилку, або просто Error
+      
       throw new Error("No active chat found or it failed to load.");
     }
     return chat;
   }
 
   public async addMessageToActiveChatPayload(messagePayload: Message, emitEvent: boolean = true): Promise<Message | null> {
-    const operationTimestampId = messagePayload.timestamp.getTime(); // Для логування
-    this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Attempting to add message (Role: ${messagePayload.role}) to active chat.`);
-
+    const operationTimestampId = messagePayload.timestamp.getTime(); 
+    
     const activeChatInstance = await this.getActiveChat(); 
     if (!activeChatInstance) {
       this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Cannot add message payload: No active chat.`);
-      // Розгляньте можливість створення нового чату тут, якщо це бажана поведінка
-      // const newChat = await this.createNewChat();
-      // if (newChat) { ... } else { return null; }
+      
+      
+      
       return null;
     }
 
-    // Переконуємося, що timestamp є
+    
     if (!messagePayload.timestamp) {
         messagePayload.timestamp = new Date();
-        this.plugin.logger.warn(`[ChatManager][addMessagePayload id:${operationTimestampId}] Message payload was missing timestamp, set to now.`);
-    }
+            }
 
     activeChatInstance.messages.push(messagePayload);
-    // Оновлюємо lastModified та потенційно інші метадані, якщо потрібно
-    // const metadataChanged = activeChatInstance.updateMetadata({ lastModified: new Date().toISOString() }); 
+    
+    
     const activityRecorded = activeChatInstance.recordActivity(); 
-    this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Message pushed to in-memory chat. Metadata changed: ${activityRecorded}`);
+    
 
 
-
-if (activityRecorded) { // Оновлюємо індекс, тільки якщо були зміни
-        const saveAndUpdateIndexSuccess = await this.saveChatAndUpdateIndex(activeChatInstance); // metadataChanged більше не потрібен як параметр, якщо save() в Chat.ts
+if (activityRecorded) { 
+        const saveAndUpdateIndexSuccess = await this.saveChatAndUpdateIndex(activeChatInstance); 
         if (!saveAndUpdateIndexSuccess) {
             this.plugin.logger.error(`[ChatManager][addMessagePayload id:${operationTimestampId}] Failed to update index for chat ${activeChatInstance.metadata.id} after activity.`);
         }
     }
 
     if (emitEvent) {
-      // Переконуємося, що ID чату для події відповідає поточному активному чату
+      
       const currentActiveChatIdForEvent = this.activeChatId || activeChatInstance.metadata.id;
-      this.plugin.logger.debug(`[ChatManager][addMessagePayload id:${operationTimestampId}] Emitting 'message-added' for chat ${currentActiveChatIdForEvent}, msg role: ${messagePayload.role}, msg_ts: ${messagePayload.timestamp.getTime()}`);
-      this.plugin.emit("message-added", { chatId: currentActiveChatIdForEvent, message: messagePayload });
+            this.plugin.emit("message-added", { chatId: currentActiveChatIdForEvent, message: messagePayload });
     }
     return messagePayload;
   }
@@ -678,63 +674,63 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
 
   let actualFilePath: string | undefined = filePath;
   if (!actualFilePath) {
-      // this.logger.debug(`[ChatManager.getChat] File path not provided for ID: ${id}. Searching in hierarchy...`);
+      
       try {
           const hierarchy = await this.getChatHierarchy();
           actualFilePath = this.findChatPathInHierarchy(id, hierarchy) ?? undefined;
           if (actualFilePath) {
-              // this.logger.debug(`[ChatManager.getChat] Found file path for ID ${id} in hierarchy: ${actualFilePath}`);
+              
           } else {
-              // this.logger.warn(`[ChatManager.getChat] File path for ID ${id} NOT found in hierarchy.`);
+              
           }
       } catch (hierarchyError) {
           this.logger.error(`[ChatManager.getChat] Error getting hierarchy while searching path for chat ${id}:`, hierarchyError);
-          actualFilePath = undefined; // Забезпечуємо, що undefined, якщо була помилка
+          actualFilePath = undefined; 
       }
   }
 
-  // Якщо шлях так і не визначено, але чат є в індексі, це проблема з консистентністю
+  
   if (!actualFilePath && this.chatIndex[id]) {
       this.logger.error(`[ChatManager.getChat] Chat ID ${id} exists in index but its file path could not be determined. Chat may be orphaned or index is stale.`);
-      // Можливо, варто спробувати перебудувати індекс тут, або просто повернути null
-      // await this.rebuildIndexFromFiles(); // Обережно: може бути рекурсивно, якщо getChat викликається з rebuildIndex
-      // if (!this.chatIndex[id]) return null; // Якщо після rebuild його немає
-      // actualFilePath = this.findChatPathInHierarchy(id, await this.getChatHierarchy()) ?? undefined;
-      // if (!actualFilePath) {
-      //     this.logger.error(`[ChatManager.getChat] Still no path after potential index rebuild for ${id}.`);
-      //     return null;
-      // }
-      return null; // Поки що просто повертаємо null, якщо шлях не знайдено
+      
+      
+      
+      
+      
+      
+      
+      
+      return null; 
   }
 
-  // Якщо чату немає в індексі і шлях не надано/не знайдено, то чату немає
+  
   if (!this.chatIndex[id] && !actualFilePath) {
       this.logger.warn(`[ChatManager.getChat] Chat ID ${id} not found in index and no file path available.`);
       return null;
   }
 
-  // Якщо шлях є, але чату немає в індексі -> спробувати завантажити, потім оновити індекс
-  // Якщо чат є в індексі, але шлях не надано -> ми вже спробували його знайти
-  // Якщо і шлях є, і в індексі є -> завантажуємо
+  
+  
+  
 
-  if (!actualFilePath) { // Ця умова тепер має бути рідкісною, якщо логіка вище відпрацювала
+  if (!actualFilePath) { 
        this.logger.error(`[ChatManager.getChat] CRITICAL: actualFilePath is still undefined for chat ID ${id} when it should be known or chat should be considered non-existent.`);
        return null;
   }
 
 
   try {
-      // actualFilePath тут точно має бути string
+      
       const chat = await Chat.loadFromFile(actualFilePath, this.adapter, this.plugin.settings, this.logger);
 
       if (chat) {
-          this.loadedChats[id] = chat; // Кешуємо завантажений чат
+          this.loadedChats[id] = chat; 
 
-          // Перевіряємо та оновлюємо індекс, якщо метадані у файлі новіші/відрізняються
+          
           const storedMeta = this.chatIndex[id];
           const currentMeta = chat.metadata;
           const indexNeedsUpdate =
-              !storedMeta || // Якщо чату не було в індексі (наприклад, завантажили по прямому шляху)
+              !storedMeta || 
               storedMeta.name !== currentMeta.name ||
               storedMeta.lastModified !== currentMeta.lastModified ||
               storedMeta.createdAt !== currentMeta.createdAt ||
@@ -745,38 +741,38 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
 
           if (indexNeedsUpdate) {
               this.logger.debug(`[ChatManager.getChat] Index needs update for chat ${id}. Calling saveChatAndUpdateIndex.`);
-              // saveChatAndUpdateIndex оновить індекс і згенерує 'chat-list-updated', якщо потрібно
+              
               await this.saveChatAndUpdateIndex(chat);
           }
           return chat;
       } else {
-          // Chat.loadFromFile повернув null (файл пошкоджений або невалідний)
+          
           this.logger.error(
           `[ChatManager.getChat] Chat.loadFromFile returned null for ID ${id} at path ${actualFilePath}. Removing from index if present.`
           );
-          // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
-          await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); // false - не намагаємось видалити файл, бо він або не існує, або пошкоджений
-          // ---
+          
+          await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); 
+          
           if (this.activeChatId === id) {
               this.logger.warn(`[ChatManager.getChat] Active chat ${id} failed to load, setting active chat to null.`);
-              await this.setActiveChat(null); // Згенерує 'active-chat-changed'
+              await this.setActiveChat(null); 
           }
           return null;
       }
   } catch (error: any) {
       this.logger.error(`[ChatManager.getChat] Unexpected error during getChat for ID ${id} from ${actualFilePath}:`, error);
-      if (error.code === "ENOENT") { // Файл не знайдено
+      if (error.code === "ENOENT") { 
           this.logger.warn(`[ChatManager.getChat] File not found (ENOENT) for chat ${id} at ${actualFilePath}. Cleaning up index.`);
-          // --- ВИПРАВЛЕНО: Використовуємо новий метод ---
-          await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); // false - файл і так не знайдено
-          // ---
+          
+          await this.deleteChatFileAndIndexEntry_NoEmit(id, actualFilePath, false); 
+          
           if (this.activeChatId === id) {
               this.logger.warn(`[ChatManager.getChat] Active chat ${id} file not found, setting active chat to null.`);
-              await this.setActiveChat(null); // Згенерує 'active-chat-changed'
+              await this.setActiveChat(null); 
           }
       }
-      // Для інших помилок, можливо, не варто видаляти з індексу одразу,
-      // але це залежить від бажаної поведінки. Поточна логіка - видалити.
+      
+      
       return null;
   }
 }
@@ -880,7 +876,7 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
         timestamp: messageTimestamp,
     };
 
-    // Додаємо опціональні поля, якщо вони надані
+    
     if (tool_calls && tool_calls.length > 0) {
       newMessage.tool_calls = tool_calls;
     }
@@ -890,7 +886,7 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
     if (name) {
       newMessage.name = name;
     }
-    // Можливо, додати поле 'images', якщо воно використовується при створенні повідомлення тут
+    
 
     return await this.addMessageToActiveChatPayload(newMessage, emitEvent);
   }
@@ -965,9 +961,9 @@ async getChat(id: string, filePath?: string): Promise<Chat | null> {
     }
   }
 
-// src/ChatManager.ts
 
-// ДОДАЙТЕ ЦЕЙ НОВИЙ ПРИВАТНИЙ МЕТОД:
+
+
 /**
  * Допоміжний метод для видалення файлу чату та запису з індексу БЕЗ генерації подій.
  * @param id ID чату для видалення.
@@ -979,25 +975,25 @@ private async deleteChatFileAndIndexEntry_NoEmit(
   id: string,
   filePath: string | null,
   deleteFile: boolean = true
-): Promise<boolean> { // Повертає true, якщо індекс змінено
-  const safeFilePath = filePath ?? "unknown_path"; // Для логування
+): Promise<boolean> { 
+  const safeFilePath = filePath ?? "unknown_path"; 
   let indexChanged = false;
 
-  // Видалення з кешу завантажених чатів
+  
   if (this.loadedChats[id]) {
       delete this.loadedChats[id];
       this.logger.debug(`[deleteHelper] Removed chat ${id} from loadedChats cache.`);
   }
-  // Видалення з індексу
+  
   if (this.chatIndex[id]) {
       delete this.chatIndex[id];
-      indexChanged = true; // Помічаємо, що індекс змінився
+      indexChanged = true; 
       this.logger.debug(`[deleteHelper] Removed chat ${id} from chatIndex.`);
   } else {
       this.logger.debug(`[deleteHelper] Chat ${id} was not in chatIndex.`);
   }
 
-  // Видалення файлу, якщо потрібно і можливо
+  
   if (deleteFile && filePath && typeof filePath === "string" && filePath !== "/" && !filePath.endsWith("/")) {
       try {
           const fileExists = await this.adapter.exists(filePath);
@@ -1015,22 +1011,22 @@ private async deleteChatFileAndIndexEntry_NoEmit(
       } catch (e: any) {
           this.logger.error(`[deleteHelper] Error removing chat file ${filePath}:`, e);
           new Notice(`Error deleting file: ${filePath.split('/').pop()}`);
-          // Не перериваємо процес через помилку видалення файлу, індекс важливіший
+          
       }
   } else if (deleteFile && filePath) {
-       // Логуємо, якщо шлях некоректний для видалення
+       
        this.logger.warn(`[deleteHelper] Invalid file path provided for deletion: ${filePath}`);
   }
 
-  // Зберігаємо індекс, ТІЛЬКИ якщо він змінився
+  
   if (indexChanged) {
       await this.saveChatIndex();
       this.logger.debug(`[deleteHelper] Saved updated chatIndex after removing ${id}.`);
   }
-  return indexChanged; // Повертаємо статус зміни індексу
+  return indexChanged; 
 }
 
-  // src/ChatManager.ts
+  
 
 async deleteChat(id: string): Promise<boolean> {
   const chatExistedInIndex = !!this.chatIndex[id];
@@ -1039,7 +1035,7 @@ async deleteChat(id: string): Promise<boolean> {
 
   let filePath: string | null = null;
   try {
-      // Знаходимо шлях до файлу (найкраще через ієрархію)
+      
       const hierarchy = await this.getChatHierarchy();
       filePath = this.findChatPathInHierarchy(id, hierarchy);
       if (!filePath && chatExistedInIndex) {
@@ -1047,41 +1043,41 @@ async deleteChat(id: string): Promise<boolean> {
       }
   } catch (hierarchyError) {
       this.logger.error(`Error getting hierarchy during delete operation for ${id}:`, hierarchyError);
-      // Продовжуємо без шляху, якщо чат є в індексі
+      
   }
 
-  // Якщо чату немає ні в індексі, ні шлях не знайдено (якщо він був потрібен)
+  
   if (!filePath && !chatExistedInIndex) {
       this.logger.warn(`[deleteChat] Chat ${id} not found in index or hierarchy. Nothing to delete.`);
-      return false; // Чату не існує
+      return false; 
   }
 
   let success = true;
-  // Змінна для події, яку потрібно згенерувати ПІСЛЯ всіх операцій
+  
   let eventToEmit: { name: string; data: any } | null = null;
 
   try {
-      // Викликаємо новий допоміжний метод, який НЕ генерує подій
+      
       const indexWasChanged = await this.deleteChatFileAndIndexEntry_NoEmit(id, filePath, true);
       this.logger.debug(`[deleteChat] deleteChatFileAndIndexEntry_NoEmit finished. Index changed: ${indexWasChanged}`);
 
-      // Визначаємо, яку подію генерувати (або жодної)
+      
       if (wasActive) {
           this.logger.debug(`[deleteChat] Deleted chat was active. Finding and setting next active chat...`);
-          // Визначаємо наступний активний чат
-          const newHierarchy = await this.getChatHierarchy(); // Отримуємо оновлену ієрархію
+          
+          const newHierarchy = await this.getChatHierarchy(); 
           const firstChat = this.findFirstChatInHierarchy(newHierarchy);
           const nextActiveId = firstChat ? firstChat.metadata.id : null;
           this.logger.debug(`[deleteChat] Next active chat will be: ${nextActiveId}`);
 
-          // Викликаємо setActiveChat. Він сам згенерує 'active-chat-changed'.
-          // Ця подія має бути достатньою для оновлення UI (включаючи список).
+          
+          
           await this.setActiveChat(nextActiveId);
-          // Немає потреби генерувати 'chat-list-updated' окремо тут.
+          
 
       } else if (indexWasChanged) {
-          // Якщо видалено НЕактивний чат, але індекс змінився,
-          // нам ПОТРІБНА подія 'chat-list-updated', щоб список оновився.
+          
+          
           this.logger.debug(`[deleteChat] Non-active chat deleted and index changed. Setting 'chat-list-updated' to be emitted.`);
           eventToEmit = { name: "chat-list-updated", data: undefined };
       }
@@ -1090,12 +1086,12 @@ async deleteChat(id: string): Promise<boolean> {
       this.logger.error(`Error during deletion process for chat ${id}:`, error);
       new Notice(`Error deleting chat ${id}. Check console.`);
       success = false;
-      // Спробуємо відновити консистентність індексу при помилці
+      
       await this.rebuildIndexFromFiles();
-      // Після перебудови індексу точно потрібне оновлення списку
+      
       eventToEmit = { name: "chat-list-updated", data: undefined };
   } finally {
-      // Генеруємо подію, якщо вона була запланована
+      
       if (eventToEmit) {
            this.logger.debug(`[deleteChat] Emitting final event: ${eventToEmit.name}`);
            this.plugin.emit(eventToEmit.name, eventToEmit.data);
@@ -1105,7 +1101,7 @@ async deleteChat(id: string): Promise<boolean> {
            this.logger.debug(`[deleteChat] No final event emitted (non-active deleted, index unchanged, or error without rebuild).`);
       }
 
-      // Показуємо сповіщення, тільки якщо видалення було успішним і чат існував
+      
       if (success && chatExistedInIndex) {
           new Notice(`Chat deleted.`);
           this.logger.info(`Chat ${id} deleted successfully.`);
@@ -1113,7 +1109,7 @@ async deleteChat(id: string): Promise<boolean> {
            this.logger.info(`Chat ${id} deletion attempt - chat did not exist in index.`);
       }
   }
-  // Повертаємо true, якщо чат існував і операція (принаймні оновлення індексу) пройшла успішно
+  
   return success && chatExistedInIndex;
 }
 
@@ -1179,7 +1175,7 @@ async deleteChat(id: string): Promise<boolean> {
       };
       this.chatIndex[newId] = storedMeta;
       await this.saveChatIndex();
-      // this.plugin.emit("chat-list-updated");
+      
 
       const savedImmediately = await clonedChat.saveImmediately();
       if (!savedImmediately) {
@@ -1242,7 +1238,7 @@ async deleteChat(id: string): Promise<boolean> {
     }
 
     const timeTarget = timestampToDelete.getTime();
-    const tolerance = 1000; // 1 second
+    const tolerance = 1000; 
     let messageIndex = -1;
 
     for (let i = 0; i < chat.messages.length; i++) {
@@ -1259,7 +1255,7 @@ async deleteChat(id: string): Promise<boolean> {
       return false;
     }
 
-    // Використовуємо _performDeleteMessageByIndex, який вже існує і обробляє chat object
+    
     return await this._performDeleteMessageByIndex(chat, messageIndex);
   }
 
@@ -1372,7 +1368,7 @@ async deleteChat(id: string): Promise<boolean> {
     }
   }
 
-  // --- НОВІ МЕТОДИ ДЛЯ ПАПОК ---
+  
 
   /**
    * Створює нову папку за вказаним шляхом.
@@ -1382,7 +1378,7 @@ async deleteChat(id: string): Promise<boolean> {
   async createFolder(folderPath: string): Promise<boolean> {
     const normalizedPath = normalizePath(folderPath);
 
-    // Перевірка базових правил
+    
     if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
       this.logger.error("Cannot create folder at root or with empty/dot path.");
       new Notice("Invalid folder path.");
@@ -1403,7 +1399,7 @@ async deleteChat(id: string): Promise<boolean> {
 
       await this.adapter.mkdir(normalizedPath);
 
-      this.plugin.emit("chat-list-updated"); // Сповіщаємо UI про зміни
+      this.plugin.emit("chat-list-updated"); 
       return true;
     } catch (error: any) {
       if (error.code === "EPERM" || error.code === "EACCES") {
@@ -1430,14 +1426,14 @@ async deleteChat(id: string): Promise<boolean> {
     const normOldPath = normalizePath(oldPath);
     const normNewPath = normalizePath(newPath);
 
-    // Перевірки
+    
     if (!normOldPath || normOldPath === "/" || !normNewPath || normNewPath === "/") {
       this.logger.error("Invalid paths provided for rename operation.");
       new Notice("Cannot rename root folder or use empty path.");
       return false;
     }
     if (normOldPath === normNewPath) {
-      return true; // Вважаємо успіхом, бо цільовий стан досягнуто
+      return true; 
     }
     if (normNewPath.startsWith(normOldPath + "/")) {
       this.logger.error(`Cannot move folder "${normOldPath}" inside itself ("${normNewPath}").`);
@@ -1466,20 +1462,20 @@ async deleteChat(id: string): Promise<boolean> {
         return false;
       }
 
-      // Виконуємо перейменування/переміщення
+      
       await this.adapter.rename(normOldPath, normNewPath);
 
-      // Оновлюємо шляхи в завантажених чатах (loadedChats), якщо вони були всередині
+      
       Object.values(this.loadedChats).forEach(chat => {
         if (chat.filePath.startsWith(normOldPath + "/")) {
           const relativePath = chat.filePath.substring(normOldPath.length);
           const updatedPath = normalizePath(normNewPath + relativePath);
 
-          chat.filePath = updatedPath; // Оновлюємо шлях у кешованому об'єкті
+          chat.filePath = updatedPath; 
         }
       });
 
-      this.plugin.emit("chat-list-updated"); // Сповіщаємо UI
+      this.plugin.emit("chat-list-updated"); 
       return true;
     } catch (error: any) {
       if (error.code === "EPERM" || error.code === "EACCES") {
@@ -1501,13 +1497,13 @@ async deleteChat(id: string): Promise<boolean> {
   async deleteFolder(folderPath: string): Promise<boolean> {
     const normalizedPath = normalizePath(folderPath);
 
-    // Перевірка, чи шлях валідний і не є коренем сховища або основною папкою чатів
+    
     if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
       this.logger.error(`Attempted to delete root or invalid folder path: ${normalizedPath}`);
       new Notice("Cannot delete this folder.");
       return false;
     }
-    // Додаткова перевірка на основну папку чатів
+    
     if (normalizedPath === this.chatsFolderPath) {
       this.logger.error(`Attempted to delete the main chat history folder: ${normalizedPath}`);
       new Notice("Cannot delete the main chat history folder set in settings.");
@@ -1517,7 +1513,7 @@ async deleteChat(id: string): Promise<boolean> {
     try {
       const exists = await this.adapter.exists(normalizedPath);
       if (!exists) {
-        // Вважаємо успіхом, якщо папки вже немає
+        
         return true;
       }
       const stat = await this.adapter.stat(normalizedPath);
@@ -1527,10 +1523,10 @@ async deleteChat(id: string): Promise<boolean> {
         return false;
       }
 
-      // --- Очищення індексу та кешу ПЕРЕД видаленням ---
+      
 
       const chatIdsToDelete: string[] = [];
-      // Функція для рекурсивного збору ID чатів
+      
       const collectChatIds = async (currentPath: string) => {
         try {
           const list = await this.adapter.list(currentPath);
@@ -1538,20 +1534,20 @@ async deleteChat(id: string): Promise<boolean> {
             const fileName = file.substring(file.lastIndexOf("/") + 1);
             if (fileName.endsWith(".json")) {
               const chatId = fileName.slice(0, -5);
-              // Перевіряємо, чи є такий ID в індексі
+              
               if (this.chatIndex[chatId]) {
                 chatIdsToDelete.push(chatId);
               }
             }
           }
           for (const folder of list.folders) {
-            await collectChatIds(folder); // Рекурсія
+            await collectChatIds(folder); 
           }
         } catch (listError) {
           this.logger.error(`Error listing folder ${currentPath} during pre-delete cleanup:`, listError);
         }
       };
-      await collectChatIds(normalizedPath); // Збираємо ID
+      await collectChatIds(normalizedPath); 
 
       let activeChatWasDeleted = false;
       chatIdsToDelete.forEach(id => {
@@ -1563,27 +1559,27 @@ async deleteChat(id: string): Promise<boolean> {
         }
         if (this.activeChatId === id) {
           activeChatWasDeleted = true;
-          this.activeChatId = null; // Скидаємо активний ID
+          this.activeChatId = null; 
           this.activeChat = null;
         }
       });
-      // Зберігаємо змінений індекс
+      
       await this.saveChatIndex();
-      // Якщо активний чат був видалений, зберігаємо null
+      
       if (activeChatWasDeleted) {
         await this.plugin.saveDataKey(ACTIVE_CHAT_ID_KEY, null);
       }
-      // --- Кінець очищення ---
+      
 
-      // Використовуємо рекурсивне видалення адаптера
+      
       await this.adapter.rmdir(normalizedPath, true);
 
-      // Сповіщаємо UI про зміни (оскільки індекс оновлено)
+      
       this.plugin.emit("chat-list-updated");
-      // Якщо активний чат скинуто, сповіщаємо про це
+      
       if (activeChatWasDeleted) {
         this.plugin.emit("active-chat-changed", { chatId: null, chat: null });
-        // Спробувати активувати наступний доступний чат (необов'язково тут, бо SidebarManager це робить)
+        
       }
 
       return true;
@@ -1595,23 +1591,23 @@ async deleteChat(id: string): Promise<boolean> {
         this.logger.error(`Error deleting folder ${normalizedPath}:`, error);
         new Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
       }
-      // Спробуємо перебудувати індекс, щоб виправити можливу розсинхронізацію
+      
       await this.rebuildIndexFromFiles();
       return false;
     }
   }
 
-     // --- ВИПРАВЛЕНИЙ МЕТОД: Переміщення чату ---
+     
     async moveChat(chatId: string, oldFilePath: string, newFolderPath: string): Promise<boolean> {
       const normOldPath = normalizePath(oldFilePath);
       const normNewFolderPath = normalizePath(newFolderPath);
       this.logger.info(`Attempting to move chat ${chatId} from "${normOldPath}" to folder "${normNewFolderPath}"`);
 
-      // --- Оголошуємо newFilePath тут, поза try ---
+      
       let newFilePath: string | null = null;
-      // ----------------------------------------
+      
 
-      // 1. Валідація
+      
       if (!chatId || !oldFilePath || !newFolderPath) {
           this.logger.error("Move chat failed: Invalid arguments provided.");
           new Notice("Move chat failed: Invalid data.");
@@ -1619,7 +1615,7 @@ async deleteChat(id: string): Promise<boolean> {
       }
 
       try {
-          // Перевірка існування джерела
+          
           if (!(await this.adapter.exists(normOldPath))) {
               this.logger.error(`Move chat failed: Source file does not exist: ${normOldPath}`);
               new Notice("Move chat failed: Source file not found.");
@@ -1634,7 +1630,7 @@ async deleteChat(id: string): Promise<boolean> {
                 return false;
            }
 
-          // Перевірка існування цільової папки
+          
           if (!(await this.adapter.exists(normNewFolderPath))) {
               this.logger.error(`Move chat failed: Target folder does not exist: ${normNewFolderPath}`);
               new Notice("Move chat failed: Target folder not found.");
@@ -1647,53 +1643,53 @@ async deleteChat(id: string): Promise<boolean> {
                 return false;
            }
 
-          // 2. Визначення нового шляху
+          
           const fileName = oldFilePath.substring(oldFilePath.lastIndexOf('/') + 1);
-          // --- Присвоюємо значення оголошеній змінній ---
+          
           newFilePath = normalizePath(`${normNewFolderPath}/${fileName}`);
-          // ------------------------------------------
+          
 
-          // Перевірка, чи файл вже в цільовій папці
+          
           if (normOldPath === newFilePath) {
               this.logger.warn(`Move chat skipped: Source and target paths are the same: ${normOldPath}`);
               return true;
           }
 
-          // 3. Перевірка на конфлікт імен
+          
           if (await this.adapter.exists(newFilePath)) {
               this.logger.error(`Move chat failed: File already exists at target path: ${newFilePath}`);
               new Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
               return false;
           }
 
-          // 4. Переміщення файлу
+          
           this.logger.debug(`Executing adapter.rename from "${normOldPath}" to "${newFilePath}"`);
           await this.adapter.rename(normOldPath, newFilePath);
           this.logger.info(`Chat file moved successfully to ${newFilePath}`);
 
-          // 5. Оновлення кешу завантажених чатів
-          if (this.loadedChats[chatId] && newFilePath) { // Перевіряємо, що newFilePath не null
+          
+          if (this.loadedChats[chatId] && newFilePath) { 
               this.logger.debug(`Updating file path in loadedChats cache for ${chatId} to ${newFilePath}`);
               this.loadedChats[chatId].filePath = newFilePath;
           }
 
-          // 6. Оновлення UI (Індекс оновиться пізніше через Vault Event)
+          
           this.plugin.emit('chat-list-updated');
 
           return true;
 
       } catch (error: any) {
-           // --- Тепер newFilePath доступний тут (може бути null, якщо помилка сталася до присвоєння) ---
-           const targetPathDesc = newFilePath ?? normNewFolderPath; // Використовуємо папку, якщо шлях файлу ще не визначено
+           
+           const targetPathDesc = newFilePath ?? normNewFolderPath; 
            if (error.code === 'EPERM' || error.code === 'EACCES') {
                this.logger.error(`Permission error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
                new Notice(`Permission error moving chat file.`);
            } else {
-               // Використовуємо targetPathDesc в логуванні
+               
                this.logger.error(`Error moving chat file from "${normOldPath}" towards "${targetPathDesc}":`, error);
                new Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
            }
-           // ---
+           
            await this.rebuildIndexFromFiles();
            this.plugin.emit('chat-list-updated');
            return false;
@@ -1706,11 +1702,9 @@ async deleteChat(id: string): Promise<boolean> {
    */
   public registerHMAResolver(timestampMs: number, resolve: () => void, reject: (reason?: any) => void): void {
     if (this.messageAddedResolvers.has(timestampMs)) {
-      this.plugin.logger.warn(`[ChatManager] HMA Resolver for timestamp ${timestampMs} already exists. Overwriting.`);
-    }
+          }
     this.messageAddedResolvers.set(timestampMs, { resolve, reject });
-    this.plugin.logger.debug(`[ChatManager] HMA Resolver registered for timestamp ${timestampMs}. Map size: ${this.messageAddedResolvers.size}`);
-  }
+      }
 
   /**
    * Викликає та видаляє резолвер для події message-added.
@@ -1719,20 +1713,16 @@ async deleteChat(id: string): Promise<boolean> {
   public invokeHMAResolver(timestampMs: number): void {
     const resolverPair = this.messageAddedResolvers.get(timestampMs);
     if (resolverPair) {
-      this.plugin.logger.debug(`[ChatManager] Invoking HMA Resolver for timestamp ${timestampMs}.`);
-      resolverPair.resolve();
+            resolverPair.resolve();
       this.messageAddedResolvers.delete(timestampMs);
-      this.plugin.logger.debug(`[ChatManager] HMA Resolver for timestamp ${timestampMs} invoked and deleted. Map size: ${this.messageAddedResolvers.size}`);
-    } else {
-      this.plugin.logger.warn(`[ChatManager] No HMA Resolver found to invoke for timestamp ${timestampMs}. Map size: ${this.messageAddedResolvers.size}`);
-    }
+          } else {
+          }
   }
   
   public rejectAndClearHMAResolver(timestampMs: number, reason: string): void {
     const resolverPair = this.messageAddedResolvers.get(timestampMs);
     if (resolverPair) {
-        this.plugin.logger.warn(`[ChatManager] Rejecting HMA Resolver for ts ${timestampMs} due to: ${reason}`);
-        resolverPair.reject(new Error(reason));
+                resolverPair.reject(new Error(reason));
         this.messageAddedResolvers.delete(timestampMs);
     }
   }
@@ -1750,9 +1740,9 @@ async deleteChat(id: string): Promise<boolean> {
   public async addUserMessageAndAwaitRender(
     content: string,
     timestamp: Date,
-    requestTimestampId: number // Для узгодженого логування
+    requestTimestampId: number 
   ): Promise<Message | null> {
-    const activeChat = await this.getActiveChat(); // Припускаємо, що getActiveChat повертає Chat | null
+    const activeChat = await this.getActiveChat(); 
     if (!activeChat) {
       this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Cannot add message: No active chat.`);
       return null;
@@ -1760,28 +1750,26 @@ async deleteChat(id: string): Promise<boolean> {
 
     const messageTimestampMs = timestamp.getTime();
     const userMessage: Message = {
-      role: "user" as MessageRoleTypeFromTypes, // Використовуємо імпортований тип
+      role: "user" as MessageRoleTypeFromTypes, 
       content,
       timestamp,
     };
 
-    this.plugin.logger.debug(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Setting up HMA Promise for UserMessage (ts: ${messageTimestampMs}).`);
-    
+        
     const hmaPromise = new Promise<void>((resolve, reject) => {
-      // Реєструємо резолвер в ChatManager, щоб OllamaView.handleMessageAdded міг його викликати
+      
       this.registerHMAResolver(messageTimestampMs, resolve, reject);
-      // Таймаут для HMA
+      
       setTimeout(() => {
-        if (this.messageAddedResolvers.has(messageTimestampMs)) { // Перевіряємо, чи резолвер ще там
+        if (this.messageAddedResolvers.has(messageTimestampMs)) { 
             const reason = `HMA Timeout for UserMessage (ts: ${messageTimestampMs}) in ChatManager.`;
-            this.plugin.logger.warn(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] ${reason}`);
-            this.rejectAndClearHMAResolver(messageTimestampMs, reason);
+                        this.rejectAndClearHMAResolver(messageTimestampMs, reason);
         }
-      }, 10000); // 10 секунд таймаут
+      }, 10000); 
     });
 
-    // Додаємо повідомлення до масиву повідомлень чату та зберігаємо чат
-    // addMessageToActiveChatPayload має дбати про збереження та емітування події "message-added"
+    
+    
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
         this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Failed to add user message payload for ts: ${messageTimestampMs}.`);
@@ -1789,17 +1777,15 @@ async deleteChat(id: string): Promise<boolean> {
         return null;
     }
     
-    this.plugin.logger.debug(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] UserMessage (ts: ${messageTimestampMs}) added to ChatManager. Waiting for HMA completion.`);
-    
+        
     try {
         await hmaPromise;
-        this.plugin.logger.info(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] HMA completed for UserMessage (ts: ${messageTimestampMs}).`);
-        return userMessage;
+                return userMessage;
     } catch (error) {
         this.plugin.logger.error(`[ChatManager][addUserMessageAndWaitForRender id:${requestTimestampId}] Error or timeout waiting for HMA for UserMessage (ts: ${messageTimestampMs}):`, error);
-        // Резолвер вже мав бути видалений rejectAndClearHMAResolver
-        return null; // Або кинути помилку далі, якщо потрібно
+        
+        return null; 
     }
   }
   
-} // End of ChatManager class
+} 
