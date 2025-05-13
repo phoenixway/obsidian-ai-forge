@@ -71,12 +71,10 @@ export default class OllamaPlugin extends Plugin {
   // Debounced функція оновлення для Vault Events
   private debouncedIndexAndUIRebuild = debounce(
     async () => {
-      // this.logger.error("[VAULT HANDLER] debouncedIndexAndUIRebuild FIRED");
-
+      
       if (this.chatManager) {
         await this.chatManager.rebuildIndexFromFiles();
-        // this.logger.error("[VAULT HANDLER] Emitting 'chat-list-updated' NOW!");
-        // this.emit("chat-list-updated");
+                // this.emit("chat-list-updated");
       }
     },
     1500,
@@ -146,8 +144,7 @@ export default class OllamaPlugin extends Plugin {
 
     // Ініціалізуємо менеджер чатів (завантажує індекс, відновлює активний чат)
     await this.chatManager.initialize();
-    // this.logger.info("Chat Manager initialized.");
-
+    
     // Оновлюємо налаштування логера реальними значеннями після завантаження
     this.logger.updateSettings({
       consoleLogLevel: this.settings.consoleLogLevel,
@@ -160,15 +157,13 @@ export default class OllamaPlugin extends Plugin {
 
     // Реєструємо View плагіна
     this.registerView(VIEW_TYPE_OLLAMA_PERSONAS, leaf => {
-      // this.logger.info("Creating OllamaView instance.");
-      this.view = new OllamaView(leaf, this);
+            this.view = new OllamaView(leaf, this);
       return this.view;
     });
 
     // Обробка помилок з'єднання з Ollama Service
     this.ollamaService.on("connection-error", error => {
-        this.logger.error("Ollama connection error detected:", error);
-        // Генеруємо подію плагіна про помилку з'єднання
+                // Генеруємо подію плагіна про помилку з'єднання
         this.emit("ollama-connection-error", error.message || "Unknown connection error");
     });
 
@@ -189,8 +184,7 @@ export default class OllamaPlugin extends Plugin {
     // Реєструємо обробник для оновлення налаштувань
     this.register(
       this.on("settings-updated", () => {
-        this.logger.info("Settings updated, applying changes...");
-        // Оновлюємо налаштування логера
+                // Оновлюємо налаштування логера
         this.logger.updateSettings({
             consoleLogLevel: this.settings.consoleLogLevel,
             fileLoggingEnabled: this.settings.fileLoggingEnabled,
@@ -302,11 +296,9 @@ export default class OllamaPlugin extends Plugin {
 
     // Виконуємо дії після того, як робочий простір готовий
     this.app.workspace.onLayoutReady(async () => {
-      this.logger.info("Workspace layout ready.");
-      // Автоматична індексація RAG при старті, якщо увімкнено
+            // Автоматична індексація RAG при старті, якщо увімкнено
       if (this.settings.ragEnabled && this.settings.ragAutoIndexOnStartup) {
-        this.logger.info("RAG enabled, starting initial indexing after delay...");
-        setTimeout(() => {
+                setTimeout(() => {
           this.ragService?.indexDocuments();
         }, 5000); // Запускаємо з невеликою затримкою
       }
@@ -324,8 +316,7 @@ export default class OllamaPlugin extends Plugin {
     // --- Реєстрація слухачів для папки РОЛЕЙ та RAG ---
     // Ці слухачі НЕ повинні викликати повний rebuild індексу чатів
     const debouncedRoleClear = debounce( () => {
-        // this.logger.debug("Debounced role cache clear triggered.");
-        this.roleListCache = null; // Скидаємо кеш списку ролей
+                this.roleListCache = null; // Скидаємо кеш списку ролей
         this.promptService?.clearRoleCache?.(); // Скидаємо кеш контенту ролей
         this.emit("roles-updated"); // Сповіщаємо про необхідність оновити списки ролей в UI
       }, 1500, true ); // Затримка та негайне виконання
@@ -387,8 +378,7 @@ export default class OllamaPlugin extends Plugin {
       this.taskCheckInterval = setInterval(() => this.checkAndProcessTaskUpdate(), 5000);
       this.registerInterval(this.taskCheckInterval as any); // Реєструємо інтервал для авто-очищення
     }
-    // this.logger.info("AI Forge Plugin loaded successfully.");
-  } // --- кінець onload ---
+      } // --- кінець onload ---
 
   registerVaultListeners(): void {
     // Обробник для create та delete
@@ -402,10 +392,7 @@ export default class OllamaPlugin extends Plugin {
         file.path.startsWith(historyPath + "/") &&
         (file.path.toLowerCase().endsWith(".json") || file instanceof TFolder)
       ) {
-        // this.logger.error(
-        //   `[VAULT HANDLER] Vault change (create/delete) detected inside history folder: ${file.path}. Triggering rebuild.`
-        // );
-        this.debouncedIndexAndUIRebuild(); // Викликаємо debounced оновлення
+                this.debouncedIndexAndUIRebuild(); // Викликаємо debounced оновлення
       }
     };
 
@@ -419,10 +406,7 @@ export default class OllamaPlugin extends Plugin {
 
       // Реагуємо, тільки якщо зміна стосується файлів/папок ВСЕРЕДИНІ папки історії
       if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
-        // this.logger.error(
-        //   `[VAULT HANDLER] Vault rename detected involving history folder: ${oldPath} -> ${file.path}. Triggering rebuild.`
-        // );
-        this.debouncedIndexAndUIRebuild();
+                this.debouncedIndexAndUIRebuild();
       }
     };
 

@@ -3837,9 +3837,6 @@ var OllamaView = class extends import_obsidian15.ItemView {
       var _a;
       const currentActiveChatId = (_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId();
       if (data.chatId !== currentActiveChatId || !this.chatContainer) {
-        this.plugin.logger.debug(
-          `handleMessageDeleted: Event ignored (Event chat ${data.chatId} !== active chat ${currentActiveChatId} or container missing).`
-        );
         return;
       }
       const timestampMs = data.timestamp.getTime();
@@ -3847,49 +3844,26 @@ var OllamaView = class extends import_obsidian15.ItemView {
       try {
         const messageGroupEl = this.chatContainer.querySelector(selector);
         if (messageGroupEl instanceof HTMLElement) {
-          this.plugin.logger.debug(
-            `handleMessageDeleted: Found message group HTMLElement to remove with selector: ${selector}`
-          );
           const currentScrollTop = this.chatContainer.scrollTop;
           const removedHeight = messageGroupEl.offsetHeight;
           const wasAboveViewport = messageGroupEl.offsetTop < currentScrollTop;
           messageGroupEl.remove();
           const initialLength = this.currentMessages.length;
           this.currentMessages = this.currentMessages.filter((msg) => msg.timestamp.getTime() !== timestampMs);
-          this.plugin.logger.debug(
-            `handleMessageDeleted: Updated local message cache from ${initialLength} to ${this.currentMessages.length} messages.`
-          );
           if (wasAboveViewport) {
             const newScrollTop = currentScrollTop - removedHeight;
             this.chatContainer.scrollTop = newScrollTop >= 0 ? newScrollTop : 0;
-            this.plugin.logger.debug(
-              `handleMessageDeleted: Adjusted scroll top from ${currentScrollTop} to ${this.chatContainer.scrollTop} (removed height: ${removedHeight})`
-            );
           } else {
             this.chatContainer.scrollTop = currentScrollTop;
-            this.plugin.logger.debug(
-              `handleMessageDeleted: Message was not above viewport, scroll top remains at ${currentScrollTop}`
-            );
           }
           if (this.currentMessages.length === 0) {
             this.showEmptyState();
           }
         } else if (messageGroupEl) {
-          this.plugin.logger.error(
-            `handleMessageDeleted: Found element with selector ${selector}, but it is not an HTMLElement. Forcing reload.`,
-            messageGroupEl
-          );
           this.loadAndDisplayActiveChat();
         } else {
-          this.plugin.logger.warn(
-            `handleMessageDeleted: Could not find message group element with selector: ${selector}. Maybe already removed or timestamp attribute missing?`
-          );
         }
       } catch (error) {
-        this.plugin.logger.error(
-          `handleMessageDeleted: Error removing message element for timestamp ${timestampMs}:`,
-          error
-        );
         this.loadAndDisplayActiveChat();
       }
     };
@@ -3934,7 +3908,6 @@ var OllamaView = class extends import_obsidian15.ItemView {
           this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
         });
       } catch (error) {
-        this.plugin.logger.error("[updateRolePanelList] Error rendering role panel list:", error);
         container.empty();
         container.createDiv({ text: "Error loading roles.", cls: "menu-error-text" });
       } finally {
@@ -3947,30 +3920,20 @@ var OllamaView = class extends import_obsidian15.ItemView {
       var _a, _b, _c, _d, _e;
       const newRolePath = (_a = roleInfo == null ? void 0 : roleInfo.path) != null ? _a : "";
       const roleNameForEvent = (_b = roleInfo == null ? void 0 : roleInfo.name) != null ? _b : "None";
-      this.plugin.logger.debug(
-        `[handleRolePanelItemClick] Clicked role: ${roleNameForEvent} (Path: ${newRolePath || "None"})`
-      );
       if (newRolePath !== currentRolePath) {
         const activeChat = await ((_c = this.plugin.chatManager) == null ? void 0 : _c.getActiveChat());
         try {
           if (activeChat) {
-            this.plugin.logger.debug(
-              `[handleRolePanelItemClick] Setting active role for chat ${activeChat.metadata.id} to: ${newRolePath || "None"}`
-            );
             await this.plugin.chatManager.updateActiveChatMetadata({
               selectedRolePath: newRolePath
             });
           } else {
-            this.plugin.logger.debug(
-              `[handleRolePanelItemClick] No active chat. Setting global default role to: ${newRolePath || "None"}`
-            );
             this.plugin.settings.selectedRolePath = newRolePath;
             await this.plugin.saveSettings();
             this.plugin.emit("role-changed", roleNameForEvent);
             (_e = (_d = this.plugin.promptService) == null ? void 0 : _d.clearRoleCache) == null ? void 0 : _e.call(_d);
           }
         } catch (error) {
-          this.plugin.logger.error(`[handleRolePanelItemClick] Error setting role to ${newRolePath}:`, error);
           new import_obsidian15.Notice("Failed to set the role.");
         }
       } else {
@@ -4081,7 +4044,6 @@ var OllamaView = class extends import_obsidian15.ItemView {
         } else {
         }
       } catch (error) {
-        this.plugin.logger.error("[OllamaView] Unexpected error during input translation call:", error);
         new import_obsidian15.Notice("Input translation encountered an unexpected error.");
       } finally {
         (0, import_obsidian15.setIcon)(this.translateInputButton, "languages");
@@ -4118,12 +4080,8 @@ var OllamaView = class extends import_obsidian15.ItemView {
         chatId = activeChat.metadata.id;
         currentName = activeChat.metadata.name;
       }
-      this.plugin.logger.debug(
-        `[handleRenameChatClick] Initiating rename for chat ${chatId} (current name: "${currentName}")`
-      );
       (_b = this.dropdownMenuManager) == null ? void 0 : _b.closeMenu();
       if (!chatId || currentName === null) {
-        this.plugin.logger.error("[handleRenameChatClick] Failed to determine chat ID or current name.");
         new import_obsidian15.Notice("Could not initiate rename process.");
         return;
       }
@@ -4236,12 +4194,10 @@ This action cannot be undone.`,
               if (targetFolder) {
                 new import_obsidian15.Notice(`Created export folder: ${targetFolderPath}`);
               } else {
-                this.plugin.logger.error("Failed to get folder even after creation attempt:", targetFolderPath);
                 new import_obsidian15.Notice(`Error creating export folder. Saving to vault root.`);
                 targetFolder = this.app.vault.getRoot();
               }
             } catch (err) {
-              this.plugin.logger.error("Error creating export folder:", err);
               new import_obsidian15.Notice(`Error creating export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
             }
@@ -4255,7 +4211,6 @@ This action cannot be undone.`,
           targetFolder = this.app.vault.getRoot();
         }
         if (!targetFolder) {
-          this.plugin.logger.error("Failed to determine a valid target folder for export.");
           new import_obsidian15.Notice("Error determining export folder. Cannot save file.");
           return;
         }
@@ -4266,7 +4221,6 @@ This action cannot be undone.`,
         const file = await this.app.vault.create(filePath, markdownContent);
         new import_obsidian15.Notice(`Chat exported to ${file.path}`);
       } catch (error) {
-        this.plugin.logger.error("Error exporting chat:", error);
         if (error instanceof Error && error.message.includes("File already exists")) {
           new import_obsidian15.Notice("Error exporting chat: File already exists.");
         } else {
@@ -4295,7 +4249,6 @@ This action cannot be undone.`,
           await ((_d = this.plugin.chatManager) == null ? void 0 : _d.addMessageToActiveChat("system", `Model changed to: ${modelName}`, new Date()));
         }
       } catch (error) {
-        this.plugin.logger.error("Error handling model change notification:", error);
       }
     };
     this.handleRoleChange = async (roleName) => {
@@ -4311,7 +4264,6 @@ This action cannot be undone.`,
           new import_obsidian15.Notice(`Role set to: ${displayRole}`);
         }
       } catch (error) {
-        this.plugin.logger.error("Error handling role change notification:", error);
         new import_obsidian15.Notice(`Role set to: ${displayRole}`);
       }
     };
@@ -4539,7 +4491,6 @@ This action cannot be undone.`,
             this.updateTemperatureIndicator(newTemp);
             new import_obsidian15.Notice(`Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`);
           } catch (error) {
-            this.plugin.logger.error("Failed to update chat temperature:", error);
             new import_obsidian15.Notice("Error setting temperature.");
           }
         }
@@ -4590,9 +4541,6 @@ This action cannot be undone.`,
             const lastModifiedDate = new Date(chatMeta.lastModified);
             const dateText = !isNaN(lastModifiedDate.getTime()) ? this.formatRelativeDate(lastModifiedDate) : "Invalid date";
             if (dateText === "Invalid date") {
-              this.plugin.logger.warn(
-                `[updateChatPanelList] Invalid date parsed for chat ${chatMeta.id}, lastModified: ${chatMeta.lastModified}`
-              );
             }
             textWrapper.createDiv({ cls: "chat-panel-item-date", text: dateText });
             const optionsBtn = chatOptionEl.createEl("button", {
@@ -4618,7 +4566,6 @@ This action cannot be undone.`,
           });
         }
       } catch (error) {
-        this.plugin.logger.error("[updateChatPanelList] Error rendering chat panel list:", error);
         container.empty();
         container.createDiv({ text: "Error loading chats.", cls: "menu-error-text" });
       } finally {
@@ -4697,29 +4644,17 @@ This action cannot be undone.`,
     };
     this.handleActiveChatChanged = async (data) => {
       var _a, _b, _c, _d, _e, _f;
-      this.plugin.logger.error(
-        `[OllamaView] handleActiveChatChanged: Received event. New activeId: ${data.chatId}, Prev activeId: ${this.lastProcessedChatId}. Chat object in event is ${data.chat ? "present" : "null"}.`
-      );
       if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
-        this.plugin.logger.warn(
-          `[OllamaView] handleActiveChatChanged: Ignoring event for chat ${data.chatId} because regeneration is in progress.`
-        );
         this.lastProcessedChatId = data.chatId;
         return;
       }
       const chatSwitched = data.chatId !== this.lastProcessedChatId;
       let metadataWasUpdatedByLoad = false;
       if (chatSwitched || data.chatId !== null && data.chat === null) {
-        this.plugin.logger.debug(
-          `[OllamaView] handleActiveChatChanged: FULL CHAT RELOAD condition met (switched: ${chatSwitched}, data.chat === null: ${data.chat === null}).`
-        );
         this.lastProcessedChatId = data.chatId;
         const result = await this.loadAndDisplayActiveChat();
         metadataWasUpdatedByLoad = result.metadataUpdated;
       } else if (data.chatId !== null && data.chat !== null) {
-        this.plugin.logger.debug(
-          `[OllamaView] handleActiveChatChanged: Lighter update path (chat ID same, chat data provided).`
-        );
         this.lastProcessedChatId = data.chatId;
         const chat = data.chat;
         const currentRolePath = (_b = (_a = chat.metadata) == null ? void 0 : _a.selectedRolePath) != null ? _b : this.plugin.settings.selectedRolePath;
@@ -4734,20 +4669,11 @@ This action cannot be undone.`,
         this.lastProcessedChatId = null;
         this.clearDisplayAndState();
       } else {
-        this.plugin.logger.warn(
-          `[OllamaView] handleActiveChatChanged: Unhandled case? chatId=${data.chatId}, chat=${data.chat}, chatSwitched=${chatSwitched}`
-        );
         this.lastProcessedChatId = data.chatId;
       }
       if (!metadataWasUpdatedByLoad) {
-        this.plugin.logger.debug(
-          `[OllamaView.handleActiveChatChanged] Metadata was NOT updated by load (or light/null path); Scheduling sidebar list update.`
-        );
         this.scheduleSidebarChatListUpdate();
       } else {
-        this.plugin.logger.debug(
-          `[OllamaView.handleActiveChatChanged] Metadata WAS updated by load; Relying on chat-list-updated event to schedule list update.`
-        );
       }
       if ((_f = this.sidebarManager) == null ? void 0 : _f.isSectionVisible("roles")) {
         this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list in handleActiveChatChanged:", e));
@@ -4755,9 +4681,6 @@ This action cannot be undone.`,
       if (this.dropdownMenuManager) {
         this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
       }
-      this.plugin.logger.debug(
-        `[OllamaView] handleActiveChatChanged: Finished processing event for chatId: ${data.chatId}. Metadata updated by load: ${metadataWasUpdatedByLoad}`
-      );
     };
     this.plugin = plugin;
     this.app = plugin.app;
@@ -4822,27 +4745,19 @@ This action cannot be undone.`,
       this.updateModelDisplay(initialModelName);
       this.updateTemperatureIndicator(initialTemperature);
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial UI element update in onOpen:", error);
     }
     this.attachEventListeners();
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
       await this.loadAndDisplayActiveChat();
-      this.plugin.logger.debug(
-        "[OllamaView] onOpen: Skipping explicit sidebar panel update. Relying on event handlers and scheduler."
-      );
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Error during initial chat load or processing in onOpen:", error);
       this.showEmptyState();
     }
     setTimeout(() => {
       if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
         this.inputEl.focus();
       } else {
-        this.plugin.logger.debug(
-          "[OllamaView] Input focus skipped in onOpen timeout (view not active/visible or input missing)."
-        );
       }
     }, 150);
     if (this.inputEl) {
@@ -4884,9 +4799,6 @@ This action cannot be undone.`,
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (this.sidebarRootEl) {
       this.sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-      this.plugin.logger.debug(
-        `[OllamaView] Internal sidebar visibility set (hidden: ${!shouldShowInternalSidebar}). Classes: ${this.sidebarRootEl.className}`
-      );
     } else {
     }
     this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
@@ -4961,7 +4873,6 @@ This action cannot be undone.`,
     if (this.resizerEl) {
       this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
     } else {
-      this.plugin.logger.error("Resizer element (resizerEl) not found during listener attachment!");
     }
     if (this.inputEl) {
       this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
@@ -5057,7 +4968,7 @@ This action cannot be undone.`,
     this.handleRenameChatClick(chatId, currentName);
   }
   async addMessageStandard(message) {
-    var _a, _b, _c;
+    var _a, _b;
     const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
     if (isNewDay) {
       this.renderDateSeparator(message.timestamp);
@@ -5111,9 +5022,6 @@ This action cannot be undone.`,
         this.chatContainer.appendChild(messageGroupEl);
         this.lastMessageElement = messageGroupEl;
         if (!messageGroupEl.isConnected) {
-          this.plugin.logger.error(
-            `[addMessageStandard] CRITICAL: Message group node for role ${message.role} was not connected to DOM after append!`
-          );
         }
         messageGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving");
         setTimeout(() => messageGroupEl == null ? void 0 : messageGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING || "message-arriving"), 500);
@@ -5129,10 +5037,6 @@ This action cannot be undone.`,
       } else if (renderer) {
       }
     } catch (error) {
-      this.plugin.logger.error(
-        `[addMessageStandard] Unexpected error during message rendering. Role: ${(message == null ? void 0 : message.role) || "unknown"}, Content Preview: "${((_c = message == null ? void 0 : message.content) == null ? void 0 : _c.substring(0, 100)) || "N/A"}"`,
-        error
-      );
       try {
         const errorNotice = `Failed to render message (Role: ${message == null ? void 0 : message.role}). Check console for details.`;
         const errorMsgObject = {
@@ -5142,10 +5046,6 @@ This action cannot be undone.`,
         };
         this.handleErrorMessage(errorMsgObject);
       } catch (criticalError) {
-        this.plugin.logger.error(
-          "[addMessageStandard] CRITICAL: Failed even to display a render error message.",
-          criticalError
-        );
         new import_obsidian15.Notice("Critical error displaying message. Check console.");
       }
     }
@@ -5249,9 +5149,6 @@ This action cannot be undone.`,
 
 This action cannot be undone.`,
       async () => {
-        this.plugin.logger.info(
-          `User confirmed deletion for message timestamp: ${messageToDelete.timestamp.toISOString()} in chat ${activeChat.metadata.id}`
-        );
         try {
           const deleteSuccess = await this.plugin.chatManager.deleteMessageByTimestamp(
             activeChat.metadata.id,
@@ -5261,15 +5158,8 @@ This action cannot be undone.`,
             new import_obsidian15.Notice("Message deleted.");
           } else {
             new import_obsidian15.Notice("Failed to delete message.");
-            this.plugin.logger.warn(
-              `deleteMessageByTimestamp returned false for chat ${activeChat.metadata.id}, timestamp ${messageToDelete.timestamp.toISOString()}`
-            );
           }
         } catch (error) {
-          this.plugin.logger.error(
-            `Error deleting message (chat ${activeChat.metadata.id}, timestamp ${messageToDelete.timestamp.toISOString()}):`,
-            error
-          );
           new import_obsidian15.Notice("An error occurred while deleting the message.");
         }
       }
@@ -5316,7 +5206,6 @@ This action cannot be undone.`,
         return;
       }
     } catch (error) {
-      this.plugin.logger.error("[handleTranslateClick] Error during text preprocessing:", error);
       new import_obsidian15.Notice("Failed to prepare text for translation.");
       return;
     }
@@ -5331,9 +5220,6 @@ This action cannot be undone.`,
     try {
       const translatedText = await this.plugin.translationService.translate(textToTranslate, targetLang);
       if (!contentEl || !contentEl.isConnected) {
-        this.plugin.logger.error(
-          "[handleTranslateClick] contentEl is null or not connected to DOM when translation arrived."
-        );
         return;
       }
       if (translatedText !== null) {
@@ -5355,7 +5241,6 @@ This action cannot be undone.`,
         this.guaranteedScrollToBottom(50, false);
       }
     } catch (error) {
-      this.plugin.logger.error("[OllamaView] Unexpected error during message translation call:", error);
     } finally {
       if (buttonEl == null ? void 0 : buttonEl.isConnected) {
         (0, import_obsidian15.setIcon)(buttonEl, originalIcon);
@@ -5871,13 +5756,9 @@ This action cannot be undone.`,
         return foundRole.name;
       } else {
         const fileName = (_a = rolePath.split("/").pop()) == null ? void 0 : _a.replace(".md", "");
-        this.plugin.logger.warn(
-          `[findRoleNameByPath] Role not found for path "${rolePath}". Using derived name: "${fileName || "Unknown"}"`
-        );
         return fileName || "Unknown Role";
       }
     } catch (error) {
-      this.plugin.logger.error(`[findRoleNameByPath] Error fetching roles for path "${rolePath}":`, error);
       return "Error";
     }
   }
@@ -5899,7 +5780,6 @@ This action cannot be undone.`,
       try {
         item.el.addClass("danger-option");
       } catch (e) {
-        this.plugin.logger.error("Failed to add danger class using item.el/dom:", e, item);
       }
     });
     menu.addItem((item) => {
@@ -5907,7 +5787,6 @@ This action cannot be undone.`,
       try {
         item.el.addClass("danger-option");
       } catch (e) {
-        this.plugin.logger.error("Failed to add danger class using item.el/dom:", e, item);
       }
     });
     menu.showAtMouseEvent(event);
@@ -5921,7 +5800,6 @@ This action cannot be undone.`,
       } else {
       }
     } catch (error) {
-      this.plugin.logger.error(`Context menu: Error cloning chat ${chatId}:`, error);
       new import_obsidian15.Notice("Error cloning chat.");
     } finally {
       cloningNotice.hide();
@@ -5953,7 +5831,6 @@ This action cannot be undone.`,
             if (targetFolder)
               new import_obsidian15.Notice(`Created export folder: ${targetFolderPath}`);
           } catch (err) {
-            this.plugin.logger.error("Error creating export folder:", err);
             new import_obsidian15.Notice(`Error creating export folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
@@ -5978,7 +5855,6 @@ This action cannot be undone.`,
       const file = await this.app.vault.create(filePath, markdownContent);
       new import_obsidian15.Notice(`Chat exported to ${file.path}`);
     } catch (error) {
-      this.plugin.logger.error(`Context menu: Error exporting chat ${chatId}:`, error);
       new import_obsidian15.Notice("An error occurred during chat export.");
     } finally {
       exportingNotice.hide();
@@ -6000,7 +5876,6 @@ This action cannot be undone.`,
             new import_obsidian15.Notice(`Failed to clear messages for chat "${chatName}".`);
           }
         } catch (error) {
-          this.plugin.logger.error(`Context menu: Error clearing messages for chat ${chatId}:`, error);
           new import_obsidian15.Notice("Error clearing messages.");
         } finally {
           clearingNotice.hide();
@@ -6023,7 +5898,6 @@ This action cannot be undone.`,
           } else {
           }
         } catch (error) {
-          this.plugin.logger.error(`Context menu: Error deleting chat ${chatId}:`, error);
           new import_obsidian15.Notice("Error deleting chat.");
         } finally {
           deletingNotice.hide();
@@ -6165,7 +6039,6 @@ Summary:`;
         throw new Error("Received empty response from summarization model.");
       }
     } catch (error) {
-      this.plugin.logger.error("Error during summarization:", error);
       let userMessage = "Summarization failed: ";
       if (error instanceof Error) {
         if (error.message.includes("404") || error.message.toLocaleLowerCase().includes("model not found")) {
@@ -6209,7 +6082,6 @@ Summary:`;
       if (contentContainer) {
         contentContainer.empty();
       } else {
-        this.plugin.logger.error("[renderOrUpdateErrorGroup] Could not find error text container in existing group!");
         return;
       }
       this.updateErrorGroupTimestamp(groupEl, lastError.timestamp);
@@ -6233,7 +6105,6 @@ Summary:`;
         }
       }
     } else {
-      this.plugin.logger.error("[renderOrUpdateErrorGroup] Failed to find/create content container for error group.");
     }
     this.guaranteedScrollToBottom(50, true);
   }
@@ -6262,9 +6133,6 @@ Summary:`;
       const summary = await this.summarizeErrors(errors);
       const contentContainer = targetGroupElement.querySelector(`.${CSS_CLASSES.ERROR_TEXT}`);
       if (!contentContainer || !contentContainer.isConnected) {
-        this.plugin.logger.warn(
-          "[triggerErrorSummarization] Error content container disappeared before summarization finished."
-        );
         return;
       }
       contentContainer.empty();
@@ -6272,13 +6140,9 @@ Summary:`;
         contentContainer.setText(`Multiple errors occurred. Summary:
 ${summary}`);
       } else {
-        this.plugin.logger.warn(
-          "[triggerErrorSummarization] Summarization failed or returned empty. Displaying list fallback."
-        );
         this.displayErrorListFallback(targetGroupElement, errors);
       }
     } catch (error) {
-      this.plugin.logger.error("[triggerErrorSummarization] Unexpected error during summarization process:", error);
       this.displayErrorListFallback(targetGroupElement, errors);
     } finally {
       this.isSummarizingErrors = false;
@@ -6337,9 +6201,6 @@ Summary:`;
       system: "You are an assistant that summarizes lists of technical error messages accurately and concisely."
     };
     try {
-      this.plugin.logger.debug(
-        `[summarizeErrors] Sending request to model ${modelName}. Prompt length: ${prompt.length}`
-      );
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && responseData.response) {
         return responseData.response.trim();
@@ -6347,7 +6208,6 @@ Summary:`;
         return null;
       }
     } catch (error) {
-      this.plugin.logger.error("[summarizeErrors] Failed to summarize errors:", error);
       return null;
     }
   }
@@ -6364,7 +6224,6 @@ Summary:`;
     try {
       this.renderOrUpdateErrorGroup(isContinuingError);
     } catch (error) {
-      this.plugin.logger.error("[handleErrorMessage] Failed to render/update error group:", error);
       try {
       } catch (e) {
       }
@@ -6384,9 +6243,6 @@ Summary:`;
       activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
         new import_obsidian15.Notice("Error: No active chat and could not create one.");
-        this.plugin.logger.error(
-          `[OllamaView][sendMessage id:${requestTimestampId}] Failed to get/create active chat.`
-        );
         this.setLoadingState(false);
         return;
       }
@@ -6471,17 +6327,9 @@ Summary:`;
         try {
           await hmaPromise;
         } catch (e_hma) {
-          this.plugin.logger.error(
-            `[OllamaView][sendMessage id:${requestTimestampId}] HMA error/timeout for max turns system message`,
-            e_hma
-          );
         }
       }
     } catch (error) {
-      this.plugin.logger.error(
-        `[OllamaView][sendMessage id:${requestTimestampId}] CATCH (Outer): ${error.message}`,
-        error
-      );
       if (this.activePlaceholder && (this.activePlaceholder.timestamp === llmResponseStartTimeMs || currentTurnLlmResponseTsForCatch !== null && this.activePlaceholder.timestamp === currentTurnLlmResponseTsForCatch) && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected)
           this.activePlaceholder.groupEl.remove();
@@ -6531,10 +6379,6 @@ Summary:`;
       try {
         await hmaErrorPromise;
       } catch (e_hma) {
-        this.plugin.logger.error(
-          `[OllamaView][sendMessage id:${requestTimestampId}] HMA error/timeout for error display message`,
-          e_hma
-        );
       }
     } finally {
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
@@ -6549,20 +6393,13 @@ Summary:`;
     }
   }
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const messageForLog = data == null ? void 0 : data.message;
     const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
     const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
     const hmaEntryId = Date.now();
-    this.plugin.logger.debug(
-      `[HMA SUPER-ENTRY ${hmaEntryId} id:${messageTimestampForLog}] Role: ${messageRoleForLog}. Active placeholder ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}`
-    );
     try {
       if (!data || !data.message) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampForLog}] EXIT (Early): Invalid data received. Data:`,
-          data
-        );
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
@@ -6570,9 +6407,6 @@ Summary:`;
       const { chatId: eventChatId, message } = data;
       const messageTimestampMs = message.timestamp.getTime();
       if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.error(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] EXIT (Early): CRITICAL Context missing!`
-        );
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
@@ -6594,7 +6428,7 @@ Summary:`;
       const alreadyInLogicCache = this.currentMessages.some(
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
       );
-      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
+      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) === messageTimestampMs;
       if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
@@ -6606,11 +6440,8 @@ Summary:`;
         this.currentMessages.push(message);
       }
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.info(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] Assistant message (ts: ${messageTimestampMs}) MATCHES active placeholder (ts: ${this.activePlaceholder.timestamp}). Updating placeholder.`
-        );
         const placeholderToUpdate = this.activePlaceholder;
-        if (((_d = placeholderToUpdate.groupEl) == null ? void 0 : _d.isConnected) && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
+        if (((_c = placeholderToUpdate.groupEl) == null ? void 0 : _c.isConnected) && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
           placeholderToUpdate.groupEl.classList.remove("placeholder");
           placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
           placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
@@ -6618,9 +6449,6 @@ Summary:`;
             `.${CSS_CLASSES.MESSAGE}`
           );
           if (!messageDomElement) {
-            this.plugin.logger.error(
-              `[HMA ${hmaEntryId} id:${messageTimestampMs}] CRITICAL: .message element NOT FOUND in placeholder. Removing placeholder and adding normally.`
-            );
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
             this.activePlaceholder = null;
@@ -6658,12 +6486,6 @@ Summary:`;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
               this.activePlaceholder = null;
-              this.plugin.logger.info(
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Placeholder successfully updated and CLEARED. Preview: "${displayContent.substring(
-                  0,
-                  50
-                )}..."`
-              );
               setTimeout(() => {
                 if (finalMessageGroupElement && finalMessageGroupElement.isConnected) {
                   this.checkMessageForCollapsing(finalMessageGroupElement);
@@ -6671,10 +6493,6 @@ Summary:`;
               }, 70);
               this.guaranteedScrollToBottom(100, true);
             } catch (renderError) {
-              this.plugin.logger.error(
-                `[HMA ${hmaEntryId} id:${messageTimestampMs}] Error during placeholder final render:`,
-                renderError
-              );
               if (placeholderToUpdate.groupEl.isConnected)
                 placeholderToUpdate.groupEl.remove();
               this.activePlaceholder = null;
@@ -6686,24 +6504,13 @@ Summary:`;
             }
           }
         } else {
-          this.plugin.logger.error(
-            `[HMA ${hmaEntryId} id:${messageTimestampMs}] Active placeholder matched, but DOM invalid. Adding via addMessageStandard.`
-          );
           this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
       } else {
-        this.plugin.logger.debug(
-          `[HMA ${hmaEntryId} id:${messageTimestampMs}] No matching placeholder OR not assistant. Role: ${message.role}. Adding via addMessageStandard.`
-        );
         await this.addMessageStandard(message);
       }
     } catch (outerError) {
-      this.plugin.logger.error(
-        `[HMA ${hmaEntryId} id:${messageTimestampForLog}] <<< CATCH OUTER ERROR >>> Role: ${messageRoleForLog}:`,
-        outerError,
-        data
-      );
       this.handleErrorMessage({
         role: "error",
         content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
@@ -6722,9 +6529,6 @@ Summary:`;
       return;
     }
     if (this.currentAbortController) {
-      this.plugin.logger.warn(
-        "[Regenerate] Attempted to start regeneration while currentAbortController is not null. Previous operation might be active."
-      );
       new import_obsidian15.Notice("Previous generation process is still active or finishing. Please wait.", 4e3);
       return;
     }
@@ -6738,10 +6542,6 @@ Summary:`;
       (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.role === userMessage.role
     );
     if (messageIndex === -1) {
-      this.plugin.logger.error(
-        "[Regenerate] Could not find the user message in the active chat history for regeneration.",
-        userMessage
-      );
       new import_obsidian15.Notice("Error: Could not find the message to regenerate from.");
       return;
     }
@@ -6751,12 +6551,9 @@ Summary:`;
       "Confirm Regeneration",
       hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
       async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+        var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
         this.isRegenerating = true;
         const regenerationRequestTimestamp = new Date().getTime();
-        this.plugin.logger.error(
-          `[Regenerate START id:${regenerationRequestTimestamp}] For userMsg ts: ${userMessage.timestamp.toISOString()}. isRegenerating set to true.`
-        );
         this.currentAbortController = new AbortController();
         let accumulatedResponse = "";
         const responseStartTime = new Date();
@@ -6765,23 +6562,14 @@ Summary:`;
         let streamErrorOccurred = null;
         let mainAssistantMessageProcessedPromise;
         try {
-          this.plugin.logger.debug(
-            `[Regenerate id:${regenerationRequestTimestamp}] Starting logic. HasMessagesAfter: ${hasMessagesAfter}`
-          );
           if (hasMessagesAfter) {
             const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
             if (!deleteSuccess) {
-              this.plugin.logger.error(
-                `[Regenerate id:${regenerationRequestTimestamp}] Failed to delete subsequent messages.`
-              );
               throw new Error("Failed to delete subsequent messages for regeneration.");
             }
           }
           await this.loadAndDisplayActiveChat();
           this.guaranteedScrollToBottom(50, true);
-          this.plugin.logger.debug(
-            `[Regenerate id:${regenerationRequestTimestamp}] Creating placeholder for new assistant response (expected ts: ${responseStartTimeMs}).`
-          );
           const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
             cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
           });
@@ -6807,13 +6595,7 @@ Summary:`;
               contentEl: assistantContentEl,
               messageWrapper: messageWrapperEl
             };
-            this.plugin.logger.debug(
-              `[Regenerate id:${regenerationRequestTimestamp}] Placeholder created. activePlaceholder.ts set to: ${this.activePlaceholder.timestamp}.`
-            );
           } else {
-            this.plugin.logger.error(
-              `[Regenerate id:${regenerationRequestTimestamp}] Failed to create all placeholder elements!`
-            );
             throw new Error("Failed to create placeholder elements for regeneration.");
           }
           assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
@@ -6821,12 +6603,8 @@ Summary:`;
           this.guaranteedScrollToBottom(50, true);
           const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
           if (!chatForStreaming) {
-            this.plugin.logger.error(`[Regenerate id:${regenerationRequestTimestamp}] Failed to get chatForStreaming.`);
             throw new Error("Failed to get updated chat context for streaming regeneration.");
           }
-          this.plugin.logger.debug(
-            `[Regenerate id:${regenerationRequestTimestamp}] Starting stream. Context messages: ${chatForStreaming.messages.length}.`
-          );
           const stream = this.plugin.ollamaService.generateChatResponseStream(
             chatForStreaming,
             this.currentAbortController.signal
@@ -6834,21 +6612,12 @@ Summary:`;
           let firstChunk = true;
           for await (const chunk of stream) {
             if (this.currentAbortController.signal.aborted) {
-              this.plugin.logger.debug(
-                `[Regenerate id:${regenerationRequestTimestamp}] Stream aborted by user during iteration.`
-              );
               throw new Error("aborted by user");
             }
             if ("error" in chunk && chunk.error) {
               if (!chunk.error.includes("aborted by user")) {
-                this.plugin.logger.error(
-                  `[Regenerate id:${regenerationRequestTimestamp}] Stream error: ${chunk.error}`
-                );
                 throw new Error(chunk.error);
               } else {
-                this.plugin.logger.debug(
-                  `[Regenerate id:${regenerationRequestTimestamp}] Stream reported 'aborted by user'.`
-                );
                 throw new Error("aborted by user");
               }
             }
@@ -6870,36 +6639,18 @@ Summary:`;
                 );
                 this.guaranteedScrollToBottom(50, true);
               } else {
-                this.plugin.logger.warn(
-                  `[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder mismatch during stream. Current.ts: ${(_b = this.activePlaceholder) == null ? void 0 : _b.timestamp}, expected: ${responseStartTimeMs}.`
-                );
                 accumulatedResponse += chunk.response;
               }
             }
             if ("done" in chunk && chunk.done) {
-              this.plugin.logger.debug(
-                `[Regenerate id:${regenerationRequestTimestamp}] Stream finished (done received).`
-              );
               break;
             }
           }
-          this.plugin.logger.debug(
-            `[Regenerate id:${regenerationRequestTimestamp}] Stream completed. Final response length: ${accumulatedResponse.length}. Active placeholder.ts: ${(_c = this.activePlaceholder) == null ? void 0 : _c.timestamp} (expected ${responseStartTimeMs})`
-          );
           if (accumulatedResponse.trim()) {
-            this.plugin.logger.debug(
-              `[Regenerate id:${regenerationRequestTimestamp}] Adding assistant message to ChatManager (expected ts: ${responseStartTimeMs}). Setting emitEvent to TRUE.`
-            );
             mainAssistantMessageProcessedPromise = new Promise((resolve) => {
               this.messageAddedResolvers.set(responseStartTimeMs, resolve);
-              this.plugin.logger.debug(
-                `[Regenerate id:${regenerationRequestTimestamp}] Resolver ADDED to map for ts ${responseStartTimeMs}. Map size: ${this.messageAddedResolvers.size}`
-              );
             });
             this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
-            this.plugin.logger.debug(
-              `[Regenerate id:${regenerationRequestTimestamp}] TRY: Awaiting mainAssistantMessageProcessedPromise (via map) for ts ${responseStartTimeMs}`
-            );
             const timeoutDuration = 1e4;
             const timeoutPromise = new Promise(
               (_, reject) => setTimeout(
@@ -6911,36 +6662,18 @@ Summary:`;
             );
             try {
               await Promise.race([mainAssistantMessageProcessedPromise, timeoutPromise]);
-              this.plugin.logger.info(
-                `[Regenerate id:${regenerationRequestTimestamp}] TRY: mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs} RESOLVED or raced successfully.`
-              );
             } catch (awaitPromiseError) {
-              this.plugin.logger.error(
-                `[Regenerate id:${regenerationRequestTimestamp}] TRY: Error or Timeout awaiting mainAssistantMessageProcessedPromise for ts ${responseStartTimeMs}: ${awaitPromiseError.message}`
-              );
               streamErrorOccurred = streamErrorOccurred || awaitPromiseError;
               if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-                this.plugin.logger.warn(
-                  `[Regenerate id:${regenerationRequestTimestamp}] Timeout/Error awaiting, removing resolver from map for ts ${responseStartTimeMs}.`
-                );
                 this.messageAddedResolvers.delete(responseStartTimeMs);
               }
             }
           } else if (!this.currentAbortController.signal.aborted) {
-            this.plugin.logger.warn(
-              `[Regenerate id:${regenerationRequestTimestamp}] Assistant provided an empty response, not due to cancellation.`
-            );
-            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs && ((_e = this.activePlaceholder.groupEl) == null ? void 0 : _e.isConnected)) {
-              this.plugin.logger.debug(
-                `[Regenerate id:${regenerationRequestTimestamp}] Removing placeholder for ts ${responseStartTimeMs} due to empty response.`
-              );
+            if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) === responseStartTimeMs && ((_c = this.activePlaceholder.groupEl) == null ? void 0 : _c.isConnected)) {
               this.activePlaceholder.groupEl.remove();
             }
-            if (((_f = this.activePlaceholder) == null ? void 0 : _f.timestamp) === responseStartTimeMs) {
+            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs) {
               this.activePlaceholder = null;
-              this.plugin.logger.debug(
-                `[Regenerate id:${regenerationRequestTimestamp}] activePlaceholder (ts: ${responseStartTimeMs}) cleared due to empty response.`
-              );
             }
             this.plugin.chatManager.addMessageToActiveChat(
               "system",
@@ -6951,8 +6684,8 @@ Summary:`;
           }
         } catch (error) {
           streamErrorOccurred = error;
-          if (((_g = this.activePlaceholder) == null ? void 0 : _g.timestamp) === responseStartTimeMs) {
-            if ((_h = this.activePlaceholder.groupEl) == null ? void 0 : _h.isConnected)
+          if (((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === responseStartTimeMs) {
+            if ((_f = this.activePlaceholder.groupEl) == null ? void 0 : _f.isConnected)
               this.activePlaceholder.groupEl.remove();
             this.activePlaceholder = null;
           }
@@ -6962,7 +6695,7 @@ Summary:`;
           let errorMsgForChat = "An unexpected error occurred during regeneration.";
           let errorMsgRole = "error";
           let savePartialResponseOnError = false;
-          if (error.name === "AbortError" || ((_i = error.message) == null ? void 0 : _i.includes("aborted by user"))) {
+          if (error.name === "AbortError" || ((_g = error.message) == null ? void 0 : _g.includes("aborted by user"))) {
             errorMsgForChat = "Regeneration stopped.";
             errorMsgRole = "system";
             if (accumulatedResponse.trim())
@@ -6979,8 +6712,8 @@ Summary:`;
           if (this.messageAddedResolvers.has(responseStartTimeMs)) {
             this.messageAddedResolvers.delete(responseStartTimeMs);
           }
-          if (((_j = this.activePlaceholder) == null ? void 0 : _j.timestamp) === responseStartTimeMs) {
-            if ((_k = this.activePlaceholder.groupEl) == null ? void 0 : _k.isConnected) {
+          if (((_h = this.activePlaceholder) == null ? void 0 : _h.timestamp) === responseStartTimeMs) {
+            if ((_i = this.activePlaceholder.groupEl) == null ? void 0 : _i.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
             this.activePlaceholder = null;
@@ -6997,10 +6730,7 @@ Summary:`;
     ).open();
   }
   async loadAndDisplayActiveChat() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-    this.plugin.logger.debug(
-      `[OllamaView] loadAndDisplayActiveChat START for activeId: ${(_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChatId()}`
-    );
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     let metadataUpdated = false;
     try {
       this.clearChatContainerInternal();
@@ -7015,44 +6745,32 @@ Summary:`;
       let finalTemperature = void 0;
       let errorOccurredLoadingData = false;
       try {
-        activeChat = await ((_b = this.plugin.chatManager) == null ? void 0 : _b.getActiveChat()) || null;
+        activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat()) || null;
         availableModels = await this.plugin.ollamaService.getModels();
-        finalRolePath = ((_c = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _c.selectedRolePath) !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
+        finalRolePath = ((_b = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _b.selectedRolePath) !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
-        this.plugin.logger.error("[loadAndDisplayActiveChat] Error loading initial chat data or models:", error);
         new import_obsidian15.Notice("Error connecting to Ollama or loading chat data.", 5e3);
         errorOccurredLoadingData = true;
         availableModels = availableModels || [];
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_d = availableModels[0]) != null ? _d : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_c = availableModels[0]) != null ? _c : null;
         finalTemperature = this.plugin.settings.temperature;
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
         activeChat = null;
       }
       if (!errorOccurredLoadingData && activeChat) {
-        let preferredModel = ((_e = activeChat.metadata) == null ? void 0 : _e.modelName) || this.plugin.settings.modelName;
+        let preferredModel = ((_d = activeChat.metadata) == null ? void 0 : _d.modelName) || this.plugin.settings.modelName;
         if (availableModels.length > 0) {
           if (preferredModel && availableModels.includes(preferredModel)) {
             finalModelName = preferredModel;
           } else {
             finalModelName = availableModels[0];
-            this.plugin.logger.warn(
-              `[loadAndDisplayActiveChat] Preferred model "${preferredModel}" for chat "${activeChat.metadata.name}" not found in available models [${availableModels.join(
-                ", "
-              )}]. Using first available: "${finalModelName}".`
-            );
           }
         } else {
           finalModelName = null;
-          this.plugin.logger.error(
-            `[loadAndDisplayActiveChat] No available Ollama models detected. Cannot set model for chat "${activeChat.metadata.name}".`
-          );
         }
         if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
-          this.plugin.logger.debug(
-            `[OllamaView] loadAndDisplayActiveChat: Aligning model name in metadata for chat "${activeChat.metadata.name}"... Old: ${activeChat.metadata.modelName}, New: ${finalModelName}`
-          );
           try {
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
@@ -7063,20 +6781,16 @@ Summary:`;
             } else {
             }
           } catch (updateError) {
-            this.plugin.logger.error(
-              `[loadAndDisplayActiveChat] Error awaiting chat model metadata update for chat "${activeChat.metadata.name}":`,
-              updateError
-            );
           }
         }
-        finalTemperature = (_g = (_f = activeChat.metadata) == null ? void 0 : _f.temperature) != null ? _g : this.plugin.settings.temperature;
+        finalTemperature = (_f = (_e = activeChat.metadata) == null ? void 0 : _e.temperature) != null ? _f : this.plugin.settings.temperature;
       } else if (!errorOccurredLoadingData && !activeChat) {
-        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_h = availableModels[0]) != null ? _h : null;
+        finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_g = availableModels[0]) != null ? _g : null;
         finalTemperature = this.plugin.settings.temperature;
         finalRolePath = this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       }
-      if (activeChat && !errorOccurredLoadingData && ((_i = activeChat.messages) == null ? void 0 : _i.length) > 0) {
+      if (activeChat && !errorOccurredLoadingData && ((_h = activeChat.messages) == null ? void 0 : _h.length) > 0) {
         this.hideEmptyState();
         this.currentMessages = [...activeChat.messages];
         this.lastRenderedMessageDate = null;
@@ -7110,7 +6824,7 @@ Summary:`;
                 renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
                 break;
               default:
-                const unknownRoleGroup = (_j = this.chatContainer) == null ? void 0 : _j.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
+                const unknownRoleGroup = (_i = this.chatContainer) == null ? void 0 : _i.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
                 if (unknownRoleGroup && this.chatContainer) {
                   renderAvatar(this.app, this.plugin, unknownRoleGroup, false);
                   const wrapper = unknownRoleGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
@@ -7130,11 +6844,6 @@ Summary:`;
               messageGroupEl = result instanceof Promise ? await result : result;
             }
           } catch (renderError) {
-            this.plugin.logger.error(
-              "[loadAndDisplayActiveChat] Error rendering message during load:",
-              renderError,
-              message
-            );
             const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" });
             errorDiv.setText(`Error rendering message (role: ${message.role})`);
             messageGroupEl = errorDiv;
@@ -7155,7 +6864,7 @@ Summary:`;
         }, 150);
       } else {
         this.showEmptyState();
-        (_k = this.scrollToBottomButton) == null ? void 0 : _k.classList.remove(CSS_CLASSES.VISIBLE || "visible");
+        (_j = this.scrollToBottomButton) == null ? void 0 : _j.classList.remove(CSS_CLASSES.VISIBLE || "visible");
       }
       this.updateInputPlaceholder(finalRoleName);
       this.updateRoleDisplay(finalRoleName);
@@ -7179,7 +6888,6 @@ Summary:`;
         this.updateSendButtonState();
       }
     } catch (error) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] XXX CRITICAL OUTER ERROR XXX", error);
       this.clearChatContainerInternal();
       this.showEmptyState();
       if (this.chatContainer) {
@@ -7248,9 +6956,6 @@ Summary:`;
         throw new Error("aborted by user");
       }
       if (chunk.type === "error") {
-        this.plugin.logger.error(
-          `[OllamaView][_processLlmStream id:${requestTimestampId}] Error chunk from service: ${chunk.error}.`
-        );
         throw new Error(chunk.error);
       }
       if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) !== currentTurnLlmResponseTs) {
@@ -7303,9 +7008,6 @@ Summary:`;
         break;
       }
     }
-    this.plugin.logger.error(
-      `[OllamaView][_processLlmStream id:${requestTimestampId}] ACCUMULATED CONTENT AT END OF STREAM (len: ${accumulatedContent.length}): "${accumulatedContent.substring(0, 500)}..."`
-    );
     return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
   }
   _determineToolCalls(nativeToolCalls, assistantMessageWithNativeCalls, accumulatedLlmContent, currentTurnLlmResponseTs, requestTimestampId) {
@@ -7830,7 +7532,6 @@ var OllamaService = class {
     this.plugin = plugin;
     if (!plugin.promptService) {
       const errorMsg = "[OllamaService] CRITICAL: PromptService not available on plugin instance during OllamaService construction!";
-      this.plugin.logger.error(errorMsg);
       throw new Error(errorMsg);
     }
     this.promptService = plugin.promptService;
@@ -7854,7 +7555,6 @@ var OllamaService = class {
         try {
           handler(data);
         } catch (e) {
-          this.plugin.logger.error(`Error in OllamaService event handler for ${event}:`, e);
         }
       });
   }
@@ -7871,12 +7571,10 @@ var OllamaService = class {
       `[OllamaService][id:${requestTimestampId}] generateChatResponseStream initiated for chat ${chat.metadata.id}`
     );
     if (!chat) {
-      this.plugin.logger.error("[OllamaService] generateChatResponseStream called with null chat object.");
       yield { type: "error", error: "Chat object is null.", done: true };
       return;
     }
     if (!this.promptService) {
-      this.plugin.logger.error("[OllamaService] PromptService is unavailable.");
       yield { type: "error", error: "Prompt service is unavailable.", done: true };
       return;
     }
@@ -7884,7 +7582,6 @@ var OllamaService = class {
     const modelName = chat.metadata.modelName || currentSettings.modelName;
     const temperature = (_a = chat.metadata.temperature) != null ? _a : currentSettings.temperature;
     if (!modelName) {
-      this.plugin.logger.error("[OllamaService] No Ollama model selected for chat.", chat.metadata);
       yield { type: "error", error: "No Ollama model selected.", done: true };
       return;
     }
@@ -7895,7 +7592,6 @@ var OllamaService = class {
       const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
       const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
       if (promptBody === null || promptBody === void 0) {
-        this.plugin.logger.error("[OllamaService] Could not generate prompt body for chat.", chat.metadata);
         yield { type: "error", error: "Could not generate prompt body.", done: true };
         return;
       }
@@ -7914,20 +7610,10 @@ var OllamaService = class {
           const seemsToSupportTools = ((_c = (_b = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _b.family) == null ? void 0 : _c.toLowerCase().includes("llama3")) || ((_e = (_d = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _d.family) == null ? void 0 : _e.toLowerCase().includes("mistral")) || ((_f = modelDetails == null ? void 0 : modelDetails.details) == null ? void 0 : _f.parameter_size) && parseFloat(modelDetails.details.parameter_size.replace("B", "")) >= 7;
           if (seemsToSupportTools) {
             requestBody.tools = agentTools.map((tool) => ({ type: "function", function: tool }));
-            this.plugin.logger.info(
-              `[OllamaService] Tools provided to Ollama for model ${modelName}:`,
-              agentTools.map((t) => t.name)
-            );
           } else {
-            this.plugin.logger.info(
-              `[OllamaService] Model ${modelName} might not natively support tool calling (or check failed). Tools not explicitly sent via 'tools' parameter. Relying on prompt-based fallback if implemented.`
-            );
           }
         }
       }
-      this.plugin.logger.debug(
-        `[OllamaService] Sending request to ${url} for model ${modelName}. System prompt length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}, Body prompt length: ${promptBody.length}`
-      );
       this.logger.debug(
         `[OllamaService][id:${requestTimestampId}] Sending request to ${url} for model ${modelName}. Prompt length: ${promptBody.length}. System part length: ${(systemPrompt == null ? void 0 : systemPrompt.length) || 0}`
       );
@@ -7946,13 +7632,11 @@ var OllamaService = class {
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
-        this.plugin.logger.error(`[OllamaService] API Error: ${errorText}`, requestBody);
         this.emit("connection-error", new Error(errorText));
         yield { type: "error", error: errorText, done: true };
         return;
       }
       if (!response.body) {
-        this.plugin.logger.error("[OllamaService] Response body is null.");
         yield { type: "error", error: "Response body is null.", done: true };
         return;
       }
@@ -7963,7 +7647,6 @@ var OllamaService = class {
       while (true) {
         const { done, value } = await reader.read();
         if (signal == null ? void 0 : signal.aborted) {
-          this.plugin.logger.info("[OllamaService] Stream generation aborted by user signal.");
           reader.cancel("Aborted by user");
           yield { type: "error", error: "Generation aborted by user.", done: true };
           return;
@@ -7971,7 +7654,6 @@ var OllamaService = class {
         const decodedChunk = decoder.decode(value, { stream: !done });
         rawResponseAccumulator += decodedChunk;
         if (done) {
-          this.plugin.logger.info("[OllamaService] Stream reader marked as done.");
           this.logger.debug(
             `[OllamaService][id:${requestTimestampId}] Stream reader 'done'. Final raw buffer: "${buffer}${decodedChunk}"`
           );
@@ -8006,9 +7688,6 @@ var OllamaService = class {
                 yield { type: "error", error: jsonChunk.error, done: true };
               }
             } catch (e) {
-              this.plugin.logger.warn(
-                `[OllamaService] Failed to parse final buffer content: "${buffer.trim()}". Error: ${e.message}`
-              );
             }
           }
           break;
@@ -8022,19 +7701,12 @@ var OllamaService = class {
             continue;
           try {
             const jsonChunk = JSON.parse(line);
-            this.plugin.logger.debug("[OllamaService] Raw chunk received:", JSON.stringify(jsonChunk));
             if (jsonChunk.error) {
-              this.plugin.logger.error(`[OllamaService] Error chunk from Ollama: ${jsonChunk.error}`);
               yield { type: "error", error: jsonChunk.error, done: true };
               reader.cancel("Error received from Ollama stream");
               return;
             }
             if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
-              this.plugin.logger.error(
-                "[OllamaService] Raw tool_calls content:",
-                JSON.stringify(jsonChunk.message.tool_calls, null, 2)
-              );
-              this.plugin.logger.info("[OllamaService] Yielding tool_calls chunk:", jsonChunk.message.tool_calls);
               yield {
                 type: "tool_calls",
                 calls: jsonChunk.message.tool_calls,
@@ -8043,7 +7715,6 @@ var OllamaService = class {
                 created_at: jsonChunk.created_at
               };
               if (jsonChunk.done === true) {
-                this.plugin.logger.info("[OllamaService] Stream finished (done:true received with tool_calls chunk).");
                 yield {
                   type: "done",
                   model: jsonChunk.model,
@@ -8066,14 +7737,6 @@ var OllamaService = class {
                 return;
               }
             } else if (typeof jsonChunk.response === "string") {
-              this.plugin.logger.debug("[OllamaService] Yielding content chunk.");
-              this.plugin.logger.error("[OllamaService] mes:", jsonChunk.message);
-              this.plugin.logger.debug("[OllamaService] Raw content chunk:", jsonChunk.response);
-              this.plugin.logger.debug(
-                "[OllamaService] Raw content chunk (stringify):",
-                JSON.stringify(jsonChunk.response, null, 2)
-              );
-              this.plugin.logger.debug("[OllamaService] Raw content chunk (stringify):", jsonChunk);
               yield {
                 type: "content",
                 response: jsonChunk.response,
@@ -8082,12 +7745,8 @@ var OllamaService = class {
                 created_at: jsonChunk.created_at
               };
               if (jsonChunk.done === true) {
-                this.plugin.logger.info("[OllamaService] Stream finished (done:true received with content chunk).");
-                this.plugin.logger.error("[OllamaService] Final chunk with metrics:", jsonChunk);
               }
             } else if (jsonChunk.done === true) {
-              this.plugin.logger.info("[OllamaService] Stream finished (final done:true chunk with metrics).");
-              this.plugin.logger.error("[OllamaService] mes:", jsonChunk.message);
               yield {
                 type: "done",
                 model: jsonChunk.model,
@@ -8104,15 +7763,11 @@ var OllamaService = class {
             } else if (jsonChunk.message && (jsonChunk.message.content === null || jsonChunk.message.content === "") && !jsonChunk.message.tool_calls) {
             }
           } catch (e) {
-            this.plugin.logger.warn(
-              `[OllamaService] Failed to parse JSON chunk: "${line}". Error: ${e.message}. Skipping chunk.`
-            );
           }
         }
       }
     } catch (error) {
       if (error.name === "AbortError") {
-        this.plugin.logger.info("[OllamaService] Stream generation aborted by user (caught AbortError).");
         yield { type: "error", error: "Generation aborted by user.", done: true };
       } else {
         let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
@@ -8120,17 +7775,14 @@ var OllamaService = class {
           errorMessage = `Connection Error: Failed to reach Ollama at ${this.plugin.settings.ollamaServerUrl}. Is it running?`;
           this.emit("connection-error", new Error(errorMessage));
         }
-        this.plugin.logger.error(`[OllamaService] Error during stream generation: ${errorMessage}`, error);
         yield { type: "error", error: errorMessage, done: true };
       }
     } finally {
-      this.plugin.logger.info("[OllamaService] generateChatResponseStream finished or terminated.");
     }
   }
   async generateRaw(requestBody) {
     var _a;
     if (!requestBody.model || !requestBody.prompt) {
-      this.plugin.logger.error("[OllamaService] generateRaw called without 'model' or 'prompt'.");
       throw new Error("generateRaw requires 'model' and 'prompt' in requestBody");
     }
     requestBody.stream = false;
@@ -8153,19 +7805,16 @@ var OllamaService = class {
         } catch (e) {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
-        this.plugin.logger.error(`[OllamaService] API Error (generateRaw): ${errorText}`, requestBody);
         this.emit("connection-error", new Error(errorText));
         throw new Error(errorText);
       }
       if (!response.body) {
-        this.plugin.logger.error("[OllamaService] Response body is null (generateRaw).");
         throw new Error("Response body is null (generateRaw)");
       }
       return await response.json();
     } catch (error) {
       const connectionErrorMsg = `Failed to connect/communicate with Ollama server at ${this.plugin.settings.ollamaServerUrl}. Is it running? (Endpoint: /api/generate, non-streamed)`;
       if (!((_a = error.message) == null ? void 0 : _a.includes("Ollama API error"))) {
-        this.plugin.logger.error(`[OllamaService] Connection/Fetch Error (generateRaw): ${connectionErrorMsg}`, error);
         this.emit("connection-error", new Error(connectionErrorMsg));
       }
       throw new Error(error.message || connectionErrorMsg);
@@ -8193,30 +7842,19 @@ var OllamaService = class {
               errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
             } catch (e) {
             }
-            this.plugin.logger.warn(
-              `[OllamaService] Embeddings API Error for prompt "${trimmedPrompt.substring(0, 30)}...": ${errorText}`
-            );
             continue;
           }
           const embeddingResponse = await response.json();
           if (embeddingResponse && embeddingResponse.embedding) {
             embeddingsList.push(embeddingResponse.embedding);
           } else {
-            this.plugin.logger.warn(
-              `[OllamaService] Valid response but no embedding found for prompt "${trimmedPrompt.substring(0, 30)}..."`
-            );
           }
         } catch (singleError) {
-          this.plugin.logger.error(
-            `[OllamaService] Error generating embedding for prompt "${trimmedPrompt.substring(0, 30)}...": ${singleError.message}`,
-            singleError
-          );
           this.emit("connection-error", new Error(singleError.message || "Embedding generation failed for a prompt"));
         }
       }
       return embeddingsList.length > 0 ? embeddingsList : null;
     } catch (error) {
-      this.plugin.logger.error(`[OllamaService] Outer error in generateEmbeddings: ${error.message}`, error);
       return null;
     }
   }
@@ -8234,7 +7872,6 @@ var OllamaService = class {
           errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
         } catch (e) {
         }
-        this.plugin.logger.error(`[OllamaService] Tags API Error: ${errorText}`);
         this.emit("connection-error", new Error(errorText));
         return [];
       }
@@ -8242,12 +7879,10 @@ var OllamaService = class {
       if (data && Array.isArray(data.models)) {
         modelListResult = data.models.map((m) => m == null ? void 0 : m.name).filter((name) => typeof name === "string" && name.length > 0).sort();
       } else {
-        this.plugin.logger.warn("[OllamaService] Received unexpected data format from /api/tags", data);
       }
     } catch (e) {
       const connectionErrorMsg = `Failed to connect or fetch models from Ollama server at ${this.plugin.settings.ollamaServerUrl}. (Endpoint: /api/tags)`;
       if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
-        this.plugin.logger.error(`[OllamaService] Connection/Fetch Error (getModels): ${connectionErrorMsg}`, e);
         this.emit("connection-error", new Error(e.message || connectionErrorMsg));
       }
       return [];
@@ -8268,7 +7903,6 @@ var OllamaService = class {
           errorText += `: ${(errJson == null ? void 0 : errJson.error) || "Details unavailable"}`;
         } catch (e) {
         }
-        this.plugin.logger.error(`[OllamaService] Show API Error: ${errorText}`);
         if (response.status !== 404) {
           this.emit("connection-error", new Error(errorText));
         }
@@ -8279,7 +7913,6 @@ var OllamaService = class {
     } catch (e) {
       const connectionErrorMsg = `Failed to connect or get details for model ${modelName} from Ollama server at ${this.plugin.settings.ollamaServerUrl}. (Endpoint: /api/show)`;
       if (!((_a = e.message) == null ? void 0 : _a.includes("API error"))) {
-        this.plugin.logger.error(`[OllamaService] Connection/Fetch Error (getModelDetails): ${connectionErrorMsg}`, e);
         this.emit("connection-error", new Error(e.message || connectionErrorMsg));
       }
       return null;
@@ -10644,7 +10277,6 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       return this.view;
     });
     this.ollamaService.on("connection-error", (error) => {
-      this.logger.error("Ollama connection error detected:", error);
       this.emit("ollama-connection-error", error.message || "Unknown connection error");
     });
     this.register(
@@ -10660,7 +10292,6 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     this.register(
       this.on("settings-updated", () => {
         var _a, _b, _c, _d;
-        this.logger.info("Settings updated, applying changes...");
         this.logger.updateSettings({
           consoleLogLevel: this.settings.consoleLogLevel,
           fileLoggingEnabled: this.settings.fileLoggingEnabled,
@@ -10751,9 +10382,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     this.settingTab = new OllamaSettingTab(this.app, this);
     this.addSettingTab(this.settingTab);
     this.app.workspace.onLayoutReady(async () => {
-      this.logger.info("Workspace layout ready.");
       if (this.settings.ragEnabled && this.settings.ragAutoIndexOnStartup) {
-        this.logger.info("RAG enabled, starting initial indexing after delay...");
         setTimeout(() => {
           var _a;
           (_a = this.ragService) == null ? void 0 : _a.indexDocuments();
