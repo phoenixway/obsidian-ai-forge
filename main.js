@@ -9881,6 +9881,169 @@ ${files.join("\n")}`;
   }
 };
 
+// src/examples/WeatherAgent.ts
+var OPENWEATHERMAP_API_KEY = "16771698f22a664fd02258a97d7f7fa8";
+var OPENWEATHERMAP_BASE_URL = "https://api.openweathermap.org/data/2.5";
+var WeatherAgent = class {
+  constructor() {
+    this.id = "weather-agent";
+    this.name = "Weather Agent";
+    this.description = "An agent that can fetch weather forecasts from the internet.";
+  }
+  getTools() {
+    return [
+      {
+        name: "getWeatherToday",
+        description: "Gets today's weather forecast for a specified location.",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "The city name or location for the weather forecast (e.g., 'Kyiv', 'London')."
+            }
+          },
+          required: ["location"]
+        }
+      },
+      {
+        name: "getWeatherTomorrow",
+        description: "Gets tomorrow's weather forecast for a specified location.",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "The city name or location for the weather forecast."
+            }
+          },
+          required: ["location"]
+        }
+      },
+      {
+        name: "getWeather5Days",
+        description: "Gets the weather forecast for the next 5 days for a specified location.",
+        parameters: {
+          type: "object",
+          properties: {
+            location: {
+              type: "string",
+              description: "The city name or location for the weather forecast."
+            }
+          },
+          required: ["location"]
+        }
+      }
+    ];
+  }
+  async executeTool(toolName, args, plugin) {
+    const location = args.location;
+    if (!location || typeof location !== "string") {
+      return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u0410\u0440\u0433\u0443\u043C\u0435\u043D\u0442 'location' \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456\u0439 \u0430\u0431\u043E \u043D\u0435 \u0454 \u0440\u044F\u0434\u043A\u043E\u043C.";
+    }
+    if (OPENWEATHERMAP_API_KEY === "16771698f22a664fd02258a97d7f7fa8") {
+      return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043E\u0431\u0445\u0456\u0434\u043D\u043E \u0437\u0430\u043C\u0456\u043D\u0438\u0442\u0438 'YOUR_OPENWEATHERMAP_API_KEY' \u043D\u0430 \u0432\u0430\u0448 \u0441\u043F\u0440\u0430\u0432\u0436\u043D\u0456\u0439 \u043A\u043B\u044E\u0447 OpenWeatherMap \u0443 \u043A\u043E\u0434\u0456 \u0430\u0433\u0435\u043D\u0442\u0430.";
+    }
+    try {
+      let url = "";
+      let forecastData;
+      url = `${OPENWEATHERMAP_BASE_URL}/forecast?q=${encodeURIComponent(location)}&units=metric&appid=${OPENWEATHERMAP_API_KEY}&lang=ua`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        let errorBody = await response.text();
+        try {
+          const errorJson = JSON.parse(errorBody);
+          if (errorJson.message) {
+            errorBody = errorJson.message;
+          }
+        } catch (e) {
+        }
+        throw new Error(`\u041F\u043E\u043C\u0438\u043B\u043A\u0430 HTTP: ${response.status} ${response.statusText}. \u0412\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C API: ${errorBody}`);
+      }
+      const data = await response.json();
+      if (data.cod !== "200") {
+        throw new Error(`\u041F\u043E\u043C\u0438\u043B\u043A\u0430 API: ${data.message || "\u041D\u0435\u0432\u0456\u0434\u043E\u043C\u0430 \u043F\u043E\u043C\u0438\u043B\u043A\u0430 API"}`);
+      }
+      forecastData = data.list;
+      const city = data.city.name;
+      let result = `\u041F\u0440\u043E\u0433\u043D\u043E\u0437 \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F ${city}:
+
+`;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayAfterTomorrow = new Date(today);
+      dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+      switch (toolName) {
+        case "getWeatherToday": {
+          const todayForecast = forecastData.find((item) => {
+            const itemDate = new Date(item.dt * 1e3);
+            itemDate.setHours(0, 0, 0, 0);
+            return itemDate.getTime() === today.getTime();
+          });
+          if (todayForecast) {
+            result += `\u0421\u044C\u043E\u0433\u043E\u0434\u043D\u0456 (${new Date(todayForecast.dt * 1e3).toLocaleDateString()}): ${todayForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${todayForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${todayForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${todayForecast.main.humidity}%.`;
+          } else {
+            result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0441\u044C\u043E\u0433\u043E\u0434\u043D\u0456.";
+          }
+          break;
+        }
+        case "getWeatherTomorrow": {
+          const tomorrowForecast = forecastData.find((item) => {
+            const itemDate = new Date(item.dt * 1e3);
+            itemDate.setHours(0, 0, 0, 0);
+            return itemDate.getTime() === tomorrow.getTime();
+          });
+          if (tomorrowForecast) {
+            result += `\u0417\u0430\u0432\u0442\u0440\u0430 (${new Date(tomorrowForecast.dt * 1e3).toLocaleDateString()}): ${tomorrowForecast.weather[0].description}, \u0422\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u0430: ${tomorrowForecast.main.temp}\xB0C, \u0412\u0456\u0434\u0447\u0443\u0432\u0430\u0454\u0442\u044C\u0441\u044F \u044F\u043A: ${tomorrowForecast.main.feels_like}\xB0C, \u0412\u043E\u043B\u043E\u0433\u0456\u0441\u0442\u044C: ${tomorrowForecast.main.humidity}%.`;
+          } else {
+            result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u0437\u043D\u0430\u0439\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 \u0437\u0430\u0432\u0442\u0440\u0430. API \u043C\u043E\u0436\u0435 \u043D\u0435 \u043D\u0430\u0434\u0430\u0432\u0430\u0442\u0438 \u0434\u0430\u043D\u0456 \u0442\u0430\u043A \u0434\u0430\u043B\u0435\u043A\u043E \u0432\u043F\u0435\u0440\u0435\u0434 \u0430\u0431\u043E \u0434\u043B\u044F \u0446\u044C\u043E\u0433\u043E \u043C\u0456\u0441\u0442\u0430.";
+          }
+          break;
+        }
+        case "getWeather5Days": {
+          const dailyForecasts = {};
+          let daysCount = 0;
+          const maxDays = 5;
+          for (const item of forecastData) {
+            const itemDate = new Date(item.dt * 1e3);
+            const dateString = itemDate.toLocaleDateString();
+            if (itemDate.getTime() < new Date().getTime() && new Date(itemDate).toDateString() === new Date().toDateString()) {
+              continue;
+            }
+            if (!dailyForecasts[dateString]) {
+              dailyForecasts[dateString] = item;
+              daysCount++;
+            }
+            if (daysCount >= maxDays) {
+              break;
+            }
+          }
+          if (Object.keys(dailyForecasts).length > 0) {
+            for (const dateString in dailyForecasts) {
+              const item = dailyForecasts[dateString];
+              const date = new Date(item.dt * 1e3).toLocaleDateString();
+              const dayOfWeek = new Date(item.dt * 1e3).toLocaleDateString("uk-UA", { weekday: "long" });
+              result += `- ${dayOfWeek}, ${date}: ${item.weather[0].description}, \u0422\u0435\u043C\u043F.: ${item.main.temp}\xB0C, \u0412\u043E\u043B\u043E\u0433.: ${item.main.humidity}%
+`;
+            }
+          } else {
+            result += "\u041D\u0435 \u0432\u0434\u0430\u043B\u043E\u0441\u044F \u043E\u0442\u0440\u0438\u043C\u0430\u0442\u0438 \u043F\u0440\u043E\u0433\u043D\u043E\u0437 \u043D\u0430 5 \u0434\u043D\u0456\u0432.";
+          }
+          break;
+        }
+        default:
+          return `\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u0432\u0456\u0434\u043E\u043C\u0438\u0439 \u0456\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442 "${toolName}" \u0434\u043B\u044F WeatherAgent.`;
+      }
+      return result;
+    } catch (e) {
+      plugin.logger.error(`[WeatherAgent] \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F ${location}:`, e);
+      return `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F "${location}": ${e.message}`;
+    }
+  }
+};
+
 // src/agents/AgentManager.ts
 var AgentManager = class {
   constructor(plugin) {
@@ -9891,6 +10054,8 @@ var AgentManager = class {
   registerDefaultAgents() {
     const fileAgent = new SimpleFileAgent();
     this.registerAgent(fileAgent);
+    const weatherAgent = new WeatherAgent();
+    this.registerAgent(weatherAgent);
   }
   registerAgent(agent) {
     if (this.agents.has(agent.id)) {
