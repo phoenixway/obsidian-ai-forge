@@ -1612,6 +1612,58 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
 
 // src/renderers/AssistantMessageRenderer.ts
 var import_obsidian9 = require("obsidian");
+
+// src/utils/toolParser.ts
+function parseAllTextualToolCalls(text, logger) {
+  const calls = [];
+  if (!text || typeof text !== "string") {
+    logger.warn("[toolParser] Input text is null, undefined, or not a string. Returning empty array.");
+    return calls;
+  }
+  const openTag = "<tool_call>";
+  const closeTag = "</tool_call>";
+  let currentIndex = 0;
+  logger.debug(`[toolParser] Starting to parse text for tool calls. Text length: ${text.length}`);
+  while (currentIndex < text.length) {
+    const openTagIndex = text.indexOf(openTag, currentIndex);
+    if (openTagIndex === -1) {
+      logger.debug("[toolParser] No more open <tool_call> tags found.");
+      break;
+    }
+    const closeTagIndex = text.indexOf(closeTag, openTagIndex + openTag.length);
+    if (closeTagIndex === -1) {
+      logger.warn(`[toolParser] Found an open <tool_call> tag at index ${openTagIndex} without a subsequent closing tag. Content preview: "${text.substring(openTagIndex, openTagIndex + 50)}..."`);
+      break;
+    }
+    const jsonString = text.substring(openTagIndex + openTag.length, closeTagIndex).trim();
+    logger.debug(`[toolParser] Attempting to parse potential JSON string: "${jsonString.substring(0, 100)}..."`);
+    if (!jsonString) {
+      logger.warn(`[toolParser] Empty content found between <tool_call> tags at index ${openTagIndex}. Skipping.`);
+      currentIndex = closeTagIndex + closeTag.length;
+      continue;
+    }
+    try {
+      const parsedJson = JSON.parse(jsonString);
+      if (parsedJson && typeof parsedJson.name === "string" && (typeof parsedJson.arguments === "object" || parsedJson.arguments === void 0 || parsedJson.arguments === null)) {
+        calls.push({ name: parsedJson.name, arguments: parsedJson.arguments || {} });
+        logger.debug(`[toolParser] Successfully parsed tool call: ${parsedJson.name}`);
+      } else {
+        logger.error("[toolParser] Parsed JSON does not match expected structure (name: string, arguments: object/undefined/null).", { jsonString, parsedJson });
+      }
+    } catch (e) {
+      logger.error(`[toolParser] Failed to parse JSON from tool_call content. JSON string was: "${jsonString}". Error: ${e.message}`);
+    }
+    currentIndex = closeTagIndex + closeTag.length;
+  }
+  if (calls.length > 0) {
+    logger.info(`[toolParser] Successfully parsed ${calls.length} textual tool call(s).`);
+  } else if (text.includes(openTag)) {
+    logger.warn(`[toolParser] <tool_call> tags were present in the text, but no valid JSON tool calls were parsed.`);
+  }
+  return calls;
+}
+
+// src/renderers/AssistantMessageRenderer.ts
 var AssistantMessageRenderer = class extends BaseMessageRenderer {
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
@@ -1650,7 +1702,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
         assistantMessage.tool_calls.forEach((tc) => toolNamesExtracted.push(tc.function.name));
       } else if (hasTextualToolCallTagsInProcessedContent) {
         plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from: "${contentToProcess.substring(0, 150)}..."`);
-        const parsedTextualCalls = view.parseAllTextualToolCalls(contentToProcess);
+        const parsedTextualCalls = parseAllTextualToolCalls(contentToProcess, plugin.logger);
         parsedTextualCalls.forEach((ptc) => toolNamesExtracted.push(ptc.name));
         plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Extracted tool names via parseAllTextualToolCalls: ${toolNamesExtracted.join(", ")}`);
         accompanyingText = contentToProcess.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
@@ -7317,42 +7369,6 @@ Summary:`;
     }
     return { metadataUpdated };
   }
-  // В OllamaView.ts
-  parseAllTextualToolCalls(text) {
-    const calls = [];
-    const openTag = "<tool_call>";
-    const closeTag = "</tool_call>";
-    let currentIndex = 0;
-    while (currentIndex < text.length) {
-      const openTagIndex = text.indexOf(openTag, currentIndex);
-      if (openTagIndex === -1)
-        break;
-      const closeTagIndex = text.indexOf(closeTag, openTagIndex + openTag.length);
-      if (closeTagIndex === -1) {
-        this.plugin.logger.warn("[OllamaView.parseAllTextualToolCalls] Found an open <tool_call> tag without a subsequent closing tag.", { searchStartIndex: openTagIndex });
-        break;
-      }
-      const jsonString = text.substring(openTagIndex + openTag.length, closeTagIndex).trim();
-      this.plugin.logger.debug(`[OllamaView.parseAllTextualToolCalls] Attempting to parse JSON string: "${jsonString}"`);
-      try {
-        const parsedJson = JSON.parse(jsonString);
-        if (parsedJson && typeof parsedJson.name === "string" && (typeof parsedJson.arguments === "object" || parsedJson.arguments === void 0 || parsedJson.arguments === null)) {
-          calls.push({ name: parsedJson.name, arguments: parsedJson.arguments || {} });
-        } else {
-          this.plugin.logger.error("[OllamaView.parseAllTextualToolCalls] Parsed JSON does not match expected structure.", { jsonString, parsedJson });
-        }
-      } catch (e) {
-        this.plugin.logger.error(`[OllamaView.parseAllTextualToolCalls] Failed to parse JSON from tool_call content. JSON string was: "${jsonString}". Error:`, e.message);
-      }
-      currentIndex = closeTagIndex + closeTag.length;
-    }
-    if (calls.length > 0) {
-      this.plugin.logger.info(`[OllamaView.parseAllTextualToolCalls] Successfully parsed ${calls.length} textual tool call(s).`);
-    } else if (text.includes(openTag)) {
-      this.plugin.logger.warn(`[OllamaView.parseAllTextualToolCalls] <tool_call> tags were present, but no valid JSON calls were parsed.`);
-    }
-    return calls;
-  }
   // --- Кінець методу handleActiveChatChanged ---
   async _processAndRenderUserMessage(content, timestamp, requestTimestampId) {
     const timestampMs = timestamp.getTime();
@@ -7481,7 +7497,7 @@ Summary:`;
     let assistantMessageForHistory;
     if (!processedToolCallsThisTurn || processedToolCallsThisTurn.length === 0) {
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] No native tool_calls. Checking textual. Content length: ${accumulatedLlmContent.length}`);
-      const parsedTextualCalls = this.parseAllTextualToolCalls(accumulatedLlmContent);
+      const parsedTextualCalls = parseAllTextualToolCalls(accumulatedLlmContent, this.plugin.logger);
       if (parsedTextualCalls.length > 0) {
         isTextualFallbackUsed = true;
         processedToolCallsThisTurn = parsedTextualCalls.map((tc, index) => ({
@@ -8722,14 +8738,6 @@ var import_obsidian19 = require("obsidian");
 // src/Chat.ts
 var import_obsidian18 = require("obsidian");
 var Chat = class {
-  // Додати властивість
-  /**
-   * Creates an instance of Chat. Should be called by ChatManager.
-   * @param adapter - Obsidian's DataAdapter.
-   * @param settings - Plugin settings relevant for chat operation.
-   * @param data - The initial chat data (metadata and messages).
-   * @param filePath - The full, normalized path where this chat should be saved/loaded from within the vault. **Required**.
-   */
   constructor(adapter, settings, data, filePath, logger) {
     this.adapter = adapter;
     this.pluginSettings = settings;
@@ -8739,15 +8747,6 @@ var Chat = class {
     this.logger = logger;
     this.debouncedSave = (0, import_obsidian18.debounce)(this._saveToFile.bind(this), 1500, true);
   }
-  // --- Message Management ---
-  /**
-   * Adds a new message to the chat history.
-   * Updates the lastModified timestamp and triggers a debounced save.
-   * @param role - The role of the message sender ('user', 'assistant', etc.).
-   * @param content - The text content of the message.
-   * @param timestamp - The timestamp for the message (defaults to now).
-   * @returns The newly added message object.
-   */
   addMessage(role, content, timestamp = new Date()) {
     const newMessage = { role, content, timestamp };
     this.messages.push(newMessage);
@@ -8755,24 +8754,14 @@ var Chat = class {
     this.save();
     return newMessage;
   }
-  /** Returns a copy of the chat messages array. */
   getMessages() {
     return [...this.messages];
   }
-  /** Clears all messages from the chat history. Updates lastModified and saves. */
   clearMessages() {
-    console.log(`[Chat ${this.metadata.id}] Clearing messages.`);
     this.messages = [];
     this.metadata.lastModified = new Date().toISOString();
     this.save();
   }
-  // У файлі Chat.ts
-  /**
-   * Updates specified metadata fields for the chat.
-   * Automatically updates the lastModified timestamp and triggers a save if changes occurred.
-   * @param updates - An object containing metadata fields to update (cannot update 'id' or 'createdAt').
-   * @returns {boolean} - True if any metadata field was actually changed, false otherwise.
-   */
   updateMetadata(updates) {
     let changed = false;
     const currentMeta = this.metadata;
@@ -8798,90 +8787,34 @@ var Chat = class {
     }
     if (changed) {
       this.metadata.lastModified = new Date().toISOString();
-      if (this.pluginSettings.logger) {
-        this.pluginSettings.logger.debug(`[Chat ${this.metadata.id}] Metadata updated, scheduling save:`, updates);
-      } else {
-        console.log(`[Chat ${this.metadata.id}] Metadata updated, scheduling save:`, updates);
-      }
       this.save();
-    } else {
-      if (this.pluginSettings.logger) {
-        this.pluginSettings.logger.debug(`[Chat ${this.metadata.id}] updateMetadata called, but no changes detected.`);
-      } else {
-        console.log(`[Chat ${this.metadata.id}] updateMetadata called, but no changes detected.`);
-      }
     }
     return changed;
   }
-  // Також переконайтесь, що конструктор Chat приймає і зберігає logger (або plugin)
-  // і що він передається при викликах new Chat та Chat.loadFromFile в ChatManager.ts
-  // Приклад оновленого конструктора Chat:
-  /*
-      private logger: Logger; // Додати властивість
-  
-      constructor(
-          adapter: DataAdapter,
-          settings: ChatConstructorSettings,
-          data: ChatData,
-          filePath: string,
-          logger: Logger // Додати параметр
-      ) {
-          this.adapter = adapter;
-          this.pluginSettings = settings;
-          this.filePath = normalizePath(filePath);
-          this.metadata = data.metadata;
-          this.messages = data.messages.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
-          this.logger = logger; // Зберегти логер
-  
-          
-          this.debouncedSave = debounce(this._saveToFile.bind(this), 1500, true);
-      }
-  
-      // І оновіть статичний метод loadFromFile, щоб він теж приймав та передавав logger
-       static async loadFromFile(filePath: string, adapter: DataAdapter, settings: ChatConstructorSettings, logger: Logger): Promise<Chat | null> {
-          // ...
-          return new Chat(adapter, settings, data, normPath, logger); // Передати logger
-          // ...
-       }
-       */
-  // --- Persistence ---
-  /** Triggers a debounced save if message history saving is enabled. */
   save() {
     if (this.pluginSettings.saveMessageHistory) {
       this.debouncedSave();
-    } else {
     }
   }
-  /**
-   * Saves the current chat state to its file immediately.
-   * Bypasses the debounce timer. Returns true on success, false on failure.
-   */
   async saveImmediately() {
     if (!this.pluginSettings.saveMessageHistory) {
       return true;
     }
     return await this._saveToFile();
   }
-  /**
-   * Internal method to perform the actual file writing operation.
-   * Creates necessary directories if they don't exist.
-   */
   async _saveToFile() {
     const chatData = {
       metadata: this.metadata,
       messages: this.messages.map((m) => ({
         ...m,
         timestamp: m.timestamp.toISOString()
-        // Cast to any to satisfy type, it's a string
       }))
     };
     const jsonString = JSON.stringify(chatData, null, 2);
     try {
       const dirPath = this.filePath.substring(0, this.filePath.lastIndexOf("/"));
       if (dirPath && !await this.adapter.exists(dirPath)) {
-        console.log(`[Chat ${this.metadata.id}] Directory ${dirPath} does not exist. Creating...`);
         await this.adapter.mkdir(dirPath);
-        console.log(`[Chat ${this.metadata.id}] Directory ${dirPath} created.`);
       }
       await this.adapter.write(this.filePath, jsonString);
       return true;
@@ -8891,20 +8824,11 @@ var Chat = class {
       return false;
     }
   }
-  /**
-   * Static method to load chat data from a specified file path within the vault.
-   * Called by ChatManager.
-   * @param filePath - The full, normalized path to the chat file.
-   * @param adapter - Obsidian's DataAdapter.
-   * @param settings - Plugin settings.
-   * @returns A new Chat instance or null if loading fails.
-   */
   static async loadFromFile(filePath, adapter, settings, logger) {
     var _a;
     const normPath = (0, import_obsidian18.normalizePath)(filePath);
     try {
       if (!await adapter.exists(normPath)) {
-        logger.warn(`[Chat] File not found for loading: ${normPath}`);
         return null;
       }
       const json = await adapter.read(normPath);
@@ -8912,29 +8836,21 @@ var Chat = class {
       if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && Array.isArray(data.messages)) {
         return new Chat(adapter, settings, data, normPath, logger);
       } else {
-        logger.error(`[Chat] Invalid data structure in file for static load: ${normPath}`, data);
         new import_obsidian18.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
         return null;
       }
     } catch (e) {
-      logger.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
+      console.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
       new import_obsidian18.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
       return null;
     }
   }
-  /**
-   * Deletes the chat's associated `.json` file from the vault.
-   * @returns true if the file was deleted or didn't exist, false on error.
-   */
   async deleteFile() {
-    console.log(`[Chat ${this.metadata.id}] Attempting to delete file: ${this.filePath}`);
     try {
       if (await this.adapter.exists(this.filePath)) {
         await this.adapter.remove(this.filePath);
-        console.log(`[Chat ${this.metadata.id}] Successfully deleted file: ${this.filePath}`);
         return true;
       }
-      console.log(`[Chat ${this.metadata.id}] File already deleted or never existed: ${this.filePath}`);
       return true;
     } catch (e) {
       console.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
@@ -8948,20 +8864,12 @@ var Chat = class {
       messages: this.messages
     };
   }
-  /**
-       * Записує активність у чаті, оновлюючи мітку часу lastModified.
-       * Автоматично викликає збереження чату (з debounce).
-       * @returns {boolean} - True, якщо мітка lastModified була фактично змінена, інакше false.
-       */
   recordActivity() {
     const oldLastModified = this.metadata.lastModified;
     this.metadata.lastModified = new Date().toISOString();
     const changed = oldLastModified !== this.metadata.lastModified;
     if (changed) {
-      this.logger.trace(`[Chat ${this.metadata.id}] Activity recorded. lastModified updated to ${this.metadata.lastModified}. Scheduling save.`);
       this.save();
-    } else {
-      this.logger.trace(`[Chat ${this.metadata.id}] recordActivity called, but lastModified did not change (called too quickly?).`);
     }
     return changed;
   }

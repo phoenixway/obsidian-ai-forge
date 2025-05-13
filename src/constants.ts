@@ -76,7 +76,7 @@ export const CSS_CLASSES = {
      THINKING_HEADER: "thinking-header",
      THINKING_TOGGLE:  "thinking-toggle",
      THINKING_TITLE: "thinking-title",
-     THINKING_CONTENT: "thinking-content",
+     THINKING_CONTENT: "thinking-content",                 
 
      // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };

@@ -7,6 +7,7 @@ import { CSS_CLASSES } from "../constants";
 import * as RendererUtils from "../MessageRendererUtils";
 import { BaseMessageRenderer } from "./BaseMessageRenderer";
 import { IMessageRenderer } from "./IMessageRenderer";
+import { parseAllTextualToolCalls } from "@/utils/toolParser";
 
 export class AssistantMessageRenderer extends BaseMessageRenderer implements IMessageRenderer {
 
@@ -66,7 +67,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
                 plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Processing TEXTUAL tool_call tags from: "${contentToProcess.substring(0,150)}..."`);
                 
                 // Використовуємо parseAllTextualToolCalls з OllamaView для отримання імен
-                const parsedTextualCalls = view.parseAllTextualToolCalls(contentToProcess); // <--- ВИКЛИК МЕТОДУ З VIEW
+                const parsedTextualCalls = parseAllTextualToolCalls(contentToProcess, plugin.logger); // <--- ВИКЛИК МЕТОДУ З VIEW
                 parsedTextualCalls.forEach(ptc => toolNamesExtracted.push(ptc.name));
                 plugin.logger.debug(`[ARender STATIC PREP][ts:${messageTimestampLog}] Extracted tool names via parseAllTextualToolCalls: ${toolNamesExtracted.join(', ')}`);
                 

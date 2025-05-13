@@ -35,6 +35,7 @@ import { SidebarManager } from "./SidebarManager";
 import { DropdownMenuManager } from "./DropdownMenuManager";
 import { ToolMessageRenderer } from "./renderers/ToolMessageRenderer";
 import { StreamChunk } from "./OllamaService"; 
+import { parseAllTextualToolCalls } from "./utils/toolParser";
 
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
@@ -4250,51 +4251,6 @@ export class OllamaView extends ItemView {
   }
 
   
-// В OllamaView.ts
-public parseAllTextualToolCalls(text: string): Array<{ name: string; arguments: any }> {
-  const calls: Array<{ name: string; arguments: any }> = [];
-  const openTag = "<tool_call>";
-  const closeTag = "</tool_call>";
-  let currentIndex = 0;
-
-  while (currentIndex < text.length) {
-      const openTagIndex = text.indexOf(openTag, currentIndex);
-      if (openTagIndex === -1) break;
-
-      // Шукаємо закриваючий тег ПІСЛЯ поточного відкриваючого
-      const closeTagIndex = text.indexOf(closeTag, openTagIndex + openTag.length);
-      if (closeTagIndex === -1) {
-          this.plugin.logger.warn("[OllamaView.parseAllTextualToolCalls] Found an open <tool_call> tag without a subsequent closing tag.", { searchStartIndex: openTagIndex });
-          break; 
-      }
-
-      const jsonString = text.substring(openTagIndex + openTag.length, closeTagIndex).trim();
-      this.plugin.logger.debug(`[OllamaView.parseAllTextualToolCalls] Attempting to parse JSON string: "${jsonString}"`);
-
-      try {
-          const parsedJson = JSON.parse(jsonString); // << Головне місце можливої помилки
-          if (parsedJson && 
-              typeof parsedJson.name === 'string' && 
-              (typeof parsedJson.arguments === 'object' || parsedJson.arguments === undefined || parsedJson.arguments === null)
-             ) {
-              calls.push({ name: parsedJson.name, arguments: parsedJson.arguments || {} });
-          } else {
-              this.plugin.logger.error("[OllamaView.parseAllTextualToolCalls] Parsed JSON does not match expected structure.", {jsonString, parsedJson});
-          }
-      } catch (e: any) {
-          this.plugin.logger.error(`[OllamaView.parseAllTextualToolCalls] Failed to parse JSON from tool_call content. JSON string was: "${jsonString}". Error:`, e.message);
-          // Не додаємо цей виклик, якщо JSON невалідний, і продовжуємо пошук наступних
-      }
-      currentIndex = closeTagIndex + closeTag.length; // Переходимо до наступного пошуку
-  }
-
-  if (calls.length > 0) {
-      this.plugin.logger.info(`[OllamaView.parseAllTextualToolCalls] Successfully parsed ${calls.length} textual tool call(s).`);
-  } else if (text.includes(openTag)) {
-      this.plugin.logger.warn(`[OllamaView.parseAllTextualToolCalls] <tool_call> tags were present, but no valid JSON calls were parsed.`);
-  }
-  return calls;
-}
   // Переконайтесь, що scheduleSidebarChatListUpdate визначено у класі
   // та інші залежності (Logger, CSS класи, типи) імпортовано/визначено.
 
@@ -4553,8 +4509,8 @@ public parseAllTextualToolCalls(text: string): Array<{ name: string; arguments: 
 
     if (!processedToolCallsThisTurn || processedToolCallsThisTurn.length === 0) {
       this.plugin.logger.debug(`[sendMessage id:${requestTimestampId}] No native tool_calls. Checking textual. Content length: ${accumulatedLlmContent.length}`);
-      const parsedTextualCalls = this.parseAllTextualToolCalls(accumulatedLlmContent);
-      if (parsedTextualCalls.length > 0) {
+      const parsedTextualCalls = parseAllTextualToolCalls(accumulatedLlmContent, this.plugin.logger);
+            if (parsedTextualCalls.length > 0) {
         isTextualFallbackUsed = true;
         processedToolCallsThisTurn = parsedTextualCalls.map((tc, index) => ({
           type: "function",
