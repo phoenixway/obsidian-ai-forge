@@ -6165,11 +6165,7 @@ Summary:`;
     this.currentAbortController = new AbortController();
     this.setLoadingState(true);
     this.hideEmptyState();
-    const llmResponseStartTimeMs = Date.now();
-    let continueConversation = true;
-    const maxTurns = 5;
-    let turns = 0;
-    let currentTurnLlmResponseTsForCatch = llmResponseStartTimeMs;
+    const initialLlmResponsePlaceholderTs = Date.now();
     try {
       const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
         userInputText,
@@ -6179,88 +6175,19 @@ Summary:`;
       if (!userMessageAdded) {
         throw new Error("User message processing failed in ChatManager.");
       }
-      let chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
-      while (continueConversation && turns < maxTurns && !this.currentAbortController.signal.aborted) {
-        turns++;
-        const currentTurnLlmResponseTs = turns === 1 ? llmResponseStartTimeMs : Date.now();
-        currentTurnLlmResponseTsForCatch = currentTurnLlmResponseTs;
-        this._managePlaceholder(currentTurnLlmResponseTs, requestTimestampId);
-        chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
-        const llmStream = this.plugin.ollamaService.generateChatResponseStream(
-          chatStateForLlm,
-          this.currentAbortController.signal
-        );
-        const { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls } = await this._processLlmStream(
-          llmStream,
-          currentTurnLlmResponseTs,
-          requestTimestampId
-        );
-        if (this.currentAbortController.signal.aborted)
-          throw new Error("aborted by user");
-        const toolCallCheckResult = this._determineToolCalls(
-          nativeToolCalls,
-          assistantMessageWithNativeCalls,
-          accumulatedContent,
-          currentTurnLlmResponseTs,
-          requestTimestampId
-        );
-        if (toolCallCheckResult.processedToolCallsThisTurn && toolCallCheckResult.processedToolCallsThisTurn.length > 0) {
-          await this._executeAndRenderToolCycle(
-            toolCallCheckResult.processedToolCallsThisTurn,
-            toolCallCheckResult.assistantMessageForHistory,
-            requestTimestampId
-          );
-          chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
-          continueConversation = true;
-        } else {
-          await this._renderFinalAssistantText(accumulatedContent, currentTurnLlmResponseTs, requestTimestampId);
-          continueConversation = false;
-        }
+      const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
+      if (!this.currentAbortController) {
+        this.plugin.logger.error("CRITICAL: AbortController not initialized in sendMessage before LlmInteractionCycle call.");
+        throw new Error("AbortController not initialized in sendMessage");
       }
-      if (turns >= maxTurns) {
-        const maxTurnsMsgTimestamp = new Date();
-        const maxTurnsMsg = {
-          role: "system",
-          content: "Max processing turns reached. If the task is not complete, please try rephrasing or breaking it down.",
-          timestamp: maxTurnsMsgTimestamp
-        };
-        const hmaPromise = new Promise((resolve, reject) => {
-          this.plugin.chatManager.registerHMAResolver(maxTurnsMsg.timestamp.getTime(), resolve, reject);
-          setTimeout(() => {
-            if (this.plugin.chatManager.messageAddedResolvers.has(maxTurnsMsg.timestamp.getTime())) {
-              this.plugin.chatManager.rejectAndClearHMAResolver(
-                maxTurnsMsg.timestamp.getTime(),
-                "HMA timeout for max turns msg"
-              );
-            }
-          }, 1e4);
-        });
-        await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
-        try {
-          await hmaPromise;
-        } catch (e_hma) {
-        }
-      }
+      await this._handleLlmInteractionCycle(chatStateForLlm, requestTimestampId, this.currentAbortController.signal);
     } catch (error) {
-      if (this.activePlaceholder && (this.activePlaceholder.timestamp === llmResponseStartTimeMs || currentTurnLlmResponseTsForCatch !== null && this.activePlaceholder.timestamp === currentTurnLlmResponseTsForCatch) && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+      if (this.activePlaceholder && this.activePlaceholder.timestamp === initialLlmResponsePlaceholderTs && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected)
           this.activePlaceholder.groupEl.remove();
       }
-      this.activePlaceholder = null;
-      this.plugin.chatManager.rejectAndClearHMAResolver(
-        userMessageTimestamp.getTime(),
-        `Outer catch in sendMessage for request ${requestTimestampId}`
-      );
-      this.plugin.chatManager.rejectAndClearHMAResolver(
-        llmResponseStartTimeMs,
-        `Outer catch in sendMessage for request ${requestTimestampId}`
-      );
-      if (currentTurnLlmResponseTsForCatch !== null) {
-        this.plugin.chatManager.rejectAndClearHMAResolver(
-          currentTurnLlmResponseTsForCatch,
-          `Outer catch in sendMessage for request ${requestTimestampId}`
-        );
-      }
+      this.plugin.chatManager.rejectAndClearHMAResolver(userMessageTimestamp.getTime(), `Outer catch in sendMessage for user message (req: ${requestTimestampId})`);
+      this.plugin.chatManager.rejectAndClearHMAResolver(initialLlmResponsePlaceholderTs, `Outer catch in sendMessage for initial placeholder (req: ${requestTimestampId})`);
       let errorMsgForChat;
       let errorMsgRole = "error";
       if (error.name === "AbortError" || ((_a = error.message) == null ? void 0 : _a.includes("aborted by user"))) {
@@ -6271,19 +6198,12 @@ Summary:`;
         new import_obsidian15.Notice(errorMsgForChat, 7e3);
       }
       const errorDisplayTimestamp = new Date();
-      const errorDisplayMsg = {
-        role: errorMsgRole,
-        content: errorMsgForChat,
-        timestamp: errorDisplayTimestamp
-      };
+      const errorDisplayMsg = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorDisplayTimestamp };
       const hmaErrorPromise = new Promise((resolve, reject) => {
         this.plugin.chatManager.registerHMAResolver(errorDisplayMsg.timestamp.getTime(), resolve, reject);
         setTimeout(() => {
           if (this.plugin.chatManager.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())) {
-            this.plugin.chatManager.rejectAndClearHMAResolver(
-              errorDisplayMsg.timestamp.getTime(),
-              "HMA timeout for error display msg"
-            );
+            this.plugin.chatManager.rejectAndClearHMAResolver(errorDisplayMsg.timestamp.getTime(), "HMA timeout for error display msg in sendMessage");
           }
         }, 1e4);
       });
@@ -6291,6 +6211,7 @@ Summary:`;
       try {
         await hmaErrorPromise;
       } catch (e_hma) {
+        this.plugin.logger.warn("[SendMessage] HMA for error display message failed or timed out:", e_hma);
       }
     } finally {
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
@@ -6433,213 +6354,6 @@ Summary:`;
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       }
     }
-  }
-  async handleRegenerateClick(userMessage) {
-    var _a;
-    if (this.isRegenerating) {
-      new import_obsidian15.Notice("Regeneration is already in progress. Please wait.", 3e3);
-      return;
-    }
-    if (this.currentAbortController) {
-      new import_obsidian15.Notice("Previous generation process is still active or finishing. Please wait.", 4e3);
-      return;
-    }
-    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
-    if (!activeChat) {
-      new import_obsidian15.Notice("Cannot regenerate: No active chat found.");
-      return;
-    }
-    const chatId = activeChat.metadata.id;
-    const messageIndex = activeChat.messages.findIndex(
-      (msg) => msg.timestamp.getTime() === userMessage.timestamp.getTime() && msg.role === userMessage.role
-    );
-    if (messageIndex === -1) {
-      new import_obsidian15.Notice("Error: Could not find the message to regenerate from.");
-      return;
-    }
-    const hasMessagesAfter = activeChat.messages.length > messageIndex + 1;
-    new ConfirmModal(
-      this.app,
-      "Confirm Regeneration",
-      hasMessagesAfter ? "This will delete all messages after this prompt and generate a new response. Continue?" : "Generate a new response for this prompt?",
-      async () => {
-        var _a2, _b, _c, _d, _e, _f, _g, _h, _i;
-        this.isRegenerating = true;
-        const regenerationRequestTimestamp = new Date().getTime();
-        this.currentAbortController = new AbortController();
-        let accumulatedResponse = "";
-        const responseStartTime = new Date();
-        const responseStartTimeMs = responseStartTime.getTime();
-        this.setLoadingState(true);
-        let streamErrorOccurred = null;
-        let mainAssistantMessageProcessedPromise;
-        try {
-          if (hasMessagesAfter) {
-            const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndex);
-            if (!deleteSuccess) {
-              throw new Error("Failed to delete subsequent messages for regeneration.");
-            }
-          }
-          await this.loadAndDisplayActiveChat();
-          this.guaranteedScrollToBottom(50, true);
-          const assistantPlaceholderGroupEl = this.chatContainer.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE_GROUP} ${CSS_CLASSES.OLLAMA_GROUP} placeholder`
-          });
-          assistantPlaceholderGroupEl.setAttribute("data-placeholder-timestamp", responseStartTimeMs.toString());
-          renderAvatar(this.app, this.plugin, assistantPlaceholderGroupEl, false);
-          const messageWrapperEl = assistantPlaceholderGroupEl.createDiv({ cls: "message-wrapper" });
-          messageWrapperEl.style.order = "2";
-          const assistantMessageElement = messageWrapperEl.createDiv({
-            cls: `${CSS_CLASSES.MESSAGE} ${CSS_CLASSES.OLLAMA_MESSAGE}`
-          });
-          const contentContainer = assistantMessageElement.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-          const assistantContentEl = contentContainer.createDiv({
-            cls: `${CSS_CLASSES.CONTENT} ${CSS_CLASSES.CONTENT_COLLAPSIBLE} streaming-text`
-          });
-          assistantContentEl.empty();
-          const dots = assistantContentEl.createDiv({ cls: CSS_CLASSES.THINKING_DOTS });
-          for (let i = 0; i < 3; i++)
-            dots.createDiv({ cls: CSS_CLASSES.THINKING_DOT });
-          if (assistantPlaceholderGroupEl && assistantContentEl && messageWrapperEl) {
-            this.activePlaceholder = {
-              timestamp: responseStartTimeMs,
-              groupEl: assistantPlaceholderGroupEl,
-              contentEl: assistantContentEl,
-              messageWrapper: messageWrapperEl
-            };
-          } else {
-            throw new Error("Failed to create placeholder elements for regeneration.");
-          }
-          assistantPlaceholderGroupEl.classList.add(CSS_CLASSES.MESSAGE_ARRIVING);
-          setTimeout(() => assistantPlaceholderGroupEl == null ? void 0 : assistantPlaceholderGroupEl.classList.remove(CSS_CLASSES.MESSAGE_ARRIVING), 500);
-          this.guaranteedScrollToBottom(50, true);
-          const chatForStreaming = await this.plugin.chatManager.getChat(chatId);
-          if (!chatForStreaming) {
-            throw new Error("Failed to get updated chat context for streaming regeneration.");
-          }
-          const stream = this.plugin.ollamaService.generateChatResponseStream(
-            chatForStreaming,
-            this.currentAbortController.signal
-          );
-          let firstChunk = true;
-          for await (const chunk of stream) {
-            if (this.currentAbortController.signal.aborted) {
-              throw new Error("aborted by user");
-            }
-            if ("error" in chunk && chunk.error) {
-              if (!chunk.error.includes("aborted by user")) {
-                throw new Error(chunk.error);
-              } else {
-                throw new Error("aborted by user");
-              }
-            }
-            if ("response" in chunk && chunk.response) {
-              if (((_a2 = this.activePlaceholder) == null ? void 0 : _a2.timestamp) === responseStartTimeMs && this.activePlaceholder.contentEl) {
-                if (firstChunk) {
-                  const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-                  if (thinkingDots)
-                    thinkingDots.remove();
-                  firstChunk = false;
-                }
-                accumulatedResponse += chunk.response;
-                await renderMarkdownContent(
-                  this.app,
-                  this,
-                  this.plugin,
-                  this.activePlaceholder.contentEl,
-                  accumulatedResponse
-                );
-                this.guaranteedScrollToBottom(50, true);
-              } else {
-                accumulatedResponse += chunk.response;
-              }
-            }
-            if ("done" in chunk && chunk.done) {
-              break;
-            }
-          }
-          if (accumulatedResponse.trim()) {
-            mainAssistantMessageProcessedPromise = new Promise((resolve) => {
-              this.messageAddedResolvers.set(responseStartTimeMs, resolve);
-            });
-            this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
-            const timeoutDuration = 1e4;
-            const timeoutPromise = new Promise(
-              (_, reject) => setTimeout(
-                () => reject(
-                  new Error(`Timeout (${timeoutDuration / 1e3}s) waiting for HMA for ts ${responseStartTimeMs}`)
-                ),
-                timeoutDuration
-              )
-            );
-            try {
-              await Promise.race([mainAssistantMessageProcessedPromise, timeoutPromise]);
-            } catch (awaitPromiseError) {
-              streamErrorOccurred = streamErrorOccurred || awaitPromiseError;
-              if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-                this.messageAddedResolvers.delete(responseStartTimeMs);
-              }
-            }
-          } else if (!this.currentAbortController.signal.aborted) {
-            if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) === responseStartTimeMs && ((_c = this.activePlaceholder.groupEl) == null ? void 0 : _c.isConnected)) {
-              this.activePlaceholder.groupEl.remove();
-            }
-            if (((_d = this.activePlaceholder) == null ? void 0 : _d.timestamp) === responseStartTimeMs) {
-              this.activePlaceholder = null;
-            }
-            this.plugin.chatManager.addMessageToActiveChat(
-              "system",
-              "Assistant provided an empty response during regeneration.",
-              new Date(),
-              true
-            );
-          }
-        } catch (error) {
-          streamErrorOccurred = error;
-          if (((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === responseStartTimeMs) {
-            if ((_f = this.activePlaceholder.groupEl) == null ? void 0 : _f.isConnected)
-              this.activePlaceholder.groupEl.remove();
-            this.activePlaceholder = null;
-          }
-          if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.messageAddedResolvers.delete(responseStartTimeMs);
-          }
-          let errorMsgForChat = "An unexpected error occurred during regeneration.";
-          let errorMsgRole = "error";
-          let savePartialResponseOnError = false;
-          if (error.name === "AbortError" || ((_g = error.message) == null ? void 0 : _g.includes("aborted by user"))) {
-            errorMsgForChat = "Regeneration stopped.";
-            errorMsgRole = "system";
-            if (accumulatedResponse.trim())
-              savePartialResponseOnError = true;
-          } else {
-            errorMsgForChat = `Regeneration failed: ${error.message || "Unknown error"}`;
-            new import_obsidian15.Notice(errorMsgForChat, 5e3);
-          }
-          this.plugin.chatManager.addMessageToActiveChat(errorMsgRole, errorMsgForChat, new Date(), true);
-          if (savePartialResponseOnError) {
-            this.plugin.chatManager.addMessageToActiveChat("assistant", accumulatedResponse, responseStartTime, true);
-          }
-        } finally {
-          if (this.messageAddedResolvers.has(responseStartTimeMs)) {
-            this.messageAddedResolvers.delete(responseStartTimeMs);
-          }
-          if (((_h = this.activePlaceholder) == null ? void 0 : _h.timestamp) === responseStartTimeMs) {
-            if ((_i = this.activePlaceholder.groupEl) == null ? void 0 : _i.isConnected) {
-              this.activePlaceholder.groupEl.remove();
-            }
-            this.activePlaceholder = null;
-          }
-          this.currentAbortController = null;
-          this.isRegenerating = false;
-          this.setLoadingState(false);
-          requestAnimationFrame(() => {
-            this.updateSendButtonState();
-          });
-          this.focusInput();
-        }
-      }
-    ).open();
   }
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
@@ -6959,11 +6673,12 @@ Summary:`;
     }
     return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
   }
-  async _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId) {
-    var _a;
+  // src/OllamaView.ts
+  // ...
+  async _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId, signal) {
     const currentViewInstance = this;
     for (const call of toolsToExecute) {
-      if ((_a = currentViewInstance.currentAbortController) == null ? void 0 : _a.signal.aborted)
+      if (signal.aborted)
         throw new Error("aborted by user");
       if (call.type === "function") {
         const toolName = call.function.name;
@@ -6981,6 +6696,8 @@ ${errorContent}
           parseErrorOccurred = true;
         }
         if (!parseErrorOccurred) {
+          if (signal.aborted)
+            throw new Error("aborted by user");
           const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
           if (execResult.success) {
             toolResultContentForHistory = `[TOOL_RESULT]
@@ -7077,6 +6794,201 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
     }
     if (((_b = currentViewInstance.activePlaceholder) == null ? void 0 : _b.timestamp) === responseTimestampMs) {
       currentViewInstance.activePlaceholder = null;
+    }
+  }
+  async handleRegenerateClick(messageToRegenerateFrom) {
+    var _a;
+    if (this.isRegenerating) {
+      new import_obsidian15.Notice("Regeneration is already in progress. Please wait.", 3e3);
+      return;
+    }
+    if (this.currentAbortController) {
+      new import_obsidian15.Notice("Another generation process is currently active. Please wait or cancel it first.", 4e3);
+      return;
+    }
+    const activeChat = await ((_a = this.plugin.chatManager) == null ? void 0 : _a.getActiveChat());
+    if (!activeChat) {
+      new import_obsidian15.Notice("Cannot regenerate: No active chat found.");
+      return;
+    }
+    const chatId = activeChat.metadata.id;
+    let anchorMessageIndex = activeChat.messages.findIndex(
+      (msg) => msg.timestamp.getTime() === messageToRegenerateFrom.timestamp.getTime() && msg.role === messageToRegenerateFrom.role
+    );
+    if (anchorMessageIndex === -1) {
+      new import_obsidian15.Notice("Error: Could not find the message to regenerate from in the current chat history.");
+      this.plugin.logger.warn("Regeneration failed: Anchor message not found for regeneration.", {
+        targetTimestamp: messageToRegenerateFrom.timestamp.getTime(),
+        targetRole: messageToRegenerateFrom.role,
+        activeChatId: chatId
+        // Можна додати перші/останні кілька повідомлень з activeChat.messages для контексту, якщо потрібно
+      });
+      return;
+    }
+    let messageIndexToDeleteAfter = anchorMessageIndex;
+    if (messageToRegenerateFrom.role === "assistant") {
+      messageIndexToDeleteAfter = anchorMessageIndex - 1;
+    }
+    const hasMessagesAfterTargetPoint = activeChat.messages.length > messageIndexToDeleteAfter + 1;
+    new ConfirmModal(
+      this.app,
+      "Confirm Regeneration",
+      hasMessagesAfterTargetPoint ? "This will delete all messages after this point in the conversation and generate a new response. Are you sure you want to continue?" : "Are you sure you want to generate a new response for this prompt?",
+      async () => {
+        var _a2;
+        this.isRegenerating = true;
+        const regenerationGlobalRequestId = Date.now();
+        this.currentAbortController = new AbortController();
+        this.setLoadingState(true);
+        const initialLlmResponsePlaceholderTsForRegen = Date.now();
+        try {
+          if (hasMessagesAfterTargetPoint) {
+            const deleteSuccess = await this.plugin.chatManager.deleteMessagesAfter(chatId, messageIndexToDeleteAfter);
+            if (!deleteSuccess) {
+              throw new Error("Failed to delete subsequent messages. Regeneration cannot proceed.");
+            }
+          }
+          await this.loadAndDisplayActiveChat();
+          this.guaranteedScrollToBottom(50, true);
+          const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
+          if (!chatStateForLlm) {
+            throw new Error("Failed to reload chat state after preparing for regeneration.");
+          }
+          if (!this.currentAbortController) {
+            this.plugin.logger.error("CRITICAL: AbortController not initialized in handleRegenerateClick before LlmInteractionCycle call.");
+            throw new Error("AbortController not initialized in handleRegenerateClick");
+          }
+          await this._handleLlmInteractionCycle(chatStateForLlm, regenerationGlobalRequestId, this.currentAbortController.signal);
+        } catch (error) {
+          if (this.activePlaceholder && this.activePlaceholder.timestamp === initialLlmResponsePlaceholderTsForRegen && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+            if (this.activePlaceholder.groupEl.isConnected)
+              this.activePlaceholder.groupEl.remove();
+          }
+          this.plugin.chatManager.rejectAndClearHMAResolver(initialLlmResponsePlaceholderTsForRegen, `Outer catch in handleRegenerateClick for initial placeholder (req: ${regenerationGlobalRequestId})`);
+          let errorMsgForChat;
+          let errorMsgRole = "error";
+          if (error.name === "AbortError" || ((_a2 = error.message) == null ? void 0 : _a2.includes("aborted by user"))) {
+            errorMsgForChat = "Regeneration process was stopped by the user.";
+            errorMsgRole = "system";
+          } else {
+            errorMsgForChat = `Regeneration failed: ${error.message || "An unknown error occurred during processing."}`;
+            new import_obsidian15.Notice(errorMsgForChat, 7e3);
+          }
+          const errorDisplayTimestamp = new Date();
+          const errorDisplayMsg = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorDisplayTimestamp };
+          const hmaErrorPromise = new Promise((resolve, reject) => {
+            this.plugin.chatManager.registerHMAResolver(errorDisplayMsg.timestamp.getTime(), resolve, reject);
+            setTimeout(() => {
+              if (this.plugin.chatManager.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())) {
+                this.plugin.chatManager.rejectAndClearHMAResolver(errorDisplayMsg.timestamp.getTime(), "HMA timeout for error display msg in handleRegenerateClick");
+              }
+            }, 1e4);
+          });
+          await this.plugin.chatManager.addMessageToActiveChatPayload(errorDisplayMsg, true);
+          try {
+            await hmaErrorPromise;
+          } catch (e_hma) {
+            this.plugin.logger.warn("[Regenerate] HMA for error display message failed or timed out:", e_hma);
+          }
+        } finally {
+          if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+            if (this.activePlaceholder.groupEl.isConnected) {
+              this.activePlaceholder.groupEl.remove();
+            }
+          }
+          this.activePlaceholder = null;
+          this.currentAbortController = null;
+          this.isRegenerating = false;
+          this.setLoadingState(false);
+          requestAnimationFrame(() => this.updateSendButtonState());
+          this.focusInput();
+        }
+      }
+    ).open();
+  }
+  async _handleLlmInteractionCycle(initialChatState, globalInteractionRequestId, signal) {
+    let continueConversation = true;
+    const maxTurns = 5;
+    let turns = 0;
+    let currentTurnLlmResponseTsForCatch = null;
+    let chatStateForLlm = initialChatState;
+    try {
+      while (continueConversation && turns < maxTurns && !signal.aborted) {
+        turns++;
+        const currentTurnLlmResponseTs = Date.now();
+        currentTurnLlmResponseTsForCatch = currentTurnLlmResponseTs;
+        const currentTurnRequestId = globalInteractionRequestId + turns;
+        this._managePlaceholder(currentTurnLlmResponseTs, currentTurnRequestId);
+        chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
+        const llmStream = this.plugin.ollamaService.generateChatResponseStream(
+          chatStateForLlm,
+          signal
+          // Передаємо сигнал скасування в сервіс
+        );
+        const { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls } = await this._processLlmStream(
+          llmStream,
+          currentTurnLlmResponseTs,
+          currentTurnRequestId
+          // _processLlmStream має внутрішньо обробляти сигнал, отриманий від ollamaService
+        );
+        if (signal.aborted)
+          throw new Error("aborted by user");
+        const toolCallCheckResult = this._determineToolCalls(
+          nativeToolCalls,
+          assistantMessageWithNativeCalls,
+          accumulatedContent,
+          currentTurnLlmResponseTs,
+          currentTurnRequestId
+        );
+        if (toolCallCheckResult.processedToolCallsThisTurn && toolCallCheckResult.processedToolCallsThisTurn.length > 0) {
+          const assistantMsgTsMs = toolCallCheckResult.assistantMessageForHistory.timestamp.getTime();
+          const assistantHmaPromise = new Promise((resolve, reject) => {
+            this.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
+            setTimeout(() => {
+              if (this.plugin.chatManager.messageAddedResolvers.has(assistantMsgTsMs)) {
+                this.plugin.chatManager.rejectAndClearHMAResolver(assistantMsgTsMs, `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs}) in _handleLlmInteractionCycle`);
+              }
+            }, 1e4);
+          });
+          await this.plugin.chatManager.addMessageToActiveChatPayload(toolCallCheckResult.assistantMessageForHistory, true);
+          await assistantHmaPromise;
+          await this._executeAndRenderToolCycle(
+            toolCallCheckResult.processedToolCallsThisTurn,
+            toolCallCheckResult.assistantMessageForHistory,
+            currentTurnRequestId,
+            signal
+            // Передаємо сигнал далі
+          );
+          continueConversation = true;
+        } else {
+          await this._renderFinalAssistantText(accumulatedContent, currentTurnLlmResponseTs, currentTurnRequestId);
+          continueConversation = false;
+        }
+      }
+      if (turns >= maxTurns && !signal.aborted) {
+        const maxTurnsMsgTimestamp = new Date();
+        const maxTurnsMsg = {
+          role: "system",
+          content: "Max processing turns reached. If the task is not complete, please try rephrasing or breaking it down.",
+          timestamp: maxTurnsMsgTimestamp
+        };
+        const hmaMaxTurnsPromise = new Promise((resolve, reject) => {
+          this.plugin.chatManager.registerHMAResolver(maxTurnsMsg.timestamp.getTime(), resolve, reject);
+          setTimeout(() => {
+            if (this.plugin.chatManager.messageAddedResolvers.has(maxTurnsMsg.timestamp.getTime())) {
+              this.plugin.chatManager.rejectAndClearHMAResolver(maxTurnsMsg.timestamp.getTime(), "HMA timeout for max turns msg in _handleLlmInteractionCycle");
+            }
+          }, 1e4);
+        });
+        await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
+        try {
+          await hmaMaxTurnsPromise;
+        } catch (e_hma) {
+          this.plugin.logger.warn("[LlmCycle] HMA for max turns message failed or timed out:", e_hma);
+        }
+      }
+    } catch (error) {
+      throw error;
     }
   }
 };
