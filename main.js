@@ -21181,6 +21181,7 @@ This action cannot be undone.`,
             type: this.mediaRecorder?.mimeType || "audio/webm"
           });
           this.inputEl.placeholder = "Processing speech...";
+          this.plugin.logger.debug("Sending audioBlob to speech worker for processing.");
           this.speechWorker.postMessage({
             apiKey: speechApiKey,
             audioBlob,
