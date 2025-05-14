@@ -199,6 +199,8 @@ $avatar-icon-size-factor: 0.65;
 // --- Стилі для бульбашок повідомлень ---
 .message {
   @extend %base-message-bubble;
+  @include flex-layout($direction: column, $align: flex-start); // Нове! Робимо .message flex-контейнером
+
 
   &.message-arriving {
     animation: message-appear 0.3s ease-out forwards;
@@ -240,22 +242,24 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// --- Стилі для конкретних ролей ---
 .message.user-message {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
-  box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2); // Специфічна тінь
+  box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
+  align-items: flex-end; // Нове! Для повідомлень користувача все всередині вирівнюється праворуч
+
   .message-timestamp {
     color: var(--text-on-accent);
     opacity: 0.75;
+    // text-align: right; // Вже не потрібен, якщо align-items: flex-end на .message.user-message
   }
 }
 
 .message.ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
+  // align-items: flex-start; // Це вже за замовчуванням для .message
   &:hover {
-    // Специфічна тінь при наведенні
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
   }
   pre {
@@ -283,9 +287,72 @@ $avatar-icon-size-factor: 0.65;
   font-size: var(--font-ui-smaller, 0.75em);
   color: var(--text-faint);
   margin-top: var(--chat-spacing-unit, 5px);
-  text-align: right;
-  display: block;
+  // text-align: right;
+  // display: block;
   opacity: 0.9;
+
+   .message.user-message & { // Якщо потрібно, щоб час у повідомленні користувача був вирівняний по-іншому
+    align-self: flex-end; // Примусово праворуч, навіть якщо загальний align-items інший
+  }
+  .message.ollama-message & {
+    align-self: flex-start; // Примусово ліворуч
+  }
+}
+
+// --- Кнопки дій ---
+.message-actions-wrapper { // Тепер цей блок всередині .message
+  @include flex-layout( // flex-direction: row за замовчуванням
+    $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
+  );
+  // width: 100%; // Вже не потрібно, якщо align-items на .message працює
+  opacity: 0;
+  visibility: hidden;
+  @include transition( (opacity, visibility), 0.2s, ease-in-out );
+  // transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
+  z-index: 6; // Можливо, вже не потрібен, якщо кнопки всередині .message
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
+
+  // Вирівнювання кнопок тепер контролюється align-items на .message
+  // Для .message.ollama-message буде align-items: flex-start;
+  // Для .message.user-message буде align-items: flex-end;
+
+  button {
+    @extend %base-action-button;
+  }
+
+  .delete-message-button {
+    &.danger-option {
+      color: var(--text-error);
+      &:hover {
+        color: var(--text-on-accent);
+        background-color: var(--background-modifier-error-hover) !important;
+      }
+    }
+  }
+
+  // Стилі для кнопок в повідомленні користувача
+  // Оскільки тепер кнопки всередині .message.user-message, селектор трохи зміниться
+  .message.user-message & button {
+    color: rgba(255, 255, 255, 0.8);
+    &:hover {
+      background: rgba(255, 255, 255, 0.25) !important;
+      color: white;
+    }
+    &.delete-message-button.danger-option {
+       color: rgba(255, 150, 150, 0.8);
+       &:hover {
+         background-color: rgba(200, 50, 50, 0.5) !important;
+         color: white;
+       }
+    }
+  }
+}
+
+// Поява кнопок при наведенні на саме повідомлення
+.message:hover .message-actions-wrapper { // Тепер :hover на .message
+  opacity: 1;
+  visibility: visible;
+  // transition-delay: 0s;
 }
 
 .show-more-button {
@@ -317,76 +384,6 @@ $avatar-icon-size-factor: 0.65;
   -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
-// --- Кнопки дій ---
-.message-actions-wrapper {
-  @include flex-layout(
-    $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
-  );
-  // width: 100%; // Зробимо на всю ширину, щоб вирівнювання працювало
-  opacity: 0;
-  visibility: hidden;
-  @include transition( (opacity, visibility), 0.2s, ease-in-out );
-  z-index: 6;
-  // margin-left: 10px; // ПРИБИРАЄМО або змінюємо
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); // Додаємо відступ зверху, щоб кнопки були під текстом
-                                                     // або залишити 0, якщо вони мають бути збоку
-
-  // Вирівнювання кнопок всередині .message-actions-wrapper
-  // Це залежить від того, де вони мають бути: зліва, справа чи по центру під повідомленням
-  // Якщо .message-wrapper має align-items: flex-start / flex-end, то це вже частково вирішує.
-
-  // // Для AI повідомлень (ліворуч)
-  // .ollama-message-group .message-wrapper & {
-  //   justify-content: flex-start; // Кнопки будуть зліва під повідомленням AI
-  // }
-
-  // // Для User повідомлень (праворуч)
-  // .user-message-group .message-wrapper & {
-  //   justify-content: flex-end; // Кнопки будуть справа під повідомленням User
-  // }
-
-
-  button {
-    @extend %base-action-button;
-  }
-
-  .delete-message-button {
-    &.danger-option {
-      color: var(--text-error);
-      &:hover {
-        color: var(--text-on-accent);
-        background-color: var(--background-modifier-error-hover) !important;
-      }
-    }
-  }
-
- .user-message-group .message-wrapper & button { // Якщо .user-message-group є батьком для .message-wrapper
-    color: rgba(255, 255, 255, 0.8);
-    &:hover {
-      background: rgba(255, 255, 255, 0.25) !important;
-      color: white;
-    }
-    &.delete-message-button.danger-option {
-       color: rgba(255, 150, 150, 0.8);
-       &:hover {
-         background-color: rgba(200, 50, 50, 0.5) !important;
-         color: white;
-       }
-    }
-  }
-
-}
-
-.message-wrapper:hover .message-actions-wrapper {
-  opacity: 1;
-  visibility: visible;
-  // transition-delay: 0s; // Це вже обробляється в transition
-}
-.message-wrapper:hover .message-actions-wrapper {
-  opacity: 1;
-  visibility: visible;
-  transition-delay: 0s; // Для visibility, щоб з'явилось одразу
-}
 
 // --- Інші стилі (залишено з твого файлу, потребують перегляду) ---
 // Ці секції поки що не змінювалися глибоко, лише мінімальні правки для узгодження
