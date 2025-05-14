@@ -12,7 +12,7 @@
 // Center the entire chat column
 .ollama-chat-container {
   max-width: var(--chat-column-max-width); // Apply overall max width
-  width: 100%;      // Allow shrinking
+  width: 100%; // Allow shrinking
   margin-left: auto;
   margin-right: auto;
   // Keep existing padding, flex properties for vertical layout if needed
@@ -20,78 +20,89 @@
   // box-sizing: border-box;
 }
 
-
 .message-group {
-  display: flex; 
+  display: flex;
   width: 100%;
   margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
   position: relative;
   box-sizing: border-box;
-  align-items: flex-end; 
+  align-items: flex-end;
 
   &.user-message-group {
-    justify-content: flex-end; 
+    justify-content: flex-end;
 
-
-    .avatar-container { 
-      order: 2; 
-      margin-left: calc(var(--chat-spacing-unit) * 2); 
-      margin-right: 0; 
-      // flex-shrink: 0; 
-    }
-
-    .message-wrapper {
-      order: 1; 
-      
-    }
-  }
-
-  &.ollama-message-group { 
-    justify-content: flex-start; 
-
-    .avatar-container { 
-      order: 1; 
-      margin-right: calc(var(--chat-spacing-unit) * 2); 
-      margin-left: 0; 
+    .avatar-container {
+      order: 2;
+      margin-left: calc(var(--chat-spacing-unit) * 2);
+      margin-right: 0;
       // flex-shrink: 0;
     }
 
     .message-wrapper {
-      order: 2; 
-      
+      order: 1;
+    }
+  }
+
+  &.ollama-message-group {
+    justify-content: flex-start;
+
+    .avatar-container {
+      order: 1;
+      margin-right: calc(var(--chat-spacing-unit) * 2);
+      margin-left: 0;
+      // flex-shrink: 0;
+    }
+
+    .message-wrapper {
+      order: 2;
+      .message:not(:last-child) {
+        border-bottom-left-radius: 5px;
+      } // Гостріший кут для проміжних повідомлень
+      .message:last-child {
+        border-bottom-left-radius: 18px;
+      } // Стандартний радіус для останнього
+      .message:not(:first-child) {
+        border-top-left-radius: 5px;
+      } // Гостріший кут для проміжних повідомлень
+      .message:first-child {
+        border-top-left-radius: 18px;
+      } // Стандартний радіус для першого
+      // For AI messages, right corners are always fully rounded
+      .message {
+        border-top-right-radius: 18px;
+        border-bottom-right-radius: 18px;
+      }
     }
   }
 }
 
 // Стилі для .message-wrapper (загальні, якщо ще не визначені так)
 .message-wrapper {
-   display: flex;
-   flex-direction: column;
+  display: flex;
+  flex-direction: column;
 }
 
 // Для вирівнювання самих бульбашок всередині message-wrapper
 .user-message-group .message-wrapper {
-  align-items: flex-end; 
+  align-items: flex-end;
 }
 .ollama-message-group .message-wrapper {
-  align-items: flex-start; 
+  align-items: flex-start;
 }
-
 
 // --- Стилі для Аватарок ---
 // Використовуємо CSS змінні для розмірів, якщо вони визначені глобально, або SASS змінні, якщо компілюється
-$base-avatar-size-from-var: var(--chat-avatar-size, 32px);         // Базовий розмір з CSS змінної або fallback
+$base-avatar-size-from-var: var(--chat-avatar-size, 32px); // Базовий розмір з CSS змінної або fallback
 $avatar-final-size: calc(#{$base-avatar-size-from-var} * 1.2); // Збільшений на 20% розмір
 
 $avatar-font-size-factor: 0.5; // Відносний розмір шрифту для ініціалів
 $avatar-icon-size-factor: 0.65; // Відносний розмір іконки всередині аватара
 
-
 // Старий селектор .message-group-avatar, оновлений для використання нового розміру
 // Цей блок може бути менш релевантним, якщо .avatar-container завжди використовується,
 // але оновлюємо для консистентності.
-.message-group-avatar { 
-  align-self: flex-end; 
+.message-group-avatar {
+  align-self: flex-end;
   width: $avatar-final-size; // Використовуємо збільшений розмір
   height: $avatar-final-size; // Використовуємо збільшений розмір
   border-radius: 50%;
@@ -102,25 +113,25 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  z-index: 5; 
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  z-index: 5;
   flex-shrink: 0;
   overflow: hidden;
 
   img.ollama-avatar-image {
-    display: block; 
-    width: 100%;    
+    display: block;
+    width: 100%;
     height: 100%;
-    object-fit: cover; 
-    object-position: center; 
+    object-fit: cover;
+    object-position: center;
   }
 
-  .svg-icon { 
+  .svg-icon {
     width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
     height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
   }
 
-  .user-message-group & { 
+  .user-message-group & {
     background-color: var(--interactive-accent-translucent);
     color: var(--interactive-accent);
   }
@@ -130,121 +141,163 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 .message {
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
   border-radius: 18px;
-  width: fit-content; 
-  max-width: 100%; 
-  max-width: var(--chat-message-max-width); 
-  white-space: normal; 
-  overflow-wrap: break-word; 
-  word-break: break-word;   
+  width: fit-content;
+  max-width: 100%;
+  max-width: var(--chat-message-max-width);
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
   line-height: 1.5;
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 
-  &.message-arriving { animation: message-appear 0.3s ease-out forwards; }
+  &.message-arriving {
+    animation: message-appear 0.3s ease-out forwards;
+  }
 }
 
 // Corner Radius logic for consecutive messages within the same wrapper
 .user-message-group .message-wrapper {
-  .message:not(:last-child) { border-bottom-right-radius: 5px; }
-  .message:last-child { border-bottom-right-radius: 18px; }
-  .message:not(:first-child) { border-top-right-radius: 5px; }
-  .message:first-child { border-top-right-radius: 18px; }
-   .message { border-top-left-radius: 18px; border-bottom-left-radius: 18px; }
+  .message:not(:last-child) {
+    border-bottom-right-radius: 5px;
+  }
+  .message:last-child {
+    border-bottom-right-radius: 18px;
+  }
+  .message:not(:first-child) {
+    border-top-right-radius: 5px;
+  }
+  .message:first-child {
+    border-top-right-radius: 18px;
+  }
+  .message {
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
+  }
 }
 .ollama-message-group .message-wrapper {
-  .message:not(:last-child) { border-bottom-left-radius: 5px; }
-  .message:last-child { border-bottom-left-radius: 18px; }
-  .message:not(:first-child) { border-top-left-radius: 5px; }
-  .message:first-child { border-top-left-radius: 18px; }
-   .message { border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
+  .message:not(:last-child) {
+    border-bottom-left-radius: 5px;
+  }
+  .message:last-child {
+    border-bottom-left-radius: 18px;
+  }
+  .message:not(:first-child) {
+    border-top-left-radius: 5px;
+  }
+  .message:first-child {
+    border-top-left-radius: 18px;
+  }
+  .message {
+    border-top-right-radius: 18px;
+    border-bottom-right-radius: 18px;
+  }
 }
-
 
 // Role-specific message bubble styles
 .user-message {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-  &:hover { box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3); transform: translateY(-1px); }
-  .message-timestamp { color: var(--text-on-accent); opacity: 0.75; }
+  &:hover {
+    box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
+    transform: translateY(-1px);
+  }
+  .message-timestamp {
+    color: var(--text-on-accent);
+    opacity: 0.75;
+  }
 }
 .ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); transform: translateY(-1px); }
-   pre { background-color: var(--background-secondary) !important; }
+  &:hover {
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+    transform: translateY(-1px);
+  }
+  pre {
+    background-color: var(--background-secondary) !important;
+  }
 }
 
 // --- Action Buttons Styling & Positioning ---
 .message-actions-wrapper {
   display: flex;
-  gap: calc(var(--chat-spacing-unit) * 1.5); 
-  width: fit-content; 
+  gap: calc(var(--chat-spacing-unit) * 1.5);
+  width: fit-content;
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
-  z-index: 6; 
+  z-index: 6;
   margin-left: 10px;
 
   button {
-    background: transparent !important; 
-    border: none; 
-    box-shadow: none; 
-    backdrop-filter: none; 
-    padding: 1px; 
-    color: var(--text-muted); 
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    padding: 1px;
+    color: var(--text-muted);
     border-radius: var(--radius-s);
     cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.15s ease;
 
-    .svg-icon { width: 14px; height: 14px; }
+    .svg-icon {
+      width: 14px;
+      height: 14px;
+    }
 
     &:hover {
-        background: transparent !important; 
-        color: var(--text-normal); 
-        transform: scale(1.05); 
+      background: transparent !important;
+      color: var(--text-normal);
+      transform: scale(1.05);
     }
-}
-
-.delete-message-button {
-  &.danger-option { 
-       color: var(--text-error); 
-       &:hover {
-           color: var(--text-on-accent); 
-           background-color: var(--background-modifier-error-hover); 
-           border-color: transparent; 
-       }
   }
-}
 
-.user-message .delete-message-button {
-  &.danger-option {
-      color: rgba(255, 150, 150, 0.8); 
+  .delete-message-button {
+    &.danger-option {
+      color: var(--text-error);
       &:hover {
-          background-color: rgba(200, 50, 50, 0.5); 
-          color: white;
+        color: var(--text-on-accent);
+        background-color: var(--background-modifier-error-hover);
+        border-color: transparent;
       }
+    }
   }
-}
 
-&.user-message-group & button { 
-  color: rgba(255, 255, 255, 0.8); 
-  background: transparent !important;
-  border: none;
-  box-shadow: none;
-   &:hover {
+  .user-message .delete-message-button {
+    &.danger-option {
+      color: rgba(255, 150, 150, 0.8);
+      &:hover {
+        background-color: rgba(200, 50, 50, 0.5);
+        color: white;
+      }
+    }
+  }
+
+  &.user-message-group & button {
+    color: rgba(255, 255, 255, 0.8);
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    &:hover {
       background: transparent !important;
       color: white;
-   }
-}
+    }
   }
-  .regenerate-button {}
-  button.summarize-button {}
+}
+.regenerate-button {
+}
+button.summarize-button {
+}
 
-.summary-modal-content {}
+.summary-modal-content {
+}
 
 .message-wrapper:hover .message-actions-wrapper {
   opacity: 1;
@@ -253,36 +306,41 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 }
 
 .user-message-group .message-actions-wrapper {
-  align-self: flex-start; 
+  align-self: flex-start;
   button {
-     background: rgba(255, 255, 255, 0.1);
-     border-color: rgba(255, 255, 255, 0.2);
-     color: rgba(255, 255, 255, 0.8);
-     &:hover {
-        background-color: rgba(255, 255, 255, 0.25);
-        color: white;
-     }
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.25);
+      color: white;
+    }
   }
 }
 
 .user-message-group .message-actions-wrapper button {
-   background: rgba(255, 255, 255, 0.1);
-   border-color: rgba(255, 255, 255, 0.2);
-   color: rgba(255, 255, 255, 0.8);
-   &:hover {
-      background-color: rgba(255, 255, 255, 0.25);
-      color: white;
-   }
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: white;
+  }
 }
 
-.message-content-container { }
+.message-content-container {
+}
 .message-content {
-  padding-bottom: calc(var(--chat-spacing-unit) * 1); 
+  padding-bottom: calc(var(--chat-spacing-unit) * 1);
   box-sizing: border-box;
   width: 100%;
-  white-space: normal; 
-  p { margin-bottom: calc(var(--p-spacing) / 2); }
-  p:last-child { margin-bottom: 0; }
+  white-space: normal;
+  p {
+    margin-bottom: calc(var(--p-spacing) / 2);
+  }
+  p:last-child {
+    margin-bottom: 0;
+  }
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -290,7 +348,7 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 .message-timestamp {
   font-size: 0.75em;
   color: var(--text-faint);
-  margin-top: var(--chat-spacing-unit); 
+  margin-top: var(--chat-spacing-unit);
   text-align: right;
   display: block;
   width: 100%;
@@ -309,7 +367,7 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 
 .show-more-button {
   display: block;
-  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto; 
+  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto;
   padding: 2px 10px;
   font-size: 0.8em;
   color: var(--text-muted);
@@ -320,92 +378,104 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
   transition: all 0.2s ease;
   text-align: center;
   width: fit-content;
-  z-index: 2; 
+  z-index: 2;
 
   &:hover {
-      background-color: var(--background-modifier-hover);
-      color: var(--text-accent-hover);
-      border-color: var(--background-modifier-border-hover);
+    background-color: var(--background-modifier-hover);
+    color: var(--text-accent-hover);
+    border-color: var(--background-modifier-border-hover);
   }
 }
-.user-message .show-more-button { 
-    background-color: transparent;
-    border-color: transparent;
-    color: rgba(255, 255, 255, 0.7);
-    &:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-        color: white;
-    }
+.user-message .show-more-button {
+  background-color: transparent;
+  border-color: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
 }
 
 @keyframes message-appear {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@media screen and (min-width: 1600px) { 
+@media screen and (min-width: 1600px) {
   .ollama-chat-container {
-    padding-left: 15%;   
-    padding-right: 15%;  
-    max-width: 3000px; 
+    padding-left: 15%;
+    padding-right: 15%;
+    max-width: 3000px;
   }
-} 
+}
 
 .scroll-to-bottom-button {
-  position: absolute; 
-  bottom: 15px; 
-  right: 20px; 
-  z-index: 50; 
-  width: 36px; 
+  position: absolute;
+  bottom: 15px;
+  right: 20px;
+  z-index: 50;
+  width: 36px;
   height: 36px;
-  border-radius: 50%; 
-  background-color: var(--background-secondary); 
-  color: var(--text-muted); 
+  border-radius: 50%;
+  background-color: var(--background-secondary);
+  color: var(--text-muted);
   border: 1px solid var(--background-modifier-border);
-  box-shadow: var(--shadow-s); 
+  box-shadow: var(--shadow-s);
   cursor: pointer;
-  display: flex; 
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  opacity: 0; 
+  opacity: 0;
   visibility: hidden;
-  transform: translateY(10px); 
+  transform: translateY(10px);
   transition: opacity 0.2s ease-out, visibility 0s linear 0.2s, transform 0.2s ease-out, background-color 0.15s ease;
 
   .svg-icon {
-    width: 20px; 
+    width: 20px;
     height: 20px;
   }
 
   &:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
-    transform: translateY(8px) scale(1.05); 
+    transform: translateY(8px) scale(1.05);
   }
 
-   &:active {
-      transform: translateY(9px) scale(1); 
-   }
+  &:active {
+    transform: translateY(9px) scale(1);
+  }
 
   &.visible {
-    opacity: 0.85; 
+    opacity: 0.85;
     visibility: visible;
     transform: translateY(0);
     transition: opacity 0.2s ease-out, visibility 0s linear 0s, transform 0.2s ease-out, background-color 0.15s ease;
 
-     &:hover {
-          opacity: 1; 
-     }
+    &:hover {
+      opacity: 1;
+    }
   }
 }
 
-.new-message-indicator.visible {}
-.summary-modal-content {}
+.new-message-indicator.visible {
+}
+.summary-modal-content {
+}
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .button-loading {
@@ -415,61 +485,61 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 }
 
 .chat-date-separator {
-  width: fit-content;                 
-  max-width: 80%;                     
-  margin-left: auto;                  
+  width: fit-content;
+  max-width: 80%;
+  margin-left: auto;
   margin-right: auto;
-  margin-top: calc(var(--chat-spacing-unit) * 6);    
-  margin-bottom: calc(var(--chat-spacing-unit) * 4); 
-  padding: calc(var(--chat-spacing-unit) * 0.75) calc(var(--chat-spacing-unit) * 2.5); 
-  font-size: var(--font-ui-smaller);  
-  color: var(--text-muted);           
-  background-color: var(--background-secondary); 
-  border-radius: var(--radius-l);     
-  text-align: center;                 
-  user-select: none;                  
-  font-weight: 500;                   
+  margin-top: calc(var(--chat-spacing-unit) * 6);
+  margin-bottom: calc(var(--chat-spacing-unit) * 4);
+  padding: calc(var(--chat-spacing-unit) * 0.75) calc(var(--chat-spacing-unit) * 2.5);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  background-color: var(--background-secondary);
+  border-radius: var(--radius-l);
+  text-align: center;
+  user-select: none;
+  font-weight: 500;
 }
 
 // Головний контейнер аватара (основне місце для стилізації розміру)
-.avatar-container { 
+.avatar-container {
   width: $avatar-final-size; // Використовуємо збільшений розмір
   height: $avatar-final-size; // Використовуємо збільшений розмір
   min-width: $avatar-final-size; // Для flex-контейнерів
   min-height: $avatar-final-size; // Для flex-контейнерів
-  border-radius: 50%; 
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; 
-  background-color: var(--background-modifier-hover); 
-  align-self: flex-end; 
+  overflow: hidden;
+  background-color: var(--background-modifier-hover);
+  align-self: flex-end;
 
   // Аватар-зображення
-  &.avatar-image, 
-  img.avatar-image { 
+  &.avatar-image,
+  img.avatar-image {
     width: 100%;
     height: 100%;
-    object-fit: cover; 
-    border-radius: 50%; 
+    object-fit: cover;
+    border-radius: 50%;
   }
 
   // Аватар-іконка
-  &.avatar-icon, 
-  .avatar-icon {  
-    svg { 
+  &.avatar-icon,
+  .avatar-icon {
+    svg {
       width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
       height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
-      display: block; 
+      display: block;
     }
   }
 
   // Аватар-ініціали
-  &.avatar-initials, 
-  div.avatar-initials { 
+  &.avatar-initials,
+  div.avatar-initials {
     font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); // Розрахунок від збільшеного розміру
     font-weight: 600;
-    color: var(--text-muted); 
+    color: var(--text-muted);
     line-height: $avatar-final-size; // Для вертикального центрування тексту, використовуємо збільшений розмір
     text-align: center;
     width: 100%;
@@ -481,13 +551,16 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 }
 
 // Специфічні стилі, якщо ви розрізняєте user/ai аватари за класами на контейнері
-.avatar-container.user-avatar { }
-.avatar-container.ai-avatar { }
+.avatar-container.user-avatar {
+}
+.avatar-container.ai-avatar {
+}
 
 .assistant-tool-usage-indicator {
   font-style: italic;
-  color: var(--text-faint); 
-  font-size: var(--font-ui-smaller); 
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
 }
 
-.assistant-tool-usage-indicator::before {}
+.assistant-tool-usage-indicator::before {
+}
