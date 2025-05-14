@@ -23,7 +23,7 @@
 .message-group {
   display: flex;
   width: 100%;
-  margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
+  margin-bottom: calc(var(--chat-spacing-unit) * 1) !important;
   position: relative;
   box-sizing: border-box;
   // align-items: flex-end;
@@ -43,7 +43,7 @@
       // flex-shrink: 0;
     }
 .message-wrapper {
-      margin-top: 35px;
+      margin-top: 15px;
 
       order: 1;
       .message:not(:last-child) {
