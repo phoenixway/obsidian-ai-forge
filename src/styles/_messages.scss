@@ -74,7 +74,8 @@
       // margin-right: calc(var(--chat-spacing-unit) * 2);
       // margin-left: 0;
 
-       margin-bottom: 50px !important;
+      //  margin-bottom: 50px !important; // не помогає
+      margin-top: 200px;
       // flex-shrink: 0;
     }
 
