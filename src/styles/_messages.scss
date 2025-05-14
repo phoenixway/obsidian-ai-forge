@@ -41,7 +41,7 @@
       // flex-shrink: 0;
     }
 .message-wrapper {
-      margin-top: 60px;;
+      margin-top: 5px;;
 
       order: 1;
       .message:not(:last-child) {
@@ -90,11 +90,11 @@
         // Якщо це перше повідомлення в групі (або єдине),
         // робимо нижній лівий кут гострим
         &:first-child {
-          border-bottom-left-radius: 5px;
+          border-bottom-left-radius: 18px;
           // Якщо є інші повідомлення, і це не останнє, то верхній лівий теж гострий
            &:not(:last-child) {
             // Для послідовності повідомлень, якщо потрібно, щоб верхній кут теж був гострий
-            // border-top-left-radius: 5px; // Поки що не додаємо, щоб відповідати тому, що спрацювало
+            border-top-left-radius: 5px; // Поки що не додаємо, щоб відповідати тому, що спрацювало
            }
         }
          // Якщо це не перше повідомлення (тобто є попереднє), робимо верхній лівий гострим
@@ -222,7 +222,7 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
     border-top-left-radius: 5px;
   } // Гостріший кут для проміжних повідомлень
   .message:first-child {
-    border-top-left-radius: 18px;
+    border-top-left-radius: 5px;
   } // Стандартний радіус для першого
   // For AI messages, right corners are always fully rounded
   .message {
