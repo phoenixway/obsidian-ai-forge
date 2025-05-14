@@ -20,39 +20,52 @@
   // box-sizing: border-box;
 }
 
+
 .message-group {
   display: flex;
-  width: 100%; // Takes width of the centered container now
-  margin-bottom: calc(var(--chat-spacing-unit) * 10) !important; // Vertical space between groups
-  position: relative; // Context for potential absolute elements if ever needed
+  width: 100%;
+  margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
+  position: relative;
   box-sizing: border-box;
+  // align-items: flex-end; // Вирівнюємо всі дочірні елементи (аватар та wrapper) по низу групи
 
-  // Group alignment dictates order and avatar margin side
   &.user-message-group {
-    justify-content: flex-end; // No longer needed if wrapper handles margin
-    .message-group-avatar { order: 2; } // Avatar on the right
+    flex-direction: row-reverse; // <--- ОСНОВНА ЗМІНА: Аватар буде першим справа
+    // justify-content: flex-end; // Це вирівняє всю групу до правого краю контейнера
+
+    .message-group-avatar {
+      // order не потрібен, бо flex-direction робить свою справу
+      // Додаємо відступ зліва від аватара, щоб відокремити його від бульбашки
+      margin-left: calc(var(--chat-spacing-unit) * 2);
+      margin-right: 0; // Скидаємо, якщо був
+      align-self: flex-end; // Переконуємось, що аватар внизу, якщо повідомлення довге
+    }
+
     .message-wrapper {
-       order: 1; // Messages on the left
-       align-items: flex-end; // Align bubbles & actions to the right inside wrapper
-       margin-right: 2px; //calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
-       margin-left: auto; // Push wrapper away from left edge
+      // order не потрібен
+      align-items: flex-end; // Бульбашки всередині wrapper притиснуті вправо
+      margin-left: auto;    // Залишаємо, щоб wrapper займав доступний простір зліва
+      margin-right: 0;       // Скидаємо, бо відступ тепер зліва від аватара
     }
   }
 
-  &.ollama-message-group {
-    // justify-content: flex-start; // No longer needed
-    .message-group-avatar { order: 1; } // Avatar on the left
-     .message-wrapper {
-       order: 2; // Messages on the right
-       align-items: flex-start; // Align bubbles & actions to the left inside wrapper
-      //  margin-left: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
-         margin-left: 2px;
+  &.ollama-message-group { // Для AI та інструментів (де аватар зліва)
+    flex-direction: row; // Явно вказуємо напрямок (хоча це і значення за замовчуванням)
+    // justify-content: flex-start;
 
-       margin-right: auto; // Push wrapper away from right edge
+    .message-group-avatar {
+      margin-right: calc(var(--chat-spacing-unit) * 2); // Відступ справа від аватара
+      margin-left: 0; // Скидаємо
+      align-self: flex-end;
+    }
+
+    .message-wrapper {
+      align-items: flex-start; // Бульбашки всередині wrapper притиснуті вліво
+      margin-right: auto;   // Залишаємо, щоб wrapper займав доступний простір справа
+      margin-left: 0;       // Скидаємо, бо відступ тепер справа від аватара
     }
   }
 }
-
 // Wrapper for one or more message bubbles + their action buttons below it
 .message-wrapper {
    display: flex;
