@@ -6607,107 +6607,133 @@ Summary:`;
       this.activePlaceholder.groupEl.setAttribute("data-placeholder-timestamp", turnTimestamp.toString());
     }
   }
-  async _processLlmStream(stream, currentTurnLlmResponseTs, requestTimestampId) {
-    var _a, _b, _c, _d, _e;
+  // src/OllamaView.ts
+  // ... (інші імпорти та частина класу) ...
+  async _processLlmStream(llmStream, timestampMs, requestTimestampId) {
     let accumulatedContent = "";
-    let nativeToolCalls = null;
-    let assistantMessageWithNativeCalls = null;
-    let firstChunkForTurn = true;
-    for await (const chunk of stream) {
-      if ((_a = this.currentAbortController) == null ? void 0 : _a.signal.aborted) {
-        throw new Error("aborted by user");
-      }
-      if (chunk.type === "error") {
-        throw new Error(chunk.error);
-      }
-      if (((_b = this.activePlaceholder) == null ? void 0 : _b.timestamp) !== currentTurnLlmResponseTs) {
-        if (chunk.type === "done")
-          break;
-        continue;
-      }
-      if (chunk.type === "content") {
-        if ((_c = this.activePlaceholder) == null ? void 0 : _c.contentEl) {
-          if (firstChunkForTurn) {
-            const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-            if (thinkingDots)
-              thinkingDots.remove();
-            firstChunkForTurn = false;
+    let parsedToolCalls = null;
+    let toolCallBuffer = "";
+    let inToolCallTag = false;
+    let toolCallIdCounter = 0;
+    const toolCallStartTag = "<tool_call>";
+    const toolCallEndTag = "</tool_call>";
+    for await (const chunk of llmStream) {
+      this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
+      let isStreamDone = false;
+      if (chunk.type === "content" && typeof chunk.response === "string") {
+        const textChunk = chunk.response;
+        accumulatedContent += textChunk;
+        let searchStartInCurrentChunk = 0;
+        while (searchStartInCurrentChunk < textChunk.length) {
+          if (!inToolCallTag) {
+            const startTagIndexInChunk = textChunk.indexOf(toolCallStartTag, searchStartInCurrentChunk);
+            if (startTagIndexInChunk !== -1) {
+              toolCallBuffer += textChunk.substring(searchStartInCurrentChunk, startTagIndexInChunk);
+              inToolCallTag = true;
+              searchStartInCurrentChunk = startTagIndexInChunk + toolCallStartTag.length;
+            } else {
+              if (inToolCallTag) {
+                toolCallBuffer += textChunk.substring(searchStartInCurrentChunk);
+              }
+              searchStartInCurrentChunk = textChunk.length;
+            }
+          } else {
+            const endTagIndexInChunk = textChunk.indexOf(toolCallEndTag, searchStartInCurrentChunk);
+            if (endTagIndexInChunk !== -1) {
+              toolCallBuffer += textChunk.substring(searchStartInCurrentChunk, endTagIndexInChunk);
+              this.plugin.logger.debug("[_processLlmStream] Attempting to parse tool call JSON from buffer:", toolCallBuffer);
+              try {
+                const parsedJson = JSON.parse(toolCallBuffer.trim());
+                const callsArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+                if (!parsedToolCalls)
+                  parsedToolCalls = [];
+                for (const callDef of callsArray) {
+                  if (callDef.name && typeof callDef.arguments !== "undefined") {
+                    parsedToolCalls.push({
+                      type: "function",
+                      id: `ollama-tool-${timestampMs}-${toolCallIdCounter++}`,
+                      function: {
+                        name: callDef.name,
+                        arguments: typeof callDef.arguments === "string" ? callDef.arguments : JSON.stringify(callDef.arguments)
+                      }
+                    });
+                  } else {
+                    this.plugin.logger.warn("[_processLlmStream] Invalid tool call definition in buffer:", callDef);
+                  }
+                }
+                this.plugin.logger.debug("[_processLlmStream] Successfully parsed tool_calls from buffer:", parsedToolCalls);
+              } catch (e) {
+                this.plugin.logger.error("[_processLlmStream] Error parsing tool call JSON from buffer:", e, toolCallBuffer);
+              }
+              toolCallBuffer = "";
+              inToolCallTag = false;
+              searchStartInCurrentChunk = endTagIndexInChunk + toolCallEndTag.length;
+            } else {
+              toolCallBuffer += textChunk.substring(searchStartInCurrentChunk);
+              searchStartInCurrentChunk = textChunk.length;
+            }
           }
-          accumulatedContent += chunk.response;
-          await renderMarkdownContent(
-            this.app,
-            this,
-            this.plugin,
-            this.activePlaceholder.contentEl,
-            accumulatedContent
-          );
-          this.guaranteedScrollToBottom(30, true);
         }
-      } else if (chunk.type === "tool_calls") {
-        nativeToolCalls = chunk.calls;
-        assistantMessageWithNativeCalls = chunk.assistant_message_with_calls;
-        if (assistantMessageWithNativeCalls == null ? void 0 : assistantMessageWithNativeCalls.content) {
-          if (firstChunkForTurn && ((_d = this.activePlaceholder) == null ? void 0 : _d.contentEl)) {
-            const thinkingDots = this.activePlaceholder.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-            if (thinkingDots)
-              thinkingDots.remove();
-            firstChunkForTurn = false;
-          }
-          if (!accumulatedContent.endsWith(assistantMessageWithNativeCalls.content)) {
-            accumulatedContent += assistantMessageWithNativeCalls.content;
-          }
-          if ((_e = this.activePlaceholder) == null ? void 0 : _e.contentEl) {
-            await renderMarkdownContent(
-              this.app,
-              this,
-              this.plugin,
-              this.activePlaceholder.contentEl,
-              accumulatedContent
-            );
-          }
+        if (typeof chunk.done === "boolean" && chunk.done) {
+          isStreamDone = true;
+          this.plugin.logger.debug("[_processLlmStream] Content chunk marked as done.");
+        }
+      } else if (chunk.type === "tool_calls" && Array.isArray(chunk.calls)) {
+        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
+        if (!parsedToolCalls) {
+          parsedToolCalls = [];
+        }
+        for (const call of chunk.calls) {
+          parsedToolCalls.push({
+            // Перетворюємо на наш внутрішній формат ToolCall, якщо потрібно
+            type: call.type || "function",
+            id: call.id || `ollama-tool-${timestampMs}-${toolCallIdCounter++}`,
+            // Генеруємо ID, якщо немає
+            function: call.function
+          });
+        }
+        if (typeof chunk.done === "boolean" && chunk.done) {
+          isStreamDone = true;
+          this.plugin.logger.debug("[_processLlmStream] Tool_calls chunk marked as done.");
         }
       } else if (chunk.type === "done") {
+        isStreamDone = true;
+        this.plugin.logger.debug("[_processLlmStream] Explicit 'done' chunk received.");
+      }
+      if (isStreamDone) {
+        if (inToolCallTag && toolCallBuffer.length > 0) {
+          this.plugin.logger.warn("[_processLlmStream] Stream ended mid-text-based-tool-call. Buffer:", toolCallBuffer);
+        }
         break;
       }
     }
-    return { accumulatedContent, nativeToolCalls, assistantMessageWithNativeCalls };
+    return {
+      accumulatedContent,
+      nativeToolCalls: parsedToolCalls,
+      assistantMessageWithNativeCalls: null
+    };
   }
-  _determineToolCalls(nativeToolCalls, assistantMessageWithNativeCalls, accumulatedLlmContent, currentTurnLlmResponseTs, requestTimestampId) {
-    let processedToolCallsThisTurn = nativeToolCalls;
-    let isTextualFallbackUsed = false;
-    let assistantMessageForHistory;
-    if (!processedToolCallsThisTurn || processedToolCallsThisTurn.length === 0) {
-      const parsedTextualCalls = parseAllTextualToolCalls(accumulatedLlmContent, this.plugin.logger);
-      if (parsedTextualCalls.length > 0) {
-        isTextualFallbackUsed = true;
-        processedToolCallsThisTurn = parsedTextualCalls.map((tc, index) => ({
-          type: "function",
-          id: `texttool-${currentTurnLlmResponseTs}-${index}`,
-          function: { name: tc.name, arguments: JSON.stringify(tc.arguments || {}) }
-        }));
-        assistantMessageForHistory = {
-          role: "assistant",
-          content: accumulatedLlmContent,
-          timestamp: new Date(currentTurnLlmResponseTs)
-        };
-      } else {
-        assistantMessageForHistory = {
-          role: "assistant",
-          content: accumulatedLlmContent,
-          timestamp: new Date(currentTurnLlmResponseTs)
-        };
-      }
+  // src/OllamaView.ts
+  // ... (інші імпорти та частина класу) ...
+  _determineToolCalls(nativeToolCallsFromStream, accumulatedContentFromStream, timestampMs, requestTimestampId) {
+    let toolsToExecute = null;
+    const finalContentForHistory = accumulatedContentFromStream.trim();
+    const assistantMessageForHistory = {
+      role: "assistant",
+      content: finalContentForHistory,
+      timestamp: new Date(timestampMs)
+    };
+    if (nativeToolCallsFromStream && nativeToolCallsFromStream.length > 0) {
+      toolsToExecute = nativeToolCallsFromStream;
+      assistantMessageForHistory.tool_calls = nativeToolCallsFromStream;
+      this.plugin.logger.debug("[_determineToolCalls] Assigning nativeToolCalls to assistantMessageForHistory.tool_calls:", nativeToolCallsFromStream);
     } else {
-      assistantMessageForHistory = assistantMessageWithNativeCalls || {
-        role: "assistant",
-        content: accumulatedLlmContent,
-        timestamp: new Date(currentTurnLlmResponseTs),
-        tool_calls: processedToolCallsThisTurn
-      };
-      assistantMessageForHistory.content = accumulatedLlmContent;
-      assistantMessageForHistory.tool_calls = processedToolCallsThisTurn;
+      this.plugin.logger.debug("[_determineToolCalls] No nativeToolCallsFromStream found or empty.");
     }
-    return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
+    return {
+      processedToolCallsThisTurn: toolsToExecute,
+      assistantMessageForHistory
+    };
   }
   // src/OllamaView.ts
   // ...
@@ -6971,10 +6997,13 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
           throw new Error("aborted by user");
         const toolCallCheckResult = this._determineToolCalls(
           nativeToolCalls,
-          assistantMessageWithNativeCalls,
+          // 1. Розпарсені інструменти
           accumulatedContent,
+          // 2. Весь текстовий контент
           currentTurnLlmResponseTs,
+          // 3. Timestamp
           currentTurnRequestId
+          // 4. Request ID (для логування/майбутнього)
         );
         if (toolCallCheckResult.processedToolCallsThisTurn && toolCallCheckResult.processedToolCallsThisTurn.length > 0) {
           const assistantMsgTsMs = toolCallCheckResult.assistantMessageForHistory.timestamp.getTime();
