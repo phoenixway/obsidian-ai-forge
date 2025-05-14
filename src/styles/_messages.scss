@@ -46,17 +46,17 @@
         border-bottom-right-radius: 5px;
       }
       .message:last-child {
-        border-bottom-right-radius: 18px;
+        border-bottom-right-radius: 5px;
       }
       .message:not(:first-child) {
         border-top-right-radius: 5px;
       }
       .message:first-child {
-        border-top-right-radius: 18px;
+        border-top-right-radius: 5px;
       }
       .message { 
-        border-top-left-radius: 18px;
-        border-bottom-left-radius: 18px;
+        border-top-left-radius: 5px;
+        border-bottom-left-radius: 5px;
       }
     }
 
@@ -194,17 +194,17 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
     border-bottom-right-radius: 5px;
   }
   .message:last-child {
-    border-bottom-right-radius: 5px;
+    border-bottom-right-radius: 18px;
   }
   .message:not(:first-child) {
     border-top-right-radius: 5px;
   }
   .message:first-child {
-    border-top-right-radius: 5px;
+    border-top-right-radius: 18px;
   }
   .message { // For user messages, left corners are always fully rounded
-    border-top-left-radius: 5px;
-    border-bottom-left-radius: 5px;
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
   }
 }
 
@@ -547,7 +547,7 @@ button.summarize-button {
   justify-content: center;
   overflow: hidden;
   background-color: var(--background-modifier-hover);
-  margin-top: 5px;
+  margin-: 5px;
   // align-self: flex-end;
   //  margin-top: 5px;
 
