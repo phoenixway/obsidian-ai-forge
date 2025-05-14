@@ -8185,7 +8185,6 @@ var Chat = class {
         timestamp: msgData.timestamp instanceof Date ? msgData.timestamp : new Date(msgData.timestamp)
       };
       if (messageWithDate.role === "assistant" && messageWithDate.tool_calls) {
-        logger.debug(`[Chat ${data.metadata.id} CONSTRUCTOR] Restored assistant message with tool_calls:`, JSON.stringify(messageWithDate.tool_calls));
       }
       return messageWithDate;
     });
@@ -8297,16 +8296,13 @@ var Chat = class {
   static async loadFromFile(filePath, adapter, settings, logger) {
     var _a;
     const normPath = (0, import_obsidian18.normalizePath)(filePath);
-    logger.debug(`[Chat LOAD] Attempting to load chat from: ${normPath}`);
     try {
       if (!await adapter.exists(normPath)) {
-        logger.warn(`[Chat LOAD] File not found: ${normPath}`);
         return null;
       }
       const json = await adapter.read(normPath);
       const rawDataFromFile = JSON.parse(json);
       if (((_a = rawDataFromFile == null ? void 0 : rawDataFromFile.metadata) == null ? void 0 : _a.id) && Array.isArray(rawDataFromFile.messages)) {
-        logger.debug(`[Chat LOAD ${rawDataFromFile.metadata.id}] Parsed data. Messages count: ${rawDataFromFile.messages.length}.`);
         const dataForConstructor = {
           metadata: rawDataFromFile.metadata,
           messages: rawDataFromFile.messages.map((msgFromFile) => {
@@ -8318,7 +8314,6 @@ var Chat = class {
               // tool_calls та інші поля копіюються через ...
             };
             if (messageForMemory.role === "assistant" && messageForMemory.tool_calls) {
-              logger.info(`[Chat LOAD ${rawDataFromFile.metadata.id}] Message (TS from file: ${msgFromFile.timestamp}) from file restored with tool_calls:`, JSON.stringify(messageForMemory.tool_calls));
             }
             return messageForMemory;
           })

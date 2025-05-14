@@ -61,7 +61,7 @@ export class Chat {
                 timestamp: msgData.timestamp instanceof Date ? msgData.timestamp : new Date(msgData.timestamp) 
             };
             if (messageWithDate.role === 'assistant' && (messageWithDate as AssistantMessage).tool_calls) {
-                logger.debug(`[Chat ${data.metadata.id} CONSTRUCTOR] Restored assistant message with tool_calls:`, JSON.stringify((messageWithDate as AssistantMessage).tool_calls));
+                
             }
             return messageWithDate;
         });
@@ -197,11 +197,11 @@ export class Chat {
         logger: Logger
     ): Promise<Chat | null> {
         const normPath = normalizePath(filePath);
-        logger.debug(`[Chat LOAD] Attempting to load chat from: ${normPath}`);
+        
 
         try {
             if (!(await adapter.exists(normPath))) {
-                logger.warn(`[Chat LOAD] File not found: ${normPath}`);
+                
                 return null;
             }
             const json = await adapter.read(normPath);
@@ -209,7 +209,7 @@ export class Chat {
             const rawDataFromFile = JSON.parse(json) as ChatDataForStorage; 
 
             if (rawDataFromFile?.metadata?.id && Array.isArray(rawDataFromFile.messages)) {
-                logger.debug(`[Chat LOAD ${rawDataFromFile.metadata.id}] Parsed data. Messages count: ${rawDataFromFile.messages.length}.`);
+                
                 
                 // Перетворюємо дані для конструктора: timestamp з рядка на Date
                 const dataForConstructor: ChatDataInMemory = {
@@ -221,7 +221,7 @@ export class Chat {
                             // tool_calls та інші поля копіюються через ...
                         };
                         if (messageForMemory.role === 'assistant' && (messageForMemory as AssistantMessage).tool_calls) {
-                            logger.info(`[Chat LOAD ${rawDataFromFile.metadata.id}] Message (TS from file: ${msgFromFile.timestamp}) from file restored with tool_calls:`, JSON.stringify((messageForMemory as AssistantMessage).tool_calls));
+                            
                         }
                         return messageForMemory;
                     })
