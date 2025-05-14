@@ -35,6 +35,7 @@ import { DropdownMenuManager } from "./DropdownMenuManager";
 import { ToolMessageRenderer } from "./renderers/ToolMessageRenderer";
 import { StreamChunk } from "./OllamaService";
 import { parseAllTextualToolCalls } from "./utils/toolParser";
+import { Logger } from "./Logger";
 
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
@@ -84,7 +85,7 @@ export class OllamaView extends ItemView {
     private frameProcessedCounter = 0;
   private readonly FRAME_PROCESSED_LOG_INTERVAL = 30; // Логувати кожен 30-й фрейм (приблизно раз на секунду, якщо фрейми по 30мс)
   private vadObjectUrls: { model?: string, worklet?: string } = {};
-
+private speechWorkerUrl: string | null = null;
 
   public readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
@@ -296,6 +297,11 @@ export class OllamaView extends ItemView {
       this.speechWorker = null;
     }
     this.stopVoiceRecording(false); // Переконайся, що VAD також зупиняється
+      if (this.speechWorkerUrl) {
+    URL.revokeObjectURL(this.speechWorkerUrl); // ВІДКЛИКАЄМО ТУТ
+    this.speechWorkerUrl = null;
+    this.plugin.logger.debug("Revoked inline SpeechWorker Object URL.");
+  }
     this.revokeVadObjectUrls();
     if (this.vad) {
       try {
@@ -1563,91 +1569,126 @@ export class OllamaView extends ItemView {
 
   private initSpeechWorker(): void {
     try {
-      const workerCode = `
-             
-             self.onmessage = async (event) => {
-                 const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+// Всередині методу initSpeechWorker в OllamaView.ts
+const workerCode = `
+  /**
+   * Конвертує ArrayBuffer в рядок Base64.
+   * @param {ArrayBuffer} buffer - ArrayBuffer для конвертації.
+   * @returns {string} Рядок Base64.
+   */
+  function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return self.btoa(binary);
+  }
 
-                 if (!apiKey || apiKey.trim() === '') {
-                     self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
-                     return;
-                 }
+  self.onmessage = async (event) => {
+    console.log("[InlineWorker] Received message:", event.data);
+    const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
 
-                 const url = "https:
+    if (!apiKey || apiKey.trim() === '') {
+      console.error("[InlineWorker] Google API Key is missing.");
+      self.postMessage({ success: false, error: 'Google API Key is not configured. Please add it in plugin settings.' });
+      return;
+    }
 
-                 try {
-                     const arrayBuffer = await audioBlob.arrayBuffer();
+    if (!(audioBlob instanceof Blob)) {
+        console.error("[InlineWorker] audioBlob is not a Blob:", audioBlob);
+        self.postMessage({ success: false, error: 'Invalid audio data received by worker.' });
+        return;
+    }
+    
+    console.log("[InlineWorker] Blob type:", audioBlob.type, "Blob size:", audioBlob.size);
 
-                     
-                     
-                     let base64Audio;
-                     if (typeof TextDecoder !== 'undefined') { 
-                             
-                             const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                             base64Audio = base64String;
+    const url = \`https://speech.googleapis.com/v1/speech:recognize?key=\${apiKey}\`; // Виправлено URL
 
-                     } else {
-                             
-                             base64Audio = btoa(
-                                 new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                             );
-                     }
+    try {
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const base64Audio = arrayBufferToBase64(arrayBuffer);
 
+      const requestPayload = {
+        config: {
+          encoding: 'WEBM_OPUS', 
+          // sampleRateHertz: 48000, // ВИДАЛЕНО: не потрібен для WEBM_OPUS
+          languageCode: languageCode,
+          model: 'latest_long', 
+          enableAutomaticPunctuation: true,
+        },
+        audio: { content: base64Audio },
+      };
 
-                     const response = await fetch(url, {
-                         method: 'POST',
-                         body: JSON.stringify({
-                             config: {
-                                 encoding: 'WEBM_OPUS', 
-                                 sampleRateHertz: 48000, 
-                                 languageCode: languageCode,
-                                 model: 'latest_long', 
-                                 enableAutomaticPunctuation: true,
-                             },
-                             audio: { content: base64Audio },
-                         }),
-                         headers: { 'Content-Type': 'application/json' },
-                     });
+      console.log("[InlineWorker] Sending request to Google Speech API with config:", requestPayload.config);
 
-                     const responseData = await response.json();
-
-                     if (!response.ok) {
-                         
-                         self.postMessage({
-                             error: true,
-                             message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
-                         });
-                         return;
-                     }
-
-                     if (responseData.results && responseData.results.length > 0) {
-                         const transcript = responseData.results
-                             .map(result => result.alternatives[0].transcript)
-                             .join(' ')
-                             .trim();
-                         self.postMessage(transcript); 
-                     } else {
-                         
-                         self.postMessage({ error: true, message: 'No speech detected or recognized.' });
-                     }
-                 } catch (error) {
-                     
-                     self.postMessage({
-                         error: true,
-                         message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
-                     });
-                 }
-             };
-           `;
-
-      const workerBlob = new Blob([workerCode], {
-        type: "application/javascript",
+      const response = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(requestPayload),
+        headers: { 'Content-Type': 'application/json' },
       });
-      const workerUrl = URL.createObjectURL(workerBlob);
-      this.speechWorker = new Worker(workerUrl);
-      URL.revokeObjectURL(workerUrl);
 
-      this.setupSpeechWorkerHandlers();
+      const responseText = await response.text(); // Отримуємо текст для кращого налагодження помилок
+      
+      if (!response.ok) {
+        let errorMessage = \`HTTP error! status: \${response.status}\`;
+        try {
+            const errorData = JSON.parse(responseText);
+            if (errorData && errorData.error && errorData.error.message) {
+                errorMessage = \`Google API Error: \${errorData.error.message}\`;
+            }
+        } catch (e) { /* Ігноруємо помилку парсингу JSON, якщо відповідь не JSON */ }
+        console.error("[InlineWorker]", errorMessage, "Response body:", responseText);
+        self.postMessage({ success: false, error: errorMessage, details: responseText });
+        return;
+      }
+
+      const responseData = JSON.parse(responseText);
+      console.log("[InlineWorker] Speech recognition data:", responseData);
+
+      if (responseData.results && responseData.results.length > 0) {
+        const transcript = responseData.results
+          .map(result => result.alternatives && result.alternatives.length > 0 ? result.alternatives[0].transcript : '')
+          .join(' ')
+          .trim();
+        
+        if (transcript) {
+            console.log("[InlineWorker] Transcript:", transcript);
+            self.postMessage({ success: true, transcript: transcript });
+        } else {
+            console.warn("[InlineWorker] No valid transcript found in alternatives:", responseData.results);
+            self.postMessage({ success: false, error: 'No valid transcript found in alternatives.' , details: responseData });
+        }
+      } else {
+        console.warn("[InlineWorker] No speech detected or recognized by API:", responseData);
+        self.postMessage({ success: false, error: 'No speech detected or recognized.', details: responseData });
+      }
+    } catch (error) {
+      const errorMessage = (error instanceof Error) ? error.message : String(error);
+      console.error('[InlineWorker] Error processing speech recognition:', errorMessage, error);
+      self.postMessage({ success: false, error: \`Error processing speech recognition: \${errorMessage}\`, details: String(error) });
+    }
+  };
+
+  // Обробник для неперехоплених помилок у воркері
+  self.onerror = (event) => {
+    console.error('[InlineWorker] Uncaught worker error:', event);
+    const errorMessage = (event instanceof ErrorEvent) ? event.message : 'Unknown worker error';
+    self.postMessage({ success: false, error: \`Uncaught worker error: \${errorMessage}\` });
+  };
+`;
+const workerBlob = new Blob([workerCode], { type: "application/javascript" });
+    
+    if (this.speechWorkerUrl) { // Відкликаємо попередній, якщо він був
+        URL.revokeObjectURL(this.speechWorkerUrl);
+    }
+    this.speechWorkerUrl = URL.createObjectURL(workerBlob); // Зберігаємо новий
+    
+    this.speechWorker = new Worker(this.speechWorkerUrl);
+    // НЕ ВІДКЛИКАЄМО ТУТ: URL.revokeObjectURL(this.speechWorkerUrl); 
+
+    this.setupSpeechWorkerHandlers();
     } catch (error) {
       new Notice("Speech recognition feature failed to initialize.");
       this.speechWorker = null;
@@ -1657,6 +1698,7 @@ export class OllamaView extends ItemView {
     if (!this.speechWorker) return;
 
     this.speechWorker.onmessage = event => {
+      this.plugin.logger.debug("[setupSpeechWorkerHandlers] Speech worker message:", event.data);
       const data = event.data;
 
       if (data && typeof data === "object" && data.error) {

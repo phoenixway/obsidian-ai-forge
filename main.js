@@ -19466,6 +19466,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
     this.FRAME_PROCESSED_LOG_INTERVAL = 30;
     // Логувати кожен 30-й фрейм (приблизно раз на секунду, якщо фрейми по 30мс)
     this.vadObjectUrls = {};
+    this.speechWorkerUrl = null;
     this.isProcessing = false;
     this.scrollTimeout = null;
     this.speechWorker = null;
@@ -20450,6 +20451,11 @@ This action cannot be undone.`,
       this.speechWorker = null;
     }
     this.stopVoiceRecording(false);
+    if (this.speechWorkerUrl) {
+      URL.revokeObjectURL(this.speechWorkerUrl);
+      this.speechWorkerUrl = null;
+      this.plugin.logger.debug("Revoked inline SpeechWorker Object URL.");
+    }
     this.revokeVadObjectUrls();
     if (this.vad) {
       try {
@@ -20952,87 +20958,119 @@ This action cannot be undone.`,
   initSpeechWorker() {
     try {
       const workerCode = `
-             
-             self.onmessage = async (event) => {
-                 const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
+  /**
+   * \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0443\u0454 ArrayBuffer \u0432 \u0440\u044F\u0434\u043E\u043A Base64.
+   * @param {ArrayBuffer} buffer - ArrayBuffer \u0434\u043B\u044F \u043A\u043E\u043D\u0432\u0435\u0440\u0442\u0430\u0446\u0456\u0457.
+   * @returns {string} \u0420\u044F\u0434\u043E\u043A Base64.
+   */
+  function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return self.btoa(binary);
+  }
 
-                 if (!apiKey || apiKey.trim() === '') {
-                     self.postMessage({ error: true, message: 'Google API Key is not configured. Please add it in plugin settings.' });
-                     return;
-                 }
+  self.onmessage = async (event) => {
+    console.log("[InlineWorker] Received message:", event.data);
+    const { apiKey, audioBlob, languageCode = 'uk-UA' } = event.data;
 
-                 const url = "https:
+    if (!apiKey || apiKey.trim() === '') {
+      console.error("[InlineWorker] Google API Key is missing.");
+      self.postMessage({ success: false, error: 'Google API Key is not configured. Please add it in plugin settings.' });
+      return;
+    }
 
-                 try {
-                     const arrayBuffer = await audioBlob.arrayBuffer();
+    if (!(audioBlob instanceof Blob)) {
+        console.error("[InlineWorker] audioBlob is not a Blob:", audioBlob);
+        self.postMessage({ success: false, error: 'Invalid audio data received by worker.' });
+        return;
+    }
+    
+    console.log("[InlineWorker] Blob type:", audioBlob.type, "Blob size:", audioBlob.size);
 
-                     
-                     
-                     let base64Audio;
-                     if (typeof TextDecoder !== 'undefined') { 
-                             
-                             const base64String = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-                             base64Audio = base64String;
+    const url = \`https://speech.googleapis.com/v1/speech:recognize?key=\${apiKey}\`; // \u0412\u0438\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E URL
 
-                     } else {
-                             
-                             base64Audio = btoa(
-                                 new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                             );
-                     }
+    try {
+      const arrayBuffer = await audioBlob.arrayBuffer();
+      const base64Audio = arrayBufferToBase64(arrayBuffer);
 
+      const requestPayload = {
+        config: {
+          encoding: 'WEBM_OPUS', 
+          // sampleRateHertz: 48000, // \u0412\u0418\u0414\u0410\u041B\u0415\u041D\u041E: \u043D\u0435 \u043F\u043E\u0442\u0440\u0456\u0431\u0435\u043D \u0434\u043B\u044F WEBM_OPUS
+          languageCode: languageCode,
+          model: 'latest_long', 
+          enableAutomaticPunctuation: true,
+        },
+        audio: { content: base64Audio },
+      };
 
-                     const response = await fetch(url, {
-                         method: 'POST',
-                         body: JSON.stringify({
-                             config: {
-                                 encoding: 'WEBM_OPUS', 
-                                 sampleRateHertz: 48000, 
-                                 languageCode: languageCode,
-                                 model: 'latest_long', 
-                                 enableAutomaticPunctuation: true,
-                             },
-                             audio: { content: base64Audio },
-                         }),
-                         headers: { 'Content-Type': 'application/json' },
-                     });
+      console.log("[InlineWorker] Sending request to Google Speech API with config:", requestPayload.config);
 
-                     const responseData = await response.json();
-
-                     if (!response.ok) {
-                         
-                         self.postMessage({
-                             error: true,
-                             message: "Error from Google Speech API: " + (responseData.error?.message || response.statusText || 'Unknown error')
-                         });
-                         return;
-                     }
-
-                     if (responseData.results && responseData.results.length > 0) {
-                         const transcript = responseData.results
-                             .map(result => result.alternatives[0].transcript)
-                             .join(' ')
-                             .trim();
-                         self.postMessage(transcript); 
-                     } else {
-                         
-                         self.postMessage({ error: true, message: 'No speech detected or recognized.' });
-                     }
-                 } catch (error) {
-                     
-                     self.postMessage({
-                         error: true,
-                         message: 'Error processing speech recognition: ' + (error instanceof Error ? error.message : String(error))
-                     });
-                 }
-             };
-           `;
-      const workerBlob = new Blob([workerCode], {
-        type: "application/javascript"
+      const response = await fetch(url, {
+        method: 'POST',
+        body: JSON.stringify(requestPayload),
+        headers: { 'Content-Type': 'application/json' },
       });
-      const workerUrl = URL.createObjectURL(workerBlob);
-      this.speechWorker = new Worker(workerUrl);
-      URL.revokeObjectURL(workerUrl);
+
+      const responseText = await response.text(); // \u041E\u0442\u0440\u0438\u043C\u0443\u0454\u043C\u043E \u0442\u0435\u043A\u0441\u0442 \u0434\u043B\u044F \u043A\u0440\u0430\u0449\u043E\u0433\u043E \u043D\u0430\u043B\u0430\u0433\u043E\u0434\u0436\u0435\u043D\u043D\u044F \u043F\u043E\u043C\u0438\u043B\u043E\u043A
+      
+      if (!response.ok) {
+        let errorMessage = \`HTTP error! status: \${response.status}\`;
+        try {
+            const errorData = JSON.parse(responseText);
+            if (errorData && errorData.error && errorData.error.message) {
+                errorMessage = \`Google API Error: \${errorData.error.message}\`;
+            }
+        } catch (e) { /* \u0406\u0433\u043D\u043E\u0440\u0443\u0454\u043C\u043E \u043F\u043E\u043C\u0438\u043B\u043A\u0443 \u043F\u0430\u0440\u0441\u0438\u043D\u0433\u0443 JSON, \u044F\u043A\u0449\u043E \u0432\u0456\u0434\u043F\u043E\u0432\u0456\u0434\u044C \u043D\u0435 JSON */ }
+        console.error("[InlineWorker]", errorMessage, "Response body:", responseText);
+        self.postMessage({ success: false, error: errorMessage, details: responseText });
+        return;
+      }
+
+      const responseData = JSON.parse(responseText);
+      console.log("[InlineWorker] Speech recognition data:", responseData);
+
+      if (responseData.results && responseData.results.length > 0) {
+        const transcript = responseData.results
+          .map(result => result.alternatives && result.alternatives.length > 0 ? result.alternatives[0].transcript : '')
+          .join(' ')
+          .trim();
+        
+        if (transcript) {
+            console.log("[InlineWorker] Transcript:", transcript);
+            self.postMessage({ success: true, transcript: transcript });
+        } else {
+            console.warn("[InlineWorker] No valid transcript found in alternatives:", responseData.results);
+            self.postMessage({ success: false, error: 'No valid transcript found in alternatives.' , details: responseData });
+        }
+      } else {
+        console.warn("[InlineWorker] No speech detected or recognized by API:", responseData);
+        self.postMessage({ success: false, error: 'No speech detected or recognized.', details: responseData });
+      }
+    } catch (error) {
+      const errorMessage = (error instanceof Error) ? error.message : String(error);
+      console.error('[InlineWorker] Error processing speech recognition:', errorMessage, error);
+      self.postMessage({ success: false, error: \`Error processing speech recognition: \${errorMessage}\`, details: String(error) });
+    }
+  };
+
+  // \u041E\u0431\u0440\u043E\u0431\u043D\u0438\u043A \u0434\u043B\u044F \u043D\u0435\u043F\u0435\u0440\u0435\u0445\u043E\u043F\u043B\u0435\u043D\u0438\u0445 \u043F\u043E\u043C\u0438\u043B\u043E\u043A \u0443 \u0432\u043E\u0440\u043A\u0435\u0440\u0456
+  self.onerror = (event) => {
+    console.error('[InlineWorker] Uncaught worker error:', event);
+    const errorMessage = (event instanceof ErrorEvent) ? event.message : 'Unknown worker error';
+    self.postMessage({ success: false, error: \`Uncaught worker error: \${errorMessage}\` });
+  };
+`;
+      const workerBlob = new Blob([workerCode], { type: "application/javascript" });
+      if (this.speechWorkerUrl) {
+        URL.revokeObjectURL(this.speechWorkerUrl);
+      }
+      this.speechWorkerUrl = URL.createObjectURL(workerBlob);
+      this.speechWorker = new Worker(this.speechWorkerUrl);
       this.setupSpeechWorkerHandlers();
     } catch (error) {
       new import_obsidian15.Notice("Speech recognition feature failed to initialize.");
@@ -21043,6 +21081,7 @@ This action cannot be undone.`,
     if (!this.speechWorker)
       return;
     this.speechWorker.onmessage = (event) => {
+      this.plugin.logger.debug("[setupSpeechWorkerHandlers] Speech worker message:", event.data);
       const data = event.data;
       if (data && typeof data === "object" && data.error) {
         new import_obsidian15.Notice(`Speech Recognition Error: ${data.message}`);
