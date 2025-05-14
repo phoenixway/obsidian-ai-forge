@@ -34,7 +34,7 @@
     .message-wrapper {
        order: 1; // Messages on the left
        align-items: flex-end; // Align bubbles & actions to the right inside wrapper
-       margin-right: calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
+       margin-right: 2px; //calc(var(--chat-avatar-size) + var(--chat-spacing-unit) * 2); // Space for avatar
        margin-left: auto; // Push wrapper away from left edge
     }
   }
