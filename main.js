@@ -1356,6 +1356,13 @@ async function renderMarkdownContent(app, view, plugin, containerEl, markdownTex
   }
 }
 function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
+  if (avatarRoleType === "tool" || avatarRoleType === "tool-usage") {
+    const existingAvatar = groupEl.querySelector(`.${CSS_CLASSES.AVATAR_CONTAINER || "avatar-container"}`);
+    if (existingAvatar) {
+      existingAvatar.remove();
+    }
+    return;
+  }
   const settings = plugin.settings;
   let avatarTypeToUse;
   let avatarContentToUse;
