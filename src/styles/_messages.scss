@@ -31,7 +31,6 @@
 
   &.user-message-group {
     justify-content: flex-end; // <--- ВАЖЛИВО: Притискає весь вміст групи до правого краю
-  max-width: var(--chat-message-max-width); // Максимальна ширина для повідомлень
 
 
     .message-group-avatar {
@@ -59,6 +58,8 @@
     }
 
     .message-wrapper {
+  max-width: var(--chat-message-max-width); // Максимальна ширина для повідомлень
+
       order: 2; // Обгортка повідомлення візуально друга (справа)
       // margin-left: 0;
       // margin-right: auto;
