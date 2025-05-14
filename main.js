@@ -8240,13 +8240,11 @@ var Chat = class {
   }
   async saveImmediately() {
     if (!this.pluginSettings.saveMessageHistory) {
-      this.logger.debug(`[Chat ${this.metadata.id}] History saving is disabled, skipping saveImmediately.`);
       return true;
     }
     return await this._saveToFile();
   }
   async _saveToFile() {
-    this.logger.debug(`[Chat ${this.metadata.id}] _saveToFile called. Messages count: ${this.messages.length}`);
     const messagesForStorage = this.messages.map((m) => {
       var _a, _b;
       const messageForSave = {
@@ -8265,7 +8263,6 @@ var Chat = class {
         messageForSave.name = m.name;
       if (m.role === "assistant" && m.tool_calls && ((_b = (_a = m.tool_calls) == null ? void 0 : _a.length) != null ? _b : 0) > 0) {
         messageForSave.tool_calls = m.tool_calls;
-        this.logger.debug(`[Chat ${this.metadata.id} _saveToFile] Assistant message (TS: ${m.timestamp.getTime()}) IS BEING SAVED WITH tool_calls:`, JSON.stringify(messageForSave.tool_calls));
       }
       return messageForSave;
     });
@@ -8282,7 +8279,6 @@ var Chat = class {
         JSON.stringify(assistantMessagesWithToolCallsInFinalData[0].tool_calls)
       );
     } else {
-      this.logger.debug(`[Chat ${this.metadata.id} _saveToFile] FINAL ChatData for stringify has NO assistant messages with tool_calls.`);
     }
     const jsonString = JSON.stringify(chatDataToSave, null, 2);
     try {
@@ -8291,7 +8287,6 @@ var Chat = class {
         await this.adapter.mkdir(dirPath);
       }
       await this.adapter.write(this.filePath, jsonString);
-      this.logger.debug(`[Chat ${this.metadata.id}] Successfully saved to ${this.filePath}`);
       return true;
     } catch (error) {
       this.logger.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
@@ -8344,10 +8339,8 @@ var Chat = class {
     try {
       if (await this.adapter.exists(this.filePath)) {
         await this.adapter.remove(this.filePath);
-        this.logger.debug(`[Chat ${this.metadata.id}] Deleted file ${this.filePath}`);
         return true;
       }
-      this.logger.debug(`[Chat ${this.metadata.id}] File ${this.filePath} not found for deletion, assuming success.`);
       return true;
     } catch (e) {
       this.logger.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
@@ -8368,7 +8361,6 @@ var Chat = class {
     this.metadata.lastModified = new Date().toISOString();
     const changed = oldLastModified !== this.metadata.lastModified;
     if (changed) {
-      this.logger.trace(`[Chat ${this.metadata.id}] Activity recorded, new lastModified: ${this.metadata.lastModified}`);
       this.save();
     }
     return changed;
@@ -8615,7 +8607,6 @@ var ChatManager = class {
               };
               chatsLoaded++;
             } else {
-              this.logger.warn(`[ChatManager rebuildIndex] Invalid or incomplete chat data in file: ${fullPath}`, data);
             }
           } catch (e) {
             if (e instanceof SyntaxError) {
@@ -8778,7 +8769,6 @@ var ChatManager = class {
         await this.saveChatIndex();
         this.plugin.emit("chat-list-updated");
       } else {
-        this.logger.trace(`Index for chat ${meta.id} unchanged after save trigger, skipping index save/event.`);
       }
       return true;
     } catch (error) {

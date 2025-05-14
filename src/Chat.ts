@@ -126,14 +126,14 @@ export class Chat {
 
     public async saveImmediately(): Promise<boolean> {
         if (!this.pluginSettings.saveMessageHistory) {
-            this.logger.debug(`[Chat ${this.metadata.id}] History saving is disabled, skipping saveImmediately.`);
+            
             return true;
         }
         return await this._saveToFile();
     }
 
     private async _saveToFile(): Promise<boolean> {
-        this.logger.debug(`[Chat ${this.metadata.id}] _saveToFile called. Messages count: ${this.messages.length}`);
+        
         
         const messagesForStorage = this.messages.map(m => {
             // Створюємо об'єкт для збереження, де timestamp буде рядком
@@ -151,7 +151,7 @@ export class Chat {
             
             if (m.role === 'assistant' && (m as AssistantMessage).tool_calls && ((m as AssistantMessage).tool_calls?.length ?? 0) > 0) {
                 messageForSave.tool_calls = (m as AssistantMessage).tool_calls;
-                this.logger.debug(`[Chat ${this.metadata.id} _saveToFile] Assistant message (TS: ${m.timestamp.getTime()}) IS BEING SAVED WITH tool_calls:`, JSON.stringify(messageForSave.tool_calls));
+                
             }
             return messageForSave;
         });
@@ -170,7 +170,7 @@ export class Chat {
                 JSON.stringify((assistantMessagesWithToolCallsInFinalData[0] as any).tool_calls)
             );
         } else {
-            this.logger.debug(`[Chat ${this.metadata.id} _saveToFile] FINAL ChatData for stringify has NO assistant messages with tool_calls.`);
+            
         }
 
         const jsonString = JSON.stringify(chatDataToSave, null, 2);
@@ -181,7 +181,7 @@ export class Chat {
                 await this.adapter.mkdir(dirPath);
             }
             await this.adapter.write(this.filePath, jsonString);
-            this.logger.debug(`[Chat ${this.metadata.id}] Successfully saved to ${this.filePath}`);
+            
             return true;
         } catch (error) {
             this.logger.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
@@ -243,10 +243,10 @@ export class Chat {
         try {
             if (await this.adapter.exists(this.filePath)) {
                 await this.adapter.remove(this.filePath);
-                this.logger.debug(`[Chat ${this.metadata.id}] Deleted file ${this.filePath}`);
+                
                 return true;
             }
-            this.logger.debug(`[Chat ${this.metadata.id}] File ${this.filePath} not found for deletion, assuming success.`);
+            
             return true;
         } catch (e) {
             this.logger.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
@@ -270,7 +270,7 @@ export class Chat {
         const changed = oldLastModified !== this.metadata.lastModified;
         
         if (changed) {
-            this.logger.trace(`[Chat ${this.metadata.id}] Activity recorded, new lastModified: ${this.metadata.lastModified}`);
+            
             this.save(); 
         }
         return changed;

@@ -273,7 +273,7 @@ export class ChatManager {
               };
               chatsLoaded++;
             } else {
-              this.logger.warn(`[ChatManager rebuildIndex] Invalid or incomplete chat data in file: ${fullPath}`, data);
+              
             }
           } catch (e: any) {
             if (e instanceof SyntaxError) {
@@ -458,7 +458,7 @@ export class ChatManager {
         await this.saveChatIndex();
                 this.plugin.emit("chat-list-updated");
               } else {
-        this.logger.trace(`Index for chat ${meta.id} unchanged after save trigger, skipping index save/event.`);
+        
       }
       return true;
     } catch (error) {
