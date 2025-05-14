@@ -28,6 +28,7 @@
   box-sizing: border-box;
   // align-items: flex-end;
   align-items: flex-start;
+  gap: calc(var(--chat-spacing-unit) * 2); 
 
   &.user-message-group {
     justify-content: flex-end;
@@ -79,7 +80,7 @@
 
 .message-wrapper {
       order: 2;
-      margin-top: 35px;
+      margin-top: 15px;
       align-items: flex-start;
       margin-left: 0 !important;
 
