@@ -128,8 +128,6 @@ export const LANGUAGES: Record<string, string> = {
   yo: "Yoruba",
   zu: "Zulu",
 };
-
-// --- Тип аватара (ДОДАНО 'image') ---
 export type AvatarType = "initials" | "icon" | "image";
 
 export type TranslationProvider = 'google' | 'ollama' | 'none';
@@ -153,14 +151,14 @@ export interface OllamaPluginSettings extends LoggerSettings {
   // View Behavior
   openChatInTab: boolean;
   maxMessageHeight: number;
-  sidebarWidth?: number; // Або null. Означає, що ширина не встановлена користувачем
+  sidebarWidth?: number; 
 
   // Appearance
   userAvatarType: AvatarType;
   userAvatarContent: string;
   aiAvatarType: AvatarType;
   aiAvatarContent: string;
-  fixBrokenEmojis: boolean; // Додано, якщо раніше не було
+  fixBrokenEmojis: boolean;
 
   // RAG
   ragEnabled: boolean;
@@ -171,39 +169,38 @@ export interface OllamaPluginSettings extends LoggerSettings {
   ragSimilarityThreshold: number;
   ragTopK: number;
   maxCharsPerDoc: number;
-  ragAutoIndexOnStartup: boolean; // Додано, якщо раніше не було
+  ragAutoIndexOnStartup: boolean;
 
   // Productivity
-  enableProductivityFeatures: boolean; // Додано, якщо раніше не було
-  dailyTaskFileName: string; // Додано, якщо раніше не було
+  enableProductivityFeatures: boolean; 
+  dailyTaskFileName: string; 
 
   // Advanced Context Management (Summarization)
-  useAdvancedContextStrategy: boolean; // Додано, якщо раніше не було
-  enableSummarization: boolean; // Додано, якщо раніше не було
-  summarizationPrompt: string; // Додано, якщо раніше не було
-  keepLastNMessagesBeforeSummary: number; // Додано, якщо раніше не було
-  summarizationChunkSize: number; // Додано, якщо раніше не було
-  summarizationModelName: string; // Додано, якщо раніше не було
-  fallbackSummarizationModelName: string; // Додано, якщо раніше не було
-
+  useAdvancedContextStrategy: boolean; 
+  enableSummarization: boolean; 
+  summarizationPrompt: string; 
+  keepLastNMessagesBeforeSummary: number; 
+  summarizationChunkSize: number; 
+  summarizationModelName: string; 
+  fallbackSummarizationModelName: string; 
 
   // Speech & Translation
-  googleApiKey: string; // Speech-to-Text
-  speechLanguage: string;
-  enableTranslation: boolean; // Можливо, це поле стане застарілим після додавання translationProvider
-  translationTargetLanguage: string;
-  googleTranslationApiKey: string;
-  translationProvider: TranslationProvider; // Додано
-  ollamaTranslationModel: string; // Додано
+  googleApiKey: string; 
+  speechLanguage: string; 
+  enableTranslation: boolean; 
+  translationTargetLanguage: string; 
+  googleTranslationApiKey: string; 
+  translationProvider: 'google' | 'ollama' | 'none'; 
+  ollamaTranslationModel: string; 
 
   // Tools/Agents
-  enableToolUse: boolean; // Додано
+  enableToolUse: boolean; 
 
   // Weather Agent Settings (НОВІ ПОЛЯ!)
-  openWeatherMapApiKey: string; // API ключ OpenWeatherMap
-  weatherDefaultLocation: string; // Локація за замовчуванням для погоди
+  openWeatherMapApiKey: string; 
+  weatherDefaultLocation: string; 
 
-    allowVadMicVadModelFromCDN: boolean;
+  allowVadMicVadModelFromCDN: boolean;
   vadUseLocalModelIfAvailable: boolean;
   vadUseLocalWorkletIfAvailable: boolean;
 }

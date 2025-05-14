@@ -21078,6 +21078,8 @@ This action cannot be undone.`,
       this.speechWorker = null;
     }
   }
+  // OllamaView.ts
+  // ... (інші імпорти, властивості, методи) ...
   setupSpeechWorkerHandlers() {
     if (!this.speechWorker)
       return;
@@ -21085,11 +21087,22 @@ This action cannot be undone.`,
       this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
       this.updateSendButtonState();
       const data = event.data;
-      if (data.success && typeof data.transcript === "string") {
-        this.plugin.logger.info("Received transcript from inline worker:", data.transcript);
-        this.inputEl.value = data.transcript;
+      if (data.success && typeof data.transcript === "string" && data.transcript.trim() !== "") {
+        const receivedTranscript = data.transcript;
+        this.plugin.logger.info("Received transcript from inline worker:", receivedTranscript);
+        const currentText = this.inputEl.value;
+        const selectionStart = this.inputEl.selectionStart;
+        const selectionEnd = this.inputEl.selectionEnd;
+        const newText = currentText.substring(0, selectionStart) + receivedTranscript + // Використовуємо нову змінну
+        currentText.substring(selectionEnd);
+        this.inputEl.value = newText;
+        const newCursorPosition = selectionStart + receivedTranscript.length;
+        this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
         this.inputEl.focus();
-      } else {
+        this.updateSendButtonState();
+      } else if (data.success && (typeof data.transcript !== "string" || data.transcript.trim() === "")) {
+        this.plugin.logger.info("Received successful but empty or non-string transcript. Nothing to insert.");
+      } else if (!data.success) {
         this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
         new import_obsidian15.Notice(`Speech recognition error: ${data.error || "Unknown error"}`);
       }
@@ -21109,6 +21122,7 @@ This action cannot be undone.`,
       }
     };
   }
+  // ... (решта класу OllamaView) ...
   insertTranscript(transcript) {
     if (!this.inputEl)
       return;

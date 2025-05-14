@@ -1697,40 +1697,70 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       this.speechWorker = null;
     }
   }
-  private setupSpeechWorkerHandlers(): void {
+  
+  // OllamaView.ts
+// ... (інші імпорти, властивості, методи) ...
+
+ private setupSpeechWorkerHandlers(): void {
     if (!this.speechWorker) return;
 
     this.speechWorker.onmessage = (event: MessageEvent<{success: boolean, transcript?: string, error?: string, details?: any}>) => {
-        this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
+        this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER; 
         this.updateSendButtonState();
 
         const data = event.data;
-        if (data.success && typeof data.transcript === 'string') {
-            this.plugin.logger.info("Received transcript from inline worker:", data.transcript);
-            this.inputEl.value = data.transcript;
-            this.inputEl.focus();
-            // ...
-        } else {
+        // Перевіряємо, що транскрипція існує, є рядком і не порожня
+        if (data.success && typeof data.transcript === 'string' && data.transcript.trim() !== "") {
+            // Після цієї перевірки, TypeScript знає, що data.transcript - це string
+            const receivedTranscript: string = data.transcript; // Тепер receivedTranscript - це гарантовано string
+
+            this.plugin.logger.info("Received transcript from inline worker:", receivedTranscript);
+            
+            const currentText = this.inputEl.value;
+            const selectionStart = this.inputEl.selectionStart;
+            const selectionEnd = this.inputEl.selectionEnd;    
+
+            const newText = 
+                currentText.substring(0, selectionStart) + 
+                receivedTranscript + // Використовуємо нову змінну
+                currentText.substring(selectionEnd);
+
+            this.inputEl.value = newText;
+            
+            const newCursorPosition = selectionStart + receivedTranscript.length; // Використовуємо нову змінну
+            this.inputEl.setSelectionRange(newCursorPosition, newCursorPosition);
+
+            this.inputEl.focus(); 
+            this.updateSendButtonState(); 
+
+        } else if (data.success && (typeof data.transcript !== 'string' || data.transcript.trim() === "")) {
+            // Обробляємо випадок, коли транскрипція успішна, але порожня або не рядок
+            this.plugin.logger.info("Received successful but empty or non-string transcript. Nothing to insert.");
+        }
+        else if (!data.success) { // Явно обробляємо випадок помилки
             this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
             new Notice(`Speech recognition error: ${data.error || 'Unknown error'}`);
         }
     };
-
     this.speechWorker.onerror = (error: ErrorEvent) => {
+        // ... (обробка помилок, як і раніше) ...
         this.plugin.logger.error("Unhandled error in inline speech worker:", error.message, error);
         new Notice(`Speech recognition worker failed: ${error.message}`);
-        this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
+        this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER; 
         this.updateSendButtonState();
-         if (this.speechWorker) { // Зупиняємо воркер, якщо він зламався
+         if (this.speechWorker) { 
             this.speechWorker.terminate();
             this.speechWorker = null;
         }
-        if (this.speechWorkerUrl) { // І відкликаємо його URL
+        if (this.speechWorkerUrl) { 
             URL.revokeObjectURL(this.speechWorkerUrl);
             this.speechWorkerUrl = null;
         }
     };
-}
+  }
+
+// ... (решта класу OllamaView) ...
+
   private insertTranscript(transcript: string): void {
     if (!this.inputEl) return;
 
