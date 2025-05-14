@@ -68,6 +68,7 @@ export const CSS_CLASSES = {
     THINKING_TOGGLE: "thinking-toggle",
     THINKING_TITLE: "thinking-title",
     THINKING_CONTENT: "thinking-content",
+    AVATAR_TOOL_SPECIFIC: "avatar-tool-specific", // Специфічний клас для аватара інструменту
     ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator",
     // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };

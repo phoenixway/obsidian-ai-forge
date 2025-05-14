@@ -1155,6 +1155,8 @@ var CSS_CLASSES = {
   THINKING_TOGGLE: "thinking-toggle",
   THINKING_TITLE: "thinking-title",
   THINKING_CONTENT: "thinking-content",
+  AVATAR_TOOL_SPECIFIC: "avatar-tool-specific",
+  // Специфічний клас для аватара інструменту
   ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator"
   // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
 };
@@ -1357,43 +1359,44 @@ function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
   const settings = plugin.settings;
   let avatarTypeToUse;
   let avatarContentToUse;
-  let specificIcon = null;
-  const defaultAiIcon = "bot";
   if (isUser) {
     avatarTypeToUse = settings.userAvatarType;
     avatarContentToUse = settings.userAvatarContent;
   } else {
-    avatarTypeToUse = settings.aiAvatarType;
-    avatarContentToUse = settings.aiAvatarContent;
-    if (avatarTypeToUse === "icon") {
-      switch (avatarRoleType) {
-        case "system":
-          specificIcon = "info";
-          break;
-        case "tool":
-          specificIcon = "wrench";
-          break;
-        case "error":
-          specificIcon = "alert-circle";
-          break;
-        case "assistant":
-        default:
-          specificIcon = avatarContentToUse || defaultAiIcon;
-          break;
-      }
-      if (specificIcon) {
-        avatarContentToUse = specificIcon;
-      }
+    switch (avatarRoleType) {
+      case "tool":
+        avatarTypeToUse = "icon";
+        avatarContentToUse = "settings";
+        break;
+      case "system":
+        avatarTypeToUse = "icon";
+        avatarContentToUse = "info";
+        break;
+      case "error":
+        avatarTypeToUse = "icon";
+        avatarContentToUse = "alert-triangle";
+        break;
+      case "assistant":
+      default:
+        avatarTypeToUse = settings.aiAvatarType;
+        avatarContentToUse = settings.aiAvatarContent;
+        if (avatarTypeToUse === "icon" && !avatarContentToUse) {
+          avatarContentToUse = "bot";
+        }
+        break;
     }
   }
   const mainAvatarContainerClass = CSS_CLASSES.AVATAR_CONTAINER || "avatar-container";
-  const specificAvatarRoleClass = isUser ? CSS_CLASSES.AVATAR_USER_SPECIFIC || "user-avatar" : CSS_CLASSES.AVATAR_AI_SPECIFIC || "ai-avatar";
+  let specificAvatarRoleClass = isUser ? CSS_CLASSES.AVATAR_USER_SPECIFIC || "user-avatar" : CSS_CLASSES.AVATAR_AI_SPECIFIC || "ai-avatar";
+  if (!isUser && avatarRoleType === "tool") {
+    specificAvatarRoleClass = `${specificAvatarRoleClass} ${CSS_CLASSES.AVATAR_TOOL_SPECIFIC || "avatar-tool-specific"}`;
+  }
   let avatarEl = groupEl.querySelector(`.${mainAvatarContainerClass.split(" ")[0]}`);
   if (!avatarEl) {
-    avatarEl = groupEl.createDiv({ cls: [mainAvatarContainerClass, specificAvatarRoleClass] });
+    avatarEl = groupEl.createDiv({ cls: [mainAvatarContainerClass, specificAvatarRoleClass].join(" ") });
   } else {
     avatarEl.className = "";
-    avatarEl.classList.add(mainAvatarContainerClass, specificAvatarRoleClass);
+    avatarEl.classList.add(...mainAvatarContainerClass.split(" "), ...specificAvatarRoleClass.split(" "));
   }
   avatarEl.empty();
   try {
@@ -1405,7 +1408,6 @@ function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
         avatarEl.createEl("img", {
           attr: { src: imageUrl, alt: isUser ? "User Avatar" : (avatarRoleType || "AI") + " Avatar" },
           cls: CSS_CLASSES.AVATAR_IMAGE || "avatar-image"
-          // Використовуємо константу
         });
         avatarEl.title = `Avatar from: ${imagePath}`;
       } else {
@@ -1433,10 +1435,10 @@ function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
     }
   } catch (e) {
     plugin.logger.warn(`Failed to render avatar (type: ${avatarTypeToUse}, content: ${avatarContentToUse}, roleType: ${avatarRoleType}):`, e.message);
-    const fallbackIcon = isUser ? "user-circle" : specificIcon || defaultAiIcon;
+    const fallbackIconName = avatarRoleType === "tool" ? "settings" : isUser ? "user-circle" : "bot";
     avatarEl.empty();
-    (0, import_obsidian6.setIcon)(avatarEl.createSpan({ cls: CSS_CLASSES.AVATAR_ICON || "avatar-icon" }), fallbackIcon);
-    avatarEl.title = `Fallback Avatar (Icon: ${fallbackIcon})`;
+    (0, import_obsidian6.setIcon)(avatarEl.createSpan({ cls: CSS_CLASSES.AVATAR_ICON || "avatar-icon" }), fallbackIconName);
+    avatarEl.title = `Fallback Avatar (Icon: ${fallbackIconName})`;
   }
 }
 
