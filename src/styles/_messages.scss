@@ -545,52 +545,50 @@
 $avatar-default-size: var(--chat-avatar-size, 32px); // Резервне значення, якщо --chat-avatar-size не визначено
 $avatar-font-size-factor: 0.5;
 $avatar-icon-size-factor: 0.65;
-$avatar-font-size: calc($avatar-default-size * 0.5); // Розмір шрифту для ініціалів
-$avatar-icon-size: calc($avatar-default-size * 0.65); // Розмір іконки всередині аватара
-$avatar-size: 56px; 
+
 
 // Головний контейнер аватара
 .avatar-container { 
   width: $avatar-default-size;
   height: $avatar-default-size;
-  min-width: $avatar-default-size;; // Важливо для flex-контейнерів
-  min-height: $avatar-default-size;;
-  border-radius: 50%; // Робимо його круглим
+  min-width: $avatar-default-size; 
+  min-height: $avatar-default-size;
+  border-radius: 50%; 
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; // Обрізаємо все, що виходить за межі
-  background-color: var(--background-modifier-hover); // Фоновий колір для ініціалів/іконок
-  margin-right: 8px; // Відступ від повідомлення (якщо аватар зліва)
-  // Якщо аватар користувача має бути справа, додайте відповідні стилі
-  // наприклад, через .message-group.user-message .avatar-container { margin-left: 8px; margin-right: 0; }
+  overflow: hidden; 
+  background-color: var(--background-modifier-hover); 
+  // margin-right тепер контролюється через .message-group.ollama-message-group .avatar-container
+  // margin-left тепер контролюється через .message-group.user-message-group .avatar-container
+  align-self: flex-end; // Вирівнюємо аватар по низу flex-групи (message-group)
 
   // Аватар-зображення
-  &.avatar-image, // Якщо цей клас додається до самого контейнера
-  img.avatar-image { // Або якщо це клас для <img> всередині
+  &.avatar-image, 
+  img.avatar-image { 
     width: 100%;
     height: 100%;
-    object-fit: cover; // Зберігає пропорції зображення, заповнюючи контейнер
-    border-radius: 50%; // Забезпечуємо круглість, навіть якщо саме зображення квадратне
+    object-fit: cover; 
+    border-radius: 50%; 
   }
 
   // Аватар-іконка
-  &.avatar-icon, // Якщо цей клас додається до самого контейнера
-  .avatar-icon {  // Або якщо це клас для <span> всередині
-    svg { // Стилізуємо SVG всередині (Obsidian setIcon використовує SVG)
-      width: $avatar-icon-size;
-      height: $avatar-icon-size;
-      display: block; // Прибирає зайві відступи
+  &.avatar-icon, 
+  .avatar-icon {  
+    svg { 
+      width: calc(#{$avatar-default-size} * #{$avatar-icon-size-factor});
+      height: calc(#{$avatar-default-size} * #{$avatar-icon-size-factor});
+      display: block; 
     }
   }
 
   // Аватар-ініціали
-  &.avatar-initials, // Якщо цей клас додається до самого контейнера
-  div.avatar-initials { // Або якщо це клас для <div> всередині
-    font-size: $avatar-font-size;
+  &.avatar-initials, 
+  div.avatar-initials { 
+    font-size: calc(#{$avatar-default-size} * #{$avatar-font-size-factor});
     font-weight: 600;
-    color: var(--text-muted); // Колір ініціалів
-    line-height: $avatar-size; // Центруємо вертикально (якщо одна літера)
+    color: var(--text-muted); 
+    line-height: $avatar-default-size; 
     text-align: center;
     width: 100%;
     height: 100%;
@@ -601,57 +599,37 @@ $avatar-size: 56px;
 }
 
 // Специфічні стилі, якщо ви розрізняєте user/ai аватари за класами на контейнері
-.user-avatar { // Або CSS_CLASSES.AVATAR_USER_SPECIFIC
+.avatar-container.user-avatar { // CSS_CLASSES.AVATAR_USER_SPECIFIC
   // Можна додати, наприклад, інший фоновий колір
   // background-color: var(--interactive-accent);
-  // color: var(--text-on-accent); // для ініціалів
+  // div.avatar-initials { // Якщо ініціали
+  //    color: var(--text-on-accent);
+  // }
 }
 
-.ai-avatar { // Або CSS_CLASSES.AVATAR_AI_SPECIFIC
+.avatar-container.ai-avatar { // CSS_CLASSES.AVATAR_AI_SPECIFIC
   // background-color: var(--background-modifier-success); // Приклад
 }
 
-// Розміщення аватара відносно групи повідомлень
-// Це приклад, якщо ваш .message-group є flex-контейнером
-.message-group {
-  display: flex;
-  align-items: flex-start; // Або flex-end, якщо аватар має бути внизу довгого повідомлення
-  margin-bottom: var(--size-2-2); // Приклад відступу між повідомленнями
-
-  // Якщо повідомлення користувача, і аватар справа
-  &.user-message { // Припускаючи, що ви додаєте клас user-message до message-group
-    flex-direction: row-reverse;
-    .avatar-container { // Або ваш клас для аватара
-      margin-right: 0;
-      margin-left: 8px;
-    }
-    .message-wrapper { // Припускаючи, що це обгортка для бульбашки
-        align-self: flex-end; // Вирівнюємо саму бульбашку по правому краю
-    }
-  }
-}
 
 .assistant-tool-usage-indicator {
   font-style: italic;
-  color: var(--text-faint); // Блідий колір тексту
-  font-size: var(--font-ui-smaller); // Трохи менший шрифт
-  // display: block; // Якщо хочете, щоб він був на окремому рядку
-  // margin-bottom: var(--size-4-1); // Невеликий відступ знизу, якщо display: block
+  color: var(--text-faint); 
+  font-size: var(--font-ui-smaller); 
+  // display: block; 
+  // margin-bottom: var(--size-4-1); 
 }
 
-// Якщо ви хочете, щоб іконка "→" мала інший стиль
+
 .assistant-tool-usage-indicator::before {
-  // Якщо ви використовуєте "→" як текстовий префікс в prepareDisplayContent
-  // content: "→ "; // Можна задати тут, а не в JS, але тоді префікс прибрати з JS
+  // content: "→ "; 
   // margin-right: 4px;
-  // font-weight: bold; // Наприклад
+  // font-weight: bold; 
 }
 
-// Альтернатива, якщо ви хочете стилізувати весь блок повідомлення асистента,
-// коли він містить ТІЛЬКИ індикатор використання інструменту.
-// Це складніше визначити без додаткової логіки в рендерері.
-// .ollama-message.is-tool-indicator-only .message-content { // Потрібно додавати клас is-tool-indicator-only
+// .ollama-message.is-tool-indicator-only .message-content { 
 //   font-style: italic;
 //   color: var(--text-faint);
 //   font-size: var(--font-ui-smaller);
 // }
+
