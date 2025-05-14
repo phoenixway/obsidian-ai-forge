@@ -82,8 +82,6 @@ export class OllamaView extends ItemView {
   private vadWorkletJs: string | null = null; // Для зберігання коду ворклету
   private vadModelArrayBuffer: ArrayBuffer | null = null; // Для зберігання моделі
 
-
-
   public readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
   private inputEl!: HTMLTextAreaElement;
@@ -254,28 +252,28 @@ export class OllamaView extends ItemView {
     }
   }
 
-   private async loadVadAssets() {
+  private async loadVadAssets() {
     // Шляхи до файлів у теці assets вашого плагіна
     const workletFileName = "vad.worklet.bundle.min.js"; // Назва файлу ворклету
     const modelFileName = "silero_vad.onnx"; // Назва файлу моделі (або silero_vad_legacy.onnx)
-    
+
     const workletPath = normalizePath(`${this.plugin.manifest.dir}/assets/${workletFileName}`);
     const modelPath = normalizePath(`${this.plugin.manifest.dir}/assets/${modelFileName}`);
 
     try {
-        this.vadWorkletJs = await this.app.vault.adapter.read(workletPath);
-        this.plugin.logger.debug("VAD worklet JS loaded successfully.");
+      this.vadWorkletJs = await this.app.vault.adapter.read(workletPath);
+      this.plugin.logger.debug("VAD worklet JS loaded successfully.");
     } catch (e) {
-        this.plugin.logger.error(`Failed to load VAD worklet JS from ${workletPath}:`, e);
-        new Notice("VAD worklet could not be loaded. Voice detection might be unstable or not work.");
+      this.plugin.logger.error(`Failed to load VAD worklet JS from ${workletPath}:`, e);
+      new Notice("VAD worklet could not be loaded. Voice detection might be unstable or not work.");
     }
 
     try {
-        this.vadModelArrayBuffer = await this.app.vault.adapter.readBinary(modelPath);
-        this.plugin.logger.debug("VAD ONNX model loaded successfully.");
+      this.vadModelArrayBuffer = await this.app.vault.adapter.readBinary(modelPath);
+      this.plugin.logger.debug("VAD ONNX model loaded successfully.");
     } catch (e) {
-        this.plugin.logger.error(`Failed to load VAD ONNX model from ${modelPath}:`, e);
-        new Notice("VAD ONNX model could not be loaded. Voice detection might be unstable or not work.");
+      this.plugin.logger.error(`Failed to load VAD ONNX model from ${modelPath}:`, e);
+      new Notice("VAD ONNX model could not be loaded. Voice detection might be unstable or not work.");
     }
   }
 
@@ -294,7 +292,7 @@ export class OllamaView extends ItemView {
       this.speechWorker = null;
     }
     this.stopVoiceRecording(false); // Переконайся, що VAD також зупиняється
-   if (this.vad) {
+    if (this.vad) {
       try {
         await this.vad.destroy();
       } catch (e) {
@@ -1713,8 +1711,8 @@ export class OllamaView extends ItemView {
       await this.startVoiceRecognition();
     }
   }
-  
- private async startVoiceRecognition(): Promise<void> {
+
+  private async startVoiceRecognition(): Promise<void> {
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       this.plugin.logger.debug("VAD: Recording already in progress.");
       return;
@@ -1732,19 +1730,25 @@ export class OllamaView extends ItemView {
     }
 
     // Завантажуємо локальні асети, якщо їх ще немає
-    if (!this.vadModelArrayBuffer) { // Ворклет JS може бути не настільки критичним, якщо бібліотека його сама тягне
-        await this.loadVadAssets(); 
-    }
-    
-    if (!this.vadModelArrayBuffer && !this.plugin.settings.allowVadMicVadModelFromCDN) { 
-        // Якщо локальна модель не завантажена І не дозволено тягнути з CDN
-        new Notice("VAD ONNX model not loaded locally, and CDN usage is disabled in settings. Voice detection cannot start.");
-        this.plugin.logger.error("Local VAD ONNX model not available and CDN disabled. Aborting voice recognition start.");
-        return;
-    } else if (!this.vadModelArrayBuffer && this.plugin.settings.allowVadMicVadModelFromCDN) {
-        this.plugin.logger.warn("Local VAD ONNX model not available. Library will attempt to load from CDN (as per settings).");
+    if (!this.vadModelArrayBuffer) {
+      // Ворклет JS може бути не настільки критичним, якщо бібліотека його сама тягне
+      await this.loadVadAssets();
     }
 
+    if (!this.vadModelArrayBuffer && !this.plugin.settings.allowVadMicVadModelFromCDN) {
+      // Якщо локальна модель не завантажена І не дозволено тягнути з CDN
+      new Notice(
+        "VAD ONNX model not loaded locally, and CDN usage is disabled in settings. Voice detection cannot start."
+      );
+      this.plugin.logger.error(
+        "Local VAD ONNX model not available and CDN disabled. Aborting voice recognition start."
+      );
+      return;
+    } else if (!this.vadModelArrayBuffer && this.plugin.settings.allowVadMicVadModelFromCDN) {
+      this.plugin.logger.warn(
+        "Local VAD ONNX model not available. Library will attempt to load from CDN (as per settings)."
+      );
+    }
 
     try {
       this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1770,7 +1774,7 @@ export class OllamaView extends ItemView {
       };
 
       this.mediaRecorder.onstop = () => {
-        this.plugin.logger.debug("MediaRecorder stopped.");
+this.plugin.logger.debug(`MediaRecorder stopped. Audio chunks count: ${audioChunks.length}. isVadSpeechDetected: ${this.isVadSpeechDetected}`);
         if (this.vad) {
           this.vad.pause();
         }
@@ -1790,19 +1794,19 @@ export class OllamaView extends ItemView {
             languageCode: this.plugin.settings.speechLanguage || "uk-UA",
           });
         } else if (audioChunks.length === 0 || !this.isVadSpeechDetected) {
-          this.plugin.logger.debug("No audio chunks or no speech detected by VAD, not sending to worker.");
+  this.plugin.logger.debug(`Not sending to worker. audioChunks.length: ${audioChunks.length}, isVadSpeechDetected: ${this.isVadSpeechDetected}`);
           this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState();
         }
       };
 
       this.mediaRecorder.onerror = (event: Event) => {
-        let errorMessage = 'Unknown MediaRecorder error';
+        let errorMessage = "Unknown MediaRecorder error";
         if (event instanceof ErrorEvent) {
           errorMessage = event.message;
           this.plugin.logger.error("MediaRecorder ErrorEvent:", event.error, event.message);
         } else if ((event as any).error) {
-          errorMessage = (event as any).error.message || (event as any).error.name || 'MediaRecorder specific error';
+          errorMessage = (event as any).error.message || (event as any).error.name || "MediaRecorder specific error";
           this.plugin.logger.error("MediaRecorder specific error object:", (event as any).error);
         } else {
           this.plugin.logger.error("MediaRecorder unknown error event type:", event);
@@ -1821,89 +1825,112 @@ export class OllamaView extends ItemView {
         }
 
         this.plugin.logger.debug("Attempting to initialize MicVAD...");
-        
-        const vadOptions: any = { // Використовуємо any, щоб TypeScript не скаржився на невідомі опції, якщо вони є
+
+        const vadOptions: any = {
+          // Використовуємо any, щоб TypeScript не скаржився на невідомі опції, якщо вони є
           stream: this.audioStream,
           ortConfig: (ort: any) => {
             this.plugin.logger.debug("[VAD ortConfig] Attempting to configure ONNXRuntime-Web instance.");
             if (ort.env && ort.env.wasm) {
               this.plugin.logger.debug("[VAD ortConfig] WASM config before:", JSON.parse(JSON.stringify(ort.env.wasm)));
               ort.env.wasm.numThreads = 1;
-              this.plugin.logger.debug("[VAD ortConfig] WASM config after (numThreads=1):", JSON.parse(JSON.stringify(ort.env.wasm)));
+              this.plugin.logger.debug(
+                "[VAD ortConfig] WASM config after (numThreads=1):",
+                JSON.parse(JSON.stringify(ort.env.wasm))
+              );
             } else {
-              this.plugin.logger.warn("[VAD ortConfig] ort.env.wasm is not available for configuration during this call.");
+              this.plugin.logger.warn(
+                "[VAD ortConfig] ort.env.wasm is not available for configuration during this call."
+              );
             }
           },
           onSpeechStart: () => {
-            this.plugin.logger.debug("VAD: Speech started.");
+            this.plugin.logger.debug("VAD EVENT: Speech started! Setting isVadSpeechDetected = true.");
             this.isVadSpeechDetected = true;
             if (this.vadSilenceTimer) {
               clearTimeout(this.vadSilenceTimer);
               this.vadSilenceTimer = null;
             }
           },
-          onSpeechEnd: (/*audio: Float32Array*/) => { // audio можна прибрати, якщо не використовується
-            this.plugin.logger.debug("VAD: Speech ended.");
-            if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-              if (this.vadSilenceTimer) clearTimeout(this.vadSilenceTimer);
-              this.vadSilenceTimer = setTimeout(() => {
-                this.plugin.logger.debug("VAD: Stopping recording due to prolonged silence after speech.");
-                this.stopVoiceRecording(true);
-              }, this.VAD_SILENCE_TIMEOUT_MS);
-            }
+          onSpeechEnd: (audioChunk: Float32Array) => {
+            // audio можна прибрати, якщо не використовується
+            this.plugin.logger.debug(
+              `VAD EVENT: Speech ended. Audio chunk length: ${audioChunk?.length}. isVadSpeechDetected: ${this.isVadSpeechDetected}`
+            );
+  if (this.isVadSpeechDetected && this.mediaRecorder && this.mediaRecorder.state === "recording") {
+    if (this.vadSilenceTimer) clearTimeout(this.vadSilenceTimer);
+    this.plugin.logger.debug("VAD EVENT: Setting vadSilenceTimer on speech end.");
+    this.vadSilenceTimer = setTimeout(() => {
+      this.plugin.logger.debug("VAD EVENT: vadSilenceTimer expired. Stopping voice recording.");
+      this.stopVoiceRecording(true); // Переконайся, що processAudio тут true
+    }, this.VAD_SILENCE_TIMEOUT_MS);
+  } else {
+      this.plugin.logger.debug("VAD EVENT: Speech ended, but not processing (isVadSpeechDetected false or recorder not recording).");
+  }
           },
-           positiveSpeechThreshold: 0.65,
-           negativeSpeechThreshold: 0.35,
-           minSpeechFrames: 5, 
-           preSpeechPadFrames: 5,
-           redemptionFrames: 8,
+          positiveSpeechThreshold: 0.65,
+          negativeSpeechThreshold: 0.35,
+          minSpeechFrames: 5,
+          preSpeechPadFrames: 5,
+          redemptionFrames: 8,
         };
 
-        // Якщо локальна модель завантажена І налаштування дозволяють її використовувати 
+        // Якщо локальна модель завантажена І налаштування дозволяють її використовувати
         // (або якщо CDN заборонено, тоді використання локальної є пріоритетом)
-        if (this.vadModelArrayBuffer && (!this.plugin.settings.allowVadMicVadModelFromCDN || this.plugin.settings.vadUseLocalModelIfAvailable)) {
-            try {
-                const modelBlob = new Blob([this.vadModelArrayBuffer], { type: 'application/octet-stream' });
-                const modelObjectURL = URL.createObjectURL(modelBlob);
-                vadOptions.modelURL = modelObjectURL; // TypeScript може скаржитися, якщо опції немає
-                this.plugin.logger.debug("Using local VAD ONNX model via Object URL:", modelObjectURL);
-                // Потрібно буде звільнити modelObjectURL в destroy/onClose
-            } catch(e) {
-                this.plugin.logger.error("Error creating Object URL for local VAD model:", e);
-            }
+        if (
+          this.vadModelArrayBuffer &&
+          (!this.plugin.settings.allowVadMicVadModelFromCDN || this.plugin.settings.vadUseLocalModelIfAvailable)
+        ) {
+          try {
+            const modelBlob = new Blob([this.vadModelArrayBuffer], { type: "application/octet-stream" });
+            const modelObjectURL = URL.createObjectURL(modelBlob);
+            vadOptions.modelURL = modelObjectURL; // TypeScript може скаржитися, якщо опції немає
+            this.plugin.logger.debug("Using local VAD ONNX model via Object URL:", modelObjectURL);
+            // Потрібно буде звільнити modelObjectURL в destroy/onClose
+          } catch (e) {
+            this.plugin.logger.error("Error creating Object URL for local VAD model:", e);
+          }
         }
-        
+
         // Аналогічно для ворклету, якщо опція workletURL існує і не викликає помилку TS
         // (якщо викликає - цей блок потрібно прибрати)
-        if (this.vadWorkletJs && this.plugin.settings.vadUseLocalWorkletIfAvailable) { // Додав налаштування
-             try {
-                const workletBlob = new Blob([this.vadWorkletJs], { type: 'application/javascript' });
-                const workletObjectURL = URL.createObjectURL(workletBlob);
-                vadOptions.workletURL = workletObjectURL; // TypeScript може скаржитися
-                this.plugin.logger.debug("Using local VAD worklet via Object URL:", workletObjectURL);
-             } catch(e) {
-                this.plugin.logger.error("Error creating Object URL for local VAD worklet:", e);
-             }
+        if (this.vadWorkletJs && this.plugin.settings.vadUseLocalWorkletIfAvailable) {
+          // Додав налаштування
+          try {
+            const workletBlob = new Blob([this.vadWorkletJs], { type: "application/javascript" });
+            const workletObjectURL = URL.createObjectURL(workletBlob);
+            vadOptions.workletURL = workletObjectURL; // TypeScript може скаржитися
+            this.plugin.logger.debug("Using local VAD worklet via Object URL:", workletObjectURL);
+          } catch (e) {
+            this.plugin.logger.error("Error creating Object URL for local VAD worklet:", e);
+          }
         }
 
-
         this.vad = await MicVAD.new(vadOptions);
-        
-        this.plugin.logger.debug("VAD initialized (MicVAD.new called).");
 
+        this.plugin.logger.debug("VAD initialized (MicVAD.new called).");
       } catch (vadError: any) {
         this.plugin.logger.error("Failed to initialize VAD (MicVAD.new error):", vadError);
         if (vadError.message && vadError.message.includes("Worker is not a constructor")) {
-            new Notice("Voice activity detection failed: Web Worker environment issue.");
-        } else if (vadError.message && (vadError.message.includes("ORT Session") || vadError.message.includes("ONNX"))) {
-            new Notice("Voice activity detection failed: Could not initialize ONNX model. Check console for details.");
-        } else if (vadError.message && (vadError.message.includes("fetch") || vadError.message.includes("network error") || vadError.message.includes("load model"))) {
-            new Notice("VAD Error: Could not load model or worklet from CDN. Consider enabling local files in settings if available.");
+          new Notice("Voice activity detection failed: Web Worker environment issue.");
+        } else if (
+          vadError.message &&
+          (vadError.message.includes("ORT Session") || vadError.message.includes("ONNX"))
+        ) {
+          new Notice("Voice activity detection failed: Could not initialize ONNX model. Check console for details.");
+        } else if (
+          vadError.message &&
+          (vadError.message.includes("fetch") ||
+            vadError.message.includes("network error") ||
+            vadError.message.includes("load model"))
+        ) {
+          new Notice(
+            "VAD Error: Could not load model or worklet from CDN. Consider enabling local files in settings if available."
+          );
+        } else {
+          new Notice(`Voice activity detection failed to start: ${vadError.message}`);
         }
-        else {
-            new Notice(`Voice activity detection failed to start: ${vadError.message}`);
-        }
-        this.vad = null; 
+        this.vad = null;
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "NotAllowedError") {

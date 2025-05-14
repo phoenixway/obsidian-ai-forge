@@ -21104,11 +21104,17 @@ This action cannot be undone.`,
       await this.loadVadAssets();
     }
     if (!this.vadModelArrayBuffer && !this.plugin.settings.allowVadMicVadModelFromCDN) {
-      new import_obsidian15.Notice("VAD ONNX model not loaded locally, and CDN usage is disabled in settings. Voice detection cannot start.");
-      this.plugin.logger.error("Local VAD ONNX model not available and CDN disabled. Aborting voice recognition start.");
+      new import_obsidian15.Notice(
+        "VAD ONNX model not loaded locally, and CDN usage is disabled in settings. Voice detection cannot start."
+      );
+      this.plugin.logger.error(
+        "Local VAD ONNX model not available and CDN disabled. Aborting voice recognition start."
+      );
       return;
     } else if (!this.vadModelArrayBuffer && this.plugin.settings.allowVadMicVadModelFromCDN) {
-      this.plugin.logger.warn("Local VAD ONNX model not available. Library will attempt to load from CDN (as per settings).");
+      this.plugin.logger.warn(
+        "Local VAD ONNX model not available. Library will attempt to load from CDN (as per settings)."
+      );
     }
     try {
       this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -21130,7 +21136,7 @@ This action cannot be undone.`,
         }
       };
       this.mediaRecorder.onstop = () => {
-        this.plugin.logger.debug("MediaRecorder stopped.");
+        this.plugin.logger.debug(`MediaRecorder stopped. Audio chunks count: ${audioChunks.length}. isVadSpeechDetected: ${this.isVadSpeechDetected}`);
         if (this.vad) {
           this.vad.pause();
         }
@@ -21149,7 +21155,7 @@ This action cannot be undone.`,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA"
           });
         } else if (audioChunks.length === 0 || !this.isVadSpeechDetected) {
-          this.plugin.logger.debug("No audio chunks or no speech detected by VAD, not sending to worker.");
+          this.plugin.logger.debug(`Not sending to worker. audioChunks.length: ${audioChunks.length}, isVadSpeechDetected: ${this.isVadSpeechDetected}`);
           this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState();
         }
@@ -21184,28 +21190,38 @@ This action cannot be undone.`,
             if (ort.env && ort.env.wasm) {
               this.plugin.logger.debug("[VAD ortConfig] WASM config before:", JSON.parse(JSON.stringify(ort.env.wasm)));
               ort.env.wasm.numThreads = 1;
-              this.plugin.logger.debug("[VAD ortConfig] WASM config after (numThreads=1):", JSON.parse(JSON.stringify(ort.env.wasm)));
+              this.plugin.logger.debug(
+                "[VAD ortConfig] WASM config after (numThreads=1):",
+                JSON.parse(JSON.stringify(ort.env.wasm))
+              );
             } else {
-              this.plugin.logger.warn("[VAD ortConfig] ort.env.wasm is not available for configuration during this call.");
+              this.plugin.logger.warn(
+                "[VAD ortConfig] ort.env.wasm is not available for configuration during this call."
+              );
             }
           },
           onSpeechStart: () => {
-            this.plugin.logger.debug("VAD: Speech started.");
+            this.plugin.logger.debug("VAD EVENT: Speech started! Setting isVadSpeechDetected = true.");
             this.isVadSpeechDetected = true;
             if (this.vadSilenceTimer) {
               clearTimeout(this.vadSilenceTimer);
               this.vadSilenceTimer = null;
             }
           },
-          onSpeechEnd: () => {
-            this.plugin.logger.debug("VAD: Speech ended.");
-            if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+          onSpeechEnd: (audioChunk) => {
+            this.plugin.logger.debug(
+              `VAD EVENT: Speech ended. Audio chunk length: ${audioChunk?.length}. isVadSpeechDetected: ${this.isVadSpeechDetected}`
+            );
+            if (this.isVadSpeechDetected && this.mediaRecorder && this.mediaRecorder.state === "recording") {
               if (this.vadSilenceTimer)
                 clearTimeout(this.vadSilenceTimer);
+              this.plugin.logger.debug("VAD EVENT: Setting vadSilenceTimer on speech end.");
               this.vadSilenceTimer = setTimeout(() => {
-                this.plugin.logger.debug("VAD: Stopping recording due to prolonged silence after speech.");
+                this.plugin.logger.debug("VAD EVENT: vadSilenceTimer expired. Stopping voice recording.");
                 this.stopVoiceRecording(true);
               }, this.VAD_SILENCE_TIMEOUT_MS);
+            } else {
+              this.plugin.logger.debug("VAD EVENT: Speech ended, but not processing (isVadSpeechDetected false or recorder not recording).");
             }
           },
           positiveSpeechThreshold: 0.65,
@@ -21243,7 +21259,9 @@ This action cannot be undone.`,
         } else if (vadError.message && (vadError.message.includes("ORT Session") || vadError.message.includes("ONNX"))) {
           new import_obsidian15.Notice("Voice activity detection failed: Could not initialize ONNX model. Check console for details.");
         } else if (vadError.message && (vadError.message.includes("fetch") || vadError.message.includes("network error") || vadError.message.includes("load model"))) {
-          new import_obsidian15.Notice("VAD Error: Could not load model or worklet from CDN. Consider enabling local files in settings if available.");
+          new import_obsidian15.Notice(
+            "VAD Error: Could not load model or worklet from CDN. Consider enabling local files in settings if available."
+          );
         } else {
           new import_obsidian15.Notice(`Voice activity detection failed to start: ${vadError.message}`);
         }
