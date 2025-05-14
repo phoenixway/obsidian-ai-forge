@@ -6413,6 +6413,7 @@ Summary:`;
       let finalRoleName = "None";
       let finalTemperature = void 0;
       let errorOccurredLoadingData = false;
+      let emptyStateMessage = "This chat is empty.";
       try {
         if (!this.plugin.chatManager) {
           throw new Error("ChatManager is not initialized.");
@@ -6428,6 +6429,7 @@ Summary:`;
         this.plugin.logger.error("[loadAndDisplayActiveChat] Error connecting to Ollama or loading chat data initial phase.", error);
         new import_obsidian15.Notice("Error connecting to Ollama or loading chat data.", 5e3);
         errorOccurredLoadingData = true;
+        emptyStateMessage = "Error loading chat data.";
         availableModels = availableModels || [];
         finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_b = availableModels[0]) != null ? _b : null;
         finalTemperature = this.plugin.settings.temperature;
@@ -6470,6 +6472,7 @@ Summary:`;
       } else if (!errorOccurredLoadingData && !activeChat) {
         finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
         finalTemperature = this.plugin.settings.temperature;
+        emptyStateMessage = "No active chat selected.";
       }
       if (activeChat && !errorOccurredLoadingData && ((_g = activeChat.messages) == null ? void 0 : _g.length) > 0) {
         this.hideEmptyState();
@@ -6523,7 +6526,6 @@ Summary:`;
                   msgBubble.createDiv({
                     cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text",
                     text: `Unknown message role: ${message.role}`
-                    // Використовуємо as any для безпеки
                   });
                   BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
                   messageGroupEl = unknownRoleGroup;
@@ -6555,6 +6557,7 @@ Summary:`;
           }, 150);
         }, 150);
       } else {
+        this.setEmptyStateMessage(emptyStateMessage);
         this.showEmptyState();
         (_j = this.scrollToBottomButton) == null ? void 0 : _j.classList.remove(CSS_CLASSES.VISIBLE || "visible");
       }
@@ -6582,11 +6585,11 @@ Summary:`;
     } catch (error) {
       this.plugin.logger.error("[loadAndDisplayActiveChat] Fatal error during chat loading and display.", error);
       this.clearChatContainerInternal();
+      this.setEmptyStateMessage("A critical error occurred. Please check console.");
       this.showEmptyState();
       if (this.chatContainer) {
         this.chatContainer.createDiv({
           cls: "fatal-error-message",
-          // Клас для повідомлення про фатальну помилку
           text: "A critical error occurred while loading the chat. Please check the console or try restarting."
         });
       }
@@ -6595,6 +6598,16 @@ Summary:`;
       this.plugin.logger.debug(`[OllamaView loadAndDisplayActiveChat] Finished loading and displaying. Metadata updated: ${metadataUpdated}`);
     }
     return { metadataUpdated };
+  }
+  // Припустимо, у тебе є метод для встановлення тексту empty state
+  // Якщо ні, то текст треба хардкодити всередині showEmptyState, або змінювати DOM напряму
+  setEmptyStateMessage(message) {
+    const emptyStateDiv = this.chatContainer.querySelector(".empty-chat-message");
+    if (emptyStateDiv) {
+      emptyStateDiv.setText(message);
+    } else {
+      this.plugin.logger.trace(`[setEmptyStateMessage] Empty state element not found to set message: "${message}"`);
+    }
   }
   _managePlaceholder(turnTimestamp, requestTimestampId) {
     if (this.activePlaceholder && this.activePlaceholder.timestamp !== turnTimestamp) {
