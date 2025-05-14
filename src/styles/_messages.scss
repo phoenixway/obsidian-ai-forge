@@ -55,7 +55,26 @@
 
     .message-wrapper {
       order: 2;
-      // !!! ПРАВИЛА ДЛЯ ЗАОКРУГЛЕННЯ КУТІВ БУДУТЬ ВИЗНАЧЕНІ НИЖЧЕ, ПОЗА ЦИМ БЛОКОМ !!!
+      align-items: flex-start; // Додано для консистентності, хоча це і так default
+
+      // !!! ВИПРАВЛЕНА ЛОГІКА ЗАОКРУГЛЕННЯ ДЛЯ AI ПОВІДОМЛЕНЬ !!!
+      .message:not(:last-child) { // Для всіх, крім останнього
+        border-bottom-left-radius: 5px; // Гострий кут знизу біля аватара
+      }
+      .message:last-child { // Тільки для останнього (або єдиного)
+        border-bottom-left-radius: 18px; // Повний радіус знизу біля аватара
+      }
+      .message:not(:first-child) { // Для всіх, крім першого
+        border-top-left-radius: 5px;    // Гострий кут зверху біля аватара
+      }
+      .message:first-child { // Тільки для першого (або єдиного)
+        border-top-left-radius: 18px;   // Повний радіус зверху біля аватара
+      }
+      // Праві кути AI повідомлень завжди повністю заокруглені
+      .message {
+        border-top-right-radius: 18px;
+        border-bottom-right-radius: 18px;
+      }
     }
   }
 }
