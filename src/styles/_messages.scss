@@ -199,7 +199,7 @@ $avatar-icon-size-factor: 0.65;
 // --- Стилі для бульбашок повідомлень ---
 .message {
   @extend %base-message-bubble;
-  @include flex-layout($direction: column, $align: flex-start); // Нове! Робимо .message flex-контейнером
+  // @include flex-layout($direction: column, $align: flex-start); // Нове! Робимо .message flex-контейнером
 
 
   &.message-arriving {
@@ -298,32 +298,39 @@ $avatar-icon-size-factor: 0.65;
   opacity: 0.9;
 
    .message.user-message & { // Якщо потрібно, щоб час у повідомленні користувача був вирівняний по-іншому
-    align-self: flex-end; // Примусово праворуч, навіть якщо загальний align-items інший
+    // align-self: flex-end; // Примусово праворуч, навіть якщо загальний align-items інший
+        text-align: right;
+
   }
   .message.ollama-message & {
-    align-self: flex-start; // Примусово ліворуч
+    // align-self: flex-start; // Примусово ліворуч
+        text-align: left;
+
   }
 }
 
 // --- Кнопки дій ---
-.message-actions-wrapper { // Тепер цей блок всередині .message
-  @include flex-layout( // flex-direction: row за замовчуванням
+.message-actions-wrapper {
+  // Цей блок є сестринським до .message всередині .message-wrapper
+  @include flex-layout( // Розташовує кнопки В РЯД всередині цього блоку
+    // $justify: flex-start; // За замовчуванням для flex-layout, якщо не вказано
     $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
   );
-  // width: 100%; // Вже не потрібно, якщо align-items на .message працює
+  // width: auto; // Або fit-content - це поведінка за замовчуванням для flex-item, якщо він не розтягується
   opacity: 0;
   visibility: hidden;
   @include transition( (opacity, visibility), 0.2s, ease-in-out );
-  // transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
-  z-index: 6; // Можливо, вже не потрібен, якщо кнопки всередині .message
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
+  // transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s; // Якщо міксін не підходить
+  z-index: 6; // Можливо, потрібен
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); // Відступ від бульбашки .message зверху
 
-  // Вирівнювання кнопок тепер контролюється align-items на .message
-  // Для .message.ollama-message буде align-items: flex-start;
-  // Для .message.user-message буде align-items: flex-end;
+  // Важливо: .message-actions-wrapper НЕ ПОВИНЕН мати власного padding-left або margin-left,
+  // якщо ми хочемо, щоб лівий край першої кнопки збігався з лівим краєм .message-actions-wrapper
+  // (який, у свою чергу, вирівняний з .message)
 
   button {
     @extend %base-action-button;
+    // Тут НЕ МАЄ бути margin-left на першій кнопці
   }
 
   .delete-message-button {
@@ -336,29 +343,44 @@ $avatar-icon-size-factor: 0.65;
     }
   }
 
-  // Стилі для кнопок в повідомленні користувача
-  // Оскільки тепер кнопки всередині .message.user-message, селектор трохи зміниться
-  .message.user-message & button {
-    color: rgba(255, 255, 255, 0.8);
-    &:hover {
-      background: rgba(255, 255, 255, 0.25) !important;
-      color: white;
-    }
-    &.delete-message-button.danger-option {
-       color: rgba(255, 150, 150, 0.8);
-       &:hover {
-         background-color: rgba(200, 50, 50, 0.5) !important;
-         color: white;
-       }
+  // Стилі для кнопок в повідомленні користувача (якщо вони мають бути вирівняні праворуч всередині .message-actions-wrapper)
+  .user-message-group .message-wrapper & {
+    // Якщо для user-message-group кнопки мають бути вирівняні праворуч всередині свого контейнера
+    // то потрібно змінити justify-content для цього конкретного випадку.
+    // Оскільки сам .message-actions-wrapper вже буде праворуч,
+    // justify-content: flex-start; всередині нього означатиме, що кнопки починаються зліва всередині цього правого блоку.
+    // justify-content: flex-end; означатиме, що кнопки будуть справа всередині цього правого блоку.
+    // За замовчуванням justify-content: initial (або flex-start, якщо так в міксіні),
+    // що означає, що кнопки будуть розташовані зліва всередині .message-actions-wrapper.
+    // Якщо .message-actions-wrapper для user вирівняний по правому краю (завдяки align-items: flex-end на .message-wrapper),
+    // а кнопки всередині нього починаються зліва, то перша кнопка буде біля правого краю .message.
+
+    // Щоб кнопки були вирівняні по правому краю всередині блоку кнопок для user:
+    // @include flex-layout($justify: flex-end, $gap: calc(var(--chat-spacing-unit, 5px) * 1.5));
+
+    // Специфічні стилі для кнопок, якщо вони відрізняються
+    button {
+        color: rgba(255, 255, 255, 0.8);
+        &:hover {
+          background: rgba(255, 255, 255, 0.25) !important;
+          color: white;
+        }
+        &.delete-message-button.danger-option {
+           color: rgba(255, 150, 150, 0.8);
+           &:hover {
+             background-color: rgba(200, 50, 50, 0.5) !important;
+             color: white;
+           }
+        }
     }
   }
 }
 
-// Поява кнопок при наведенні на саме повідомлення
-.message:hover .message-actions-wrapper { // Тепер :hover на .message
+// Поява кнопок при наведенні на .message-wrapper
+.message-wrapper:hover .message-actions-wrapper {
   opacity: 1;
   visibility: visible;
-  // transition-delay: 0s;
+  // transition-delay: 0s; // Обробляється transition
 }
 
 .show-more-button {
