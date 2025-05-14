@@ -80,8 +80,8 @@
   z-index: 5; // Above potential background elements
   flex-shrink: 0;
 
-  overflow: hidden; 
-  
+  overflow: hidden;
+
   img.ollama-avatar-image {
     display: block; // Прибирає можливий нижній відступ
     width: 100%;    // Заповнює всю ширину/висоту батьківського div
@@ -109,8 +109,9 @@
   width: fit-content; // Bubble width based on content
   max-width: 100%; // Max width is constrained by message-wrapper
     // word-wrap: break-word;
+  white-space: normal; // Дозволити перенос тексту
   overflow-wrap: break-word; // Standard property for word-wrap
- word-break: break-word;   // Allow breaking words if they are too long
+  word-break: break-word;   // Allow breaking words if they are too long
 
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
@@ -302,6 +303,7 @@
   padding-bottom: calc(var(--chat-spacing-unit) * 1); // Smaller padding is okay now
   box-sizing: border-box;
   width: 100%;
+  white-space: normal; // Дозволити перенос тексту
   p { margin-bottom: calc(var(--p-spacing) / 2); }
   p:last-child { margin-bottom: 0; }
   overflow-wrap: break-word;

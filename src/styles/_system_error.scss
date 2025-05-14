@@ -1,77 +1,85 @@
 // src/styles/_system_error.scss
 
 .system-message-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: calc(var(--chat-spacing-unit) * 10);
-        padding: 0 calc(var(--chat-spacing-unit) * 4); // Add some horizontal padding
-    box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: calc(var(--chat-spacing-unit) * 10);
+  padding: 0 calc(var(--chat-spacing-unit) * 4); // Add some horizontal padding
+  box-sizing: border-box;
+}
+
+.system-message {
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  border-left: 3px solid var(--interactive-accent);
+  font-style: italic;
+  padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
+  border-radius: 8px;
+  max-width: 90%;
+  display: flex !important; // Use flex for icon alignment
+  align-items: center !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+  position: relative;
+  font-size: 0.9em;
+  white-space: normal; // Дозволити перенос тексту
+
+  .system-icon {
+    color: var(--interactive-accent);
+    margin-right: 8px;
+    font-size: 1em;
+    flex-shrink: 0;
   }
-  
-  .system-message {
-    background: var(--background-secondary);
-    color: var(--text-muted);
-    border-left: 3px solid var(--interactive-accent);
-    font-style: italic;
-    padding: calc(var(--chat-spacing-unit) * 1.5) calc(var(--chat-spacing-unit) * 2.5);
-    border-radius: 8px;
-    max-width: 90%;
-    display: flex !important; // Use flex for icon alignment
-    align-items: center !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-    position: relative;
-    font-size: 0.9em;
-  
-    .system-icon {
-      color: var(--interactive-accent);
-      margin-right: 8px;
-      font-size: 1em;
-      flex-shrink: 0;
-    }
-  
-    .system-message-text {
-      line-height: 1.4;
-    }
+
+  .system-message-text {
+    line-height: 1.4;
+    white-space: normal; // Дозволити перенос тексту
+    overflow-wrap: break-word; // Уже було, але підтверджуємо
+    word-break: break-word;   // Уже було, але підтверджуємо
   }
-  
-  .error-message-group {
-    margin-bottom: calc(var(--chat-spacing-unit) * 10) !important; 
-        display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 calc(var(--chat-spacing-unit) * 4); // Add some horizontal padding
-    box-sizing: border-box;
-  
-    &:last-child .error-message { // Apply pulse only to the last error message group
-      animation: error-pulse 1.5s ease-out 1 !important;
-    }
+}
+
+.error-message-group {
+  margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 calc(var(--chat-spacing-unit) * 4); // Add some horizontal padding
+  box-sizing: border-box;
+
+  &:last-child .error-message { // Apply pulse only to the last error message group
+    animation: error-pulse 1.5s ease-out 1 !important;
   }
-  
-  .error-message {
-    background: var(--background-modifier-error) !important;
+}
+
+.error-message {
+  background: var(--background-modifier-error) !important;
+  color: var(--text-on-error) !important;
+  border-left: 3px solid var(--text-error) !important;
+  font-weight: 500 !important;
+  padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3) !important;
+  max-width: 90% !important;
+  position: relative;
+  box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2) !important;
+  border-radius: 8px !important;
+  display: flex !important; // Use flex for icon alignment
+  align-items: center !important;
+  font-size: 0.95em !important;
+  white-space: normal; // Дозволити перенос тексту
+
+  .error-icon {
+    color: var(--text-error) !important;
+    margin-right: 10px !important;
+    font-size: 1.1em !important;
+    flex-shrink: 0;
+  }
+
+  .error-message-text {
+    line-height: 1.4 !important;
     color: var(--text-on-error) !important;
-    border-left: 3px solid var(--text-error) !important;
-    font-weight: 500 !important;
-    padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3) !important;
-    max-width: 90% !important;
-    position: relative;
-    box-shadow: 0 2px 6px rgba(var(--text-error-rgb), 0.2) !important;
-    border-radius: 8px !important;
-    display: flex !important; // Use flex for icon alignment
-    align-items: center !important;
-    font-size: 0.95em !important;
-  
-    .error-icon {
-      color: var(--text-error) !important;
-      margin-right: 10px !important;
-      font-size: 1.1em !important;
-      flex-shrink: 0;
-    }
-  
-    .error-message-text {
-      line-height: 1.4 !important;
-      color: var(--text-on-error) !important;
-      font-weight: normal !important; // Ensure text itself isn't bold if message container is
-    }
+    font-weight: normal !important; // Ensure text itself isn't bold if message container is
+    white-space: normal; // Дозволити перенос тексту
+    overflow-wrap: break-word; // Уже було, але підтверджуємо
+    word-break: break-word;   // Уже було, але підтверджуємо
   }
+}
