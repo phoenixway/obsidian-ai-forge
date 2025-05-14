@@ -26,7 +26,8 @@
   margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
   position: relative;
   box-sizing: border-box;
-  align-items: flex-end;
+  // align-items: flex-end;
+  align-items: flex-start;
 
   &.user-message-group {
     justify-content: flex-end;
@@ -35,6 +36,7 @@
       order: 2;
       margin-left: calc(var(--chat-spacing-unit) * 2);
       margin-right: 0;
+      margin-top: 5px;
       // flex-shrink: 0;
     }
 .message-wrapper {
@@ -66,6 +68,7 @@
       order: 1;
       margin-right: calc(var(--chat-spacing-unit) * 2);
       margin-left: 0;
+       margin-top: 5px;
       // flex-shrink: 0;
     }
 
