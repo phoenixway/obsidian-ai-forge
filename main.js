@@ -21132,17 +21132,13 @@ This action cannot be undone.`,
           await this.vad.destroy();
           this.vad = null;
         }
-        this.vad = await import_vad_web.MicVAD.create({
-          // workletURL: MicVAD.WORKLET_URL,
+        this.vad = await import_vad_web.MicVAD.new({
+          // <--- ВИКОРИСТОВУЄМО MicVAD.new
+          // workletURL: ... (якщо потрібен, логіка та сама, що й раніше)
+          // Для початку спробуємо без явного workletURL, 
+          // бібліотека має спробувати завантажити його з CDN (зазвичай jsdelivr)
           stream: this.audioStream,
-          positiveSpeechThreshold: 0.7,
-          // Поріг для визначення мовлення (0.0 - 1.0)
-          negativeSpeechThreshold: 0.5,
-          // Поріг для визначення тиші (нижчий за positive)
-          minSpeechFrames: 3,
-          // Мінімальна кількість фреймів мовлення
-          // preSpeechPadFrames: 1,     // Кількість фреймів тиші перед мовленням (опціонально)
-          // postSpeechPadFrames: 5,    // Кількість фреймів тиші після мовлення (опціонально)
+          // Передаємо аудіопотік
           onSpeechStart: () => {
             this.plugin.logger.debug("VAD: Speech started.");
             this.isVadSpeechDetected = true;
@@ -21151,7 +21147,7 @@ This action cannot be undone.`,
               this.vadSilenceTimer = null;
             }
           },
-          onSpeechEnd: () => {
+          onSpeechEnd: (audio) => {
             this.plugin.logger.debug("VAD: Speech ended.");
             if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
               if (this.vadSilenceTimer)
@@ -21162,14 +21158,14 @@ This action cannot be undone.`,
               }, this.VAD_SILENCE_TIMEOUT_MS);
             }
           }
+          // Додаткові параметри, які можуть бути корисними з документації:
+          // positiveSpeechThreshold: 0.7, // Поріг для визначення мовлення (0.0 - 1.0)
+          // negativeSpeechThreshold: 0.3, // Поріг для визначення тиші (нижчий за positive)
+          // minSpeechFrames: 5,           // Мінімальна кількість фреймів мовлення
+          // preSpeechPadFrames: 10,       // Кількість фреймів тиші перед мовленням
+          // redemptionFrames: 15          // Кількість фреймів для "виправлення" помилкового speech end
         });
-        if (this.vad) {
-          this.vad.start();
-          this.plugin.logger.debug("VAD started.");
-        } else {
-          this.plugin.logger.warn("VAD instance is null, cannot start.");
-        }
-        this.plugin.logger.debug("VAD started.");
+        this.plugin.logger.debug("VAD initialized and listening.");
       } catch (vadError) {
         this.plugin.logger.error("Failed to initialize or start VAD:", vadError);
         new import_obsidian15.Notice("Voice activity detection failed to start. Recording will proceed without automatic stop.");

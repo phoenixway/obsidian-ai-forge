@@ -1775,50 +1775,59 @@ export class OllamaView extends ItemView {
       this.plugin.logger.debug("MediaRecorder started.");
 
       // Ініціалізація та запуск VAD
-      try {
-        if (this.vad) {
-          // Якщо VAD вже існує, можливо, його потрібно перезапустити
-          await this.vad.destroy();
-          this.vad = null;
-        }
-        // @ts-ignore // Тимчасово для обходу можливої проблеми з типами, якщо вона виникне
-        this.vad = await MicVAD.create({
-          // workletURL: MicVAD.WORKLET_URL,
-          stream: this.audioStream,
-          positiveSpeechThreshold: 0.7, // Поріг для визначення мовлення (0.0 - 1.0)
-          negativeSpeechThreshold: 0.5, // Поріг для визначення тиші (нижчий за positive)
-          minSpeechFrames: 3, // Мінімальна кількість фреймів мовлення
-          // preSpeechPadFrames: 1,     // Кількість фреймів тиші перед мовленням (опціонально)
-          // postSpeechPadFrames: 5,    // Кількість фреймів тиші після мовлення (опціонально)
-          onSpeechStart: () => {
-            this.plugin.logger.debug("VAD: Speech started.");
-            this.isVadSpeechDetected = true; // Позначаємо, що мова була
-            if (this.vadSilenceTimer) {
-              clearTimeout(this.vadSilenceTimer);
-              this.vadSilenceTimer = null;
-            }
-          },
-          onSpeechEnd: () => {
-            this.plugin.logger.debug("VAD: Speech ended.");
-            if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-              // Запускаємо таймер тиші тільки якщо запис ще йде
-              if (this.vadSilenceTimer) clearTimeout(this.vadSilenceTimer);
-              this.vadSilenceTimer = setTimeout(() => {
-                this.plugin.logger.debug("VAD: Stopping recording due to prolonged silence after speech.");
-                this.stopVoiceRecording(true); // Зупиняємо запис та обробляємо аудіо
-              }, this.VAD_SILENCE_TIMEOUT_MS);
-            }
-          },
-        });
-        if (this.vad) {
-          this.vad.start();
-          this.plugin.logger.debug("VAD started.");
-        } else {
-          this.plugin.logger.warn("VAD instance is null, cannot start.");
-          // Можливо, тут також варто показати Notice користувачу
-        }
-        this.plugin.logger.debug("VAD started.");
-      } catch (vadError) {
+     try {
+      if (this.vad) {
+        // Метод destroy() має бути доступний на екземплярі, якщо він був створений
+        await this.vad.destroy(); 
+        this.vad = null;
+      }
+
+      // ВИПРАВЛЕННЯ ВИКЛИКУ ФАБРИЧНОГО МЕТОДУ:
+      this.vad = await MicVAD.new({ // <--- ВИКОРИСТОВУЄМО MicVAD.new
+        // workletURL: ... (якщо потрібен, логіка та сама, що й раніше)
+        // Для початку спробуємо без явного workletURL, 
+        // бібліотека має спробувати завантажити його з CDN (зазвичай jsdelivr)
+
+        stream: this.audioStream, // Передаємо аудіопотік
+        onSpeechStart: () => {
+          this.plugin.logger.debug("VAD: Speech started.");
+          this.isVadSpeechDetected = true;
+          if (this.vadSilenceTimer) {
+            clearTimeout(this.vadSilenceTimer);
+            this.vadSilenceTimer = null;
+          }
+        },
+        onSpeechEnd: (audio: Float32Array) => { // onSpeechEnd тепер може повертати аудіодані
+          this.plugin.logger.debug("VAD: Speech ended.");
+          // audio: Float32Array - це аудіодані для останнього сегменту мовлення.
+          // Ти можеш їх використовувати, якщо потрібно, але для поточного завдання 
+          // ми покладаємося на MediaRecorder для збору всіх чанків.
+
+          if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+            if (this.vadSilenceTimer) clearTimeout(this.vadSilenceTimer);
+            this.vadSilenceTimer = setTimeout(() => {
+              this.plugin.logger.debug("VAD: Stopping recording due to prolonged silence after speech.");
+              this.stopVoiceRecording(true);
+            }, this.VAD_SILENCE_TIMEOUT_MS);
+          }
+        },
+        // Додаткові параметри, які можуть бути корисними з документації:
+        // positiveSpeechThreshold: 0.7, // Поріг для визначення мовлення (0.0 - 1.0)
+        // negativeSpeechThreshold: 0.3, // Поріг для визначення тиші (нижчий за positive)
+        // minSpeechFrames: 5,           // Мінімальна кількість фреймів мовлення
+        // preSpeechPadFrames: 10,       // Кількість фреймів тиші перед мовленням
+        // redemptionFrames: 15          // Кількість фреймів для "виправлення" помилкового speech end
+      });
+
+      // `this.vad.start()` не потрібен, бо `.new()` вже може запускати VAD або він запускається автоматично
+      // при наявності потоку. Якщо виникає помилка, що VAD не стартував, перевір документацію
+      // щодо явного методу запуску на екземплярі, якщо він є (наприклад, this.vad.startListening() або щось подібне).
+      // Але зазвичай .new або .create вже готує його до роботи.
+      // Для MicVAD, він починає слухати автоматично після успішного .new().
+      
+      this.plugin.logger.debug("VAD initialized and listening.");
+
+    } catch (vadError) {
         this.plugin.logger.error("Failed to initialize or start VAD:", vadError);
         new Notice("Voice activity detection failed to start. Recording will proceed without automatic stop.");
         // У цьому випадку VAD не працюватиме, але запис триватиме до ручної зупинки
