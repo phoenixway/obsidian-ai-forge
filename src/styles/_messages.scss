@@ -217,10 +217,10 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
     border-bottom-left-radius: 18px;
   } // Стандартний радіус для останнього
   .message:not(:first-child) {
-    border-top-left-radius: 5px;
+    border-top-left-radius: 18px;
   } // Гостріший кут для проміжних повідомлень
   .message:first-child {
-    border-top-left-radius: 18px;
+    border-top-left-radius: 5px;
   } // Стандартний радіус для першого
   // For AI messages, right corners are always fully rounded
   .message {
