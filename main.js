@@ -6177,7 +6177,9 @@ Summary:`;
       }
       const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
       if (!this.currentAbortController) {
-        this.plugin.logger.error("CRITICAL: AbortController not initialized in sendMessage before LlmInteractionCycle call.");
+        this.plugin.logger.error(
+          "CRITICAL: AbortController not initialized in sendMessage before LlmInteractionCycle call."
+        );
         throw new Error("AbortController not initialized in sendMessage");
       }
       await this._handleLlmInteractionCycle(chatStateForLlm, requestTimestampId, this.currentAbortController.signal);
@@ -6186,8 +6188,14 @@ Summary:`;
         if (this.activePlaceholder.groupEl.isConnected)
           this.activePlaceholder.groupEl.remove();
       }
-      this.plugin.chatManager.rejectAndClearHMAResolver(userMessageTimestamp.getTime(), `Outer catch in sendMessage for user message (req: ${requestTimestampId})`);
-      this.plugin.chatManager.rejectAndClearHMAResolver(initialLlmResponsePlaceholderTs, `Outer catch in sendMessage for initial placeholder (req: ${requestTimestampId})`);
+      this.plugin.chatManager.rejectAndClearHMAResolver(
+        userMessageTimestamp.getTime(),
+        `Outer catch in sendMessage for user message (req: ${requestTimestampId})`
+      );
+      this.plugin.chatManager.rejectAndClearHMAResolver(
+        initialLlmResponsePlaceholderTs,
+        `Outer catch in sendMessage for initial placeholder (req: ${requestTimestampId})`
+      );
       let errorMsgForChat;
       let errorMsgRole = "error";
       if (error.name === "AbortError" || ((_a = error.message) == null ? void 0 : _a.includes("aborted by user"))) {
@@ -6198,12 +6206,19 @@ Summary:`;
         new import_obsidian15.Notice(errorMsgForChat, 7e3);
       }
       const errorDisplayTimestamp = new Date();
-      const errorDisplayMsg = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorDisplayTimestamp };
+      const errorDisplayMsg = {
+        role: errorMsgRole,
+        content: errorMsgForChat,
+        timestamp: errorDisplayTimestamp
+      };
       const hmaErrorPromise = new Promise((resolve, reject) => {
         this.plugin.chatManager.registerHMAResolver(errorDisplayMsg.timestamp.getTime(), resolve, reject);
         setTimeout(() => {
           if (this.plugin.chatManager.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())) {
-            this.plugin.chatManager.rejectAndClearHMAResolver(errorDisplayMsg.timestamp.getTime(), "HMA timeout for error display msg in sendMessage");
+            this.plugin.chatManager.rejectAndClearHMAResolver(
+              errorDisplayMsg.timestamp.getTime(),
+              "HMA timeout for error display msg in sendMessage"
+            );
           }
         }, 1e4);
       });
@@ -6250,7 +6265,10 @@ Summary:`;
         return;
       }
       if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0 && this.currentAbortController) {
-        this.plugin.logger.debug("[handleMessageAdded] Skipping render for assistant message with tool_calls.", message);
+        this.plugin.logger.debug(
+          "[handleMessageAdded] Skipping render for assistant message with tool_calls.",
+          message
+        );
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
@@ -6865,16 +6883,25 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
             throw new Error("Failed to reload chat state after preparing for regeneration.");
           }
           if (!this.currentAbortController) {
-            this.plugin.logger.error("CRITICAL: AbortController not initialized in handleRegenerateClick before LlmInteractionCycle call.");
+            this.plugin.logger.error(
+              "CRITICAL: AbortController not initialized in handleRegenerateClick before LlmInteractionCycle call."
+            );
             throw new Error("AbortController not initialized in handleRegenerateClick");
           }
-          await this._handleLlmInteractionCycle(chatStateForLlm, regenerationGlobalRequestId, this.currentAbortController.signal);
+          await this._handleLlmInteractionCycle(
+            chatStateForLlm,
+            regenerationGlobalRequestId,
+            this.currentAbortController.signal
+          );
         } catch (error) {
           if (this.activePlaceholder && this.activePlaceholder.timestamp === initialLlmResponsePlaceholderTsForRegen && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
             if (this.activePlaceholder.groupEl.isConnected)
               this.activePlaceholder.groupEl.remove();
           }
-          this.plugin.chatManager.rejectAndClearHMAResolver(initialLlmResponsePlaceholderTsForRegen, `Outer catch in handleRegenerateClick for initial placeholder (req: ${regenerationGlobalRequestId})`);
+          this.plugin.chatManager.rejectAndClearHMAResolver(
+            initialLlmResponsePlaceholderTsForRegen,
+            `Outer catch in handleRegenerateClick for initial placeholder (req: ${regenerationGlobalRequestId})`
+          );
           let errorMsgForChat;
           let errorMsgRole = "error";
           if (error.name === "AbortError" || ((_a2 = error.message) == null ? void 0 : _a2.includes("aborted by user"))) {
@@ -6885,12 +6912,19 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
             new import_obsidian15.Notice(errorMsgForChat, 7e3);
           }
           const errorDisplayTimestamp = new Date();
-          const errorDisplayMsg = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorDisplayTimestamp };
+          const errorDisplayMsg = {
+            role: errorMsgRole,
+            content: errorMsgForChat,
+            timestamp: errorDisplayTimestamp
+          };
           const hmaErrorPromise = new Promise((resolve, reject) => {
             this.plugin.chatManager.registerHMAResolver(errorDisplayMsg.timestamp.getTime(), resolve, reject);
             setTimeout(() => {
               if (this.plugin.chatManager.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())) {
-                this.plugin.chatManager.rejectAndClearHMAResolver(errorDisplayMsg.timestamp.getTime(), "HMA timeout for error display msg in handleRegenerateClick");
+                this.plugin.chatManager.rejectAndClearHMAResolver(
+                  errorDisplayMsg.timestamp.getTime(),
+                  "HMA timeout for error display msg in handleRegenerateClick"
+                );
               }
             }, 1e4);
           });
@@ -6956,11 +6990,17 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
             this.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
             setTimeout(() => {
               if (this.plugin.chatManager.messageAddedResolvers.has(assistantMsgTsMs)) {
-                this.plugin.chatManager.rejectAndClearHMAResolver(assistantMsgTsMs, `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs}) in _handleLlmInteractionCycle`);
+                this.plugin.chatManager.rejectAndClearHMAResolver(
+                  assistantMsgTsMs,
+                  `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs}) in _handleLlmInteractionCycle`
+                );
               }
             }, 1e4);
           });
-          await this.plugin.chatManager.addMessageToActiveChatPayload(toolCallCheckResult.assistantMessageForHistory, true);
+          await this.plugin.chatManager.addMessageToActiveChatPayload(
+            toolCallCheckResult.assistantMessageForHistory,
+            true
+          );
           await assistantHmaPromise;
           await this._executeAndRenderToolCycle(
             toolCallCheckResult.processedToolCallsThisTurn,
@@ -6986,7 +7026,10 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
           this.plugin.chatManager.registerHMAResolver(maxTurnsMsg.timestamp.getTime(), resolve, reject);
           setTimeout(() => {
             if (this.plugin.chatManager.messageAddedResolvers.has(maxTurnsMsg.timestamp.getTime())) {
-              this.plugin.chatManager.rejectAndClearHMAResolver(maxTurnsMsg.timestamp.getTime(), "HMA timeout for max turns msg in _handleLlmInteractionCycle");
+              this.plugin.chatManager.rejectAndClearHMAResolver(
+                maxTurnsMsg.timestamp.getTime(),
+                "HMA timeout for max turns msg in _handleLlmInteractionCycle"
+              );
             }
           }, 1e4);
         });
