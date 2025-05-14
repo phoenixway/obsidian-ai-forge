@@ -17,7 +17,7 @@ $tool-code-background: var(--background-primary, #202020);
   .avatar { // Припускаючи, що ваш RendererUtils.renderAvatar створює div з класом 'avatar'
     // margin-right: calc(var(--chat-spacing-unit) * 2); // Попередня спроба
     margin-right: 12px; // Спробуємо більш явний і трохи більший відступ
-    display: none;
+    display: none !important;
   }
 }
 
@@ -101,4 +101,5 @@ $tool-code-background: var(--background-primary, #202020);
   // Специфічні стилі для іконки інструменту, якщо це потрібно
   // Наприклад, колір
   // color: var(--text-accent);
+  display: none !important; // Сховати аватар для інструменту
 }
