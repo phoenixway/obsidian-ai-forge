@@ -11,7 +11,7 @@ import {
   Menu,
   Platform,
 } from "obsidian";
-
+import { MicVAD } from "@ricky0123/vad-web";
 import { ConfirmModal } from "./ConfirmModal";
 import { PromptModal } from "./PromptModal";
 import OllamaPlugin from "./main";
@@ -72,6 +72,12 @@ export type MessageRole = "user" | "assistant" | "system" | "error" | "tool";
 export class OllamaView extends ItemView {
   private sidebarManager!: SidebarManager;
   private dropdownMenuManager!: DropdownMenuManager;
+
+  private vad: MicVAD | null = null; // <--- ВЛАСТИВІСТЬ ДЛЯ VAD
+  private vadSilenceTimer: NodeJS.Timeout | null = null; // <--- ТАЙМЕР ДЛЯ ТИШІ
+  private readonly VAD_SILENCE_TIMEOUT_MS = 2000; // 2 секунди тиші для зупинки
+  private readonly VAD_MIN_SPEECH_DURATION_MS = 250; // Мінімальна тривалість мовлення для початку (опціонально)
+  private isVadSpeechDetected: boolean = false; // Прапорець, що мова була виявлена
 
   public readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
@@ -256,7 +262,15 @@ export class OllamaView extends ItemView {
       this.speechWorker.terminate();
       this.speechWorker = null;
     }
-    this.stopVoiceRecording(false);
+    this.stopVoiceRecording(false); // Переконайся, що VAD також зупиняється
+    if (this.vad) {
+      await this.vad.destroy(); // Зупинка та очищення VAD
+      this.vad = null;
+    }
+    if (this.vadSilenceTimer) {
+      clearTimeout(this.vadSilenceTimer);
+      this.vadSilenceTimer = null;
+    }
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(t => t.stop());
       this.audioStream = null;
@@ -960,17 +974,17 @@ export class OllamaView extends ItemView {
     }
   };
 
-public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
-    this.dropdownMenuManager?.closeMenu(); 
-    
+  public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu();
+
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (activeChat) {
       const chatName = activeChat.metadata.name;
       new ConfirmModal(
         this.app,
-        "Clear Current Chat", 
+        "Clear Current Chat",
         `Are you sure you want to clear all messages in the current chat "${chatName}"?\nThis action cannot be undone.`,
-        async () => { 
+        async () => {
           try {
             await this.plugin.chatManager.clearActiveChatMessages();
             // Якщо clearActiveChatMessages не кинув помилку, вважаємо, що все пройшло добре.
@@ -990,7 +1004,7 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
     } else {
       new Notice("No active chat to clear.");
     }
-  }
+  };
 
   private async addMessageStandard(message: Message): Promise<void> {
     const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
@@ -1221,9 +1235,9 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
     }
   }
 
-// OllamaView.ts
+  // OllamaView.ts
 
-// ... (інші частини класу) ...
+  // ... (інші частини класу) ...
 
   public showEmptyState(
     messageText: string = "No messages yet", // Текст за замовчуванням
@@ -1235,26 +1249,32 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
       this.emptyStateEl = null;
     }
 
-    // Перевіряємо умови (можливо, this.currentMessages.length === 0 тут не потрібне, 
+    // Перевіряємо умови (можливо, this.currentMessages.length === 0 тут не потрібне,
     // бо ми викликаємо його, коли знаємо, що стан порожній)
-    if (this.chatContainer) { // Переконуємося, що контейнер існує
+    if (this.chatContainer) {
+      // Переконуємося, що контейнер існує
       // this.chatContainer.empty(); // Очищаємо контейнер перед показом empty state
-                                  // Якщо це не бажано (наприклад, якщо там є інші елементи), прибери цей рядок.
-                                  // Але якщо chatContainer призначений тільки для повідомлень та emptyState, то це ок.
+      // Якщо це не бажано (наприклад, якщо там є інші елементи), прибери цей рядок.
+      // Але якщо chatContainer призначений тільки для повідомлень та emptyState, то це ок.
 
       this.emptyStateEl = this.chatContainer.createDiv({
         cls: CSS_CLASS_EMPTY_STATE, // Переконайся, що CSS_CLASS_EMPTY_STATE визначено
       });
-      this.emptyStateEl.createEl("p", { // Використовуємо <p> для семантики
+      this.emptyStateEl.createEl("p", {
+        // Використовуємо <p> для семантики
         cls: "empty-state-message",
         text: messageText,
       });
 
-      const finalTipText = tipText !== undefined 
-        ? tipText 
-        : `Type a message or use the menu options to start interacting with ${this.plugin?.settings?.modelName || "the AI"}.`;
+      const finalTipText =
+        tipText !== undefined
+          ? tipText
+          : `Type a message or use the menu options to start interacting with ${
+              this.plugin?.settings?.modelName || "the AI"
+            }.`;
 
-      if (finalTipText) { // Додаємо підказку, тільки якщо вона є
+      if (finalTipText) {
+        // Додаємо підказку, тільки якщо вона є
         this.emptyStateEl.createEl("p", {
           cls: "empty-state-tip",
           text: finalTipText,
@@ -1270,7 +1290,7 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
     }
   }
 
-// ... (решта класу) ...
+  // ... (решта класу) ...
 
   public setLoadingState(isLoading: boolean): void {
     this.isProcessing = isLoading;
@@ -1659,17 +1679,19 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
     }
   }
   private async startVoiceRecognition(): Promise<void> {
-    if (!this.speechWorker) {
-      new Notice("Функція розпізнавання мовлення недоступна (worker не ініціалізовано).");
+    if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+      this.plugin.logger.debug("VAD: Recording already in progress.");
+      return;
+    }
 
+    if (!this.speechWorker) {
+      new Notice("Speech recognition feature not available (worker not initialized).");
       return;
     }
 
     const speechApiKey = this.plugin.settings.googleApiKey;
     if (!speechApiKey) {
-      new Notice(
-        "Ключ Google API для розпізнавання мовлення не налаштовано. Будь ласка, додайте його в налаштуваннях плагіна."
-      );
+      new Notice("Google API Key for speech recognition not configured. Please add it in plugin settings.");
       return;
     }
 
@@ -1680,77 +1702,183 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
 
       let recorderOptions: MediaRecorderOptions | undefined;
       const preferredMimeType = "audio/webm;codecs=opus";
-
       if (MediaRecorder.isTypeSupported(preferredMimeType)) {
         recorderOptions = { mimeType: preferredMimeType };
-      } else {
-        recorderOptions = undefined;
       }
 
       this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
-
       const audioChunks: Blob[] = [];
 
-      this.voiceButton?.classList.add(CSS_CLASS_RECORDING);
-      setIcon(this.voiceButton, "stop-circle");
-      this.inputEl.placeholder = "Recording... Speak now.";
+      this.voiceButton?.classList.add(CSS_CLASS_RECORDING); // CSS_CLASS_RECORDING має бути визначений
+      if (this.voiceButton) setIcon(this.voiceButton, "stop-circle");
+      this.inputEl.placeholder = "Listening... Speak now.";
+      this.isVadSpeechDetected = false; // Скидаємо прапорець
 
       this.mediaRecorder.ondataavailable = event => {
         if (event.data.size > 0) {
           audioChunks.push(event.data);
         }
       };
+
       this.mediaRecorder.onstop = () => {
-        if (this.speechWorker && audioChunks.length > 0) {
+        this.plugin.logger.debug("MediaRecorder stopped.");
+        if (this.vad) {
+          // Зупиняємо VAD, якщо він ще активний
+          this.vad.pause(); // або destroy, залежно від логіки
+        }
+        if (this.vadSilenceTimer) {
+          clearTimeout(this.vadSilenceTimer);
+          this.vadSilenceTimer = null;
+        }
+
+        if (this.speechWorker && audioChunks.length > 0 && this.isVadSpeechDetected) {
+          // Відправляємо тільки якщо була мова
           const audioBlob = new Blob(audioChunks, {
             type: this.mediaRecorder?.mimeType || "audio/webm",
           });
-
           this.inputEl.placeholder = "Processing speech...";
           this.speechWorker.postMessage({
             apiKey: speechApiKey,
             audioBlob,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA",
           });
-        } else if (audioChunks.length === 0) {
+        } else if (audioChunks.length === 0 || !this.isVadSpeechDetected) {
+          this.plugin.logger.debug("No audio chunks or no speech detected by VAD, not sending to worker.");
           this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState();
         }
       };
-      this.mediaRecorder.onerror = () => {
-        new Notice("An error occurred during recording.");
+
+      // OllamaView.ts, рядок приблизно 1751
+      this.mediaRecorder.onerror = (event: Event) => {
+        // const errorEvent = event as MediaRecorderErrorEvent; // <--- ПРОБЛЕМА ТУТ
+        // new Notice(`An error occurred during recording: ${errorEvent.error?.message || 'Unknown error'}`);
+        // this.plugin.logger.error("MediaRecorder error:", errorEvent.error);
+
+        // ВИПРАВЛЕННЯ:
+        let errorMessage = "Unknown MediaRecorder error";
+        if (event instanceof ErrorEvent) {
+          // Стандартний DOM ErrorEvent
+          errorMessage = event.message;
+          this.plugin.logger.error("MediaRecorder ErrorEvent:", event.error, event.message);
+        } else if ((event as any).error) {
+          // Спроба доступу до властивості error, якщо це специфічний тип
+          errorMessage = (event as any).error.message || (event as any).error.name || "MediaRecorder specific error";
+          this.plugin.logger.error("MediaRecorder specific error object:", (event as any).error);
+        } else {
+          this.plugin.logger.error("MediaRecorder unknown error event type:", event);
+        }
+        new Notice(`An error occurred during recording: ${errorMessage}`);
         this.stopVoiceRecording(false);
       };
+      this.mediaRecorder.start(); // Починаємо запис
+      this.plugin.logger.debug("MediaRecorder started.");
 
-      this.mediaRecorder.start();
+      // Ініціалізація та запуск VAD
+      try {
+        if (this.vad) {
+          // Якщо VAD вже існує, можливо, його потрібно перезапустити
+          await this.vad.destroy();
+          this.vad = null;
+        }
+        // @ts-ignore // Тимчасово для обходу можливої проблеми з типами, якщо вона виникне
+        this.vad = await MicVAD.create({
+          // workletURL: MicVAD.WORKLET_URL,
+          stream: this.audioStream,
+          positiveSpeechThreshold: 0.7, // Поріг для визначення мовлення (0.0 - 1.0)
+          negativeSpeechThreshold: 0.5, // Поріг для визначення тиші (нижчий за positive)
+          minSpeechFrames: 3, // Мінімальна кількість фреймів мовлення
+          // preSpeechPadFrames: 1,     // Кількість фреймів тиші перед мовленням (опціонально)
+          // postSpeechPadFrames: 5,    // Кількість фреймів тиші після мовлення (опціонально)
+          onSpeechStart: () => {
+            this.plugin.logger.debug("VAD: Speech started.");
+            this.isVadSpeechDetected = true; // Позначаємо, що мова була
+            if (this.vadSilenceTimer) {
+              clearTimeout(this.vadSilenceTimer);
+              this.vadSilenceTimer = null;
+            }
+          },
+          onSpeechEnd: () => {
+            this.plugin.logger.debug("VAD: Speech ended.");
+            if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
+              // Запускаємо таймер тиші тільки якщо запис ще йде
+              if (this.vadSilenceTimer) clearTimeout(this.vadSilenceTimer);
+              this.vadSilenceTimer = setTimeout(() => {
+                this.plugin.logger.debug("VAD: Stopping recording due to prolonged silence after speech.");
+                this.stopVoiceRecording(true); // Зупиняємо запис та обробляємо аудіо
+              }, this.VAD_SILENCE_TIMEOUT_MS);
+            }
+          },
+        });
+        if (this.vad) {
+          this.vad.start();
+          this.plugin.logger.debug("VAD started.");
+        } else {
+          this.plugin.logger.warn("VAD instance is null, cannot start.");
+          // Можливо, тут також варто показати Notice користувачу
+        }
+        this.plugin.logger.debug("VAD started.");
+      } catch (vadError) {
+        this.plugin.logger.error("Failed to initialize or start VAD:", vadError);
+        new Notice("Voice activity detection failed to start. Recording will proceed without automatic stop.");
+        // У цьому випадку VAD не працюватиме, але запис триватиме до ручної зупинки
+      }
     } catch (error) {
+      // ... (існуюча обробка помилок getUserMedia) ...
       if (error instanceof DOMException && error.name === "NotAllowedError") {
         new Notice("Microphone access denied. Please grant permission.");
       } else if (error instanceof DOMException && error.name === "NotFoundError") {
         new Notice("Microphone not found. Please ensure it's connected and enabled.");
       } else {
         new Notice("Could not start voice recording.");
+        this.plugin.logger.error("Error starting voice recognition:", error);
       }
-      this.stopVoiceRecording(false);
+      this.stopVoiceRecording(false); // Зупиняємо все, якщо була помилка на старті
     }
   }
   private stopVoiceRecording(processAudio: boolean): void {
+    this.plugin.logger.debug(`Stopping voice recording. Process audio: ${processAudio}`);
+
+    if (this.vad) {
+      this.vad.pause(); // Зупиняємо VAD від обробки нових даних
+      // Не викликаємо destroy тут, щоб уникнути помилок, якщо onstop ще не спрацював
+      // destroy буде викликаний в onClose або перед наступним стартом
+    }
+    if (this.vadSilenceTimer) {
+      clearTimeout(this.vadSilenceTimer);
+      this.vadSilenceTimer = null;
+    }
+
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-      this.mediaRecorder.stop();
-    } else if (!processAudio && this.mediaRecorder?.state === "inactive") {
+      this.mediaRecorder.stop(); // Це викличе onstop, де буде обробка audioChunks
+      this.plugin.logger.debug("MediaRecorder.stop() called.");
+    } else if (this.mediaRecorder && this.mediaRecorder.state === "inactive") {
+      this.plugin.logger.debug("MediaRecorder was already inactive.");
+      // Якщо не processAudio, а ми тут, значить, можливо, VAD не спрацював або була помилка
+      // і потрібно просто оновити UI
+      if (!processAudio) {
+        this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
+        this.updateSendButtonState();
+      }
     }
 
     this.voiceButton?.classList.remove(CSS_CLASS_RECORDING);
-    setIcon(this.voiceButton, "mic");
+    if (this.voiceButton) setIcon(this.voiceButton, "mic");
 
-    this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
-    this.updateSendButtonState();
+    // Оновлення плейсхолдера та кнопки може відбуватися в onstop або тут,
+    // якщо onstop не викликається (наприклад, через помилку)
+    if (this.mediaRecorder?.state !== "recording" && !processAudio) {
+      // Якщо запис точно не йде
+      this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
+    }
+    this.updateSendButtonState(); // Завжди оновлюємо стан кнопки
 
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(track => track.stop());
       this.audioStream = null;
+      this.plugin.logger.debug("Audio stream tracks stopped.");
     }
-    this.mediaRecorder = null;
+    // this.mediaRecorder = null; // Не скидаємо тут, onstop може ще ним користуватися
   }
 
   public checkAllMessagesForCollapsing(): void {
@@ -2983,7 +3111,7 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
 
   // src/OllamaView.ts
 
-// ... (інші імпорти та частина класу) ...
+  // ... (інші імпорти та частина класу) ...
 
   private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
     const messageForLog = data?.message;
@@ -2993,13 +3121,18 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
     // Логуємо вхідну подію
     this.plugin.logger.debug(
       `[handleMessageAdded] Received message event for chat ${data.chatId}. Message role: ${messageRoleForLog}, timestamp: ${messageTimestampForLog}`,
-      { role: messageForLog?.role, contentPreview: messageForLog?.content?.substring(0, 50) + "...", tool_calls: (messageForLog as AssistantMessage)?.tool_calls }
+      {
+        role: messageForLog?.role,
+        contentPreview: messageForLog?.content?.substring(0, 50) + "...",
+        tool_calls: (messageForLog as AssistantMessage)?.tool_calls,
+      }
     );
 
     try {
       // 1. Базові перевірки на валідність даних
-      if (!data || !data.message || !messageForLog || !messageTimestampForLog) { // Перевіряємо і messageTimestampForLog
-        
+      if (!data || !data.message || !messageForLog || !messageTimestampForLog) {
+        // Перевіряємо і messageTimestampForLog
+
         if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
@@ -3008,16 +3141,15 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
       const messageTimestampMs = messageTimestampForLog; // Тепер це те саме, що message.timestamp.getTime()
 
       // Логування оброблюваного повідомлення
-      this.plugin.logger.debug(`[handleMessageAdded] Processing message:`, { 
-        id: messageTimestampMs, 
-        role: message.role, 
-        content: message.content?.substring(0,100) + (message.content && message.content.length > 100 ? "..." : ""),
-        tool_calls: (message as AssistantMessage).tool_calls // Приводимо до AssistantMessage для доступу до tool_calls
+      this.plugin.logger.debug(`[handleMessageAdded] Processing message:`, {
+        id: messageTimestampMs,
+        role: message.role,
+        content: message.content?.substring(0, 100) + (message.content && message.content.length > 100 ? "..." : ""),
+        tool_calls: (message as AssistantMessage).tool_calls, // Приводимо до AssistantMessage для доступу до tool_calls
       });
 
       // 2. Перевірка наявності chatContainer та chatManager
       if (!this.chatContainer || !this.plugin.chatManager) {
-        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -3025,18 +3157,17 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
       // 3. Перевірка, чи повідомлення для активного чату
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
-        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
-      
+
       // 4. Визначення умов для спеціальної обробки
       const isAssistant = message.role === "assistant";
-      const hasToolCalls = !!((message as AssistantMessage).tool_calls && (message as AssistantMessage).tool_calls!.length > 0);
+      const hasToolCalls = !!(
+        (message as AssistantMessage).tool_calls && (message as AssistantMessage).tool_calls!.length > 0
+      );
       // isActiveCycle: Перевіряємо, чи є активний AbortController (або інший індикатор активного LLM циклу)
       const isActiveCycle = !!this.currentAbortController; // Ти використовував currentAbortController
-
-      
 
       // --- КЛЮЧОВА ЗМІНА ЛОГІКИ ---
       // 5. Пропуск рендерингу для повідомлень асистента з tool_calls
@@ -3044,23 +3175,25 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
       if (isAssistant && hasToolCalls) {
         this.plugin.logger.info(
           `[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls (role: ${message.role}, ts: ${messageTimestampMs}). This message is for tool execution only.`,
-          { contentPreview: message.content?.substring(0, 70) + "...", tool_calls: (message as AssistantMessage).tool_calls }
+          {
+            contentPreview: message.content?.substring(0, 70) + "...",
+            tool_calls: (message as AssistantMessage).tool_calls,
+          }
         );
-        
+
         // Видаляємо плейсхолдер, якщо він був створений для цього конкретного повідомлення
         // (малоймовірно для assistant+tool_calls, але для повноти)
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-            
-            if (this.activePlaceholder.groupEl.isConnected) {
-                this.activePlaceholder.groupEl.remove();
-            }
-            this.activePlaceholder = null;
+          if (this.activePlaceholder.groupEl.isConnected) {
+            this.activePlaceholder.groupEl.remove();
+          }
+          this.activePlaceholder = null;
         }
         // Також, якщо це повідомлення було в currentMessages (наприклад, додане ChatManager), але не буде рендеритися,
         // його можна прибрати, щоб не впливати на логіку "alreadyInLogicCache" для майбутніх повідомлень.
         // Або ж, якщо воно має бути в історії для логіки LLM, але не для UI.
         // Поки що залишимо його в this.currentMessages, якщо ChatManager його туди додає.
-        
+
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs); // Завершуємо HMA
         return; // Повністю виходимо, не рендеримо це повідомлення
       }
@@ -3070,7 +3203,6 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -3078,9 +3210,9 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
       // 7. Перевірка, чи повідомлення вже є в логічному кеші (this.currentMessages)
       // Це може допомогти уникнути дублювання, якщо подія прийшла двічі до рендерингу.
       const isAlreadyInLogicCache = this.currentMessages.some(
-        m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role 
+        m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
         // Порівняння контенту може бути надлишковим і дорогим, якщо ID (timestamp) унікальний
-        // && m.content === message.content 
+        // && m.content === message.content
       );
 
       // Визначаємо, чи це повідомлення асистента призначене для оновлення активного плейсхолдера
@@ -3092,21 +3224,18 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
       if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
         // Якщо повідомлення вже в кеші І воно не для оновлення плейсхолдера,
         // то, ймовірно, це дублікат або вже оброблена ситуація.
-        
+
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
-      
+
       // Додаємо в логічний кеш, якщо ще не там (або якщо це для плейсхолдера, то воно вже може бути там)
       if (!isAlreadyInLogicCache) {
-        
         this.currentMessages.push(message); // Зберігаємо оригінальне повідомлення з Date об'єктом
       }
 
       // 8. Логіка рендерингу: оновлення плейсхолдера або додавання нового повідомлення
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        
-        
         const placeholderToUpdate = this.activePlaceholder; // Зберігаємо посилання
         this.activePlaceholder = null; // Очищаємо activePlaceholder перед асинхронними операціями
 
@@ -3124,14 +3253,13 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
           ) as HTMLElement | null;
 
           if (!messageDomElement) {
-            
             if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
             // this.activePlaceholder = null; // Вже очищено
-            await this.addMessageStandard(message); 
+            await this.addMessageStandard(message);
           } else {
             placeholderToUpdate.contentEl.classList.remove("streaming-text");
             const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
-            if (dotsEl)  dotsEl.remove(); 
+            if (dotsEl) dotsEl.remove();
 
             try {
               const displayContent = AssistantMessageRenderer.prepareDisplayContent(
@@ -3141,56 +3269,72 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
                 this
               );
               placeholderToUpdate.contentEl.empty(); // Очищаємо вміст перед новим рендерингом
-              await RendererUtils.renderMarkdownContent( this.app, this, this.plugin, placeholderToUpdate.contentEl, displayContent );
-              AssistantMessageRenderer.addAssistantActionButtons( messageDomElement, placeholderToUpdate.contentEl, message as AssistantMessage, this.plugin, this );
+              await RendererUtils.renderMarkdownContent(
+                this.app,
+                this,
+                this.plugin,
+                placeholderToUpdate.contentEl,
+                displayContent
+              );
+              AssistantMessageRenderer.addAssistantActionButtons(
+                messageDomElement,
+                placeholderToUpdate.contentEl,
+                message as AssistantMessage,
+                this.plugin,
+                this
+              );
               BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
-              
+
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl; // Зберігаємо для setTimeout
               // this.activePlaceholder = null; // Вже очищено
-              
+
               // Асинхронна перевірка на згортання
-              setTimeout(() => { if (finalMessageGroupElement?.isConnected) this.checkMessageForCollapsing(finalMessageGroupElement); }, 70);
+              setTimeout(() => {
+                if (finalMessageGroupElement?.isConnected) this.checkMessageForCollapsing(finalMessageGroupElement);
+              }, 70);
               this.guaranteedScrollToBottom(100, true); // Прокрутка
             } catch (renderError: any) {
-              
               if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
               // this.activePlaceholder = null; // Вже очищено
-              this.handleErrorMessage({ role: "error", content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
+              this.handleErrorMessage({
+                role: "error",
+                content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`,
+                timestamp: new Date(),
+              });
             }
           }
-        } else { 
-          
+        } else {
           // this.activePlaceholder = null; // Вже очищено
           await this.addMessageStandard(message);
         }
-      } else { // Якщо не оновлення плейсхолдера, то стандартне додавання
+      } else {
+        // Якщо не оновлення плейсхолдера, то стандартне додавання
         // Це включає повідомлення користувача, інструментів, помилок,
         // а також повідомлення асистента, якщо для них не було плейсхолдера (наприклад, при завантаженні історії)
-        
+
         await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
-      
       this.handleErrorMessage({
         role: "error",
-        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message || 'Unknown error'}`,
+        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${
+          outerError.message || "Unknown error"
+        }`,
         timestamp: new Date(),
       });
     } finally {
       // Гарантовано викликаємо резолвер, якщо він ще існує
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
-         
-         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
-         // Якщо резолвера вже немає, логуємо це, щоб розуміти потік
-         
+        // Якщо резолвера вже немає, логуємо це, щоб розуміти потік
       }
     }
   }
 
-// ... (решта коду класу) ...
+  // ... (решта коду класу) ...
 
   private scheduleSidebarChatListUpdate = (delay: number = 50): void => {
     if (this.chatListUpdateTimeoutId) {
@@ -3216,18 +3360,17 @@ public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
 
   // src/OllamaView.ts
 
-// ... (припускаємо, що всі необхідні імпорти, CSS_CLASSES, RendererUtils, рендерери повідомлень, etc. вже є) ...
+  // ... (припускаємо, що всі необхідні імпорти, CSS_CLASSES, RendererUtils, рендерери повідомлень, etc. вже є) ...
 
-async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
+  async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
     let metadataUpdated = false;
-    
 
     try {
       this.clearChatContainerInternal(); // Очищає this.chatContainer та this.currentMessages
 
       this.lastMessageElement = null;
       this.consecutiveErrorMessages = []; // Скидаємо лічильник послідовних помилок
-      this.errorGroupElement = null;    // Скидаємо групу помилок
+      this.errorGroupElement = null; // Скидаємо групу помилок
 
       let activeChat: Chat | null = null;
       let availableModels: string[] = [];
@@ -3240,12 +3383,12 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
       // Блок завантаження даних чату та моделей
       try {
         if (!this.plugin.chatManager) {
-            throw new Error("ChatManager is not initialized.");
+          throw new Error("ChatManager is not initialized.");
         }
         activeChat = (await this.plugin.chatManager.getActiveChat()) || null;
-        
+
         if (!this.plugin.ollamaService) {
-            throw new Error("OllamaService is not initialized.");
+          throw new Error("OllamaService is not initialized.");
         }
         availableModels = await this.plugin.ollamaService.getModels();
 
@@ -3255,9 +3398,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
             ? activeChat.metadata.selectedRolePath
             : this.plugin.settings.selectedRolePath; // Потім з налаштувань плагіна
         finalRoleName = await this.findRoleNameByPath(finalRolePath); // findRoleNameByPath має обробляти null/undefined
-
       } catch (error: any) {
-        
         new Notice("Error connecting to Ollama or loading chat data.", 5000);
         errorOccurredLoadingData = true;
 
@@ -3280,12 +3421,10 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
             finalModelName = preferredModel;
           } else {
             // Якщо бажана модель недоступна, встановлюємо першу доступну
-            finalModelName = availableModels[0]; 
-            
+            finalModelName = availableModels[0];
           }
         } else {
           finalModelName = null; // Немає доступних моделей
-          
         }
 
         // Оновлення метаданих чату, якщо модель змінилася
@@ -3295,19 +3434,17 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
               metadataUpdated = true;
-              
+
               // Перезавантажуємо дані чату, щоб отримати оновлені метадані
               const potentiallyUpdatedChat = await this.plugin.chatManager.getChat(activeChat.metadata.id);
               if (potentiallyUpdatedChat) activeChat = potentiallyUpdatedChat;
             } else {
-              
             }
-          } catch (updateError) {
-            
-          }
+          } catch (updateError) {}
         }
         finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
-      } else if (!errorOccurredLoadingData && !activeChat) { // Якщо чат не завантажено, але не було помилки (наприклад, немає активного)
+      } else if (!errorOccurredLoadingData && !activeChat) {
+        // Якщо чат не завантажено, але не було помилки (наприклад, немає активного)
         finalModelName = availableModels.includes(this.plugin.settings.modelName)
           ? this.plugin.settings.modelName
           : availableModels[0] ?? null;
@@ -3319,7 +3456,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
       if (activeChat && !errorOccurredLoadingData && activeChat.messages?.length > 0) {
         this.hideEmptyState();
         // this.currentMessages вже очищено в clearChatContainerInternal, заповнюємо його знову
-        this.currentMessages = [...activeChat.messages]; 
+        this.currentMessages = [...activeChat.messages];
         this.lastRenderedMessageDate = null; // Скидаємо для розділювачів дат
 
         for (const message of this.currentMessages) {
@@ -3327,12 +3464,17 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
 
           // Перевірка на пропуск рендерингу для assistant + tool_calls
           const isAssistant = message.role === "assistant";
-          const hasToolCalls = !!((message as AssistantMessage).tool_calls && (message as AssistantMessage).tool_calls!.length > 0);
+          const hasToolCalls = !!(
+            (message as AssistantMessage).tool_calls && (message as AssistantMessage).tool_calls!.length > 0
+          );
 
           if (isAssistant && hasToolCalls) {
             this.plugin.logger.info(
               `[loadAndDisplayActiveChat] SKIPPING RENDER for HISTORICAL assistant message with tool_calls (ts: ${message.timestamp.getTime()})`,
-              { contentPreview: message.content?.substring(0,70), tool_calls: (message as AssistantMessage).tool_calls }
+              {
+                contentPreview: message.content?.substring(0, 70),
+                tool_calls: (message as AssistantMessage).tool_calls,
+              }
             );
             continue; // Пропускаємо решту циклу для цього повідомлення
           }
@@ -3344,7 +3486,8 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
           const isFirstRenderedMessageInContainer = this.chatContainer.children.length === 0;
 
           if (isNewDay || isFirstRenderedMessageInContainer) {
-            if (isNewDay && !isFirstRenderedMessageInContainer) { // Не додаємо розділювач перед першим повідомленням
+            if (isNewDay && !isFirstRenderedMessageInContainer) {
+              // Не додаємо розділювач перед першим повідомленням
               this.renderDateSeparator(message.timestamp);
             }
             this.lastRenderedMessageDate = message.timestamp; // Оновлюємо дату останнього ВІДРЕНДЕРЕНОГО повідомлення
@@ -3352,7 +3495,13 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
 
           // Створення та рендеринг повідомлення
           try {
-            let renderer: UserMessageRenderer | AssistantMessageRenderer | SystemMessageRenderer | ErrorMessageRenderer | ToolMessageRenderer | null = null;
+            let renderer:
+              | UserMessageRenderer
+              | AssistantMessageRenderer
+              | SystemMessageRenderer
+              | ErrorMessageRenderer
+              | ToolMessageRenderer
+              | null = null;
 
             switch (message.role) {
               case "user":
@@ -3372,7 +3521,6 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
                 renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
                 break;
               default:
-                
                 const unknownRoleGroup = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
                 if (unknownRoleGroup && this.chatContainer) {
                   RendererUtils.renderAvatar(this.app, this.plugin, unknownRoleGroup, false); // Аватар за замовчуванням
@@ -3388,12 +3536,12 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
                 break;
             }
 
-            if (renderer && message.role !== "error") { // Помилки обробляються окремо
+            if (renderer && message.role !== "error") {
+              // Помилки обробляються окремо
               const result = renderer.render();
               messageGroupEl = result instanceof Promise ? await result : result;
             }
           } catch (renderError: any) {
-            
             // Створюємо елемент помилки рендерингу
             const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" }); // Переконайся, що CSS_CLASSES.ERROR_MESSAGE визначено
             errorDiv.setText(`Error rendering message (role: ${message.role}): ${renderError.message}`);
@@ -3403,7 +3551,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
           if (messageGroupEl) {
             // Додаємо елемент, тільки якщо він ще не є дочірнім (наприклад, handleErrorMessage міг вже додати)
             if (messageGroupEl.parentElement !== this.chatContainer) {
-                this.chatContainer.appendChild(messageGroupEl);
+              this.chatContainer.appendChild(messageGroupEl);
             }
             this.lastMessageElement = messageGroupEl;
           }
@@ -3417,7 +3565,8 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
             this.updateScrollStateAndIndicators(); // Оновлюємо індикатори прокрутки
           }, 150); // Додаткова затримка для стабілізації прокрутки
         }, 150);
-      } else { // Якщо немає повідомлень або сталася помилка завантаження даних чату
+      } else {
+        // Якщо немає повідомлень або сталася помилка завантаження даних чату
         this.showEmptyState(errorOccurredLoadingData ? "Error loading chat." : "This chat is empty.");
         this.scrollToBottomButton?.classList.remove(CSS_CLASSES.VISIBLE || "visible"); // Переконайся, що CSS_CLASSES.VISIBLE визначено
       }
@@ -3429,7 +3578,8 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
       this.updateTemperatureIndicator(finalTemperature);
 
       // Оновлення стану інпут поля та кнопки відправки
-      if (finalModelName === null) { // Якщо немає доступних моделей
+      if (finalModelName === null) {
+        // Якщо немає доступних моделей
         if (this.inputEl) {
           this.inputEl.disabled = true;
           this.inputEl.placeholder = "No models available...";
@@ -3439,14 +3589,15 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
           this.sendButton.classList.add(CSS_CLASSES.DISABLED || "disabled"); // Переконайся, що CSS_CLASSES.DISABLED визначено
         }
         if (this.isProcessing) this.setLoadingState(false); // Скидаємо стан завантаження, якщо він був активний
-      } else { // Якщо моделі є
-        if (this.inputEl && !this.isProcessing) { // Розблоковуємо інпут, якщо не йде обробка
+      } else {
+        // Якщо моделі є
+        if (this.inputEl && !this.isProcessing) {
+          // Розблоковуємо інпут, якщо не йде обробка
           this.inputEl.disabled = false;
         }
         this.updateSendButtonState(); // Оновлюємо стан кнопки відправки
       }
     } catch (error: any) {
-      
       this.clearChatContainerInternal(); // Очищаємо все
       this.showEmptyState("Fatal error."); // Показуємо стан помилки
       if (this.chatContainer) {
@@ -3459,14 +3610,11 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
       return { metadataUpdated: false }; // Або можна кинути помилку далі
     } finally {
       // Можна додати логування завершення методу
-      
     }
 
     return { metadataUpdated };
   }
 
-
-  
   private handleActiveChatChanged = async (data: { chatId: string | null; chat: Chat | null }): Promise<void> => {
     if (this.isRegenerating && data.chatId === this.plugin.chatManager.getActiveChatId()) {
       this.lastProcessedChatId = data.chatId;
@@ -3562,15 +3710,18 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
     }
   }
 
-   private async _processLlmStream(
+  private async _processLlmStream(
     llmStream: AsyncIterableIterator<OllamaStreamChunk>, // Тепер тип має бути сумісним
     timestampMs: number,
     requestTimestampId: number
-  ): Promise<{ accumulatedContent: string; nativeToolCalls: ToolCall[] | null; assistantMessageWithNativeCalls: AssistantMessage | null }> {
-    
-    let accumulatedContent = ""; 
+  ): Promise<{
+    accumulatedContent: string;
+    nativeToolCalls: ToolCall[] | null;
+    assistantMessageWithNativeCalls: AssistantMessage | null;
+  }> {
+    let accumulatedContent = "";
     let parsedToolCalls: ToolCall[] | null = null;
-    let fullResponseBuffer = ""; 
+    let fullResponseBuffer = "";
     let toolCallIdCounter = 0;
 
     const toolCallStartTag = "<tool_call>";
@@ -3581,58 +3732,57 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
 
       let isLastChunk = false;
 
-      if ('error' in chunk && chunk.error) { // OllamaErrorChunk
+      if ("error" in chunk && chunk.error) {
+        // OllamaErrorChunk
         this.plugin.logger.error("[_processLlmStream] Received error chunk:", chunk.error);
         throw new Error(`Ollama stream error: ${chunk.error}`);
-      } 
+      }
       // Перевіряємо на OllamaToolCallsChunk першим, якщо він має поле 'type'
       // Потрібно переконатися, що OllamaGenerateChunk не має 'type: "tool_calls"'
       // або додати 'type: "content"' до OllamaGenerateChunk
-      else if ('type' in chunk && chunk.type === "tool_calls" && 'calls' in chunk) { // OllamaToolCallsChunk
+      else if ("type" in chunk && chunk.type === "tool_calls" && "calls" in chunk) {
+        // OllamaToolCallsChunk
         this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
         if (!parsedToolCalls) parsedToolCalls = [];
-        
+
         for (const call of chunk.calls) {
-             // Додаємо перевірку, щоб уникнути дублювання, якщо ID вже існує
-            if (!parsedToolCalls.some(existingCall => existingCall.id === call.id)) {
-                 parsedToolCalls.push({
-                    type: call.type || "function",
-                    id: call.id || `ollama-tc-${timestampMs}-${toolCallIdCounter++}`, 
-                    function: call.function
-                 });
-            }
+          // Додаємо перевірку, щоб уникнути дублювання, якщо ID вже існує
+          if (!parsedToolCalls.some(existingCall => existingCall.id === call.id)) {
+            parsedToolCalls.push({
+              type: call.type || "function",
+              id: call.id || `ollama-tc-${timestampMs}-${toolCallIdCounter++}`,
+              function: call.function,
+            });
+          }
         }
         if (chunk.done) isLastChunk = true; // Якщо цей чанк може бути останнім
-
-      } else if ('response' in chunk) { // OllamaGenerateChunk (текстовий контент)
+      } else if ("response" in chunk) {
+        // OllamaGenerateChunk (текстовий контент)
         if (chunk.response) {
           accumulatedContent += chunk.response;
-          fullResponseBuffer += chunk.response; 
+          fullResponseBuffer += chunk.response;
         }
         if (chunk.done) isLastChunk = true; // Цей текстовий чанк є останнім
       }
       // Якщо є інший спосіб визначити останній чанк (наприклад, спеціальний тип 'done' без 'response')
       // else if (chunk.type === "done_signal") { isLastChunk = true; }
 
-
       if (isLastChunk) {
-        
-        
         // Парсинг текстових <tool_call> з fullResponseBuffer (якщо вони є)
         // Ця логіка виконується ТІЛЬКИ ОДИН РАЗ в кінці.
         let lastIndex = 0;
         while (lastIndex < fullResponseBuffer.length) {
           const startIndex = fullResponseBuffer.indexOf(toolCallStartTag, lastIndex);
-          if (startIndex === -1) break; 
+          if (startIndex === -1) break;
 
           const endIndex = fullResponseBuffer.indexOf(toolCallEndTag, startIndex + toolCallStartTag.length);
           if (endIndex === -1) {
-            
-            break; 
+            break;
           }
 
-          const toolCallJsonString = fullResponseBuffer.substring(startIndex + toolCallStartTag.length, endIndex).trim();
-          
+          const toolCallJsonString = fullResponseBuffer
+            .substring(startIndex + toolCallStartTag.length, endIndex)
+            .trim();
 
           try {
             const parsedJson = JSON.parse(toolCallJsonString);
@@ -3640,75 +3790,73 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
             if (!parsedToolCalls) parsedToolCalls = [];
 
             for (const callDef of callsArray) {
-              if (callDef.name && typeof callDef.arguments !== 'undefined') {
+              if (callDef.name && typeof callDef.arguments !== "undefined") {
                 // Додаємо, лише якщо схожого виклику ще немає (проста перевірка за іменем)
                 // Для більш надійної перевірки на дублікати потрібні ID або більш глибоке порівняння
                 if (!parsedToolCalls.some(ptc => ptc.function.name === callDef.name)) {
-                    parsedToolCalls.push({
-                        type: "function",
-                        id: `ollama-txt-tc-${timestampMs}-${toolCallIdCounter++}`, // Інший префікс для текстових
-                        function: {
-                            name: callDef.name,
-                            arguments: typeof callDef.arguments === 'string' 
-                                         ? callDef.arguments 
-                                         : JSON.stringify(callDef.arguments),
-                        },
-                    });
+                  parsedToolCalls.push({
+                    type: "function",
+                    id: `ollama-txt-tc-${timestampMs}-${toolCallIdCounter++}`, // Інший префікс для текстових
+                    function: {
+                      name: callDef.name,
+                      arguments:
+                        typeof callDef.arguments === "string" ? callDef.arguments : JSON.stringify(callDef.arguments),
+                    },
+                  });
                 }
               } else {
-                
               }
             }
-            
           } catch (e) {
-            this.plugin.logger.error("[_processLlmStream] Error parsing text-based tool call JSON:", e, toolCallJsonString);
+            this.plugin.logger.error(
+              "[_processLlmStream] Error parsing text-based tool call JSON:",
+              e,
+              toolCallJsonString
+            );
           }
           lastIndex = endIndex + toolCallEndTag.length;
         }
-        break; 
+        break;
       }
     }
-    
-    return { 
-      accumulatedContent: accumulatedContent, 
-      nativeToolCalls: parsedToolCalls, 
-      assistantMessageWithNativeCalls: null 
+
+    return {
+      accumulatedContent: accumulatedContent,
+      nativeToolCalls: parsedToolCalls,
+      assistantMessageWithNativeCalls: null,
     };
   }
 
-// ... (решта методів)
+  // ... (решта методів)
 
   // src/OllamaView.ts
 
-// ... (інші імпорти та частина класу) ...
+  // ... (інші імпорти та частина класу) ...
 
   private _determineToolCalls(
-    nativeToolCallsFromStream: ToolCall[] | null, 
-    accumulatedContentFromStream: string,        
+    nativeToolCallsFromStream: ToolCall[] | null,
+    accumulatedContentFromStream: string,
     timestampMs: number,
     requestTimestampId: number // Цей аргумент зараз не використовується активно, але залишений для узгодженості
   ): { processedToolCallsThisTurn: ToolCall[] | null; assistantMessageForHistory: AssistantMessage } {
-    
     let toolsToExecute: ToolCall[] | null = null;
     const finalContentForHistory = accumulatedContentFromStream.trim();
 
     const assistantMessageForHistory: AssistantMessage = {
       role: "assistant",
-      content: finalContentForHistory, 
+      content: finalContentForHistory,
       timestamp: new Date(timestampMs),
     };
 
     if (nativeToolCallsFromStream && nativeToolCallsFromStream.length > 0) {
       toolsToExecute = nativeToolCallsFromStream;
-      assistantMessageForHistory.tool_calls = nativeToolCallsFromStream; 
-      
+      assistantMessageForHistory.tool_calls = nativeToolCallsFromStream;
     } else {
-      
     }
-    
-    return { 
-      processedToolCallsThisTurn: toolsToExecute, 
-      assistantMessageForHistory: assistantMessageForHistory 
+
+    return {
+      processedToolCallsThisTurn: toolsToExecute,
+      assistantMessageForHistory: assistantMessageForHistory,
     };
   }
 
@@ -3781,9 +3929,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
         try {
           await toolResultHmaPromise;
-        } catch (hmaError) {
-          
-        }
+        } catch (hmaError) {}
       }
     }
   }
@@ -3849,13 +3995,13 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
     }
   }
 
-    public async handleRegenerateClick(messageToRegenerateFrom: Message): Promise<void> {
+  public async handleRegenerateClick(messageToRegenerateFrom: Message): Promise<void> {
     if (this.isRegenerating) {
       new Notice("Regeneration is already in progress. Please wait.", 3000);
       return;
     }
-    
-    if (this.currentAbortController) { 
+
+    if (this.currentAbortController) {
       new Notice("Another generation process is currently active. Please wait or cancel it first.", 4000);
       return;
     }
@@ -3866,15 +4012,17 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
       return;
     }
     const chatId = activeChat.metadata.id;
-    
+
     let anchorMessageIndex = activeChat.messages.findIndex(
-      msg => msg.timestamp.getTime() === messageToRegenerateFrom.timestamp.getTime() && msg.role === messageToRegenerateFrom.role
+      msg =>
+        msg.timestamp.getTime() === messageToRegenerateFrom.timestamp.getTime() &&
+        msg.role === messageToRegenerateFrom.role
     );
 
     if (anchorMessageIndex === -1) {
       new Notice("Error: Could not find the message to regenerate from in the current chat history.");
-      this.plugin.logger.warn("Regeneration failed: Anchor message not found for regeneration.", { 
-        targetTimestamp: messageToRegenerateFrom.timestamp.getTime(), 
+      this.plugin.logger.warn("Regeneration failed: Anchor message not found for regeneration.", {
+        targetTimestamp: messageToRegenerateFrom.timestamp.getTime(),
         targetRole: messageToRegenerateFrom.role,
         activeChatId: chatId,
         // Можна додати перші/останні кілька повідомлень з activeChat.messages для контексту, якщо потрібно
@@ -3886,7 +4034,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
     // Якщо регенеруємо відповідь асистента, то видаляємо повідомлення, починаючи з цього асистента.
     // Отже, "видаляти після" означає видаляти після повідомлення, що було *перед* цим асистентом.
     if (messageToRegenerateFrom.role === "assistant") {
-        messageIndexToDeleteAfter = anchorMessageIndex - 1; 
+      messageIndexToDeleteAfter = anchorMessageIndex - 1;
     }
     // Якщо messageToRegenerateFrom.role === "user", то anchorMessageIndex вже вказує на це повідомлення користувача,
     // і ми будемо видаляти все ПІСЛЯ нього.
@@ -3901,12 +4049,12 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         : "Are you sure you want to generate a new response for this prompt?",
       async () => {
         this.isRegenerating = true;
-        const regenerationGlobalRequestId = Date.now(); 
-        
-        this.currentAbortController = new AbortController(); 
+        const regenerationGlobalRequestId = Date.now();
+
+        this.currentAbortController = new AbortController();
         this.setLoadingState(true);
 
-        const initialLlmResponsePlaceholderTsForRegen = Date.now(); 
+        const initialLlmResponsePlaceholderTsForRegen = Date.now();
 
         try {
           if (hasMessagesAfterTargetPoint) {
@@ -3915,71 +4063,85 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
               throw new Error("Failed to delete subsequent messages. Regeneration cannot proceed.");
             }
           }
-          
-          await this.loadAndDisplayActiveChat(); 
+
+          await this.loadAndDisplayActiveChat();
           this.guaranteedScrollToBottom(50, true);
 
           const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
-          if (!chatStateForLlm) { 
+          if (!chatStateForLlm) {
             throw new Error("Failed to reload chat state after preparing for regeneration.");
           }
-            
-          if (!this.currentAbortController) { 
-              this.plugin.logger.error("CRITICAL: AbortController not initialized in handleRegenerateClick before LlmInteractionCycle call.");
-              throw new Error("AbortController not initialized in handleRegenerateClick");
-          }
-          await this._handleLlmInteractionCycle(chatStateForLlm, regenerationGlobalRequestId, this.currentAbortController.signal);
 
+          if (!this.currentAbortController) {
+            this.plugin.logger.error(
+              "CRITICAL: AbortController not initialized in handleRegenerateClick before LlmInteractionCycle call."
+            );
+            throw new Error("AbortController not initialized in handleRegenerateClick");
+          }
+          await this._handleLlmInteractionCycle(
+            chatStateForLlm,
+            regenerationGlobalRequestId,
+            this.currentAbortController.signal
+          );
         } catch (error: any) {
-          if (this.activePlaceholder && 
-              this.activePlaceholder.timestamp === initialLlmResponsePlaceholderTsForRegen &&
-              this.activePlaceholder.groupEl.classList.contains("placeholder")) {
+          if (
+            this.activePlaceholder &&
+            this.activePlaceholder.timestamp === initialLlmResponsePlaceholderTsForRegen &&
+            this.activePlaceholder.groupEl.classList.contains("placeholder")
+          ) {
             if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
           }
-          
-          this.plugin.chatManager.rejectAndClearHMAResolver(initialLlmResponsePlaceholderTsForRegen, `Outer catch in handleRegenerateClick for initial placeholder (req: ${regenerationGlobalRequestId})`);
+
+          this.plugin.chatManager.rejectAndClearHMAResolver(
+            initialLlmResponsePlaceholderTsForRegen,
+            `Outer catch in handleRegenerateClick for initial placeholder (req: ${regenerationGlobalRequestId})`
+          );
 
           let errorMsgForChat: string;
           let errorMsgRole: MessageRole = "error";
           if (error.name === "AbortError" || error.message?.includes("aborted by user")) {
             errorMsgForChat = "Regeneration process was stopped by the user.";
-            errorMsgRole = "system"; 
+            errorMsgRole = "system";
           } else {
             errorMsgForChat = `Regeneration failed: ${error.message || "An unknown error occurred during processing."}`;
-            new Notice(errorMsgForChat, 7000); 
+            new Notice(errorMsgForChat, 7000);
           }
           const errorDisplayTimestamp = new Date();
-          const errorDisplayMsg: Message = { role: errorMsgRole, content: errorMsgForChat, timestamp: errorDisplayTimestamp };
-          
+          const errorDisplayMsg: Message = {
+            role: errorMsgRole,
+            content: errorMsgForChat,
+            timestamp: errorDisplayTimestamp,
+          };
+
           const hmaErrorPromise = new Promise<void>((resolve, reject) => {
             this.plugin.chatManager.registerHMAResolver(errorDisplayMsg.timestamp.getTime(), resolve, reject);
             setTimeout(() => {
               if (this.plugin.chatManager.messageAddedResolvers.has(errorDisplayMsg.timestamp.getTime())) {
-                this.plugin.chatManager.rejectAndClearHMAResolver(errorDisplayMsg.timestamp.getTime(), "HMA timeout for error display msg in handleRegenerateClick");
+                this.plugin.chatManager.rejectAndClearHMAResolver(
+                  errorDisplayMsg.timestamp.getTime(),
+                  "HMA timeout for error display msg in handleRegenerateClick"
+                );
               }
             }, 10000);
           });
           await this.plugin.chatManager.addMessageToActiveChatPayload(errorDisplayMsg, true);
-          try { 
-            await hmaErrorPromise; 
-          } catch (e_hma) { 
-             
-          }
-
+          try {
+            await hmaErrorPromise;
+          } catch (e_hma) {}
         } finally {
           if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
             if (this.activePlaceholder.groupEl.isConnected) {
               this.activePlaceholder.groupEl.remove();
             }
           }
-          this.activePlaceholder = null; 
+          this.activePlaceholder = null;
 
-          this.currentAbortController = null; 
-          this.isRegenerating = false; 
-          this.setLoadingState(false); 
-          
-          requestAnimationFrame(() => this.updateSendButtonState()); 
-          this.focusInput(); 
+          this.currentAbortController = null;
+          this.isRegenerating = false;
+          this.setLoadingState(false);
+
+          requestAnimationFrame(() => this.updateSendButtonState());
+          this.focusInput();
         }
       }
     ).open();
@@ -4024,12 +4186,11 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         if (signal.aborted) throw new Error("aborted by user");
 
         const toolCallCheckResult = this._determineToolCalls(
-          nativeToolCalls,         // 1. Розпарсені інструменти
-          accumulatedContent,      // 2. Весь текстовий контент
-          currentTurnLlmResponseTs,// 3. Timestamp
-          currentTurnRequestId     // 4. Request ID (для логування/майбутнього)
+          nativeToolCalls, // 1. Розпарсені інструменти
+          accumulatedContent, // 2. Весь текстовий контент
+          currentTurnLlmResponseTs, // 3. Timestamp
+          currentTurnRequestId // 4. Request ID (для логування/майбутнього)
         );
-
 
         if (
           toolCallCheckResult.processedToolCallsThisTurn &&
@@ -4090,9 +4251,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         await this.plugin.chatManager.addMessageToActiveChatPayload(maxTurnsMsg, true);
         try {
           await hmaMaxTurnsPromise;
-        } catch (e_hma) {
-          
-        }
+        } catch (e_hma) {}
       }
     } catch (error) {
       // Помилка прокидається для обробки у викликаючому методі (sendMessage/handleRegenerateClick)
