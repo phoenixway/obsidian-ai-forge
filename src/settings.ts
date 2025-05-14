@@ -202,6 +202,10 @@ export interface OllamaPluginSettings extends LoggerSettings {
   // Weather Agent Settings (НОВІ ПОЛЯ!)
   openWeatherMapApiKey: string; // API ключ OpenWeatherMap
   weatherDefaultLocation: string; // Локація за замовчуванням для погоди
+
+    allowVadMicVadModelFromCDN: boolean;
+  vadUseLocalModelIfAvailable: boolean;
+  vadUseLocalWorkletIfAvailable: boolean;
 }
 
 
@@ -282,6 +286,11 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
     logCallerInfo: false,
     logFilePath: "", // Logger сам підставить шлях до папки плагіна
     logFileMaxSizeMB: 5,
+
+  allowVadMicVadModelFromCDN: true,    // За замовчуванням дозволяємо завантаження моделі VAD з CDN
+  vadUseLocalModelIfAvailable: true,   // Але якщо локальна модель є, пріоритет їй
+  vadUseLocalWorkletIfAvailable: true, // Аналогічно для локального ворклету VAD
+
 
 };
 

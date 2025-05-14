@@ -26,6 +26,7 @@
 		"date-fns": "file:latest/locale/uk",
 		"esbuild": "0.17.3",
 		"eslint": "^9.22.0",
+		"fs-extra": "^11.3.0",
 		"jest": "^29.7.0",
 		"jest-environment-jsdom": "^29.7.0",
 		"obsidian": "latest",

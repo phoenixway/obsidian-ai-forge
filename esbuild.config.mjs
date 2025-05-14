@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from 'builtin-modules';
+import fs from 'fs-extra'; 
 
 const banner =
 `/*
@@ -43,6 +44,23 @@ const context = await esbuild.context({
     'process.env.NODE_ENV': prod ? '"production"' : '"development"',
     'global': 'window', // Map global to window for browser environment
   },
+  plugins: [
+    // { // Плагін для копіювання теки assets
+    //   name: 'copy-assets',
+    //   setup(build) {
+    //     build.onEnd(async result => {
+    //       if (result.errors.length === 0) {
+    //         try {
+    //           await fs.copy('assets', 'assets', { overwrite: true });
+    //           console.log('Assets copied successfully!');
+    //         } catch (err) {
+    //           console.error('Error copying assets:', err);
+    //         }
+    //       }
+    //     });
+    //   },
+    // },
+  ]
 });
 
 if (prod) {
