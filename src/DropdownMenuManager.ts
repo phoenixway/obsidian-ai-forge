@@ -32,6 +32,8 @@ const CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 const CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 const CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
+const CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION = "clear-current-chat-option"; // <--- НОВИЙ КЛАС
+
 
 // Унікальні класи для роздільників
 const CSS_HR_AFTER_MODEL = "hr-after-model";
@@ -67,6 +69,7 @@ export class DropdownMenuManager {
     private exportChatOption!: HTMLElement;
     private deleteChatOption!: HTMLElement;
     private toggleViewLocationOption!: HTMLElement;
+    private clearCurrentChatOption!: HTMLElement;
 
     private listeners: { element: HTMLElement | Document; type: string; handler: (e: any) => void }[] = [];
 
@@ -80,103 +83,73 @@ export class DropdownMenuManager {
         
     }
 
-    // --- ОСНОВНИЙ МЕТОД СТВОРЕННЯ МЕНЮ З КЛАСАМИ ДЛЯ РОЗДІЛЬНИКІВ ---
-    public createMenuUI(): void {
+ public createMenuUI(): void {
         
         this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
         this.menuDropdown.style.display = "none";
 
-        // Додаємо контекстні класи до головного контейнера меню
         this.menuDropdown.classList.toggle('is-desktop', this.isDesktop);
         this.menuDropdown.classList.toggle('is-mobile-tablet', !this.isDesktop);
         this.menuDropdown.classList.toggle('is-sidebar-location', this.isSidebarLocation);
         this.menuDropdown.classList.toggle('is-tab-location', !this.isSidebarLocation);
         
-
-        // --- Створюємо ВСІ секції та елементи ЗАВЖДИ ---
-
-        // Model Section
         const modelSection = this.createSubmenuSection("Select Model", "list-collapse", CSS_CLASS_MODEL_LIST_CONTAINER, "model-submenu-section");
         this.modelSubmenuHeader = modelSection.header; this.modelSubmenuContent = modelSection.content;
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_MODEL] }); // <--- Клас HR
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_MODEL] });
 
-        // Role Section
         const roleDropdownSection = this.createSubmenuSection("Select Role", "users", CSS_CLASS_ROLE_LIST_CONTAINER, "role-submenu-section");
         this.roleSubmenuHeader = roleDropdownSection.header; this.roleSubmenuContent = roleDropdownSection.content;
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ROLE] }); // <--- Клас HR
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ROLE] });
 
-        // Chat Section
         const chatDropdownSection = this.createSubmenuSection("Load Chat", "messages-square", CSS_CLASS_CHAT_LIST_CONTAINER, "chat-submenu-section");
         this.chatSubmenuHeader = chatDropdownSection.header; this.chatSubmenuContent = chatDropdownSection.content;
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_CHAT] }); // <--- Клас HR
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_CHAT] });
 
-        // Chat Actions Group
         this.newChatOption = this.createActionItem("plus-circle", "New Chat", CSS_CLASS_NEW_CHAT_OPTION);
         this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
         this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
         this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
-        // Роздільник після ОСТАННЬОГО елемента групи
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] }); // <--- Клас HR
+        
+        // --- ДОДАЄМО НОВУ ОПЦІЮ ТУТ (перед "Clear Messages" або після, на твій розсуд) ---
+        // Можна додати її в групу "Chat Actions" або "Danger Actions"
+        // Для прикладу, додамо перед "Clear Messages", як менш небезпечну, але пов'язану дію
+        this.clearCurrentChatOption = this.createActionItem("eraser", "Clear Current Chat", [CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION]); // <--- НОВА ОПЦІЯ
+        // --- КІНЕЦЬ ДОДАВАННЯ ---
 
-        // Danger Actions Group
-        this.clearChatOption = this.createActionItem("trash", "Clear Messages", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
+
+        this.clearChatOption = this.createActionItem("trash", "Clear All Messages (Legacy)", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]); // Можна перейменувати стару, якщо нова її замінює
         this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [CSS_CLASS_DELETE_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
-         // Роздільник після ОСТАННЬОГО елемента групи
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_DANGER] }); // <--- Клас HR
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_DANGER] });
 
-        // Toggle View Location
         this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
         this.updateToggleViewLocationOption();
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_TOGGLE] }); // <--- Клас HR
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_TOGGLE] });
 
-        // Settings
         this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
-        // Роздільник після Settings не потрібен
-
-        
     }
 
-    // attachEventListeners залишається таким, як у попередній відповіді (додає слухачі до всіх)
     public attachEventListeners(): void {
-        // this.plugin.logger.error(`[DropdownMenuManager] !!! ATTACHING ALL POTENTIAL EVENT LISTENERS (Visibility controlled by CSS) !!!`);
-        // --- Null Checks ---
-        if (!this.modelSubmenuHeader) console.error("Model header missing");
-         if (!this.roleSubmenuHeader) console.error("Role header missing");
-         if (!this.chatSubmenuHeader) console.error("Chat header missing");
-         if (!this.newChatOption) console.error("New Chat missing");
-         if (!this.renameChatOption) console.error("Rename Chat missing");
-         if (!this.cloneChatOption) console.error("Clone Chat missing");
-         if (!this.exportChatOption) console.error("Export Chat missing");
-         if (!this.clearChatOption) console.error("Clear Chat missing");
-         if (!this.deleteChatOption) console.error("Delete Chat missing");
-         if (!this.toggleViewLocationOption) console.error("Toggle View missing");
-         if (!this.settingsOption) console.error("Settings missing");
-         if (!this.menuDropdown) console.error("menuDropdown missing!");
+        // ... (перевірки на null для існуючих елементів) ...
+        if (!this.clearCurrentChatOption) console.error("Clear Current Chat option missing"); // <--- НОВА ПЕРЕВІРКА
 
-        // --- Додаємо слухачі до ВСІХ елементів ---
-        // Model
-        if (this.modelSubmenuHeader) {
-            this.registerListener(this.modelSubmenuHeader, "click", () => { this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"); });
-        }
-        // Role
-        if (this.roleSubmenuHeader) {
-            this.registerListener(this.roleSubmenuHeader, "click", () => { this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles"); });
-        }
-        // Chat
-        if (this.chatSubmenuHeader) {
-            this.registerListener(this.chatSubmenuHeader, "click", () => { if (this.chatSubmenuContent) { this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats"); } });
-        }
-        // Actions
+        if (this.modelSubmenuHeader) this.registerListener(this.modelSubmenuHeader, "click", () => { this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models"); });
+        if (this.roleSubmenuHeader) this.registerListener(this.roleSubmenuHeader, "click", () => { this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles"); });
+        if (this.chatSubmenuHeader) this.registerListener(this.chatSubmenuHeader, "click", () => { if (this.chatSubmenuContent) { this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats"); } });
+        
         if (this.newChatOption) this.registerListener(this.newChatOption, "click", this.view.handleNewChatClick);
         if (this.renameChatOption) this.registerListener(this.renameChatOption, "click", () => this.view.handleRenameChatClick());
         if (this.cloneChatOption) this.registerListener(this.cloneChatOption, "click", this.view.handleCloneChatClick);
         if (this.exportChatOption) this.registerListener(this.exportChatOption, "click", this.view.handleExportChatClick);
-        if (this.clearChatOption) this.registerListener(this.clearChatOption, "click", this.view.handleClearChatClick);
+        
+        // --- ДОДАЄМО СЛУХАЧА ДЛЯ НОВОЇ ОПЦІЇ ---
+        if (this.clearCurrentChatOption) this.registerListener(this.clearCurrentChatOption, "click", this.view.handleClearCurrentChatClickFromMenu); // <--- НОВИЙ СЛУХАЧ
+        // --- КІНЕЦЬ ДОДАВАННЯ ---
+
+        if (this.clearChatOption) this.registerListener(this.clearChatOption, "click", this.view.handleClearChatClick); // Це стара "Clear Messages"
         if (this.deleteChatOption) this.registerListener(this.deleteChatOption, "click", this.view.handleDeleteChatClick);
         if (this.toggleViewLocationOption) this.registerListener(this.toggleViewLocationOption, "click", this.view.handleToggleViewLocationClick);
         if (this.settingsOption) this.registerListener(this.settingsOption, "click", this.view.handleSettingsClick);
-
-        // this.plugin.logger.error("[DropdownMenuManager] !!! FINISHED ATTACHING ALL EVENT LISTENERS !!!");
     }
 
 

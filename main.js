@@ -3125,6 +3125,7 @@ var CSS_CLASS_DELETE_CHAT_OPTION = "delete-chat-option";
 var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
+var CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION = "clear-current-chat-option";
 var CSS_HR_AFTER_MODEL = "hr-after-model";
 var CSS_HR_AFTER_ROLE = "hr-after-role";
 var CSS_HR_AFTER_CHAT = "hr-after-chat";
@@ -3164,7 +3165,6 @@ var DropdownMenuManager = class {
     this.isSidebarLocation = isSidebarLocation;
     this.isDesktop = isDesktop;
   }
-  // --- ОСНОВНИЙ МЕТОД СТВОРЕННЯ МЕНЮ З КЛАСАМИ ДЛЯ РОЗДІЛЬНИКІВ ---
   createMenuUI() {
     this.menuDropdown = this.parentElement.createEl("div", { cls: [CSS_CLASS_MENU_DROPDOWN, "ollama-chat-menu"] });
     this.menuDropdown.style.display = "none";
@@ -3188,8 +3188,9 @@ var DropdownMenuManager = class {
     this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
     this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
     this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
+    this.clearCurrentChatOption = this.createActionItem("eraser", "Clear Current Chat", [CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION]);
     this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
-    this.clearChatOption = this.createActionItem("trash", "Clear Messages", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
+    this.clearChatOption = this.createActionItem("trash", "Clear All Messages (Legacy)", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
     this.deleteChatOption = this.createActionItem("trash-2", "Delete Chat", [CSS_CLASS_DELETE_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
     this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_DANGER] });
     this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION2} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
@@ -3197,49 +3198,23 @@ var DropdownMenuManager = class {
     this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_TOGGLE] });
     this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
   }
-  // attachEventListeners залишається таким, як у попередній відповіді (додає слухачі до всіх)
   attachEventListeners() {
-    if (!this.modelSubmenuHeader)
-      console.error("Model header missing");
-    if (!this.roleSubmenuHeader)
-      console.error("Role header missing");
-    if (!this.chatSubmenuHeader)
-      console.error("Chat header missing");
-    if (!this.newChatOption)
-      console.error("New Chat missing");
-    if (!this.renameChatOption)
-      console.error("Rename Chat missing");
-    if (!this.cloneChatOption)
-      console.error("Clone Chat missing");
-    if (!this.exportChatOption)
-      console.error("Export Chat missing");
-    if (!this.clearChatOption)
-      console.error("Clear Chat missing");
-    if (!this.deleteChatOption)
-      console.error("Delete Chat missing");
-    if (!this.toggleViewLocationOption)
-      console.error("Toggle View missing");
-    if (!this.settingsOption)
-      console.error("Settings missing");
-    if (!this.menuDropdown)
-      console.error("menuDropdown missing!");
-    if (this.modelSubmenuHeader) {
+    if (!this.clearCurrentChatOption)
+      console.error("Clear Current Chat option missing");
+    if (this.modelSubmenuHeader)
       this.registerListener(this.modelSubmenuHeader, "click", () => {
         this.toggleSubmenu(this.modelSubmenuHeader, this.modelSubmenuContent, "models");
       });
-    }
-    if (this.roleSubmenuHeader) {
+    if (this.roleSubmenuHeader)
       this.registerListener(this.roleSubmenuHeader, "click", () => {
         this.toggleSubmenu(this.roleSubmenuHeader, this.roleSubmenuContent, "roles");
       });
-    }
-    if (this.chatSubmenuHeader) {
+    if (this.chatSubmenuHeader)
       this.registerListener(this.chatSubmenuHeader, "click", () => {
         if (this.chatSubmenuContent) {
           this.toggleSubmenu(this.chatSubmenuHeader, this.chatSubmenuContent, "chats");
         }
       });
-    }
     if (this.newChatOption)
       this.registerListener(this.newChatOption, "click", this.view.handleNewChatClick);
     if (this.renameChatOption)
@@ -3248,6 +3223,8 @@ var DropdownMenuManager = class {
       this.registerListener(this.cloneChatOption, "click", this.view.handleCloneChatClick);
     if (this.exportChatOption)
       this.registerListener(this.exportChatOption, "click", this.view.handleExportChatClick);
+    if (this.clearCurrentChatOption)
+      this.registerListener(this.clearCurrentChatOption, "click", this.view.handleClearCurrentChatClickFromMenu);
     if (this.clearChatOption)
       this.registerListener(this.clearChatOption, "click", this.view.handleClearChatClick);
     if (this.deleteChatOption)
@@ -4186,6 +4163,30 @@ This action cannot be undone.`,
       if ((_b = this.sidebarManager) == null ? void 0 : _b.isSectionVisible("roles")) {
         this.sidebarManager.updateRoleList().catch((e) => this.plugin.logger.error("Error updating role panel list:", e));
       } else {
+      }
+    };
+    this.handleClearCurrentChatClickFromMenu = async () => {
+      var _a, _b;
+      (_a = this.dropdownMenuManager) == null ? void 0 : _a.closeMenu();
+      const activeChat = await ((_b = this.plugin.chatManager) == null ? void 0 : _b.getActiveChat());
+      if (activeChat) {
+        const chatName = activeChat.metadata.name;
+        new ConfirmModal(
+          this.app,
+          "Clear Current Chat",
+          `Are you sure you want to clear all messages in the current chat "${chatName}"?
+This action cannot be undone.`,
+          async () => {
+            try {
+              await this.plugin.chatManager.clearActiveChatMessages();
+            } catch (error) {
+              this.plugin.logger.error("Error clearing current chat from menu:", error);
+              new import_obsidian15.Notice(`Failed to clear messages for chat "${chatName}".`);
+            }
+          }
+        ).open();
+      } else {
+        new import_obsidian15.Notice("No active chat to clear.");
       }
     };
     this.handleMessagesCleared = (chatId) => {

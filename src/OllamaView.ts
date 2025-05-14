@@ -960,6 +960,38 @@ export class OllamaView extends ItemView {
     }
   };
 
+public handleClearCurrentChatClickFromMenu = async (): Promise<void> => {
+    this.dropdownMenuManager?.closeMenu(); 
+    
+    const activeChat = await this.plugin.chatManager?.getActiveChat();
+    if (activeChat) {
+      const chatName = activeChat.metadata.name;
+      new ConfirmModal(
+        this.app,
+        "Clear Current Chat", 
+        `Are you sure you want to clear all messages in the current chat "${chatName}"?\nThis action cannot be undone.`,
+        async () => { 
+          try {
+            await this.plugin.chatManager.clearActiveChatMessages();
+            // Якщо clearActiveChatMessages не кинув помилку, вважаємо, що все пройшло добре.
+            // Подія "messages-cleared" має обробити оновлення UI.
+            // Можна додати Notice тут, якщо ChatManager не робить цього після успішного очищення.
+            // Однак, handleMessagesCleared в OllamaView, ймовірно, вже відповідає за UI оновлення.
+            // Щоб уникнути дублювання Notice, перевір логіку в ChatManager.clearActiveChatMessages
+            // та OllamaView.handleMessagesCleared.
+            // Для простоти, поки що припустимо, що ChatManager/події подбають про Notice.
+            // Якщо ні, то: new Notice(`Messages cleared for chat "${chatName}".`);
+          } catch (error) {
+            this.plugin.logger.error("Error clearing current chat from menu:", error);
+            new Notice(`Failed to clear messages for chat "${chatName}".`);
+          }
+        }
+      ).open();
+    } else {
+      new Notice("No active chat to clear.");
+    }
+  }
+
   private async addMessageStandard(message: Message): Promise<void> {
     const isNewDay = !this.lastRenderedMessageDate || !this.isSameDay(this.lastRenderedMessageDate, message.timestamp);
     if (isNewDay) {
