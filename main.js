@@ -8174,15 +8174,23 @@ var Chat = class {
     this.pluginSettings = settings;
     this.filePath = (0, import_obsidian18.normalizePath)(filePath);
     this.metadata = data.metadata;
-    this.messages = data.messages.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
+    this.messages = data.messages.map((msgData) => {
+      const messageWithDate = {
+        ...msgData,
+        timestamp: msgData.timestamp instanceof Date ? msgData.timestamp : new Date(msgData.timestamp)
+      };
+      if (messageWithDate.role === "assistant" && messageWithDate.tool_calls) {
+        logger.debug(`[Chat ${data.metadata.id} CONSTRUCTOR] Restored assistant message with tool_calls:`, JSON.stringify(messageWithDate.tool_calls));
+      }
+      return messageWithDate;
+    });
     this.logger = logger;
     this.debouncedSave = (0, import_obsidian18.debounce)(this._saveToFile.bind(this), 1500, true);
   }
   addMessage(role, content, timestamp = new Date()) {
     const newMessage = { role, content, timestamp };
     this.messages.push(newMessage);
-    this.metadata.lastModified = timestamp.toISOString();
-    this.save();
+    this.recordActivity();
     return newMessage;
   }
   getMessages() {
@@ -8190,8 +8198,7 @@ var Chat = class {
   }
   clearMessages() {
     this.messages = [];
-    this.metadata.lastModified = new Date().toISOString();
-    this.save();
+    this.recordActivity();
   }
   updateMetadata(updates) {
     let changed = false;
@@ -8217,8 +8224,7 @@ var Chat = class {
       changed = true;
     }
     if (changed) {
-      this.metadata.lastModified = new Date().toISOString();
-      this.save();
+      this.recordActivity();
     }
     return changed;
   }
@@ -8229,28 +8235,61 @@ var Chat = class {
   }
   async saveImmediately() {
     if (!this.pluginSettings.saveMessageHistory) {
+      this.logger.debug(`[Chat ${this.metadata.id}] History saving is disabled, skipping saveImmediately.`);
       return true;
     }
     return await this._saveToFile();
   }
   async _saveToFile() {
-    const chatData = {
-      metadata: this.metadata,
-      messages: this.messages.map((m) => ({
-        ...m,
+    this.logger.debug(`[Chat ${this.metadata.id}] _saveToFile called. Messages count: ${this.messages.length}`);
+    const messagesForStorage = this.messages.map((m) => {
+      var _a, _b;
+      const messageForSave = {
+        role: m.role,
+        content: m.content,
         timestamp: m.timestamp.toISOString()
-      }))
+        // Перетворюємо Date на ISO string
+      };
+      if (m.type)
+        messageForSave.type = m.type;
+      if (m.images)
+        messageForSave.images = m.images;
+      if (m.tool_call_id)
+        messageForSave.tool_call_id = m.tool_call_id;
+      if (m.name)
+        messageForSave.name = m.name;
+      if (m.role === "assistant" && m.tool_calls && ((_b = (_a = m.tool_calls) == null ? void 0 : _a.length) != null ? _b : 0) > 0) {
+        messageForSave.tool_calls = m.tool_calls;
+        this.logger.debug(`[Chat ${this.metadata.id} _saveToFile] Assistant message (TS: ${m.timestamp.getTime()}) IS BEING SAVED WITH tool_calls:`, JSON.stringify(messageForSave.tool_calls));
+      }
+      return messageForSave;
+    });
+    const chatDataToSave = {
+      metadata: this.metadata,
+      messages: messagesForStorage
     };
-    const jsonString = JSON.stringify(chatData, null, 2);
+    const assistantMessagesWithToolCallsInFinalData = chatDataToSave.messages.filter(
+      (msg) => msg.role === "assistant" && msg.tool_calls && msg.tool_calls.length > 0
+    );
+    if (assistantMessagesWithToolCallsInFinalData.length > 0) {
+      this.logger.info(
+        `[Chat ${this.metadata.id} _saveToFile] FINAL ChatData for stringify CONTAINS tool_calls for ${assistantMessagesWithToolCallsInFinalData.length} assistant messages. First one's tool_calls:`,
+        JSON.stringify(assistantMessagesWithToolCallsInFinalData[0].tool_calls)
+      );
+    } else {
+      this.logger.debug(`[Chat ${this.metadata.id} _saveToFile] FINAL ChatData for stringify has NO assistant messages with tool_calls.`);
+    }
+    const jsonString = JSON.stringify(chatDataToSave, null, 2);
     try {
       const dirPath = this.filePath.substring(0, this.filePath.lastIndexOf("/"));
       if (dirPath && !await this.adapter.exists(dirPath)) {
         await this.adapter.mkdir(dirPath);
       }
       await this.adapter.write(this.filePath, jsonString);
+      this.logger.debug(`[Chat ${this.metadata.id}] Successfully saved to ${this.filePath}`);
       return true;
     } catch (error) {
-      console.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
+      this.logger.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
       new import_obsidian18.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
       return false;
     }
@@ -8258,20 +8297,40 @@ var Chat = class {
   static async loadFromFile(filePath, adapter, settings, logger) {
     var _a;
     const normPath = (0, import_obsidian18.normalizePath)(filePath);
+    logger.debug(`[Chat LOAD] Attempting to load chat from: ${normPath}`);
     try {
       if (!await adapter.exists(normPath)) {
+        logger.warn(`[Chat LOAD] File not found: ${normPath}`);
         return null;
       }
       const json = await adapter.read(normPath);
-      const data = JSON.parse(json);
-      if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) && Array.isArray(data.messages)) {
-        return new Chat(adapter, settings, data, normPath, logger);
+      const rawDataFromFile = JSON.parse(json);
+      if (((_a = rawDataFromFile == null ? void 0 : rawDataFromFile.metadata) == null ? void 0 : _a.id) && Array.isArray(rawDataFromFile.messages)) {
+        logger.debug(`[Chat LOAD ${rawDataFromFile.metadata.id}] Parsed data. Messages count: ${rawDataFromFile.messages.length}.`);
+        const dataForConstructor = {
+          metadata: rawDataFromFile.metadata,
+          messages: rawDataFromFile.messages.map((msgFromFile) => {
+            const messageForMemory = {
+              ...msgFromFile,
+              // Приведення типу для TypeScript
+              timestamp: new Date(msgFromFile.timestamp)
+              // Конвертуємо рядок в Date
+              // tool_calls та інші поля копіюються через ...
+            };
+            if (messageForMemory.role === "assistant" && messageForMemory.tool_calls) {
+              logger.info(`[Chat LOAD ${rawDataFromFile.metadata.id}] Message (TS from file: ${msgFromFile.timestamp}) from file restored with tool_calls:`, JSON.stringify(messageForMemory.tool_calls));
+            }
+            return messageForMemory;
+          })
+        };
+        return new Chat(adapter, settings, dataForConstructor, normPath, logger);
       } else {
+        logger.error(`[Chat LOAD] Invalid data structure in ${normPath}`, rawDataFromFile);
         new import_obsidian18.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
         return null;
       }
     } catch (e) {
-      console.error(`[Chat] Error loading or parsing file for static load: ${normPath}`, e);
+      logger.error(`[Chat LOAD] Error loading or parsing file: ${normPath}`, e);
       new import_obsidian18.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
       return null;
     }
@@ -8280,19 +8339,23 @@ var Chat = class {
     try {
       if (await this.adapter.exists(this.filePath)) {
         await this.adapter.remove(this.filePath);
+        this.logger.debug(`[Chat ${this.metadata.id}] Deleted file ${this.filePath}`);
         return true;
       }
+      this.logger.debug(`[Chat ${this.metadata.id}] File ${this.filePath} not found for deletion, assuming success.`);
       return true;
     } catch (e) {
-      console.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
+      this.logger.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
       new import_obsidian18.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
+  // Повертає ChatDataInMemory, де timestamp є Date
   toJSON() {
     return {
       metadata: this.metadata,
-      messages: this.messages
+      // Повертаємо копію повідомлень, як вони є в пам'яті (з Date об'єктами)
+      messages: this.messages.map((m) => ({ ...m }))
     };
   }
   recordActivity() {
@@ -8300,6 +8363,7 @@ var Chat = class {
     this.metadata.lastModified = new Date().toISOString();
     const changed = oldLastModified !== this.metadata.lastModified;
     if (changed) {
+      this.logger.trace(`[Chat ${this.metadata.id}] Activity recorded, new lastModified: ${this.metadata.lastModified}`);
       this.save();
     }
     return changed;
@@ -8531,7 +8595,8 @@ var ChatManager = class {
           try {
             const jsonContent = await this.adapter.read(fullPath);
             const data = JSON.parse(jsonContent);
-            if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) === chatId && typeof data.metadata.name === "string" && data.metadata.name.trim() !== "" && typeof data.metadata.lastModified === "string" && !isNaN(new Date(data.metadata.lastModified).getTime()) && typeof data.metadata.createdAt === "string" && !isNaN(new Date(data.metadata.createdAt).getTime())) {
+            if (((_a = data == null ? void 0 : data.metadata) == null ? void 0 : _a.id) === chatId && typeof data.metadata.name === "string" && data.metadata.name.trim() !== "" && typeof data.metadata.lastModified === "string" && // lastModified та createdAt вже є рядками
+            !isNaN(new Date(data.metadata.lastModified).getTime()) && typeof data.metadata.createdAt === "string" && !isNaN(new Date(data.metadata.createdAt).getTime())) {
               const meta = data.metadata;
               newIndex[chatId] = {
                 name: meta.name,
@@ -8541,13 +8606,17 @@ var ChatManager = class {
                 selectedRolePath: meta.selectedRolePath,
                 temperature: meta.temperature,
                 contextWindow: meta.contextWindow
+                // Якщо це поле додано до ChatMetadata
               };
               chatsLoaded++;
             } else {
+              this.logger.warn(`[ChatManager rebuildIndex] Invalid or incomplete chat data in file: ${fullPath}`, data);
             }
           } catch (e) {
             if (e instanceof SyntaxError) {
+              this.logger.error(`[ChatManager rebuildIndex] SyntaxError parsing JSON from ${fullPath}:`, e);
             } else {
+              this.logger.error(`[ChatManager rebuildIndex] Error reading or processing file ${fullPath}:`, e);
             }
           }
         }

@@ -1,7 +1,7 @@
-
+//ChatManager.ts
 import { App, Notice, DataAdapter, normalizePath, TFolder, debounce, TAbstractFile } from "obsidian"; 
 import OllamaPlugin, { ACTIVE_CHAT_ID_KEY, CHAT_INDEX_KEY } from "./main";
-import { Chat, ChatMetadata, ChatData, ChatConstructorSettings } from "./Chat";
+import { Chat, ChatMetadata, ChatDataInMemory, ChatDataForStorage, ChatConstructorSettings } from "./Chat";
 import { MessageRole } from "./OllamaView"; 
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "./Logger";
@@ -247,15 +247,16 @@ export class ChatManager {
 
           const chatId = fileName.slice(0, -5);
 
-          try {
+           try {
             const jsonContent = await this.adapter.read(fullPath);
-            const data = JSON.parse(jsonContent) as Partial<ChatData>;
+            // ВИПРАВЛЕНО: використовуємо ChatDataForStorage, оскільки дані з файлу
+            const data = JSON.parse(jsonContent) as Partial<ChatDataForStorage>; 
 
             if (
               data?.metadata?.id === chatId &&
               typeof data.metadata.name === "string" &&
               data.metadata.name.trim() !== "" &&
-              typeof data.metadata.lastModified === "string" &&
+              typeof data.metadata.lastModified === "string" && // lastModified та createdAt вже є рядками
               !isNaN(new Date(data.metadata.lastModified).getTime()) &&
               typeof data.metadata.createdAt === "string" &&
               !isNaN(new Date(data.metadata.createdAt).getTime())
@@ -268,16 +269,20 @@ export class ChatManager {
                 modelName: meta.modelName,
                 selectedRolePath: meta.selectedRolePath,
                 temperature: meta.temperature,
-                contextWindow: meta.contextWindow,
+                contextWindow: meta.contextWindow, // Якщо це поле додано до ChatMetadata
               };
               chatsLoaded++;
             } else {
+              this.logger.warn(`[ChatManager rebuildIndex] Invalid or incomplete chat data in file: ${fullPath}`, data);
             }
           } catch (e: any) {
             if (e instanceof SyntaxError) {
+              this.logger.error(`[ChatManager rebuildIndex] SyntaxError parsing JSON from ${fullPath}:`, e);
             } else {
+              this.logger.error(`[ChatManager rebuildIndex] Error reading or processing file ${fullPath}:`, e);
             }
           }
+        
         }
 
         for (const subFolderPath of listResult.folders) {
@@ -491,7 +496,7 @@ async createNewChat(name?: string, folderPath?: string): Promise<Chat | null> {
       };
 
       const constructorSettings: ChatConstructorSettings = { ...this.plugin.settings };
-      const chatData: ChatData = { metadata: initialMetadata, messages: [] };
+      const chatData: ChatDataInMemory = { metadata: initialMetadata, messages: [] }; 
 
       const newChat = new Chat(this.adapter, constructorSettings, chatData, filePath, this.logger);
 
@@ -1683,3 +1688,4 @@ async deleteChat(id: string): Promise<boolean> {
   }
   
 } 
+//End of ChatManager.ts
