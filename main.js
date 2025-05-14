@@ -30,7 +30,7 @@ __export(main_exports, {
   default: () => OllamaPlugin2
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian22 = require("obsidian");
+var import_obsidian23 = require("obsidian");
 
 // src/OllamaView.ts
 var import_obsidian15 = require("obsidian");
@@ -9827,6 +9827,7 @@ ${files.join("\n")}`;
 };
 
 // src/examples/WeatherAgent.ts
+var import_obsidian22 = require("obsidian");
 var OPENWEATHERMAP_BASE_URL = "https://api.openweathermap.org/data/2.5";
 var WeatherAgent = class {
   constructor() {
@@ -9838,65 +9839,67 @@ var WeatherAgent = class {
     return [
       {
         name: "getWeatherToday",
-        description: "Gets today's weather forecast for a specified location.",
+        description: "Gets today's weather forecast for a specified location. Uses default location from settings if not provided.",
         parameters: {
           type: "object",
           properties: {
             location: {
+              // Залишаємо параметр, але він може бути не наданий
               type: "string",
-              description: "The city name or location for the weather forecast (e.g., 'Kyiv', 'London')."
+              description: "Optional. The city name or location for the weather forecast (e.g., 'Kyiv', 'London'). If omitted, uses default from settings."
             }
-          },
-          required: ["location"]
+          }
+          // required: ["location"], // ВИДАЛЯЄМО required, щоб AI міг викликати без локації
         }
       },
       {
         name: "getWeatherTomorrow",
-        description: "Gets tomorrow's weather forecast for a specified location.",
+        description: "Gets tomorrow's weather forecast for a specified location. Uses default location from settings if not provided.",
         parameters: {
           type: "object",
           properties: {
             location: {
               type: "string",
-              description: "The city name or location for the weather forecast."
+              description: "Optional. The city name or location for the weather forecast. If omitted, uses default from settings."
             }
-          },
-          required: ["location"]
+          }
+          // required: ["location"], // ВИДАЛЯЄМО required
         }
       },
       {
         name: "getWeather5Days",
-        description: "Gets the weather forecast for the next 5 days for a specified location.",
+        description: "Gets the weather forecast for the next 5 days for a specified location. Uses default location from settings if not provided.",
         parameters: {
           type: "object",
           properties: {
             location: {
               type: "string",
-              description: "The city name or location for the weather forecast."
+              description: "Optional. The city name or location for the weather forecast. If omitted, uses default from settings."
             }
-          },
-          required: ["location"]
+          }
+          // required: ["location"], // ВИДАЛЯЄМО required
         }
       }
     ];
   }
   async executeTool(toolName, args, plugin) {
     const apiKey = plugin.settings.openWeatherMapApiKey;
-    let location = args.location;
+    let locationToUse = args == null ? void 0 : args.location;
     if (!apiKey || apiKey === "YOUR_OPENWEATHERMAP_API_KEY") {
       return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041D\u0435\u043E\u0431\u0445\u0456\u0434\u043D\u043E \u043D\u0430\u0434\u0430\u0442\u0438 API \u043A\u043B\u044E\u0447 OpenWeatherMap \u0443 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445 \u043F\u043B\u0430\u0433\u0456\u043D\u0430 Weather Agent.";
     }
-    if (!location || typeof location !== "string") {
-      location = plugin.settings.weatherDefaultLocation;
-      if (!location) {
-        return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u0410\u0440\u0433\u0443\u043C\u0435\u043D\u0442 'location' \u0432\u0456\u0434\u0441\u0443\u0442\u043D\u0456\u0439 \u0456 \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.";
+    if (!locationToUse || typeof locationToUse !== "string" || locationToUse.trim() === "") {
+      locationToUse = plugin.settings.weatherDefaultLocation;
+      if (!locationToUse || locationToUse.trim() === "") {
+        return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041B\u043E\u043A\u0430\u0446\u0456\u044F \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0456 \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.";
       }
+      new import_obsidian22.Notice(`\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C: ${locationToUse}`);
     }
     try {
       let url = "";
       let result = "";
       let forecastData;
-      url = `${OPENWEATHERMAP_BASE_URL}/forecast?q=${encodeURIComponent(location)}&units=metric&appid=${apiKey}&lang=ua`;
+      url = `${OPENWEATHERMAP_BASE_URL}/forecast?q=${encodeURIComponent(locationToUse)}&units=metric&appid=${apiKey}&lang=ua`;
       const response = await fetch(url);
       if (!response.ok) {
         let errorBody = await response.text();
@@ -9965,10 +9968,14 @@ var WeatherAgent = class {
           for (const item of forecastData) {
             const itemDate = new Date(item.dt * 1e3);
             const dayKey = itemDate.toDateString();
-            if (itemDate.getTime() < now2.getTime() && itemDate.toDateString() === now2.toDateString() && processedDays.has(dayKey)) {
+            if (itemDate.getTime() < now2.getTime() && dayKey === now2.toDateString() && processedDays.has(dayKey)) {
               continue;
             }
             if (!processedDays.has(dayKey)) {
+              if (dayKey === now2.toDateString() && itemDate.getTime() < now2.getTime() && !Object.values(dailyForecasts).some((df) => new Date(df.dt * 1e3).toDateString() === dayKey)) {
+              } else if (dayKey === now2.toDateString() && itemDate.getTime() < now2.getTime()) {
+                continue;
+              }
               dailyForecasts[dayKey] = item;
               processedDays.add(dayKey);
               daysCount++;
@@ -9997,8 +10004,8 @@ var WeatherAgent = class {
       }
       return result;
     } catch (e) {
-      plugin.logger.error(`[WeatherAgent] \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F ${location}:`, e);
-      return `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F "${location}": ${e.message}`;
+      plugin.logger.error(`[WeatherAgent] \u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F ${locationToUse}:`, e);
+      return `\u041F\u043E\u043C\u0438\u043B\u043A\u0430 \u043E\u0442\u0440\u0438\u043C\u0430\u043D\u043D\u044F \u043F\u043E\u0433\u043E\u0434\u0438 \u0434\u043B\u044F "${locationToUse}": ${e.message}`;
     }
   }
 };
@@ -10074,7 +10081,7 @@ var AgentManager = class {
 var SESSIONS_INDEX_KEY = "chatIndex_v2";
 var ACTIVE_CHAT_ID_KEY = "activeChatId_v2";
 var CHAT_INDEX_KEY = "chatIndex_v2";
-var OllamaPlugin2 = class extends import_obsidian22.Plugin {
+var OllamaPlugin2 = class extends import_obsidian23.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -10087,7 +10094,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     this.taskFileNeedsUpdate = false;
     this.taskCheckInterval = null;
     // Debounced функція оновлення для Vault Events
-    this.debouncedIndexAndUIRebuild = (0, import_obsidian22.debounce)(
+    this.debouncedIndexAndUIRebuild = (0, import_obsidian23.debounce)(
       async () => {
         if (this.chatManager) {
           await this.chatManager.rebuildIndexFromFiles();
@@ -10167,7 +10174,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
         if (this.chatManager) {
           await this.chatManager.addMessageToActiveChat("error", `Ollama Connection Error: ${message}`, new Date());
         } else {
-          new import_obsidian22.Notice(`Ollama Connection Error: ${message}`);
+          new import_obsidian23.Notice(`Ollama Connection Error: ${message}`);
         }
       })
     );
@@ -10209,7 +10216,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
         if (this.settings.ragEnabled) {
           await this.ragService.indexDocuments();
         } else {
-          new import_obsidian22.Notice("RAG is disabled in settings.");
+          new import_obsidian23.Notice("RAG is disabled in settings.");
         }
       }
     });
@@ -10226,7 +10233,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       callback: async () => {
         await this.listRoleFiles(true);
         this.emit("roles-updated");
-        new import_obsidian22.Notice("Role list refreshed.");
+        new import_obsidian23.Notice("Role list refreshed.");
       }
     });
     this.addCommand({
@@ -10235,9 +10242,9 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       callback: async () => {
         const newChat = await this.chatManager.createNewChat();
         if (newChat) {
-          new import_obsidian22.Notice(`Created new chat: ${newChat.metadata.name}`);
+          new import_obsidian23.Notice(`Created new chat: ${newChat.metadata.name}`);
         } else {
-          new import_obsidian22.Notice("Failed to create new chat.");
+          new import_obsidian23.Notice("Failed to create new chat.");
         }
       }
     });
@@ -10273,14 +10280,14 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       }
     });
     this.registerVaultListeners();
-    const debouncedRoleClear = (0, import_obsidian22.debounce)(() => {
+    const debouncedRoleClear = (0, import_obsidian23.debounce)(() => {
       var _a, _b;
       this.roleListCache = null;
       (_b = (_a = this.promptService) == null ? void 0 : _a.clearRoleCache) == null ? void 0 : _b.call(_a);
       this.emit("roles-updated");
     }, 1500, true);
     const handleModifyEvent = (file) => {
-      if (file instanceof import_obsidian22.TFile) {
+      if (file instanceof import_obsidian23.TFile) {
         this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
         this.handleTaskFileModify(file);
       }
@@ -10331,15 +10338,15 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     const handleFileCreateDelete = (file) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
-      const historyPath = (0, import_obsidian22.normalizePath)(this.settings.chatHistoryFolderPath);
-      if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian22.TFolder)) {
+      const historyPath = (0, import_obsidian23.normalizePath)(this.settings.chatHistoryFolderPath);
+      if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian23.TFolder)) {
         this.debouncedIndexAndUIRebuild();
       }
     };
     const handleFileRename = (file, oldPath) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
-      const historyPath = (0, import_obsidian22.normalizePath)(this.settings.chatHistoryFolderPath);
+      const historyPath = (0, import_obsidian23.normalizePath)(this.settings.chatHistoryFolderPath);
       const isInHistoryNew = file.path.startsWith(historyPath + "/");
       const isInHistoryOld = oldPath.startsWith(historyPath + "/");
       if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
@@ -10355,7 +10362,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     var _a, _b, _c;
     const folderPath = (_a = this.settings.ragFolderPath) == null ? void 0 : _a.trim();
     const fileName = (_b = this.settings.dailyTaskFileName) == null ? void 0 : _b.trim();
-    const newPath = folderPath && fileName ? (0, import_obsidian22.normalizePath)(`${folderPath}/${fileName}`) : null;
+    const newPath = folderPath && fileName ? (0, import_obsidian23.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
       this.dailyTaskFilePath = newPath;
       this.taskFileContentCache = null;
@@ -10454,9 +10461,9 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
   // --- Кінець логіки файлу завдань ---
   // Обробник змін для ролей та RAG
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear, isDeletion = false) {
-    const normPath = (0, import_obsidian22.normalizePath)(changedPath);
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian22.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian22.normalizePath)(`${this.manifest.dir}/roles`) : null;
+    const normPath = (0, import_obsidian23.normalizePath)(changedPath);
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian23.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian23.normalizePath)(`${this.manifest.dir}/roles`) : null;
     let isRoleFile = false;
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/")) {
@@ -10475,7 +10482,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     if (isRoleFile) {
       debouncedRoleClear();
     }
-    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian22.normalizePath)(this.settings.ragFolderPath) : null;
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian23.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && (normPath.startsWith(ragFolderPath + "/") || normPath === ragFolderPath)) {
       if (normPath !== this.dailyTaskFilePath) {
         this.debounceIndexUpdate();
@@ -10545,11 +10552,11 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
         try {
           await leaf.setViewState({ type: viewType, active: true });
         } catch (e) {
-          new import_obsidian22.Notice("Error opening AI Forge view.");
+          new import_obsidian23.Notice("Error opening AI Forge view.");
           return;
         }
       } else {
-        new import_obsidian22.Notice("Could not open AI Forge view.");
+        new import_obsidian23.Notice("Could not open AI Forge view.");
         return;
       }
     }
@@ -10594,19 +10601,19 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
   }
   async clearMessageHistoryWithConfirmation() {
     if (!this.chatManager) {
-      new import_obsidian22.Notice("Error: Chat Manager not ready.");
+      new import_obsidian23.Notice("Error: Chat Manager not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (activeChat && activeChat.messages.length > 0) {
       new ConfirmModal(this.app, "Clear History", `Clear messages in "${activeChat.metadata.name}"?`, async () => {
         await this.chatManager.clearActiveChatMessages();
-        new import_obsidian22.Notice(`History cleared for "${activeChat.metadata.name}".`);
+        new import_obsidian23.Notice(`History cleared for "${activeChat.metadata.name}".`);
       }).open();
     } else if (activeChat) {
-      new import_obsidian22.Notice("Chat history is already empty.");
+      new import_obsidian23.Notice("Chat history is already empty.");
     } else {
-      new import_obsidian22.Notice("No active chat to clear.");
+      new import_obsidian23.Notice("No active chat to clear.");
     }
   }
   async listRoleFiles(forceRefresh = false) {
@@ -10621,7 +10628,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     const builtInRoleFileName = "Productivity_Assistant.md";
     let builtInRolePath = null;
     if (pluginDir) {
-      builtInRolePath = (0, import_obsidian22.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+      builtInRolePath = (0, import_obsidian23.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
       try {
         if (await adapter.exists(builtInRolePath)) {
           const stat = await adapter.stat(builtInRolePath);
@@ -10633,7 +10640,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       } catch (error) {
       }
     }
-    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian22.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian23.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
       try {
         const folderExists = await adapter.exists(userRolesFolderPath);
@@ -10665,7 +10672,7 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
       return { stdout: "", stderr: "Empty command.", error: new Error("Empty command.") };
     }
     if (typeof process === "undefined" || !((_a = process == null ? void 0 : process.versions) == null ? void 0 : _a.node)) {
-      new import_obsidian22.Notice("Cannot execute system command: Node.js environment is required.");
+      new import_obsidian23.Notice("Cannot execute system command: Node.js environment is required.");
       return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required.") };
     }
     return new Promise((resolve) => {
@@ -10678,16 +10685,16 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
     });
   }
   async showChatSwitcher() {
-    new import_obsidian22.Notice("Switch Chat UI not implemented yet.");
+    new import_obsidian23.Notice("Switch Chat UI not implemented yet.");
   }
   async renameActiveChat() {
     if (!this.chatManager) {
-      new import_obsidian22.Notice("Error: Chat manager is not ready.");
+      new import_obsidian23.Notice("Error: Chat manager is not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      new import_obsidian22.Notice("No active chat to rename.");
+      new import_obsidian23.Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
@@ -10699,20 +10706,20 @@ var OllamaPlugin2 = class extends import_obsidian22.Plugin {
         if (!success) {
         }
       } else if (newName === null || trimmedName === "") {
-        new import_obsidian22.Notice("Rename cancelled or invalid name entered.");
+        new import_obsidian23.Notice("Rename cancelled or invalid name entered.");
       } else {
-        new import_obsidian22.Notice("Name unchanged.");
+        new import_obsidian23.Notice("Name unchanged.");
       }
     }).open();
   }
   async deleteActiveChatWithConfirmation() {
     if (!this.chatManager) {
-      new import_obsidian22.Notice("Error: Chat manager is not ready.");
+      new import_obsidian23.Notice("Error: Chat manager is not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      new import_obsidian22.Notice("No active chat to delete.");
+      new import_obsidian23.Notice("No active chat to delete.");
       return;
     }
     const chatName = activeChat.metadata.name;
