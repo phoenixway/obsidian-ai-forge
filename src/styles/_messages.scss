@@ -245,7 +245,6 @@ $avatar-icon-size-factor: 0.65;
 .message.user-message {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
-   border: 1px solid red; 
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
   align-items: flex-end; // Нове! Для повідомлень користувача все всередині вирівнюється праворуч
 
@@ -259,6 +258,8 @@ $avatar-icon-size-factor: 0.65;
 .message.ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
+     border: 1px solid red; 
+
   // align-items: flex-start; // Це вже за замовчуванням для .message
   &:hover {
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
