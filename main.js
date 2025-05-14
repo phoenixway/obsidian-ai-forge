@@ -10225,7 +10225,7 @@ var AgentManager = class {
     const weatherAgent = new WeatherAgent();
     this.registerAgent(weatherAgent);
     const timeAgent = new TimeAgent();
-    this.registerAgent(weatherAgent);
+    this.registerAgent(timeAgent);
   }
   registerAgent(agent) {
     if (this.agents.has(agent.id)) {

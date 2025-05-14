@@ -21,7 +21,7 @@ export class AgentManager {
     const weatherAgent = new WeatherAgent();
     this.registerAgent(weatherAgent);
     const timeAgent = new TimeAgent(); // Приклад агента
-    this.registerAgent(weatherAgent);
+    this.registerAgent(timeAgent);
     // тут можна додати інших агентів
   }
 
