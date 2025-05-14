@@ -40,6 +40,23 @@
 
     .message-wrapper {
       order: 1;
+      // Правила для заокруглення кутів користувача залишаються тут
+      .message:not(:last-child) {
+        border-bottom-right-radius: 5px;
+      }
+      .message:last-child {
+        border-bottom-right-radius: 18px;
+      }
+      .message:not(:first-child) {
+        border-top-right-radius: 5px;
+      }
+      .message:first-child {
+        border-top-right-radius: 18px;
+      }
+      .message { // For user messages, left corners are always fully rounded
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+      }
     }
   }
 
@@ -53,29 +70,42 @@
       // flex-shrink: 0;
     }
 
-    .message-wrapper {
+.message-wrapper {
       order: 2;
-      align-items: flex-start; // Додано для консистентності, хоча це і так default
+      align-items: flex-start;
 
-      // !!! ВИПРАВЛЕНА ЛОГІКА ЗАОКРУГЛЕННЯ ДЛЯ AI ПОВІДОМЛЕНЬ !!!
-      .message:not(:last-child) { // Для всіх, крім останнього
-        border-bottom-left-radius: 5px; // Гострий кут знизу біля аватара
-      }
-      .message:last-child { // Тільки для останнього (або єдиного)
-        border-bottom-left-radius: 18px; // Повний радіус знизу біля аватара
-      }
-      .message:not(:first-child) { // Для всіх, крім першого
-        border-top-left-radius: 5px;    // Гострий кут зверху біля аватара
-      }
-      .message:first-child { // Тільки для першого (або єдиного)
-        border-top-left-radius: 18px;   // Повний радіус зверху біля аватара
-      }
-      // Праві кути AI повідомлень завжди повністю заокруглені
+      // !!! НОВИЙ ПІДХІД ДО ЗАОКРУГЛЕННЯ ДЛЯ AI ПОВІДОМЛЕНЬ !!!
       .message {
+        // Спочатку задаємо всім кутам повний радіус
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
         border-top-right-radius: 18px;
         border-bottom-right-radius: 18px;
       }
+
+      // Якщо це ПЕРШЕ повідомлення, АЛЕ НЕ ОСТАННЄ (тобто є ще повідомлення після нього)
+      .message:first-child:not(:last-child) {
+        border-bottom-left-radius: 5px; // Гострий нижній лівий кут
+        // Верхній лівий залишається 18px, праві теж 18px
+      }
+
+      // Якщо це ОСТАННЄ повідомлення, АЛЕ НЕ ПЕРШЕ (тобто є повідомлення до нього)
+      .message:last-child:not(:first-child) {
+        border-top-left-radius: 5px;    // Гострий верхній лівий кут
+        // Нижній лівий залишається 18px, праві теж 18px
+      }
+
+      // Якщо це ПРОМІЖНЕ повідомлення (не перше І не останнє)
+      .message:not(:first-child):not(:last-child) {
+        border-top-left-radius: 5px;    // Гострий верхній лівий
+        border-bottom-left-radius: 5px; // Гострий нижній лівий
+        // Праві залишаються 18px
+      }
+      
+      // Якщо повідомлення ЄДИНЕ (і перше, і останнє), то всі кути залишаться 18px (задано вище)
+      // і жодне з цих специфічних правил не спрацює.
     }
+  
   }
 }
 
