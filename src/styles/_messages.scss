@@ -41,7 +41,7 @@
       // flex-shrink: 0;
     }
 .message-wrapper {
-      margin-top: 5px;;
+      margin-top: 10px;
 
       order: 1;
       .message:not(:last-child) {
@@ -77,6 +77,7 @@
 
 .message-wrapper {
       order: 2;
+      margin-top: 10px;
       align-items: flex-start;
 
       // Застосовуємо стилі до .message всередині AI групи
