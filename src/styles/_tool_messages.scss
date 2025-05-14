@@ -1,4 +1,5 @@
 // Змінні для кольорів (адаптуйте до вашої теми або використовуйте CSS змінні Obsidian)
+// Змінні для кольорів (адаптуйте до вашої теми або використовуйте CSS змінні Obsidian)
 $tool-message-background: var(--background-secondary-alt, #2a2a2f); // Трохи світліший фон
 $tool-message-border-color: var(--background-modifier-border, #444);
 $tool-message-text-color: var(--text-muted, #999da5);
@@ -15,7 +16,11 @@ $tool-code-background: var(--background-primary, #202020);
 
   // Якщо аватар зліва (як у асистента)
   .avatar { // Припускаючи, що ваш RendererUtils.renderAvatar створює div з класом 'avatar'
-    margin-right: 8px;
+    // margin-right: 8px; // Старий відступ
+    margin-right: calc(var(--chat-spacing-unit) * 2); // Новий уніфікований відступ
+    // Розмір аватара береться з var(--chat-avatar-size), тому його не додаємо сюди,
+    // на відміну від .message-wrapper, де margin включає розмір аватара, бо сам аватар поза wrapper.
+    // Тут аватар і tool-message є сусідами.
   }
 }
 
@@ -32,6 +37,7 @@ $tool-code-background: var(--background-primary, #202020);
   white-space: normal; // Дозволити перенос тексту
   overflow-wrap: break-word; // For any general text directly in .tool-message
   word-break: break-word;
+  // margin-left: 0; // Переконаємось, що немає додаткового лівого відступу на самій бульбашці
 
 
   .tool-result-header {
@@ -39,7 +45,7 @@ $tool-code-background: var(--background-primary, #202020);
     align-items: center;
     font-weight: bold;
     color: $tool-message-header-color;
-    margin-bottom: 6px; // Змінив з 60px, це виглядало як помилка
+    margin-bottom: 6px;
     font-size: var(--font-ui-small, 0.9em);
     white-space: normal; // Дозволити перенос тексту в заголовку
     overflow-wrap: break-word; // For the header text
