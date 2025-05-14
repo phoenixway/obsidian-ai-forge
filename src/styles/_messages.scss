@@ -55,23 +55,7 @@
 
     .message-wrapper {
       order: 2;
-      .message:not(:last-child) {
-        border-bottom-left-radius: 5px;
-      } // Гостріший кут для проміжних повідомлень
-      .message:last-child {
-        border-bottom-left-radius: 18px;
-      } // Стандартний радіус для останнього
-      .message:not(:first-child) {
-        border-top-left-radius: 5px;
-      } // Гостріший кут для проміжних повідомлень
-      .message:first-child {
-        border-top-left-radius: 18px;
-      } // Стандартний радіус для першого
-      // For AI messages, right corners are always fully rounded
-      .message {
-        border-top-right-radius: 18px;
-        border-bottom-right-radius: 18px;
-      }
+      // !!! ПРАВИЛА ДЛЯ ЗАОКРУГЛЕННЯ КУТІВ БУДУТЬ ВИЗНАЧЕНІ НИЖЧЕ, ПОЗА ЦИМ БЛОКОМ !!!
     }
   }
 }
@@ -171,24 +155,27 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
   .message:first-child {
     border-top-right-radius: 18px;
   }
-  .message {
+  .message { // For user messages, left corners are always fully rounded
     border-top-left-radius: 18px;
     border-bottom-left-radius: 18px;
   }
 }
+
+// !!! ВИПРАВЛЕНО ТУТ: Правила винесені на правильний рівень вкладеності !!!
 .ollama-message-group .message-wrapper {
   .message:not(:last-child) {
     border-bottom-left-radius: 5px;
-  }
+  } // Гостріший кут для проміжних повідомлень
   .message:last-child {
     border-bottom-left-radius: 18px;
-  }
+  } // Стандартний радіус для останнього
   .message:not(:first-child) {
     border-top-left-radius: 5px;
-  }
+  } // Гостріший кут для проміжних повідомлень
   .message:first-child {
     border-top-left-radius: 18px;
-  }
+  } // Стандартний радіус для першого
+  // For AI messages, right corners are always fully rounded
   .message {
     border-top-right-radius: 18px;
     border-bottom-right-radius: 18px;
