@@ -544,6 +544,7 @@ button.summarize-button {
   overflow: hidden;
   background-color: var(--background-modifier-hover);
   align-self: flex-end;
+   margin-top: 5px;
 
   // Аватар-зображення
   &.avatar-image,
