@@ -34,7 +34,8 @@
 
     .message-group-avatar {
       order: 2; // Аватар візуально буде другим (справа)
-      margin-left: calc(var(--chat-spacing-unit) * 2); // Відступ між бульбашкою (зліва) та аватаром (справа)
+      // margin-left: calc(var(--chat-spacing-unit) * 2); // Відступ між бульбашкою (зліва) та аватаром (справа)
+      margin-right: 5px; // Не потрібен, бо аватар тепер справа
       // flex-shrink: 0; // Щоб аватар не стискався
     }
 
