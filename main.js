@@ -6230,7 +6230,6 @@ Summary:`;
     const messageForLog = data == null ? void 0 : data.message;
     const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
     const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
-    const hmaEntryId = Date.now();
     try {
       if (!data || !data.message) {
         if (messageTimestampForLog)
@@ -6250,6 +6249,18 @@ Summary:`;
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
+      if (message.role === "assistant" && message.tool_calls && message.tool_calls.length > 0 && this.currentAbortController) {
+        this.plugin.logger.debug("[handleMessageAdded] Skipping render for assistant message with tool_calls.", message);
+        if (messageTimestampForLog)
+          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
+          if (this.activePlaceholder.groupEl.isConnected) {
+            this.activePlaceholder.groupEl.remove();
+          }
+          this.activePlaceholder = null;
+        }
+        return;
+      }
       const existingRenderedMessage = this.chatContainer.querySelector(
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
@@ -6266,8 +6277,6 @@ Summary:`;
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
-      }
-      if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
       }
       if (!alreadyInLogicCache) {
         this.currentMessages.push(message);
@@ -6349,8 +6358,9 @@ Summary:`;
         content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
         timestamp: new Date()
       });
+      this.plugin.logger.error("Outer error in handleMessageAdded", outerError, { messageData: data });
     } finally {
-      if (messageTimestampForLog) {
+      if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       }
     }

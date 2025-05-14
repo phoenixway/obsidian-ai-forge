@@ -2909,11 +2909,12 @@ export class OllamaView extends ItemView {
     this.saveWidthDebounced();
   };
 
-  private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
+  
+   private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
     const messageForLog = data?.message;
     const messageTimestampForLog = messageForLog?.timestamp?.getTime();
-    const messageRoleForLog = messageForLog?.role as MessageRole;
-    const hmaEntryId = Date.now();
+    const messageRoleForLog = messageForLog?.role as MessageRole; // Додано as MessageRole для типу
+    // const hmaEntryId = Date.now(); // Не використовується, можна прибрати
 
     try {
       if (!data || !data.message) {
@@ -2934,6 +2935,38 @@ export class OllamaView extends ItemView {
         if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
+      
+      // ---- НОВА ЛОГІКА ----
+      // Якщо це повідомлення асистента, яке містить tool_calls,
+      // і ми знаходимося в активному циклі обробки (currentAbortController існує),
+      // то ми НЕ рендеримо це проміжне повідомлення "Using tool...".
+      // Ми очікуємо, що далі будуть повідомлення "tool" з результатами, а потім фінальна відповідь асистента.
+      if (
+        message.role === "assistant" &&
+        (message as AssistantMessage).tool_calls &&
+        (message as AssistantMessage).tool_calls!.length > 0 &&
+        this.currentAbortController // Перевірка, що ми в активному циклі sendMessage або regenerate
+      ) {
+        // Це повідомлення асистента з наміром викликати інструменти.
+        // Ми вже додали його в історію через ChatManager.
+        // Не будемо його візуально рендерити тут, щоб уникнути "Using tool..."
+        this.plugin.logger.debug("[handleMessageAdded] Skipping render for assistant message with tool_calls.", message);
+        
+        // Важливо! Потрібно все одно викликати HMA резолвер, оскільки ChatManager на нього чекає.
+        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        
+        // Також, якщо це повідомлення оновлювало плейсхолдер, його треба прибрати,
+        // бо ми не хочемо бачити цей "намір" як фінальне повідомлення.
+        if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
+            if (this.activePlaceholder.groupEl.isConnected) {
+                this.activePlaceholder.groupEl.remove();
+            }
+            this.activePlaceholder = null;
+        }
+        return; 
+      }
+      // ---- КІНЕЦЬ НОВОЇ ЛОГІКИ ----
+
 
       const existingRenderedMessage = this.chatContainer.querySelector(
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
@@ -2954,9 +2987,7 @@ export class OllamaView extends ItemView {
         if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
-      if (alreadyInLogicCache && isPotentiallyAssistantForPlaceholder) {
-      }
-
+      
       if (!alreadyInLogicCache) {
         this.currentMessages.push(message);
       }
@@ -2969,6 +3000,9 @@ export class OllamaView extends ItemView {
           placeholderToUpdate.contentEl &&
           placeholderToUpdate.messageWrapper
         ) {
+          // ... (логіка оновлення плейсхолдера до фінального повідомлення асистента БЕЗ tool_calls) ...
+          // Ця частина залишається для випадку, коли асистент генерує фінальний текст БЕЗ інструментів
+          // або коли ми рендеримо фінальну відповідь ПІСЛЯ інструментів.
           placeholderToUpdate.groupEl.classList.remove("placeholder");
           placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
           placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
@@ -2980,7 +3014,7 @@ export class OllamaView extends ItemView {
           if (!messageDomElement) {
             if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
             this.activePlaceholder = null;
-            await this.addMessageStandard(message);
+            await this.addMessageStandard(message); // Повертаємося до стандартного рендерингу, якщо щось пішло не так
           } else {
             placeholderToUpdate.contentEl.classList.remove("streaming-text");
             const dotsEl = placeholderToUpdate.contentEl.querySelector(`.${CSS_CLASSES.THINKING_DOTS}`);
@@ -3037,11 +3071,11 @@ export class OllamaView extends ItemView {
               });
             }
           }
-        } else {
+        } else { // Плейсхолдер або його елементи не існують/не підключені
           this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
-      } else {
+      } else { // Не оновлення плейсхолдера, а стандартне додавання
         await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
@@ -3050,9 +3084,14 @@ export class OllamaView extends ItemView {
         content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
         timestamp: new Date(),
       });
+      this.plugin.logger.error("Outer error in handleMessageAdded", outerError, { messageData: data });
     } finally {
-      if (messageTimestampForLog) {
-        this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+      // HMA резолвер тепер викликається раніше, якщо умова пропуску рендерингу спрацьовує,
+      // або в кінці логіки обробки плейсхолдера/стандартного додавання.
+      // Переконайся, що він викликається рівно один раз для кожного повідомлення.
+      // Якщо ми дійшли сюди і він ще не викликаний:
+      if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
+         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       }
     }
   }
