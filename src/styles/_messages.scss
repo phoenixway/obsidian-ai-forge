@@ -22,60 +22,68 @@
 
 
 .message-group {
-  display: flex;
+  display: flex; // Це вже є, добре
   width: 100%;
   margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
   position: relative;
   box-sizing: border-box;
-  // align-items: flex-end; // Вирівнюємо всі дочірні елементи (аватар та wrapper) по низу групи
+  align-items: flex-end; // Вирівнюємо аватари та обгортки по низу групи
 
   &.user-message-group {
-    flex-direction: row-reverse; // <--- ОСНОВНА ЗМІНА: Аватар буде першим справа
-    // justify-content: flex-end; // Це вирівняє всю групу до правого краю контейнера
+    justify-content: flex-end; // <--- ВАЖЛИВО: Притискає весь вміст групи до правого краю
 
     .message-group-avatar {
-      // order не потрібен, бо flex-direction робить свою справу
-      // Додаємо відступ зліва від аватара, щоб відокремити його від бульбашки
-      margin-left: calc(var(--chat-spacing-unit) * 2);
-      margin-right: 0; // Скидаємо, якщо був
-      align-self: flex-end; // Переконуємось, що аватар внизу, якщо повідомлення довге
+      order: 2; // Аватар візуально буде другим (справа)
+      margin-left: calc(var(--chat-spacing-unit) * 2); // Відступ між бульбашкою (зліва) та аватаром (справа)
+      // flex-shrink: 0; // Щоб аватар не стискався
     }
 
     .message-wrapper {
-      // order не потрібен
-      align-items: flex-end; // Бульбашки всередині wrapper притиснуті вправо
-      margin-left: auto;    // Залишаємо, щоб wrapper займав доступний простір зліва
-      margin-right: 0;       // Скидаємо, бо відступ тепер зліва від аватара
+      order: 1; // Обгортка повідомлення візуально буде першою (зліва)
+      // margin-right: 0; // Не потрібен, бо аватар тепер справа
+      // margin-left: auto; // Не потрібен, якщо justify-content: flex-end на батьку
+      // max-width: calc(100% - var(--chat-avatar-size) - (var(--chat-spacing-unit) * 2) - 1px); // Опціонально, щоб не наїжджав
     }
   }
 
-  &.ollama-message-group { // Для AI та інструментів (де аватар зліва)
-    flex-direction: row; // Явно вказуємо напрямок (хоча це і значення за замовчуванням)
-    // justify-content: flex-start;
+  &.ollama-message-group { // Для AI та інструментів
+    justify-content: flex-start; // Притискає вміст групи до лівого краю (це і так за замовчуванням для flex)
 
     .message-group-avatar {
-      margin-right: calc(var(--chat-spacing-unit) * 2); // Відступ справа від аватара
-      margin-left: 0; // Скидаємо
-      align-self: flex-end;
+      order: 1; // Аватар візуально перший (зліва)
+      margin-right: calc(var(--chat-spacing-unit) * 2); // Відступ між аватаром (зліва) та бульбашкою (справа)
+      // flex-shrink: 0;
     }
 
     .message-wrapper {
-      align-items: flex-start; // Бульбашки всередині wrapper притиснуті вліво
-      margin-right: auto;   // Залишаємо, щоб wrapper займав доступний простір справа
-      margin-left: 0;       // Скидаємо, бо відступ тепер справа від аватара
+      order: 2; // Обгортка повідомлення візуально друга (справа)
+      // margin-left: 0;
+      // margin-right: auto;
+      // max-width: calc(100% - var(--chat-avatar-size) - (var(--chat-spacing-unit) * 2) - 1px); // Опціонально
     }
   }
 }
-// Wrapper for one or more message bubbles + their action buttons below it
+
+// Стилі для .message-wrapper (загальні, якщо ще не визначені так)
 .message-wrapper {
    display: flex;
    flex-direction: column;
-   max-width: var(--chat-message-max-width); // Apply the fixed PX max-width here
-   gap: calc(var(--chat-spacing-unit) * 0.75); // Vertical gap between message bubble and action buttons below it
-   // align-items (flex-start/flex-end) are set by the parent group rule
-
-
+   // max-width встановлюється окремо var(--chat-message-max-width);
+   // gap вже є
+   // align-items (flex-start/flex-end) тепер мають бути тут, а не в .message-group
+   // так як .message-wrapper тепер основний блок для бульбашок.
+   // Однак, якщо вирівнювання бульбашок (ліво/право) всередині wrapper залежить від user/ollama,
+   // то це краще залишити в специфічних правилах user-message-group/ollama-message-group.
 }
+
+// Для вирівнювання самих бульбашок всередині message-wrapper
+.user-message-group .message-wrapper {
+  align-items: flex-end; // Бульбашки всередині user wrapper - справа
+}
+.ollama-message-group .message-wrapper {
+  align-items: flex-start; // Бульбашки всередині ollama wrapper - зліва
+}
+
 
 
 // Avatar Styles
