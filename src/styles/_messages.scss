@@ -40,11 +40,11 @@
       // margin-left: calc(var(--chat-spacing-unit) * 2);
       // margin-right: 0;
 
-      // margin-top: 20px;
+      margin-top: 20px;
       // flex-shrink: 0;
     }
 .message-wrapper {
-      margin-top: 20px;
+      margin-top: 20px;//не помогає
 
       order: 1;
       .message:not(:last-child) {
