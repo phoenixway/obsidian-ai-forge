@@ -3429,85 +3429,123 @@ export class OllamaView extends ItemView {
         }
         return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
     }
-    _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId) {
-        return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
-            const currentViewInstance = this;
-            const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
-            const assistantHmaPromise = new Promise((resolve, reject) => {
-                currentViewInstance.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
-                setTimeout(() => {
-                    if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(assistantMsgTsMs)) {
-                        currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(assistantMsgTsMs, `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs})`);
-                    }
-                }, 10000);
-            });
-            yield currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
-            yield assistantHmaPromise;
-            if (((_a = currentViewInstance.activePlaceholder) === null || _a === void 0 ? void 0 : _a.timestamp) === assistantMsgTsMs) {
-                currentViewInstance.activePlaceholder = null;
-            }
-            for (const call of toolsToExecute) {
-                if ((_b = currentViewInstance.currentAbortController) === null || _b === void 0 ? void 0 : _b.signal.aborted)
-                    throw new Error("aborted by user");
-                if (call.type === "function") {
-                    const toolName = call.function.name;
-                    let toolArgs = {};
-                    try {
-                        toolArgs = JSON.parse(call.function.arguments || "{}");
-                    }
-                    catch (e) {
-                        const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
-                        const errorToolTimestamp = new Date();
-                        const errorToolMsg = {
-                            role: "tool",
-                            tool_call_id: call.id,
-                            name: toolName,
-                            content: errorContent,
-                            timestamp: errorToolTimestamp,
-                        };
-                        const toolErrorHmaPromise = new Promise((resolve, reject) => {
-                            currentViewInstance.plugin.chatManager.registerHMAResolver(errorToolMsg.timestamp.getTime(), resolve, reject);
-                            setTimeout(() => {
-                                if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(errorToolMsg.timestamp.getTime())) {
-                                    currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(errorToolMsg.timestamp.getTime(), "HMA timeout for tool error msg");
-                                }
-                            }, 10000);
-                        });
-                        yield currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
-                        try {
-                            yield toolErrorHmaPromise;
-                        }
-                        catch (e_hma) {
-                        }
-                        continue;
-                    }
-                    const execResult = yield currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
-                    const toolResultContent = execResult.success
-                        ? execResult.result
-                        : `Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}`;
-                    const toolResponseTimestamp = new Date();
-                    const toolResponseMsg = {
-                        role: "tool",
-                        tool_call_id: call.id,
-                        name: toolName,
-                        content: toolResultContent,
-                        timestamp: toolResponseTimestamp,
-                    };
-                    const toolResultHmaPromise = new Promise((resolve, reject) => {
-                        currentViewInstance.plugin.chatManager.registerHMAResolver(toolResponseMsg.timestamp.getTime(), resolve, reject);
-                        setTimeout(() => {
-                            if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(toolResponseMsg.timestamp.getTime())) {
-                                currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(toolResponseMsg.timestamp.getTime(), `HMA Timeout for tool result: ${toolName}`);
-                            }
-                        }, 10000);
-                    });
-                    yield currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
-                    yield toolResultHmaPromise;
-                }
-            }
-        });
+    
+     // src/OllamaView.ts
+
+// ... (інші імпорти та код)
+
+  private async _executeAndRenderToolCycle(
+    toolsToExecute: ToolCall[],
+    assistantMessageIntent: AssistantMessage, // Це повідомлення з tool_calls
+    requestTimestampId: number
+  ): Promise<void> {
+    const currentViewInstance = this;
+    const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
+
+    // 1. Додаємо повідомлення асистента з tool_calls до історії, АЛЕ НЕ РЕНДЕРИМО ЙОГО ЯВНО
+    //    Метод addMessageToActiveChatPayload сам викличе HMA резолвер,
+    //    але оскільки ми не створюємо для нього активний плейсхолдер,
+    //    його стандартний рендеринг через handleMessageAdded не відбудеться так, як для звичайних повідомлень.
+    //    АБО, якщо ми хочемо повністю приховати його з UI, але зберегти в історії,
+    //    то ChatManager має це враховувати.
+    //    Поки що припустимо, що ChatManager.addMessageToActiveChatPayload додасть його
+    //    до логічного списку повідомлень, а тут ми контролюємо UI.
+
+    //    Якщо ми не хочемо бачити "Using tool..." взагалі, то цей блок не потрібен для UI.
+    //    Але для історії чату він важливий.
+    //    ChatManager подбає про збереження. Ми тут дбаємо про НЕ-відображення.
+    
+    // Видаляємо явний рендеринг цього повідомлення з UI (плейсхолдер для нього не створювався на цьому етапі)
+    // Якщо activePlaceholder був для попереднього текстового виводу, він вже був оброблений.
+    // Нам потрібно переконатися, що після цього циклу ми не намагаємося відрендерити `assistantMessageIntent` як фінальний текст.
+
+    if (currentViewInstance.activePlaceholder?.timestamp === assistantMsgTsMs) {
+        // Якщо плейсхолдер був створений саме для цього повідомлення з tool_calls
+        // (що малоймовірно, бо плейсхолдер зазвичай для текстового стріму),
+        // то його треба прибрати, бо ми не хочемо його показувати.
+        if (currentViewInstance.activePlaceholder.groupEl.isConnected) {
+            currentViewInstance.activePlaceholder.groupEl.remove();
+        }
+        currentViewInstance.activePlaceholder = null;
     }
+
+
+    for (const call of toolsToExecute) {
+      if (currentViewInstance.currentAbortController?.signal.aborted) throw new Error("aborted by user");
+      if (call.type === "function") {
+        const toolName = call.function.name;
+        let toolArgs = {};
+        try {
+          toolArgs = JSON.parse(call.function.arguments || "{}");
+        } catch (e: any) {
+          const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
+          const errorToolTimestamp = new Date();
+          const errorToolMsg: Message = {
+            role: "tool",
+            tool_call_id: call.id,
+            name: toolName,
+            content: errorContent,
+            timestamp: errorToolTimestamp,
+          };
+
+          // Рендеримо повідомлення про помилку інструменту
+          const toolErrorHmaPromise = new Promise<void>((resolve, reject) => {
+            currentViewInstance.plugin.chatManager.registerHMAResolver(
+              errorToolMsg.timestamp.getTime(),
+              resolve,
+              reject
+            );
+            setTimeout(() => {
+              if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(errorToolMsg.timestamp.getTime())) {
+                currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(
+                  errorToolMsg.timestamp.getTime(),
+                  "HMA timeout for tool error msg"
+                );
+              }
+            }, 10000);
+          });
+          await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
+          // Цей HMA має спрацювати і відрендерити повідомлення типу 'tool' через handleMessageAdded
+          await toolErrorHmaPromise; 
+          continue;
+        }
+
+        const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
+        const toolResultContent = execResult.success
+          ? execResult.result
+          : `Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}`;
+        const toolResponseTimestamp = new Date();
+        const toolResponseMsg: Message = {
+          role: "tool",
+          tool_call_id: call.id,
+          name: toolName,
+          content: toolResultContent,
+          timestamp: toolResponseTimestamp,
+        };
+
+        // Рендеримо повідомлення з результатом роботи інструменту
+        const toolResultHmaPromise = new Promise<void>((resolve, reject) => {
+          currentViewInstance.plugin.chatManager.registerHMAResolver(
+            toolResponseMsg.timestamp.getTime(),
+            resolve,
+            reject
+          );
+          setTimeout(() => {
+            if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(toolResponseMsg.timestamp.getTime())) {
+              currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(
+                toolResponseMsg.timestamp.getTime(),
+                `HMA Timeout for tool result: ${toolName}`
+              );
+            }
+          }, 10000);
+        });
+        await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
+        // Цей HMA має спрацювати і відрендерити повідомлення типу 'tool' через handleMessageAdded
+        await toolResultHmaPromise; 
+     }
+    }
+  }
+
     _renderFinalAssistantText(finalContent, responseTimestampMs, requestTimestampId) {
         return __awaiter(this, void 0, void 0, function* () {
             var _a, _b;

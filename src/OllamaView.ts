@@ -3837,29 +3837,45 @@ export class OllamaView extends ItemView {
     return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
   }
 
+  // src/OllamaView.ts
+
+// ... (інші імпорти та код)
+
   private async _executeAndRenderToolCycle(
     toolsToExecute: ToolCall[],
-    assistantMessageIntent: AssistantMessage,
+    assistantMessageIntent: AssistantMessage, // Це повідомлення з tool_calls
     requestTimestampId: number
   ): Promise<void> {
     const currentViewInstance = this;
     const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
-    const assistantHmaPromise = new Promise<void>((resolve, reject) => {
-      currentViewInstance.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
-      setTimeout(() => {
-        if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(assistantMsgTsMs)) {
-          currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(
-            assistantMsgTsMs,
-            `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs})`
-          );
-        }
-      }, 10000);
-    });
-    await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
-    await assistantHmaPromise;
+
+    // 1. Додаємо повідомлення асистента з tool_calls до історії, АЛЕ НЕ РЕНДЕРИМО ЙОГО ЯВНО
+    //    Метод addMessageToActiveChatPayload сам викличе HMA резолвер,
+    //    але оскільки ми не створюємо для нього активний плейсхолдер,
+    //    його стандартний рендеринг через handleMessageAdded не відбудеться так, як для звичайних повідомлень.
+    //    АБО, якщо ми хочемо повністю приховати його з UI, але зберегти в історії,
+    //    то ChatManager має це враховувати.
+    //    Поки що припустимо, що ChatManager.addMessageToActiveChatPayload додасть його
+    //    до логічного списку повідомлень, а тут ми контролюємо UI.
+
+    //    Якщо ми не хочемо бачити "Using tool..." взагалі, то цей блок не потрібен для UI.
+    //    Але для історії чату він важливий.
+    //    ChatManager подбає про збереження. Ми тут дбаємо про НЕ-відображення.
+    
+    // Видаляємо явний рендеринг цього повідомлення з UI (плейсхолдер для нього не створювався на цьому етапі)
+    // Якщо activePlaceholder був для попереднього текстового виводу, він вже був оброблений.
+    // Нам потрібно переконатися, що після цього циклу ми не намагаємося відрендерити `assistantMessageIntent` як фінальний текст.
+
     if (currentViewInstance.activePlaceholder?.timestamp === assistantMsgTsMs) {
-      currentViewInstance.activePlaceholder = null;
+        // Якщо плейсхолдер був створений саме для цього повідомлення з tool_calls
+        // (що малоймовірно, бо плейсхолдер зазвичай для текстового стріму),
+        // то його треба прибрати, бо ми не хочемо його показувати.
+        if (currentViewInstance.activePlaceholder.groupEl.isConnected) {
+            currentViewInstance.activePlaceholder.groupEl.remove();
+        }
+        currentViewInstance.activePlaceholder = null;
     }
+
 
     for (const call of toolsToExecute) {
       if (currentViewInstance.currentAbortController?.signal.aborted) throw new Error("aborted by user");
@@ -3879,6 +3895,7 @@ export class OllamaView extends ItemView {
             timestamp: errorToolTimestamp,
           };
 
+          // Рендеримо повідомлення про помилку інструменту
           const toolErrorHmaPromise = new Promise<void>((resolve, reject) => {
             currentViewInstance.plugin.chatManager.registerHMAResolver(
               errorToolMsg.timestamp.getTime(),
@@ -3895,10 +3912,8 @@ export class OllamaView extends ItemView {
             }, 10000);
           });
           await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
-          try {
-            await toolErrorHmaPromise;
-          } catch (e_hma) {
-          }
+          // Цей HMA має спрацювати і відрендерити повідомлення типу 'tool' через handleMessageAdded
+          await toolErrorHmaPromise; 
           continue;
         }
 
@@ -3915,6 +3930,7 @@ export class OllamaView extends ItemView {
           timestamp: toolResponseTimestamp,
         };
 
+        // Рендеримо повідомлення з результатом роботи інструменту
         const toolResultHmaPromise = new Promise<void>((resolve, reject) => {
           currentViewInstance.plugin.chatManager.registerHMAResolver(
             toolResponseMsg.timestamp.getTime(),
@@ -3931,7 +3947,8 @@ export class OllamaView extends ItemView {
           }, 10000);
         });
         await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
-        await toolResultHmaPromise;
+        // Цей HMA має спрацювати і відрендерити повідомлення типу 'tool' через handleMessageAdded
+        await toolResultHmaPromise; 
      }
     }
   }

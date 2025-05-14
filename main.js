@@ -6950,24 +6950,16 @@ Summary:`;
     }
     return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
   }
+  // src/OllamaView.ts
+  // ... (інші імпорти та код)
   async _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId) {
     var _a, _b;
     const currentViewInstance = this;
     const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
-    const assistantHmaPromise = new Promise((resolve, reject) => {
-      currentViewInstance.plugin.chatManager.registerHMAResolver(assistantMsgTsMs, resolve, reject);
-      setTimeout(() => {
-        if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(assistantMsgTsMs)) {
-          currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(
-            assistantMsgTsMs,
-            `HMA Timeout for assistant tool intent (ts: ${assistantMsgTsMs})`
-          );
-        }
-      }, 1e4);
-    });
-    await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(assistantMessageIntent, true);
-    await assistantHmaPromise;
     if (((_a = currentViewInstance.activePlaceholder) == null ? void 0 : _a.timestamp) === assistantMsgTsMs) {
+      if (currentViewInstance.activePlaceholder.groupEl.isConnected) {
+        currentViewInstance.activePlaceholder.groupEl.remove();
+      }
       currentViewInstance.activePlaceholder = null;
     }
     for (const call of toolsToExecute) {
@@ -7004,10 +6996,7 @@ Summary:`;
             }, 1e4);
           });
           await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
-          try {
-            await toolErrorHmaPromise;
-          } catch (e_hma) {
-          }
+          await toolErrorHmaPromise;
           continue;
         }
         const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
