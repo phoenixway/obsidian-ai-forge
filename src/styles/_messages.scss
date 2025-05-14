@@ -58,7 +58,6 @@
     }
 
     .message-wrapper {
-  max-width: var(--chat-message-max-width); // Максимальна ширина для повідомлень
 
       order: 2; // Обгортка повідомлення візуально друга (справа)
       // margin-left: 0;
@@ -135,6 +134,8 @@
   border-radius: 18px;
   width: fit-content; // Bubble width based on content
   max-width: 100%; // Max width is constrained by message-wrapper
+  max-width: var(--chat-message-max-width); // Максимальна ширина для повідомлень
+
     // word-wrap: break-word;
   white-space: normal; // Дозволити перенос тексту
   overflow-wrap: break-word; // Standard property for word-wrap
