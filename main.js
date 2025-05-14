@@ -6615,7 +6615,6 @@ Summary:`;
     const toolCallStartTag = "<tool_call>";
     const toolCallEndTag = "</tool_call>";
     for await (const chunk of llmStream) {
-      this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
       let isLastChunk = false;
       if ("error" in chunk && chunk.error) {
         this.plugin.logger.error("[_processLlmStream] Received error chunk:", chunk.error);

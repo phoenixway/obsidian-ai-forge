@@ -3433,7 +3433,7 @@ export class OllamaView extends ItemView {
     const toolCallEndTag = "</tool_call>";
 
     for await (const chunk of llmStream) {
-      this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
+      // this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
 
       let isLastChunk = false;
 
