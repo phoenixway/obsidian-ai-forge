@@ -1,5 +1,4 @@
 // src/styles/_messages.scss
-// src/styles/_messages.scss
 // Styling for message groups, bubbles, avatars, actions, timestamps etc.
 
 // Assumes these variables are defined elsewhere (e.g., in :root or _variables.scss)
@@ -34,10 +33,10 @@
     justify-content: flex-end; 
 
 
-    .avatar-container { // Змінено селектор з .message-group-avatar на .avatar-container
+    .avatar-container { 
       order: 2; 
       margin-left: calc(var(--chat-spacing-unit) * 2); 
-      margin-right: 0; // Додано для однозначності
+      margin-right: 0; 
       // flex-shrink: 0; 
     }
 
@@ -50,10 +49,10 @@
   &.ollama-message-group { 
     justify-content: flex-start; 
 
-    .avatar-container { // Змінено селектор з .message-group-avatar на .avatar-container
+    .avatar-container { 
       order: 1; 
       margin-right: calc(var(--chat-spacing-unit) * 2); 
-      margin-left: 0; // Додано для однозначності
+      margin-left: 0; 
       // flex-shrink: 0;
     }
 
@@ -68,37 +67,37 @@
 .message-wrapper {
    display: flex;
    flex-direction: column;
-   // max-width встановлюється окремо var(--chat-message-max-width);
-   // gap вже є
-   // align-items (flex-start/flex-end) тепер мають бути тут, а не в .message-group
-   // так як .message-wrapper тепер основний блок для бульбашок.
-   // Однак, якщо вирівнювання бульбашок (ліво/право) всередині wrapper залежить від user/ollama,
-   // то це краще залишити в специфічних правилах user-message-group/ollama-message-group.
 }
 
 // Для вирівнювання самих бульбашок всередині message-wrapper
 .user-message-group .message-wrapper {
-  align-items: flex-end; // Бульбашки всередині user wrapper - справа
+  align-items: flex-end; 
 }
 .ollama-message-group .message-wrapper {
-  align-items: flex-start; // Бульбашки всередині ollama wrapper - зліва
+  align-items: flex-start; 
 }
 
 
+// --- Стилі для Аватарок ---
+// Використовуємо CSS змінні для розмірів, якщо вони визначені глобально, або SASS змінні, якщо компілюється
+$base-avatar-size-from-var: var(--chat-avatar-size, 32px);         // Базовий розмір з CSS змінної або fallback
+$avatar-final-size: calc(#{$base-avatar-size-from-var} * 1.2); // Збільшений на 20% розмір
 
-// Avatar Styles
-// Цей блок .message-group-avatar, ймовірно, тепер менш релевантний для позиціонування,
-// але може містити загальні стилі, які потім уточнюються в .avatar-container.
-// Для чистоти, краще б всі стилі аватара були під одним селектором .avatar-container.
-// Але поки що залишимо його, щоб не зламати щось інше.
-.message-group-avatar { // Цей селектор використовувався для order раніше, але не для розміру/вигляду
+$avatar-font-size-factor: 0.5; // Відносний розмір шрифту для ініціалів
+$avatar-icon-size-factor: 0.65; // Відносний розмір іконки всередині аватара
+
+
+// Старий селектор .message-group-avatar, оновлений для використання нового розміру
+// Цей блок може бути менш релевантним, якщо .avatar-container завжди використовується,
+// але оновлюємо для консистентності.
+.message-group-avatar { 
   align-self: flex-end; 
-  width: var(--chat-avatar-size);
-  height: var(--chat-avatar-size);
+  width: $avatar-final-size; // Використовуємо збільшений розмір
+  height: $avatar-final-size; // Використовуємо збільшений розмір
   border-radius: 50%;
   background-color: var(--background-modifier-hover);
   color: var(--text-muted);
-  font-size: calc(var(--chat-avatar-size) * 0.5);
+  font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); // Розрахунок від збільшеного розміру
   display: flex;
   align-items: center;
   justify-content: center;
@@ -116,9 +115,12 @@
     object-position: center; 
   }
 
-  .svg-icon { width: 60%; height: 60%; }
+  .svg-icon { 
+    width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
+    height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
+  }
 
-  .user-message-group & { // Ці стилі застосуються, якщо .message-group-avatar все ще використовується десь
+  .user-message-group & { 
     background-color: var(--interactive-accent-translucent);
     color: var(--interactive-accent);
   }
@@ -126,20 +128,14 @@
 
 // Message Bubble Styles
 .message {
-  // margin-bottom: calc(var(--chat-spacing-unit) * 1); // Use gap in wrapper instead
   padding: calc(var(--chat-spacing-unit) * 2) calc(var(--chat-spacing-unit) * 3);
-  // position: relative; // No longer needed for buttons
-  // padding-bottom: calc(var(--chat-spacing-unit) * 5); // No longer needed
   border-radius: 18px;
-  width: fit-content; // Bubble width based on content
-  max-width: 100%; // Max width is constrained by message-wrapper
-  max-width: var(--chat-message-max-width); // Максимальна ширина для повідомлень
-
-    // word-wrap: break-word;
-  white-space: normal; // Дозволити перенос тексту
-  overflow-wrap: break-word; // Standard property for word-wrap
-  word-break: break-word;   // Allow breaking words if they are too long
-
+  width: fit-content; 
+  max-width: 100%; 
+  max-width: var(--chat-message-max-width); 
+  white-space: normal; 
+  overflow-wrap: break-word; 
+  word-break: break-word;   
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
   line-height: 1.5;
@@ -149,7 +145,6 @@
 }
 
 // Corner Radius logic for consecutive messages within the same wrapper
-// Applied to the .message elements
 .user-message-group .message-wrapper {
   .message:not(:last-child) { border-bottom-right-radius: 5px; }
   .message:last-child { border-bottom-right-radius: 18px; }
@@ -169,7 +164,6 @@
 // Role-specific message bubble styles
 .user-message {
   background-color: var(--interactive-accent);
-  // background-image: linear-gradient(135deg, var(--interactive-accent) 0%, var(--interactive-accent-hover) 100%);
   color: var(--text-on-accent);
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
   &:hover { box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3); transform: translateY(-1px); }
@@ -185,77 +179,59 @@
 
 // --- Action Buttons Styling & Positioning ---
 .message-actions-wrapper {
-  // Removed absolute positioning
   display: flex;
-  gap: calc(var(--chat-spacing-unit) * 1.5); // Space between buttons
-  width: fit-content; // Only as wide as needed
-  // align-self will be controlled by parent .message-wrapper's align-items
-
-  // Desktop hover visibility (default hidden)
+  gap: calc(var(--chat-spacing-unit) * 1.5); 
+  width: fit-content; 
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
-  z-index: 6; // Ensure clickable
+  z-index: 6; 
   margin-left: 10px;
 
-  // Base button style inside actions
   button {
-    background: transparent !important; // Force transparent background
-    border: none; // Remove border
-    box-shadow: none; // Remove shadow
-    backdrop-filter: none; // Remove blur
-    padding: 1px; // Minimal padding around icon
-    color: var(--text-muted); // Icon color
-
-    // background: rgba(var(--background-secondary-rgb), 0.7);
-    // backdrop-filter: blur(3px);
-    // border: 1px solid rgba(var(--background-modifier-border-rgb), 0.5);
+    background: transparent !important; 
+    border: none; 
+    box-shadow: none; 
+    backdrop-filter: none; 
+    padding: 1px; 
+    color: var(--text-muted); 
     border-radius: var(--radius-s);
-    // padding: 2px;
-    // color: var(--text-muted);
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.15s ease;
-    // box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 
     .svg-icon { width: 14px; height: 14px; }
 
     &:hover {
-        background: transparent !important; // Still transparent on hover
-        color: var(--text-normal); // Change only icon color on hover
-        transform: scale(1.05); // Keep scale effect if desired
+        background: transparent !important; 
+        color: var(--text-normal); 
+        transform: scale(1.05); 
     }
 }
 
 .delete-message-button {
-  // Можна успадкувати базові стилі кнопки
-
-  &.danger-option { // Використовуємо клас небезпеки
-       color: var(--text-error); // Червонуватий колір іконки
-
+  &.danger-option { 
+       color: var(--text-error); 
        &:hover {
-           color: var(--text-on-accent); // Білий або інший контрастний при наведенні
-           background-color: var(--background-modifier-error-hover); // Червонуватий фон при наведенні
-           border-color: transparent; // Можна прибрати рамку при наведенні
+           color: var(--text-on-accent); 
+           background-color: var(--background-modifier-error-hover); 
+           border-color: transparent; 
        }
   }
 }
 
-// --- Специфічні стилі для кнопки видалення НА ПОВІДОМЛЕННЯХ КОРИСТУВАЧА ---
-// (щоб краще виглядало на синьому фоні)
 .user-message .delete-message-button {
   &.danger-option {
-      color: rgba(255, 150, 150, 0.8); // Світло-червоний для кращої видимості
-
+      color: rgba(255, 150, 150, 0.8); 
       &:hover {
-          background-color: rgba(200, 50, 50, 0.5); // Темніший червоний фон при наведенні
+          background-color: rgba(200, 50, 50, 0.5); 
           color: white;
       }
   }
 }
 
-&.user-message-group & button { // Or .user-message + & button
-  color: rgba(255, 255, 255, 0.8); // Lighter icon color for user messages
+&.user-message-group & button { 
+  color: rgba(255, 255, 255, 0.8); 
   background: transparent !important;
   border: none;
   box-shadow: none;
@@ -265,28 +241,11 @@
    }
 }
   }
-  // Style for Regenerate button (optional)
-  .regenerate-button {
-     // color: var(--text-warning); // Example accent
-  }
-  button.summarize-button {
-    // Можна додати специфічний колір або інші налаштування
-    // Наприклад:
-    // color: var(--text-accent);
-    // &:hover {
-    //   color: var(--text-accent-hover);
-    // }
-  }
+  .regenerate-button {}
+  button.summarize-button {}
 
+.summary-modal-content {}
 
-// Стилі для модального вікна сумаризації (якщо потрібно)
-.summary-modal-content {
-  // Стилі для контейнера з текстом сумаризації
-}
-
-
-// Show buttons on hover of the MESSAGE BUBBLE (as buttons are now siblings)
-// Or hover of the wrapper containing both? Let's try wrapper for larger target.
 .message-wrapper:hover .message-actions-wrapper {
   opacity: 1;
   visibility: visible;
@@ -294,12 +253,7 @@
 }
 
 .user-message-group .message-actions-wrapper {
-  // --- ДОДАНО ЦЕ ПРАВИЛО ---
-  align-self: flex-start; // Перевизначає align-items: flex-end батьківського .message-wrapper,
-                          // змушуючи САМЕ ЦЕЙ БЛОК КНОПОК вирівнятись по лівому краю.
-  // --------------------------
-
-  // Стилі самих кнопок (залишаються ті ж)
+  align-self: flex-start; 
   button {
      background: rgba(255, 255, 255, 0.1);
      border-color: rgba(255, 255, 255, 0.2);
@@ -311,8 +265,6 @@
   }
 }
 
-
-// Specific button styles for user messages (actions appear below user bubble)
 .user-message-group .message-actions-wrapper button {
    background: rgba(255, 255, 255, 0.1);
    border-color: rgba(255, 255, 255, 0.2);
@@ -322,34 +274,29 @@
       color: white;
    }
 }
-// --- End Action Buttons Styling ---
 
-// Message Content & Meta Containers
-.message-content-container { /* Probably no longer needed if actions are outside */ }
+.message-content-container { }
 .message-content {
-  padding-bottom: calc(var(--chat-spacing-unit) * 1); // Smaller padding is okay now
+  padding-bottom: calc(var(--chat-spacing-unit) * 1); 
   box-sizing: border-box;
   width: 100%;
-  white-space: normal; // Дозволити перенос тексту
+  white-space: normal; 
   p { margin-bottom: calc(var(--p-spacing) / 2); }
   p:last-child { margin-bottom: 0; }
   overflow-wrap: break-word;
   word-break: break-word;
 }
 
-// Timestamp - should be inside .message, maybe after content? Let's keep it simple for now.
 .message-timestamp {
   font-size: 0.75em;
   color: var(--text-faint);
-  margin-top: var(--chat-spacing-unit); // Add space above timestamp if needed
+  margin-top: var(--chat-spacing-unit); 
   text-align: right;
   display: block;
   width: 100%;
   opacity: 0.9;
 }
 
-
-// --- Message Collapsing Styles ---
 .message-content-collapsible {
   overflow: hidden;
   transition: max-height 0.3s ease-out;
@@ -358,15 +305,11 @@
 .message-content-collapsed {
   mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  // position: relative; // No longer needed for ::after
-  // Remove ::after styles entirely
 }
-// Remove .user-message .message-content-collapsed::after styles
 
-// Show more button (consolidated styles)
 .show-more-button {
   display: block;
-  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto; // Small top margin, centered below collapsed content
+  margin: calc(var(--chat-spacing-unit) * 0.5) auto 0 auto; 
   padding: 2px 10px;
   font-size: 0.8em;
   color: var(--text-muted);
@@ -377,7 +320,7 @@
   transition: all 0.2s ease;
   text-align: center;
   width: fit-content;
-  z-index: 2; // Above masked content
+  z-index: 2; 
 
   &:hover {
       background-color: var(--background-modifier-hover);
@@ -385,7 +328,7 @@
       border-color: var(--background-modifier-border-hover);
   }
 }
-.user-message .show-more-button { // Style button when inside user message
+.user-message .show-more-button { 
     background-color: transparent;
     border-color: transparent;
     color: rgba(255, 255, 255, 0.7);
@@ -394,174 +337,113 @@
         color: white;
     }
 }
-// --- End Message Collapsing Styles ---
 
-// --- Animation for arriving messages ---
 @keyframes message-appear {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-// --- Media Query for Large Screens ---
-@media screen and (min-width: 1600px) { // Порог ширини екрану (можна змінити: 1400px, 1800px, тощо)
-
+@media screen and (min-width: 1600px) { 
   .ollama-chat-container {
-    // Збільшуємо бокові відступи (padding) всередині контейнера чату
-    // Це змусить контент бути вужчим і ближчим до центру
-    // Експериментуйте зі значеннями (%, rem, px)
-    padding-left: 15%;   // Наприклад, 15% від ширини контейнера зліва
-    padding-right: 15%;  // Наприклад, 15% від ширини контейнера справа
-
-    // Опціонально: Можна також трохи збільшити максимальну ширину самої колонки чату,
-    // якщо вона здається занадто вузькою на великому екрані після додавання паддінгів.
-    max-width: 3000px; // Наприклад
+    padding-left: 15%;   
+    padding-right: 15%;  
+    max-width: 3000px; 
   }
-
-  // Зазвичай, змінювати margin-left/right: auto для .message-wrapper не потрібно,
-  // бо збільшення паддінгу батьківського контейнера вже звузить доступний простір.
-  // Але якщо повідомлення все ще "липнуть" до країв після додавання паддінгу,
-  // можна спробувати додати це (розкоментувати):
-  /*
-  .user-message-group .message-wrapper {
-     margin-left: 0; // Прибираємо автоматичний відступ, що штовхав праворуч
-  }
-  .ollama-message-group .message-wrapper {
-     margin-right: 0; // Прибираємо автоматичний відступ, що штовхав ліворуч
-  }
-  */
-
-} // --- Кінець медіа-запиту ---
+} 
 
 .scroll-to-bottom-button {
-  position: absolute; // Позиціонування відносно батьківського .ollama-chat-area-content
-  bottom: 15px; // Відступ від нижнього краю
-  right: 20px; // Відступ від правого краю
-  z-index: 50; // Має бути над повідомленнями
-
-  width: 36px; // Розмір кнопки
+  position: absolute; 
+  bottom: 15px; 
+  right: 20px; 
+  z-index: 50; 
+  width: 36px; 
   height: 36px;
-  border-radius: 50%; // Кругла
-  background-color: var(--background-secondary); // Фон, схожий на фон повідомлень ШІ або інший
-  color: var(--text-muted); // Колір іконки
+  border-radius: 50%; 
+  background-color: var(--background-secondary); 
+  color: var(--text-muted); 
   border: 1px solid var(--background-modifier-border);
-  box-shadow: var(--shadow-s); // Тінь для виділення
+  box-shadow: var(--shadow-s); 
   cursor: pointer;
-
-  display: flex; // Для центрування іконки
+  display: flex; 
   align-items: center;
   justify-content: center;
   padding: 0;
-
-  opacity: 0; // Прихована за замовчуванням
+  opacity: 0; 
   visibility: hidden;
-  transform: translateY(10px); // Початкова позиція для анімації появи
+  transform: translateY(10px); 
   transition: opacity 0.2s ease-out, visibility 0s linear 0.2s, transform 0.2s ease-out, background-color 0.15s ease;
 
   .svg-icon {
-    width: 20px; // Розмір іконки
+    width: 20px; 
     height: 20px;
   }
 
   &:hover {
     background-color: var(--background-modifier-hover);
     color: var(--text-normal);
-    transform: translateY(8px) scale(1.05); // Невеликий підйом при наведенні
+    transform: translateY(8px) scale(1.05); 
   }
 
    &:active {
-      transform: translateY(9px) scale(1); // Невелике "натискання"
+      transform: translateY(9px) scale(1); 
    }
 
-  // Клас для видимої кнопки
   &.visible {
-    opacity: 0.85; // Не повністю непрозора, щоб не заважати
+    opacity: 0.85; 
     visibility: visible;
     transform: translateY(0);
     transition: opacity 0.2s ease-out, visibility 0s linear 0s, transform 0.2s ease-out, background-color 0.15s ease;
 
      &:hover {
-          opacity: 1; // Повна непрозорість при наведенні
+          opacity: 1; 
      }
   }
 }
 
-// Опціонально: Можна додати анімацію появи лічильника на індикаторі нових повідомлень,
-// коли з'являється і кнопка прокрутки вниз, якщо ви додаєте лічильник.
-.new-message-indicator.visible {
-   // Стилі для видимого індикатора
-}
-
-.summary-modal-content {
-  // Стилі для контейнера з текстом сумаризації
-}
+.new-message-indicator.visible {}
+.summary-modal-content {}
 
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-// Універсальний клас для анімації завантаження іконки в кнопці
 .button-loading {
-  // Можна додати стилі для самої кнопки в стані завантаження, якщо потрібно
-  // Наприклад:
-  // cursor: default; // Змінити курсор
-
-  // Головне - анімація для іконки всередині
   .svg-icon {
     animation: spin 1s linear infinite;
   }
-
-  
 }
 
-// styles.scss (або _messages.scss / _chat.scss)
-
-// --- Стилі для роздільника дати в чаті ---
 .chat-date-separator {
-  width: fit-content;                 // Ширина за вмістом
-  max-width: 80%;                     // Максимальна ширина, щоб не розтягуватись надто сильно
-  margin-left: auto;                  // Горизонтальне центрування блоку
+  width: fit-content;                 
+  max-width: 80%;                     
+  margin-left: auto;                  
   margin-right: auto;
-  margin-top: calc(var(--chat-spacing-unit) * 6);    // Відступ зверху (більший)
-  margin-bottom: calc(var(--chat-spacing-unit) * 4); // Відступ знизу (стандартний)
-  padding: calc(var(--chat-spacing-unit) * 0.75) calc(var(--chat-spacing-unit) * 2.5); // Внутрішні відступи
-  font-size: var(--font-ui-smaller);  // Розмір шрифту - маленький
-  color: var(--text-muted);           // Колір тексту - приглушений
-  background-color: var(--background-secondary); // Фон, як у другорядних елементів UI
-  border-radius: var(--radius-l);     // Закруглені кути
-  text-align: center;                 // Центрування тексту всередині
-  user-select: none;                  // Заборонити виділення тексту
-  font-weight: 500;                   // Трохи жирніший шрифт (опціонально)
-
-  // Опціонально: Додаємо ледь помітну рамку
-  // border: 1px solid var(--background-modifier-border-hover);
+  margin-top: calc(var(--chat-spacing-unit) * 6);    
+  margin-bottom: calc(var(--chat-spacing-unit) * 4); 
+  padding: calc(var(--chat-spacing-unit) * 0.75) calc(var(--chat-spacing-unit) * 2.5); 
+  font-size: var(--font-ui-smaller);  
+  color: var(--text-muted);           
+  background-color: var(--background-secondary); 
+  border-radius: var(--radius-l);     
+  text-align: center;                 
+  user-select: none;                  
+  font-weight: 500;                   
 }
 
-
-// styles.scss або main.scss
-
-// --- Стилі для Аватарок ---
-// Використовуємо CSS змінні для розмірів, якщо вони визначені глобально, або SASS змінні, якщо компілюється
-$avatar-default-size: var(--chat-avatar-size, 32px); // Резервне значення, якщо --chat-avatar-size не визначено
-$avatar-font-size-factor: 0.5;
-$avatar-icon-size-factor: 0.65;
-
-
-// Головний контейнер аватара
+// Головний контейнер аватара (основне місце для стилізації розміру)
 .avatar-container { 
-  width: $avatar-default-size;
-  height: $avatar-default-size;
-  min-width: $avatar-default-size; 
-  min-height: $avatar-default-size;
+  width: $avatar-final-size; // Використовуємо збільшений розмір
+  height: $avatar-final-size; // Використовуємо збільшений розмір
+  min-width: $avatar-final-size; // Для flex-контейнерів
+  min-height: $avatar-final-size; // Для flex-контейнерів
   border-radius: 50%; 
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden; 
   background-color: var(--background-modifier-hover); 
-  // margin-right тепер контролюється через .message-group.ollama-message-group .avatar-container
-  // margin-left тепер контролюється через .message-group.user-message-group .avatar-container
-  align-self: flex-end; // Вирівнюємо аватар по низу flex-групи (message-group)
+  align-self: flex-end; 
 
   // Аватар-зображення
   &.avatar-image, 
@@ -576,8 +458,8 @@ $avatar-icon-size-factor: 0.65;
   &.avatar-icon, 
   .avatar-icon {  
     svg { 
-      width: calc(#{$avatar-default-size} * #{$avatar-icon-size-factor});
-      height: calc(#{$avatar-default-size} * #{$avatar-icon-size-factor});
+      width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
+      height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); // Розрахунок від збільшеного розміру
       display: block; 
     }
   }
@@ -585,10 +467,10 @@ $avatar-icon-size-factor: 0.65;
   // Аватар-ініціали
   &.avatar-initials, 
   div.avatar-initials { 
-    font-size: calc(#{$avatar-default-size} * #{$avatar-font-size-factor});
+    font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); // Розрахунок від збільшеного розміру
     font-weight: 600;
     color: var(--text-muted); 
-    line-height: $avatar-default-size; 
+    line-height: $avatar-final-size; // Для вертикального центрування тексту, використовуємо збільшений розмір
     text-align: center;
     width: 100%;
     height: 100%;
@@ -599,37 +481,13 @@ $avatar-icon-size-factor: 0.65;
 }
 
 // Специфічні стилі, якщо ви розрізняєте user/ai аватари за класами на контейнері
-.avatar-container.user-avatar { // CSS_CLASSES.AVATAR_USER_SPECIFIC
-  // Можна додати, наприклад, інший фоновий колір
-  // background-color: var(--interactive-accent);
-  // div.avatar-initials { // Якщо ініціали
-  //    color: var(--text-on-accent);
-  // }
-}
-
-.avatar-container.ai-avatar { // CSS_CLASSES.AVATAR_AI_SPECIFIC
-  // background-color: var(--background-modifier-success); // Приклад
-}
-
+.avatar-container.user-avatar { }
+.avatar-container.ai-avatar { }
 
 .assistant-tool-usage-indicator {
   font-style: italic;
   color: var(--text-faint); 
   font-size: var(--font-ui-smaller); 
-  // display: block; 
-  // margin-bottom: var(--size-4-1); 
 }
 
-
-.assistant-tool-usage-indicator::before {
-  // content: "→ "; 
-  // margin-right: 4px;
-  // font-weight: bold; 
-}
-
-// .ollama-message.is-tool-indicator-only .message-content { 
-//   font-style: italic;
-//   color: var(--text-faint);
-//   font-size: var(--font-ui-smaller);
-// }
-
+.assistant-tool-usage-indicator::before {}
