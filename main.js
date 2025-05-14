@@ -4996,22 +4996,31 @@ This action cannot be undone.`,
       this.sendButton.classList.toggle(CSS_CLASSES.DISABLED, sendShouldBeDisabled);
     }
   }
-  showEmptyState() {
+  // OllamaView.ts
+  // ... (інші частини класу) ...
+  showEmptyState(messageText = "No messages yet", tipText) {
     var _a, _b;
-    if (this.currentMessages.length === 0 && !this.emptyStateEl && this.chatContainer) {
-      this.chatContainer.empty();
+    if (this.emptyStateEl) {
+      this.emptyStateEl.remove();
+      this.emptyStateEl = null;
+    }
+    if (this.chatContainer) {
       this.emptyStateEl = this.chatContainer.createDiv({
         cls: CSS_CLASS_EMPTY_STATE
+        // Переконайся, що CSS_CLASS_EMPTY_STATE визначено
       });
-      this.emptyStateEl.createDiv({
+      this.emptyStateEl.createEl("p", {
+        // Використовуємо <p> для семантики
         cls: "empty-state-message",
-        text: "No messages yet"
+        text: messageText
       });
-      const modelName = ((_b = (_a = this.plugin) == null ? void 0 : _a.settings) == null ? void 0 : _b.modelName) || "the AI";
-      this.emptyStateEl.createDiv({
-        cls: "empty-state-tip",
-        text: `Type a message or use the menu options to start interacting with ${modelName}.`
-      });
+      const finalTipText = tipText !== void 0 ? tipText : `Type a message or use the menu options to start interacting with ${((_b = (_a = this.plugin) == null ? void 0 : _a.settings) == null ? void 0 : _b.modelName) || "the AI"}.`;
+      if (finalTipText) {
+        this.emptyStateEl.createEl("p", {
+          cls: "empty-state-tip",
+          text: finalTipText
+        });
+      }
     }
   }
   hideEmptyState() {
@@ -5020,6 +5029,7 @@ This action cannot be undone.`,
       this.emptyStateEl = null;
     }
   }
+  // ... (решта класу) ...
   setLoadingState(isLoading) {
     this.isProcessing = isLoading;
     if (this.inputEl)
@@ -6254,7 +6264,6 @@ Summary:`;
     );
     try {
       if (!data || !data.message || !messageForLog || !messageTimestampForLog) {
-        this.plugin.logger.warn("[handleMessageAdded] Event data, message, or timestamp is null/undefined.", data);
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
@@ -6269,27 +6278,23 @@ Summary:`;
         // Приводимо до AssistantMessage для доступу до tool_calls
       });
       if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager is null. Aborting render.");
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message for inactive chat ${eventChatId} (active is ${activeChatId}). Skipping render.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const isAssistant = message.role === "assistant";
       const hasToolCalls = !!(message.tool_calls && message.tool_calls.length > 0);
       const isActiveCycle = !!this.currentAbortController;
-      this.plugin.logger.debug("[handleMessageAdded] Conditions for special handling:", { isAssistant, hasToolCalls, isActiveCycle });
       if (isAssistant && hasToolCalls) {
         this.plugin.logger.info(
           `[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls (role: ${message.role}, ts: ${messageTimestampMs}). This message is for tool execution only.`,
           { contentPreview: ((_d = message.content) == null ? void 0 : _d.substring(0, 70)) + "...", tool_calls: message.tool_calls }
         );
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-          this.plugin.logger.debug("[handleMessageAdded] Removing active placeholder (if any) for skipped assistant tool_call message.", { placeholderTs: this.activePlaceholder.timestamp });
           if (this.activePlaceholder.groupEl.isConnected) {
             this.activePlaceholder.groupEl.remove();
           }
@@ -6302,7 +6307,6 @@ Summary:`;
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already fully rendered. Skipping.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -6315,16 +6319,13 @@ Summary:`;
       !hasToolCalls && // І воно НЕ має tool_calls (бо такі ми вже пропустили)
       ((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === messageTimestampMs;
       if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} found in logic cache and not intended for current placeholder. Skipping.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       if (!isAlreadyInLogicCache) {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding message with ts ${messageTimestampMs} to currentMessages cache.`);
         this.currentMessages.push(message);
       }
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message ts ${messageTimestampMs}.`);
         const placeholderToUpdate = this.activePlaceholder;
         this.activePlaceholder = null;
         if (((_f = placeholderToUpdate.groupEl) == null ? void 0 : _f.isConnected) && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
@@ -6335,7 +6336,6 @@ Summary:`;
             `.${CSS_CLASSES.MESSAGE}`
           );
           if (!messageDomElement) {
-            this.plugin.logger.warn("[handleMessageAdded] Placeholder DOM element missing during update. Falling back to standard add.");
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
             await this.addMessageStandard(message);
@@ -6365,22 +6365,18 @@ Summary:`;
               }, 70);
               this.guaranteedScrollToBottom(100, true);
             } catch (renderError) {
-              this.plugin.logger.error("[handleMessageAdded] Error finalizing placeholder display.", renderError);
               if (placeholderToUpdate.groupEl.isConnected)
                 placeholderToUpdate.groupEl.remove();
               this.handleErrorMessage({ role: "error", content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
             }
           }
         } else {
-          this.plugin.logger.warn("[handleMessageAdded] Placeholder or its elements not connected/found. Falling back to standard add.");
           await this.addMessageStandard(message);
         }
       } else {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding message ts ${messageTimestampMs} via addMessageStandard.`);
         await this.addMessageStandard(message);
       }
     } catch (outerError) {
-      this.plugin.logger.error("[handleMessageAdded] Outer error caught in handleMessageAdded.", outerError, { messageData: data });
       this.handleErrorMessage({
         role: "error",
         content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message || "Unknown error"}`,
@@ -6388,10 +6384,8 @@ Summary:`;
       });
     } finally {
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
-        this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for ts ${messageTimestampForLog} in finally block.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
-        this.plugin.logger.trace(`[handleMessageAdded] HMA resolver for ts ${messageTimestampForLog} was not found or already invoked before finally block.`);
       }
     }
   }
@@ -6400,7 +6394,6 @@ Summary:`;
   async loadAndDisplayActiveChat() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     let metadataUpdated = false;
-    this.plugin.logger.debug(`[OllamaView loadAndDisplayActiveChat] Starting to load and display active chat.`);
     try {
       this.clearChatContainerInternal();
       this.lastMessageElement = null;
@@ -6413,7 +6406,6 @@ Summary:`;
       let finalRoleName = "None";
       let finalTemperature = void 0;
       let errorOccurredLoadingData = false;
-      let emptyStateMessage = "This chat is empty.";
       try {
         if (!this.plugin.chatManager) {
           throw new Error("ChatManager is not initialized.");
@@ -6426,10 +6418,8 @@ Summary:`;
         finalRolePath = ((_a = activeChat == null ? void 0 : activeChat.metadata) == null ? void 0 : _a.selectedRolePath) !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
-        this.plugin.logger.error("[loadAndDisplayActiveChat] Error connecting to Ollama or loading chat data initial phase.", error);
         new import_obsidian15.Notice("Error connecting to Ollama or loading chat data.", 5e3);
         errorOccurredLoadingData = true;
-        emptyStateMessage = "Error loading chat data.";
         availableModels = availableModels || [];
         finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_b = availableModels[0]) != null ? _b : null;
         finalTemperature = this.plugin.settings.temperature;
@@ -6444,11 +6434,9 @@ Summary:`;
             finalModelName = preferredModel;
           } else {
             finalModelName = availableModels[0];
-            this.plugin.logger.warn(`[loadAndDisplayActiveChat] Preferred model "${preferredModel}" not available. Using "${finalModelName}".`);
           }
         } else {
           finalModelName = null;
-          this.plugin.logger.warn(`[loadAndDisplayActiveChat] No models available from Ollama service.`);
         }
         if (activeChat.metadata.modelName !== finalModelName && finalModelName !== null) {
           try {
@@ -6457,22 +6445,18 @@ Summary:`;
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
               metadataUpdated = true;
-              this.plugin.logger.info(`[loadAndDisplayActiveChat] Active chat metadata (modelName) updated to: ${finalModelName}`);
               const potentiallyUpdatedChat = await this.plugin.chatManager.getChat(activeChat.metadata.id);
               if (potentiallyUpdatedChat)
                 activeChat = potentiallyUpdatedChat;
             } else {
-              this.plugin.logger.warn(`[loadAndDisplayActiveChat] Failed to update chat metadata for modelName.`);
             }
           } catch (updateError) {
-            this.plugin.logger.error(`[loadAndDisplayActiveChat] Error updating chat metadata for modelName.`, updateError);
           }
         }
         finalTemperature = (_e = (_d = activeChat.metadata) == null ? void 0 : _d.temperature) != null ? _e : this.plugin.settings.temperature;
       } else if (!errorOccurredLoadingData && !activeChat) {
         finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : (_f = availableModels[0]) != null ? _f : null;
         finalTemperature = this.plugin.settings.temperature;
-        emptyStateMessage = "No active chat selected.";
       }
       if (activeChat && !errorOccurredLoadingData && ((_g = activeChat.messages) == null ? void 0 : _g.length) > 0) {
         this.hideEmptyState();
@@ -6517,7 +6501,6 @@ Summary:`;
                 renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
                 break;
               default:
-                this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role: ${message.role}`);
                 const unknownRoleGroup = (_i = this.chatContainer) == null ? void 0 : _i.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
                 if (unknownRoleGroup && this.chatContainer) {
                   renderAvatar(this.app, this.plugin, unknownRoleGroup, false);
@@ -6526,6 +6509,7 @@ Summary:`;
                   msgBubble.createDiv({
                     cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text",
                     text: `Unknown message role: ${message.role}`
+                    // Використовуємо as any для безпеки
                   });
                   BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
                   messageGroupEl = unknownRoleGroup;
@@ -6537,7 +6521,6 @@ Summary:`;
               messageGroupEl = result instanceof Promise ? await result : result;
             }
           } catch (renderError) {
-            this.plugin.logger.error(`[loadAndDisplayActiveChat] Error rendering message (role: ${message.role}, ts: ${message.timestamp.getTime()})`, renderError);
             const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" });
             errorDiv.setText(`Error rendering message (role: ${message.role}): ${renderError.message}`);
             messageGroupEl = errorDiv;
@@ -6557,8 +6540,7 @@ Summary:`;
           }, 150);
         }, 150);
       } else {
-        this.setEmptyStateMessage(emptyStateMessage);
-        this.showEmptyState();
+        this.showEmptyState(errorOccurredLoadingData ? "Error loading chat." : "This chat is empty.");
         (_j = this.scrollToBottomButton) == null ? void 0 : _j.classList.remove(CSS_CLASSES.VISIBLE || "visible");
       }
       this.updateInputPlaceholder(finalRoleName);
@@ -6583,31 +6565,19 @@ Summary:`;
         this.updateSendButtonState();
       }
     } catch (error) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] Fatal error during chat loading and display.", error);
       this.clearChatContainerInternal();
-      this.setEmptyStateMessage("A critical error occurred. Please check console.");
-      this.showEmptyState();
+      this.showEmptyState("Fatal error.");
       if (this.chatContainer) {
         this.chatContainer.createDiv({
           cls: "fatal-error-message",
+          // Клас для повідомлення про фатальну помилку
           text: "A critical error occurred while loading the chat. Please check the console or try restarting."
         });
       }
       return { metadataUpdated: false };
     } finally {
-      this.plugin.logger.debug(`[OllamaView loadAndDisplayActiveChat] Finished loading and displaying. Metadata updated: ${metadataUpdated}`);
     }
     return { metadataUpdated };
-  }
-  // Припустимо, у тебе є метод для встановлення тексту empty state
-  // Якщо ні, то текст треба хардкодити всередині showEmptyState, або змінювати DOM напряму
-  setEmptyStateMessage(message) {
-    const emptyStateDiv = this.chatContainer.querySelector(".empty-chat-message");
-    if (emptyStateDiv) {
-      emptyStateDiv.setText(message);
-    } else {
-      this.plugin.logger.trace(`[setEmptyStateMessage] Empty state element not found to set message: "${message}"`);
-    }
   }
   _managePlaceholder(turnTimestamp, requestTimestampId) {
     if (this.activePlaceholder && this.activePlaceholder.timestamp !== turnTimestamp) {
@@ -6689,7 +6659,6 @@ Summary:`;
           isLastChunk = true;
       }
       if (isLastChunk) {
-        this.plugin.logger.debug("[_processLlmStream] Stream marked as done. Final accumulated content:", accumulatedContent.substring(0, 300) + "...");
         let lastIndex = 0;
         while (lastIndex < fullResponseBuffer.length) {
           const startIndex = fullResponseBuffer.indexOf(toolCallStartTag, lastIndex);
@@ -6697,11 +6666,9 @@ Summary:`;
             break;
           const endIndex = fullResponseBuffer.indexOf(toolCallEndTag, startIndex + toolCallStartTag.length);
           if (endIndex === -1) {
-            this.plugin.logger.warn("[_processLlmStream] Found start <tool_call> but no end tag in full buffer.");
             break;
           }
           const toolCallJsonString = fullResponseBuffer.substring(startIndex + toolCallStartTag.length, endIndex).trim();
-          this.plugin.logger.debug("[_processLlmStream] Extracted text-based tool call JSON string:", toolCallJsonString);
           try {
             const parsedJson = JSON.parse(toolCallJsonString);
             const callsArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
@@ -6721,10 +6688,8 @@ Summary:`;
                   });
                 }
               } else {
-                this.plugin.logger.warn("[_processLlmStream] Invalid text-based tool call definition:", callDef);
               }
             }
-            this.plugin.logger.debug("[_processLlmStream] Parsed text-based tool_calls:", parsedToolCalls);
           } catch (e) {
             this.plugin.logger.error("[_processLlmStream] Error parsing text-based tool call JSON:", e, toolCallJsonString);
           }
@@ -6753,9 +6718,7 @@ Summary:`;
     if (nativeToolCallsFromStream && nativeToolCallsFromStream.length > 0) {
       toolsToExecute = nativeToolCallsFromStream;
       assistantMessageForHistory.tool_calls = nativeToolCallsFromStream;
-      this.plugin.logger.debug("[_determineToolCalls] Assigning nativeToolCalls to assistantMessageForHistory.tool_calls:", nativeToolCallsFromStream);
     } else {
-      this.plugin.logger.debug("[_determineToolCalls] No nativeToolCallsFromStream found or empty.");
     }
     return {
       processedToolCallsThisTurn: toolsToExecute,
@@ -6825,7 +6788,6 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
         try {
           await toolResultHmaPromise;
         } catch (hmaError) {
-          this.plugin.logger.warn(`[ToolCycle] HMA for tool response ${toolName} failed or timed out:`, hmaError);
         }
       }
     }
@@ -6977,7 +6939,6 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
           try {
             await hmaErrorPromise;
           } catch (e_hma) {
-            this.plugin.logger.warn("[Regenerate] HMA for error display message failed or timed out:", e_hma);
           }
         } finally {
           if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
@@ -7085,7 +7046,6 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
         try {
           await hmaMaxTurnsPromise;
         } catch (e_hma) {
-          this.plugin.logger.warn("[LlmCycle] HMA for max turns message failed or timed out:", e_hma);
         }
       }
     } catch (error) {

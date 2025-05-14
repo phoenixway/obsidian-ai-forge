@@ -2967,7 +2967,7 @@ export class OllamaView extends ItemView {
     try {
       // 1. Базові перевірки на валідність даних
       if (!data || !data.message || !messageForLog || !messageTimestampForLog) { // Перевіряємо і messageTimestampForLog
-        this.plugin.logger.warn("[handleMessageAdded] Event data, message, or timestamp is null/undefined.", data);
+        
         if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
@@ -2985,7 +2985,7 @@ export class OllamaView extends ItemView {
 
       // 2. Перевірка наявності chatContainer та chatManager
       if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager is null. Aborting render.");
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -2993,7 +2993,7 @@ export class OllamaView extends ItemView {
       // 3. Перевірка, чи повідомлення для активного чату
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message for inactive chat ${eventChatId} (active is ${activeChatId}). Skipping render.`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -3004,7 +3004,7 @@ export class OllamaView extends ItemView {
       // isActiveCycle: Перевіряємо, чи є активний AbortController (або інший індикатор активного LLM циклу)
       const isActiveCycle = !!this.currentAbortController; // Ти використовував currentAbortController
 
-      this.plugin.logger.debug("[handleMessageAdded] Conditions for special handling:", { isAssistant, hasToolCalls, isActiveCycle });
+      
 
       // --- КЛЮЧОВА ЗМІНА ЛОГІКИ ---
       // 5. Пропуск рендерингу для повідомлень асистента з tool_calls
@@ -3018,7 +3018,7 @@ export class OllamaView extends ItemView {
         // Видаляємо плейсхолдер, якщо він був створений для цього конкретного повідомлення
         // (малоймовірно для assistant+tool_calls, але для повноти)
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-            this.plugin.logger.debug("[handleMessageAdded] Removing active placeholder (if any) for skipped assistant tool_call message.", { placeholderTs: this.activePlaceholder.timestamp });
+            
             if (this.activePlaceholder.groupEl.isConnected) {
                 this.activePlaceholder.groupEl.remove();
             }
@@ -3038,7 +3038,7 @@ export class OllamaView extends ItemView {
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already fully rendered. Skipping.`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -3060,20 +3060,20 @@ export class OllamaView extends ItemView {
       if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
         // Якщо повідомлення вже в кеші І воно не для оновлення плейсхолдера,
         // то, ймовірно, це дублікат або вже оброблена ситуація.
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} found in logic cache and not intended for current placeholder. Skipping.`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       
       // Додаємо в логічний кеш, якщо ще не там (або якщо це для плейсхолдера, то воно вже може бути там)
       if (!isAlreadyInLogicCache) {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding message with ts ${messageTimestampMs} to currentMessages cache.`);
+        
         this.currentMessages.push(message); // Зберігаємо оригінальне повідомлення з Date об'єктом
       }
 
       // 8. Логіка рендерингу: оновлення плейсхолдера або додавання нового повідомлення
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message ts ${messageTimestampMs}.`);
+        
         
         const placeholderToUpdate = this.activePlaceholder; // Зберігаємо посилання
         this.activePlaceholder = null; // Очищаємо activePlaceholder перед асинхронними операціями
@@ -3092,7 +3092,7 @@ export class OllamaView extends ItemView {
           ) as HTMLElement | null;
 
           if (!messageDomElement) {
-            this.plugin.logger.warn("[handleMessageAdded] Placeholder DOM element missing during update. Falling back to standard add.");
+            
             if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
             // this.activePlaceholder = null; // Вже очищено
             await this.addMessageStandard(message); 
@@ -3122,25 +3122,25 @@ export class OllamaView extends ItemView {
               setTimeout(() => { if (finalMessageGroupElement?.isConnected) this.checkMessageForCollapsing(finalMessageGroupElement); }, 70);
               this.guaranteedScrollToBottom(100, true); // Прокрутка
             } catch (renderError: any) {
-              this.plugin.logger.error("[handleMessageAdded] Error finalizing placeholder display.", renderError);
+              
               if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
               // this.activePlaceholder = null; // Вже очищено
               this.handleErrorMessage({ role: "error", content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
             }
           }
         } else { 
-          this.plugin.logger.warn("[handleMessageAdded] Placeholder or its elements not connected/found. Falling back to standard add.");
+          
           // this.activePlaceholder = null; // Вже очищено
           await this.addMessageStandard(message);
         }
       } else { // Якщо не оновлення плейсхолдера, то стандартне додавання
         // Це включає повідомлення користувача, інструментів, помилок,
         // а також повідомлення асистента, якщо для них не було плейсхолдера (наприклад, при завантаженні історії)
-        this.plugin.logger.debug(`[handleMessageAdded] Adding message ts ${messageTimestampMs} via addMessageStandard.`);
+        
         await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
-      this.plugin.logger.error("[handleMessageAdded] Outer error caught in handleMessageAdded.", outerError, { messageData: data });
+      
       this.handleErrorMessage({
         role: "error",
         content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message || 'Unknown error'}`,
@@ -3149,11 +3149,11 @@ export class OllamaView extends ItemView {
     } finally {
       // Гарантовано викликаємо резолвер, якщо він ще існує
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
-         this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for ts ${messageTimestampForLog} in finally block.`);
+         
          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
          // Якщо резолвера вже немає, логуємо це, щоб розуміти потік
-         this.plugin.logger.trace(`[handleMessageAdded] HMA resolver for ts ${messageTimestampForLog} was not found or already invoked before finally block.`);
+         
       }
     }
   }
@@ -3188,7 +3188,7 @@ export class OllamaView extends ItemView {
 
 async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
     let metadataUpdated = false;
-    this.plugin.logger.debug(`[OllamaView loadAndDisplayActiveChat] Starting to load and display active chat.`);
+    
 
     try {
       this.clearChatContainerInternal(); // Очищає this.chatContainer та this.currentMessages
@@ -3225,7 +3225,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         finalRoleName = await this.findRoleNameByPath(finalRolePath); // findRoleNameByPath має обробляти null/undefined
 
       } catch (error: any) {
-        this.plugin.logger.error("[loadAndDisplayActiveChat] Error connecting to Ollama or loading chat data initial phase.", error);
+        
         new Notice("Error connecting to Ollama or loading chat data.", 5000);
         errorOccurredLoadingData = true;
 
@@ -3249,11 +3249,11 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
           } else {
             // Якщо бажана модель недоступна, встановлюємо першу доступну
             finalModelName = availableModels[0]; 
-            this.plugin.logger.warn(`[loadAndDisplayActiveChat] Preferred model "${preferredModel}" not available. Using "${finalModelName}".`);
+            
           }
         } else {
           finalModelName = null; // Немає доступних моделей
-          this.plugin.logger.warn(`[loadAndDisplayActiveChat] No models available from Ollama service.`);
+          
         }
 
         // Оновлення метаданих чату, якщо модель змінилася
@@ -3263,15 +3263,15 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
             const updateSuccess = await this.plugin.chatManager.updateActiveChatMetadata({ modelName: finalModelName });
             if (updateSuccess) {
               metadataUpdated = true;
-              this.plugin.logger.info(`[loadAndDisplayActiveChat] Active chat metadata (modelName) updated to: ${finalModelName}`);
+              
               // Перезавантажуємо дані чату, щоб отримати оновлені метадані
               const potentiallyUpdatedChat = await this.plugin.chatManager.getChat(activeChat.metadata.id);
               if (potentiallyUpdatedChat) activeChat = potentiallyUpdatedChat;
             } else {
-              this.plugin.logger.warn(`[loadAndDisplayActiveChat] Failed to update chat metadata for modelName.`);
+              
             }
           } catch (updateError) {
-            this.plugin.logger.error(`[loadAndDisplayActiveChat] Error updating chat metadata for modelName.`, updateError);
+            
           }
         }
         finalTemperature = activeChat.metadata?.temperature ?? this.plugin.settings.temperature;
@@ -3340,7 +3340,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
                 renderer = new ToolMessageRenderer(this.app, this.plugin, message, this);
                 break;
               default:
-                this.plugin.logger.warn(`[loadAndDisplayActiveChat] Unknown message role: ${message.role}`);
+                
                 const unknownRoleGroup = this.chatContainer?.createDiv({ cls: CSS_CLASSES.MESSAGE_GROUP });
                 if (unknownRoleGroup && this.chatContainer) {
                   RendererUtils.renderAvatar(this.app, this.plugin, unknownRoleGroup, false); // Аватар за замовчуванням
@@ -3361,7 +3361,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
               messageGroupEl = result instanceof Promise ? await result : result;
             }
           } catch (renderError: any) {
-            this.plugin.logger.error(`[loadAndDisplayActiveChat] Error rendering message (role: ${message.role}, ts: ${message.timestamp.getTime()})`, renderError);
+            
             // Створюємо елемент помилки рендерингу
             const errorDiv = this.chatContainer.createDiv({ cls: CSS_CLASSES.ERROR_MESSAGE || "render-error" }); // Переконайся, що CSS_CLASSES.ERROR_MESSAGE визначено
             errorDiv.setText(`Error rendering message (role: ${message.role}): ${renderError.message}`);
@@ -3414,7 +3414,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         this.updateSendButtonState(); // Оновлюємо стан кнопки відправки
       }
     } catch (error: any) {
-      this.plugin.logger.error("[loadAndDisplayActiveChat] Fatal error during chat loading and display.", error);
+      
       this.clearChatContainerInternal(); // Очищаємо все
       this.showEmptyState("Fatal error."); // Показуємо стан помилки
       if (this.chatContainer) {
@@ -3427,7 +3427,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
       return { metadataUpdated: false }; // Або можна кинути помилку далі
     } finally {
       // Можна додати логування завершення методу
-      this.plugin.logger.debug(`[OllamaView loadAndDisplayActiveChat] Finished loading and displaying. Metadata updated: ${metadataUpdated}`);
+      
     }
 
     return { metadataUpdated };
@@ -3584,7 +3584,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
 
 
       if (isLastChunk) {
-        this.plugin.logger.debug("[_processLlmStream] Stream marked as done. Final accumulated content:", accumulatedContent.substring(0, 300) + "...");
+        
         
         // Парсинг текстових <tool_call> з fullResponseBuffer (якщо вони є)
         // Ця логіка виконується ТІЛЬКИ ОДИН РАЗ в кінці.
@@ -3595,12 +3595,12 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
 
           const endIndex = fullResponseBuffer.indexOf(toolCallEndTag, startIndex + toolCallStartTag.length);
           if (endIndex === -1) {
-            this.plugin.logger.warn("[_processLlmStream] Found start <tool_call> but no end tag in full buffer.");
+            
             break; 
           }
 
           const toolCallJsonString = fullResponseBuffer.substring(startIndex + toolCallStartTag.length, endIndex).trim();
-          this.plugin.logger.debug("[_processLlmStream] Extracted text-based tool call JSON string:", toolCallJsonString);
+          
 
           try {
             const parsedJson = JSON.parse(toolCallJsonString);
@@ -3624,10 +3624,10 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
                     });
                 }
               } else {
-                this.plugin.logger.warn("[_processLlmStream] Invalid text-based tool call definition:", callDef);
+                
               }
             }
-            this.plugin.logger.debug("[_processLlmStream] Parsed text-based tool_calls:", parsedToolCalls);
+            
           } catch (e) {
             this.plugin.logger.error("[_processLlmStream] Error parsing text-based tool call JSON:", e, toolCallJsonString);
           }
@@ -3669,9 +3669,9 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
     if (nativeToolCallsFromStream && nativeToolCallsFromStream.length > 0) {
       toolsToExecute = nativeToolCallsFromStream;
       assistantMessageForHistory.tool_calls = nativeToolCallsFromStream; 
-      this.plugin.logger.debug("[_determineToolCalls] Assigning nativeToolCalls to assistantMessageForHistory.tool_calls:", nativeToolCallsFromStream);
+      
     } else {
-      this.plugin.logger.debug("[_determineToolCalls] No nativeToolCallsFromStream found or empty.");
+      
     }
     
     return { 
@@ -3750,7 +3750,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         try {
           await toolResultHmaPromise;
         } catch (hmaError) {
-          this.plugin.logger.warn(`[ToolCycle] HMA for tool response ${toolName} failed or timed out:`, hmaError);
+          
         }
       }
     }
@@ -3931,7 +3931,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
           try { 
             await hmaErrorPromise; 
           } catch (e_hma) { 
-            this.plugin.logger.warn("[Regenerate] HMA for error display message failed or timed out:", e_hma); 
+             
           }
 
         } finally {
@@ -4059,7 +4059,7 @@ async loadAndDisplayActiveChat(): Promise<{ metadataUpdated: boolean }> {
         try {
           await hmaMaxTurnsPromise;
         } catch (e_hma) {
-          this.plugin.logger.warn("[LlmCycle] HMA for max turns message failed or timed out:", e_hma);
+          
         }
       }
     } catch (error) {
