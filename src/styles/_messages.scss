@@ -43,10 +43,10 @@
 .message-wrapper {
       order: 1;
       .message:not(:last-child) {
-        border-bottom-right-radius: 5px;
+        border-bottom-right-radius: 18px;
       }
       .message:last-child {
-        border-bottom-right-radius: 5px;
+        border-bottom-right-radius: 18px;
       }
       .message:not(:first-child) {
         border-top-right-radius: 5px;
@@ -55,8 +55,8 @@
         border-top-right-radius: 5px;
       }
       .message { 
-        border-top-left-radius: 5px;
-        border-bottom-left-radius: 5px;
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
       }
     }
 
@@ -547,7 +547,7 @@ button.summarize-button {
   justify-content: center;
   overflow: hidden;
   background-color: var(--background-modifier-hover);
-  margin-: 5px;
+  margin-bottom: 5px;
   // align-self: flex-end;
   //  margin-top: 5px;
 
