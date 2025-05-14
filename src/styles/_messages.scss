@@ -1,4 +1,5 @@
 // src/styles/_messages.scss
+// src/styles/_messages.scss
 // Styling for message groups, bubbles, avatars, actions, timestamps etc.
 
 // Assumes these variables are defined elsewhere (e.g., in :root or _variables.scss)
@@ -22,47 +23,43 @@
 
 
 .message-group {
-  display: flex; // Це вже є, добре
+  display: flex; 
   width: 100%;
   margin-bottom: calc(var(--chat-spacing-unit) * 10) !important;
   position: relative;
   box-sizing: border-box;
-  align-items: flex-end; // Вирівнюємо аватари та обгортки по низу групи
+  align-items: flex-end; 
 
   &.user-message-group {
-    justify-content: flex-end; // <--- ВАЖЛИВО: Притискає весь вміст групи до правого краю
+    justify-content: flex-end; 
 
 
-    .message-group-avatar {
-      order: 2; // Аватар візуально буде другим (справа)
-      margin-left: calc(var(--chat-spacing-unit) * 2); // Відступ між бульбашкою (зліва) та аватаром (справа)
-      // margin-right: 1px; // Не потрібен, бо аватар тепер справа
-      // flex-shrink: 0; // Щоб аватар не стискався
+    .avatar-container { // Змінено селектор з .message-group-avatar на .avatar-container
+      order: 2; 
+      margin-left: calc(var(--chat-spacing-unit) * 2); 
+      margin-right: 0; // Додано для однозначності
+      // flex-shrink: 0; 
     }
 
     .message-wrapper {
-      order: 1; // Обгортка повідомлення візуально буде першою (зліва)
-      // margin-right: 0; // Не потрібен, бо аватар тепер справа
-      // margin-left: auto; // Не потрібен, якщо justify-content: flex-end на батьку
-      // max-width: calc(100% - var(--chat-avatar-size) - (var(--chat-spacing-unit) * 2) - 1px); // Опціонально, щоб не наїжджав
+      order: 1; 
+      
     }
   }
 
-  &.ollama-message-group { // Для AI та інструментів
-    justify-content: flex-start; // Притискає вміст групи до лівого краю (це і так за замовчуванням для flex)
+  &.ollama-message-group { 
+    justify-content: flex-start; 
 
-    .message-group-avatar {
-      order: 1; // Аватар візуально перший (зліва)
-      margin-right: calc(var(--chat-spacing-unit) * 2); // Відступ між аватаром (зліва) та бульбашкою (справа)
+    .avatar-container { // Змінено селектор з .message-group-avatar на .avatar-container
+      order: 1; 
+      margin-right: calc(var(--chat-spacing-unit) * 2); 
+      margin-left: 0; // Додано для однозначності
       // flex-shrink: 0;
     }
 
     .message-wrapper {
-
-      order: 2; // Обгортка повідомлення візуально друга (справа)
-      // margin-left: 0;
-      // margin-right: auto;
-      // max-width: calc(100% - var(--chat-avatar-size) - (var(--chat-spacing-unit) * 2) - 1px); // Опціонально
+      order: 2; 
+      
     }
   }
 }
@@ -90,8 +87,12 @@
 
 
 // Avatar Styles
-.message-group-avatar {
-  align-self: flex-end; // Stick to the bottom of the group's vertical space
+// Цей блок .message-group-avatar, ймовірно, тепер менш релевантний для позиціонування,
+// але може містити загальні стилі, які потім уточнюються в .avatar-container.
+// Для чистоти, краще б всі стилі аватара були під одним селектором .avatar-container.
+// Але поки що залишимо його, щоб не зламати щось інше.
+.message-group-avatar { // Цей селектор використовувався для order раніше, але не для розміру/вигляду
+  align-self: flex-end; 
   width: var(--chat-avatar-size);
   height: var(--chat-avatar-size);
   border-radius: 50%;
@@ -103,23 +104,21 @@
   justify-content: center;
   font-weight: 600;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  z-index: 5; // Above potential background elements
+  z-index: 5; 
   flex-shrink: 0;
-
   overflow: hidden;
 
   img.ollama-avatar-image {
-    display: block; // Прибирає можливий нижній відступ
-    width: 100%;    // Заповнює всю ширину/висоту батьківського div
+    display: block; 
+    width: 100%;    
     height: 100%;
-    object-fit: cover; // Масштабує зображення, зберігаючи пропорції і обрізаючи зайве
-                       // Можна спробувати 'contain', якщо хочете бачити все зображення
-    object-position: center; // Центрує зображення
+    object-fit: cover; 
+    object-position: center; 
   }
 
   .svg-icon { width: 60%; height: 60%; }
 
-  .user-message-group & {
+  .user-message-group & { // Ці стилі застосуються, якщо .message-group-avatar все ще використовується десь
     background-color: var(--interactive-accent-translucent);
     color: var(--interactive-accent);
   }
@@ -542,16 +541,20 @@
 // styles.scss або main.scss
 
 // --- Стилі для Аватарок ---
-$avatar-size: 56px; // Бажаний розмір аватара (наприклад, 28px, 30px, 32px)
-$avatar-font-size: calc($avatar-size * 0.5); // Розмір шрифту для ініціалів
-$avatar-icon-size: calc($avatar-size * 0.65); // Розмір іконки всередині аватара
+// Використовуємо CSS змінні для розмірів, якщо вони визначені глобально, або SASS змінні, якщо компілюється
+$avatar-default-size: var(--chat-avatar-size, 32px); // Резервне значення, якщо --chat-avatar-size не визначено
+$avatar-font-size-factor: 0.5;
+$avatar-icon-size-factor: 0.65;
+$avatar-font-size: calc($avatar-default-size * 0.5); // Розмір шрифту для ініціалів
+$avatar-icon-size: calc($avatar-default-size * 0.65); // Розмір іконки всередині аватара
+$avatar-size: 56px; 
 
 // Головний контейнер аватара
-.avatar-container { // Або CSS_CLASSES.AVATAR_CONTAINER, якщо ви так генеруєте класи
-  width: $avatar-size;
-  height: $avatar-size;
-  min-width: $avatar-size; // Важливо для flex-контейнерів
-  min-height: $avatar-size;
+.avatar-container { 
+  width: $avatar-default-size;
+  height: $avatar-default-size;
+  min-width: $avatar-default-size;; // Важливо для flex-контейнерів
+  min-height: $avatar-default-size;;
   border-radius: 50%; // Робимо його круглим
   display: flex;
   align-items: center;
