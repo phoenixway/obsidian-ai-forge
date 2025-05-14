@@ -30,13 +30,14 @@
   align-items: flex-start;
 
   &.user-message-group {
-    justify-content: flex-end;
+    // justify-content: flex-end;
+    justify-content: flex-start;
 
     .avatar-container {
       order: 2;
       margin-left: calc(var(--chat-spacing-unit) * 2);
       margin-right: 0;
-      margin-top: 5px;
+      margin-top: 50px;
       // flex-shrink: 0;
     }
 .message-wrapper {
@@ -68,7 +69,7 @@
       order: 1;
       margin-right: calc(var(--chat-spacing-unit) * 2);
       margin-left: 0;
-       margin-top: 5px;
+       margin-top: 50px;
       // flex-shrink: 0;
     }
 
