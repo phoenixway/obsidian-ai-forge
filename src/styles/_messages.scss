@@ -191,16 +191,16 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
 // Corner Radius logic for consecutive messages within the same wrapper
 .user-message-group .message-wrapper {
   .message:not(:last-child) {
-    border-bottom-right-radius: 5px;
+    border-bottom-right-radius: 18px;
   }
   .message:last-child {
     border-bottom-right-radius: 18px;
   }
   .message:not(:first-child) {
-    border-top-right-radius: 5px;
+    border-top-right-radius: 18px;
   }
   .message:first-child {
-    border-top-right-radius: 18px;
+    border-top-right-radius: 5px;
   }
   .message { // For user messages, left corners are always fully rounded
     border-top-left-radius: 18px;
