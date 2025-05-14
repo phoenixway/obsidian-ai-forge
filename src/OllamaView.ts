@@ -86,6 +86,8 @@ export class OllamaView extends ItemView {
   private readonly FRAME_PROCESSED_LOG_INTERVAL = 30; // Логувати кожен 30-й фрейм (приблизно раз на секунду, якщо фрейми по 30мс)
   private vadObjectUrls: { model?: string, worklet?: string } = {};
 private speechWorkerUrl: string | null = null;
+  private readonly DEFAULT_PLACEHOLDER: string; 
+
 
   public readonly plugin: OllamaPlugin;
   private chatContainerEl!: HTMLElement;
@@ -173,6 +175,7 @@ private speechWorkerUrl: string | null = null;
     );
     this.boundOnDragMove = this.onDragMove.bind(this);
     this.boundOnDragEnd = this.onDragEnd.bind(this);
+    this.DEFAULT_PLACEHOLDER = "Type your message or use the voice input..."; // Або будь-яке інше значення
 
     this.saveWidthDebounced = debounce(() => {
       if (this.sidebarRootEl) {
@@ -1697,33 +1700,37 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
   private setupSpeechWorkerHandlers(): void {
     if (!this.speechWorker) return;
 
-    this.speechWorker.onmessage = event => {
-      this.plugin.logger.debug("[setupSpeechWorkerHandlers] Speech worker message:", event.data);
-      const data = event.data;
-
-      if (data && typeof data === "object" && data.error) {
-        new Notice(`Speech Recognition Error: ${data.message}`);
-        this.updateInputPlaceholder(this.plugin.settings.modelName);
+    this.speechWorker.onmessage = (event: MessageEvent<{success: boolean, transcript?: string, error?: string, details?: any}>) => {
+        this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
         this.updateSendButtonState();
-        return;
-      }
 
-      if (typeof data === "string" && data.trim()) {
-        const transcript = data.trim();
-        this.insertTranscript(transcript);
-      } else if (typeof data !== "string") {
-      }
-
-      this.updateSendButtonState();
+        const data = event.data;
+        if (data.success && typeof data.transcript === 'string') {
+            this.plugin.logger.info("Received transcript from inline worker:", data.transcript);
+            this.inputEl.value = data.transcript;
+            this.inputEl.focus();
+            // ...
+        } else {
+            this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
+            new Notice(`Speech recognition error: ${data.error || 'Unknown error'}`);
+        }
     };
 
-    this.speechWorker.onerror = () => {
-      new Notice("An unexpected error occurred in the speech recognition worker.");
-      this.updateInputPlaceholder(this.plugin.settings.modelName);
-
-      this.stopVoiceRecording(false);
+    this.speechWorker.onerror = (error: ErrorEvent) => {
+        this.plugin.logger.error("Unhandled error in inline speech worker:", error.message, error);
+        new Notice(`Speech recognition worker failed: ${error.message}`);
+        this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
+        this.updateSendButtonState();
+         if (this.speechWorker) { // Зупиняємо воркер, якщо він зламався
+            this.speechWorker.terminate();
+            this.speechWorker = null;
+        }
+        if (this.speechWorkerUrl) { // І відкликаємо його URL
+            URL.revokeObjectURL(this.speechWorkerUrl);
+            this.speechWorkerUrl = null;
+        }
     };
-  }
+}
   private insertTranscript(transcript: string): void {
     if (!this.inputEl) return;
 

@@ -20346,6 +20346,7 @@ This action cannot be undone.`,
     );
     this.boundOnDragMove = this.onDragMove.bind(this);
     this.boundOnDragEnd = this.onDragEnd.bind(this);
+    this.DEFAULT_PLACEHOLDER = "Type your message or use the voice input...";
     this.saveWidthDebounced = (0, import_obsidian15.debounce)(() => {
       if (this.sidebarRootEl) {
         const newWidth = this.sidebarRootEl.offsetWidth;
@@ -21081,25 +21082,31 @@ This action cannot be undone.`,
     if (!this.speechWorker)
       return;
     this.speechWorker.onmessage = (event) => {
-      this.plugin.logger.debug("[setupSpeechWorkerHandlers] Speech worker message:", event.data);
-      const data = event.data;
-      if (data && typeof data === "object" && data.error) {
-        new import_obsidian15.Notice(`Speech Recognition Error: ${data.message}`);
-        this.updateInputPlaceholder(this.plugin.settings.modelName);
-        this.updateSendButtonState();
-        return;
-      }
-      if (typeof data === "string" && data.trim()) {
-        const transcript = data.trim();
-        this.insertTranscript(transcript);
-      } else if (typeof data !== "string") {
-      }
+      this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
       this.updateSendButtonState();
+      const data = event.data;
+      if (data.success && typeof data.transcript === "string") {
+        this.plugin.logger.info("Received transcript from inline worker:", data.transcript);
+        this.inputEl.value = data.transcript;
+        this.inputEl.focus();
+      } else {
+        this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
+        new import_obsidian15.Notice(`Speech recognition error: ${data.error || "Unknown error"}`);
+      }
     };
-    this.speechWorker.onerror = () => {
-      new import_obsidian15.Notice("An unexpected error occurred in the speech recognition worker.");
-      this.updateInputPlaceholder(this.plugin.settings.modelName);
-      this.stopVoiceRecording(false);
+    this.speechWorker.onerror = (error) => {
+      this.plugin.logger.error("Unhandled error in inline speech worker:", error.message, error);
+      new import_obsidian15.Notice(`Speech recognition worker failed: ${error.message}`);
+      this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
+      this.updateSendButtonState();
+      if (this.speechWorker) {
+        this.speechWorker.terminate();
+        this.speechWorker = null;
+      }
+      if (this.speechWorkerUrl) {
+        URL.revokeObjectURL(this.speechWorkerUrl);
+        this.speechWorkerUrl = null;
+      }
     };
   }
   insertTranscript(transcript) {
