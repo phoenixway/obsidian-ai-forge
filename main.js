@@ -6244,83 +6244,90 @@ Summary:`;
   // src/OllamaView.ts
   // ... (інші імпорти та частина класу) ...
   async handleMessageAdded(data) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const messageForLog = data == null ? void 0 : data.message;
     const messageTimestampForLog = (_a = messageForLog == null ? void 0 : messageForLog.timestamp) == null ? void 0 : _a.getTime();
     const messageRoleForLog = messageForLog == null ? void 0 : messageForLog.role;
-    this.plugin.logger.debug(`[handleMessageAdded] Received message event for chat ${data.chatId}. Message role: ${messageRoleForLog}, timestamp: ${messageTimestampForLog}`, data.message);
+    this.plugin.logger.debug(
+      `[handleMessageAdded] Received message event for chat ${data.chatId}. Message role: ${messageRoleForLog}, timestamp: ${messageTimestampForLog}`,
+      { role: messageForLog == null ? void 0 : messageForLog.role, contentPreview: ((_b = messageForLog == null ? void 0 : messageForLog.content) == null ? void 0 : _b.substring(0, 50)) + "...", tool_calls: messageForLog == null ? void 0 : messageForLog.tool_calls }
+    );
     try {
-      if (!data || !data.message) {
-        this.plugin.logger.warn("[handleMessageAdded] Event data or message is null/undefined.", data);
+      if (!data || !data.message || !messageForLog || !messageTimestampForLog) {
+        this.plugin.logger.warn("[handleMessageAdded] Event data, message, or timestamp is null/undefined.", data);
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
       const { chatId: eventChatId, message } = data;
-      const messageTimestampMs = message.timestamp.getTime();
+      const messageTimestampMs = messageTimestampForLog;
       this.plugin.logger.debug(`[handleMessageAdded] Processing message:`, {
         id: messageTimestampMs,
         role: message.role,
-        content: ((_b = message.content) == null ? void 0 : _b.substring(0, 100)) + (message.content && message.content.length > 100 ? "..." : ""),
+        content: ((_c = message.content) == null ? void 0 : _c.substring(0, 100)) + (message.content && message.content.length > 100 ? "..." : ""),
         tool_calls: message.tool_calls
+        // Приводимо до AssistantMessage для доступу до tool_calls
       });
       if (!this.chatContainer || !this.plugin.chatManager) {
         this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager is null. Aborting render.");
-        if (messageTimestampForLog)
-          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
         this.plugin.logger.debug(`[handleMessageAdded] Message for inactive chat ${eventChatId} (active is ${activeChatId}). Skipping render.`);
-        if (messageTimestampForLog)
-          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const isAssistant = message.role === "assistant";
       const hasToolCalls = !!(message.tool_calls && message.tool_calls.length > 0);
       const isActiveCycle = !!this.currentAbortController;
-      this.plugin.logger.debug("[handleMessageAdded] Conditions for skipping render:", { isAssistant, hasToolCalls, isActiveCycle });
-      if (isAssistant && hasToolCalls && isActiveCycle) {
-        this.plugin.logger.info("[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls during active cycle.", message);
-        if (messageTimestampForLog)
-          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+      this.plugin.logger.debug("[handleMessageAdded] Conditions for special handling:", { isAssistant, hasToolCalls, isActiveCycle });
+      if (isAssistant && hasToolCalls) {
+        this.plugin.logger.info(
+          `[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls (role: ${message.role}, ts: ${messageTimestampMs}). This message is for tool execution only.`,
+          { contentPreview: ((_d = message.content) == null ? void 0 : _d.substring(0, 70)) + "...", tool_calls: message.tool_calls }
+        );
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-          this.plugin.logger.debug("[handleMessageAdded] Removing active placeholder for skipped assistant message.", { placeholderTs: this.activePlaceholder.timestamp });
+          this.plugin.logger.debug("[handleMessageAdded] Removing active placeholder (if any) for skipped assistant tool_call message.", { placeholderTs: this.activePlaceholder.timestamp });
           if (this.activePlaceholder.groupEl.isConnected) {
             this.activePlaceholder.groupEl.remove();
           }
           this.activePlaceholder = null;
         }
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const existingRenderedMessage = this.chatContainer.querySelector(
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already rendered. Skipping.`);
-        if (messageTimestampForLog)
-          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already fully rendered. Skipping.`);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
-      const alreadyInLogicCache = this.currentMessages.some(
-        (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
+      const isAlreadyInLogicCache = this.currentMessages.some(
+        (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
+        // Порівняння контенту може бути надлишковим і дорогим, якщо ID (timestamp) унікальний
+        // && m.content === message.content 
       );
-      const isPotentiallyAssistantForPlaceholder = message.role === "assistant" && ((_c = this.activePlaceholder) == null ? void 0 : _c.timestamp) === messageTimestampMs;
-      if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already in logic cache and not for placeholder. Skipping.`);
-        if (messageTimestampForLog)
-          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+      const isPotentiallyAssistantForPlaceholder = isAssistant && // Це повідомлення асистента
+      !hasToolCalls && // І воно НЕ має tool_calls (бо такі ми вже пропустили)
+      ((_e = this.activePlaceholder) == null ? void 0 : _e.timestamp) === messageTimestampMs;
+      if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
+        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} found in logic cache and not intended for current placeholder. Skipping.`);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
-      if (!alreadyInLogicCache) {
+      if (!isAlreadyInLogicCache) {
         this.plugin.logger.debug(`[handleMessageAdded] Adding message with ts ${messageTimestampMs} to currentMessages cache.`);
         this.currentMessages.push(message);
       }
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Updating placeholder for assistant message ts ${messageTimestampMs}.`);
+        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message ts ${messageTimestampMs}.`);
         const placeholderToUpdate = this.activePlaceholder;
-        if (((_d = placeholderToUpdate.groupEl) == null ? void 0 : _d.isConnected) && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
+        this.activePlaceholder = null;
+        if (((_f = placeholderToUpdate.groupEl) == null ? void 0 : _f.isConnected) && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
           placeholderToUpdate.groupEl.classList.remove("placeholder");
           placeholderToUpdate.groupEl.removeAttribute("data-placeholder-timestamp");
           placeholderToUpdate.groupEl.setAttribute("data-timestamp", messageTimestampMs.toString());
@@ -6331,7 +6338,6 @@ Summary:`;
             this.plugin.logger.warn("[handleMessageAdded] Placeholder DOM element missing during update. Falling back to standard add.");
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
-            this.activePlaceholder = null;
             await this.addMessageStandard(message);
           } else {
             placeholderToUpdate.contentEl.classList.remove("streaming-text");
@@ -6342,6 +6348,7 @@ Summary:`;
               const displayContent = AssistantMessageRenderer.prepareDisplayContent(
                 message.content || "",
                 message,
+                // message тут вже не має tool_calls, бо ми їх відфільтрували
                 this.plugin,
                 this
               );
@@ -6352,7 +6359,6 @@ Summary:`;
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
-              this.activePlaceholder = null;
               setTimeout(() => {
                 if (finalMessageGroupElement == null ? void 0 : finalMessageGroupElement.isConnected)
                   this.checkMessageForCollapsing(finalMessageGroupElement);
@@ -6362,13 +6368,11 @@ Summary:`;
               this.plugin.logger.error("[handleMessageAdded] Error finalizing placeholder display.", renderError);
               if (placeholderToUpdate.groupEl.isConnected)
                 placeholderToUpdate.groupEl.remove();
-              this.activePlaceholder = null;
               this.handleErrorMessage({ role: "error", content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
             }
           }
         } else {
           this.plugin.logger.warn("[handleMessageAdded] Placeholder or its elements not connected/found. Falling back to standard add.");
-          this.activePlaceholder = null;
           await this.addMessageStandard(message);
         }
       } else {
@@ -6376,10 +6380,10 @@ Summary:`;
         await this.addMessageStandard(message);
       }
     } catch (outerError) {
-      this.plugin.logger.error("[handleMessageAdded] Outer error caught.", outerError, { messageData: data });
+      this.plugin.logger.error("[handleMessageAdded] Outer error caught in handleMessageAdded.", outerError, { messageData: data });
       this.handleErrorMessage({
         role: "error",
-        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
+        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message || "Unknown error"}`,
         timestamp: new Date()
       });
     } finally {
@@ -6387,7 +6391,7 @@ Summary:`;
         this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for ts ${messageTimestampForLog} in finally block.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
-        this.plugin.logger.debug(`[handleMessageAdded] HMA resolver for ts ${messageTimestampForLog} already invoked or not found in finally.`);
+        this.plugin.logger.trace(`[handleMessageAdded] HMA resolver for ts ${messageTimestampForLog} was not found or already invoked before finally block.`);
       }
     }
   }

@@ -2928,98 +2928,128 @@ export class OllamaView extends ItemView {
 
   private async handleMessageAdded(data: { chatId: string; message: Message }): Promise<void> {
     const messageForLog = data?.message;
-    const messageTimestampForLog = messageForLog?.timestamp?.getTime();
-    const messageRoleForLog = messageForLog?.role as MessageRole;
+    const messageTimestampForLog = messageForLog?.timestamp?.getTime(); // Використовуємо ?. для безпеки
+    const messageRoleForLog = messageForLog?.role as MessageRole; // Припускаємо, що MessageRole з OllamaView
 
-    this.plugin.logger.debug(`[handleMessageAdded] Received message event for chat ${data.chatId}. Message role: ${messageRoleForLog}, timestamp: ${messageTimestampForLog}`, data.message);
+    // Логуємо вхідну подію
+    this.plugin.logger.debug(
+      `[handleMessageAdded] Received message event for chat ${data.chatId}. Message role: ${messageRoleForLog}, timestamp: ${messageTimestampForLog}`,
+      { role: messageForLog?.role, contentPreview: messageForLog?.content?.substring(0, 50) + "...", tool_calls: (messageForLog as AssistantMessage)?.tool_calls }
+    );
 
     try {
-      if (!data || !data.message) {
-        this.plugin.logger.warn("[handleMessageAdded] Event data or message is null/undefined.", data);
+      // 1. Базові перевірки на валідність даних
+      if (!data || !data.message || !messageForLog || !messageTimestampForLog) { // Перевіряємо і messageTimestampForLog
+        this.plugin.logger.warn("[handleMessageAdded] Event data, message, or timestamp is null/undefined.", data);
         if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
 
-      const { chatId: eventChatId, message } = data;
-      const messageTimestampMs = message.timestamp.getTime();
+      const { chatId: eventChatId, message } = data; // message тут гарантовано є
+      const messageTimestampMs = messageTimestampForLog; // Тепер це те саме, що message.timestamp.getTime()
 
+      // Логування оброблюваного повідомлення
       this.plugin.logger.debug(`[handleMessageAdded] Processing message:`, { 
         id: messageTimestampMs, 
         role: message.role, 
         content: message.content?.substring(0,100) + (message.content && message.content.length > 100 ? "..." : ""),
-        tool_calls: (message as AssistantMessage).tool_calls 
+        tool_calls: (message as AssistantMessage).tool_calls // Приводимо до AssistantMessage для доступу до tool_calls
       });
 
-
+      // 2. Перевірка наявності chatContainer та chatManager
       if (!this.chatContainer || !this.plugin.chatManager) {
         this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager is null. Aborting render.");
-        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
 
+      // 3. Перевірка, чи повідомлення для активного чату
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
         this.plugin.logger.debug(`[handleMessageAdded] Message for inactive chat ${eventChatId} (active is ${activeChatId}). Skipping render.`);
-        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       
-      // Перевіряємо умови для пропуску рендерингу
+      // 4. Визначення умов для спеціальної обробки
       const isAssistant = message.role === "assistant";
       const hasToolCalls = !!((message as AssistantMessage).tool_calls && (message as AssistantMessage).tool_calls!.length > 0);
-      const isActiveCycle = !!this.currentAbortController;
+      // isActiveCycle: Перевіряємо, чи є активний AbortController (або інший індикатор активного LLM циклу)
+      const isActiveCycle = !!this.currentAbortController; // Ти використовував currentAbortController
 
-      this.plugin.logger.debug("[handleMessageAdded] Conditions for skipping render:", { isAssistant, hasToolCalls, isActiveCycle });
+      this.plugin.logger.debug("[handleMessageAdded] Conditions for special handling:", { isAssistant, hasToolCalls, isActiveCycle });
 
-      if (isAssistant && hasToolCalls && isActiveCycle) {
-        this.plugin.logger.info("[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls during active cycle.", message);
+      // --- КЛЮЧОВА ЗМІНА ЛОГІКИ ---
+      // 5. Пропуск рендерингу для повідомлень асистента з tool_calls
+      // Це має відбуватися НЕЗАЛЕЖНО від isActiveCycle, якщо ми хочемо приховати їх і при перезавантаженні.
+      if (isAssistant && hasToolCalls) {
+        this.plugin.logger.info(
+          `[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls (role: ${message.role}, ts: ${messageTimestampMs}). This message is for tool execution only.`,
+          { contentPreview: message.content?.substring(0, 70) + "...", tool_calls: (message as AssistantMessage).tool_calls }
+        );
         
-        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
-        
+        // Видаляємо плейсхолдер, якщо він був створений для цього конкретного повідомлення
+        // (малоймовірно для assistant+tool_calls, але для повноти)
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-            this.plugin.logger.debug("[handleMessageAdded] Removing active placeholder for skipped assistant message.", { placeholderTs: this.activePlaceholder.timestamp });
+            this.plugin.logger.debug("[handleMessageAdded] Removing active placeholder (if any) for skipped assistant tool_call message.", { placeholderTs: this.activePlaceholder.timestamp });
             if (this.activePlaceholder.groupEl.isConnected) {
                 this.activePlaceholder.groupEl.remove();
             }
             this.activePlaceholder = null;
         }
-        return; 
+        // Також, якщо це повідомлення було в currentMessages (наприклад, додане ChatManager), але не буде рендеритися,
+        // його можна прибрати, щоб не впливати на логіку "alreadyInLogicCache" для майбутніх повідомлень.
+        // Або ж, якщо воно має бути в історії для логіки LLM, але не для UI.
+        // Поки що залишимо його в this.currentMessages, якщо ChatManager його туди додає.
+        
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs); // Завершуємо HMA
+        return; // Повністю виходимо, не рендеримо це повідомлення
       }
 
-      // Решта логіки методу
+      // 6. Запобігання повторному рендерингу вже існуючих повідомлень
       const existingRenderedMessage = this.chatContainer.querySelector(
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already rendered. Skipping.`);
-        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already fully rendered. Skipping.`);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
 
-      const alreadyInLogicCache = this.currentMessages.some(
-        m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role && m.content === message.content
+      // 7. Перевірка, чи повідомлення вже є в логічному кеші (this.currentMessages)
+      // Це може допомогти уникнути дублювання, якщо подія прийшла двічі до рендерингу.
+      const isAlreadyInLogicCache = this.currentMessages.some(
+        m => m.timestamp.getTime() === messageTimestampMs && m.role === message.role 
+        // Порівняння контенту може бути надлишковим і дорогим, якщо ID (timestamp) унікальний
+        // && m.content === message.content 
       );
 
+      // Визначаємо, чи це повідомлення асистента призначене для оновлення активного плейсхолдера
       const isPotentiallyAssistantForPlaceholder =
-        message.role === "assistant" && this.activePlaceholder?.timestamp === messageTimestampMs;
+        isAssistant && // Це повідомлення асистента
+        !hasToolCalls && // І воно НЕ має tool_calls (бо такі ми вже пропустили)
+        this.activePlaceholder?.timestamp === messageTimestampMs; // І є активний плейсхолдер для нього
 
-      if (alreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} already in logic cache and not for placeholder. Skipping.`);
-        if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
+      if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
+        // Якщо повідомлення вже в кеші І воно не для оновлення плейсхолдера,
+        // то, ймовірно, це дублікат або вже оброблена ситуація.
+        this.plugin.logger.debug(`[handleMessageAdded] Message with ts ${messageTimestampMs} found in logic cache and not intended for current placeholder. Skipping.`);
+        this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       
-      if (!alreadyInLogicCache) {
+      // Додаємо в логічний кеш, якщо ще не там (або якщо це для плейсхолдера, то воно вже може бути там)
+      if (!isAlreadyInLogicCache) {
         this.plugin.logger.debug(`[handleMessageAdded] Adding message with ts ${messageTimestampMs} to currentMessages cache.`);
-        this.currentMessages.push(message);
+        this.currentMessages.push(message); // Зберігаємо оригінальне повідомлення з Date об'єктом
       }
 
+      // 8. Логіка рендерингу: оновлення плейсхолдера або додавання нового повідомлення
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Updating placeholder for assistant message ts ${messageTimestampMs}.`);
-        // ... (логіка оновлення плейсхолдера) ...
-        // Ця логіка має бути досягнута ТІЛЬКИ для фінального повідомлення асистента, 
-        // яке НЕ має tool_calls або для якого isActiveCycle = false.
-          const placeholderToUpdate = this.activePlaceholder;
+        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message ts ${messageTimestampMs}.`);
+        
+        const placeholderToUpdate = this.activePlaceholder; // Зберігаємо посилання
+        this.activePlaceholder = null; // Очищаємо activePlaceholder перед асинхронними операціями
 
         if (
           placeholderToUpdate.groupEl?.isConnected &&
@@ -3037,7 +3067,7 @@ export class OllamaView extends ItemView {
           if (!messageDomElement) {
             this.plugin.logger.warn("[handleMessageAdded] Placeholder DOM element missing during update. Falling back to standard add.");
             if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
-            this.activePlaceholder = null;
+            // this.activePlaceholder = null; // Вже очищено
             await this.addMessageStandard(message); 
           } else {
             placeholderToUpdate.contentEl.classList.remove("streaming-text");
@@ -3047,49 +3077,56 @@ export class OllamaView extends ItemView {
             try {
               const displayContent = AssistantMessageRenderer.prepareDisplayContent(
                 message.content || "",
-                message as AssistantMessage,
+                message as AssistantMessage, // message тут вже не має tool_calls, бо ми їх відфільтрували
                 this.plugin,
                 this
               );
-              placeholderToUpdate.contentEl.empty();
+              placeholderToUpdate.contentEl.empty(); // Очищаємо вміст перед новим рендерингом
               await RendererUtils.renderMarkdownContent( this.app, this, this.plugin, placeholderToUpdate.contentEl, displayContent );
               AssistantMessageRenderer.addAssistantActionButtons( messageDomElement, placeholderToUpdate.contentEl, message as AssistantMessage, this.plugin, this );
               BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
+              
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
-              const finalMessageGroupElement = placeholderToUpdate.groupEl;
-              this.activePlaceholder = null;
+              const finalMessageGroupElement = placeholderToUpdate.groupEl; // Зберігаємо для setTimeout
+              // this.activePlaceholder = null; // Вже очищено
+              
+              // Асинхронна перевірка на згортання
               setTimeout(() => { if (finalMessageGroupElement?.isConnected) this.checkMessageForCollapsing(finalMessageGroupElement); }, 70);
-              this.guaranteedScrollToBottom(100, true);
+              this.guaranteedScrollToBottom(100, true); // Прокрутка
             } catch (renderError: any) {
               this.plugin.logger.error("[handleMessageAdded] Error finalizing placeholder display.", renderError);
               if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
-              this.activePlaceholder = null;
+              // this.activePlaceholder = null; // Вже очищено
               this.handleErrorMessage({ role: "error", content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`, timestamp: new Date() });
             }
           }
         } else { 
           this.plugin.logger.warn("[handleMessageAdded] Placeholder or its elements not connected/found. Falling back to standard add.");
-          this.activePlaceholder = null;
+          // this.activePlaceholder = null; // Вже очищено
           await this.addMessageStandard(message);
         }
-      } else { 
+      } else { // Якщо не оновлення плейсхолдера, то стандартне додавання
+        // Це включає повідомлення користувача, інструментів, помилок,
+        // а також повідомлення асистента, якщо для них не було плейсхолдера (наприклад, при завантаженні історії)
         this.plugin.logger.debug(`[handleMessageAdded] Adding message ts ${messageTimestampMs} via addMessageStandard.`);
         await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
-      this.plugin.logger.error("[handleMessageAdded] Outer error caught.", outerError, { messageData: data });
+      this.plugin.logger.error("[handleMessageAdded] Outer error caught in handleMessageAdded.", outerError, { messageData: data });
       this.handleErrorMessage({
         role: "error",
-        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message}`,
+        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message || 'Unknown error'}`,
         timestamp: new Date(),
       });
     } finally {
+      // Гарантовано викликаємо резолвер, якщо він ще існує
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
          this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for ts ${messageTimestampForLog} in finally block.`);
          this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
-         this.plugin.logger.debug(`[handleMessageAdded] HMA resolver for ts ${messageTimestampForLog} already invoked or not found in finally.`);
+         // Якщо резолвера вже немає, логуємо це, щоб розуміти потік
+         this.plugin.logger.trace(`[handleMessageAdded] HMA resolver for ts ${messageTimestampForLog} was not found or already invoked before finally block.`);
       }
     }
   }
