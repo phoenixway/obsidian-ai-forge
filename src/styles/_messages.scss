@@ -28,7 +28,7 @@
   box-sizing: border-box;
   // align-items: flex-end;
   align-items: flex-start;
-  // gap: calc(var(--chat-spacing-unit) * 2); 
+  // gap: calc(var(--chat-spacing-unit) * 2);
 
   &.user-message-group {
     justify-content: flex-end;
@@ -43,7 +43,7 @@
       margin-top: 200px;
       // flex-shrink: 0;
     }
-.message-wrapper {
+    .message-wrapper {
       //margin-top: 20px;//не помогає
 
       order: 1;
@@ -59,12 +59,11 @@
       .message:first-child {
         border-top-right-radius: 5px;
       }
-      .message { 
+      .message {
         border-top-left-radius: 18px;
         border-bottom-left-radius: 18px;
       }
     }
-
   }
 
   &.ollama-message-group {
@@ -79,7 +78,7 @@
       // flex-shrink: 0;
     }
 
-.message-wrapper {
+    .message-wrapper {
       order: 2;
       // margin-top: 15px;
       align-items: flex-start;
@@ -89,7 +88,7 @@
       .message {
         // Спочатку встановлюємо всі кути на стандартний радіус
         border-top-left-radius: 5px;
-        border-bottom-left-radius: 18px; 
+        border-bottom-left-radius: 18px;
         border-top-right-radius: 18px;
         border-bottom-right-radius: 18px;
 
@@ -98,20 +97,21 @@
         &:first-child {
           border-bottom-left-radius: 18px;
           // Якщо є інші повідомлення, і це не останнє, то верхній лівий теж гострий
-           &:not(:last-child) {
+          &:not(:last-child) {
             // Для послідовності повідомлень, якщо потрібно, щоб верхній кут теж був гострий
             border-top-left-radius: 5px; // Поки що не додаємо, щоб відповідати тому, що спрацювало
-           }
+          }
         }
-         // Якщо це не перше повідомлення (тобто є попереднє), робимо верхній лівий гострим
-         &:not(:first-child) {
-            border-top-left-radius: 5px;
-            // Якщо це також не останнє, то нижній лівий також гострий (для середини довгої розмови)
-             &:not(:last-child) {
-                 border-bottom-left-radius: 5px;
-             }
-         }
-        }}
+        // Якщо це не перше повідомлення (тобто є попереднє), робимо верхній лівий гострим
+        &:not(:first-child) {
+          border-top-left-radius: 5px;
+          // Якщо це також не останнє, то нижній лівий також гострий (для середини довгої розмови)
+          &:not(:last-child) {
+            border-bottom-left-radius: 5px;
+          }
+        }
+      }
+    }
   }
 }
 
@@ -210,7 +210,8 @@ $avatar-icon-size-factor: 0.65; // Відносний розмір іконки 
   .message:first-child {
     border-top-right-radius: 18px;
   }
-  .message { // For user messages, left corners are always fully rounded
+  .message {
+    // For user messages, left corners are always fully rounded
     border-top-left-radius: 18px;
     border-bottom-left-radius: 18px;
   }
