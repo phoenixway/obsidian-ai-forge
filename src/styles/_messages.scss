@@ -75,7 +75,7 @@
       // margin-left: 0;
 
       //  margin-bottom: 50px !important; // не помогає
-      margin-top: 30px;
+      margin-top: 35px;
       // flex-shrink: 0;
     }
 
@@ -96,16 +96,16 @@
         // Якщо це перше повідомлення в групі (або єдине),
         // робимо нижній лівий кут гострим
         &:first-child {
-          border-bottom-left-radius: 18px;
+          border-bottom-left-radius: 5px;
           // Якщо є інші повідомлення, і це не останнє, то верхній лівий теж гострий
           &:not(:last-child) {
             // Для послідовності повідомлень, якщо потрібно, щоб верхній кут теж був гострий
-            border-top-left-radius: 5px; // Поки що не додаємо, щоб відповідати тому, що спрацювало
+            border-top-left-radius: 18px; // Поки що не додаємо, щоб відповідати тому, що спрацювало
           }
         }
         // Якщо це не перше повідомлення (тобто є попереднє), робимо верхній лівий гострим
         &:not(:first-child) {
-          border-top-left-radius: 5px;
+          border-top-left-radius: 18px;
           // Якщо це також не останнє, то нижній лівий також гострий (для середини довгої розмови)
           &:not(:last-child) {
             border-bottom-left-radius: 5px;
