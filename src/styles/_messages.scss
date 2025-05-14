@@ -29,7 +29,7 @@
 
   // Group alignment dictates order and avatar margin side
   &.user-message-group {
-    // justify-content: flex-end; // No longer needed if wrapper handles margin
+    justify-content: flex-end; // No longer needed if wrapper handles margin
     .message-group-avatar { order: 2; } // Avatar on the right
     .message-wrapper {
        order: 1; // Messages on the left
