@@ -63,13 +63,13 @@
   }
 
   &.ollama-message-group {
-    justify-content: flex-start;
+    justify-content: flex-end;
 
     .avatar-container {
       order: 1;
       margin-right: calc(var(--chat-spacing-unit) * 2);
       margin-left: 0;
-       margin-top: 50px;
+      margin-top: 50px !important;
       // flex-shrink: 0;
     }
 
