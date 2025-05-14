@@ -264,11 +264,11 @@ export function renderAvatar(
     } else {
         // Визначаємо тип і контент індивідуально для кожної ролі
         switch (avatarRoleType) {
-            case 'tool': // Це для "Tool Executed..."
-            // case 'tool-usage': // Якщо ви використовуєте окремий тип для "Using tool..."
-                avatarTypeToUse = 'icon'; // Завжди іконка для інструментів
-                avatarContentToUse = 'settings'; // Або 'cog' - це іконка шестерні в Lucide
-                break;
+            // case 'tool': // Це для "Tool Executed..."
+            // // case 'tool-usage': // Якщо ви використовуєте окремий тип для "Using tool..."
+            //     avatarTypeToUse = 'icon'; // Завжди іконка для інструментів
+            //     avatarContentToUse = 'settings'; // Або 'cog' - це іконка шестерні в Lucide
+            //     break;
             case 'system':
                 avatarTypeToUse = 'icon'; 
                 avatarContentToUse = 'info';  

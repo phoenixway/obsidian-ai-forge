@@ -1364,10 +1364,6 @@ function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
     avatarContentToUse = settings.userAvatarContent;
   } else {
     switch (avatarRoleType) {
-      case "tool":
-        avatarTypeToUse = "icon";
-        avatarContentToUse = "settings";
-        break;
       case "system":
         avatarTypeToUse = "icon";
         avatarContentToUse = "info";
