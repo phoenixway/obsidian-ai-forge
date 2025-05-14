@@ -53,7 +53,7 @@ $avatar-icon-size-factor: 0.65;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
   line-height: 1.5;
-  @include transition((transform, box-shadow), 0.2s, ease-out); // Уточнено властивості для transition
+  @include transition((transform, box-shadow), 0.2s, ease-out);
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5);
 
   &:last-child {
@@ -69,7 +69,7 @@ $avatar-icon-size-factor: 0.65;
   color: var(--text-muted);
   border-radius: var(--radius-s);
   cursor: pointer;
-  @include transition; // Використовуємо міксін transition
+  @include transition;
   @include flex-layout($align: center, $justify: center);
 
   .svg-icon {
@@ -125,7 +125,7 @@ $avatar-icon-size-factor: 0.65;
 
     .avatar-container {
       order: 2;
-      margin-bottom: 50px; // TODO: Розглянути альтернативу цьому великому відступу
+      margin-bottom: 50px; // TODO: Розглянути альтернативу
     }
     .message-wrapper {
       order: 1;
@@ -137,7 +137,7 @@ $avatar-icon-size-factor: 0.65;
 
     .avatar-container {
       order: 1;
-      margin-top: 45px; // TODO: Розглянути альтернативу цьому великому відступу
+      margin-top: 45px; // TODO: Розглянути альтернативу
     }
     .message-wrapper {
       order: 2;
@@ -158,9 +158,7 @@ $avatar-icon-size-factor: 0.65;
 
   &.avatar-icon .svg-icon,
   .avatar-icon svg {
-    // Прибираємо зайву вкладеність .svg-icon, якщо .avatar-icon вже на svg або його обгортці
     svg {
-      // Або якщо .avatar-icon - це батьківський контейнер для svg
       width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
       height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
       display: block;
@@ -188,19 +186,21 @@ $avatar-icon-size-factor: 0.65;
 .message-wrapper {
   @include flex-layout($direction: column);
 
-  .user-message-group & {
-    align-items: flex-end;
-  }
   .ollama-message-group & {
     align-items: flex-start;
+  }
+  .user-message-group & {
+    align-items: flex-end;
   }
 }
 
 // --- Стилі для бульбашок повідомлень ---
 .message {
   @extend %base-message-bubble;
-  // @include flex-layout($direction: column, $align: flex-start); // Нове! Робимо .message flex-контейнером
-
+  
+  &.ollama-message {
+    border: 1px solid red; // Тимчасово для діагностики
+  }
 
   &.message-arriving {
     animation: message-appear 0.3s ease-out forwards;
@@ -211,74 +211,45 @@ $avatar-icon-size-factor: 0.65;
 .user-message-group .message-wrapper .message {
   border-top-left-radius: 18px;
   border-bottom-left-radius: 18px;
-  &:first-child {
-    border-top-right-radius: 18px;
-  }
-  &:not(:first-child) {
-    border-top-right-radius: 5px;
-  }
-  &:last-child {
-    border-bottom-right-radius: 18px;
-  }
-  &:not(:last-child) {
-    border-bottom-right-radius: 5px;
-  }
+  &:first-child { border-top-right-radius: 18px; }
+  &:not(:first-child) { border-top-right-radius: 5px; }
+  &:last-child { border-bottom-right-radius: 18px; }
+  &:not(:last-child) { border-bottom-right-radius: 5px; }
 }
 
 .ollama-message-group .message-wrapper .message {
   border-top-right-radius: 18px;
   border-bottom-right-radius: 18px;
-  &:first-child {
-    border-top-left-radius: 18px;
-  }
-  &:not(:first-child) {
-    border-top-left-radius: 5px;
-  }
-  &:last-child {
-    border-bottom-left-radius: 18px;
-  }
-  &:not(:last-child) {
-    border-bottom-left-radius: 5px;
-  }
+  &:first-child { border-top-left-radius: 18px; }
+  &:not(:first-child) { border-top-left-radius: 5px; }
+  &:last-child { border-bottom-left-radius: 18px; }
+  &:not(:last-child) { border-bottom-left-radius: 5px; }
 }
 
+// --- Стилі для конкретних ролей повідомлень ---
 .message.user-message {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-  align-items: flex-end; // Нове! Для повідомлень користувача все всередині вирівнюється праворуч
-
-  .message-timestamp {
-    color: var(--text-on-accent);
-    opacity: 0.75;
-    // text-align: right; // Вже не потрібен, якщо align-items: flex-end на .message.user-message
-  }
 }
 
 .message.ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
-     border: 1px solid red; 
-
-  // align-items: flex-start; // Це вже за замовчуванням для .message
   &:hover {
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
   }
   pre {
     background-color: var(--background-secondary) !important;
     padding: calc(var(--chat-spacing-unit, 5px) * 2);
-    border-radius: var(--radius-m, 6px); // Додав fallback для --radius-m
+    border-radius: var(--radius-m, 6px);
     margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
     margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
     overflow-x: auto;
   }
-   .message-actions-wrapper {
-  border: 1px solid blue; // Тимчасово
-  // ... інші стилі ...
-}
 }
 
-// --- Контент повідомлення, час, кнопка "показати більше" ---
+// --- Контент повідомлення, час ---
 .message-content {
   p {
     margin-top: 0;
@@ -293,44 +264,40 @@ $avatar-icon-size-factor: 0.65;
   font-size: var(--font-ui-smaller, 0.75em);
   color: var(--text-faint);
   margin-top: var(--chat-spacing-unit, 5px);
-  // text-align: right;
-  // display: block;
+  display: block;
   opacity: 0.9;
 
-   .message.user-message & { // Якщо потрібно, щоб час у повідомленні користувача був вирівняний по-іншому
-    // align-self: flex-end; // Примусово праворуч, навіть якщо загальний align-items інший
-        text-align: right;
-
+  .ollama-message-group .message & {
+    text-align: left;
   }
-  .message.ollama-message & {
-    // align-self: flex-start; // Примусово ліворуч
-        text-align: left;
-
+  .user-message-group .message & {
+    text-align: right;
+    // Специфічний колір для часу в повідомленні користувача, якщо потрібно
+    // color: var(--text-on-accent); 
+    // opacity: 0.75;
+  }
+  // Якщо .message.user-message має інший колір для тексту, то і для timestamp теж може знадобитись
+  .message.user-message & {
+     color: var(--text-on-accent); 
+     opacity: 0.75;
   }
 }
 
 // --- Кнопки дій ---
 .message-actions-wrapper {
-  // Цей блок є сестринським до .message всередині .message-wrapper
-  @include flex-layout( // Розташовує кнопки В РЯД всередині цього блоку
-    // $justify: flex-start; // За замовчуванням для flex-layout, якщо не вказано
+  @include flex-layout(
     $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
   );
-  // width: auto; // Або fit-content - це поведінка за замовчуванням для flex-item, якщо він не розтягується
   opacity: 0;
   visibility: hidden;
   @include transition( (opacity, visibility), 0.2s, ease-in-out );
-  // transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s; // Якщо міксін не підходить
-  z-index: 6; // Можливо, потрібен
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); // Відступ від бульбашки .message зверху
-
-  // Важливо: .message-actions-wrapper НЕ ПОВИНЕН мати власного padding-left або margin-left,
-  // якщо ми хочемо, щоб лівий край першої кнопки збігався з лівим краєм .message-actions-wrapper
-  // (який, у свою чергу, вирівняний з .message)
+  z-index: 6;
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
+  
+  border: 1px solid blue; // Тимчасово для діагностики
 
   button {
     @extend %base-action-button;
-    // Тут НЕ МАЄ бути margin-left на першій кнопці
   }
 
   .delete-message-button {
@@ -343,22 +310,10 @@ $avatar-icon-size-factor: 0.65;
     }
   }
 
-  // Стилі для кнопок в повідомленні користувача (якщо вони мають бути вирівняні праворуч всередині .message-actions-wrapper)
   .user-message-group .message-wrapper & {
-    // Якщо для user-message-group кнопки мають бути вирівняні праворуч всередині свого контейнера
-    // то потрібно змінити justify-content для цього конкретного випадку.
-    // Оскільки сам .message-actions-wrapper вже буде праворуч,
-    // justify-content: flex-start; всередині нього означатиме, що кнопки починаються зліва всередині цього правого блоку.
-    // justify-content: flex-end; означатиме, що кнопки будуть справа всередині цього правого блоку.
-    // За замовчуванням justify-content: initial (або flex-start, якщо так в міксіні),
-    // що означає, що кнопки будуть розташовані зліва всередині .message-actions-wrapper.
-    // Якщо .message-actions-wrapper для user вирівняний по правому краю (завдяки align-items: flex-end на .message-wrapper),
-    // а кнопки всередині нього починаються зліва, то перша кнопка буде біля правого краю .message.
-
-    // Щоб кнопки були вирівняні по правому краю всередині блоку кнопок для user:
+    // Якщо кнопки всередині цього блоку мають бути вирівняні по правому краю для user:
     // @include flex-layout($justify: flex-end, $gap: calc(var(--chat-spacing-unit, 5px) * 1.5));
-
-    // Специфічні стилі для кнопок, якщо вони відрізняються
+    
     button {
         color: rgba(255, 255, 255, 0.8);
         &:hover {
@@ -376,11 +331,9 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// Поява кнопок при наведенні на .message-wrapper
 .message-wrapper:hover .message-actions-wrapper {
   opacity: 1;
   visibility: visible;
-  // transition-delay: 0s; // Обробляється transition
 }
 
 .show-more-button {
@@ -391,7 +344,7 @@ $avatar-icon-size-factor: 0.65;
   z-index: 2;
 }
 
-.message.user-message .show-more-button {
+.message.user-message .show-more-button { 
   color: rgba(255, 255, 255, 0.7);
   background-color: transparent;
   border-color: transparent;
@@ -412,43 +365,26 @@ $avatar-icon-size-factor: 0.65;
   -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
-
-// --- Інші стилі (залишено з твого файлу, потребують перегляду) ---
-// Ці секції поки що не змінювалися глибоко, лише мінімальні правки для узгодження
-.regenerate-button {
-  /* Твої стилі */
-}
-button.summarize-button {
-  /* Твої стилі */
-}
-.summary-modal-content {
-  /* Твої стилі */
-}
-.message-content-container {
-  /* Твої стилі, можливо, вже не потрібен */
-}
+.regenerate-button { /* Твої стилі */ }
+button.summarize-button { /* Твої стилі */ }
+.summary-modal-content { /* Твої стилі */ }
+.message-content-container { /* Твої стилі, можливо, вже не потрібен */ }
 
 @keyframes message-appear {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media screen and (min-width: 1600px) {
   .ollama-chat-container {
-    padding-left: 15%; // TODO: Розглянути використання змінних або більш адаптивних одиниць
+    padding-left: 15%; 
     padding-right: 15%;
-    max-width: 3000px; // TODO: Перевірити доцільність такої великої ширини
+    max-width: 3000px; 
   }
 }
 
 .scroll-to-bottom-button {
-  position: absolute;
+  position: absolute; 
   bottom: 15px;
   right: 20px;
   z-index: 50;
@@ -461,17 +397,11 @@ button.summarize-button {
   box-shadow: var(--shadow-s);
   cursor: pointer;
   @include flex-layout($align: center, $justify: center);
-  padding: 0;
+  padding: 0; 
   opacity: 0;
   visibility: hidden;
   transform: translateY(10px);
-  // Оптимізований transition
-  @include transition((opacity, transform, background-color), 0.2s, ease-out);
-  // visibility має оброблятися окремо, якщо потрібна затримка
-  // transition-property: opacity, transform, background-color, visibility;
-  // transition-duration: 0.2s, 0.2s, 0.15s, 0s;
-  // transition-timing-function: ease-out, ease-out, ease, linear;
-  // transition-delay: 0s, 0s, 0s, 0.2s; // Затримка для visibility
+  @include transition( (opacity, transform, background-color), 0.2s, ease-out );
 
   .svg-icon {
     width: 20px;
@@ -492,25 +422,17 @@ button.summarize-button {
     opacity: 0.85;
     visibility: visible;
     transform: translateY(0);
-    // transition-delay: 0s; // Скидаємо затримку для visibility при появі
-
     &:hover {
       opacity: 1;
     }
   }
 }
 
-.new-message-indicator.visible {
-  /* Твої стилі, якщо є */
-}
+.new-message-indicator.visible { /* Твої стилі, якщо є */ }
 
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .button-loading {
@@ -527,10 +449,10 @@ button.summarize-button {
   margin-top: calc(var(--chat-spacing-unit, 5px) * 6);
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 4);
   padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2.5);
-  font-size: var(--font-ui-smaller, 0.8em); // Додав fallback
+  font-size: var(--font-ui-smaller, 0.8em);
   color: var(--text-muted);
   background-color: var(--background-secondary);
-  border-radius: var(--radius-l, 16px); // Додав fallback
+  border-radius: var(--radius-l, 16px);
   text-align: center;
   user-select: none;
   font-weight: 500;
@@ -539,5 +461,5 @@ button.summarize-button {
 .assistant-tool-usage-indicator {
   font-style: italic;
   color: var(--text-faint);
-  font-size: var(--font-ui-smaller, 0.8em); // Додав fallback
+  font-size: var(--font-ui-smaller, 0.8em);
 }
