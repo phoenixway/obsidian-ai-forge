@@ -29,6 +29,8 @@ $tool-code-background: var(--background-primary, #202020);
   font-size: var(--font-ui-smaller, 0.85em); // Трохи менший шрифт
   width: fit-content; // Або max-width, якщо потрібно обмежити
   max-width: 85%; // Щоб не займало всю ширину
+  max-width: var(--chat-message-max-width); // Максимальна ширина для повідомлень
+
   align-self: flex-start; // Розташування бульбашки в message-wrapper
   white-space: normal; // Дозволити перенос тексту
   overflow-wrap: break-word; // For any general text directly in .tool-message
