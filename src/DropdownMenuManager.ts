@@ -34,6 +34,7 @@ const CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 const CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
 const CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION = "clear-current-chat-option"; // <--- НОВИЙ КЛАС
 
+const CSS_HR_BEFORE_SETTINGS = "hr-before-settings";
 
 // Унікальні класи для роздільників
 const CSS_HR_AFTER_MODEL = "hr-after-model";
@@ -113,6 +114,8 @@ export class DropdownMenuManager {
         // --- ДОДАЄМО НОВУ ОПЦІЮ ТУТ (перед "Clear Messages" або після, на твій розсуд) ---
         // Можна додати її в групу "Chat Actions" або "Danger Actions"
         // Для прикладу, додамо перед "Clear Messages", як менш небезпечну, але пов'язану дію
+                this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
+
         this.clearCurrentChatOption = this.createActionItem("eraser", "Clear Current Chat", [CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION]); // <--- НОВА ОПЦІЯ
         // --- КІНЕЦЬ ДОДАВАННЯ ---
 
