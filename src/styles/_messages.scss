@@ -31,7 +31,6 @@
 
   &.user-message-group {
     justify-content: flex-end;
-    margin-top: 60px;;
     // justify-content: flex-start;
 
     .avatar-container {
@@ -42,6 +41,8 @@
       // flex-shrink: 0;
     }
 .message-wrapper {
+      margin-top: 60px;;
+
       order: 1;
       .message:not(:last-child) {
         border-bottom-right-radius: 18px;
