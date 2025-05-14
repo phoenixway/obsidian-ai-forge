@@ -302,7 +302,7 @@ $avatar-icon-size-factor: 0.65;
 // --- Кнопки дій ---
 .message-actions-wrapper { // Тепер цей блок всередині .message
   @include flex-layout( // flex-direction: row за замовчуванням
-    $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
+    // $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
   );
   // width: 100%; // Вже не потрібно, якщо align-items на .message працює
   opacity: 0;
