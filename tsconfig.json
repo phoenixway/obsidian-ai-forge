@@ -4,7 +4,7 @@
 	  "inlineSourceMap": true,
 	  "inlineSources": true,
 	  "module": "ESNext",
-	  "target": "ES6",
+	  "target": "ES2020",
 	  "allowJs": true,
 	  "noImplicitAny": true,
 	  "moduleResolution": "node",
@@ -12,7 +12,7 @@
 	  "isolatedModules": true,
 	  "allowSyntheticDefaultImports": true,
 	  "strictNullChecks": true,
-	  "lib": ["DOM", "ES6", "DOM.Iterable", "ScriptHost", "ES2023"],
+	  "lib": ["DOM", "ES2020", "DOM.Iterable", "ScriptHost", "ES2023"],
 	  "paths": {
 		"@/*": ["src/*"]
 	  }
