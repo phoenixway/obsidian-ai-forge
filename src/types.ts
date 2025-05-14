@@ -126,13 +126,54 @@ export interface OllamaGenerateChunk {
     eval_duration?: number;
 }
 
-/** Структура відповіді Ollama при помилці потоку */
-export interface OllamaErrorChunk {
-    error: string;
+export interface OllamaDoneChunk {
+    type: "done"; // Додаємо поле type
+    model: string;
+    created_at: string;
+    // Інші поля, які можуть бути в цьому типі чанка, згідно з помилкою:
+    context?: number[];
+    total_duration?: number;
+    load_duration?: number;
+    prompt_eval_count?: number;
+    prompt_eval_duration?: number;
+    eval_count?: number;
+    eval_duration?: number;
+    // Важливо: цей тип НЕ МАЄ `done: boolean`, оскільки його `type: "done"` вже сигналізує про завершення.
+    // Або, якщо він все ж має `done: true`, то можна додати `done: true;`
 }
 
-/** Тип, що об'єднує успішний чанк та помилку */
-export type OllamaStreamChunk = OllamaGenerateChunk | OllamaErrorChunk;
+export interface OllamaErrorChunk {
+    error: string;
+}export interface OllamaToolCallsChunk {
+    type: "tool_calls"; // Додаємо поле type для розрізнення
+    calls: ToolCall[];
+    // assistant_message_with_calls: AssistantMessage; // Це поле було в помилці, але може бути зайвим, якщо ми формуємо його самі
+    model: string;
+    created_at: string;
+    done?: boolean; // <--- ЗРОБИМО `done` ОПЦІОНАЛЬНИМ ТУТ, або додамо, якщо він має бути
+}
+
+export interface OllamaGenerateChunk {
+    model: string;
+    created_at: string;
+    response?: string; 
+    done: boolean;    // <--- Якщо кожен GenerateChunk має це поле, залишаємо обов'язковим.
+                      // Якщо `done` може бути відсутнім у проміжних, то `done?: boolean;`
+                      // Але помилка вказує, що проблема з `tool_calls` чанком.
+    context?: number[]; 
+    total_duration?: number;
+    load_duration?: number;
+    prompt_eval_count?: number;
+    prompt_eval_duration?: number;
+    eval_count?: number;
+    eval_duration?: number;
+}
+
+export type OllamaStreamChunk = 
+    OllamaGenerateChunk | 
+    OllamaErrorChunk | 
+    OllamaToolCallsChunk |
+    OllamaDoneChunk;
 
 export interface ToolCallFunction {
     name: string;

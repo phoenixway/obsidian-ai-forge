@@ -19,7 +19,7 @@ import { AvatarType, LANGUAGES } from "./settings";
 import { RoleInfo } from "./ChatManager";
 import { Chat, ChatMetadata } from "./Chat";
 import { SummaryModal } from "./SummaryModal";
-import { AssistantMessage, Message, OllamaGenerateResponse, ToolCall } from "./types";
+import { AssistantMessage, Message, OllamaGenerateResponse, OllamaStreamChunk, ToolCall } from "./types";
 import { MessageRole as MessageRoleTypeFromTypes } from "./types";
 
 import { CSS_CLASSES } from "./constants";
@@ -3418,21 +3418,16 @@ export class OllamaView extends ItemView {
     }
   }
 
-  // src/OllamaView.ts
-
-// ... (інші імпорти та частина класу) ...
-
-  private async _processLlmStream(
-    llmStream: AsyncIterableIterator<StreamChunk>, 
-    timestampMs: number, 
-    requestTimestampId: number 
+   private async _processLlmStream(
+    llmStream: AsyncIterableIterator<OllamaStreamChunk>, // Тепер тип має бути сумісним
+    timestampMs: number,
+    requestTimestampId: number
   ): Promise<{ accumulatedContent: string; nativeToolCalls: ToolCall[] | null; assistantMessageWithNativeCalls: AssistantMessage | null }> {
     
     let accumulatedContent = ""; 
     let parsedToolCalls: ToolCall[] | null = null;
-    let toolCallBuffer = ""; 
-    let inToolCallTag = false;
-    let toolCallIdCounter = 0; 
+    let fullResponseBuffer = ""; 
+    let toolCallIdCounter = 0;
 
     const toolCallStartTag = "<tool_call>";
     const toolCallEndTag = "</tool_call>";
@@ -3440,118 +3435,95 @@ export class OllamaView extends ItemView {
     for await (const chunk of llmStream) {
       this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
 
-      let isStreamDone = false; // Прапорець, що потік завершено
+      let isLastChunk = false;
 
-      // 1. Обробка текстового контенту та парсинг <tool_call> з нього
-      if (chunk.type === "content" && typeof chunk.response === 'string') {
-        const textChunk = chunk.response;
-        accumulatedContent += textChunk;
-
-        // --- Початок логіки парсингу <tool_call> з textChunk ---
-        // (Ця логіка залишається такою ж, як у попередній відповіді,
-        // вона шукає <tool_call>...</tool_call> всередині textChunk)
-        let searchStartInCurrentChunk = 0;
-        while(searchStartInCurrentChunk < textChunk.length) {
-            if (!inToolCallTag) {
-                const startTagIndexInChunk = textChunk.indexOf(toolCallStartTag, searchStartInCurrentChunk);
-                if (startTagIndexInChunk !== -1) {
-                    toolCallBuffer += textChunk.substring(searchStartInCurrentChunk, startTagIndexInChunk);
-                    inToolCallTag = true;
-                    searchStartInCurrentChunk = startTagIndexInChunk + toolCallStartTag.length;
-                } else {
-                    if (inToolCallTag) { 
-                        toolCallBuffer += textChunk.substring(searchStartInCurrentChunk);
-                    }
-                    searchStartInCurrentChunk = textChunk.length; 
-                }
-            } else { // inToolCallTag is true
-                const endTagIndexInChunk = textChunk.indexOf(toolCallEndTag, searchStartInCurrentChunk);
-                if (endTagIndexInChunk !== -1) {
-                    toolCallBuffer += textChunk.substring(searchStartInCurrentChunk, endTagIndexInChunk);
-                    this.plugin.logger.debug("[_processLlmStream] Attempting to parse tool call JSON from buffer:", toolCallBuffer);
-                    try {
-                        const parsedJson = JSON.parse(toolCallBuffer.trim());
-                        const callsArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
-                        if (!parsedToolCalls) parsedToolCalls = [];
-                        for (const callDef of callsArray) {
-                            if (callDef.name && typeof callDef.arguments !== 'undefined') {
-                                parsedToolCalls.push({
-                                    type: "function",
-                                    id: `ollama-tool-${timestampMs}-${toolCallIdCounter++}`,
-                                    function: {
-                                        name: callDef.name,
-                                        arguments: typeof callDef.arguments === 'string' 
-                                                     ? callDef.arguments 
-                                                     : JSON.stringify(callDef.arguments),
-                                    },
-                                });
-                            } else {
-                               this.plugin.logger.warn("[_processLlmStream] Invalid tool call definition in buffer:", callDef);
-                            }
-                        }
-                        this.plugin.logger.debug("[_processLlmStream] Successfully parsed tool_calls from buffer:", parsedToolCalls);
-                    } catch (e) {
-                        this.plugin.logger.error("[_processLlmStream] Error parsing tool call JSON from buffer:", e, toolCallBuffer);
-                    }
-                    toolCallBuffer = ""; 
-                    inToolCallTag = false;
-                    searchStartInCurrentChunk = endTagIndexInChunk + toolCallEndTag.length;
-                } else {
-                    toolCallBuffer += textChunk.substring(searchStartInCurrentChunk);
-                    searchStartInCurrentChunk = textChunk.length; 
-                }
+      if ('error' in chunk && chunk.error) { // OllamaErrorChunk
+        this.plugin.logger.error("[_processLlmStream] Received error chunk:", chunk.error);
+        throw new Error(`Ollama stream error: ${chunk.error}`);
+      } 
+      // Перевіряємо на OllamaToolCallsChunk першим, якщо він має поле 'type'
+      // Потрібно переконатися, що OllamaGenerateChunk не має 'type: "tool_calls"'
+      // або додати 'type: "content"' до OllamaGenerateChunk
+      else if ('type' in chunk && chunk.type === "tool_calls" && 'calls' in chunk) { // OllamaToolCallsChunk
+        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
+        if (!parsedToolCalls) parsedToolCalls = [];
+        
+        for (const call of chunk.calls) {
+             // Додаємо перевірку, щоб уникнути дублювання, якщо ID вже існує
+            if (!parsedToolCalls.some(existingCall => existingCall.id === call.id)) {
+                 parsedToolCalls.push({
+                    type: call.type || "function",
+                    id: call.id || `ollama-tc-${timestampMs}-${toolCallIdCounter++}`, 
+                    function: call.function
+                 });
             }
         }
-        // --- Кінець логіки парсингу <tool_call> з textChunk ---
+        if (chunk.done) isLastChunk = true; // Якщо цей чанк може бути останнім
 
-        // Перевіряємо, чи цей чанк контенту є останнім
-        if (typeof (chunk as any).done === 'boolean' && (chunk as any).done) {
-          isStreamDone = true;
-          this.plugin.logger.debug("[_processLlmStream] Content chunk marked as done.");
+      } else if ('response' in chunk) { // OllamaGenerateChunk (текстовий контент)
+        if (chunk.response) {
+          accumulatedContent += chunk.response;
+          fullResponseBuffer += chunk.response; 
         }
-      } 
-      // 2. Обробка структурованих викликів інструментів (якщо сервіс їх так повертає)
-      else if (chunk.type === "tool_calls" && Array.isArray((chunk as any).calls)) {
-        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", (chunk as any).calls);
-        if (!parsedToolCalls) {
-          parsedToolCalls = [];
-        }
-        // Додаємо/об'єднуємо ці виклики інструментів
-        // Потрібно переконатися, що ми не дублюємо, якщо <tool_call> також парсилися з тексту.
-        // Для простоти, припустимо, що якщо приходить "tool_calls", то це основне джерело.
-        // Або можна додати логіку для об'єднання/уникнення дублікатів.
-        // Поки що просто додамо їх.
-        for (const call of (chunk as any).calls as ToolCall[]) {
-            // Перевіряємо, чи такий інструмент (за ID, якщо він є, або за іменем/аргументами) вже є
-            // Це потребує більш складної логіки злиття, якщо ID не генеруються тут.
-            // Поки що просто додаємо, припускаючи, що OllamaService надсилає їх унікально.
-             parsedToolCalls.push({ // Перетворюємо на наш внутрішній формат ToolCall, якщо потрібно
-                type: call.type || "function",
-                id: call.id || `ollama-tool-${timestampMs}-${toolCallIdCounter++}`, // Генеруємо ID, якщо немає
-                function: call.function
-             });
-        }
-        // Якщо цей тип чанку також може сигналізувати про кінець, перевіряємо 'done'
-         if (typeof (chunk as any).done === 'boolean' && (chunk as any).done) {
-          isStreamDone = true;
-          this.plugin.logger.debug("[_processLlmStream] Tool_calls chunk marked as done.");
-        }
+        if (chunk.done) isLastChunk = true; // Цей текстовий чанк є останнім
       }
-      // 3. Обробка явного маркера завершення потоку (якщо такий є)
-      else if (chunk.type === "done") { 
-        isStreamDone = true;
-        this.plugin.logger.debug("[_processLlmStream] Explicit 'done' chunk received.");
-      }
+      // Якщо є інший спосіб визначити останній чанк (наприклад, спеціальний тип 'done' без 'response')
+      // else if (chunk.type === "done_signal") { isLastChunk = true; }
 
-      // Якщо потік завершено будь-яким з способів
-      if (isStreamDone) {
-        if (inToolCallTag && toolCallBuffer.length > 0) {
-          this.plugin.logger.warn("[_processLlmStream] Stream ended mid-text-based-tool-call. Buffer:", toolCallBuffer);
-          // Можна спробувати розпарсити залишок буфера тут, якщо потрібно
+
+      if (isLastChunk) {
+        this.plugin.logger.debug("[_processLlmStream] Stream marked as done. Final accumulated content:", accumulatedContent.substring(0, 300) + "...");
+        
+        // Парсинг текстових <tool_call> з fullResponseBuffer (якщо вони є)
+        // Ця логіка виконується ТІЛЬКИ ОДИН РАЗ в кінці.
+        let lastIndex = 0;
+        while (lastIndex < fullResponseBuffer.length) {
+          const startIndex = fullResponseBuffer.indexOf(toolCallStartTag, lastIndex);
+          if (startIndex === -1) break; 
+
+          const endIndex = fullResponseBuffer.indexOf(toolCallEndTag, startIndex + toolCallStartTag.length);
+          if (endIndex === -1) {
+            this.plugin.logger.warn("[_processLlmStream] Found start <tool_call> but no end tag in full buffer.");
+            break; 
+          }
+
+          const toolCallJsonString = fullResponseBuffer.substring(startIndex + toolCallStartTag.length, endIndex).trim();
+          this.plugin.logger.debug("[_processLlmStream] Extracted text-based tool call JSON string:", toolCallJsonString);
+
+          try {
+            const parsedJson = JSON.parse(toolCallJsonString);
+            const callsArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+            if (!parsedToolCalls) parsedToolCalls = [];
+
+            for (const callDef of callsArray) {
+              if (callDef.name && typeof callDef.arguments !== 'undefined') {
+                // Додаємо, лише якщо схожого виклику ще немає (проста перевірка за іменем)
+                // Для більш надійної перевірки на дублікати потрібні ID або більш глибоке порівняння
+                if (!parsedToolCalls.some(ptc => ptc.function.name === callDef.name)) {
+                    parsedToolCalls.push({
+                        type: "function",
+                        id: `ollama-txt-tc-${timestampMs}-${toolCallIdCounter++}`, // Інший префікс для текстових
+                        function: {
+                            name: callDef.name,
+                            arguments: typeof callDef.arguments === 'string' 
+                                         ? callDef.arguments 
+                                         : JSON.stringify(callDef.arguments),
+                        },
+                    });
+                }
+              } else {
+                this.plugin.logger.warn("[_processLlmStream] Invalid text-based tool call definition:", callDef);
+              }
+            }
+            this.plugin.logger.debug("[_processLlmStream] Parsed text-based tool_calls:", parsedToolCalls);
+          } catch (e) {
+            this.plugin.logger.error("[_processLlmStream] Error parsing text-based tool call JSON:", e, toolCallJsonString);
+          }
+          lastIndex = endIndex + toolCallEndTag.length;
         }
-        break; // Виходимо з циклу for await
+        break; 
       }
-    } // кінець for await
+    }
     
     return { 
       accumulatedContent: accumulatedContent, 
@@ -3559,6 +3531,8 @@ export class OllamaView extends ItemView {
       assistantMessageWithNativeCalls: null 
     };
   }
+
+// ... (решта методів)
 
   // src/OllamaView.ts
 

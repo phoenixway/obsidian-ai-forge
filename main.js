@@ -6607,102 +6607,83 @@ Summary:`;
       this.activePlaceholder.groupEl.setAttribute("data-placeholder-timestamp", turnTimestamp.toString());
     }
   }
-  // src/OllamaView.ts
-  // ... (інші імпорти та частина класу) ...
   async _processLlmStream(llmStream, timestampMs, requestTimestampId) {
     let accumulatedContent = "";
     let parsedToolCalls = null;
-    let toolCallBuffer = "";
-    let inToolCallTag = false;
+    let fullResponseBuffer = "";
     let toolCallIdCounter = 0;
     const toolCallStartTag = "<tool_call>";
     const toolCallEndTag = "</tool_call>";
     for await (const chunk of llmStream) {
       this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
-      let isStreamDone = false;
-      if (chunk.type === "content" && typeof chunk.response === "string") {
-        const textChunk = chunk.response;
-        accumulatedContent += textChunk;
-        let searchStartInCurrentChunk = 0;
-        while (searchStartInCurrentChunk < textChunk.length) {
-          if (!inToolCallTag) {
-            const startTagIndexInChunk = textChunk.indexOf(toolCallStartTag, searchStartInCurrentChunk);
-            if (startTagIndexInChunk !== -1) {
-              toolCallBuffer += textChunk.substring(searchStartInCurrentChunk, startTagIndexInChunk);
-              inToolCallTag = true;
-              searchStartInCurrentChunk = startTagIndexInChunk + toolCallStartTag.length;
-            } else {
-              if (inToolCallTag) {
-                toolCallBuffer += textChunk.substring(searchStartInCurrentChunk);
-              }
-              searchStartInCurrentChunk = textChunk.length;
-            }
-          } else {
-            const endTagIndexInChunk = textChunk.indexOf(toolCallEndTag, searchStartInCurrentChunk);
-            if (endTagIndexInChunk !== -1) {
-              toolCallBuffer += textChunk.substring(searchStartInCurrentChunk, endTagIndexInChunk);
-              this.plugin.logger.debug("[_processLlmStream] Attempting to parse tool call JSON from buffer:", toolCallBuffer);
-              try {
-                const parsedJson = JSON.parse(toolCallBuffer.trim());
-                const callsArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
-                if (!parsedToolCalls)
-                  parsedToolCalls = [];
-                for (const callDef of callsArray) {
-                  if (callDef.name && typeof callDef.arguments !== "undefined") {
-                    parsedToolCalls.push({
-                      type: "function",
-                      id: `ollama-tool-${timestampMs}-${toolCallIdCounter++}`,
-                      function: {
-                        name: callDef.name,
-                        arguments: typeof callDef.arguments === "string" ? callDef.arguments : JSON.stringify(callDef.arguments)
-                      }
-                    });
-                  } else {
-                    this.plugin.logger.warn("[_processLlmStream] Invalid tool call definition in buffer:", callDef);
-                  }
-                }
-                this.plugin.logger.debug("[_processLlmStream] Successfully parsed tool_calls from buffer:", parsedToolCalls);
-              } catch (e) {
-                this.plugin.logger.error("[_processLlmStream] Error parsing tool call JSON from buffer:", e, toolCallBuffer);
-              }
-              toolCallBuffer = "";
-              inToolCallTag = false;
-              searchStartInCurrentChunk = endTagIndexInChunk + toolCallEndTag.length;
-            } else {
-              toolCallBuffer += textChunk.substring(searchStartInCurrentChunk);
-              searchStartInCurrentChunk = textChunk.length;
-            }
+      let isLastChunk = false;
+      if ("error" in chunk && chunk.error) {
+        this.plugin.logger.error("[_processLlmStream] Received error chunk:", chunk.error);
+        throw new Error(`Ollama stream error: ${chunk.error}`);
+      } else if ("type" in chunk && chunk.type === "tool_calls" && "calls" in chunk) {
+        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
+        if (!parsedToolCalls)
+          parsedToolCalls = [];
+        for (const call of chunk.calls) {
+          if (!parsedToolCalls.some((existingCall) => existingCall.id === call.id)) {
+            parsedToolCalls.push({
+              type: call.type || "function",
+              id: call.id || `ollama-tc-${timestampMs}-${toolCallIdCounter++}`,
+              function: call.function
+            });
           }
         }
-        if (typeof chunk.done === "boolean" && chunk.done) {
-          isStreamDone = true;
-          this.plugin.logger.debug("[_processLlmStream] Content chunk marked as done.");
+        if (chunk.done)
+          isLastChunk = true;
+      } else if ("response" in chunk) {
+        if (chunk.response) {
+          accumulatedContent += chunk.response;
+          fullResponseBuffer += chunk.response;
         }
-      } else if (chunk.type === "tool_calls" && Array.isArray(chunk.calls)) {
-        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
-        if (!parsedToolCalls) {
-          parsedToolCalls = [];
-        }
-        for (const call of chunk.calls) {
-          parsedToolCalls.push({
-            // Перетворюємо на наш внутрішній формат ToolCall, якщо потрібно
-            type: call.type || "function",
-            id: call.id || `ollama-tool-${timestampMs}-${toolCallIdCounter++}`,
-            // Генеруємо ID, якщо немає
-            function: call.function
-          });
-        }
-        if (typeof chunk.done === "boolean" && chunk.done) {
-          isStreamDone = true;
-          this.plugin.logger.debug("[_processLlmStream] Tool_calls chunk marked as done.");
-        }
-      } else if (chunk.type === "done") {
-        isStreamDone = true;
-        this.plugin.logger.debug("[_processLlmStream] Explicit 'done' chunk received.");
+        if (chunk.done)
+          isLastChunk = true;
       }
-      if (isStreamDone) {
-        if (inToolCallTag && toolCallBuffer.length > 0) {
-          this.plugin.logger.warn("[_processLlmStream] Stream ended mid-text-based-tool-call. Buffer:", toolCallBuffer);
+      if (isLastChunk) {
+        this.plugin.logger.debug("[_processLlmStream] Stream marked as done. Final accumulated content:", accumulatedContent.substring(0, 300) + "...");
+        let lastIndex = 0;
+        while (lastIndex < fullResponseBuffer.length) {
+          const startIndex = fullResponseBuffer.indexOf(toolCallStartTag, lastIndex);
+          if (startIndex === -1)
+            break;
+          const endIndex = fullResponseBuffer.indexOf(toolCallEndTag, startIndex + toolCallStartTag.length);
+          if (endIndex === -1) {
+            this.plugin.logger.warn("[_processLlmStream] Found start <tool_call> but no end tag in full buffer.");
+            break;
+          }
+          const toolCallJsonString = fullResponseBuffer.substring(startIndex + toolCallStartTag.length, endIndex).trim();
+          this.plugin.logger.debug("[_processLlmStream] Extracted text-based tool call JSON string:", toolCallJsonString);
+          try {
+            const parsedJson = JSON.parse(toolCallJsonString);
+            const callsArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+            if (!parsedToolCalls)
+              parsedToolCalls = [];
+            for (const callDef of callsArray) {
+              if (callDef.name && typeof callDef.arguments !== "undefined") {
+                if (!parsedToolCalls.some((ptc) => ptc.function.name === callDef.name)) {
+                  parsedToolCalls.push({
+                    type: "function",
+                    id: `ollama-txt-tc-${timestampMs}-${toolCallIdCounter++}`,
+                    // Інший префікс для текстових
+                    function: {
+                      name: callDef.name,
+                      arguments: typeof callDef.arguments === "string" ? callDef.arguments : JSON.stringify(callDef.arguments)
+                    }
+                  });
+                }
+              } else {
+                this.plugin.logger.warn("[_processLlmStream] Invalid text-based tool call definition:", callDef);
+              }
+            }
+            this.plugin.logger.debug("[_processLlmStream] Parsed text-based tool_calls:", parsedToolCalls);
+          } catch (e) {
+            this.plugin.logger.error("[_processLlmStream] Error parsing text-based tool call JSON:", e, toolCallJsonString);
+          }
+          lastIndex = endIndex + toolCallEndTag.length;
         }
         break;
       }
@@ -6713,6 +6694,7 @@ Summary:`;
       assistantMessageWithNativeCalls: null
     };
   }
+  // ... (решта методів)
   // src/OllamaView.ts
   // ... (інші імпорти та частина класу) ...
   _determineToolCalls(nativeToolCallsFromStream, accumulatedContentFromStream, timestampMs, requestTimestampId) {
