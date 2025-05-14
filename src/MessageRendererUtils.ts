@@ -277,6 +277,10 @@ export function renderAvatar(
             //     avatarTypeToUse = 'icon'; // Завжди іконка для інструментів
             //     avatarContentToUse = 'settings'; // Або 'cog' - це іконка шестерні в Lucide
             //     break;
+            case 'tool': 
+        avatarTypeToUse = 'icon'; 
+        avatarContentToUse = 'cog'; // Шестерня
+        break;
             case 'system':
                 avatarTypeToUse = 'icon'; 
                 avatarContentToUse = 'info';  

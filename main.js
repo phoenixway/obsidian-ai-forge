@@ -1364,6 +1364,10 @@ function renderAvatar(app, plugin, groupEl, isUser, avatarRoleType) {
     avatarContentToUse = settings.userAvatarContent;
   } else {
     switch (avatarRoleType) {
+      case "tool":
+        avatarTypeToUse = "icon";
+        avatarContentToUse = "cog";
+        break;
       case "system":
         avatarTypeToUse = "icon";
         avatarContentToUse = "info";
@@ -1472,7 +1476,7 @@ var BaseMessageRenderer = class {
   }
   // --- КІНЕЦЬ ЗМІНИ ---
   addAvatar(messageGroup, isUser) {
-    renderAvatar(this.app, this.plugin, messageGroup, isUser);
+    renderAvatar(this.app, this.plugin, messageGroup, isUser, this.message.role);
   }
   // addBaseActionButtons залишається методом екземпляра, бо залежить від this.message та this.view
   addBaseActionButtons(messageWrapper, contentToCopy) {

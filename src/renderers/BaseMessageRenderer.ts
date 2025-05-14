@@ -49,9 +49,11 @@ export abstract class BaseMessageRenderer implements IMessageRenderer {
 	}
 	// --- КІНЕЦЬ ЗМІНИ ---
 
-	protected addAvatar(messageGroup: HTMLElement, isUser: boolean): void {
-		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, isUser);
-	}
+protected addAvatar(messageGroup: HTMLElement, isUser: boolean): void {
+    RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, isUser, this.message.role);
+}
+
+
 
 	// addBaseActionButtons залишається методом екземпляра, бо залежить від this.message та this.view
     protected addBaseActionButtons(messageWrapper: HTMLElement, contentToCopy: string): void {
