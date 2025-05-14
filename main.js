@@ -21224,9 +21224,9 @@ This action cannot be undone.`,
               this.plugin.logger.debug("VAD EVENT: Speech ended, but not processing (isVadSpeechDetected false or recorder not recording).");
             }
           },
-          positiveSpeechThreshold: 0.65,
-          negativeSpeechThreshold: 0.35,
-          minSpeechFrames: 5,
+          positiveSpeechThreshold: 0.4,
+          negativeSpeechThreshold: 0.3,
+          minSpeechFrames: 3,
           preSpeechPadFrames: 5,
           redemptionFrames: 8
         };
