@@ -63,7 +63,7 @@
   }
 
   &.ollama-message-group {
-    justify-content: flex-end;
+    justify-content: flex-start;
 
     .avatar-container {
       order: 1;
@@ -118,7 +118,7 @@
   align-items: flex-end;
 }
 .ollama-message-group .message-wrapper {
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 // --- Стилі для Аватарок ---
@@ -547,8 +547,8 @@ button.summarize-button {
   justify-content: center;
   overflow: hidden;
   background-color: var(--background-modifier-hover);
-  align-self: flex-end;
-   margin-top: 5px;
+  // align-self: flex-end;
+  //  margin-top: 5px;
 
   // Аватар-зображення
   &.avatar-image,
