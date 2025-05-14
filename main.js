@@ -3646,25 +3646,34 @@ var ToolMessageRenderer = class extends BaseMessageRenderer {
     const { messageEl, contentContainer, contentEl } = this.createMessageBubble(
       messageWrapperEl,
       [CSS_CLASSES.TOOL_MESSAGE]
-      // Основний клас для стилізації повідомлення інструменту
     );
-    this.renderToolSpecificContent(contentEl);
+    this.renderToolSpecificContent(contentEl, this.message.content);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     this.addBaseActionButtons(messageEl, this.message.content);
     return messageGroupEl;
   }
-  renderToolSpecificContent(contentEl) {
+  renderToolSpecificContent(contentEl, rawContentWithMarkers) {
     contentEl.empty();
     const toolHeader = contentEl.createDiv({ cls: CSS_CLASSES.TOOL_RESULT_HEADER });
     const iconSpan = toolHeader.createSpan({ cls: CSS_CLASSES.TOOL_RESULT_ICON });
     (0, import_obsidian14.setIcon)(iconSpan, "wrench");
     toolHeader.createSpan({
       text: `Tool Executed: ${this.message.name || "Unknown Tool"}`
-      // message.name має містити назву інструменту
     });
     const preEl = contentEl.createEl("pre", { cls: CSS_CLASSES.TOOL_RESULT_CONTENT });
     const codeEl = preEl.createEl("code");
-    codeEl.setText(this.message.content);
+    let displayContent = rawContentWithMarkers;
+    const toolResultStartMarker = "[TOOL_RESULT]\n";
+    const toolResultEndMarker = "\n[/TOOL_RESULT]";
+    const toolErrorStartMarker = "[TOOL_ERROR]\n";
+    const toolErrorEndMarker = "\n[/TOOL_ERROR]";
+    if (displayContent.startsWith(toolResultStartMarker) && displayContent.endsWith(toolResultEndMarker)) {
+      displayContent = displayContent.substring(toolResultStartMarker.length, displayContent.length - toolResultEndMarker.length);
+    } else if (displayContent.startsWith(toolErrorStartMarker) && displayContent.endsWith(toolErrorEndMarker)) {
+      displayContent = displayContent.substring(toolErrorStartMarker.length, displayContent.length - toolErrorEndMarker.length);
+      preEl.addClass("tool-execution-error-display");
+    }
+    codeEl.setText(displayContent.trim());
   }
   // Перевизначаємо addAvatar, якщо потрібна особлива логіка для аватара інструменту.
   // Якщо стандартної логіки з BaseMessageRenderer + RendererUtils.renderAvatar достатньо,
@@ -6950,63 +6959,45 @@ Summary:`;
     }
     return { processedToolCallsThisTurn, assistantMessageForHistory, isTextualFallbackUsed };
   }
-  // src/OllamaView.ts
-  // ... (інші імпорти та код)
   async _executeAndRenderToolCycle(toolsToExecute, assistantMessageIntent, requestTimestampId) {
-    var _a, _b;
+    var _a;
     const currentViewInstance = this;
-    const assistantMsgTsMs = assistantMessageIntent.timestamp.getTime();
-    if (((_a = currentViewInstance.activePlaceholder) == null ? void 0 : _a.timestamp) === assistantMsgTsMs) {
-      if (currentViewInstance.activePlaceholder.groupEl.isConnected) {
-        currentViewInstance.activePlaceholder.groupEl.remove();
-      }
-      currentViewInstance.activePlaceholder = null;
-    }
     for (const call of toolsToExecute) {
-      if ((_b = currentViewInstance.currentAbortController) == null ? void 0 : _b.signal.aborted)
+      if ((_a = currentViewInstance.currentAbortController) == null ? void 0 : _a.signal.aborted)
         throw new Error("aborted by user");
       if (call.type === "function") {
         const toolName = call.function.name;
         let toolArgs = {};
+        let toolResultContentForHistory = "";
+        let parseErrorOccurred = false;
         try {
           toolArgs = JSON.parse(call.function.arguments || "{}");
         } catch (e) {
-          const errorContent = `Error parsing args for ${toolName}: ${e.message}. Args string: "${call.function.arguments}"`;
-          const errorToolTimestamp = new Date();
-          const errorToolMsg = {
-            role: "tool",
-            tool_call_id: call.id,
-            name: toolName,
-            content: errorContent,
-            timestamp: errorToolTimestamp
-          };
-          const toolErrorHmaPromise = new Promise((resolve, reject) => {
-            currentViewInstance.plugin.chatManager.registerHMAResolver(
-              errorToolMsg.timestamp.getTime(),
-              resolve,
-              reject
-            );
-            setTimeout(() => {
-              if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(errorToolMsg.timestamp.getTime())) {
-                currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(
-                  errorToolMsg.timestamp.getTime(),
-                  "HMA timeout for tool error msg"
-                );
-              }
-            }, 1e4);
-          });
-          await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(errorToolMsg, true);
-          await toolErrorHmaPromise;
-          continue;
+          const errorContent = `Error parsing arguments for tool ${toolName}: ${e.message}. Arguments string: "${call.function.arguments}"`;
+          this.plugin.logger.error(`[ToolCycle] Arg Parsing Error for ${toolName}: ${errorContent}`);
+          toolResultContentForHistory = `[TOOL_ERROR]
+${errorContent}
+[/TOOL_ERROR]`;
+          parseErrorOccurred = true;
         }
-        const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
-        const toolResultContent = execResult.success ? execResult.result : `Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}`;
+        if (!parseErrorOccurred) {
+          const execResult = await currentViewInstance.plugin.agentManager.executeTool(toolName, toolArgs);
+          if (execResult.success) {
+            toolResultContentForHistory = `[TOOL_RESULT]
+${execResult.result}
+[/TOOL_RESULT]`;
+          } else {
+            toolResultContentForHistory = `[TOOL_ERROR]
+Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
+[/TOOL_ERROR]`;
+          }
+        }
         const toolResponseTimestamp = new Date();
         const toolResponseMsg = {
           role: "tool",
           tool_call_id: call.id,
           name: toolName,
-          content: toolResultContent,
+          content: toolResultContentForHistory,
           timestamp: toolResponseTimestamp
         };
         const toolResultHmaPromise = new Promise((resolve, reject) => {
@@ -7019,16 +7010,21 @@ Summary:`;
             if (currentViewInstance.plugin.chatManager.messageAddedResolvers.has(toolResponseMsg.timestamp.getTime())) {
               currentViewInstance.plugin.chatManager.rejectAndClearHMAResolver(
                 toolResponseMsg.timestamp.getTime(),
-                `HMA Timeout for tool result: ${toolName}`
+                `HMA Timeout for tool result: ${toolName} in _executeAndRenderToolCycle`
               );
             }
           }, 1e4);
         });
         await currentViewInstance.plugin.chatManager.addMessageToActiveChatPayload(toolResponseMsg, true);
-        await toolResultHmaPromise;
+        try {
+          await toolResultHmaPromise;
+        } catch (hmaError) {
+          this.plugin.logger.warn(`[ToolCycle] HMA for tool response ${toolName} failed or timed out:`, hmaError);
+        }
       }
     }
   }
+  // ... (решта методів OllamaView.ts) ...
   async _renderFinalAssistantText(finalContent, responseTimestampMs, requestTimestampId) {
     var _a, _b;
     const currentViewInstance = this;
@@ -7826,10 +7822,6 @@ var PromptService = class {
     const roleDefinition = await this.getRoleDefinition(rolePath);
     return (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
   }
-  /**
-   * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції
-   * та дефолтний промпт для використання інструментів, якщо іншого немає.
-   */
   async getSystemPromptForAPI(chatMetadata) {
     var _a;
     const settings = this.plugin.settings;
@@ -7837,10 +7829,6 @@ var PromptService = class {
     let roleDefinition = null;
     if (selectedRolePath && settings.followRole) {
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
-      if (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) {
-      } else {
-      }
-    } else {
     }
     const roleSystemPrompt = (roleDefinition == null ? void 0 : roleDefinition.systemPrompt) || null;
     const isProductivityActive = (_a = roleDefinition == null ? void 0 : roleDefinition.isProductivityPersona) != null ? _a : false;
@@ -7879,7 +7867,7 @@ General Rules for BOTH Context Sections:
       if (agentTools.length > 0) {
         toolUsageInstructions = "\n\n--- Tool Usage Guidelines ---\n";
         toolUsageInstructions += "You have access to the following tools. ";
-        toolUsageInstructions += "If you decide to use a tool, you MUST respond ONLY with a single JSON object representing the tool call, enclosed in <tool_call></tool_call> XML-like tags. Do NOT add any other text, explanation, or markdown formatting before or after these tags.\n";
+        toolUsageInstructions += "To use a tool, you MUST respond ONLY with a single JSON object representing the tool call, enclosed in <tool_call></tool_call> XML-like tags. Do NOT add any other text, explanation, or markdown formatting before or after these tags.\n";
         toolUsageInstructions += "The JSON object must have a 'name' property with the tool's name and an 'arguments' property containing an object of parameters for that tool.\n";
         toolUsageInstructions += "Example of a tool call response:\n";
         toolUsageInstructions += "<tool_call>\n";
@@ -7891,6 +7879,19 @@ General Rules for BOTH Context Sections:
         toolUsageInstructions += "  }\n";
         toolUsageInstructions += "}\n";
         toolUsageInstructions += "</tool_call>\n\n";
+        toolUsageInstructions += "After you make a tool call, the system will execute the tool and provide you with the result in a message with role 'tool'. This result will be clearly marked. For example:\n";
+        toolUsageInstructions += '<message role="tool" tool_call_id="[some_id]" name="[tool_name]">\n';
+        toolUsageInstructions += "[TOOL_RESULT]\n";
+        toolUsageInstructions += "[The actual result from the tool will be here]\n";
+        toolUsageInstructions += "[/TOOL_RESULT]\n";
+        toolUsageInstructions += "</message>\n";
+        toolUsageInstructions += "If there was an error during tool execution or argument parsing, the result will be marked like this:\n";
+        toolUsageInstructions += '<message role="tool" tool_call_id="[some_id]" name="[tool_name]">\n';
+        toolUsageInstructions += "[TOOL_ERROR]\n";
+        toolUsageInstructions += "[Details of the error will be here]\n";
+        toolUsageInstructions += "[/TOOL_ERROR]\n";
+        toolUsageInstructions += "</message>\n";
+        toolUsageInstructions += "You MUST analyze the content within [TOOL_RESULT]...[/TOOL_RESULT] (or [TOOL_ERROR]...[/TOOL_ERROR]) and use it to formulate your response to the user. Do not re-call the same tool with the exact same arguments if you have already received a result for it, unless the result was an error and you are correcting the arguments. If the tool result provides the necessary information, generate a final answer for the user. If you need more information or need to process the data further, you may call another tool or the same tool with different arguments.\n\n";
         toolUsageInstructions += "Available tools are:\n";
         agentTools.forEach((tool) => {
           toolUsageInstructions += `
@@ -7932,10 +7933,6 @@ Tool Name: "${tool.name}"
     const finalTrimmedPrompt = combinedBasePrompt.trim();
     return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
-  /**
-   * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
-   * Використовує оновлений `prepareContext` з `RagService`.
-   */
   async preparePromptBody(history, chatMetadata) {
     var _a, _b;
     const settings = this.plugin.settings;
@@ -7952,7 +7949,6 @@ Tool Name: "${tool.name}"
         taskContext += `Other: ${taskState.regular.join(", ") || "None"}
 `;
         taskContext += "--- End Tasks Context ---";
-      } else {
       }
     }
     const approxTaskTokens = this._countTokens(taskContext);
@@ -7969,12 +7965,7 @@ Tool Name: "${tool.name}"
       const lastUserMessage = history.findLast((m) => m.role === "user");
       if (lastUserMessage == null ? void 0 : lastUserMessage.content) {
         ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
-        if (!ragContext) {
-        } else {
-        }
-      } else {
       }
-    } else {
     }
     let finalPromptBodyParts = [];
     if (ragContext) {
@@ -7993,6 +7984,9 @@ ${processedHistoryString}`);
     }
     return finalPromptBody;
   }
+  // _buildSimpleContext та _buildAdvancedContext тепер мають отримувати повідомлення
+  // з role: "tool", які вже відформатовані з маркерами [TOOL_RESULT] або [TOOL_ERROR]
+  // з методу OllamaView._executeAndRenderToolCycle
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
@@ -8000,7 +7994,30 @@ ${processedHistoryString}`);
       const message = history[i];
       if (message.role === "system" || message.role === "error")
         continue;
-      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+      let formattedMessage = "";
+      if (message.role === "user") {
+        formattedMessage = `User: ${message.content.trim()}`;
+      } else if (message.role === "assistant") {
+        if (message.tool_calls && message.tool_calls.length > 0) {
+          const toolCallsString = JSON.stringify(message.tool_calls);
+          formattedMessage = `Assistant:
+<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+          if (message.content && message.content.trim() !== "") {
+            formattedMessage = `Assistant: ${message.content.trim()}
+<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+          }
+        } else {
+          formattedMessage = `Assistant: ${message.content.trim()}`;
+        }
+      } else if (message.role === "tool") {
+        formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">
+${message.content.trim()}
+</message>`;
+      }
       const messageTokens = this._countTokens(formattedMessage) + 5;
       if (currentTokens + messageTokens <= maxTokens) {
         context = formattedMessage + "\n\n" + context;
@@ -8028,7 +8045,6 @@ ${processedHistoryString}`);
           olderContextContent = `[Summary of earlier conversation]:
 ${summary}`;
           olderContextTokens = this._countTokens(olderContextContent) + 10;
-        } else {
         }
       }
       if (!olderContextContent) {
@@ -8037,7 +8053,30 @@ ${summary}`;
           const message = messagesToProcess[i];
           if (message.role === "system" || message.role === "error")
             continue;
-          const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+          let formattedMessage = "";
+          if (message.role === "user") {
+            formattedMessage = `User: ${message.content.trim()}`;
+          } else if (message.role === "assistant") {
+            if (message.tool_calls && message.tool_calls.length > 0) {
+              const toolCallsString = JSON.stringify(message.tool_calls);
+              formattedMessage = `Assistant:
+<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+              if (message.content && message.content.trim() !== "") {
+                formattedMessage = `Assistant: ${message.content.trim()}
+<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+              }
+            } else {
+              formattedMessage = `Assistant: ${message.content.trim()}`;
+            }
+          } else if (message.role === "tool") {
+            formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">
+${message.content.trim()}
+</message>`;
+          }
           const messageTokens = this._countTokens(formattedMessage) + 5;
           if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
             olderContextContent = formattedMessage + "\n\n" + olderContextContent;
@@ -8057,22 +8096,42 @@ ${olderContextContent.trim()}
       if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
         processedParts.push(olderContextContent);
         currentTokens += olderContextTokens;
-      } else if (olderContextContent) {
       }
     }
     let keptMessagesString = "";
     let keptMessagesTokens = 0;
-    let includedKeptCount = 0;
     for (let i = messagesToKeep.length - 1; i >= 0; i--) {
       const message = messagesToKeep[i];
       if (message.role === "system" || message.role === "error")
         continue;
-      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+      let formattedMessage = "";
+      if (message.role === "user") {
+        formattedMessage = `User: ${message.content.trim()}`;
+      } else if (message.role === "assistant") {
+        if (message.tool_calls && message.tool_calls.length > 0) {
+          const toolCallsString = JSON.stringify(message.tool_calls);
+          formattedMessage = `Assistant:
+<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+          if (message.content && message.content.trim() !== "") {
+            formattedMessage = `Assistant: ${message.content.trim()}
+<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+          }
+        } else {
+          formattedMessage = `Assistant: ${message.content.trim()}`;
+        }
+      } else if (message.role === "tool") {
+        formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">
+${message.content.trim()}
+</message>`;
+      }
       const messageTokens = this._countTokens(formattedMessage) + 5;
       if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
         keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
         keptMessagesTokens += messageTokens;
-        includedKeptCount++;
       } else {
         break;
       }
@@ -8080,7 +8139,6 @@ ${olderContextContent.trim()}
     if (keptMessagesString) {
       processedParts.push(keptMessagesString.trim());
       currentTokens += keptMessagesTokens;
-    } else {
     }
     return processedParts.join("\n\n").trim();
   }
@@ -8088,11 +8146,30 @@ ${olderContextContent.trim()}
     if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
       return null;
     }
-    const textToSummarize = messagesToSummarize.filter((m) => m.role === "user" || m.role === "assistant").map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`).join("\n");
+    const textToSummarize = messagesToSummarize.filter((m) => m.role === "user" || m.role === "assistant" || m.role === "tool").map((m) => {
+      if (m.role === "user") {
+        return `User: ${m.content.trim()}`;
+      } else if (m.role === "assistant") {
+        if (m.tool_calls && m.tool_calls.length > 0) {
+          const toolCallsString = JSON.stringify(m.tool_calls);
+          let contentPart = m.content && m.content.trim() !== "" ? `${m.content.trim()}
+` : "";
+          return `Assistant: ${contentPart}<tool_calls>
+${toolCallsString}
+</tool_calls>`;
+        }
+        return `Assistant: ${m.content.trim()}`;
+      } else if (m.role === "tool") {
+        return `<message role="tool" tool_call_id="${m.tool_call_id}" name="${m.name}">
+${m.content.trim()}
+</message>`;
+      }
+      return "";
+    }).filter(Boolean).join("\n");
     if (!textToSummarize.trim()) {
       return null;
     }
-    const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely:\n\n{text_to_summarize}";
+    const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely, preserving key information and tool usage context:\n\n{text_to_summarize}";
     const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
     const summarizationModelName = this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
     const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
@@ -8101,22 +8178,17 @@ ${olderContextContent.trim()}
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.3,
-      options: {
-        num_ctx: summarizationContextWindow
-      },
-      system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, and unresolved questions."
+      options: { num_ctx: summarizationContextWindow },
+      system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, unresolved questions, and the context of any tool calls and their results."
     };
     try {
-      if (!this.plugin.ollamaService) {
+      if (!this.plugin.ollamaService)
         return null;
-      }
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
-        const summary = responseData.response.trim();
-        return summary;
-      } else {
-        return null;
+        return responseData.response.trim();
       }
+      return null;
     } catch (error) {
       return null;
     }

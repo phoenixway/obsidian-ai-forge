@@ -1,3 +1,4 @@
+// src/PromptService.ts
 import { App, normalizePath, TFile, Notice, FrontMatterCache } from "obsidian";
 import OllamaPlugin from "./main";
 import { Message, MessageRole, OllamaGenerateResponse, RoleDefinition } from "./types";
@@ -49,7 +50,6 @@ export class PromptService {
     if (!normalizedPath || !this.plugin.settings.followRole) {
       const definition: RoleDefinition = {
         systemPrompt: null,
-
         isProductivityPersona: false,
       };
       return definition;
@@ -85,7 +85,6 @@ export class PromptService {
       } catch (error) {
         new Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
-
         return { systemPrompt: null, isProductivityPersona: false };
       }
     } else {
@@ -102,10 +101,6 @@ export class PromptService {
     return roleDefinition?.isProductivityPersona ?? false;
   }
 
-  /**
-   * ОНОВЛЕНО: Повертає фінальний системний промпт для API, включаючи нові RAG інструкції
-   * та дефолтний промпт для використання інструментів, якщо іншого немає.
-   */
   async getSystemPromptForAPI(chatMetadata: ChatMetadata): Promise<string | null> {
     const settings = this.plugin.settings;
 
@@ -116,12 +111,8 @@ export class PromptService {
 
     let roleDefinition: RoleDefinition | null = null;
     if (selectedRolePath && settings.followRole) {
-            roleDefinition = await this.getRoleDefinition(selectedRolePath);
-      if (roleDefinition?.systemPrompt) {
-              } else {
-              }
-    } else {
-          }
+      roleDefinition = await this.getRoleDefinition(selectedRolePath);
+    }
 
     const roleSystemPrompt = roleDefinition?.systemPrompt || null;
     const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
@@ -151,11 +142,11 @@ General Rules for BOTH Context Sections:
     let systemPromptParts: string[] = [];
 
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-            systemPromptParts.push(ragInstructions);
+      systemPromptParts.push(ragInstructions);
     }
 
     if (roleSystemPrompt) {
-            systemPromptParts.push(roleSystemPrompt.trim());
+      systemPromptParts.push(roleSystemPrompt.trim());
     }
 
     let combinedBasePrompt = systemPromptParts.join("\n\n").trim();
@@ -167,11 +158,8 @@ General Rules for BOTH Context Sections:
       if (agentTools.length > 0) {
         toolUsageInstructions = "\n\n--- Tool Usage Guidelines ---\n";
         toolUsageInstructions += "You have access to the following tools. ";
-
-        toolUsageInstructions +=
-          "If you decide to use a tool, you MUST respond ONLY with a single JSON object representing the tool call, enclosed in <tool_call></tool_call> XML-like tags. Do NOT add any other text, explanation, or markdown formatting before or after these tags.\n";
-        toolUsageInstructions +=
-          "The JSON object must have a 'name' property with the tool's name and an 'arguments' property containing an object of parameters for that tool.\n";
+        toolUsageInstructions += "To use a tool, you MUST respond ONLY with a single JSON object representing the tool call, enclosed in <tool_call></tool_call> XML-like tags. Do NOT add any other text, explanation, or markdown formatting before or after these tags.\n";
+        toolUsageInstructions += "The JSON object must have a 'name' property with the tool's name and an 'arguments' property containing an object of parameters for that tool.\n";
         toolUsageInstructions += "Example of a tool call response:\n";
         toolUsageInstructions += "<tool_call>\n";
         toolUsageInstructions += "{\n";
@@ -182,6 +170,21 @@ General Rules for BOTH Context Sections:
         toolUsageInstructions += "  }\n";
         toolUsageInstructions += "}\n";
         toolUsageInstructions += "</tool_call>\n\n";
+        
+        toolUsageInstructions += "After you make a tool call, the system will execute the tool and provide you with the result in a message with role 'tool'. This result will be clearly marked. For example:\n";
+        toolUsageInstructions += "<message role=\"tool\" tool_call_id=\"[some_id]\" name=\"[tool_name]\">\n";
+        toolUsageInstructions += "[TOOL_RESULT]\n";
+        toolUsageInstructions += "[The actual result from the tool will be here]\n";
+        toolUsageInstructions += "[/TOOL_RESULT]\n";
+        toolUsageInstructions += "</message>\n";
+        toolUsageInstructions += "If there was an error during tool execution or argument parsing, the result will be marked like this:\n";
+        toolUsageInstructions += "<message role=\"tool\" tool_call_id=\"[some_id]\" name=\"[tool_name]\">\n";
+        toolUsageInstructions += "[TOOL_ERROR]\n";
+        toolUsageInstructions += "[Details of the error will be here]\n";
+        toolUsageInstructions += "[/TOOL_ERROR]\n";
+        toolUsageInstructions += "</message>\n";
+        toolUsageInstructions += "You MUST analyze the content within [TOOL_RESULT]...[/TOOL_RESULT] (or [TOOL_ERROR]...[/TOOL_ERROR]) and use it to formulate your response to the user. Do not re-call the same tool with the exact same arguments if you have already received a result for it, unless the result was an error and you are correcting the arguments. If the tool result provides the necessary information, generate a final answer for the user. If you need more information or need to process the data further, you may call another tool or the same tool with different arguments.\n\n";
+        
         toolUsageInstructions += "Available tools are:\n";
         agentTools.forEach(tool => {
           toolUsageInstructions += `\nTool Name: "${tool.name}"\n`;
@@ -200,14 +203,16 @@ General Rules for BOTH Context Sections:
 
       if (combinedBasePrompt.length === 0) {
         combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
-              } else {
+      } else {
         combinedBasePrompt += toolUsageInstructions;
-              }
+      }
     } else if (combinedBasePrompt.length === 0) {
+      // Fallback if no role, no RAG, and no tools enabled
+      // combinedBasePrompt = "You are a helpful AI assistant."; // Можна залишити порожнім, якщо не хочемо дефолтного
     }
 
     if (isProductivityActive && combinedBasePrompt && settings.enableProductivityFeatures) {
-            const now = new Date();
+      const now = new Date();
       const formattedDate = now.toLocaleDateString(undefined, {
         weekday: "long",
         year: "numeric",
@@ -220,14 +225,9 @@ General Rules for BOTH Context Sections:
     }
 
     const finalTrimmedPrompt = combinedBasePrompt.trim();
-    
     return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
 
-  /**
-   * Готує ТІЛО основного промпту (без системного), включаючи історію, контекст завдань та RAG.
-   * Використовує оновлений `prepareContext` з `RagService`.
-   */
   async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
     const settings = this.plugin.settings;
     const selectedRolePath =
@@ -246,13 +246,11 @@ General Rules for BOTH Context Sections:
         taskContext += `Urgent: ${taskState.urgent.join(", ") || "None"}\n`;
         taskContext += `Other: ${taskState.regular.join(", ") || "None"}\n`;
         taskContext += "--- End Tasks Context ---";
-              } else {
       }
     }
 
     const approxTaskTokens = this._countTokens(taskContext);
-
-    const maxRagTokens = settings.ragEnabled ? ((settings.ragTopK * settings.ragChunkSize) / 4) * 1.8 : 0;
+    const maxRagTokens = settings.ragEnabled ? ((settings.ragTopK * settings.ragChunkSize) / 4) * 1.8 : 0; 
     const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250;
 
     let processedHistoryString = "";
@@ -267,12 +265,7 @@ General Rules for BOTH Context Sections:
       const lastUserMessage = history.findLast(m => m.role === "user");
       if (lastUserMessage?.content) {
         ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
-        if (!ragContext) {
-        } else {
-        }
-      } else {
       }
-    } else {
     }
 
     let finalPromptBodyParts: string[] = [];
@@ -283,6 +276,7 @@ General Rules for BOTH Context Sections:
       finalPromptBodyParts.push(taskContext);
     }
     if (processedHistoryString) {
+      // Тепер історія вже містить відформатовані повідомлення з role: "tool" (з маркерами)
       finalPromptBodyParts.push(`### Conversation History:\n${processedHistoryString}`);
     }
 
@@ -295,16 +289,40 @@ General Rules for BOTH Context Sections:
     return finalPromptBody;
   }
 
+  // _buildSimpleContext та _buildAdvancedContext тепер мають отримувати повідомлення
+  // з role: "tool", які вже відформатовані з маркерами [TOOL_RESULT] або [TOOL_ERROR]
+  // з методу OllamaView._executeAndRenderToolCycle
   private _buildSimpleContext(history: Message[], maxTokens: number): string {
     let context = "";
     let currentTokens = 0;
     for (let i = history.length - 1; i >= 0; i--) {
       const message = history[i];
 
-      if (message.role === "system" || message.role === "error") continue;
+      if (message.role === "system" || message.role === "error") continue; // error тут - це помилка рендерингу, а не TOOL_ERROR
 
-      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
-      const messageTokens = this._countTokens(formattedMessage) + 5;
+      let formattedMessage = "";
+      if (message.role === "user") {
+        formattedMessage = `User: ${message.content.trim()}`;
+      } else if (message.role === "assistant") {
+        // Якщо це повідомлення асистента з tool_calls, воно має бути відформатоване для LLM
+        // Відповідно до документації Ollama для tool use
+        if (message.tool_calls && message.tool_calls.length > 0) {
+            const toolCallsString = JSON.stringify(message.tool_calls); // Або інший формат, який очікує модель
+            formattedMessage = `Assistant:\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+            if (message.content && message.content.trim() !== "") {
+                 // Додаємо текстовий контент, якщо він є разом з tool_calls
+                 formattedMessage = `Assistant: ${message.content.trim()}\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+            }
+        } else {
+            formattedMessage = `Assistant: ${message.content.trim()}`;
+        }
+      } else if (message.role === "tool") {
+        // Повідомлення 'tool' вже має містити маркери [TOOL_RESULT] або [TOOL_ERROR]
+        // у своєму message.content, додані в OllamaView
+        formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">\n${message.content.trim()}\n</message>`;
+      }
+      
+      const messageTokens = this._countTokens(formattedMessage) + 5; // +5 для приблизних токенів на роль/нову лінію
       if (currentTokens + messageTokens <= maxTokens) {
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
@@ -338,16 +356,34 @@ General Rules for BOTH Context Sections:
         if (summary) {
           olderContextContent = `[Summary of earlier conversation]:\n${summary}`;
           olderContextTokens = this._countTokens(olderContextContent) + 10;
-        } else {
         }
       }
 
       if (!olderContextContent) {
         let includedOlderCount = 0;
+        // Використовуємо ту ж логіку форматування, що й у _buildSimpleContext
         for (let i = messagesToProcess.length - 1; i >= 0; i--) {
           const message = messagesToProcess[i];
           if (message.role === "system" || message.role === "error") continue;
-          const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
+          
+          let formattedMessage = "";
+          // ... (така ж логіка форматування user/assistant/tool, як у _buildSimpleContext) ...
+            if (message.role === "user") {
+                formattedMessage = `User: ${message.content.trim()}`;
+            } else if (message.role === "assistant") {
+                if (message.tool_calls && message.tool_calls.length > 0) {
+                    const toolCallsString = JSON.stringify(message.tool_calls);
+                    formattedMessage = `Assistant:\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+                    if (message.content && message.content.trim() !== "") {
+                        formattedMessage = `Assistant: ${message.content.trim()}\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+                    }
+                } else {
+                    formattedMessage = `Assistant: ${message.content.trim()}`;
+                }
+            } else if (message.role === "tool") {
+                formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">\n${message.content.trim()}\n</message>`;
+            }
+
           const messageTokens = this._countTokens(formattedMessage) + 5;
 
           if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
@@ -360,39 +396,55 @@ General Rules for BOTH Context Sections:
         }
         if (includedOlderCount > 0) {
           olderContextContent = `[Start of older messages directly included]:\n${olderContextContent.trim()}\n[End of older messages]`;
-          olderContextTokens += 10;
+          olderContextTokens += 10; 
         }
       }
 
       if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
         processedParts.push(olderContextContent);
         currentTokens += olderContextTokens;
-      } else if (olderContextContent) {
       }
     }
 
     let keptMessagesString = "";
     let keptMessagesTokens = 0;
-    let includedKeptCount = 0;
+    // Використовуємо ту ж логіку форматування, що й у _buildSimpleContext
     for (let i = messagesToKeep.length - 1; i >= 0; i--) {
-      const message = messagesToKeep[i];
-      if (message.role === "system" || message.role === "error") continue;
-      const formattedMessage = `${message.role === "user" ? "User" : "Assistant"}: ${message.content.trim()}`;
-      const messageTokens = this._countTokens(formattedMessage) + 5;
+        const message = messagesToKeep[i];
+        if (message.role === "system" || message.role === "error") continue;
+        
+        let formattedMessage = "";
+        // ... (така ж логіка форматування user/assistant/tool, як у _buildSimpleContext) ...
+        if (message.role === "user") {
+            formattedMessage = `User: ${message.content.trim()}`;
+        } else if (message.role === "assistant") {
+            if (message.tool_calls && message.tool_calls.length > 0) {
+                const toolCallsString = JSON.stringify(message.tool_calls);
+                formattedMessage = `Assistant:\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+                if (message.content && message.content.trim() !== "") {
+                    formattedMessage = `Assistant: ${message.content.trim()}\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+                }
+            } else {
+                formattedMessage = `Assistant: ${message.content.trim()}`;
+            }
+        } else if (message.role === "tool") {
+            formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">\n${message.content.trim()}\n</message>`;
+        }
 
-      if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
-        keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
-        keptMessagesTokens += messageTokens;
-        includedKeptCount++;
-      } else {
-        break;
-      }
+        const messageTokens = this._countTokens(formattedMessage) + 5;
+
+        if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
+            keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
+            keptMessagesTokens += messageTokens;
+        } else {
+            break;
+        }
     }
+
 
     if (keptMessagesString) {
       processedParts.push(keptMessagesString.trim());
       currentTokens += keptMessagesTokens;
-    } else {
     }
 
     return processedParts.join("\n\n").trim();
@@ -403,9 +455,26 @@ General Rules for BOTH Context Sections:
       return null;
     }
 
+    // Форматуємо історію для сумаризації так само, як для основного контексту
     const textToSummarize = messagesToSummarize
-      .filter(m => m.role === "user" || m.role === "assistant")
-      .map(m => `${m.role === "user" ? "User" : "Assistant"}: ${m.content.trim()}`)
+      .filter(m => m.role === "user" || m.role === "assistant" || m.role === "tool")
+      .map(m => {
+        if (m.role === "user") {
+            return `User: ${m.content.trim()}`;
+        } else if (m.role === "assistant") {
+            if (m.tool_calls && m.tool_calls.length > 0) {
+                const toolCallsString = JSON.stringify(m.tool_calls);
+                let contentPart = m.content && m.content.trim() !== "" ? `${m.content.trim()}\n` : "";
+                return `Assistant: ${contentPart}<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+            }
+            return `Assistant: ${m.content.trim()}`;
+        } else if (m.role === "tool") {
+            // Повідомлення 'tool' вже мають маркери
+            return `<message role="tool" tool_call_id="${m.tool_call_id}" name="${m.name}">\n${m.content.trim()}\n</message>`;
+        }
+        return ""; // На випадок непередбачених ролей
+      })
+      .filter(Boolean)
       .join("\n");
 
     if (!textToSummarize.trim()) {
@@ -414,12 +483,11 @@ General Rules for BOTH Context Sections:
 
     const summarizationPromptTemplate =
       this.plugin.settings.summarizationPrompt ||
-      "Summarize the following conversation concisely:\n\n{text_to_summarize}";
+      "Summarize the following conversation concisely, preserving key information and tool usage context:\n\n{text_to_summarize}";
     const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
 
     const summarizationModelName =
       this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
-
     const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
 
     const requestBody = {
@@ -427,27 +495,18 @@ General Rules for BOTH Context Sections:
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.3,
-      options: {
-        num_ctx: summarizationContextWindow,
-      },
-
+      options: { num_ctx: summarizationContextWindow, },
       system:
-        "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, and unresolved questions.",
+        "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, unresolved questions, and the context of any tool calls and their results.",
     };
 
     try {
-      if (!this.plugin.ollamaService) {
-        return null;
-      }
-
+      if (!this.plugin.ollamaService) return null;
       const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
-
       if (responseData && typeof responseData.response === "string") {
-        const summary = responseData.response.trim();
-        return summary;
-      } else {
-        return null;
+        return responseData.response.trim();
       }
+      return null;
     } catch (error) {
       return null;
     }

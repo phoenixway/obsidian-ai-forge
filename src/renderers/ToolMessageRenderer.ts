@@ -14,59 +14,51 @@ export class ToolMessageRenderer extends BaseMessageRenderer implements IMessage
   }
 
   public render(): HTMLElement {
-    // 1. Створюємо головний контейнер групи повідомлень
-    const messageGroupEl = this.createMessageGroupWrapper([CSS_CLASSES.TOOL_MESSAGE_GROUP || "tool-message-group"]); // Додайте TOOL_MESSAGE_GROUP до CSS_CLASSES
-
-    // 2. Додаємо аватар (або іконку інструменту)
-    //    Передаємо isUser: false, щоб аватар був зліва, як у асистента/системи.
-    //    RendererUtils.renderAvatar має обробити спеціальний тип 'tool', якщо ви його додали,
-    //    або відобразить дефолтну іконку для "не-користувача".
-    this.addAvatar(messageGroupEl, false); // 'false' означає, що це не повідомлення користувача
-
-    // 3. Створюємо обгортку для самого повідомлення (бульбашки)
+    const messageGroupEl = this.createMessageGroupWrapper([CSS_CLASSES.TOOL_MESSAGE_GROUP || "tool-message-group"]);
+    this.addAvatar(messageGroupEl, false); 
     const messageWrapperEl = messageGroupEl.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
-
-    // 4. Створюємо структуру бульбашки повідомлення
     const { messageEl, contentContainer, contentEl } = this.createMessageBubble(
         messageWrapperEl,
-        [CSS_CLASSES.TOOL_MESSAGE] // Основний клас для стилізації повідомлення інструменту
+        [CSS_CLASSES.TOOL_MESSAGE] 
     );
 
-    // 5. Рендеримо специфічний вміст для повідомлення інструменту
-    this.renderToolSpecificContent(contentEl);
+    this.renderToolSpecificContent(contentEl, this.message.content);
 
-    // 6. Додаємо мітку часу
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
-    
-    // 7. Додаємо базові кнопки дій (наприклад, копіювати)
-    // Передаємо this.message.content як текст для копіювання
-    this.addBaseActionButtons(messageEl, this.message.content);
-
+    this.addBaseActionButtons(messageEl, this.message.content); // Передаємо оригінальний контент з маркерами, якщо кнопки копіювання мають копіювати саме його
 
     return messageGroupEl;
   }
 
-  protected renderToolSpecificContent(contentEl: HTMLElement): void {
-    contentEl.empty(); // Очищуємо на випадок повторного рендерингу
+    protected renderToolSpecificContent(contentEl: HTMLElement, rawContentWithMarkers: string): void {
+    contentEl.empty(); 
 
-    // Заголовок з назвою інструменту
     const toolHeader = contentEl.createDiv({ cls: CSS_CLASSES.TOOL_RESULT_HEADER });
     const iconSpan = toolHeader.createSpan({ cls: CSS_CLASSES.TOOL_RESULT_ICON });
-    setIcon(iconSpan, "wrench"); // Іконка "гайковий ключ" для інструментів
+    setIcon(iconSpan, "wrench"); 
     toolHeader.createSpan({
-      text: `Tool Executed: ${this.message.name || "Unknown Tool"}`, // message.name має містити назву інструменту
+      text: `Tool Executed: ${this.message.name || "Unknown Tool"}`, 
     });
 
-    // Вміст результату інструменту
-    // Використовуємо <pre><code> для збереження форматування, оскільки результат може бути багаторядковим
-    // або навіть містити JSON (хоча ми очікуємо рядок від SimpleFileAgent)
     const preEl = contentEl.createEl("pre", { cls: CSS_CLASSES.TOOL_RESULT_CONTENT });
     const codeEl = preEl.createEl("code");
-    codeEl.setText(this.message.content); // this.message.content - це результат роботи інструменту
 
-    // Тут не використовуємо MarkdownRenderer, оскільки результат інструменту - це дані,
-    // а не Markdown для відображення (хоча це може залежати від конкретного інструменту).
-    // Якщо інструмент повертає Markdown, тоді тут потрібно викликати MarkdownRenderer.
+    let displayContent = rawContentWithMarkers;
+    const toolResultStartMarker = "[TOOL_RESULT]\n";
+    const toolResultEndMarker = "\n[/TOOL_RESULT]";
+    const toolErrorStartMarker = "[TOOL_ERROR]\n";
+    const toolErrorEndMarker = "\n[/TOOL_ERROR]";
+
+    if (displayContent.startsWith(toolResultStartMarker) && displayContent.endsWith(toolResultEndMarker)) {
+        displayContent = displayContent.substring(toolResultStartMarker.length, displayContent.length - toolResultEndMarker.length);
+    } else if (displayContent.startsWith(toolErrorStartMarker) && displayContent.endsWith(toolErrorEndMarker)) {
+        displayContent = displayContent.substring(toolErrorStartMarker.length, displayContent.length - toolErrorEndMarker.length);
+        // Можна додати спеціальну стилізацію для помилок інструменту тут, якщо потрібно
+        // Наприклад, додати клас до preEl або codeEl
+        preEl.addClass("tool-execution-error-display"); // Приклад класу
+    }
+    
+    codeEl.setText(displayContent.trim());
   }
 
   // Перевизначаємо addAvatar, якщо потрібна особлива логіка для аватара інструменту.
