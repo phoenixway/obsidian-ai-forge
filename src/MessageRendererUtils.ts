@@ -253,13 +253,13 @@ export function renderAvatar(
     avatarRoleType?: 'user' | 'assistant' | 'system' | 'tool' | 'error' | 'tool-usage' | string // Додав 'tool-usage' як приклад
 ): void {
  
-if (avatarRoleType === 'tool' || avatarRoleType === 'tool-usage') {
-    const existingAvatar = groupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.AVATAR_CONTAINER || "avatar-container"}`);
-    if (existingAvatar) {
-        existingAvatar.remove();
-    }
-    return; // Не рендеримо аватар
-}
+// if (avatarRoleType === 'tool' || avatarRoleType === 'tool-usage') {
+//     const existingAvatar = groupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.AVATAR_CONTAINER || "avatar-container"}`);
+//     if (existingAvatar) {
+//         existingAvatar.remove();
+//     }
+//     return; // Не рендеримо аватар
+// }
     const settings = plugin.settings;
     
     let avatarTypeToUse: AvatarType;
