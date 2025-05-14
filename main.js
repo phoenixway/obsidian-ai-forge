@@ -19464,6 +19464,8 @@ var OllamaView = class extends import_obsidian15.ItemView {
     // Для зберігання моделі
     this.frameProcessedCounter = 0;
     this.FRAME_PROCESSED_LOG_INTERVAL = 30;
+    // Логувати кожен 30-й фрейм (приблизно раз на секунду, якщо фрейми по 30мс)
+    this.vadObjectUrls = {};
     this.isProcessing = false;
     this.scrollTimeout = null;
     this.speechWorker = null;
@@ -20448,6 +20450,7 @@ This action cannot be undone.`,
       this.speechWorker = null;
     }
     this.stopVoiceRecording(false);
+    this.revokeVadObjectUrls();
     if (this.vad) {
       try {
         await this.vad.destroy();
@@ -21096,22 +21099,30 @@ This action cannot be undone.`,
     }
     if (!this.speechWorker) {
       new import_obsidian15.Notice("Speech recognition feature not available (worker not initialized).");
+      this.plugin.logger.warn("Speech worker not initialized, aborting voice recognition.");
       return;
     }
     const speechApiKey = this.plugin.settings.googleApiKey;
     if (!speechApiKey) {
       new import_obsidian15.Notice("Google API Key for speech recognition not configured. Please add it in plugin settings.");
+      this.plugin.logger.warn("Google API Key not configured, aborting voice recognition.");
       return;
     }
-    if (!this.vadModelArrayBuffer && !this.plugin.settings.allowVadMicVadModelFromCDN) {
-      new import_obsidian15.Notice("VAD ONNX model not loaded locally, and CDN usage is disabled in settings. Voice detection cannot start.");
-      this.plugin.logger.error("Local VAD ONNX model not available and CDN disabled. Aborting voice recognition start.");
-      return;
-    } else if (!this.vadModelArrayBuffer && this.plugin.settings.allowVadMicVadModelFromCDN) {
-      this.plugin.logger.warn("Local VAD ONNX model not available. Library will attempt to load from CDN (as per settings).");
-    }
-    if (this.plugin.settings.vadUseLocalModelIfAvailable && !this.vadModelArrayBuffer || this.plugin.settings.vadUseLocalWorkletIfAvailable && !this.vadWorkletJs) {
+    const needLocalModel = this.plugin.settings.vadUseLocalModelIfAvailable || !this.plugin.settings.allowVadMicVadModelFromCDN;
+    const needLocalWorklet = this.plugin.settings.vadUseLocalWorkletIfAvailable;
+    if (needLocalModel && !this.vadModelArrayBuffer || needLocalWorklet && !this.vadWorkletJs) {
+      this.plugin.logger.debug("Attempting to load VAD assets as they are missing or preferred locally.");
       await this.loadVadAssets();
+    }
+    if (needLocalModel && !this.vadModelArrayBuffer) {
+      new import_obsidian15.Notice("Required local VAD ONNX model not loaded. Voice detection cannot start.");
+      this.plugin.logger.error("Local VAD ONNX model required but not available. Aborting voice recognition start.");
+      return;
+    }
+    if (needLocalWorklet && !this.vadWorkletJs && !this.plugin.settings.allowVadMicVadModelFromCDN) {
+      new import_obsidian15.Notice("Required local VAD worklet not loaded, and CDN fallback disabled. Voice detection cannot start.");
+      this.plugin.logger.error("Local VAD worklet required but not available, and CDN fallback for worklet disabled. Aborting voice recognition start.");
+      return;
     }
     try {
       this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -21123,12 +21134,23 @@ This action cannot be undone.`,
           if (settings.sampleRate) {
             this.plugin.logger.debug(`AudioStream sample rate: ${settings.sampleRate} Hz`);
           }
+        } else {
+          this.plugin.logger.warn("getUserMedia returned an audioStream with no audio tracks.");
+          new import_obsidian15.Notice("Could not get an audio track from the microphone.");
+          return;
         }
+      } else {
+        this.plugin.logger.error("getUserMedia did not return an audioStream.");
+        new import_obsidian15.Notice("Could not access the microphone stream.");
+        return;
       }
       let recorderOptions;
       const preferredMimeType = "audio/webm;codecs=opus";
       if (MediaRecorder.isTypeSupported(preferredMimeType)) {
         recorderOptions = { mimeType: preferredMimeType };
+        this.plugin.logger.debug("Using preferred MIME type for MediaRecorder:", preferredMimeType);
+      } else {
+        this.plugin.logger.debug("Preferred MIME type not supported, using default for MediaRecorder.");
       }
       this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
       const audioChunks = [];
@@ -21138,6 +21160,7 @@ This action cannot be undone.`,
       this.inputEl.placeholder = "Listening... Speak now.";
       this.isVadSpeechDetected = false;
       this.frameProcessedCounter = 0;
+      this.revokeVadObjectUrls();
       this.mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunks.push(event.data);
@@ -21187,12 +21210,14 @@ This action cannot be undone.`,
       this.plugin.logger.debug("MediaRecorder started.");
       try {
         if (this.vad) {
+          this.plugin.logger.debug("Destroying previous VAD instance.");
           await this.vad.destroy();
           this.vad = null;
         }
         this.plugin.logger.debug("Attempting to initialize MicVAD...");
         const vadOptions = {
           stream: this.audioStream,
+          // Передаємо аудіопотік в VAD
           ortConfig: (ort) => {
             this.plugin.logger.debug("[VAD ortConfig] Attempting to configure ONNXRuntime-Web instance.");
             if (ort.env && ort.env.wasm) {
@@ -21218,8 +21243,8 @@ This action cannot be undone.`,
                 this.plugin.logger.debug(`VAD Frame (${this.frameProcessedCounter}): received unexpected probability format:`, probabilities);
               }
             }
-            if (probValue > 0.9 && !this.isVadSpeechDetected && this.frameProcessedCounter % (this.FRAME_PROCESSED_LOG_INTERVAL / 2) === 0) {
-              this.plugin.logger.warn(`VAD Frame: HIGH speech probability (${probValue.toFixed(4)}) but onSpeechStart not triggered yet.`);
+            if (probValue > 0.9 && !this.isVadSpeechDetected && this.frameProcessedCounter % Math.floor(this.FRAME_PROCESSED_LOG_INTERVAL / 3) === 0) {
+              this.plugin.logger.warn(`VAD Frame: HIGH speech probability (${probValue.toFixed(4)}) but onSpeechStart not triggered yet. Current threshold: ${vadOptions.positiveSpeechThreshold}, minFrames: ${vadOptions.minSpeechFrames}`);
             }
           },
           onSpeechStart: () => {
@@ -21245,25 +21270,19 @@ This action cannot be undone.`,
               this.plugin.logger.debug("VAD EVENT: Speech ended, but not processing (isVadSpeechDetected false or recorder not recording).");
             }
           },
-          // --- Поточні параметри VAD для тестування (можеш змінювати) ---
+          // --- Параметри VAD для тестування (можеш змінювати) ---
           positiveSpeechThreshold: 0.4,
-          // Дуже чутливий
           negativeSpeechThreshold: 0.3,
-          //  
           minSpeechFrames: 3
-          // Дуже чутливий
-          // preSpeechPadFrames: 5,     // Можна закоментувати, щоб покладатися на дефолтні
-          // redemptionFrames: 8,       // Можна закоментувати
-          // --- Кінець параметрів VAD ---
+          // preSpeechPadFrames: 5,     
+          // redemptionFrames: 8,      
         };
-        let modelObjectUrlToRevoke = void 0;
-        let workletObjectUrlToRevoke = void 0;
         if (this.vadModelArrayBuffer && (this.plugin.settings.vadUseLocalModelIfAvailable || !this.plugin.settings.allowVadMicVadModelFromCDN)) {
           try {
             const modelBlob = new Blob([this.vadModelArrayBuffer], { type: "application/octet-stream" });
-            modelObjectUrlToRevoke = URL.createObjectURL(modelBlob);
-            vadOptions.modelURL = modelObjectUrlToRevoke;
-            this.plugin.logger.debug("Using local VAD ONNX model via Object URL:", modelObjectUrlToRevoke);
+            this.vadObjectUrls.model = URL.createObjectURL(modelBlob);
+            vadOptions.modelURL = this.vadObjectUrls.model;
+            this.plugin.logger.debug("Using local VAD ONNX model via Object URL:", this.vadObjectUrls.model);
           } catch (e) {
             this.plugin.logger.error("Error creating Object URL for local VAD model:", e);
           }
@@ -21271,15 +21290,21 @@ This action cannot be undone.`,
         if (this.vadWorkletJs && this.plugin.settings.vadUseLocalWorkletIfAvailable) {
           try {
             const workletBlob = new Blob([this.vadWorkletJs], { type: "application/javascript" });
-            workletObjectUrlToRevoke = URL.createObjectURL(workletBlob);
-            vadOptions.workletURL = workletObjectUrlToRevoke;
-            this.plugin.logger.debug("Using local VAD worklet via Object URL:", workletObjectUrlToRevoke);
+            this.vadObjectUrls.worklet = URL.createObjectURL(workletBlob);
+            vadOptions.workletURL = this.vadObjectUrls.worklet;
+            this.plugin.logger.debug("Using local VAD worklet via Object URL:", this.vadObjectUrls.worklet);
           } catch (e) {
             this.plugin.logger.error("Error creating Object URL for local VAD worklet:", e);
           }
         }
         this.vad = await import_vad_web.MicVAD.new(vadOptions);
         this.plugin.logger.debug("VAD initialized (MicVAD.new called).");
+        if (this.vad) {
+          this.plugin.logger.debug("Attempting to explicitly call this.vad.start()...");
+          this.vad.start();
+          this.plugin.logger.debug("this.vad.start() called.");
+          this.plugin.logger.debug("Cannot directly check VAD AudioContext state due to encapsulation. Assuming start() handled it.");
+        }
       } catch (vadError) {
         this.plugin.logger.error("Failed to initialize VAD (MicVAD.new error):", vadError, vadError.stack);
         if (vadError.message && vadError.message.includes("Worker is not a constructor")) {
@@ -21292,6 +21317,7 @@ This action cannot be undone.`,
           new import_obsidian15.Notice(`Voice activity detection failed to start: ${vadError.message}`);
         }
         this.vad = null;
+        this.revokeVadObjectUrls();
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "NotAllowedError") {
@@ -21305,8 +21331,21 @@ This action cannot be undone.`,
       this.stopVoiceRecording(false);
     }
   }
+  revokeVadObjectUrls() {
+    if (this.vadObjectUrls.model) {
+      URL.revokeObjectURL(this.vadObjectUrls.model);
+      this.plugin.logger.debug("Revoked VAD model Object URL:", this.vadObjectUrls.model);
+      delete this.vadObjectUrls.model;
+    }
+    if (this.vadObjectUrls.worklet) {
+      URL.revokeObjectURL(this.vadObjectUrls.worklet);
+      this.plugin.logger.debug("Revoked VAD worklet Object URL:", this.vadObjectUrls.worklet);
+      delete this.vadObjectUrls.worklet;
+    }
+  }
   stopVoiceRecording(processAudio) {
     this.plugin.logger.debug(`Stopping voice recording. Process audio: ${processAudio}`);
+    this.revokeVadObjectUrls();
     if (this.vad) {
       this.vad.pause();
     }
