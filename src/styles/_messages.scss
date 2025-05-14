@@ -1,7 +1,6 @@
 // src/styles/_messages.scss
 
 // --- Змінні SASS (якщо не імпортуються з іншого місця) ---
-// Припускаємо, що CSS custom properties типу --chat-spacing-unit вже визначені глобально
 $avatar-final-size: calc(var(--chat-avatar-size, 32px) * 1.2);
 $avatar-font-size-factor: 0.5;
 $avatar-icon-size-factor: 0.65;
@@ -23,6 +22,12 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
+@mixin transition($properties: all, $duration: 0.2s, $timing-function: ease) {
+  transition-property: $properties;
+  transition-duration: $duration;
+  transition-timing-function: $timing-function;
+}
+
 // --- Плейсхолдери ---
 %base-avatar-container {
   width: $avatar-final-size;
@@ -39,7 +44,7 @@ $avatar-icon-size-factor: 0.65;
 
 %base-message-bubble {
   padding: calc(var(--chat-spacing-unit, 5px) * 2) calc(var(--chat-spacing-unit, 5px) * 3);
-  border-radius: 18px; // Базовий радіус, буде уточнено для кутів
+  border-radius: 18px;
   width: fit-content;
   max-width: var(--chat-message-max-width, 700px);
   white-space: normal;
@@ -48,7 +53,7 @@ $avatar-icon-size-factor: 0.65;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
   line-height: 1.5;
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  @include transition( (transform, box-shadow), 0.2s, ease-out ); // Уточнено властивості для transition
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5);
 
   &:last-child {
@@ -64,7 +69,7 @@ $avatar-icon-size-factor: 0.65;
   color: var(--text-muted);
   border-radius: var(--radius-s);
   cursor: pointer;
-  transition: all 0.15s ease;
+  @include transition; // Використовуємо міксін transition
   @include flex-layout($align: center, $justify: center);
 
   .svg-icon {
@@ -76,6 +81,25 @@ $avatar-icon-size-factor: 0.65;
     background: var(--background-modifier-hover) !important;
     color: var(--text-normal);
     transform: scale(1.05);
+  }
+}
+
+%button-like-text {
+  display: inline-block;
+  padding: calc(var(--chat-spacing-unit, 5px) * 0.5) calc(var(--chat-spacing-unit, 5px) * 1.5);
+  font-size: var(--font-ui-small, 0.8em);
+  color: var(--text-muted);
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-m, 12px);
+  cursor: pointer;
+  text-align: center;
+  @include transition( (color, background-color, border-color) );
+
+  &:hover {
+    color: var(--text-accent-hover);
+    background-color: var(--background-modifier-hover);
+    border-color: var(--background-modifier-border-hover);
   }
 }
 
@@ -120,7 +144,6 @@ $avatar-icon-size-factor: 0.65;
     }
     .message-wrapper {
       order: 2;
-      // margin-left: 0 !important; // Спробувати прибрати, якщо gap працює
     }
   }
 }
@@ -129,7 +152,6 @@ $avatar-icon-size-factor: 0.65;
 .avatar-container {
   @extend %base-avatar-container;
 
-  // Стилі для дочірніх елементів аватара
   &.avatar-image,
   img.avatar-image {
     width: 100%;
@@ -138,8 +160,8 @@ $avatar-icon-size-factor: 0.65;
   }
 
   &.avatar-icon .svg-icon,
-  .avatar-icon svg {
-    svg {
+  .avatar-icon svg { // Прибираємо зайву вкладеність .svg-icon, якщо .avatar-icon вже на svg або його обгортці
+    svg { // Або якщо .avatar-icon - це батьківський контейнер для svg
       width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
       height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
       display: block;
@@ -158,7 +180,6 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// Специфічні стилі для аватара користувача в групі
 .user-message-group .avatar-container {
    background-color: var(--interactive-accent-translucent);
    color: var(--interactive-accent);
@@ -185,52 +206,30 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// --- Логіка заокруглення кутів для послідовних повідомлень ---
+// --- Логіка заокруглення кутів ---
 .user-message-group .message-wrapper .message {
     border-top-left-radius: 18px;
     border-bottom-left-radius: 18px;
-
-    &:first-child {
-      border-top-right-radius: 18px;
-    }
-    &:not(:first-child) {
-      border-top-right-radius: 5px;
-    }
-    &:last-child {
-      border-bottom-right-radius: 18px;
-    }
-    &:not(:last-child) {
-      border-bottom-right-radius: 5px;
-    }
+    &:first-child { border-top-right-radius: 18px; }
+    &:not(:first-child) { border-top-right-radius: 5px; }
+    &:last-child { border-bottom-right-radius: 18px; }
+    &:not(:last-child) { border-bottom-right-radius: 5px; }
 }
 
 .ollama-message-group .message-wrapper .message {
     border-top-right-radius: 18px;
     border-bottom-right-radius: 18px;
-
-    &:first-child {
-      border-top-left-radius: 18px;
-    }
-    &:not(:first-child) {
-      border-top-left-radius: 5px;
-    }
-    &:last-child {
-      border-bottom-left-radius: 18px;
-    }
-    &:not(:last-child) {
-      border-bottom-left-radius: 5px;
-    }
+    &:first-child { border-top-left-radius: 18px; }
+    &:not(:first-child) { border-top-left-radius: 5px; }
+    &:last-child { border-bottom-left-radius: 18px; }
+    &:not(:last-child) { border-bottom-left-radius: 5px; }
 }
 
-// --- Стилі для конкретних ролей повідомлень ---
+// --- Стилі для конкретних ролей ---
 .message.user-message {
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
-  box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-  &:hover {
-    box-shadow: 0 3px 7px rgba(var(--interactive-accent-rgb), 0.3);
-    // transform: translateY(-1px); // Вже є в %base-message-bubble
-  }
+  box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2); // Специфічна тінь
   .message-timestamp {
     color: var(--text-on-accent);
     opacity: 0.75;
@@ -240,19 +239,68 @@ $avatar-icon-size-factor: 0.65;
 .message.ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
-  &:hover {
+  &:hover { // Специфічна тінь при наведенні
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-    // transform: translateY(-1px); // Вже є в %base-message-bubble
   }
   pre {
     background-color: var(--background-secondary) !important;
     padding: calc(var(--chat-spacing-unit, 5px) * 2);
-    border-radius: var(--radius-m);
+    border-radius: var(--radius-m, 6px); // Додав fallback для --radius-m
     margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
     margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
     overflow-x: auto;
   }
 }
+
+// --- Контент повідомлення, час, кнопка "показати більше" ---
+.message-content {
+  p {
+    margin-top: 0; 
+    margin-bottom: calc(var(--p-spacing, 1em) / 2);
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+.message-timestamp {
+  font-size: var(--font-ui-smaller, 0.75em);
+  color: var(--text-faint);
+  margin-top: var(--chat-spacing-unit, 5px);
+  text-align: right;
+  display: block;
+  opacity: 0.9;
+}
+
+.show-more-button {
+  @extend %button-like-text;
+  display: block;
+  margin: calc(var(--chat-spacing-unit, 5px) * 0.5) auto 0 auto;
+  width: fit-content;
+  z-index: 2;
+}
+
+.message.user-message .show-more-button { 
+  color: rgba(255, 255, 255, 0.7);
+  background-color: transparent;
+  border-color: transparent;
+  &:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: transparent;
+  }
+}
+
+.message-content-collapsible {
+  overflow: hidden;
+  @include transition(max-height, 0.3s, ease-out);
+}
+
+.message-content-collapsed {
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+}
+
 
 // --- Кнопки дій ---
 .message-actions-wrapper {
@@ -262,7 +310,8 @@ $avatar-icon-size-factor: 0.65;
   width: fit-content;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s;
+  @include transition( (opacity, visibility), 0.2s, ease-in-out ); // visibility transition має бути миттєвим
+                                                                // opacity 0.2s ease-in-out, visibility 0s linear 0.2s; (як було)
   z-index: 6;
   margin-left: 10px;
 
@@ -299,110 +348,32 @@ $avatar-icon-size-factor: 0.65;
 .message-wrapper:hover .message-actions-wrapper {
   opacity: 1;
   visibility: visible;
-  transition-delay: 0s;
+  transition-delay: 0s; // Для visibility, щоб з'явилось одразу
 }
 
-// --- Інші стилі (залишено з твого файлу, потребують перегляду на дублювання/оптимізацію) ---
-.regenerate-button {
-  // Твої стилі
-}
-button.summarize-button {
-  // Твої стилі
-}
-.summary-modal-content {
-  // Твої стилі
-}
+// --- Інші стилі (залишено з твого файлу, потребують перегляду) ---
+// Ці секції поки що не змінювалися глибоко, лише мінімальні правки для узгодження
+.regenerate-button { /* Твої стилі */ }
+button.summarize-button { /* Твої стилі */ }
+.summary-modal-content { /* Твої стилі */ }
+.message-content-container { /* Твої стилі, можливо, вже не потрібен */ }
 
-.message-content-container {
-  // Твої стилі
-}
-.message-content {
-  padding-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
-  box-sizing: border-box;
-  width: 100%;
-  white-space: normal;
-  p {
-    margin-bottom: calc(var(--p-spacing) / 2); // Припускаємо, що --p-spacing визначено
-  }
-  p:last-child {
-    margin-bottom: 0;
-  }
-  overflow-wrap: break-word; // Вже є на %base-message-bubble
-  word-break: break-word; // Вже є на %base-message-bubble
-}
-
-.message-timestamp {
-  font-size: 0.75em;
-  color: var(--text-faint);
-  margin-top: var(--chat-spacing-unit, 5px);
-  text-align: right;
-  display: block;
-  width: 100%;
-  opacity: 0.9;
-}
-
-.message-content-collapsible {
-  overflow: hidden;
-  transition: max-height 0.3s ease-out;
-}
-
-.message-content-collapsed {
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-}
-
-.show-more-button {
-  display: block;
-  margin: calc(var(--chat-spacing-unit, 5px) * 0.5) auto 0 auto;
-  padding: 2px 10px;
-  font-size: 0.8em;
-  color: var(--text-muted);
-  background-color: transparent;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-align: center;
-  width: fit-content;
-  z-index: 2;
-
-  &:hover {
-    background-color: var(--background-modifier-hover);
-    color: var(--text-accent-hover);
-    border-color: var(--background-modifier-border-hover);
-  }
-}
-.user-message .show-more-button { // Селектор прив'язаний до .user-message
-  background-color: transparent;
-  border-color: transparent;
-  color: rgba(255, 255, 255, 0.7);
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
-  }
-}
 
 @keyframes message-appear {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media screen and (min-width: 1600px) {
   .ollama-chat-container {
-    padding-left: 15%;
+    padding-left: 15%; // TODO: Розглянути використання змінних або більш адаптивних одиниць
     padding-right: 15%;
-    max-width: 3000px; // Це дуже велика ширина, переконайся, що це навмисно
+    max-width: 3000px; // TODO: Перевірити доцільність такої великої ширини
   }
 }
 
 .scroll-to-bottom-button {
-  position: absolute; // Відносно чого? .ollama-chat-container або іншого обгорткового елемента
+  position: absolute; 
   bottom: 15px;
   right: 20px;
   z-index: 50;
@@ -415,11 +386,18 @@ button.summarize-button {
   box-shadow: var(--shadow-s);
   cursor: pointer;
   @include flex-layout($align: center, $justify: center);
-  padding: 0; // Якщо flex центрує, padding може не бути потрібним
+  padding: 0; 
   opacity: 0;
   visibility: hidden;
   transform: translateY(10px);
-  transition: opacity 0.2s ease-out, visibility 0s linear 0.2s, transform 0.2s ease-out, background-color 0.15s ease;
+  // Оптимізований transition
+  @include transition( (opacity, transform, background-color), 0.2s, ease-out );
+  // visibility має оброблятися окремо, якщо потрібна затримка
+  // transition-property: opacity, transform, background-color, visibility;
+  // transition-duration: 0.2s, 0.2s, 0.15s, 0s;
+  // transition-timing-function: ease-out, ease-out, ease, linear;
+  // transition-delay: 0s, 0s, 0s, 0.2s; // Затримка для visibility
+
 
   .svg-icon {
     width: 20px;
@@ -440,9 +418,7 @@ button.summarize-button {
     opacity: 0.85;
     visibility: visible;
     transform: translateY(0);
-    // transition властивості тут дублюють попередні, можна оптимізувати
-    // transition: opacity 0.2s ease-out, visibility 0s linear 0s, transform 0.2s ease-out, background-color 0.15s ease;
-    // Краще мати один transition на базовому селекторі, а тут змінювати тільки ті властивості, що анімуються
+    // transition-delay: 0s; // Скидаємо затримку для visibility при появі
 
     &:hover {
       opacity: 1;
@@ -450,17 +426,11 @@ button.summarize-button {
   }
 }
 
-.new-message-indicator.visible {
-  // Твої стилі, якщо є
-}
+.new-message-indicator.visible { /* Твої стилі, якщо є */ }
 
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .button-loading {
@@ -477,23 +447,17 @@ button.summarize-button {
   margin-top: calc(var(--chat-spacing-unit, 5px) * 6);
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 4);
   padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2.5);
-  font-size: var(--font-ui-smaller);
+  font-size: var(--font-ui-smaller, 0.8em); // Додав fallback
   color: var(--text-muted);
   background-color: var(--background-secondary);
-  border-radius: var(--radius-l); // Використовуй змінні, якщо є
+  border-radius: var(--radius-l, 16px); // Додав fallback
   text-align: center;
   user-select: none;
   font-weight: 500;
 }
 
-// Специфічні стилі, якщо ви розрізняєте user/ai аватари за класами на контейнері
-// .avatar-container.user-avatar {} // Вже є .user-message-group .avatar-container
-// .avatar-container.ai-avatar {} // Аналогічно для AI, якщо потрібно
-
 .assistant-tool-usage-indicator {
   font-style: italic;
   color: var(--text-faint);
-  font-size: var(--font-ui-smaller);
+  font-size: var(--font-ui-smaller, 0.8em); // Додав fallback
 }
-
-// .assistant-tool-usage-indicator::before {} // Якщо потрібен псевдоелемент
