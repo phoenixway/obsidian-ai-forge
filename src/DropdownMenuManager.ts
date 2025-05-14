@@ -114,7 +114,7 @@ export class DropdownMenuManager {
         // --- ДОДАЄМО НОВУ ОПЦІЮ ТУТ (перед "Clear Messages" або після, на твій розсуд) ---
         // Можна додати її в групу "Chat Actions" або "Danger Actions"
         // Для прикладу, додамо перед "Clear Messages", як менш небезпечну, але пов'язану дію
-                this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
+                // this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
 
         this.clearCurrentChatOption = this.createActionItem("eraser", "Clear Current Chat", [CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION]); // <--- НОВА ОПЦІЯ
         // --- КІНЕЦЬ ДОДАВАННЯ ---
@@ -127,7 +127,7 @@ export class DropdownMenuManager {
 
         this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
         this.updateToggleViewLocationOption();
-        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_TOGGLE] });
+        this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_BEFORE_SETTINGS] }); 
 
         this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
     }

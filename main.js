@@ -3126,12 +3126,12 @@ var CSS_CLASS_CLONE_CHAT_OPTION = "clone-chat-option";
 var CSS_CLASS_TOGGLE_VIEW_LOCATION = "toggle-view-location-option";
 var CSS_CLASS_CHAT_LIST_ITEM = "ollama-chat-list-item";
 var CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION = "clear-current-chat-option";
+var CSS_HR_BEFORE_SETTINGS = "hr-before-settings";
 var CSS_HR_AFTER_MODEL = "hr-after-model";
 var CSS_HR_AFTER_ROLE = "hr-after-role";
 var CSS_HR_AFTER_CHAT = "hr-after-chat";
 var CSS_HR_AFTER_ACTIONS = "hr-after-actions";
 var CSS_HR_AFTER_DANGER = "hr-after-danger";
-var CSS_HR_AFTER_TOGGLE = "hr-after-toggle";
 var CHAT_LIST_MAX_HEIGHT = "250px";
 var DropdownMenuManager = class {
   constructor(plugin, app, view, parentElement, isSidebarLocation, isDesktop) {
@@ -3188,7 +3188,6 @@ var DropdownMenuManager = class {
     this.renameChatOption = this.createActionItem("pencil", "Rename Chat", CSS_CLASS_RENAME_CHAT_OPTION);
     this.cloneChatOption = this.createActionItem("copy-plus", "Clone Chat", CSS_CLASS_CLONE_CHAT_OPTION);
     this.exportChatOption = this.createActionItem("download", "Export Chat to Note", CSS_CLASS_EXPORT_CHAT_OPTION);
-    this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
     this.clearCurrentChatOption = this.createActionItem("eraser", "Clear Current Chat", [CSS_CLASS_CLEAR_CURRENT_CHAT_OPTION]);
     this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_ACTIONS] });
     this.clearChatOption = this.createActionItem("trash", "Clear All Messages (Legacy)", [CSS_CLASS_CLEAR_CHAT_OPTION, CSS_CLASSES.DANGER_OPTION]);
@@ -3196,7 +3195,7 @@ var DropdownMenuManager = class {
     this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_DANGER] });
     this.toggleViewLocationOption = this.menuDropdown.createEl("div", { cls: `${CSS_CLASS_MENU_OPTION2} ${CSS_CLASS_TOGGLE_VIEW_LOCATION}` });
     this.updateToggleViewLocationOption();
-    this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_AFTER_TOGGLE] });
+    this.menuDropdown.createEl("hr", { cls: [CSS_CLASS_MENU_SEPARATOR, CSS_HR_BEFORE_SETTINGS] });
     this.settingsOption = this.createActionItem("settings", "Settings", CSS_CLASS_SETTINGS_OPTION);
   }
   attachEventListeners() {
