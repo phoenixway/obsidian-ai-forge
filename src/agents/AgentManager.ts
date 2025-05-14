@@ -4,6 +4,8 @@ import { IAgent, IToolFunction } from "./IAgent";
 import { SimpleFileAgent } from "@/examples/SimpleFileAgent"; // Приклад агента
 import { WeatherAgent } from "@/examples/WeatherAgent";
 
+import { TimeAgent } from "@/examples/TimeAgent";
+
 export class AgentManager {
   private agents: Map<string, IAgent> = new Map();
   private plugin: OllamaPlugin;
@@ -17,6 +19,8 @@ export class AgentManager {
     const fileAgent = new SimpleFileAgent();
     this.registerAgent(fileAgent);
     const weatherAgent = new WeatherAgent();
+    this.registerAgent(weatherAgent);
+    const timeAgent = new TimeAgent(); // Приклад агента
     this.registerAgent(weatherAgent);
     // тут можна додати інших агентів
   }
