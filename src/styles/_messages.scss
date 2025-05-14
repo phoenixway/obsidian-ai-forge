@@ -182,8 +182,12 @@ $avatar-icon-size-factor: 0.65;
 }
 
 // --- Стилі для бульбашок повідомлень ---
-.message {
-  // @extend %base-message-bubble; // ТИМЧАСОВО ВИМКНЕНО
+.message { // Тепер .message є батьківським для кнопок дій
+  @extend %base-message-bubble; // Повертаємо плейсхолдер
+  display: flex;                 // РОБИМО .message FLEX-КОНТЕЙНЕРОМ
+  flex-direction: column;        // Елементи всередині будуть у стовпчик
+  align-items: flex-start; 
+  
   padding: 10px 12px; 
   border-radius: 18px;
   width: fit-content;
