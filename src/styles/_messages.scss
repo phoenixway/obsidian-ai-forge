@@ -163,18 +163,21 @@ $avatar-icon-size-factor: 0.65;
   color: var(--interactive-accent);
 }
 
+// ... (попередні стилі без змін до цього моменту) ...
+
 // --- Обгортка для повідомлень ---
 .message-wrapper {
   display: flex;
   flex-direction: column;
+  // width: 100%; // Переконайся, що він займає доступну ширину
 
-  .ollama-message-group & {
-    align-items: flex-start;
-    // background-color: rgba(0, 255, 0, 0.05); // Можна розкоментувати для візуальної діагностики
+  .ollama-message-group & { // Спробуємо зробити селектор більш прямим
+    align-items: flex-start !important; // ФОРСУЄМО для діагностики
+    // background-color: rgba(0, 255, 0, 0.05); // Рамка для батька
   }
   .user-message-group & {
-    align-items: flex-end;
-    // background-color: rgba(0, 0, 255, 0.05); // Можна розкоментувати для візуальної діагностики
+    align-items: flex-end !important; // ФОРСУЄМО для діагностики
+    // background-color: rgba(0, 0, 255, 0.05);
   }
 }
 
@@ -187,7 +190,10 @@ $avatar-icon-size-factor: 0.65;
   max-width: 700px; 
   background-color: #eee; 
   margin-bottom: 5px; 
-  box-sizing: border-box; // Додаємо на випадок, якщо глобально не встановлено
+  box-sizing: border-box;
+  
+  margin-left: 0 !important; // ФОРСУЄМО відсутність лівого margin для діагностики
+  margin-right: 0 !important; // І правого теж
 
   &.ollama-message {
     border: 2px solid deeppink; 
@@ -196,68 +202,10 @@ $avatar-icon-size-factor: 0.65;
   &.user-message {
     border: 2px solid orange;
     background-color: #e0e0e0;
-    // Якщо ми не використовуємо @extend %base-message-bubble, потрібно визначити кольори тут
-    // background-color: var(--interactive-accent);
-    // color: var(--text-on-accent);
   }
 
   &.message-arriving {
     animation: message-appear 0.3s ease-out forwards;
-  }
-}
-
-// --- Логіка заокруглення кутів ---
-// Ця логіка може не працювати ідеально без @extend %base-message-bubble,
-// оскільки базовий border-radius може бути іншим. Тимчасово можемо її ігнорувати.
-.user-message-group .message-wrapper .message { /* ... */ }
-.ollama-message-group .message-wrapper .message { /* ... */ }
-
-// --- Стилі для конкретних ролей повідомлень (частково замінені вище для діагностики) ---
-.message.user-message {
-  // Стилі для фону та кольору визначені вище в діагностичному блоці
-  // box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-}
-
-.message.ollama-message {
-  // Стилі для фону та кольору визначені вище в діагностичному блоці
-  // &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); }
-  pre {
-    background-color: var(--background-secondary) !important;
-    padding: calc(var(--chat-spacing-unit, 5px) * 2);
-    border-radius: var(--radius-m, 6px);
-    margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
-    margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
-    overflow-x: auto;
-  }
-}
-
-// --- Контент повідомлення, час ---
-.message-content {
-  p {
-    margin-top: 0;
-    margin-bottom: calc(var(--p-spacing, 1em) / 2);
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-}
-
-.message-timestamp {
-  font-size: var(--font-ui-smaller, 0.75em);
-  color: var(--text-faint);
-  margin-top: var(--chat-spacing-unit, 5px);
-  display: block;
-  opacity: 0.9;
-
-  .ollama-message-group .message & {
-    text-align: left;
-  }
-  .user-message-group .message & {
-    text-align: right;
-  }
-  .message.user-message & { // Для специфічного кольору тексту в user-message
-     color: var(--text-on-accent); 
-     opacity: 0.75;
   }
 }
 
@@ -268,14 +216,14 @@ $avatar-icon-size-factor: 0.65;
   margin-top: 5px;
   border: 2px solid limegreen;
   padding: 2px;
-  box-sizing: border-box; // Додаємо на випадок
+  box-sizing: border-box;
+  
+  margin-left: 0 !important; // ФОРСУЄМО відсутність лівого margin для діагностики
+  margin-right: 0 !important;
 
   // ТИМЧАСОВО ВИМКНЕНО opacity/visibility
   // opacity: 0;
   // visibility: hidden;
-  // @include transition( (opacity, visibility), 0.2s, ease-in-out );
-  // z-index: 6;
-  
 
   button {
     // @extend %base-action-button; // ТИМЧАСОВО ВИМКНЕНО
@@ -284,20 +232,9 @@ $avatar-icon-size-factor: 0.65;
     border: 1px solid #999;
     cursor: pointer;
   }
-
-  .delete-message-button {
-    &.danger-option {
-      // color: var(--text-error);
-      // &:hover { /* ... */ }
-    }
-  }
-
-  .user-message-group .message-wrapper & {
-    // @include flex-layout($justify: flex-end, $gap: calc(var(--chat-spacing-unit, 5px) * 1.5));
-    // button { /* ... */ }
-  }
 }
 
+// ... (решта файлу без змін, включаючи show-more-button і т.д., бо вони зараз не в фокусі) ...
 // ТИМЧАСОВО ВИМКНЕНО :hover ефект
 // .message-wrapper:hover .message-actions-wrapper {
 //   opacity: 1;
