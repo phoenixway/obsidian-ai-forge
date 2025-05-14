@@ -28,7 +28,7 @@
   box-sizing: border-box;
   // align-items: flex-end;
   align-items: flex-start;
-  gap: calc(var(--chat-spacing-unit) * 2); 
+  // gap: calc(var(--chat-spacing-unit) * 2); 
 
   &.user-message-group {
     justify-content: flex-end;
