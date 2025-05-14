@@ -53,7 +53,7 @@ $avatar-icon-size-factor: 0.65;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   font-size: var(--font-ui-small);
   line-height: 1.5;
-  @include transition( (transform, box-shadow), 0.2s, ease-out ); // Уточнено властивості для transition
+  @include transition((transform, box-shadow), 0.2s, ease-out); // Уточнено властивості для transition
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5);
 
   &:last-child {
@@ -94,7 +94,7 @@ $avatar-icon-size-factor: 0.65;
   border-radius: var(--radius-m, 12px);
   cursor: pointer;
   text-align: center;
-  @include transition( (color, background-color, border-color) );
+  @include transition((color, background-color, border-color));
 
   &:hover {
     color: var(--text-accent-hover);
@@ -116,10 +116,7 @@ $avatar-icon-size-factor: 0.65;
   width: 100%;
   position: relative;
   box-sizing: border-box;
-  @include flex-layout(
-    $align: flex-start,
-    $gap: calc(var(--chat-spacing-unit, 5px) * 2)
-  );
+  @include flex-layout($align: flex-start, $gap: calc(var(--chat-spacing-unit, 5px) * 2));
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
 
   &.user-message-group {
@@ -160,14 +157,16 @@ $avatar-icon-size-factor: 0.65;
   }
 
   &.avatar-icon .svg-icon,
-  .avatar-icon svg { // Прибираємо зайву вкладеність .svg-icon, якщо .avatar-icon вже на svg або його обгортці
-    svg { // Або якщо .avatar-icon - це батьківський контейнер для svg
+  .avatar-icon svg {
+    // Прибираємо зайву вкладеність .svg-icon, якщо .avatar-icon вже на svg або його обгортці
+    svg {
+      // Або якщо .avatar-icon - це батьківський контейнер для svg
       width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
       height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
       display: block;
     }
   }
-  
+
   &.avatar-initials,
   div.avatar-initials {
     font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor});
@@ -181,8 +180,8 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .user-message-group .avatar-container {
-   background-color: var(--interactive-accent-translucent);
-   color: var(--interactive-accent);
+  background-color: var(--interactive-accent-translucent);
+  color: var(--interactive-accent);
 }
 
 // --- Обгортка для повідомлень ---
@@ -208,21 +207,37 @@ $avatar-icon-size-factor: 0.65;
 
 // --- Логіка заокруглення кутів ---
 .user-message-group .message-wrapper .message {
-    border-top-left-radius: 18px;
-    border-bottom-left-radius: 18px;
-    &:first-child { border-top-right-radius: 18px; }
-    &:not(:first-child) { border-top-right-radius: 5px; }
-    &:last-child { border-bottom-right-radius: 18px; }
-    &:not(:last-child) { border-bottom-right-radius: 5px; }
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+  &:first-child {
+    border-top-right-radius: 18px;
+  }
+  &:not(:first-child) {
+    border-top-right-radius: 5px;
+  }
+  &:last-child {
+    border-bottom-right-radius: 18px;
+  }
+  &:not(:last-child) {
+    border-bottom-right-radius: 5px;
+  }
 }
 
 .ollama-message-group .message-wrapper .message {
-    border-top-right-radius: 18px;
-    border-bottom-right-radius: 18px;
-    &:first-child { border-top-left-radius: 18px; }
-    &:not(:first-child) { border-top-left-radius: 5px; }
-    &:last-child { border-bottom-left-radius: 18px; }
-    &:not(:last-child) { border-bottom-left-radius: 5px; }
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+  &:first-child {
+    border-top-left-radius: 18px;
+  }
+  &:not(:first-child) {
+    border-top-left-radius: 5px;
+  }
+  &:last-child {
+    border-bottom-left-radius: 18px;
+  }
+  &:not(:last-child) {
+    border-bottom-left-radius: 5px;
+  }
 }
 
 // --- Стилі для конкретних ролей ---
@@ -239,7 +254,8 @@ $avatar-icon-size-factor: 0.65;
 .message.ollama-message {
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
-  &:hover { // Специфічна тінь при наведенні
+  &:hover {
+    // Специфічна тінь при наведенні
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
   }
   pre {
@@ -255,7 +271,7 @@ $avatar-icon-size-factor: 0.65;
 // --- Контент повідомлення, час, кнопка "показати більше" ---
 .message-content {
   p {
-    margin-top: 0; 
+    margin-top: 0;
     margin-bottom: calc(var(--p-spacing, 1em) / 2);
     &:last-child {
       margin-bottom: 0;
@@ -280,7 +296,7 @@ $avatar-icon-size-factor: 0.65;
   z-index: 2;
 }
 
-.message.user-message .show-more-button { 
+.message.user-message .show-more-button {
   color: rgba(255, 255, 255, 0.7);
   background-color: transparent;
   border-color: transparent;
@@ -301,19 +317,34 @@ $avatar-icon-size-factor: 0.65;
   -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
 }
 
-
 // --- Кнопки дій ---
 .message-actions-wrapper {
   @include flex-layout(
     $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
   );
-  width: fit-content;
+  width: 100%; // Зробимо на всю ширину, щоб вирівнювання працювало
   opacity: 0;
   visibility: hidden;
-  @include transition( (opacity, visibility), 0.2s, ease-in-out ); // visibility transition має бути миттєвим
-                                                                // opacity 0.2s ease-in-out, visibility 0s linear 0.2s; (як було)
+  @include transition( (opacity, visibility), 0.2s, ease-in-out );
   z-index: 6;
-  margin-left: 10px;
+  // margin-left: 10px; // ПРИБИРАЄМО або змінюємо
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); // Додаємо відступ зверху, щоб кнопки були під текстом
+                                                     // або залишити 0, якщо вони мають бути збоку
+
+  // Вирівнювання кнопок всередині .message-actions-wrapper
+  // Це залежить від того, де вони мають бути: зліва, справа чи по центру під повідомленням
+  // Якщо .message-wrapper має align-items: flex-start / flex-end, то це вже частково вирішує.
+
+  // Для AI повідомлень (ліворуч)
+  .ollama-message-group .message-wrapper & {
+    justify-content: flex-start; // Кнопки будуть зліва під повідомленням AI
+  }
+
+  // Для User повідомлень (праворуч)
+  .user-message-group .message-wrapper & {
+    justify-content: flex-end; // Кнопки будуть справа під повідомленням User
+  }
+
 
   button {
     @extend %base-action-button;
@@ -329,7 +360,10 @@ $avatar-icon-size-factor: 0.65;
     }
   }
 
-  .user-message-group & button {
+  // Стилі для кнопок в повідомленні користувача (якщо вони відрізняються від дефолтних для AI)
+  .user-message-group & button { // Якщо .user-message-group є батьком для .message-wrapper
+    // Тут були специфічні стилі для кнопок користувача, їх потрібно зберегти,
+    // якщо вони відрізняються від %base-action-button для AI
     color: rgba(255, 255, 255, 0.8);
     &:hover {
       background: rgba(255, 255, 255, 0.25) !important;
@@ -348,20 +382,38 @@ $avatar-icon-size-factor: 0.65;
 .message-wrapper:hover .message-actions-wrapper {
   opacity: 1;
   visibility: visible;
+  // transition-delay: 0s; // Це вже обробляється в transition
+}ьщ
+.message-wrapper:hover .message-actions-wrapper {
+  opacity: 1;
+  visibility: visible;
   transition-delay: 0s; // Для visibility, щоб з'явилось одразу
 }
 
 // --- Інші стилі (залишено з твого файлу, потребують перегляду) ---
 // Ці секції поки що не змінювалися глибоко, лише мінімальні правки для узгодження
-.regenerate-button { /* Твої стилі */ }
-button.summarize-button { /* Твої стилі */ }
-.summary-modal-content { /* Твої стилі */ }
-.message-content-container { /* Твої стилі, можливо, вже не потрібен */ }
-
+.regenerate-button {
+  /* Твої стилі */
+}
+button.summarize-button {
+  /* Твої стилі */
+}
+.summary-modal-content {
+  /* Твої стилі */
+}
+.message-content-container {
+  /* Твої стилі, можливо, вже не потрібен */
+}
 
 @keyframes message-appear {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media screen and (min-width: 1600px) {
@@ -373,7 +425,7 @@ button.summarize-button { /* Твої стилі */ }
 }
 
 .scroll-to-bottom-button {
-  position: absolute; 
+  position: absolute;
   bottom: 15px;
   right: 20px;
   z-index: 50;
@@ -386,18 +438,17 @@ button.summarize-button { /* Твої стилі */ }
   box-shadow: var(--shadow-s);
   cursor: pointer;
   @include flex-layout($align: center, $justify: center);
-  padding: 0; 
+  padding: 0;
   opacity: 0;
   visibility: hidden;
   transform: translateY(10px);
   // Оптимізований transition
-  @include transition( (opacity, transform, background-color), 0.2s, ease-out );
+  @include transition((opacity, transform, background-color), 0.2s, ease-out);
   // visibility має оброблятися окремо, якщо потрібна затримка
   // transition-property: opacity, transform, background-color, visibility;
   // transition-duration: 0.2s, 0.2s, 0.15s, 0s;
   // transition-timing-function: ease-out, ease-out, ease, linear;
   // transition-delay: 0s, 0s, 0s, 0.2s; // Затримка для visibility
-
 
   .svg-icon {
     width: 20px;
@@ -426,11 +477,17 @@ button.summarize-button { /* Твої стилі */ }
   }
 }
 
-.new-message-indicator.visible { /* Твої стилі, якщо є */ }
+.new-message-indicator.visible {
+  /* Твої стилі, якщо є */
+}
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .button-loading {
