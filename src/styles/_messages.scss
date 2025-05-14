@@ -30,8 +30,8 @@
   align-items: flex-start;
 
   &.user-message-group {
-    // justify-content: flex-end;
-    justify-content: flex-start;
+    justify-content: flex-end;
+    // justify-content: flex-start;
 
     .avatar-container {
       order: 2;
