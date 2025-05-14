@@ -322,7 +322,7 @@ $avatar-icon-size-factor: 0.65;
   @include flex-layout(
     $gap: calc(var(--chat-spacing-unit, 5px) * 1.5)
   );
-  width: 100%; // Зробимо на всю ширину, щоб вирівнювання працювало
+  // width: 100%; // Зробимо на всю ширину, щоб вирівнювання працювало
   opacity: 0;
   visibility: hidden;
   @include transition( (opacity, visibility), 0.2s, ease-in-out );
@@ -335,15 +335,15 @@ $avatar-icon-size-factor: 0.65;
   // Це залежить від того, де вони мають бути: зліва, справа чи по центру під повідомленням
   // Якщо .message-wrapper має align-items: flex-start / flex-end, то це вже частково вирішує.
 
-  // Для AI повідомлень (ліворуч)
-  .ollama-message-group .message-wrapper & {
-    justify-content: flex-start; // Кнопки будуть зліва під повідомленням AI
-  }
+  // // Для AI повідомлень (ліворуч)
+  // .ollama-message-group .message-wrapper & {
+  //   justify-content: flex-start; // Кнопки будуть зліва під повідомленням AI
+  // }
 
-  // Для User повідомлень (праворуч)
-  .user-message-group .message-wrapper & {
-    justify-content: flex-end; // Кнопки будуть справа під повідомленням User
-  }
+  // // Для User повідомлень (праворуч)
+  // .user-message-group .message-wrapper & {
+  //   justify-content: flex-end; // Кнопки будуть справа під повідомленням User
+  // }
 
 
   button {
@@ -360,10 +360,7 @@ $avatar-icon-size-factor: 0.65;
     }
   }
 
-  // Стилі для кнопок в повідомленні користувача (якщо вони відрізняються від дефолтних для AI)
-  .user-message-group & button { // Якщо .user-message-group є батьком для .message-wrapper
-    // Тут були специфічні стилі для кнопок користувача, їх потрібно зберегти,
-    // якщо вони відрізняються від %base-action-button для AI
+ .user-message-group .message-wrapper & button { // Якщо .user-message-group є батьком для .message-wrapper
     color: rgba(255, 255, 255, 0.8);
     &:hover {
       background: rgba(255, 255, 255, 0.25) !important;
@@ -377,6 +374,7 @@ $avatar-icon-size-factor: 0.65;
        }
     }
   }
+
 }
 
 .message-wrapper:hover .message-actions-wrapper {
