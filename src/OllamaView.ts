@@ -2121,46 +2121,72 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
   }
 
     public checkAllMessagesForCollapsing(): void {
-    this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach(msgGroupEl => {
-      // Перевіряємо, чи це не активний плейсхолдер для стрімінгу
+    this.plugin.logger.debug("[checkAllMessagesForCollapsing] Starting scan for messages to collapse/expand.");
+    const messageGroups = this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`);
+    
+    if (!messageGroups || messageGroups.length === 0) {
+        this.plugin.logger.debug("[checkAllMessagesForCollapsing] No message groups found in chat container.");
+        return;
+    }
+    this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Found ${messageGroups.length} message groups.`);
+
+    messageGroups.forEach((msgGroupEl, index) => {
+      const groupTimestampAttr = msgGroupEl.getAttribute("data-timestamp");
+      const groupPlaceholderTimestampAttr = msgGroupEl.getAttribute("data-placeholder-timestamp");
+      const groupClasses = Array.from(msgGroupEl.classList).join(", ");
+      
+      this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Processing group ${index + 1}/${messageGroups.length}:`, {
+        timestamp: groupTimestampAttr,
+        placeholderTimestamp: groupPlaceholderTimestampAttr,
+        classes: groupClasses,
+        isProcessing: this.isProcessing
+      });
+
       const isStreamingPlaceholder = msgGroupEl.classList.contains("placeholder") && 
                                      msgGroupEl.hasAttribute("data-placeholder-timestamp") && 
                                      this.isProcessing; 
 
       if (isStreamingPlaceholder) {
-        // Для активних стрімінг-плейсхолдерів кнопка згортання не потрібна
+        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} IS an active streaming placeholder. Hiding toggle button if exists.`);
         const toggleButton = msgGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
-        toggleButton?.hide();
+        if (toggleButton) {
+            toggleButton.hide();
+            this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1}: Streaming placeholder toggle button hidden.`);
+        }
         const contentCollapsible = msgGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
         if (contentCollapsible) {
-          contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження для стрімінгу
+          contentCollapsible.style.maxHeight = ""; 
           contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+          this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1}: Streaming placeholder content uncollapsed.`);
         }
-        return; // Не викликаємо checkMessageForCollapsing для активних стрімінг-плейсхолдерів
+        return; 
       }
 
-      // Викликаємо checkMessageForCollapsing тільки для "фіналізованих" груп повідомлень
-      // або для плейсхолдерів, які вже отримали свій data-timestamp (тобто стали повідомленнями)
-      // або для "залишених" плейсхолдерів (обробка завершена)
-      if (msgGroupEl.hasAttribute("data-timestamp") || 
-          (msgGroupEl.classList.contains("placeholder") && !this.isProcessing)) {
-            // Додаткова перевірка: викликаємо checkMessageForCollapsing, тільки якщо є базовий елемент .message,
-            // щоб уникнути попереджень для повністю порожніх або некоректних груп.
-            if (msgGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`)) {
-                 this.checkMessageForCollapsing(msgGroupEl);
-            } else if (msgGroupEl.classList.contains("placeholder")) {
-                // Це "залишений" плейсхолдер без внутрішньої структури .message.
-                // Ймовірно, його слід ігнорувати або він має бути видалений іншою логікою.
-                this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping abandoned placeholder without .message structure:", { classList: Array.from(msgGroupEl.classList) });
-            } else if (!msgGroupEl.hasAttribute("data-timestamp")) {
-                 // Це не плейсхолдер, не має timestamp, і немає .message. Можливо, якась інша група елементів.
-                 this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping group without timestamp, not a placeholder, and missing .message structure:", { classList: Array.from(msgGroupEl.classList) });
-            }
-      } else if (msgGroupEl.classList.contains("placeholder")) {
-        // Це активний плейсхолдер (this.isProcessing is true), вже оброблений логікою isStreamingPlaceholder.
-        // Або це плейсхолдер без timestamp під час обробки.
+      const hasTimestamp = msgGroupEl.hasAttribute("data-timestamp");
+      const isPlaceholder = msgGroupEl.classList.contains("placeholder");
+      const processingComplete = !this.isProcessing;
+
+      const shouldProcess = hasTimestamp || (isPlaceholder && processingComplete);
+      
+      if (shouldProcess) {
+        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} should be processed for collapsing. HasTimestamp: ${hasTimestamp}, IsPlaceholder: ${isPlaceholder}, ProcessingComplete: ${processingComplete}`);
+        
+        const messageElementExists = !!msgGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
+        if (messageElementExists) {
+            this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} has a .message element. Calling checkMessageForCollapsing.`);
+            this.checkMessageForCollapsing(msgGroupEl);
+        } else {
+            this.plugin.logger.warn(`[checkAllMessagesForCollapsing] Group ${index + 1} SKIPPED (shouldProcess=true, but NO .message element).`, {
+                timestamp: groupTimestampAttr,
+                placeholderTimestamp: groupPlaceholderTimestampAttr,
+                classes: groupClasses
+            });
+        }
+      } else {
+        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} will NOT be processed for collapsing. HasTimestamp: ${hasTimestamp}, IsPlaceholder: ${isPlaceholder}, ProcessingComplete: ${processingComplete}`);
       }
     });
+    this.plugin.logger.debug("[checkAllMessagesForCollapsing] Finished scan.");
   }
 
   // src/OllamaView.ts
@@ -2870,52 +2896,56 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
   }
 
-   public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
-    // Попередня перевірка на активний плейсхолдер вже є в checkAllMessagesForCollapsing,
-    // але для безпеки можна залишити і тут, якщо метод викликається з інших місць.
+    public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
+    const groupTimestampAttr = messageGroupEl.getAttribute("data-timestamp") || messageGroupEl.getAttribute("data-placeholder-timestamp");
+    this.plugin.logger.debug(`[checkMessageForCollapsing] Entered for group with effective timestamp: ${groupTimestampAttr}.`);
+
     if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
+        this.plugin.logger.debug(`[checkMessageForCollapsing] Group (ts: ${groupTimestampAttr}) is a placeholder without final timestamp. Hiding toggle button.`);
         const tempToggleButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
-        tempToggleButton?.hide();
+        if (tempToggleButton) tempToggleButton.hide();
         return;
     }
     
     const messageEl = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE}`);
-    // Якщо немає елемента .message, то це не стандартна структура повідомлення, виходимо.
-    // Попередження про це вже обробляється в checkAllMessagesForCollapsing, якщо це там виявлено.
     if (!messageEl) {
-      // Можна додати тут лог, якщо цей метод викликається напряму і messageEl відсутній.
-      // this.plugin.logger.warn("[checkMsgCollapseDirect] No .message element in group.", { classList: Array.from(messageGroupEl.classList) });
+      this.plugin.logger.warn(`[checkMessageForCollapsing] No .message element found in group (ts: ${groupTimestampAttr}). Aborting for this group.`);
       return;
     }
+    this.plugin.logger.debug(`[checkMessageForCollapsing] Found .message element for group (ts: ${groupTimestampAttr}).`);
 
     const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-    
     const actionsWrapper = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
     const toggleCollapseButton = actionsWrapper?.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
 
-    // Якщо немає кнопки згортання АБО немає елемента для згортання, то ця логіка не застосовується.
-    // Це нормально для системних повідомлень, повідомлень про помилки тощо.
-    if (!toggleCollapseButton || !contentCollapsible) {
-      // Якщо є contentCollapsible, але немає кнопки, переконуємося, що воно не згорнуте.
-      if (contentCollapsible) {
-        contentCollapsible.style.maxHeight = "";
-        contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-      }
-      // Якщо є кнопка, але немає contentCollapsible (малоймовірно, але можливо), ховаємо кнопку.
-      if (toggleCollapseButton && !contentCollapsible) {
+    if (!toggleCollapseButton) {
+        this.plugin.logger.debug(`[checkMessageForCollapsing] No TOGGLE_COLLAPSE_BUTTON found for group (ts: ${groupTimestampAttr}). Collapsing logic not applicable.`);
+        if (contentCollapsible) {
+            contentCollapsible.style.maxHeight = "";
+            contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+             this.plugin.logger.debug(`[checkMessageForCollapsing] Ensured contentCollapsible is uncollapsed for group (ts: ${groupTimestampAttr}) as no button found.`);
+        }
+        return;
+    }
+     this.plugin.logger.debug(`[checkMessageForCollapsing] Found TOGGLE_COLLAPSE_BUTTON for group (ts: ${groupTimestampAttr}).`);
+
+    if (!contentCollapsible) {
+        this.plugin.logger.warn(`[checkMessageForCollapsing] No CONTENT_COLLAPSIBLE element found for group (ts: ${groupTimestampAttr}), but button exists. Hiding button.`);
         toggleCollapseButton.hide();
         toggleCollapseButton.classList.remove("explicitly-expanded");
-      }
-      return; // Виходимо, оскільки згортання не передбачено для цього типу повідомлення.
+        return;
     }
+    this.plugin.logger.debug(`[checkMessageForCollapsing] Found CONTENT_COLLAPSIBLE for group (ts: ${groupTimestampAttr}).`);
     
     const maxH = this.plugin.settings.maxMessageHeight;
+    this.plugin.logger.debug(`[checkMessageForCollapsing] maxMessageHeight setting: ${maxH} for group (ts: ${groupTimestampAttr}).`);
 
     const isStreamingNow = this.isProcessing && 
                            messageGroupEl.classList.contains("placeholder") && 
                            contentCollapsible.classList.contains("streaming-text");
 
     if (isStreamingNow) {
+      this.plugin.logger.debug(`[checkMessageForCollapsing] Group (ts: ${groupTimestampAttr}) IS actively streaming. Hiding button, uncollapsing content.`);
       toggleCollapseButton.hide(); 
       contentCollapsible.style.maxHeight = ""; 
       contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
@@ -2923,6 +2953,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
 
     if (maxH <= 0) { 
+      this.plugin.logger.debug(`[checkMessageForCollapsing] maxMessageHeight <= 0 for group (ts: ${groupTimestampAttr}). Hiding button, uncollapsing content.`);
       toggleCollapseButton.hide();
       toggleCollapseButton.classList.remove("explicitly-expanded");
       contentCollapsible.style.maxHeight = "";
@@ -2930,36 +2961,58 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       return;
     }
 
+    this.plugin.logger.debug(`[checkMessageForCollapsing] Proceeding to rAF for group (ts: ${groupTimestampAttr}).`);
     requestAnimationFrame(() => {
-      if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected) return;
+      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Entered for group (ts: ${groupTimestampAttr}).`);
+      if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected) {
+        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Elements disconnected for group (ts: ${groupTimestampAttr}). Aborting rAF.`);
+        return;
+      }
 
       const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
+      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): wasExplicitlyExpanded = ${wasExplicitlyExpanded}.`);
       
-      contentCollapsible.style.maxHeight = ""; 
+      // Запам'ятовуємо стиль, якщо він був встановлений, ДО того як ми його скинемо
+      // Це важливо, якщо rAF викликається кілька разів і вміст не змінився
+      const currentMaxHeightStyle = contentCollapsible.style.maxHeight;
+      const currentlyCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+
+      contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження для вимірювання
       const scrollHeight = contentCollapsible.scrollHeight;
+      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight = ${scrollHeight}, maxH = ${maxH}.`);
       
       if (scrollHeight > maxH) {
+        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight > maxH. Button should be visible.`);
         toggleCollapseButton.show();
         
         if (wasExplicitlyExpanded) {
+            this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Was explicitly expanded. Uncollapsing.`);
             contentCollapsible.style.maxHeight = ""; 
             contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-up");
             toggleCollapseButton.setAttribute("title", "Show Less");
         } else {
+            this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Not explicitly expanded. Collapsing.`);
             contentCollapsible.style.maxHeight = `${maxH}px`;
             contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-down");
             toggleCollapseButton.setAttribute("title", "Show More");
         }
       } else { 
+        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight <= maxH. Button should be hidden.`);
         toggleCollapseButton.hide();
-        if (wasExplicitlyExpanded) toggleCollapseButton.classList.remove("explicitly-expanded");
+        if (wasExplicitlyExpanded) {
+            toggleCollapseButton.classList.remove("explicitly-expanded");
+            this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Removing 'explicitly-expanded' as content is now short.`);
+        }
         contentCollapsible.style.maxHeight = ""; 
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
+      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Finished for group (ts: ${groupTimestampAttr}). Final state: button visible = ${toggleCollapseButton.style.display !== 'none'}, collapsed = ${contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)}`);
     });
   }
+
+
 
   public async handleSummarizeClick(originalContent: string, buttonEl: HTMLButtonElement): Promise<void> {
     const summarizationModel = this.plugin.settings.summarizationModelName;
