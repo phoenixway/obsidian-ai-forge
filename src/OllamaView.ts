@@ -2869,8 +2869,6 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
   public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
     // Переконуємося, що ми працюємо з реальною групою повідомлення, а не з плейсхолдером, який ще не фіналізований
     if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
-        // Це активний плейсхолдер, для якого ще немає фінального timestamp.
-        // Кнопка згортання для нього не має сенсу зараз.
         const tempToggleButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
         tempToggleButton?.hide();
         return;
@@ -2891,9 +2889,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     const actionsWrapper = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
     const toggleCollapseButton = actionsWrapper?.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
 
-    // Якщо немає обгортки для дій або самої кнопки (наприклад, для системних повідомлень, де вона не додається)
     if (!actionsWrapper || !toggleCollapseButton) {
-      // Переконуємося, що контент не згорнутий, якщо кнопки немає
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
@@ -2901,19 +2897,17 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     
     const maxH = this.plugin.settings.maxMessageHeight;
 
-    // Перевіряємо, чи це повідомлення асистента, яке зараз активно стрімиться
     const isStreamingNow = this.isProcessing && 
-                           messageGroupEl.classList.contains("placeholder") && // Ще є плейсхолдером
-                           contentCollapsible.classList.contains("streaming-text"); // Має клас стрімінгу
+                           messageGroupEl.classList.contains("placeholder") && 
+                           contentCollapsible.classList.contains("streaming-text");
 
     if (isStreamingNow) {
-      toggleCollapseButton.hide(); // Приховуємо кнопку під час активного стрімінгу
-      contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження висоти для стрімінгу
+      toggleCollapseButton.hide(); 
+      contentCollapsible.style.maxHeight = ""; 
       contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
 
-    // Якщо згортання вимкнене в налаштуваннях
     if (maxH <= 0) { 
       toggleCollapseButton.hide();
       toggleCollapseButton.classList.remove("explicitly-expanded");
@@ -2922,54 +2916,41 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       return;
     }
 
-    // Використовуємо requestAnimationFrame для отримання актуальних розмірів після рендерингу
     requestAnimationFrame(() => {
       if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected) return;
 
-      const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
-      const wasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+      const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
       
+      // Зберігаємо поточний стан згортання перед вимірюванням
+      const initialWasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+      const initialMaxHeightStyle = contentCollapsible.style.maxHeight;
+
       // Тимчасово знімаємо обмеження для вимірювання реальної висоти
       contentCollapsible.style.maxHeight = ""; 
       const scrollHeight = contentCollapsible.scrollHeight;
       
-      // Повертаємо попередній стиль maxHeight, якщо він був, щоб не "стрибало" при перевірці
-      // якщо користувач вже взаємодіяв з кнопкою.
-      if (wasCollapsed && previousMaxHeightStyle) {
-         contentCollapsible.style.maxHeight = previousMaxHeightStyle;
-      } else if (!wasCollapsed && scrollHeight > maxH && !toggleCollapseButton.classList.contains("explicitly-expanded")) {
-         // Якщо не було згорнуто, але має бути, і не розгорнуто явно
-         // Нічого не робимо тут, щоб не перезгортати автоматично, якщо користувач розгорнув
-      } else if (wasCollapsed && !previousMaxHeightStyle) {
-         // Якщо було позначено як згорнуте, але стиль не встановлено, встановлюємо
-         contentCollapsible.style.maxHeight = `${maxH}px`;
-      }
-
-
       if (scrollHeight > maxH) {
         toggleCollapseButton.show();
-        // Оновлюємо іконку/текст кнопки на основі поточного стану згортання
-        if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
-          setIcon(toggleCollapseButton, "chevron-down");
-          toggleCollapseButton.setAttribute("title", "Show More");
+        
+        if (wasExplicitlyExpanded) {
+            // Користувач явно розгорнув, залишаємо розгорнутим
+            contentCollapsible.style.maxHeight = ""; 
+            contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+            setIcon(toggleCollapseButton, "chevron-up");
+            toggleCollapseButton.setAttribute("title", "Show Less");
         } else {
-          setIcon(toggleCollapseButton, "chevron-up");
-          toggleCollapseButton.setAttribute("title", "Show Less");
-        }
-
-        // Якщо контент НЕ згорнутий, але має бути (бо scrollHeight > maxH),
-        // І він НЕ був явно розгорнутий користувачем, то згортаємо його.
-        if (!contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED) && 
-            !toggleCollapseButton.classList.contains("explicitly-expanded")) {
+            // Повинно бути згорнуте за замовчуванням або якщо користувач згорнув
             contentCollapsible.style.maxHeight = `${maxH}px`;
             contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-down");
             toggleCollapseButton.setAttribute("title", "Show More");
         }
-      } else { // scrollHeight <= maxH, згортання не потрібне
+      } else { 
+        // scrollHeight <= maxH, згортання не потрібне
         toggleCollapseButton.hide();
-        toggleCollapseButton.classList.remove("explicitly-expanded"); // Скидаємо стан явного розгортання
-        contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження, якщо було
+        // Скидаємо стан, якщо воно було згорнуте або явно розгорнуте, але тепер вміст малий
+        if (wasExplicitlyExpanded) toggleCollapseButton.classList.remove("explicitly-expanded");
+        contentCollapsible.style.maxHeight = ""; 
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
     });

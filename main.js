@@ -21972,8 +21972,7 @@ This action cannot be undone.`,
       return;
     }
     const maxH = this.plugin.settings.maxMessageHeight;
-    const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && // Ще є плейсхолдером
-    contentCollapsible.classList.contains("streaming-text");
+    const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && contentCollapsible.classList.contains("streaming-text");
     if (isStreamingNow) {
       toggleCollapseButton.hide();
       contentCollapsible.style.maxHeight = "";
@@ -21990,26 +21989,19 @@ This action cannot be undone.`,
     requestAnimationFrame(() => {
       if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected)
         return;
-      const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
-      const wasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+      const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
+      const initialWasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+      const initialMaxHeightStyle = contentCollapsible.style.maxHeight;
       contentCollapsible.style.maxHeight = "";
       const scrollHeight = contentCollapsible.scrollHeight;
-      if (wasCollapsed && previousMaxHeightStyle) {
-        contentCollapsible.style.maxHeight = previousMaxHeightStyle;
-      } else if (!wasCollapsed && scrollHeight > maxH && !toggleCollapseButton.classList.contains("explicitly-expanded")) {
-      } else if (wasCollapsed && !previousMaxHeightStyle) {
-        contentCollapsible.style.maxHeight = `${maxH}px`;
-      }
       if (scrollHeight > maxH) {
         toggleCollapseButton.show();
-        if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
-          (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-down");
-          toggleCollapseButton.setAttribute("title", "Show More");
-        } else {
+        if (wasExplicitlyExpanded) {
+          contentCollapsible.style.maxHeight = "";
+          contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
           (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-up");
           toggleCollapseButton.setAttribute("title", "Show Less");
-        }
-        if (!contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED) && !toggleCollapseButton.classList.contains("explicitly-expanded")) {
+        } else {
           contentCollapsible.style.maxHeight = `${maxH}px`;
           contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
           (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-down");
@@ -22017,7 +22009,8 @@ This action cannot be undone.`,
         }
       } else {
         toggleCollapseButton.hide();
-        toggleCollapseButton.classList.remove("explicitly-expanded");
+        if (wasExplicitlyExpanded)
+          toggleCollapseButton.classList.remove("explicitly-expanded");
         contentCollapsible.style.maxHeight = "";
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
