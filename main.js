@@ -17301,9 +17301,6 @@ var BaseMessageRenderer = class {
 
 // src/renderers/UserMessageRenderer.ts
 var import_obsidian8 = require("obsidian");
-var CSS_CLASS_USER_GROUP = "user-message-group";
-var CSS_CLASS_USER_MESSAGE = "user-message";
-var CSS_CLASS_REGENERATE_BUTTON = "regenerate-button";
 var UserMessageRenderer = class extends BaseMessageRenderer {
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
@@ -17312,40 +17309,56 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     }
   }
   render() {
-    const messageGroup = this.createMessageGroupWrapper([CSS_CLASS_USER_GROUP]);
-    this.addAvatar(messageGroup, true);
-    const messageWrapper = messageGroup.createDiv({ cls: "message-wrapper" });
+    const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
+    renderAvatar(this.app, this.plugin, messageGroup, true, "user");
+    const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
     messageWrapper.style.order = "1";
-    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASS_USER_MESSAGE]);
-    this.message.content.split("\n").forEach((line, i, arr) => {
-      contentEl.appendText(line);
-      if (i < arr.length - 1)
-        contentEl.createEl("br");
-    });
-    this.addUserActionButtons(messageWrapper);
-    const metaActionsWrapper = messageEl.createDiv({ cls: "message-meta-actions-wrapper" });
+    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
+    const contentToRender = this.message.content || "";
+    if (contentToRender.includes("\n")) {
+      contentToRender.split("\n").forEach((line, i, arr) => {
+        contentEl.appendText(line);
+        if (i < arr.length - 1)
+          contentEl.createEl("br");
+      });
+    } else {
+      contentEl.setText(contentToRender);
+    }
+    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
     BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+    this.addUserActionButtons(metaActionsWrapper);
+    setTimeout(() => {
+      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
+        this.view.checkMessageForCollapsing(messageEl);
+      }
+    }, 70);
     return messageGroup;
   }
   /**
    * Додає кнопки дій, специфічні для повідомлення користувача (Regenerate, Copy, Delete).
-   * @param messageWrapper - Обгортка повідомлення (div.message-wrapper).
+   * Кнопки додаються до .message-actions-wrapper, який створюється всередині parentElementForActionsContainer.
+   * @param parentElementForActionsContainer - Обгортка, куди буде додано .message-actions-wrapper (це .message-meta-actions-wrapper).
    */
-  addUserActionButtons(messageWrapper) {
-    const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-    const finalContent = this.message.content;
-    const regenerateBtn = buttonsWrapper.createEl("button", {
-      cls: CSS_CLASS_REGENERATE_BUTTON,
-      attr: { title: "Regenerate response" }
+  addUserActionButtons(parentElementForActionsContainer) {
+    const messageTimestamp = this.message.timestamp.getTime().toString();
+    let actionsWrapperActual = parentElementForActionsContainer.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
+    if (actionsWrapperActual) {
+      return;
+    }
+    actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+    actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
+    const finalContent = this.message.content || "";
+    const regenerateBtn = actionsWrapperActual.createEl("button", {
+      cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+      attr: { title: "Regenerate response based on this message" }
     });
     (0, import_obsidian8.setIcon)(regenerateBtn, "refresh-cw");
     this.view.registerDomEvent(regenerateBtn, "click", (e) => {
       e.stopPropagation();
       this.view.handleRegenerateClick(this.message);
     });
-    const copyBtn = buttonsWrapper.createEl("button", {
-      cls: CSS_CLASSES.COPY_BUTTON,
-      // Використовуємо константу
+    const copyBtn = actionsWrapperActual.createEl("button", {
+      cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
       attr: { "aria-label": "Copy", title: "Copy" }
     });
     (0, import_obsidian8.setIcon)(copyBtn, "copy");
@@ -17353,9 +17366,8 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
       e.stopPropagation();
       this.view.handleCopyClick(finalContent, copyBtn);
     });
-    const deleteBtn = buttonsWrapper.createEl("button", {
-      cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION],
-      // Використовуємо константи
+    const deleteBtn = actionsWrapperActual.createEl("button", {
+      cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
       attr: { "aria-label": "Delete message", title: "Delete Message" }
     });
     (0, import_obsidian8.setIcon)(deleteBtn, "trash");
