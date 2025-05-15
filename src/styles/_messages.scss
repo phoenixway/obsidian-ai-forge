@@ -249,6 +249,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-meta-actions-wrapper {
+  // Загальні стилі для обгортки
   @include flex-layout( 
     $align: center          
   );
@@ -262,6 +263,8 @@ $avatar-icon-size-factor: 0.65;
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
+    justify-content: flex-start; // Явно, щоб margin-left: auto спрацював
+    
     // .message-actions-wrapper залишається зліва за замовчуванням
     .message-timestamp {
       margin-left: auto; // Відштовхує час вправо
@@ -270,11 +273,8 @@ $avatar-icon-size-factor: 0.65;
 
   // Для повідомлень користувача (бульбашка справа): час зліва, кнопки справа
   .user-message-group .message-wrapper & {
-    @include flex-layout(
-        $justify: space-between, 
-        $align: center
-    );
-    // DOM порядок: timestamp (перший), потім actions-wrapper (другий)
+    justify-content: space-between; // Явно встановлюємо space-between
+    // DOM порядок (з UserMessageRenderer.ts): timestamp (перший), потім actions-wrapper (другий)
     // space-between розмістить timestamp зліва, actions-wrapper справа
   }
 
@@ -294,13 +294,14 @@ $avatar-icon-size-factor: 0.65;
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
     opacity: 0.75;
-    margin-left: 0; 
+    margin-left: 0; // Важливо: скидаємо margin-left, щоб не було конфлікту з space-between
   }
   
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
       color: var(--text-faint);
-      margin-left: 0; 
+      margin-left: 0; // Скидаємо margin-left
   }
+  // Для AI/Tool/Error .message-timestamp вже має margin-left: auto з попереднього блоку
 }
 
 .message-actions-wrapper { 
@@ -314,6 +315,7 @@ $avatar-icon-size-factor: 0.65;
 
   button.message-action-button { @extend %base-action-button; }
 
+  // Стилі для кнопок всередині повідомлень користувача
   .user-message-group .message-wrapper .message-meta-actions-wrapper & {
      button.message-action-button {
         color: rgba(255, 255, 255, 0.8); 
@@ -321,24 +323,23 @@ $avatar-icon-size-factor: 0.65;
             background: rgba(255, 255, 255, 0.25) !important; 
             color: white; 
         }
-        &.delete-message-button.danger-option { 
-            color: rgba(255, 150, 150, 0.8); 
-            &:hover { 
-                background-color: rgba(200, 50, 50, 0.5) !important; 
-                color: white; 
-            } 
-        }
+     }
+     .delete-message-button.danger-option { // Більш специфічний селектор для кнопки видалення в user-message
+        color: rgba(255, 150, 150, 0.8) !important;  // !important для перекриття, якщо потрібно
+        &:hover { 
+            background-color: rgba(200, 50, 50, 0.5) !important; 
+            color: white !important; 
+        } 
      }
   }
-  .delete-message-button { 
-      &.danger-option { 
-          // Загальний стиль для кнопки видалення, якщо вона не в user-message-group
-          color: var(--text-error); 
-          &:hover { 
-              color: var(--text-on-accent); 
-              background-color: var(--background-modifier-error-hover) !important; 
-          } 
-      } 
+  // Загальні стилі для кнопки видалення (якщо вона НЕ в повідомленні користувача)
+  .delete-message-button.danger-option { 
+    // Цей стиль застосується, якщо попередній, більш специфічний, не спрацює
+    color: var(--text-error); 
+    &:hover { 
+        color: var(--text-on-accent); 
+        background-color: var(--background-modifier-error-hover) !important; 
+    } 
   }
 }
 
