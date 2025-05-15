@@ -254,22 +254,32 @@ $avatar-icon-size-factor: 0.65;
     $align: center          
   );
   width: 100%;                  
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); // Збільшено відступ від бульбашки
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); 
   padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5); 
   box-sizing: border-box;
-  min-height: 20px; // Мінімальна висота, щоб уникнути "стрибків" при появі кнопок
+  min-height: 20px; 
 
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
+    .message-actions-wrapper { order: 1; } // Кнопки зліва
+    .message-timestamp { order: 2; }       // Час справа
+    // Якщо потрібно вирівняти краї з контентом бульбашки:
     // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); 
+    // padding-right: calc(var(--chat-spacing-unit, 5px) * 3); 
   }
+
   .user-message-group .message-wrapper & {
-     // padding-right: calc(var(--chat-spacing-unit, 5px) * 3); 
+    .message-actions-wrapper { order: 1; } // Кнопки зліва (відносно правого краю)
+    .message-timestamp { order: 2; }       // Час справа (на правому краю)
+     // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); 
+     // padding-right: calc(var(--chat-spacing-unit, 5px) * 3);
   }
+
   .system-message-group .message-wrapper & { 
     justify-content: center; 
     .message-actions-wrapper { display: none; } 
+    .message-timestamp { order: 1; } 
   }
 }
 
@@ -283,7 +293,7 @@ $avatar-icon-size-factor: 0.65;
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
     opacity: 0.75;
-    order: 2; 
+    // order: 2; // Вже встановлено вище
   }
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
       color: var(--text-faint);
@@ -299,9 +309,7 @@ $avatar-icon-size-factor: 0.65;
   @include transition( (opacity, visibility), 0.2s, ease-in-out );
   box-sizing: border-box;
 
-  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-    order: 1; 
-  }
+  // order вже встановлюється в батьківському .message-meta-actions-wrapper
 
   button.message-action-button { @extend %base-action-button; }
   .delete-message-button { &.danger-option { color: var(--text-error); &:hover { color: var(--text-on-accent); background-color: var(--background-modifier-error-hover) !important; } } }
@@ -312,13 +320,11 @@ $avatar-icon-size-factor: 0.65;
 
 .show-more-button { 
   @extend %button-like-text;
+  // Якщо .show-more-button НЕ є частиною .message-meta-actions-wrapper, а окремим елементом:
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); width: fit-content;
-  // Якщо .show-more-button також знаходиться всередині .message-meta-actions-wrapper,
-  // то його align-self не потрібен, він буде вирівнюватися за правилами flex-контейнера.
-  // Якщо він є окремим сестринським елементом до .message та .message-meta-actions-wrapper:
   .ollama-message-group .message-wrapper &, 
   .tool-message-group .message-wrapper &, 
-  .error-message-group .message-wrapper & { align-self: center; }
+  .error-message-group .message-wrapper & { align-self: center; } // або flex-start/flex-end якщо потрібно
   .user-message-group .message-wrapper & { 
     align-self: center; color: rgba(255, 255, 255, 0.7); background-color: transparent; border-color: transparent;
     &:hover { color: white; background-color: rgba(255, 255, 255, 0.2); border-color: transparent; }
