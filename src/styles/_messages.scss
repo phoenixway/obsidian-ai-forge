@@ -249,49 +249,61 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-meta-actions-wrapper {
-  display: flex;
-  justify-content: space-between; 
-  align-items: center;          
+  @include flex-layout(
+    $justify: space-between, 
+    $align: center          
+  );
   width: 100%;                  
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); 
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); // Збільшено відступ від бульбашки
   padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5); 
   box-sizing: border-box;
+  min-height: 20px; // Мінімальна висота, щоб уникнути "стрибків" при появі кнопок
 
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
-    // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); // Зсув для відповідності контенту бульбашки
+    // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); 
   }
   .user-message-group .message-wrapper & {
-     // padding-right: calc(var(--chat-spacing-unit, 5px) * 3); // Аналогічний зсув
+     // padding-right: calc(var(--chat-spacing-unit, 5px) * 3); 
   }
-  .system-message-group .message-wrapper & { // Для системних, можливо, не потрібні або інші
-    justify-content: center; // Якщо тільки час, то він буде по центру
-    .message-actions-wrapper { display: none; } // Приховуємо кнопки для системних
+  .system-message-group .message-wrapper & { 
+    justify-content: center; 
+    .message-actions-wrapper { display: none; } 
   }
 }
 
 .message-timestamp { 
-  font-size: var(--font-ui-smaller, 0.75em); color: var(--text-faint);
-  opacity: 0.9; box-sizing: border-box;
-  flex-shrink: 0; // Не стискати час
+  font-size: var(--font-ui-smaller, 0.75em); 
+  color: var(--text-faint);
+  opacity: 0.9; 
+  box-sizing: border-box;
+  flex-shrink: 0; 
 
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
     opacity: 0.75;
+    order: 2; 
   }
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
-      color: var(--text-faint); // Колір для системних
+      color: var(--text-faint);
   }
 }
 
 .message-actions-wrapper { 
-  @include flex-layout($gap: calc(var(--chat-spacing-unit, 5px) * 1.0));
-  opacity: 0; visibility: hidden; @include transition((opacity, visibility), 0.2s, ease-in-out);
+  @include flex-layout(
+    $gap: calc(var(--chat-spacing-unit, 5px) * 1.0)
+  );
+  opacity: 0; 
+  visibility: hidden; 
+  @include transition( (opacity, visibility), 0.2s, ease-in-out );
   box-sizing: border-box;
 
-  button.message-action-button { @extend %base-action-button; }
+  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 1; 
+  }
 
+  button.message-action-button { @extend %base-action-button; }
   .delete-message-button { &.danger-option { color: var(--text-error); &:hover { color: var(--text-on-accent); background-color: var(--background-modifier-error-hover) !important; } } }
   .user-message-group .message-wrapper .message-meta-actions-wrapper & button.message-action-button { color: rgba(255, 255, 255, 0.8); &:hover { background: rgba(255, 255, 255, 0.25) !important; color: white; } &.delete-message-button.danger-option { color: rgba(255, 150, 150, 0.8); &:hover { background-color: rgba(200, 50, 50, 0.5) !important; color: white; } } }
 }
@@ -300,10 +312,10 @@ $avatar-icon-size-factor: 0.65;
 
 .show-more-button { 
   @extend %button-like-text;
-  // Якщо всередині .message:
-  // display: block; margin: calc(var(--chat-spacing-unit, 5px) * 0.5) auto 0 auto; width: fit-content;
-  // Якщо сестринський до .message (всередині .message-wrapper, ПІСЛЯ .message-meta-actions-wrapper):
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); width: fit-content;
+  // Якщо .show-more-button також знаходиться всередині .message-meta-actions-wrapper,
+  // то його align-self не потрібен, він буде вирівнюватися за правилами flex-контейнера.
+  // Якщо він є окремим сестринським елементом до .message та .message-meta-actions-wrapper:
   .ollama-message-group .message-wrapper &, 
   .tool-message-group .message-wrapper &, 
   .error-message-group .message-wrapper & { align-self: center; }
@@ -363,5 +375,6 @@ button.summarize-button { @extend %base-action-button; }
   .thinking-content { padding: 10px; background-color: var(--background-primary); font-size: var(--font-ui-smaller); max-height: 200px; overflow-y: auto; transition: max-height 0.3s ease-out, padding 0.3s ease-out; &.is-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; } }
 }
 
-.error-icon { /* Якщо потрібен спеціальний стиль для контейнера іконки помилки */ }
-.system-icon { /* Якщо потрібен спеціальний стиль для контейнера іконки системного повідомлення */ }
+.error-icon { /* Наприклад: width: 16px; height: 16px; fill: currentColor; */ }
+.system-icon { /* Наприклад: width: 16px; height: 16px; fill: currentColor; */ }
+.tool-result-icon { /* Наприклад: width: 14px; height: 14px; fill: currentColor; */ }
