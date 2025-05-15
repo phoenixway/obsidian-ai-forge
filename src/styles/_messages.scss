@@ -41,7 +41,7 @@ $avatar-icon-size-factor: 0.65;
   flex-shrink: 0;
   @include flex-layout($justify: center, $align: center);
   box-sizing: border-box;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); // Однаковий невеликий відступ зверху для всіх аватарів
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); 
 }
 
 %base-message-bubble {
@@ -64,23 +64,24 @@ $avatar-icon-size-factor: 0.65;
   border: none;
   box-shadow: none;
   padding: 1px;
-  color: var(--text-muted); // Стандартний колір для кнопок дій
+  color: var(--text-muted); 
   border-radius: var(--radius-s);
   cursor: pointer;
   @include transition;
-  @include flex-layout($align: center, $justify: center);
+  @include flex-layout($align: center, $justify: center); 
   box-sizing: border-box;
   margin-left: 0;
   position: relative; 
+  line-height: 1; 
 
   .svg-icon {
-    width: 14px;
-    height: 14px;
+    width: 14px; 
+    height: 14px; 
   }
 
   &:hover {
     background: var(--background-modifier-hover) !important; 
-    color: var(--text-normal); // Стандартний колір для кнопок дій при наведенні
+    color: var(--text-normal); 
     transform: scale(1.05);
   }
 }
@@ -125,7 +126,6 @@ $avatar-icon-size-factor: 0.65;
     justify-content: flex-end;
     .avatar-container { 
         order: 2; 
-        // margin-bottom: 50px; // Прибрано
     }
     .message-wrapper { order: 1; }
   }
@@ -134,7 +134,6 @@ $avatar-icon-size-factor: 0.65;
     justify-content: flex-start;
     .avatar-container { 
         order: 1; 
-        // margin-top: 45px; // Прибрано
     }
     .message-wrapper { order: 2; }
   }
@@ -157,7 +156,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .avatar-container { 
-  @extend %base-avatar-container; // Включає новий margin-top
+  @extend %base-avatar-container; 
   &.user-avatar { background-color: var(--interactive-accent-translucent); color: var(--interactive-accent); }
   &.ai-avatar { background-color: var(--background-modifier-success); color: var(--text-on-accent); }
   &.avatar-tool-specific { background-color: var(--background-modifier-info); color: var(--text-normal);
@@ -267,7 +266,6 @@ $avatar-icon-size-factor: 0.65;
   min-height: 20px; 
   position: relative; 
 
-  // Для AI-подібних повідомлень (бульбашка зліва): кнопки зліва, час справа
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
@@ -287,7 +285,6 @@ $avatar-icon-size-factor: 0.65;
     }
   }
 
-  // Для повідомлень користувача (бульбашка справа): час зліва, кнопки справа
   .user-message-group .message-wrapper & {
     justify-content: flex-start; 
 
@@ -318,18 +315,14 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-timestamp { 
-  font-size: var(--font-ui-smaller, 0.75em); 
-  color: var(--text-faint); // Уніфікований колір для всіх timestamp
+  font-size: 0.7em; 
+  color: var(--text-faint); 
   opacity: 0.9; 
   visibility: visible; 
   box-sizing: border-box;
   flex-shrink: 0; 
   position: relative; 
-
-  // Для повідомлень користувача, якщо потрібна інша прозорість (колір вже уніфікований)
-  // .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
-  //   opacity: 0.75; // Можна залишити, якщо це бажано для контрасту на темному фоні user-повідомлення
-  // }
+  line-height: 1.2; 
 }
 
 .message-actions-wrapper { 
@@ -347,17 +340,11 @@ $avatar-icon-size-factor: 0.65;
   box-sizing: border-box;
 
   button.message-action-button { 
-    @extend %base-action-button; // Включає уніфіковані кольори
+    @extend %base-action-button; 
   }
-
-  // Специфічні стилі для delete-button (не колір, а, наприклад, якщо він має бути червонішим)
-  // Кольори вже уніфіковані через %base-action-button та загальні стилі нижче
-  // .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-     // Тут більше не потрібні специфічні кольори для кнопок користувача, вони беруться з %base-action-button
-  // }
-
-  .delete-message-button.danger-option { // Застосовується до всіх кнопок видалення
-    color: var(--text-error) !important; // !important для перекриття базового сірого з плейсхолдера
+  
+  .delete-message-button.danger-option { 
+    color: var(--text-error) !important; 
     &:hover { 
         color: var(--text-on-accent) !important; 
         background-color: var(--background-modifier-error-hover) !important; 
@@ -377,20 +364,16 @@ $avatar-icon-size-factor: 0.65;
   .tool-message-group .message-wrapper &, 
   .error-message-group .message-wrapper & { align-self: center; }
   .user-message-group .message-wrapper & { 
-    // Кольори для кнопки "Показати більше" у повідомленні користувача, якщо вони мають відрізнятися
-    // Якщо ні, ці стилі можна прибрати, і вона успадкує з %button-like-text
     align-self: center; 
-    color: rgba(255, 255, 255, 0.7); // Світліший текст для темного фону
+    color: rgba(255, 255, 255, 0.7); 
     &:hover { 
         color: white; 
-        background-color: rgba(255, 255, 255, 0.2); // Світліший фон при наведенні
+        background-color: rgba(255, 255, 255, 0.2); 
         border-color: transparent; 
     }
   }
   .system-message-group .message-wrapper & { display: none; }
 }
-
-// ... (решта файлу без змін, включаючи .message-content-collapsible, анімації, медіа-запити і т.д.) ...
 
 .message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
 .message-content-collapsed { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
