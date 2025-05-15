@@ -41,6 +41,7 @@ $avatar-icon-size-factor: 0.65;
   flex-shrink: 0;
   @include flex-layout($justify: center, $align: center);
   box-sizing: border-box;
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); // Однаковий невеликий відступ зверху для всіх аватарів
 }
 
 %base-message-bubble {
@@ -59,18 +60,18 @@ $avatar-icon-size-factor: 0.65;
 }
 
 %base-action-button {
-  background: transparent !important; // Може бути потрібен для перекриття Obsidian стилів
+  background: transparent !important; 
   border: none;
   box-shadow: none;
   padding: 1px;
-  color: var(--text-muted);
+  color: var(--text-muted); // Стандартний колір для кнопок дій
   border-radius: var(--radius-s);
   cursor: pointer;
   @include transition;
   @include flex-layout($align: center, $justify: center);
   box-sizing: border-box;
   margin-left: 0;
-  position: relative; // Важливо, щоб бути в потоці
+  position: relative; 
 
   .svg-icon {
     width: 14px;
@@ -78,8 +79,8 @@ $avatar-icon-size-factor: 0.65;
   }
 
   &:hover {
-    background: var(--background-modifier-hover) !important; // Може бути потрібен для перекриття Obsidian стилів
-    color: var(--text-normal);
+    background: var(--background-modifier-hover) !important; 
+    color: var(--text-normal); // Стандартний колір для кнопок дій при наведенні
     transform: scale(1.05);
   }
 }
@@ -122,13 +123,19 @@ $avatar-icon-size-factor: 0.65;
 
   &.user-message-group { 
     justify-content: flex-end;
-    .avatar-container { order: 2; margin-bottom: 50px; /* TODO: Review margin */ }
+    .avatar-container { 
+        order: 2; 
+        // margin-bottom: 50px; // Прибрано
+    }
     .message-wrapper { order: 1; }
   }
 
   &.ollama-message-group { 
     justify-content: flex-start;
-    .avatar-container { order: 1; margin-top: 45px; /* TODO: Review margin */ }
+    .avatar-container { 
+        order: 1; 
+        // margin-top: 45px; // Прибрано
+    }
     .message-wrapper { order: 2; }
   }
   &.tool-message-group { 
@@ -150,7 +157,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .avatar-container { 
-  @extend %base-avatar-container;
+  @extend %base-avatar-container; // Включає новий margin-top
   &.user-avatar { background-color: var(--interactive-accent-translucent); color: var(--interactive-accent); }
   &.ai-avatar { background-color: var(--background-modifier-success); color: var(--text-on-accent); }
   &.avatar-tool-specific { background-color: var(--background-modifier-info); color: var(--text-normal);
@@ -215,7 +222,7 @@ $avatar-icon-size-factor: 0.65;
   color: var(--text-normal);
   &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); }
   pre {
-    background-color: var(--background-secondary) !important; // !important може бути потрібним для перекриття стилів рендерера markdown
+    background-color: var(--background-secondary) !important;
     padding: calc(var(--chat-spacing-unit, 5px) * 2);
     border-radius: var(--radius-m, 6px); margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
     margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1); overflow-x: auto; box-sizing: border-box;
@@ -312,21 +319,17 @@ $avatar-icon-size-factor: 0.65;
 
 .message-timestamp { 
   font-size: var(--font-ui-smaller, 0.75em); 
-  color: var(--text-faint);
+  color: var(--text-faint); // Уніфікований колір для всіх timestamp
   opacity: 0.9; 
   visibility: visible; 
   box-sizing: border-box;
   flex-shrink: 0; 
   position: relative; 
 
-  .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
-    color: var(--text-on-accent); 
-    opacity: 0.75; 
-  }
-  
-  .system-message-group .message-wrapper .message-meta-actions-wrapper & {
-      color: var(--text-faint);
-  }
+  // Для повідомлень користувача, якщо потрібна інша прозорість (колір вже уніфікований)
+  // .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
+  //   opacity: 0.75; // Можна залишити, якщо це бажано для контрасту на темному фоні user-повідомлення
+  // }
 }
 
 .message-actions-wrapper { 
@@ -339,34 +342,24 @@ $avatar-icon-size-factor: 0.65;
   @include transition( (opacity, visibility), 0.2s, ease-in-out );
   
   position: relative; 
-  z-index: 1; // Може допомогти уникнути перекриття іншими елементами
+  z-index: 1; 
   
   box-sizing: border-box;
 
   button.message-action-button { 
-    @extend %base-action-button; 
+    @extend %base-action-button; // Включає уніфіковані кольори
   }
 
-  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-     button.message-action-button {
-        color: rgba(255, 255, 255, 0.8); 
-        &:hover { 
-            background: rgba(255, 255, 255, 0.25) !important; 
-            color: white; 
-        }
-     }
-     .delete-message-button.danger-option {
-        color: rgba(255, 150, 150, 0.8) !important;
-        &:hover { 
-            background-color: rgba(200, 50, 50, 0.5) !important; 
-            color: white !important; 
-        } 
-     }
-  }
-  .delete-message-button.danger-option { 
-    color: var(--text-error); 
+  // Специфічні стилі для delete-button (не колір, а, наприклад, якщо він має бути червонішим)
+  // Кольори вже уніфіковані через %base-action-button та загальні стилі нижче
+  // .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+     // Тут більше не потрібні специфічні кольори для кнопок користувача, вони беруться з %base-action-button
+  // }
+
+  .delete-message-button.danger-option { // Застосовується до всіх кнопок видалення
+    color: var(--text-error) !important; // !important для перекриття базового сірого з плейсхолдера
     &:hover { 
-        color: var(--text-on-accent); 
+        color: var(--text-on-accent) !important; 
         background-color: var(--background-modifier-error-hover) !important; 
     } 
   }
@@ -384,11 +377,20 @@ $avatar-icon-size-factor: 0.65;
   .tool-message-group .message-wrapper &, 
   .error-message-group .message-wrapper & { align-self: center; }
   .user-message-group .message-wrapper & { 
-    align-self: center; color: rgba(255, 255, 255, 0.7); background-color: transparent; border-color: transparent;
-    &:hover { color: white; background-color: rgba(255, 255, 255, 0.2); border-color: transparent; }
+    // Кольори для кнопки "Показати більше" у повідомленні користувача, якщо вони мають відрізнятися
+    // Якщо ні, ці стилі можна прибрати, і вона успадкує з %button-like-text
+    align-self: center; 
+    color: rgba(255, 255, 255, 0.7); // Світліший текст для темного фону
+    &:hover { 
+        color: white; 
+        background-color: rgba(255, 255, 255, 0.2); // Світліший фон при наведенні
+        border-color: transparent; 
+    }
   }
   .system-message-group .message-wrapper & { display: none; }
 }
+
+// ... (решта файлу без змін, включаючи .message-content-collapsible, анімації, медіа-запити і т.д.) ...
 
 .message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
 .message-content-collapsed { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
