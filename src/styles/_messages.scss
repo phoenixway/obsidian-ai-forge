@@ -360,12 +360,12 @@ $avatar-icon-size-factor: 0.65;
 .show-more-button { 
   @extend %button-like-text;
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); 
-  width: fit-content; // Кнопка не розтягується на всю ширину
-  align-self: center; // Горизонтальне центрування в батьківському flex-column (.message-wrapper)
+  width: fit-content; 
+  margin-left: auto;   // Для центрування
+  margin-right: auto;  // Для центрування
+  // align-self: center; // Попередній варіант, замінений на margin auto
 
-  // Специфічні стилі для кнопки в повідомленнях користувача (якщо потрібен інший вигляд)
   .user-message-group .message-wrapper & { 
-    // align-self: center; // Вже встановлено вище
     color: rgba(255, 255, 255, 0.7); 
     &:hover { 
         color: white; 
@@ -374,7 +374,6 @@ $avatar-icon-size-factor: 0.65;
     }
   }
 
-  // Приховуємо кнопку для системних повідомлень
   .system-message-group .message-wrapper & { 
     display: none; 
   }
