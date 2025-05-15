@@ -16939,8 +16939,8 @@ var CSS_CLASSES = {
   THINKING_CONTENT: "thinking-content",
   AVATAR_TOOL_SPECIFIC: "avatar-tool-specific",
   // Специфічний клас для аватара інструменту
-  ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator"
-  // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
+  ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator",
+  TOGGLE_COLLAPSE_BUTTON: "toggle-collapse-button"
 };
 
 // src/MessageRendererUtils.ts
@@ -17250,10 +17250,11 @@ var BaseMessageRenderer = class {
     renderAvatar(this.app, this.plugin, messageGroup, isUser, this.message.role);
   }
   /**
-   * Додає базовий набір кнопок дій (Копіювати, Видалити) до .message-actions-wrapper,
+   * Додає набір кнопок дій (Toggle Collapse, Копіювати, Видалити) до .message-actions-wrapper,
    * який має бути створений всередині parentElementForMeta.
+   * Кнопка "Toggle Collapse" додається першою і спочатку прихована.
    * @param parentElementForMeta Елемент (зазвичай .message-meta-actions-wrapper), куди буде додано .message-actions-wrapper.
-   * @param contentToCopy Текст, який буде копіюватися.
+   * @param contentToCopy Текст, який буде копіюватися кнопкою "Copy".
    * @param messageForContext Повідомлення, до якого відносяться ці кнопки.
    * @returns Створений HTMLElement (.message-actions-wrapper).
    */
@@ -17267,10 +17268,31 @@ var BaseMessageRenderer = class {
       actionsWrapper = parentElementForMeta.createDiv({ cls: actionsWrapperClass });
       actionsWrapper.setAttribute("data-message-timestamp", messageTimestamp);
     }
-    const copyButtonClass = CSS_CLASSES.COPY_BUTTON || "copy-button";
     const actionButtonBaseClass = CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button";
+    const toggleCollapseButtonClass = CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON || "toggle-collapse-button";
+    const copyButtonClass = CSS_CLASSES.COPY_BUTTON || "copy-button";
     const deleteButtonClass = CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button";
     const dangerOptionClass = CSS_CLASSES.DANGER_OPTION || "danger-option";
+    const toggleCollapseBtn = actionsWrapper.createEl("button", {
+      cls: [toggleCollapseButtonClass, actionButtonBaseClass],
+      attr: { "aria-label": "Toggle content", title: "Toggle content" }
+    });
+    (0, import_obsidian7.setIcon)(toggleCollapseBtn, "chevrons-up-down");
+    toggleCollapseBtn.hide();
+    this.view.registerDomEvent(toggleCollapseBtn, "click", (e) => {
+      e.stopPropagation();
+      const messageGroup = toggleCollapseBtn.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`);
+      if (messageGroup) {
+        const contentCollapsible = messageGroup.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+        if (contentCollapsible) {
+          this.view.toggleMessageCollapse(contentCollapsible, toggleCollapseBtn);
+        } else {
+          console.warn("Could not find .content-collapsible for toggle button in group:", messageGroup);
+        }
+      } else {
+        console.warn("Could not find .message-group for toggle button:", toggleCollapseBtn);
+      }
+    });
     const copyBtn = actionsWrapper.createEl("button", {
       cls: [copyButtonClass, actionButtonBaseClass],
       attr: { "aria-label": "Copy", title: "Copy" }
@@ -17294,7 +17316,7 @@ var BaseMessageRenderer = class {
   createMessageBubble(messageWrapperEl, messageClasses = []) {
     const messageEl = messageWrapperEl.createDiv({ cls: [CSS_CLASSES.MESSAGE, ...messageClasses] });
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
-    const contentEl = contentContainer.createDiv({ cls: CSS_CLASSES.CONTENT });
+    const contentEl = contentContainer.createDiv({ cls: [CSS_CLASSES.CONTENT, CSS_CLASSES.CONTENT_COLLAPSIBLE] });
     return { messageEl, contentContainer, contentEl };
   }
 };
@@ -19462,7 +19484,6 @@ var VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 var SCROLL_THRESHOLD = 150;
 var CSS_CLASS_TRANSLATING_INPUT = "translating-input";
 var CSS_CLASS_EMPTY_STATE = "ollama-empty-state";
-var CSS_CLASS_MESSAGE = "message";
 var CSS_CLASS_ERROR_TEXT2 = "error-message-text";
 var CSS_CLASS_TRANSLATION_CONTAINER = "translation-container";
 var CSS_CLASS_TRANSLATION_CONTENT = "translation-content";
@@ -19471,7 +19492,6 @@ var CSS_CLASS_RECORDING = "recording";
 var CSS_CLASS_DISABLED = "disabled";
 var CSS_CLASS_DATE_SEPARATOR = "chat-date-separator";
 var CSS_CLASS_VISIBLE = "visible";
-var CSS_CLASS_CONTENT_COLLAPSED = "message-content-collapsed";
 var CSS_CLASS_MENU_OPTION3 = "menu-option";
 var CSS_ROLE_PANEL_ITEM2 = "ollama-role-panel-item";
 var CSS_ROLE_PANEL_ITEM_ICON2 = "ollama-role-panel-item-icon";
@@ -21476,36 +21496,55 @@ This action cannot be undone.`,
       this.plugin.logger.debug("Audio stream tracks stopped.");
     }
   }
+  // src/OllamaView.ts
   checkAllMessagesForCollapsing() {
-    this.chatContainer?.querySelectorAll(`.${CSS_CLASS_MESSAGE}`).forEach((msgEl) => {
-      this.checkMessageForCollapsing(msgEl);
+    this.chatContainer?.querySelectorAll(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach((msgGroupEl) => {
+      if (msgGroupEl.classList.contains("placeholder") && this.isProcessing) {
+        const streamingContent = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}.streaming-text`);
+        if (streamingContent) {
+          const toggleButton = msgGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+          toggleButton?.hide();
+          const contentCollapsible = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+          if (contentCollapsible) {
+            contentCollapsible.style.maxHeight = "";
+            contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+          }
+          return;
+        }
+      }
+      this.checkMessageForCollapsing(msgGroupEl);
     });
   }
+  // src/OllamaView.ts
   toggleMessageCollapse(contentEl, buttonEl) {
     const maxHeightLimit = this.plugin.settings.maxMessageHeight;
-    const isInitialExpandedState = buttonEl.hasAttribute("data-initial-state");
-    if (isInitialExpandedState) {
-      buttonEl.removeAttribute("data-initial-state");
-      contentEl.style.maxHeight = `${maxHeightLimit}px`;
-      contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-      buttonEl.setText("Show More \u25BC");
-      setTimeout(() => {
-        contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }, 310);
+    if (maxHeightLimit <= 0)
+      return;
+    const isCollapsed = contentEl.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+    if (isCollapsed) {
+      contentEl.style.maxHeight = "";
+      contentEl.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+      (0, import_obsidian15.setIcon)(buttonEl, "chevron-up");
+      buttonEl.setAttribute("title", "Show Less");
+      buttonEl.classList.add("explicitly-expanded");
     } else {
-      const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
-      if (isCollapsed) {
-        contentEl.style.maxHeight = "";
-        contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-        buttonEl.setText("Show Less \u25B2");
-      } else {
-        contentEl.style.maxHeight = `${maxHeightLimit}px`;
-        contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        buttonEl.setText("Show More \u25BC");
-        setTimeout(() => {
-          contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 310);
-      }
+      contentEl.style.maxHeight = `${maxHeightLimit}px`;
+      contentEl.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
+      (0, import_obsidian15.setIcon)(buttonEl, "chevron-down");
+      buttonEl.setAttribute("title", "Show More");
+      buttonEl.classList.remove("explicitly-expanded");
+      setTimeout(() => {
+        const messageGroup = buttonEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`);
+        if (messageGroup && this.chatContainer) {
+          const rect = messageGroup.getBoundingClientRect();
+          const containerRect = this.chatContainer.getBoundingClientRect();
+          if (rect.top < containerRect.top) {
+            messageGroup.scrollIntoView({ behavior: "smooth", block: "start" });
+          } else if (rect.bottom > containerRect.bottom && (rect.top > containerRect.top + containerRect.height * 0.3 || rect.top >= containerRect.bottom)) {
+            messageGroup.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      }, 310);
     }
   }
   getChatContainer() {
@@ -21906,69 +21945,77 @@ This action cannot be undone.`,
       this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
     }
   }
-  checkMessageForCollapsing(messageElOrGroupEl) {
-    const messageGroupEl = messageElOrGroupEl.classList.contains(CSS_CLASSES.MESSAGE_GROUP) ? messageElOrGroupEl : messageElOrGroupEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`);
-    if (!messageGroupEl) {
+  // src/OllamaView.ts
+  checkMessageForCollapsing(messageGroupEl) {
+    if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
+      const tempToggleButton = messageGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+      tempToggleButton?.hide();
       return;
     }
-    const contentCollapsible = messageGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
     const messageEl = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
-    if (!contentCollapsible || !messageEl) {
+    if (!messageEl) {
+      this.plugin.logger.warn("[checkMsgCollapse] No .message element found in group", messageGroupEl);
+      return;
+    }
+    const contentCollapsible = messageEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+    if (!contentCollapsible) {
+      this.plugin.logger.warn("[checkMsgCollapse] No .content-collapsible element found in message", messageEl);
+      return;
+    }
+    const actionsWrapper = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
+    const toggleCollapseButton = actionsWrapper?.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+    if (!actionsWrapper || !toggleCollapseButton) {
+      contentCollapsible.style.maxHeight = "";
+      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
     const maxH = this.plugin.settings.maxMessageHeight;
-    const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && messageGroupEl.hasAttribute("data-placeholder-timestamp") && contentCollapsible.classList.contains("streaming-text");
+    const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && // Ще є плейсхолдером
+    contentCollapsible.classList.contains("streaming-text");
     if (isStreamingNow) {
-      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
-      existingButton?.remove();
+      toggleCollapseButton.hide();
       contentCollapsible.style.maxHeight = "";
-      contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
     if (maxH <= 0) {
-      const existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
-      existingButton?.remove();
+      toggleCollapseButton.hide();
+      toggleCollapseButton.classList.remove("explicitly-expanded");
       contentCollapsible.style.maxHeight = "";
-      contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
     requestAnimationFrame(() => {
-      if (!contentCollapsible || !contentCollapsible.isConnected || !messageGroupEl.isConnected || !messageEl.isConnected)
+      if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected)
         return;
-      let existingButton = messageEl.querySelector(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
       const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
+      const wasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
       contentCollapsible.style.maxHeight = "";
       const scrollHeight = contentCollapsible.scrollHeight;
-      if (existingButton && previousMaxHeightStyle && !existingButton.classList.contains("explicitly-expanded")) {
+      if (wasCollapsed && previousMaxHeightStyle) {
         contentCollapsible.style.maxHeight = previousMaxHeightStyle;
+      } else if (!wasCollapsed && scrollHeight > maxH && !toggleCollapseButton.classList.contains("explicitly-expanded")) {
+      } else if (wasCollapsed && !previousMaxHeightStyle) {
+        contentCollapsible.style.maxHeight = `${maxH}px`;
       }
       if (scrollHeight > maxH) {
-        if (!existingButton) {
-          existingButton = messageEl.createEl("button", {
-            cls: CSS_CLASSES.SHOW_MORE_BUTTON
-          });
-          this.registerDomEvent(existingButton, "click", () => {
-            if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
-              existingButton.classList.add("explicitly-expanded");
-            } else {
-              existingButton.classList.remove("explicitly-expanded");
-            }
-            this.toggleMessageCollapse(contentCollapsible, existingButton);
-          });
+        toggleCollapseButton.show();
+        if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
+          (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-down");
+          toggleCollapseButton.setAttribute("title", "Show More");
+        } else {
+          (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-up");
+          toggleCollapseButton.setAttribute("title", "Show Less");
+        }
+        if (!contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED) && !toggleCollapseButton.classList.contains("explicitly-expanded")) {
           contentCollapsible.style.maxHeight = `${maxH}px`;
           contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
-          existingButton.setText("Show More \u25BC");
-        } else {
-          if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
-            existingButton.setText("Show More \u25BC");
-          } else {
-            existingButton.setText("Show Less \u25B2");
-          }
+          (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-down");
+          toggleCollapseButton.setAttribute("title", "Show More");
         }
       } else {
-        if (existingButton) {
-          existingButton.remove();
-        }
+        toggleCollapseButton.hide();
+        toggleCollapseButton.classList.remove("explicitly-expanded");
         contentCollapsible.style.maxHeight = "";
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }

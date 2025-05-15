@@ -87,6 +87,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 %button-like-text {
+  // Цей плейсхолдер більше не потрібен для .show-more-button, але може використовуватися деінде
   display: inline-block;
   padding: calc(var(--chat-spacing-unit, 5px) * 0.5) calc(var(--chat-spacing-unit, 5px) * 1.5);
   font-size: var(--font-ui-small, 0.8em);
@@ -168,23 +169,21 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-wrapper { 
-  @include flex-layout($direction: column); // Це робить .message-wrapper flex-контейнером для його дітей
+  @include flex-layout($direction: column);
   box-sizing: border-box;
   width: fit-content; 
   max-width: var(--chat-message-max-width, 700px);
 
-  // За замовчуванням дочірні елементи (включаючи .show-more-button) будуть вирівнюватися по лівому краю
-  // якщо для них не вказано align-self
   .ollama-message-group &,
   .tool-message-group &, 
   .error-message-group & { 
-    align-items: flex-start; // Це впливає на вирівнювання самого .message-wrapper, а не його вмісту
+    align-items: flex-start; 
   }
   .user-message-group & { 
-    align-items: flex-end;   // Це впливає на вирівнювання самого .message-wrapper, а не його вмісту
+    align-items: flex-end;   
   }
   .system-message-group & {
-    align-items: center; // Це впливає на вирівнювання самого .message-wrapper, а не його вмісту
+    align-items: center; 
   }
 }
 
@@ -306,7 +305,7 @@ $avatar-icon-size-factor: 0.65;
 
   .system-message-group .message-wrapper & { 
     justify-content: center; 
-    .message-actions-wrapper { display: none; } 
+    .message-actions-wrapper { display: none; } // Системні повідомлення не мають кнопок дій
     .message-timestamp {
         order: 1; 
         margin-left: 0; 
@@ -343,6 +342,10 @@ $avatar-icon-size-factor: 0.65;
 
   button.message-action-button { 
     @extend %base-action-button; 
+    // Кнопка toggle-collapse буде першою завдяки DOM-порядку
+    // Якщо вона має клас .toggle-collapse-button, її можна стилізувати окремо, якщо потрібно
+    // Наприклад:
+    // &.toggle-collapse-button { /* специфічні стилі, якщо треба */ }
   }
   
   .delete-message-button.danger-option { 
@@ -359,41 +362,8 @@ $avatar-icon-size-factor: 0.65;
   visibility: visible; 
 } 
 
-.show-more-button { 
-  @extend %button-like-text;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); 
-  width: fit-content; 
-  // За замовчуванням буде вирівнюватися по початку (ліворуч) батьківського .message-wrapper,
-  // оскільки .message-wrapper є flex-контейнером з align-items: flex-start (для AI) або align-items: flex-end (для user)
-  // і зазвичай дочірні елементи успадковують це або мають align-self: auto (що еквівалентно stretch, але тут width: fit-content)
-  // Якщо .message-wrapper має align-items: flex-start, то і кнопка буде зліва.
-  // Якщо .message-wrapper має align-items: flex-end, то і кнопка буде справа.
-  // Для user-повідомлень, можливо, потрібно align-self: flex-start; якщо хочемо її зліва,
-  // або залишити як є, якщо справа - це ОК.
-
-  // Повертаємо до align-self: flex-start для AI/Tool/Error, щоб була зліва.
-  .ollama-message-group .message-wrapper &,
-  .tool-message-group .message-wrapper &,
-  .error-message-group .message-wrapper & {
-    align-self: flex-start;
-  }
-
-  // Для user-повідомлень, якщо також хочемо зліва, незважаючи на align-items: flex-end у .message-wrapper
-  .user-message-group .message-wrapper & { 
-    align-self: flex-start; // Якщо кнопка "show more" для user має бути зліва
-    // Стилі для вигляду на темному фоні
-    color: rgba(255, 255, 255, 0.7); 
-    &:hover { 
-        color: white; 
-        background-color: rgba(255, 255, 255, 0.2); 
-        border-color: transparent; 
-    }
-  }
-
-  .system-message-group .message-wrapper & { 
-    display: none; 
-  }
-}
+// ПРИБИРАЄМО СТАРИЙ .show-more-button
+// .show-more-button { ... } 
 
 .message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
 .message-content-collapsed { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }

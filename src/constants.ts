@@ -81,6 +81,6 @@ export const CSS_CLASSES = {
     AVATAR_TOOL_SPECIFIC: "avatar-tool-specific", // Специфічний клас для аватара інструменту
 
      ASSISTANT_TOOL_USAGE_INDICATOR: "assistant-tool-usage-indicator",
-     // --- ДОДАЙТЕ АБО ПЕРЕВІРТЕ НАЯВНІСТЬ ЦИХ КЛАСІВ ДЛЯ БЛОКІВ КОДУ ---
+TOGGLE_COLLAPSE_BUTTON: "toggle-collapse-button",
 };
 export const SCROLL_THRESHOLD = 150;

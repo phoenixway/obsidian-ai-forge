@@ -2120,43 +2120,68 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     // this.mediaRecorder = null; // Не скидаємо тут, onstop може ще ним користуватися
   }
 
+  // src/OllamaView.ts
+
   public checkAllMessagesForCollapsing(): void {
-    this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASS_MESSAGE}`).forEach(msgEl => {
-      this.checkMessageForCollapsing(msgEl);
+    this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach(msgGroupEl => {
+      // Пропускаємо плейсхолдери, якщо вони не є фіналізованими повідомленнями
+      // і якщо йде активна обробка (щоб не ховати кнопку для стрімінгу)
+      if (msgGroupEl.classList.contains("placeholder") && this.isProcessing) {
+        const streamingContent = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}.streaming-text`);
+        if (streamingContent) { // Якщо це активний стрімінг-плейсхолдер
+          const toggleButton = msgGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+          toggleButton?.hide(); // Приховуємо кнопку для активного стрімінгу
+          const contentCollapsible = msgGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+          if (contentCollapsible) {
+            contentCollapsible.style.maxHeight = "";
+            contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+          }
+          return; // Не перевіряємо далі для активного стрімінгу
+        }
+      }
+      this.checkMessageForCollapsing(msgGroupEl);
     });
   }
 
-  private toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void {
+  // src/OllamaView.ts
+
+  public toggleMessageCollapse(contentEl: HTMLElement, buttonEl: HTMLButtonElement): void {
     const maxHeightLimit = this.plugin.settings.maxMessageHeight;
+    if (maxHeightLimit <= 0) return; // Якщо згортання вимкнене
 
-    const isInitialExpandedState = buttonEl.hasAttribute("data-initial-state");
+    const isCollapsed = contentEl.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
 
-    if (isInitialExpandedState) {
-      buttonEl.removeAttribute("data-initial-state");
-
+    if (isCollapsed) { // Було згорнуто, тепер розгортаємо
+      contentEl.style.maxHeight = ""; // Знімаємо обмеження
+      contentEl.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+      setIcon(buttonEl, "chevron-up");
+      buttonEl.setAttribute("title", "Show Less");
+      buttonEl.classList.add("explicitly-expanded"); // Позначаємо, що користувач розгорнув
+    } else { // Було розгорнуто (або не було обмеження), тепер згортаємо
       contentEl.style.maxHeight = `${maxHeightLimit}px`;
-      contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-      buttonEl.setText("Show More ▼");
+      contentEl.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
+      setIcon(buttonEl, "chevron-down");
+      buttonEl.setAttribute("title", "Show More");
+      buttonEl.classList.remove("explicitly-expanded"); // Знімаємо позначку
 
+      // Плавна прокрутка до верху повідомлення, якщо воно згортається і може вийти за екран
       setTimeout(() => {
-        contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }, 310);
-    } else {
-      const isCollapsed = contentEl.classList.contains(CSS_CLASS_CONTENT_COLLAPSED);
+        const messageGroup = buttonEl.closest<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`);
+        if (messageGroup && this.chatContainer) {
+            const rect = messageGroup.getBoundingClientRect();
+            const containerRect = this.chatContainer.getBoundingClientRect();
 
-      if (isCollapsed) {
-        contentEl.style.maxHeight = "";
-        contentEl.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
-        buttonEl.setText("Show Less ▲");
-      } else {
-        contentEl.style.maxHeight = `${maxHeightLimit}px`;
-        contentEl.classList.add(CSS_CLASS_CONTENT_COLLAPSED);
-        buttonEl.setText("Show More ▼");
-
-        setTimeout(() => {
-          contentEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        }, 310);
-      }
+            // Якщо верхня частина повідомлення вище за видиму область контейнера
+            if (rect.top < containerRect.top) { 
+                 messageGroup.scrollIntoView({ behavior: "smooth", block: "start" });
+            } 
+            // Якщо нижня частина виходить за екран, і верхня частина не надто високо,
+            // або якщо повідомлення повністю поза екраном знизу.
+            else if (rect.bottom > containerRect.bottom && (rect.top > containerRect.top + (containerRect.height * 0.3) || rect.top >= containerRect.bottom) ) {
+                 messageGroup.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+        }
+      }, 310); // Затримка має відповідати тривалості анімації max-height
     }
   }
 
@@ -2825,95 +2850,112 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
   }
 
-  public checkMessageForCollapsing(messageElOrGroupEl: HTMLElement): void {
-    const messageGroupEl = messageElOrGroupEl.classList.contains(CSS_CLASSES.MESSAGE_GROUP)
-      ? messageElOrGroupEl
-      : messageElOrGroupEl.closest<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`);
+  // src/OllamaView.ts
 
-    if (!messageGroupEl) {
-      return;
+  public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
+    // Переконуємося, що ми працюємо з реальною групою повідомлення, а не з плейсхолдером, який ще не фіналізований
+    if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
+        // Це активний плейсхолдер, для якого ще немає фінального timestamp.
+        // Кнопка згортання для нього не має сенсу зараз.
+        const tempToggleButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+        tempToggleButton?.hide();
+        return;
     }
-
-    const contentCollapsible = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-
+    
     const messageEl = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE}`);
-
-    if (!contentCollapsible || !messageEl) {
+    if (!messageEl) {
+      this.plugin.logger.warn("[checkMsgCollapse] No .message element found in group", messageGroupEl);
       return;
     }
 
+    const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+    if (!contentCollapsible) {
+      this.plugin.logger.warn("[checkMsgCollapse] No .content-collapsible element found in message", messageEl);
+      return;
+    }
+    
+    const actionsWrapper = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
+    const toggleCollapseButton = actionsWrapper?.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+
+    // Якщо немає обгортки для дій або самої кнопки (наприклад, для системних повідомлень, де вона не додається)
+    if (!actionsWrapper || !toggleCollapseButton) {
+      // Переконуємося, що контент не згорнутий, якщо кнопки немає
+      contentCollapsible.style.maxHeight = "";
+      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+      return;
+    }
+    
     const maxH = this.plugin.settings.maxMessageHeight;
 
-    const isStreamingNow =
-      this.isProcessing &&
-      messageGroupEl.classList.contains("placeholder") &&
-      messageGroupEl.hasAttribute("data-placeholder-timestamp") &&
-      contentCollapsible.classList.contains("streaming-text");
+    // Перевіряємо, чи це повідомлення асистента, яке зараз активно стрімиться
+    const isStreamingNow = this.isProcessing && 
+                           messageGroupEl.classList.contains("placeholder") && // Ще є плейсхолдером
+                           contentCollapsible.classList.contains("streaming-text"); // Має клас стрімінгу
 
     if (isStreamingNow) {
-      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
-      existingButton?.remove();
-      contentCollapsible.style.maxHeight = "";
-      contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      toggleCollapseButton.hide(); // Приховуємо кнопку під час активного стрімінгу
+      contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження висоти для стрімінгу
+      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
 
-    if (maxH <= 0) {
-      const existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
-      existingButton?.remove();
+    // Якщо згортання вимкнене в налаштуваннях
+    if (maxH <= 0) { 
+      toggleCollapseButton.hide();
+      toggleCollapseButton.classList.remove("explicitly-expanded");
       contentCollapsible.style.maxHeight = "";
-      contentCollapsible.classList.remove(CSS_CLASS_CONTENT_COLLAPSED);
+      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
 
+    // Використовуємо requestAnimationFrame для отримання актуальних розмірів після рендерингу
     requestAnimationFrame(() => {
-      if (
-        !contentCollapsible ||
-        !contentCollapsible.isConnected ||
-        !messageGroupEl.isConnected ||
-        !messageEl.isConnected
-      )
-        return;
-
-      let existingButton = messageEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`);
+      if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected) return;
 
       const previousMaxHeightStyle = contentCollapsible.style.maxHeight;
-      contentCollapsible.style.maxHeight = "";
+      const wasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
+      
+      // Тимчасово знімаємо обмеження для вимірювання реальної висоти
+      contentCollapsible.style.maxHeight = ""; 
       const scrollHeight = contentCollapsible.scrollHeight;
-
-      if (existingButton && previousMaxHeightStyle && !existingButton.classList.contains("explicitly-expanded")) {
-        contentCollapsible.style.maxHeight = previousMaxHeightStyle;
+      
+      // Повертаємо попередній стиль maxHeight, якщо він був, щоб не "стрибало" при перевірці
+      // якщо користувач вже взаємодіяв з кнопкою.
+      if (wasCollapsed && previousMaxHeightStyle) {
+         contentCollapsible.style.maxHeight = previousMaxHeightStyle;
+      } else if (!wasCollapsed && scrollHeight > maxH && !toggleCollapseButton.classList.contains("explicitly-expanded")) {
+         // Якщо не було згорнуто, але має бути, і не розгорнуто явно
+         // Нічого не робимо тут, щоб не перезгортати автоматично, якщо користувач розгорнув
+      } else if (wasCollapsed && !previousMaxHeightStyle) {
+         // Якщо було позначено як згорнуте, але стиль не встановлено, встановлюємо
+         contentCollapsible.style.maxHeight = `${maxH}px`;
       }
 
-      if (scrollHeight > maxH) {
-        if (!existingButton) {
-          existingButton = messageEl.createEl("button", {
-            cls: CSS_CLASSES.SHOW_MORE_BUTTON,
-          });
 
-          this.registerDomEvent(existingButton, "click", () => {
-            if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
-              existingButton!.classList.add("explicitly-expanded");
-            } else {
-              existingButton!.classList.remove("explicitly-expanded");
-            }
-            this.toggleMessageCollapse(contentCollapsible, existingButton!);
-          });
-          contentCollapsible.style.maxHeight = `${maxH}px`;
-          contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
-          existingButton.setText("Show More ▼");
+      if (scrollHeight > maxH) {
+        toggleCollapseButton.show();
+        // Оновлюємо іконку/текст кнопки на основі поточного стану згортання
+        if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
+          setIcon(toggleCollapseButton, "chevron-down");
+          toggleCollapseButton.setAttribute("title", "Show More");
         } else {
-          if (contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)) {
-            existingButton.setText("Show More ▼");
-          } else {
-            existingButton.setText("Show Less ▲");
-          }
+          setIcon(toggleCollapseButton, "chevron-up");
+          toggleCollapseButton.setAttribute("title", "Show Less");
         }
-      } else {
-        if (existingButton) {
-          existingButton.remove();
+
+        // Якщо контент НЕ згорнутий, але має бути (бо scrollHeight > maxH),
+        // І він НЕ був явно розгорнутий користувачем, то згортаємо його.
+        if (!contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED) && 
+            !toggleCollapseButton.classList.contains("explicitly-expanded")) {
+            contentCollapsible.style.maxHeight = `${maxH}px`;
+            contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
+            setIcon(toggleCollapseButton, "chevron-down");
+            toggleCollapseButton.setAttribute("title", "Show More");
         }
-        contentCollapsible.style.maxHeight = "";
+      } else { // scrollHeight <= maxH, згортання не потрібне
+        toggleCollapseButton.hide();
+        toggleCollapseButton.classList.remove("explicitly-expanded"); // Скидаємо стан явного розгортання
+        contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження, якщо було
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
     });
