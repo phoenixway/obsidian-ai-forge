@@ -249,8 +249,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-meta-actions-wrapper {
-  @include flex-layout(
-    $justify: space-between, 
+  @include flex-layout( 
     $align: center          
   );
   width: 100%;                  
@@ -262,24 +261,26 @@ $avatar-icon-size-factor: 0.65;
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
-    .message-actions-wrapper { order: 1; } // Кнопки зліва
-    .message-timestamp { order: 2; }       // Час справа
-    // Якщо потрібно вирівняти краї з контентом бульбашки:
-    // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); 
-    // padding-right: calc(var(--chat-spacing-unit, 5px) * 3); 
+    .message-actions-wrapper { 
+      // Залишається зліва за замовчуванням
+    }
+    .message-timestamp {
+      margin-left: auto; // Відштовхує час вправо
+    }
   }
 
   .user-message-group .message-wrapper & {
-    .message-actions-wrapper { order: 1; } // Кнопки зліва (відносно правого краю)
-    .message-timestamp { order: 2; }       // Час справа (на правому краю)
-     // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); 
-     // padding-right: calc(var(--chat-spacing-unit, 5px) * 3);
+    @include flex-layout(
+        $justify: space-between, // Кнопки зліва, час справа
+        $align: center
+    );
+    // .message-actions-wrapper { } // Залишається зліва в цьому space-between
+    // .message-timestamp { }       // Залишається справа в цьому space-between
   }
 
   .system-message-group .message-wrapper & { 
     justify-content: center; 
     .message-actions-wrapper { display: none; } 
-    .message-timestamp { order: 1; } 
   }
 }
 
@@ -293,10 +294,11 @@ $avatar-icon-size-factor: 0.65;
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
     opacity: 0.75;
-    // order: 2; // Вже встановлено вище
+    margin-left: 0; // Скидаємо margin-left, бо тут керує space-between
   }
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
       color: var(--text-faint);
+      margin-left: 0; // Також скидаємо, якщо є
   }
 }
 
@@ -309,8 +311,6 @@ $avatar-icon-size-factor: 0.65;
   @include transition( (opacity, visibility), 0.2s, ease-in-out );
   box-sizing: border-box;
 
-  // order вже встановлюється в батьківському .message-meta-actions-wrapper
-
   button.message-action-button { @extend %base-action-button; }
   .delete-message-button { &.danger-option { color: var(--text-error); &:hover { color: var(--text-on-accent); background-color: var(--background-modifier-error-hover) !important; } } }
   .user-message-group .message-wrapper .message-meta-actions-wrapper & button.message-action-button { color: rgba(255, 255, 255, 0.8); &:hover { background: rgba(255, 255, 255, 0.25) !important; color: white; } &.delete-message-button.danger-option { color: rgba(255, 150, 150, 0.8); &:hover { background-color: rgba(200, 50, 50, 0.5) !important; color: white; } } }
@@ -320,11 +320,10 @@ $avatar-icon-size-factor: 0.65;
 
 .show-more-button { 
   @extend %button-like-text;
-  // Якщо .show-more-button НЕ є частиною .message-meta-actions-wrapper, а окремим елементом:
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); width: fit-content;
   .ollama-message-group .message-wrapper &, 
   .tool-message-group .message-wrapper &, 
-  .error-message-group .message-wrapper & { align-self: center; } // або flex-start/flex-end якщо потрібно
+  .error-message-group .message-wrapper & { align-self: center; }
   .user-message-group .message-wrapper & { 
     align-self: center; color: rgba(255, 255, 255, 0.7); background-color: transparent; border-color: transparent;
     &:hover { color: white; background-color: rgba(255, 255, 255, 0.2); border-color: transparent; }
@@ -381,6 +380,6 @@ button.summarize-button { @extend %base-action-button; }
   .thinking-content { padding: 10px; background-color: var(--background-primary); font-size: var(--font-ui-smaller); max-height: 200px; overflow-y: auto; transition: max-height 0.3s ease-out, padding 0.3s ease-out; &.is-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; } }
 }
 
-.error-icon { /* Наприклад: width: 16px; height: 16px; fill: currentColor; */ }
-.system-icon { /* Наприклад: width: 16px; height: 16px; fill: currentColor; */ }
-.tool-result-icon { /* Наприклад: width: 14px; height: 14px; fill: currentColor; */ }
+.error-icon { /* width: 16px; height: 16px; fill: currentColor; */ }
+.system-icon { /* width: 16px; height: 16px; fill: currentColor; */ }
+.tool-result-icon { /* width: 14px; height: 14px; fill: currentColor; */ }
