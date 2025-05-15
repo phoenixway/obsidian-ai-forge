@@ -112,85 +112,78 @@ $avatar-icon-size-factor: 0.65;
   box-sizing: border-box;
 }
 
-.message-group { // CSS_CLASSES.MESSAGE_GROUP
+.message-group { 
   width: 100%;
   position: relative;
   box-sizing: border-box;
   @include flex-layout($align: flex-start, $gap: calc(var(--chat-spacing-unit, 5px) * 2));
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
 
-  &.user-message-group { // CSS_CLASSES.USER_MESSAGE_GROUP
+  &.user-message-group { 
     justify-content: flex-end;
-    .avatar-container { order: 2; margin-bottom: 50px; /* TODO: Review margin for avatar */ }
+    .avatar-container { order: 2; margin-bottom: 50px; /* TODO: Review margin */ }
     .message-wrapper { order: 1; }
   }
 
-  &.ollama-message-group { // CSS_CLASSES.OLLAMA_MESSAGE_GROUP
+  &.ollama-message-group { 
     justify-content: flex-start;
-    .avatar-container { order: 1; margin-top: 45px; /* TODO: Review margin for avatar */ }
+    .avatar-container { order: 1; margin-top: 45px; /* TODO: Review margin */ }
     .message-wrapper { order: 2; }
   }
-  &.tool-message-group { // CSS_CLASSES.TOOL_MESSAGE_GROUP
-    justify-content: flex-start; // Або як потрібно для інструментів
-    .avatar-container { order: 1; /* ... */ }
-    .message-wrapper { order: 2; /* ... */ }
+  &.tool-message-group { 
+    justify-content: flex-start; 
+    .avatar-container { order: 1; }
+    .message-wrapper { order: 2; }
   }
-  &.system-message-group { // CSS_CLASSES.SYSTEM_GROUP
-    justify-content: center; // Системні повідомлення часто по центру
+  &.system-message-group { 
+    justify-content: center; 
     width: 100%;
-    .message-wrapper {
-      align-items: center;
-      width: 100%;
-      max-width: 90%; // Обмеження ширини для читабельності
-    }
-    .avatar-container { display: none; } // Системні повідомлення зазвичай без аватара
+    .message-wrapper { align-items: center; width: 100%; max-width: 90%; }
+    .avatar-container { display: none; } 
   }
-  &.error-message-group { // CSS_CLASSES.ERROR_GROUP
-    justify-content: flex-start; // Або по центру, якщо це глобальна помилка
-    .message-wrapper {
-      // Схоже на ollama-message-group
-      order: 2;
-    }
-    .avatar-container { order: 1; /* ... */ }
+  &.error-message-group { 
+    justify-content: flex-start; 
+    .message-wrapper { order: 2; }
+    .avatar-container { order: 1; }
   }
 }
 
-.avatar-container { // CSS_CLASSES.AVATAR_CONTAINER
+.avatar-container { 
   @extend %base-avatar-container;
-  &.user-avatar { /* CSS_CLASSES.AVATAR_USER або AVATAR_USER_SPECIFIC */ background-color: var(--interactive-accent-translucent); color: var(--interactive-accent); }
-  &.ai-avatar { /* CSS_CLASSES.AVATAR_AI або AVATAR_AI_SPECIFIC */ background-color: var(--background-modifier-success); color: var(--text-on-accent); /* Приклад */ }
-  &.avatar-tool-specific { /* CSS_CLASSES.AVATAR_TOOL_SPECIFIC */ background-color: var(--background-modifier-info); color: var(--text-normal); /* Приклад */
-    .svg-icon svg { fill: var(--text-normal); } // Для іконки інструменту
+  &.user-avatar { background-color: var(--interactive-accent-translucent); color: var(--interactive-accent); }
+  &.ai-avatar { background-color: var(--background-modifier-success); color: var(--text-on-accent); }
+  &.avatar-tool-specific { background-color: var(--background-modifier-info); color: var(--text-normal);
+    .svg-icon svg { fill: var(--text-normal); } 
   }
-  &.avatar-image { /* CSS_CLASSES.AVATAR_IMAGE */ width: 100%; height: 100%; object-fit: cover; }
-  &.avatar-icon .svg-icon { /* CSS_CLASSES.AVATAR_ICON */ svg { width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); display: block; } }
-  &.avatar-initials { /* CSS_CLASSES.AVATAR_INITIALS */ font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); font-weight: 600; line-height: 1; text-align: center; width: 100%; height: 100%; @include flex-layout($align: center, $justify: center); }
+  &.avatar-image { width: 100%; height: 100%; object-fit: cover; }
+  &.avatar-icon .svg-icon { svg { width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); display: block; } }
+  &.avatar-initials { font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); font-weight: 600; line-height: 1; text-align: center; width: 100%; height: 100%; @include flex-layout($align: center, $justify: center); }
 }
 
-.message-wrapper { // CSS_CLASSES.MESSAGE_WRAPPER
+.message-wrapper { 
   @include flex-layout($direction: column);
   box-sizing: border-box;
-  width: fit-content;
+  width: fit-content; 
   max-width: var(--chat-message-max-width, 700px);
 
   .ollama-message-group &,
-  .tool-message-group &, // Інструменти теж зліва
-  .error-message-group & { // Помилки теж зліва (якщо не глобальні)
+  .tool-message-group &, 
+  .error-message-group & { 
     align-items: flex-start; 
   }
   .user-message-group & { 
     align-items: flex-end;   
   }
   .system-message-group & {
-    align-items: center; // Для системних повідомлень по центру
+    align-items: center; 
   }
 }
 
-.message { // CSS_CLASSES.MESSAGE
+.message { 
   @extend %base-message-bubble; 
   width: 100%;
 
-  &.message-arriving { // CSS_CLASSES.MESSAGE_ARRIVING
+  &.message-arriving { 
     animation: message-appear 0.3s ease-out forwards;
   }
 }
@@ -201,22 +194,22 @@ $avatar-icon-size-factor: 0.65;
   &:last-child { border-bottom-right-radius: 18px; } &:not(:last-child) { border-bottom-right-radius: 5px; }
 }
 .ollama-message-group .message-wrapper .message,
-.tool-message-group .message-wrapper .message, // Інструменти як AI
-.error-message-group .message-wrapper .message { // Помилки як AI
+.tool-message-group .message-wrapper .message,
+.error-message-group .message-wrapper .message {
   border-top-right-radius: 18px; border-bottom-right-radius: 18px;
   &:first-child { border-top-left-radius: 18px; } &:not(:first-child) { border-top-left-radius: 5px; }
   &:last-child { border-bottom-left-radius: 18px; } &:not(:last-child) { border-bottom-left-radius: 5px; }
 }
-.system-message-group .message-wrapper .message { // Системні можуть мати інший радіус
-  border-radius: var(--radius-m, 8px); // Приклад
+.system-message-group .message-wrapper .message { 
+  border-radius: var(--radius-m, 8px); 
 }
 
-.message.user-message { // CSS_CLASSES.USER_MESSAGE
+.message.user-message { 
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
 }
-.message.ollama-message { // CSS_CLASSES.OLLAMA_MESSAGE
+.message.ollama-message { 
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
   &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); }
@@ -226,53 +219,43 @@ $avatar-icon-size-factor: 0.65;
     margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1); overflow-x: auto; box-sizing: border-box;
   }
 }
-.message.system-message { // CSS_CLASSES.SYSTEM_MESSAGE
-  background-color: var(--background-modifier-accent-hover); // Приклад
+.message.system-message { 
+  background-color: var(--background-modifier-accent-hover); 
   color: var(--text-faint);
   font-style: italic;
   padding: calc(var(--chat-spacing-unit, 5px) * 1) calc(var(--chat-spacing-unit, 5px) * 2.5);
   box-shadow: none;
   text-align: center;
 }
-.message.error-message { // CSS_CLASSES.ERROR_MESSAGE
-  background-color: var(--background-modifier-error); // Приклад
-  color: var(--text-on-accent); // Або var(--text-error-hover)
+.message.error-message { 
+  background-color: var(--background-modifier-error); 
+  color: var(--text-on-accent); 
   border: 1px solid var(--color-red-hover);
   box-shadow: 0 1px 2px var(--color-red-faint);
   .error-icon { margin-right: 8px; }
 }
-.message.tool-message { // CSS_CLASSES.TOOL_MESSAGE
-  background-color: var(--background-modifier-info-hover); // Приклад
+.message.tool-message { 
+  background-color: var(--background-modifier-info-hover); 
   border: 1px solid var(--color-blue-faint);
-  .tool-result-header { /* ... */ }
-  .tool-result-content { /* ... */ }
+  .tool-result-header { font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; .tool-result-icon { margin-right: 5px;} }
+  .tool-result-content { background-color: var(--background-secondary); padding: 8px; border-radius: var(--radius-s); white-space: pre-wrap; }
 }
 
-
-.message-content-container { // CSS_CLASSES.CONTENT_CONTAINER
+.message-content-container { 
   width: 100%; box-sizing: border-box;
 }
-.message-content { // CSS_CLASSES.CONTENT
+.message-content { 
   p { margin-top: 0; margin-bottom: calc(var(--p-spacing, 1em) / 2); &:last-child { margin-bottom: 0; } }
 }
 
-.message-timestamp { // CSS_CLASSES.TIMESTAMP
-  font-size: var(--font-ui-smaller, 0.75em); color: var(--text-faint);
-  margin-top: var(--chat-spacing-unit, 5px); opacity: 0.9;
-  box-sizing: border-box; display: block;
-
-  .message.user-message & { text-align: right; color: var(--text-on-accent); opacity: 0.75; }
-  .message.ollama-message & { text-align: left; }
-  .message.tool-message & { text-align: left; }
-  .message.system-message & { text-align: center; color: var(--text-faint); margin-top: calc(var(--chat-spacing-unit, 5px)*0.5); }
-  .message.error-message & { text-align: left; color: var(--text-on-accent); opacity: 0.8; }
-}
-
-.message-actions-wrapper { // CSS_CLASSES.MESSAGE_ACTIONS
-  @include flex-layout($gap: calc(var(--chat-spacing-unit, 5px) * 1.5));
-  opacity: 0; visibility: hidden; @include transition((opacity, visibility), 0.2s, ease-in-out);
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); padding: 2px 0; 
-  box-sizing: border-box; width: 100%;
+.message-meta-actions-wrapper {
+  display: flex;
+  justify-content: space-between; 
+  align-items: center;          
+  width: 100%;                  
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); 
+  padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5); 
+  box-sizing: border-box;
 
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
@@ -280,25 +263,47 @@ $avatar-icon-size-factor: 0.65;
     // padding-left: calc(var(--chat-spacing-unit, 5px) * 3); // Зсув для відповідності контенту бульбашки
   }
   .user-message-group .message-wrapper & {
-     @include flex-layout($justify: flex-end, $gap: calc(var(--chat-spacing-unit, 5px) * 1.5));
      // padding-right: calc(var(--chat-spacing-unit, 5px) * 3); // Аналогічний зсув
   }
   .system-message-group .message-wrapper & { // Для системних, можливо, не потрібні або інші
-    justify-content: center;
+    justify-content: center; // Якщо тільки час, то він буде по центру
+    .message-actions-wrapper { display: none; } // Приховуємо кнопки для системних
   }
+}
 
-  button.message-action-button { @extend %base-action-button; } // CSS_CLASSES.MESSAGE_ACTION_BUTTON
+.message-timestamp { 
+  font-size: var(--font-ui-smaller, 0.75em); color: var(--text-faint);
+  opacity: 0.9; box-sizing: border-box;
+  flex-shrink: 0; // Не стискати час
 
-  .delete-message-button { /* CSS_CLASSES.DELETE_MESSAGE_BUTTON */ &.danger-option { /* CSS_CLASSES.DANGER_OPTION */ color: var(--text-error); &:hover { color: var(--text-on-accent); background-color: var(--background-modifier-error-hover) !important; } } }
-  .user-message-group .message-wrapper & button.message-action-button { color: rgba(255, 255, 255, 0.8); &:hover { background: rgba(255, 255, 255, 0.25) !important; color: white; } &.delete-message-button.danger-option { color: rgba(255, 150, 150, 0.8); &:hover { background-color: rgba(200, 50, 50, 0.5) !important; color: white; } } }
+  .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
+    color: var(--text-on-accent); 
+    opacity: 0.75;
+  }
+  .system-message-group .message-wrapper .message-meta-actions-wrapper & {
+      color: var(--text-faint); // Колір для системних
+  }
+}
+
+.message-actions-wrapper { 
+  @include flex-layout($gap: calc(var(--chat-spacing-unit, 5px) * 1.0));
+  opacity: 0; visibility: hidden; @include transition((opacity, visibility), 0.2s, ease-in-out);
+  box-sizing: border-box;
+
+  button.message-action-button { @extend %base-action-button; }
+
+  .delete-message-button { &.danger-option { color: var(--text-error); &:hover { color: var(--text-on-accent); background-color: var(--background-modifier-error-hover) !important; } } }
+  .user-message-group .message-wrapper .message-meta-actions-wrapper & button.message-action-button { color: rgba(255, 255, 255, 0.8); &:hover { background: rgba(255, 255, 255, 0.25) !important; color: white; } &.delete-message-button.danger-option { color: rgba(255, 150, 150, 0.8); &:hover { background-color: rgba(200, 50, 50, 0.5) !important; color: white; } } }
 }
 
 .message-wrapper:hover .message-actions-wrapper { opacity: 1; visibility: visible; }
 
-.show-more-button { // CSS_CLASSES.SHOW_MORE_BUTTON
+.show-more-button { 
   @extend %button-like-text;
+  // Якщо всередині .message:
+  // display: block; margin: calc(var(--chat-spacing-unit, 5px) * 0.5) auto 0 auto; width: fit-content;
+  // Якщо сестринський до .message (всередині .message-wrapper, ПІСЛЯ .message-meta-actions-wrapper):
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); width: fit-content;
-  // Якщо сестринський до .message:
   .ollama-message-group .message-wrapper &, 
   .tool-message-group .message-wrapper &, 
   .error-message-group .message-wrapper & { align-self: center; }
@@ -306,60 +311,57 @@ $avatar-icon-size-factor: 0.65;
     align-self: center; color: rgba(255, 255, 255, 0.7); background-color: transparent; border-color: transparent;
     &:hover { color: white; background-color: rgba(255, 255, 255, 0.2); border-color: transparent; }
   }
-  .system-message-group .message-wrapper & { display: none; /* Системні зазвичай короткі */ }
+  .system-message-group .message-wrapper & { display: none; }
 }
 
-.message-content-collapsible { /* CSS_CLASSES.CONTENT_COLLAPSIBLE */ overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
-.message-content-collapsed { /* CSS_CLASSES.CONTENT_COLLAPSED */ mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
+.message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
+.message-content-collapsed { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
 
-.regenerate-button { /* CSS_CLASSES.REGENERATE_BUTTON */ @extend %base-action-button; /* Додаткові стилі, якщо потрібно */ }
-button.summarize-button { /* CSS_CLASSES.SUMMARIZE_BUTTON */ @extend %base-action-button; /* Додаткові стилі, якщо потрібно */ }
+.regenerate-button { @extend %base-action-button; }
+button.summarize-button { @extend %base-action-button; }
 .summary-modal-content { padding: var(--size-4-3) var(--size-4-4); background-color: var(--background-primary); border-radius: var(--radius-m); max-width: 600px; margin: 20px auto; }
 
 @keyframes message-appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @media screen and (min-width: 1600px) { .ollama-chat-container { padding-left: 15%; padding-right: 15%; max-width: 3000px; } }
 
-.scroll-to-bottom-button { /* CSS_CLASSES.SCROLL_BOTTOM_BUTTON */ position: absolute; bottom: 15px; right: 20px; z-index: 50; width: 36px; height: 36px; border-radius: 50%; background-color: var(--background-secondary); color: var(--text-muted); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); cursor: pointer; @include flex-layout($align: center, $justify: center); padding: 0; opacity: 0; visibility: hidden; transform: translateY(10px); @include transition((opacity, transform, background-color), 0.2s, ease-out); .svg-icon { width: 20px; height: 20px; } &:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); transform: translateY(8px) scale(1.05); } &:active { transform: translateY(9px) scale(1); } &.visible { /* CSS_CLASSES.VISIBLE */ opacity: 0.85; visibility: visible; transform: translateY(0); &:hover { opacity: 1; } } }
-.new-message-indicator.visible { /* CSS_CLASSES.VISIBLE */ display: flex; align-items: center; justify-content: center; padding: 5px 10px; background-color: var(--interactive-accent); color: var(--text-on-accent); border-radius: var(--radius-l); position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); box-shadow: var(--shadow-m); cursor: pointer; opacity: 0.9; @include transition; &:hover { opacity: 1; box-shadow: var(--shadow-l); } .indicator-icon { margin-right: 5px; } }
+.scroll-to-bottom-button { position: absolute; bottom: 15px; right: 20px; z-index: 50; width: 36px; height: 36px; border-radius: 50%; background-color: var(--background-secondary); color: var(--text-muted); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); cursor: pointer; @include flex-layout($align: center, $justify: center); padding: 0; opacity: 0; visibility: hidden; transform: translateY(10px); @include transition((opacity, transform, background-color), 0.2s, ease-out); .svg-icon { width: 20px; height: 20px; } &:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); transform: translateY(8px) scale(1.05); } &:active { transform: translateY(9px) scale(1); } &.visible { opacity: 0.85; visibility: visible; transform: translateY(0); &:hover { opacity: 1; } } }
+.new-message-indicator.visible { display: flex; align-items: center; justify-content: center; padding: 5px 10px; background-color: var(--interactive-accent); color: var(--text-on-accent); border-radius: var(--radius-l); position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); box-shadow: var(--shadow-m); cursor: pointer; opacity: 0.9; @include transition; &:hover { opacity: 1; box-shadow: var(--shadow-l); } .indicator-icon { margin-right: 5px; } }
 
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 .button-loading .svg-icon { animation: spin 1s linear infinite; }
 
-.chat-date-separator { /* CSS_CLASSES.DATE_SEPARATOR */ width: fit-content; max-width: 80%; margin-left: auto; margin-right: auto; margin-top: calc(var(--chat-spacing-unit, 5px) * 6); margin-bottom: calc(var(--chat-spacing-unit, 5px) * 4); padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2.5); font-size: var(--font-ui-smaller, 0.8em); color: var(--text-muted); background-color: var(--background-secondary); border-radius: var(--radius-l, 16px); text-align: center; user-select: none; font-weight: 500; box-sizing: border-box; }
-.assistant-tool-usage-indicator { /* CSS_CLASSES.ASSISTANT_TOOL_USAGE_INDICATOR */ font-style: italic; color: var(--text-faint); font-size: var(--font-ui-smaller, 0.8em); display: block; margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5); }
+.chat-date-separator { width: fit-content; max-width: 80%; margin-left: auto; margin-right: auto; margin-top: calc(var(--chat-spacing-unit, 5px) * 6); margin-bottom: calc(var(--chat-spacing-unit, 5px) * 4); padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2.5); font-size: var(--font-ui-smaller, 0.8em); color: var(--text-muted); background-color: var(--background-secondary); border-radius: var(--radius-l, 16px); text-align: center; user-select: none; font-weight: 500; box-sizing: border-box; }
+.assistant-tool-usage-indicator { font-style: italic; color: var(--text-faint); font-size: var(--font-ui-smaller, 0.8em); display: block; margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5); }
 
-.system-message-text { /* CSS_CLASSES.SYSTEM_MESSAGE_TEXT */ font-size: var(--font-ui-small); line-height: 1.4; }
-.error-message-text { /* CSS_CLASSES.ERROR_TEXT */ color: inherit; /* Колір успадковується від .message.error-message */ 
+.system-message-text { font-size: var(--font-ui-small); line-height: 1.4; }
+.error-message-text { color: inherit; 
   ul { list-style-type: disc; padding-left: 20px; margin-top: 5px; }
   .error-summary-header { font-weight: bold; margin-bottom: 5px;}
 }
-.thinking-dots { /* CSS_CLASSES.THINKING_DOTS */ display: flex; align-items: center; justify-content: center; height: 20px; /* Або інша висота */
-  .thinking-dot { /* CSS_CLASSES.THINKING_DOT */ width: 6px; height: 6px; margin: 0 2px; background-color: var(--text-faint); border-radius: 50%; display: inline-block; animation: thinking-blink 1.4s infinite both;
+.thinking-dots { display: flex; align-items: center; justify-content: center; height: 20px; 
+  .thinking-dot { width: 6px; height: 6px; margin: 0 2px; background-color: var(--text-faint); border-radius: 50%; display: inline-block; animation: thinking-blink 1.4s infinite both;
     &:nth-child(1) { animation-delay: -0.32s; }
     &:nth-child(2) { animation-delay: -0.16s; }
   }
 }
 @keyframes thinking-blink { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 
-.submenu-content-hidden { /* CSS_CLASSES.SUBMENU_CONTENT_HIDDEN */ display: none !important; }
-.code-block-copy-button { /* CSS_CLASSES.CODE_BLOCK_COPY_BUTTON */ position: absolute; top: 5px; right: 5px; opacity: 0; transition: opacity 0.2s; padding: 3px 6px; background-color: var(--background-modifier-hover); border-radius: var(--radius-s); cursor: pointer; &:hover { opacity: 1; background-color: var(--background-modifier-active); } pre:hover & { opacity: 0.7; } }
-.code-block-language { /* CSS_CLASSES.CODE_BLOCK_LANGUAGE */ position: absolute; top: 5px; left: 10px; font-size: var(--font-ui-smaller); color: var(--text-faint); user-select: none; }
+.submenu-content-hidden { display: none !important; }
+.code-block-copy-button { position: absolute; top: 5px; right: 5px; opacity: 0; transition: opacity 0.2s; padding: 3px 6px; background-color: var(--background-modifier-hover); border-radius: var(--radius-s); cursor: pointer; &:hover { opacity: 1; background-color: var(--background-modifier-active); } pre:hover & { opacity: 0.7; } }
+.code-block-language { position: absolute; top: 5px; left: 10px; font-size: var(--font-ui-smaller); color: var(--text-faint); user-select: none; }
 
-.translation-container { /* CSS_CLASSES.TRANSLATION_CONTAINER */ border-top: 1px dashed var(--background-modifier-border); margin-top: calc(var(--chat-spacing-unit, 5px) * 2); padding-top: calc(var(--chat-spacing-unit, 5px) * 1.5); .translation-indicator { font-size: var(--font-ui-smaller); color: var(--text-faint); font-style: italic; margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); } }
-.translation-content { /* CSS_CLASSES.TRANSLATION_CONTENT */ p:last-child { margin-bottom: 0; } }
-.translation-pending { /* CSS_CLASSES.TRANSLATION_PENDING */ /* Стилі для кнопки, коли йде переклад, наприклад, анімація */ }
-.recording { /* CSS_CLASSES.RECORDING */ /* Стилі для кнопки запису, наприклад, червоний колір */ color: var(--color-red) !important; }
+.translation-container { border-top: 1px dashed var(--background-modifier-border); margin-top: calc(var(--chat-spacing-unit, 5px) * 2); padding-top: calc(var(--chat-spacing-unit, 5px) * 1.5); .translation-indicator { font-size: var(--font-ui-smaller); color: var(--text-faint); font-style: italic; margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); } }
+.translation-content { p:last-child { margin-bottom: 0; } }
+.translation-pending { /* Стилі для кнопки, коли йде переклад */ }
+.recording { color: var(--color-red) !important; }
 
-.thinking-block { /* CSS_CLASSES.THINKING_BLOCK */ margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); overflow: hidden;
-  .thinking-header { /* CSS_CLASSES.THINKING_HEADER */ background-color: var(--background-secondary); padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;
-    .thinking-title { /* CSS_CLASSES.THINKING_TITLE */ font-weight: 500; font-size: var(--font-ui-small); }
-    .thinking-toggle { /* CSS_CLASSES.THINKING_TOGGLE */ .svg-icon { transition: transform 0.2s; } &.is-collapsed .svg-icon { transform: rotate(-90deg); } }
+.thinking-block { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); overflow: hidden;
+  .thinking-header { background-color: var(--background-secondary); padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;
+    .thinking-title { font-weight: 500; font-size: var(--font-ui-small); }
+    .thinking-toggle { .svg-icon { transition: transform 0.2s; } &.is-collapsed .svg-icon { transform: rotate(-90deg); } }
   }
-  .thinking-content { /* CSS_CLASSES.THINKING_CONTENT */ padding: 10px; background-color: var(--background-primary); font-size: var(--font-ui-smaller); max-height: 200px; overflow-y: auto; transition: max-height 0.3s ease-out, padding 0.3s ease-out; &.is-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; } }
+  .thinking-content { padding: 10px; background-color: var(--background-primary); font-size: var(--font-ui-smaller); max-height: 200px; overflow-y: auto; transition: max-height 0.3s ease-out, padding 0.3s ease-out; &.is-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; } }
 }
 
-.tool-result-header { /* CSS_CLASSES.TOOL_RESULT_HEADER */ display: flex; align-items: center; font-weight: 500; margin-bottom: 5px; .tool-result-icon { margin-right: 5px; } }
-.tool-result-content { /* CSS_CLASSES.TOOL_RESULT_CONTENT */ background-color: var(--background-secondary); padding: 8px; border-radius: var(--radius-s); white-space: pre-wrap; /* Для збереження форматування результату інструменту */ }
-
-.error-icon { /* CSS_CLASSES.ERROR_ICON */ /* Стилі для іконки помилки */ }
-.system-icon { /* CSS_CLASSES.SYSTEM_ICON */ /* Стилі для іконки системного повідомлення */ }
+.error-icon { /* Якщо потрібен спеціальний стиль для контейнера іконки помилки */ }
+.system-icon { /* Якщо потрібен спеціальний стиль для контейнера іконки системного повідомлення */ }

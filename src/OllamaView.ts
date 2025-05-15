@@ -1101,7 +1101,9 @@ private speechWorkerUrl: string | null = null;
               cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text",
               text: `Internal Plugin Error: Unknown message role received by renderer: '${message.role}'. Message content was logged.`,
             });
-            BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
+                        const metaActionsWrapper = msgBubble.createDiv({ cls: "message-meta-actions-wrapper" });
+
+            BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
             this.chatContainer.appendChild(unknownRoleGroup);
             this.lastMessageElement = unknownRoleGroup;
           }
@@ -3520,7 +3522,9 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
                 this.plugin,
                 this
               );
-              BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
+                  const metaActionsWrapper = messageDomElement.createDiv({ cls: "message-meta-actions-wrapper" });
+
+              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
 
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
@@ -3767,7 +3771,10 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
                     cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text",
                     text: `Unknown message role: ${(message as any).role}`, // Використовуємо as any для безпеки
                   });
-                  BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
+                                    const metaActionsWrapper = msgBubble.createDiv({ cls: "message-meta-actions-wrapper" });
+
+              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
+
                   messageGroupEl = unknownRoleGroup;
                 }
                 break;

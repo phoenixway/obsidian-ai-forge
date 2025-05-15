@@ -41,7 +41,10 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		this.addUserActionButtons(messageWrapper);
 
 		// Додаємо мітку часу
-		BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
+        		                                    const metaActionsWrapper = messageEl.createDiv({ cls: "message-meta-actions-wrapper" });
+
+              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+
 		return messageGroup;
 	}
 

@@ -17229,61 +17229,49 @@ var BaseMessageRenderer = class {
     this.message = message;
     this.view = view;
   }
-  /**
-   * Створює зовнішню обгортку для групи повідомлень (.message-group).
-   * @param groupClasses Додаткові класи для .message-group.
-   * @returns Створений HTMLElement.
-   */
   createMessageGroupWrapper(groupClasses = []) {
     const messageGroup = document.createElement("div");
     messageGroup.classList.add(CSS_CLASSES.MESSAGE_GROUP, ...groupClasses);
     messageGroup.setAttribute("data-timestamp", this.message.timestamp.getTime().toString());
     return messageGroup;
   }
-  /**
-   * Створює та додає елемент мітки часу до вказаного батьківського елемента (зазвичай .message).
-   * @param parentElement - Елемент, куди додати мітку часу.
-   * @param timestamp - Об'єкт Date для форматування.
-   * @param view - Екземпляр OllamaView для доступу до форматера.
-   */
-  static addTimestamp(parentElement, timestamp, view) {
-    if (parentElement.querySelector(`.${CSS_CLASSES.TIMESTAMP}`)) {
-      return;
+  static addTimestampToElement(parentElementForTimestamp, timestamp, view) {
+    let tsEl = parentElementForTimestamp.querySelector(`.${CSS_CLASSES.TIMESTAMP}`);
+    if (tsEl) {
+      tsEl.setText(view.formatTime(timestamp));
+    } else {
+      tsEl = parentElementForTimestamp.createDiv({
+        cls: CSS_CLASSES.TIMESTAMP,
+        text: view.formatTime(timestamp)
+      });
     }
-    parentElement.createDiv({
-      cls: CSS_CLASSES.TIMESTAMP,
-      text: view.formatTime(timestamp)
-    });
   }
-  /**
-   * Допоміжний метод для рендерингу аватара.
-   * @param messageGroup Елемент .message-group, куди буде додано аватар.
-   * @param isUser Прапорець, чи це повідомлення користувача.
-   */
   addAvatar(messageGroup, isUser) {
     renderAvatar(this.app, this.plugin, messageGroup, isUser, this.message.role);
   }
   /**
-   * Додає базовий набір кнопок дій (Копіювати, Видалити) до вказаного батьківського елемента.
-   * Цей метод призначений для використання в рендерерах, де потрібен лише базовий набір.
-   * @param parentElementForActions Елемент (зазвичай .message-wrapper), куди будуть додані кнопки.
+   * Додає базовий набір кнопок дій (Копіювати, Видалити) до .message-actions-wrapper,
+   * який має бути створений всередині parentElementForMeta.
+   * @param parentElementForMeta Елемент (зазвичай .message-meta-actions-wrapper), куди буде додано .message-actions-wrapper.
    * @param contentToCopy Текст, який буде копіюватися.
-   * @param messageForContext Повідомлення, до якого відносяться ці кнопки (для видалення).
+   * @param messageForContext Повідомлення, до якого відносяться ці кнопки.
+   * @returns Створений HTMLElement (.message-actions-wrapper).
    */
-  addBaseActionButtons(parentElementForActions, contentToCopy, messageForContext) {
+  addBaseActionButtons(parentElementForMeta, contentToCopy, messageForContext) {
     const messageTimestamp = messageForContext.timestamp.getTime().toString();
-    const existingActions = parentElementForActions.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
-    if (existingActions) {
-      return;
+    let actionsWrapper = parentElementForMeta.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
+    if (actionsWrapper) {
+      actionsWrapper.empty();
+    } else {
+      const actionsWrapperClass = CSS_CLASSES.MESSAGE_ACTIONS || "message-actions-wrapper";
+      actionsWrapper = parentElementForMeta.createDiv({ cls: actionsWrapperClass });
+      actionsWrapper.setAttribute("data-message-timestamp", messageTimestamp);
     }
-    const actionsWrapperClass = CSS_CLASSES.MESSAGE_ACTIONS || "message-actions-wrapper";
-    const buttonsWrapper = parentElementForActions.createDiv({ cls: actionsWrapperClass });
-    buttonsWrapper.setAttribute("data-message-timestamp", messageTimestamp);
     const copyButtonClass = CSS_CLASSES.COPY_BUTTON || "copy-button";
     const actionButtonBaseClass = CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button";
     const deleteButtonClass = CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button";
     const dangerOptionClass = CSS_CLASSES.DANGER_OPTION || "danger-option";
-    const copyBtn = buttonsWrapper.createEl("button", {
+    const copyBtn = actionsWrapper.createEl("button", {
       cls: [copyButtonClass, actionButtonBaseClass],
       attr: { "aria-label": "Copy", title: "Copy" }
     });
@@ -17292,7 +17280,7 @@ var BaseMessageRenderer = class {
       e.stopPropagation();
       this.view.handleCopyClick(contentToCopy, copyBtn);
     });
-    const deleteBtn = buttonsWrapper.createEl("button", {
+    const deleteBtn = actionsWrapper.createEl("button", {
       cls: [deleteButtonClass, dangerOptionClass, actionButtonBaseClass],
       attr: { "aria-label": "Delete message", title: "Delete Message" }
     });
@@ -17301,13 +17289,8 @@ var BaseMessageRenderer = class {
       e.stopPropagation();
       this.view.handleDeleteMessageClick(messageForContext);
     });
+    return actionsWrapper;
   }
-  /**
-   * Створює бульбашку повідомлення (.message) та її внутрішні контейнери для контенту.
-   * @param messageWrapperEl Елемент-обгортка (.message-wrapper), куди буде додано .message.
-   * @param messageClasses Додаткові класи для .message.
-   * @returns Об'єкт з посиланнями на створені елементи: messageEl, contentContainer, contentEl.
-   */
   createMessageBubble(messageWrapperEl, messageClasses = []) {
     const messageEl = messageWrapperEl.createDiv({ cls: [CSS_CLASSES.MESSAGE, ...messageClasses] });
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
@@ -17340,7 +17323,8 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         contentEl.createEl("br");
     });
     this.addUserActionButtons(messageWrapper);
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
+    const metaActionsWrapper = messageEl.createDiv({ cls: "message-meta-actions-wrapper" });
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     return messageGroup;
   }
   /**
@@ -17495,16 +17479,15 @@ ${accompanyingText.trim()}`;
     } catch (error) {
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
     }
+    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     AssistantMessageRenderer.addAssistantActionButtons(
-      messageWrapper,
-      // Тепер це messageWrapper
+      metaActionsWrapper,
       contentEl,
-      // contentEl все ще потрібен для handleTranslateClick
       assistantMessage,
       this.plugin,
       this.view
     );
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     setTimeout(() => {
       if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
         this.view.checkMessageForCollapsing(messageEl);
@@ -17512,16 +17495,16 @@ ${accompanyingText.trim()}`;
     }, 70);
     return messageGroup;
   }
-  static addAssistantActionButtons(parentElementForActions, contentElForTranslationContext, message, plugin, view) {
+  static addAssistantActionButtons(parentElementForActionsContainer, contentElForTranslationContext, message, plugin, view) {
     const messageTimestamp = message.timestamp.getTime().toString();
-    const existingActions = parentElementForActions.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
-    if (existingActions) {
+    let actionsWrapperActual = parentElementForActionsContainer.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
+    if (actionsWrapperActual) {
       return;
     }
-    const buttonsWrapper = parentElementForActions.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-    buttonsWrapper.setAttribute("data-message-timestamp", messageTimestamp);
+    actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+    actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
     const originalLlMRawContent = message.content || "";
-    const copyBtn = buttonsWrapper.createEl("button", {
+    const copyBtn = actionsWrapperActual.createEl("button", {
       cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
       attr: { "aria-label": "Copy", title: "Copy" }
     });
@@ -17531,7 +17514,7 @@ ${accompanyingText.trim()}`;
       view.handleCopyClick(originalLlMRawContent, copyBtn);
     });
     if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && originalLlMRawContent && originalLlMRawContent.trim()) {
-      const translateBtn = buttonsWrapper.createEl("button", {
+      const translateBtn = actionsWrapperActual.createEl("button", {
         cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { "aria-label": "Translate", title: "Translate" }
       });
@@ -17546,7 +17529,7 @@ ${accompanyingText.trim()}`;
       });
     }
     if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && originalLlMRawContent && originalLlMRawContent.trim()) {
-      const summarizeBtn = buttonsWrapper.createEl("button", {
+      const summarizeBtn = actionsWrapperActual.createEl("button", {
         cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { title: "Summarize message" }
       });
@@ -17558,7 +17541,7 @@ ${accompanyingText.trim()}`;
     }
     const originalContentContainsTextualToolCall = typeof originalLlMRawContent === "string" && originalLlMRawContent.includes("<tool_call>");
     if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
-      const regenerateBtn = buttonsWrapper.createEl("button", {
+      const regenerateBtn = actionsWrapperActual.createEl("button", {
         cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { "aria-label": "Regenerate response", title: "Regenerate Response" }
       });
@@ -17568,7 +17551,7 @@ ${accompanyingText.trim()}`;
         view.handleRegenerateClick(message);
       });
     }
-    const deleteBtn = buttonsWrapper.createEl("button", {
+    const deleteBtn = actionsWrapperActual.createEl("button", {
       cls: [
         CSS_CLASSES.DELETE_MESSAGE_BUTTON,
         CSS_CLASSES.DANGER_OPTION,
@@ -17625,7 +17608,8 @@ var SystemMessageRenderer = class extends BaseMessageRenderer {
       text: this.message.content
       // Беремо контент з protected властивості базового класу
     });
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
+    const metaActionsWrapper = messageEl.createDiv({ cls: "message-meta-actions-wrapper" });
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     return messageGroup;
   }
 };
@@ -17654,7 +17638,8 @@ var ErrorMessageRenderer = class extends BaseMessageRenderer {
     contentEl.addClass(CSS_CLASS_ERROR_TEXT);
     (0, import_obsidian11.setIcon)(contentContainer.createSpan({ cls: CSS_CLASS_ERROR_ICON, prepend: true }), "alert-triangle");
     contentEl.setText(this.message.content);
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
+    const metaActionsWrapper = messageEl.createDiv({ cls: "message-meta-actions-wrapper" });
+    BaseMessageRenderer.addTimestampToElement(messageEl, this.message.timestamp, this.view);
     this.addErrorActionButtons(messageWrapper);
     return messageGroup;
   }
@@ -19402,29 +19387,46 @@ var import_obsidian14 = require("obsidian");
 var ToolMessageRenderer = class extends BaseMessageRenderer {
   constructor(app, plugin, message, view) {
     super(app, plugin, message, view);
+    if (message.role !== "tool") {
+      throw new Error("ToolMessageRenderer can only render messages with role 'tool'.");
+    }
   }
   render() {
     const messageGroupEl = this.createMessageGroupWrapper([CSS_CLASSES.TOOL_MESSAGE_GROUP || "tool-message-group"]);
     this.addAvatar(messageGroupEl, false);
     const messageWrapperEl = messageGroupEl.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
-    const { messageEl, contentContainer, contentEl } = this.createMessageBubble(
+    const { messageEl, contentEl } = this.createMessageBubble(
+      // contentContainer не використовується прямо тут, але повертається
       messageWrapperEl,
-      [CSS_CLASSES.TOOL_MESSAGE]
+      [CSS_CLASSES.TOOL_MESSAGE || "tool-message"]
     );
     this.renderToolSpecificContent(contentEl, this.message.content);
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
-    this.addBaseActionButtons(messageEl, this.message.content, this.message);
+    const metaActionsWrapper = messageWrapperEl.createDiv({ cls: "message-meta-actions-wrapper" });
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+    this.addBaseActionButtons(
+      metaActionsWrapper,
+      this.message.content,
+      // Контент для копіювання
+      this.message
+      // Повідомлення для контексту (наприклад, для видалення)
+    );
+    setTimeout(() => {
+      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
+        this.view.checkMessageForCollapsing(messageEl);
+      }
+    }, 70);
     return messageGroupEl;
   }
   renderToolSpecificContent(contentEl, rawContentWithMarkers) {
     contentEl.empty();
-    const toolHeader = contentEl.createDiv({ cls: CSS_CLASSES.TOOL_RESULT_HEADER });
-    const iconSpan = toolHeader.createSpan({ cls: CSS_CLASSES.TOOL_RESULT_ICON });
+    const toolHeader = contentEl.createDiv({ cls: CSS_CLASSES.TOOL_RESULT_HEADER || "tool-result-header" });
+    const iconSpan = toolHeader.createSpan({ cls: CSS_CLASSES.TOOL_RESULT_ICON || "tool-result-icon" });
     (0, import_obsidian14.setIcon)(iconSpan, "wrench");
     toolHeader.createSpan({
-      text: `Tool Executed: ${this.message.name || "Unknown Tool"}`
+      text: `Tool: ${this.message.name || "Executed Tool"}`
+      // this.message.name - це ім'я інструменту
     });
-    const preEl = contentEl.createEl("pre", { cls: CSS_CLASSES.TOOL_RESULT_CONTENT });
+    const preEl = contentEl.createEl("pre", { cls: CSS_CLASSES.TOOL_RESULT_CONTENT || "tool-result-content" });
     const codeEl = preEl.createEl("code");
     let displayContent = rawContentWithMarkers;
     const toolResultStartMarker = "[TOOL_RESULT]\n";
@@ -19433,21 +19435,14 @@ var ToolMessageRenderer = class extends BaseMessageRenderer {
     const toolErrorEndMarker = "\n[/TOOL_ERROR]";
     if (displayContent.startsWith(toolResultStartMarker) && displayContent.endsWith(toolResultEndMarker)) {
       displayContent = displayContent.substring(toolResultStartMarker.length, displayContent.length - toolResultEndMarker.length);
+      preEl.addClass("tool-execution-success");
     } else if (displayContent.startsWith(toolErrorStartMarker) && displayContent.endsWith(toolErrorEndMarker)) {
       displayContent = displayContent.substring(toolErrorStartMarker.length, displayContent.length - toolErrorEndMarker.length);
       preEl.addClass("tool-execution-error-display");
+      toolHeader.addClass("tool-execution-error-header");
     }
     codeEl.setText(displayContent.trim());
   }
-  // Перевизначаємо addAvatar, якщо потрібна особлива логіка для аватара інструменту.
-  // Якщо стандартної логіки з BaseMessageRenderer + RendererUtils.renderAvatar достатньо,
-  // цей метод можна не перевизначати (але тоді треба передавати isUser=false).
-  // У вашому BaseMessageRenderer `addAvatar` не є абстрактним, тому його можна просто викликати.
-  // Для прикладу, якщо RendererUtils.renderAvatar підтримує тип 'tool':
-  // protected addAvatar(messageGroup: HTMLElement): void {
-  //   RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'tool');
-  // }
-  // Якщо ні, то виклик this.addAvatar(messageGroupEl, false); з render() використає реалізацію з BaseMessageRenderer.
 };
 
 // src/OllamaView.ts
@@ -20727,7 +20722,8 @@ This action cannot be undone.`,
               cls: CSS_CLASSES.SYSTEM_MESSAGE_TEXT || "system-message-text",
               text: `Internal Plugin Error: Unknown message role received by renderer: '${message.role}'. Message content was logged.`
             });
-            BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
+            const metaActionsWrapper = msgBubble.createDiv({ cls: "message-meta-actions-wrapper" });
+            BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
             this.chatContainer.appendChild(unknownRoleGroup);
             this.lastMessageElement = unknownRoleGroup;
           }
@@ -22420,7 +22416,8 @@ Summary:`;
                 this.plugin,
                 this
               );
-              BaseMessageRenderer.addTimestamp(messageDomElement, message.timestamp, this);
+              const metaActionsWrapper = messageDomElement.createDiv({ cls: "message-meta-actions-wrapper" });
+              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
@@ -22582,7 +22579,8 @@ Summary:`;
                     text: `Unknown message role: ${message.role}`
                     // Використовуємо as any для безпеки
                   });
-                  BaseMessageRenderer.addTimestamp(msgBubble, message.timestamp, this);
+                  const metaActionsWrapper = msgBubble.createDiv({ cls: "message-meta-actions-wrapper" });
+                  BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
                   messageGroupEl = unknownRoleGroup;
                 }
                 break;

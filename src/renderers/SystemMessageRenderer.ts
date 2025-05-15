@@ -72,8 +72,11 @@ export class SystemMessageRenderer extends BaseMessageRenderer {
 		});
 
         // Додаємо мітку часу, використовуючи метод базового класу
-		BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
         // Кнопки дій для системних повідомлень не потрібні
+		                                    const metaActionsWrapper = messageEl.createDiv({ cls: "message-meta-actions-wrapper" });
+
+              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+
 
 		return messageGroup; // Повертаємо створений елемент групи
 	}

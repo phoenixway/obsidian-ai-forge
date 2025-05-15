@@ -1,13 +1,13 @@
 // src/renderers/AssistantMessageRenderer.ts
 import { App, Notice, setIcon, MarkdownRenderer } from "obsidian";
-import { AssistantMessage, Message, ToolCall } from "../types";
+import { AssistantMessage, Message, ToolCall } from "../types"; // Переконайся, що типи імпортовані правильно
 import OllamaPlugin from "../main";
 import { OllamaView } from "../OllamaView";
 import { CSS_CLASSES } from "../constants";
 import * as RendererUtils from "../MessageRendererUtils";
 import { BaseMessageRenderer } from "./BaseMessageRenderer";
 import { IMessageRenderer } from "./IMessageRenderer";
-import { parseAllTextualToolCalls } from "@/utils/toolParser"; // Переконайся, що цей шлях правильний
+import { parseAllTextualToolCalls } from "@/utils/toolParser"; // Переконайся, що шлях правильний
 
 export class AssistantMessageRenderer extends BaseMessageRenderer implements IMessageRenderer {
   constructor(app: App, plugin: OllamaPlugin, message: AssistantMessage, view: OllamaView) {
@@ -51,8 +51,6 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
           }
         } catch (parseError) {
           logger.error("Error parsing textual tool calls in prepareDisplayContent:", parseError);
-          // Якщо парсинг не вдався, показуємо вихідний текст без змін (після видалення <think>)
-          // або можна додати повідомлення про помилку парсингу
         }
       }
 
@@ -77,11 +75,9 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
     RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     
-    // Створюємо messageWrapper всередині messageGroup
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
     messageWrapper.style.order = "2"; 
 
-    // Створюємо бульбашку .message всередині messageWrapper
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
     contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
 
@@ -99,16 +95,20 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
     }
 
-    // Додаємо кнопки дій до messageWrapper (батьківського для messageEl)
+    // Створюємо обгортку для timestamp та кнопок
+    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+    
+    // Додаємо timestamp до metaActionsWrapper
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+    
+    // Додаємо блок кнопок (.message-actions-wrapper) до metaActionsWrapper
     AssistantMessageRenderer.addAssistantActionButtons(
-      messageWrapper,               // Тепер це messageWrapper
-      contentEl,                    // contentEl все ще потрібен для handleTranslateClick
+      metaActionsWrapper, 
+      contentEl,      
       assistantMessage,
       this.plugin,
       this.view
     );
-
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
 
     setTimeout(() => {
       if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
@@ -120,30 +120,27 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
   }
 
   public static addAssistantActionButtons(
-    parentElementForActions: HTMLElement, // Це має бути messageWrapper
+    parentElementForActionsContainer: HTMLElement, // Це message-meta-actions-wrapper
     contentElForTranslationContext: HTMLElement,
     message: AssistantMessage,
     plugin: OllamaPlugin,
     view: OllamaView
   ): void {
-    // Перевіряємо, чи кнопки вже існують для цього конкретного повідомлення.
-    // Оскільки ми передаємо messageWrapper, який може містити кілька повідомлень,
-    // нам потрібен спосіб унікально ідентифікувати кнопки для цього повідомлення.
-    // Можна використовувати data-attribute на message-actions-wrapper, що містить timestamp повідомлення.
     const messageTimestamp = message.timestamp.getTime().toString();
-    const existingActions = parentElementForActions.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
-    
-    if (existingActions) {
-      // Якщо кнопки для цього повідомлення вже є, нічого не робимо (або оновлюємо, якщо потрібно)
-      return;
-    }
+    let actionsWrapperActual = parentElementForActionsContainer.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
 
-    const buttonsWrapper = parentElementForActions.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-    buttonsWrapper.setAttribute("data-message-timestamp", messageTimestamp); // Додаємо ідентифікатор
+    if (actionsWrapperActual) {
+      // Якщо обгортка кнопок вже існує, очищаємо її для оновлення кнопок (або просто виходимо, якщо оновлення не потрібне)
+      // Поки що просто виходимо, щоб уникнути дублювання при випадковому повторному виклику
+      return; 
+    }
+    
+    actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+    actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
 
     const originalLlMRawContent = message.content || "";
 
-    const copyBtn = buttonsWrapper.createEl("button", {
+    const copyBtn = actionsWrapperActual.createEl("button", {
       cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
       attr: { "aria-label": "Copy", title: "Copy" },
     });
@@ -160,7 +157,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       originalLlMRawContent &&
       originalLlMRawContent.trim()
     ) {
-      const translateBtn = buttonsWrapper.createEl("button", {
+      const translateBtn = actionsWrapperActual.createEl("button", {
         cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { "aria-label": "Translate", title: "Translate" },
       });
@@ -181,7 +178,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       originalLlMRawContent &&
       originalLlMRawContent.trim()
     ) {
-      const summarizeBtn = buttonsWrapper.createEl("button", {
+      const summarizeBtn = actionsWrapperActual.createEl("button", {
         cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { title: "Summarize message" },
       });
@@ -196,7 +193,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       typeof originalLlMRawContent === "string" && originalLlMRawContent.includes("<tool_call>");
 
     if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
-      const regenerateBtn = buttonsWrapper.createEl("button", {
+      const regenerateBtn = actionsWrapperActual.createEl("button", {
         cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { "aria-label": "Regenerate response", title: "Regenerate Response" },
       });
@@ -207,7 +204,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       });
     }
 
-    const deleteBtn = buttonsWrapper.createEl("button", {
+    const deleteBtn = actionsWrapperActual.createEl("button", {
       cls: [
         CSS_CLASSES.DELETE_MESSAGE_BUTTON,
         CSS_CLASSES.DANGER_OPTION,

@@ -1,47 +1,74 @@
 // src/renderers/ToolMessageRenderer.ts
 import { App, MarkdownRenderer, setIcon } from "obsidian";
-import OllamaPlugin from "../main"; // Адаптуйте шлях, якщо потрібно (напр. "@/main")
-import { Message } from "../types"; // Адаптуйте шлях
-import { OllamaView } from "../OllamaView"; // Адаптуйте шлях
+import OllamaPlugin from "../main"; 
+import { Message } from "../types"; 
+import { OllamaView } from "../OllamaView"; 
 import { BaseMessageRenderer } from "./BaseMessageRenderer";
-import * as RendererUtils from "../MessageRendererUtils"; // Адаптуйте шлях
-import { CSS_CLASSES } from "../constants"; // Адаптуйте шлях
+import * as RendererUtils from "../MessageRendererUtils"; 
+import { CSS_CLASSES } from "../constants"; 
 import { IMessageRenderer } from "./IMessageRenderer";
 
 export class ToolMessageRenderer extends BaseMessageRenderer implements IMessageRenderer {
   constructor(app: App, plugin: OllamaPlugin, message: Message, view: OllamaView) {
     super(app, plugin, message, view);
+    if (message.role !== "tool") {
+      throw new Error("ToolMessageRenderer can only render messages with role 'tool'.");
+    }
   }
 
   public render(): HTMLElement {
     const messageGroupEl = this.createMessageGroupWrapper([CSS_CLASSES.TOOL_MESSAGE_GROUP || "tool-message-group"]);
-    this.addAvatar(messageGroupEl, false); 
+    
+    // Використовуємо метод addAvatar з BaseMessageRenderer, передаючи isUser = false
+    // або спеціальний тип, якщо RendererUtils.renderAvatar його підтримує
+    this.addAvatar(messageGroupEl, false); // Або RendererUtils.renderAvatar(this.app, this.plugin, messageGroupEl, false, 'tool');
+
     const messageWrapperEl = messageGroupEl.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
-    const { messageEl, contentContainer, contentEl } = this.createMessageBubble(
+    
+    const { messageEl, contentEl } = this.createMessageBubble( // contentContainer не використовується прямо тут, але повертається
         messageWrapperEl,
-        [CSS_CLASSES.TOOL_MESSAGE] 
+        [CSS_CLASSES.TOOL_MESSAGE || "tool-message"] 
     );
 
     this.renderToolSpecificContent(contentEl, this.message.content);
 
-    BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
-    this.addBaseActionButtons(messageEl, this.message.content, this.message); // Передаємо оригінальний контент з маркерами, якщо кнопки копіювання мають копіювати саме його
-    //fixme
+    // Створюємо обгортку для timestamp та кнопок
+    const metaActionsWrapper = messageWrapperEl.createDiv({ cls: "message-meta-actions-wrapper" });
+    
+    // Додаємо timestamp до metaActionsWrapper
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+    
+    // Додаємо блок кнопок (.message-actions-wrapper) до metaActionsWrapper
+    // Використовуємо addBaseActionButtons з BaseMessageRenderer, оскільки для Tool повідомлень
+    // зазвичай потрібні лише базові кнопки (Копіювати, Видалити).
+    // Якщо потрібні специфічні кнопки, створи окремий метод.
+    this.addBaseActionButtons(
+        metaActionsWrapper, 
+        this.message.content, // Контент для копіювання
+        this.message          // Повідомлення для контексту (наприклад, для видалення)
+    );
+
+    // setTimeout для перевірки згортання, якщо це потрібно для tool-повідомлень
+    setTimeout(() => {
+      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
+        this.view.checkMessageForCollapsing(messageEl);
+      }
+    }, 70);
 
     return messageGroupEl;
   }
 
-    protected renderToolSpecificContent(contentEl: HTMLElement, rawContentWithMarkers: string): void {
+  protected renderToolSpecificContent(contentEl: HTMLElement, rawContentWithMarkers: string): void {
     contentEl.empty(); 
 
-    const toolHeader = contentEl.createDiv({ cls: CSS_CLASSES.TOOL_RESULT_HEADER });
-    const iconSpan = toolHeader.createSpan({ cls: CSS_CLASSES.TOOL_RESULT_ICON });
-    setIcon(iconSpan, "wrench"); 
+    const toolHeader = contentEl.createDiv({ cls: CSS_CLASSES.TOOL_RESULT_HEADER || "tool-result-header" });
+    const iconSpan = toolHeader.createSpan({ cls: CSS_CLASSES.TOOL_RESULT_ICON || "tool-result-icon" });
+    setIcon(iconSpan, "wrench"); // Або інша іконка для інструментів
     toolHeader.createSpan({
-      text: `Tool Executed: ${this.message.name || "Unknown Tool"}`, 
+      text: `Tool: ${this.message.name || "Executed Tool"}`, // this.message.name - це ім'я інструменту
     });
 
-    const preEl = contentEl.createEl("pre", { cls: CSS_CLASSES.TOOL_RESULT_CONTENT });
+    const preEl = contentEl.createEl("pre", { cls: CSS_CLASSES.TOOL_RESULT_CONTENT || "tool-result-content" });
     const codeEl = preEl.createEl("code");
 
     let displayContent = rawContentWithMarkers;
@@ -52,23 +79,13 @@ export class ToolMessageRenderer extends BaseMessageRenderer implements IMessage
 
     if (displayContent.startsWith(toolResultStartMarker) && displayContent.endsWith(toolResultEndMarker)) {
         displayContent = displayContent.substring(toolResultStartMarker.length, displayContent.length - toolResultEndMarker.length);
+        preEl.addClass("tool-execution-success"); // Додатковий клас для успішного виконання
     } else if (displayContent.startsWith(toolErrorStartMarker) && displayContent.endsWith(toolErrorEndMarker)) {
         displayContent = displayContent.substring(toolErrorStartMarker.length, displayContent.length - toolErrorEndMarker.length);
-        // Можна додати спеціальну стилізацію для помилок інструменту тут, якщо потрібно
-        // Наприклад, додати клас до preEl або codeEl
-        preEl.addClass("tool-execution-error-display"); // Приклад класу
+        preEl.addClass("tool-execution-error-display"); 
+        toolHeader.addClass("tool-execution-error-header"); // Стилізуємо заголовок теж
     }
     
     codeEl.setText(displayContent.trim());
   }
-
-  // Перевизначаємо addAvatar, якщо потрібна особлива логіка для аватара інструменту.
-  // Якщо стандартної логіки з BaseMessageRenderer + RendererUtils.renderAvatar достатньо,
-  // цей метод можна не перевизначати (але тоді треба передавати isUser=false).
-  // У вашому BaseMessageRenderer `addAvatar` не є абстрактним, тому його можна просто викликати.
-  // Для прикладу, якщо RendererUtils.renderAvatar підтримує тип 'tool':
-  // protected addAvatar(messageGroup: HTMLElement): void {
-  //   RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, 'tool');
-  // }
-  // Якщо ні, то виклик this.addAvatar(messageGroupEl, false); з render() використає реалізацію з BaseMessageRenderer.
 }
