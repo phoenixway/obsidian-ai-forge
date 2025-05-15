@@ -17500,7 +17500,6 @@ ${accompanyingText.trim()}`;
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
     messageWrapper.style.order = "2";
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
-    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
     const assistantMessage = this.message;
     const displayContent = AssistantMessageRenderer.prepareDisplayContent(
       this.message.content || "",
@@ -17520,26 +17519,45 @@ ${accompanyingText.trim()}`;
       contentEl,
       assistantMessage,
       this.plugin,
-      this.view
+      this.view,
+      messageGroup
+      // Передаємо messageGroup для пошуку contentCollapsible
     );
     setTimeout(() => {
-      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
-        this.view.checkMessageForCollapsing(messageEl);
+      if (messageGroup.isConnected) {
+        this.view.checkMessageForCollapsing(messageGroup);
       }
     }, 70);
     return messageGroup;
   }
-  static addAssistantActionButtons(parentElementForActionsContainer, contentElForTranslationContext, message, plugin, view) {
+  static addAssistantActionButtons(parentElementForActionsContainer, contentElForTranslationContext, message, plugin, view, messageGroupForCollapseContext) {
     const messageTimestamp = message.timestamp.getTime().toString();
     let actionsWrapperActual = parentElementForActionsContainer.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
     if (actionsWrapperActual) {
-      return;
+      actionsWrapperActual.empty();
+    } else {
+      actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+      actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
     }
-    actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-    actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
     const originalLlMRawContent = message.content || "";
+    const toggleCollapseBtn = actionsWrapperActual.createEl("button", {
+      cls: [CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, "clickable-icon"],
+      // Додав clickable-icon
+      attr: { "aria-label": "Toggle content", title: "Toggle content" }
+    });
+    (0, import_obsidian9.setIcon)(toggleCollapseBtn, "chevrons-up-down");
+    toggleCollapseBtn.hide();
+    view.registerDomEvent(toggleCollapseBtn, "click", (e) => {
+      e.stopPropagation();
+      const contentCollapsible = messageGroupForCollapseContext.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+      if (contentCollapsible) {
+        view.toggleMessageCollapse(contentCollapsible, toggleCollapseBtn);
+      } else {
+        plugin.logger.warn("Could not find .content-collapsible for toggle button from messageGroup context:", messageGroupForCollapseContext);
+      }
+    });
     const copyBtn = actionsWrapperActual.createEl("button", {
-      cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+      cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, "clickable-icon"],
       attr: { "aria-label": "Copy", title: "Copy" }
     });
     (0, import_obsidian9.setIcon)(copyBtn, "copy");
@@ -17549,7 +17567,7 @@ ${accompanyingText.trim()}`;
     });
     if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && originalLlMRawContent && originalLlMRawContent.trim()) {
       const translateBtn = actionsWrapperActual.createEl("button", {
-        cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+        cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, "clickable-icon"],
         attr: { "aria-label": "Translate", title: "Translate" }
       });
       (0, import_obsidian9.setIcon)(translateBtn, "languages");
@@ -17564,7 +17582,7 @@ ${accompanyingText.trim()}`;
     }
     if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && originalLlMRawContent && originalLlMRawContent.trim()) {
       const summarizeBtn = actionsWrapperActual.createEl("button", {
-        cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+        cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, "clickable-icon"],
         attr: { title: "Summarize message" }
       });
       (0, import_obsidian9.setIcon)(summarizeBtn, "scroll-text");
@@ -17576,7 +17594,7 @@ ${accompanyingText.trim()}`;
     const originalContentContainsTextualToolCall = typeof originalLlMRawContent === "string" && originalLlMRawContent.includes("<tool_call>");
     if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
       const regenerateBtn = actionsWrapperActual.createEl("button", {
-        cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+        cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, "clickable-icon"],
         attr: { "aria-label": "Regenerate response", title: "Regenerate Response" }
       });
       (0, import_obsidian9.setIcon)(regenerateBtn, "refresh-cw");
@@ -17589,7 +17607,8 @@ ${accompanyingText.trim()}`;
       cls: [
         CSS_CLASSES.DELETE_MESSAGE_BUTTON,
         CSS_CLASSES.DANGER_OPTION,
-        CSS_CLASSES.MESSAGE_ACTION_BUTTON
+        CSS_CLASSES.MESSAGE_ACTION_BUTTON,
+        "clickable-icon"
       ],
       attr: { "aria-label": "Delete message", title: "Delete Message" }
     });
@@ -20337,6 +20356,7 @@ This action cannot be undone.`,
       this.saveWidthDebounced();
     };
     // ... (решта коду класу) ...
+    // ... (решта коду класу) ...
     this.scheduleSidebarChatListUpdate = (delay = 50) => {
       if (this.chatListUpdateTimeoutId) {
         clearTimeout(this.chatListUpdateTimeoutId);
@@ -22428,6 +22448,7 @@ Summary:`;
     );
     try {
       if (!data || !data.message || !messageForLog || !messageTimestampForLog) {
+        this.plugin.logger.warn("[handleMessageAdded] Invalid data received or message/timestamp missing.", data);
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
@@ -22439,20 +22460,20 @@ Summary:`;
         role: message.role,
         content: message.content?.substring(0, 100) + (message.content && message.content.length > 100 ? "..." : ""),
         tool_calls: message.tool_calls
-        // Приводимо до AssistantMessage для доступу до tool_calls
       });
       if (!this.chatContainer || !this.plugin.chatManager) {
+        this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager not available. Aborting.");
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
+        this.plugin.logger.debug(`[handleMessageAdded] Message for non-active chat (${eventChatId} vs ${activeChatId}). Skipping UI update.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const isAssistant = message.role === "assistant";
       const hasToolCalls = !!(message.tool_calls && message.tool_calls.length > 0);
-      const isActiveCycle = !!this.currentAbortController;
       if (isAssistant && hasToolCalls) {
         this.plugin.logger.info(
           `[handleMessageAdded] INTENDED SKIP: Skipping render for assistant message with tool_calls (role: ${message.role}, ts: ${messageTimestampMs}). This message is for tool execution only.`,
@@ -22462,6 +22483,7 @@ Summary:`;
           }
         );
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
+          this.plugin.logger.debug(`[handleMessageAdded] Removing active placeholder for skipped tool_call assistant message (ts: ${messageTimestampMs})`);
           if (this.activePlaceholder.groupEl.isConnected) {
             this.activePlaceholder.groupEl.remove();
           }
@@ -22474,25 +22496,25 @@ Summary:`;
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
+        this.plugin.logger.debug(`[handleMessageAdded] Message (ts: ${messageTimestampMs}) already rendered. Skipping duplicate render.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const isAlreadyInLogicCache = this.currentMessages.some(
         (m) => m.timestamp.getTime() === messageTimestampMs && m.role === message.role
-        // Порівняння контенту може бути надлишковим і дорогим, якщо ID (timestamp) унікальний
-        // && m.content === message.content
       );
-      const isPotentiallyAssistantForPlaceholder = isAssistant && // Це повідомлення асистента
-      !hasToolCalls && // І воно НЕ має tool_calls (бо такі ми вже пропустили)
-      this.activePlaceholder?.timestamp === messageTimestampMs;
+      const isPotentiallyAssistantForPlaceholder = isAssistant && !hasToolCalls && this.activePlaceholder?.timestamp === messageTimestampMs;
       if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
+        this.plugin.logger.debug(`[handleMessageAdded] Message (ts: ${messageTimestampMs}) already in logic cache and not for placeholder update. Skipping.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       if (!isAlreadyInLogicCache) {
+        this.plugin.logger.debug(`[handleMessageAdded] Adding message (ts: ${messageTimestampMs}) to currentMessages logic cache.`);
         this.currentMessages.push(message);
       }
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
+        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message (ts: ${messageTimestampMs}).`);
         const placeholderToUpdate = this.activePlaceholder;
         this.activePlaceholder = null;
         if (placeholderToUpdate.groupEl?.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
@@ -22503,6 +22525,7 @@ Summary:`;
             `.${CSS_CLASSES.MESSAGE}`
           );
           if (!messageDomElement) {
+            this.plugin.logger.warn(`[handleMessageAdded] Placeholder (ts: ${messageTimestampMs}) missing .message element during finalization. Removing placeholder and adding as new.`);
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
             await this.addMessageStandard(message);
@@ -22515,7 +22538,6 @@ Summary:`;
               const displayContent = AssistantMessageRenderer.prepareDisplayContent(
                 message.content || "",
                 message,
-                // message тут вже не має tool_calls, бо ми їх відфільтрували
                 this.plugin,
                 this
               );
@@ -22527,49 +22549,71 @@ Summary:`;
                 placeholderToUpdate.contentEl,
                 displayContent
               );
+              let metaActionsWrapper = placeholderToUpdate.messageWrapper.querySelector(".message-meta-actions-wrapper");
+              if (!metaActionsWrapper) {
+                metaActionsWrapper = placeholderToUpdate.messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+                this.plugin.logger.debug(`[handleMessageAdded] Created new .message-meta-actions-wrapper for placeholder (ts: ${messageTimestampMs})`);
+              } else {
+                const existingActions = metaActionsWrapper.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
+                if (existingActions) {
+                  this.plugin.logger.debug(`[handleMessageAdded] Removing existing .message-actions from meta wrapper for placeholder (ts: ${messageTimestampMs})`);
+                  existingActions.remove();
+                }
+              }
+              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
               AssistantMessageRenderer.addAssistantActionButtons(
-                messageDomElement,
+                metaActionsWrapper,
                 placeholderToUpdate.contentEl,
+                // Content element for translation context
                 message,
                 this.plugin,
-                this
+                this,
+                placeholderToUpdate.groupEl
+                // The message group for collapse context
               );
-              const metaActionsWrapper = messageDomElement.createDiv({ cls: "message-meta-actions-wrapper" });
-              BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, message.timestamp, this);
+              this.plugin.logger.debug(`[handleMessageAdded] Called addAssistantActionButtons for finalized placeholder (ts: ${messageTimestampMs}).`);
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
               setTimeout(() => {
-                if (finalMessageGroupElement?.isConnected)
+                if (finalMessageGroupElement?.isConnected) {
+                  this.plugin.logger.debug(`[handleMessageAdded] Scheduling checkMessageForCollapsing for finalized placeholder (ts: ${messageTimestampMs}).`);
                   this.checkMessageForCollapsing(finalMessageGroupElement);
+                }
               }, 70);
               this.guaranteedScrollToBottom(100, true);
             } catch (renderError) {
+              this.plugin.logger.error(`[handleMessageAdded] Error finalizing placeholder display for ts ${messageTimestampMs}:`, renderError);
               if (placeholderToUpdate.groupEl.isConnected)
                 placeholderToUpdate.groupEl.remove();
               this.handleErrorMessage({
                 role: "error",
-                content: `Failed to finalize display for ts ${messageTimestampMs}: ${renderError.message}`,
+                content: `Failed to finalize display for assistant message: ${renderError.message}`,
                 timestamp: new Date()
               });
             }
           }
         } else {
+          this.plugin.logger.warn(`[handleMessageAdded] Placeholder (ts: ${messageTimestampMs}) or its core elements disconnected before finalization. Adding as new.`);
           await this.addMessageStandard(message);
         }
       } else {
+        this.plugin.logger.debug(`[handleMessageAdded] Adding new standard message (role: ${message.role}, ts: ${messageTimestampMs}).`);
         await this.addMessageStandard(message);
       }
     } catch (outerError) {
+      this.plugin.logger.error(`[handleMessageAdded] Outer catch error for ${messageRoleForLog} msg (ts ${messageTimestampForLog}):`, outerError);
       this.handleErrorMessage({
         role: "error",
-        content: `Internal error in handleMessageAdded for ${messageRoleForLog} msg (ts ${messageTimestampForLog}): ${outerError.message || "Unknown error"}`,
+        content: `Internal error in handleMessageAdded: ${outerError.message || "Unknown error"}`,
         timestamp: new Date()
       });
     } finally {
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
+        this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for message (ts: ${messageTimestampForLog}).`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
+        this.plugin.logger.debug(`[handleMessageAdded] HMA resolver for message (ts: ${messageTimestampForLog}) was already cleared or never existed.`);
       }
     }
   }

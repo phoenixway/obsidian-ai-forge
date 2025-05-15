@@ -71,7 +71,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
     return finalDisplayContent;
   }
 
-  public async render(): Promise<HTMLElement> {
+ public async render(): Promise<HTMLElement> {
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
     RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
     
@@ -79,7 +79,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
     messageWrapper.style.order = "2"; 
 
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
-    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
+    // contentEl ВЖЕ має клас CSS_CLASSES.CONTENT_COLLAPSIBLE з createMessageBubble
 
     const assistantMessage = this.message as AssistantMessage;
     const displayContent = AssistantMessageRenderer.prepareDisplayContent(
@@ -95,24 +95,26 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
     }
 
-    // Створюємо обгортку для timestamp та кнопок
     const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
     
-    // Додаємо timestamp до metaActionsWrapper
     BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     
-    // Додаємо блок кнопок (.message-actions-wrapper) до metaActionsWrapper
+    // Тепер addAssistantActionButtons відповідає за ВСІ кнопки, включаючи кнопку згортання
     AssistantMessageRenderer.addAssistantActionButtons(
       metaActionsWrapper, 
       contentEl,      
       assistantMessage,
       this.plugin,
-      this.view
+      this.view,
+      messageGroup // Передаємо messageGroup для пошуку contentCollapsible
     );
 
+    // Викликаємо checkMessageForCollapsing для messageGroup, а не messageEl,
+    // тому що саме messageGroup має data-timestamp і є кореневим для логіки згортання.
+    // Також, contentEl передається в addAssistantActionButtons, де кнопка може знайти його.
     setTimeout(() => {
-      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
-        this.view.checkMessageForCollapsing(messageEl);
+      if (messageGroup.isConnected) { // Перевіряємо messageGroup
+        this.view.checkMessageForCollapsing(messageGroup);
       }
     }, 70);
 
@@ -120,28 +122,49 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
   }
 
   public static addAssistantActionButtons(
-    parentElementForActionsContainer: HTMLElement, // Це message-meta-actions-wrapper
-    contentElForTranslationContext: HTMLElement,
+    parentElementForActionsContainer: HTMLElement,
+    contentElForTranslationContext: HTMLElement, // Використовується для контексту перекладу, а не для згортання
     message: AssistantMessage,
     plugin: OllamaPlugin,
-    view: OllamaView
+    view: OllamaView,
+    messageGroupForCollapseContext: HTMLElement // Новий параметр
   ): void {
     const messageTimestamp = message.timestamp.getTime().toString();
+    // Створюємо actionsWrapper всередині parentElementForActionsContainer (це message-meta-actions-wrapper)
     let actionsWrapperActual = parentElementForActionsContainer.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
 
     if (actionsWrapperActual) {
-      // Якщо обгортка кнопок вже існує, очищаємо її для оновлення кнопок (або просто виходимо, якщо оновлення не потрібне)
-      // Поки що просто виходимо, щоб уникнути дублювання при випадковому повторному виклику
-      return; 
+      actionsWrapperActual.empty(); // Очищаємо, якщо вже існує, щоб уникнути дублів при ре-рендері
+    } else {
+      actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+      actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
     }
     
-    actionsWrapperActual = parentElementForActionsContainer.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
-    actionsWrapperActual.setAttribute("data-message-timestamp", messageTimestamp);
-
     const originalLlMRawContent = message.content || "";
 
+    // 1. Кнопка "Toggle Collapse" (завжди перша)
+    const toggleCollapseBtn = actionsWrapperActual.createEl("button", {
+      cls: [CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, 'clickable-icon'], // Додав clickable-icon
+      attr: { "aria-label": "Toggle content", title: "Toggle content" }
+    });
+    setIcon(toggleCollapseBtn, "chevrons-up-down"); 
+    toggleCollapseBtn.hide(); 
+    
+    view.registerDomEvent(toggleCollapseBtn, "click", (e) => {
+      e.stopPropagation();
+      // Шукаємо contentCollapsible відносно messageGroupForCollapseContext
+      const contentCollapsible = messageGroupForCollapseContext.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+      if (contentCollapsible) {
+        view.toggleMessageCollapse(contentCollapsible, toggleCollapseBtn);
+      } else {
+        plugin.logger.warn("Could not find .content-collapsible for toggle button from messageGroup context:", messageGroupForCollapseContext);
+      }
+    });
+
+    // 2. Інші кнопки (Copy, Translate, Summarize, Regenerate, Delete)
+
     const copyBtn = actionsWrapperActual.createEl("button", {
-      cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+      cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, 'clickable-icon'],
       attr: { "aria-label": "Copy", title: "Copy" },
     });
     setIcon(copyBtn, "copy");
@@ -158,13 +181,13 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       originalLlMRawContent.trim()
     ) {
       const translateBtn = actionsWrapperActual.createEl("button", {
-        cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+        cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, 'clickable-icon'],
         attr: { "aria-label": "Translate", title: "Translate" },
       });
       setIcon(translateBtn, "languages");
       view.registerDomEvent(translateBtn, "click", e => {
         e.stopPropagation();
-        if (contentElForTranslationContext.isConnected) {
+        if (contentElForTranslationContext.isConnected) { // contentElForTranslationContext все ще використовується для перекладу
           view.handleTranslateClick(originalLlMRawContent, contentElForTranslationContext, translateBtn);
         } else {
           new Notice("Cannot translate: message content element not found.");
@@ -179,7 +202,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       originalLlMRawContent.trim()
     ) {
       const summarizeBtn = actionsWrapperActual.createEl("button", {
-        cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+        cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, 'clickable-icon'],
         attr: { title: "Summarize message" },
       });
       setIcon(summarizeBtn, "scroll-text");
@@ -194,7 +217,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
 
     if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
       const regenerateBtn = actionsWrapperActual.createEl("button", {
-        cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
+        cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON, 'clickable-icon'],
         attr: { "aria-label": "Regenerate response", title: "Regenerate Response" },
       });
       setIcon(regenerateBtn, "refresh-cw");
@@ -209,6 +232,7 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
         CSS_CLASSES.DELETE_MESSAGE_BUTTON,
         CSS_CLASSES.DANGER_OPTION,
         CSS_CLASSES.MESSAGE_ACTION_BUTTON,
+        'clickable-icon'
       ],
       attr: { "aria-label": "Delete message", title: "Delete Message" },
     });
@@ -218,4 +242,5 @@ export class AssistantMessageRenderer extends BaseMessageRenderer implements IMe
       view.handleDeleteMessageClick(message);
     });
   }
+  
 }
