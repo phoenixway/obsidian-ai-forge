@@ -20504,14 +20504,12 @@ This action cannot be undone.`,
     const modelPath = (0, import_obsidian15.normalizePath)(`${this.plugin.manifest.dir}/assets/${modelFileName}`);
     try {
       this.vadWorkletJs = await this.app.vault.adapter.read(workletPath);
-      this.plugin.logger.debug("VAD worklet JS loaded successfully.");
     } catch (e) {
       this.plugin.logger.error(`Failed to load VAD worklet JS from ${workletPath}:`, e);
       new import_obsidian15.Notice("VAD worklet could not be loaded. Voice detection might be unstable or not work.");
     }
     try {
       this.vadModelArrayBuffer = await this.app.vault.adapter.readBinary(modelPath);
-      this.plugin.logger.debug("VAD ONNX model loaded successfully.");
     } catch (e) {
       this.plugin.logger.error(`Failed to load VAD ONNX model from ${modelPath}:`, e);
       new import_obsidian15.Notice("VAD ONNX model could not be loaded. Voice detection might be unstable or not work.");
@@ -20533,7 +20531,6 @@ This action cannot be undone.`,
     if (this.speechWorkerUrl) {
       URL.revokeObjectURL(this.speechWorkerUrl);
       this.speechWorkerUrl = null;
-      this.plugin.logger.debug("Revoked inline SpeechWorker Object URL.");
     }
     this.revokeVadObjectUrls();
     if (this.vad) {
@@ -21168,7 +21165,6 @@ This action cannot be undone.`,
       const data = event.data;
       if (data.success && typeof data.transcript === "string" && data.transcript.trim() !== "") {
         const receivedTranscript = data.transcript;
-        this.plugin.logger.info("Received transcript from inline worker:", receivedTranscript);
         const currentText = this.inputEl.value;
         const selectionStart = this.inputEl.selectionStart;
         const selectionEnd = this.inputEl.selectionEnd;
@@ -21180,7 +21176,6 @@ This action cannot be undone.`,
         this.inputEl.focus();
         this.updateSendButtonState();
       } else if (data.success && (typeof data.transcript !== "string" || data.transcript.trim() === "")) {
-        this.plugin.logger.info("Received successful but empty or non-string transcript. Nothing to insert.");
       } else if (!data.success) {
         this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
         new import_obsidian15.Notice(`Speech recognition error: ${data.error || "Unknown error"}`);
@@ -21233,24 +21228,20 @@ This action cannot be undone.`,
   }
   async startVoiceRecognition() {
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-      this.plugin.logger.debug("VAD: Recording already in progress.");
       return;
     }
     if (!this.speechWorker) {
       new import_obsidian15.Notice("Speech recognition feature not available (worker not initialized).");
-      this.plugin.logger.warn("Speech worker not initialized, aborting voice recognition.");
       return;
     }
     const speechApiKey = this.plugin.settings.googleApiKey;
     if (!speechApiKey) {
       new import_obsidian15.Notice("Google API Key for speech recognition not configured. Please add it in plugin settings.");
-      this.plugin.logger.warn("Google API Key not configured, aborting voice recognition.");
       return;
     }
     const needLocalModel = this.plugin.settings.vadUseLocalModelIfAvailable || !this.plugin.settings.allowVadMicVadModelFromCDN;
     const needLocalWorklet = this.plugin.settings.vadUseLocalWorkletIfAvailable;
     if (needLocalModel && !this.vadModelArrayBuffer || needLocalWorklet && !this.vadWorkletJs) {
-      this.plugin.logger.debug("Attempting to load VAD assets as they are missing or preferred locally.");
       await this.loadVadAssets();
     }
     if (needLocalModel && !this.vadModelArrayBuffer) {
@@ -21269,12 +21260,9 @@ This action cannot be undone.`,
         const audioTracks = this.audioStream.getAudioTracks();
         if (audioTracks.length > 0) {
           const settings = audioTracks[0].getSettings();
-          this.plugin.logger.debug("AudioTrack settings from getUserMedia:", JSON.stringify(settings));
           if (settings.sampleRate) {
-            this.plugin.logger.debug(`AudioStream sample rate: ${settings.sampleRate} Hz`);
           }
         } else {
-          this.plugin.logger.warn("getUserMedia returned an audioStream with no audio tracks.");
           new import_obsidian15.Notice("Could not get an audio track from the microphone.");
           return;
         }
@@ -21287,9 +21275,7 @@ This action cannot be undone.`,
       const preferredMimeType = "audio/webm;codecs=opus";
       if (MediaRecorder.isTypeSupported(preferredMimeType)) {
         recorderOptions = { mimeType: preferredMimeType };
-        this.plugin.logger.debug("Using preferred MIME type for MediaRecorder:", preferredMimeType);
       } else {
-        this.plugin.logger.debug("Preferred MIME type not supported, using default for MediaRecorder.");
       }
       this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
       const audioChunks = [];
@@ -21306,10 +21292,8 @@ This action cannot be undone.`,
         }
       };
       this.mediaRecorder.onstop = () => {
-        this.plugin.logger.debug(`MediaRecorder stopped. Audio chunks count: ${audioChunks.length}. isVadSpeechDetected: ${this.isVadSpeechDetected}`);
         if (this.vad) {
           this.vad.pause();
-          this.plugin.logger.debug("VAD paused on MediaRecorder stop.");
         }
         if (this.vadSilenceTimer) {
           clearTimeout(this.vadSilenceTimer);
@@ -21320,14 +21304,12 @@ This action cannot be undone.`,
             type: this.mediaRecorder?.mimeType || "audio/webm"
           });
           this.inputEl.placeholder = "Processing speech...";
-          this.plugin.logger.debug("Sending audioBlob to speech worker for processing.");
           this.speechWorker.postMessage({
             apiKey: speechApiKey,
             audioBlob,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA"
           });
         } else {
-          this.plugin.logger.debug(`Not sending to worker. audioChunks.length: ${audioChunks.length}, isVadSpeechDetected: ${this.isVadSpeechDetected}`);
           this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState();
         }
@@ -21347,25 +21329,18 @@ This action cannot be undone.`,
         this.stopVoiceRecording(false);
       };
       this.mediaRecorder.start();
-      this.plugin.logger.debug("MediaRecorder started.");
       try {
         if (this.vad) {
-          this.plugin.logger.debug("Destroying previous VAD instance.");
           await this.vad.destroy();
           this.vad = null;
         }
-        this.plugin.logger.debug("Attempting to initialize MicVAD...");
         const vadOptions = {
           stream: this.audioStream,
           // Передаємо аудіопотік в VAD
           ortConfig: (ort) => {
-            this.plugin.logger.debug("[VAD ortConfig] Attempting to configure ONNXRuntime-Web instance.");
             if (ort.env && ort.env.wasm) {
-              this.plugin.logger.debug("[VAD ortConfig] WASM config before:", JSON.parse(JSON.stringify(ort.env.wasm)));
               ort.env.wasm.numThreads = 1;
-              this.plugin.logger.debug("[VAD ortConfig] WASM config after (numThreads=1):", JSON.parse(JSON.stringify(ort.env.wasm)));
             } else {
-              this.plugin.logger.warn("[VAD ortConfig] ort.env.wasm is not available for configuration during this call.");
             }
           },
           onFrameProcessed: (probabilities) => {
@@ -21378,13 +21353,10 @@ This action cannot be undone.`,
             }
             if (this.frameProcessedCounter % this.FRAME_PROCESSED_LOG_INTERVAL === 0) {
               if (probValue !== -1) {
-                this.plugin.logger.debug(`VAD Frame (${this.frameProcessedCounter}): isSpeech probability = ${probValue.toFixed(4)}`);
               } else {
-                this.plugin.logger.debug(`VAD Frame (${this.frameProcessedCounter}): received unexpected probability format:`, probabilities);
               }
             }
             if (probValue > 0.9 && !this.isVadSpeechDetected && this.frameProcessedCounter % Math.floor(this.FRAME_PROCESSED_LOG_INTERVAL / 3) === 0) {
-              this.plugin.logger.warn(`VAD Frame: HIGH speech probability (${probValue.toFixed(4)}) but onSpeechStart not triggered yet. Current threshold: ${vadOptions.positiveSpeechThreshold}, minFrames: ${vadOptions.minSpeechFrames}`);
             }
           },
           onSpeechStart: () => {
@@ -21393,7 +21365,6 @@ This action cannot be undone.`,
             if (this.vadSilenceTimer) {
               clearTimeout(this.vadSilenceTimer);
               this.vadSilenceTimer = null;
-              this.plugin.logger.debug("VAD EVENT: Cleared vadSilenceTimer on speech start.");
             }
           },
           onSpeechEnd: () => {
@@ -21401,13 +21372,10 @@ This action cannot be undone.`,
             if (this.isVadSpeechDetected && this.mediaRecorder && this.mediaRecorder.state === "recording") {
               if (this.vadSilenceTimer)
                 clearTimeout(this.vadSilenceTimer);
-              this.plugin.logger.debug("VAD EVENT: Setting vadSilenceTimer on speech end.");
               this.vadSilenceTimer = setTimeout(() => {
-                this.plugin.logger.debug("VAD EVENT: vadSilenceTimer expired. Stopping voice recording.");
                 this.stopVoiceRecording(true);
               }, this.VAD_SILENCE_TIMEOUT_MS);
             } else {
-              this.plugin.logger.debug("VAD EVENT: Speech ended, but not processing (isVadSpeechDetected false or recorder not recording).");
             }
           },
           // --- Параметри VAD для тестування (можеш змінювати) ---
@@ -21422,7 +21390,6 @@ This action cannot be undone.`,
             const modelBlob = new Blob([this.vadModelArrayBuffer], { type: "application/octet-stream" });
             this.vadObjectUrls.model = URL.createObjectURL(modelBlob);
             vadOptions.modelURL = this.vadObjectUrls.model;
-            this.plugin.logger.debug("Using local VAD ONNX model via Object URL:", this.vadObjectUrls.model);
           } catch (e) {
             this.plugin.logger.error("Error creating Object URL for local VAD model:", e);
           }
@@ -21432,18 +21399,13 @@ This action cannot be undone.`,
             const workletBlob = new Blob([this.vadWorkletJs], { type: "application/javascript" });
             this.vadObjectUrls.worklet = URL.createObjectURL(workletBlob);
             vadOptions.workletURL = this.vadObjectUrls.worklet;
-            this.plugin.logger.debug("Using local VAD worklet via Object URL:", this.vadObjectUrls.worklet);
           } catch (e) {
             this.plugin.logger.error("Error creating Object URL for local VAD worklet:", e);
           }
         }
         this.vad = await import_vad_web.MicVAD.new(vadOptions);
-        this.plugin.logger.debug("VAD initialized (MicVAD.new called).");
         if (this.vad) {
-          this.plugin.logger.debug("Attempting to explicitly call this.vad.start()...");
           this.vad.start();
-          this.plugin.logger.debug("this.vad.start() called.");
-          this.plugin.logger.debug("Cannot directly check VAD AudioContext state due to encapsulation. Assuming start() handled it.");
         }
       } catch (vadError) {
         this.plugin.logger.error("Failed to initialize VAD (MicVAD.new error):", vadError, vadError.stack);
@@ -21474,17 +21436,14 @@ This action cannot be undone.`,
   revokeVadObjectUrls() {
     if (this.vadObjectUrls.model) {
       URL.revokeObjectURL(this.vadObjectUrls.model);
-      this.plugin.logger.debug("Revoked VAD model Object URL:", this.vadObjectUrls.model);
       delete this.vadObjectUrls.model;
     }
     if (this.vadObjectUrls.worklet) {
       URL.revokeObjectURL(this.vadObjectUrls.worklet);
-      this.plugin.logger.debug("Revoked VAD worklet Object URL:", this.vadObjectUrls.worklet);
       delete this.vadObjectUrls.worklet;
     }
   }
   stopVoiceRecording(processAudio) {
-    this.plugin.logger.debug(`Stopping voice recording. Process audio: ${processAudio}`);
     this.revokeVadObjectUrls();
     if (this.vad) {
       this.vad.pause();
@@ -21495,9 +21454,7 @@ This action cannot be undone.`,
     }
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       this.mediaRecorder.stop();
-      this.plugin.logger.debug("MediaRecorder.stop() called.");
     } else if (this.mediaRecorder && this.mediaRecorder.state === "inactive") {
-      this.plugin.logger.debug("MediaRecorder was already inactive.");
       if (!processAudio) {
         this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
         this.updateSendButtonState();
@@ -21513,17 +21470,13 @@ This action cannot be undone.`,
     if (this.audioStream) {
       this.audioStream.getTracks().forEach((track) => track.stop());
       this.audioStream = null;
-      this.plugin.logger.debug("Audio stream tracks stopped.");
     }
   }
   checkAllMessagesForCollapsing() {
-    this.plugin.logger.debug("[checkAllMessagesForCollapsing] Starting scan for messages to collapse/expand.");
     const messageGroups = this.chatContainer?.querySelectorAll(`.${CSS_CLASSES.MESSAGE_GROUP}`);
     if (!messageGroups || messageGroups.length === 0) {
-      this.plugin.logger.debug("[checkAllMessagesForCollapsing] No message groups found in chat container.");
       return;
     }
-    this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Found ${messageGroups.length} message groups.`);
     messageGroups.forEach((msgGroupEl, index) => {
       const groupTimestampAttr = msgGroupEl.getAttribute("data-timestamp");
       const groupPlaceholderTimestampAttr = msgGroupEl.getAttribute("data-placeholder-timestamp");
@@ -21536,17 +21489,14 @@ This action cannot be undone.`,
       });
       const isStreamingPlaceholder = msgGroupEl.classList.contains("placeholder") && msgGroupEl.hasAttribute("data-placeholder-timestamp") && this.isProcessing;
       if (isStreamingPlaceholder) {
-        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} IS an active streaming placeholder. Hiding toggle button if exists.`);
         const toggleButton = msgGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
         if (toggleButton) {
           toggleButton.hide();
-          this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1}: Streaming placeholder toggle button hidden.`);
         }
         const contentCollapsible = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
         if (contentCollapsible) {
           contentCollapsible.style.maxHeight = "";
           contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-          this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1}: Streaming placeholder content uncollapsed.`);
         }
         return;
       }
@@ -21555,10 +21505,8 @@ This action cannot be undone.`,
       const processingComplete = !this.isProcessing;
       const shouldProcess = hasTimestamp || isPlaceholder && processingComplete;
       if (shouldProcess) {
-        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} should be processed for collapsing. HasTimestamp: ${hasTimestamp}, IsPlaceholder: ${isPlaceholder}, ProcessingComplete: ${processingComplete}`);
         const messageElementExists = !!msgGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
         if (messageElementExists) {
-          this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} has a .message element. Calling checkMessageForCollapsing.`);
           this.checkMessageForCollapsing(msgGroupEl);
         } else {
           this.plugin.logger.warn(`[checkAllMessagesForCollapsing] Group ${index + 1} SKIPPED (shouldProcess=true, but NO .message element).`, {
@@ -21568,10 +21516,8 @@ This action cannot be undone.`,
           });
         }
       } else {
-        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} will NOT be processed for collapsing. HasTimestamp: ${hasTimestamp}, IsPlaceholder: ${isPlaceholder}, ProcessingComplete: ${processingComplete}`);
       }
     });
-    this.plugin.logger.debug("[checkAllMessagesForCollapsing] Finished scan.");
   }
   // src/OllamaView.ts
   toggleMessageCollapse(contentEl, buttonEl) {
@@ -22005,9 +21951,7 @@ This action cannot be undone.`,
   }
   checkMessageForCollapsing(messageGroupEl) {
     const groupTimestampAttr = messageGroupEl.getAttribute("data-timestamp") || messageGroupEl.getAttribute("data-placeholder-timestamp");
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Entered for group with effective timestamp: ${groupTimestampAttr}.`);
     if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
-      this.plugin.logger.debug(`[checkMessageForCollapsing] Group (ts: ${groupTimestampAttr}) is a placeholder without final timestamp. Hiding toggle button.`);
       const tempToggleButton = messageGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
       if (tempToggleButton)
         tempToggleButton.hide();
@@ -22015,89 +21959,68 @@ This action cannot be undone.`,
     }
     const messageEl = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
     if (!messageEl) {
-      this.plugin.logger.warn(`[checkMessageForCollapsing] No .message element found in group (ts: ${groupTimestampAttr}). Aborting for this group.`);
       return;
     }
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Found .message element for group (ts: ${groupTimestampAttr}).`);
     const contentCollapsible = messageEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
     const actionsWrapper = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
     const toggleCollapseButton = actionsWrapper?.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
     if (!toggleCollapseButton) {
-      this.plugin.logger.debug(`[checkMessageForCollapsing] No TOGGLE_COLLAPSE_BUTTON found for group (ts: ${groupTimestampAttr}). Collapsing logic not applicable.`);
       if (contentCollapsible) {
         contentCollapsible.style.maxHeight = "";
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-        this.plugin.logger.debug(`[checkMessageForCollapsing] Ensured contentCollapsible is uncollapsed for group (ts: ${groupTimestampAttr}) as no button found.`);
       }
       return;
     }
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Found TOGGLE_COLLAPSE_BUTTON for group (ts: ${groupTimestampAttr}).`);
     if (!contentCollapsible) {
-      this.plugin.logger.warn(`[checkMessageForCollapsing] No CONTENT_COLLAPSIBLE element found for group (ts: ${groupTimestampAttr}), but button exists. Hiding button.`);
       toggleCollapseButton.hide();
       toggleCollapseButton.classList.remove("explicitly-expanded");
       return;
     }
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Found CONTENT_COLLAPSIBLE for group (ts: ${groupTimestampAttr}).`);
     const maxH = this.plugin.settings.maxMessageHeight;
-    this.plugin.logger.debug(`[checkMessageForCollapsing] maxMessageHeight setting: ${maxH} for group (ts: ${groupTimestampAttr}).`);
     const isStreamingNow = this.isProcessing && messageGroupEl.classList.contains("placeholder") && contentCollapsible.classList.contains("streaming-text");
     if (isStreamingNow) {
-      this.plugin.logger.debug(`[checkMessageForCollapsing] Group (ts: ${groupTimestampAttr}) IS actively streaming. Hiding button, uncollapsing content.`);
       toggleCollapseButton.hide();
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
     if (maxH <= 0) {
-      this.plugin.logger.debug(`[checkMessageForCollapsing] maxMessageHeight <= 0 for group (ts: ${groupTimestampAttr}). Hiding button, uncollapsing content.`);
       toggleCollapseButton.hide();
       toggleCollapseButton.classList.remove("explicitly-expanded");
       contentCollapsible.style.maxHeight = "";
       contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       return;
     }
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Proceeding to rAF for group (ts: ${groupTimestampAttr}).`);
     requestAnimationFrame(() => {
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Entered for group (ts: ${groupTimestampAttr}).`);
       if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected) {
-        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Elements disconnected for group (ts: ${groupTimestampAttr}). Aborting rAF.`);
         return;
       }
       const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): wasExplicitlyExpanded = ${wasExplicitlyExpanded}.`);
       const currentMaxHeightStyle = contentCollapsible.style.maxHeight;
       const currentlyCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
       contentCollapsible.style.maxHeight = "";
       const scrollHeight = contentCollapsible.scrollHeight;
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight = ${scrollHeight}, maxH = ${maxH}.`);
       if (scrollHeight > maxH) {
-        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight > maxH. Button should be visible.`);
         toggleCollapseButton.show();
         if (wasExplicitlyExpanded) {
-          this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Was explicitly expanded. Uncollapsing.`);
           contentCollapsible.style.maxHeight = "";
           contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
           (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-up");
           toggleCollapseButton.setAttribute("title", "Show Less");
         } else {
-          this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Not explicitly expanded. Collapsing.`);
           contentCollapsible.style.maxHeight = `${maxH}px`;
           contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
           (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-down");
           toggleCollapseButton.setAttribute("title", "Show More");
         }
       } else {
-        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight <= maxH. Button should be hidden.`);
         toggleCollapseButton.hide();
         if (wasExplicitlyExpanded) {
           toggleCollapseButton.classList.remove("explicitly-expanded");
-          this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Removing 'explicitly-expanded' as content is now short.`);
         }
         contentCollapsible.style.maxHeight = "";
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Finished for group (ts: ${groupTimestampAttr}). Final state: button visible = ${toggleCollapseButton.style.display !== "none"}, collapsed = ${contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)}`);
     });
   }
   async handleSummarizeClick(originalContent, buttonEl) {
@@ -22418,7 +22341,6 @@ Summary:`;
       try {
         await hmaErrorPromise;
       } catch (e_hma) {
-        this.plugin.logger.warn("[SendMessage] HMA for error display message failed or timed out:", e_hma);
       }
     } finally {
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
@@ -22448,7 +22370,6 @@ Summary:`;
     );
     try {
       if (!data || !data.message || !messageForLog || !messageTimestampForLog) {
-        this.plugin.logger.warn("[handleMessageAdded] Invalid data received or message/timestamp missing.", data);
         if (messageTimestampForLog)
           this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
@@ -22462,13 +22383,11 @@ Summary:`;
         tool_calls: message.tool_calls
       });
       if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager not available. Aborting.");
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message for non-active chat (${eventChatId} vs ${activeChatId}). Skipping UI update.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -22483,7 +22402,6 @@ Summary:`;
           }
         );
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-          this.plugin.logger.debug(`[handleMessageAdded] Removing active placeholder for skipped tool_call assistant message (ts: ${messageTimestampMs})`);
           if (this.activePlaceholder.groupEl.isConnected) {
             this.activePlaceholder.groupEl.remove();
           }
@@ -22496,7 +22414,6 @@ Summary:`;
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message (ts: ${messageTimestampMs}) already rendered. Skipping duplicate render.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -22505,16 +22422,13 @@ Summary:`;
       );
       const isPotentiallyAssistantForPlaceholder = isAssistant && !hasToolCalls && this.activePlaceholder?.timestamp === messageTimestampMs;
       if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message (ts: ${messageTimestampMs}) already in logic cache and not for placeholder update. Skipping.`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
       if (!isAlreadyInLogicCache) {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding message (ts: ${messageTimestampMs}) to currentMessages logic cache.`);
         this.currentMessages.push(message);
       }
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message (ts: ${messageTimestampMs}).`);
         const placeholderToUpdate = this.activePlaceholder;
         this.activePlaceholder = null;
         if (placeholderToUpdate.groupEl?.isConnected && placeholderToUpdate.contentEl && placeholderToUpdate.messageWrapper) {
@@ -22525,7 +22439,6 @@ Summary:`;
             `.${CSS_CLASSES.MESSAGE}`
           );
           if (!messageDomElement) {
-            this.plugin.logger.warn(`[handleMessageAdded] Placeholder (ts: ${messageTimestampMs}) missing .message element during finalization. Removing placeholder and adding as new.`);
             if (placeholderToUpdate.groupEl.isConnected)
               placeholderToUpdate.groupEl.remove();
             await this.addMessageStandard(message);
@@ -22552,11 +22465,9 @@ Summary:`;
               let metaActionsWrapper = placeholderToUpdate.messageWrapper.querySelector(".message-meta-actions-wrapper");
               if (!metaActionsWrapper) {
                 metaActionsWrapper = placeholderToUpdate.messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-                this.plugin.logger.debug(`[handleMessageAdded] Created new .message-meta-actions-wrapper for placeholder (ts: ${messageTimestampMs})`);
               } else {
                 const existingActions = metaActionsWrapper.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
                 if (existingActions) {
-                  this.plugin.logger.debug(`[handleMessageAdded] Removing existing .message-actions from meta wrapper for placeholder (ts: ${messageTimestampMs})`);
                   existingActions.remove();
                 }
               }
@@ -22571,13 +22482,11 @@ Summary:`;
                 placeholderToUpdate.groupEl
                 // The message group for collapse context
               );
-              this.plugin.logger.debug(`[handleMessageAdded] Called addAssistantActionButtons for finalized placeholder (ts: ${messageTimestampMs}).`);
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
               const finalMessageGroupElement = placeholderToUpdate.groupEl;
               setTimeout(() => {
                 if (finalMessageGroupElement?.isConnected) {
-                  this.plugin.logger.debug(`[handleMessageAdded] Scheduling checkMessageForCollapsing for finalized placeholder (ts: ${messageTimestampMs}).`);
                   this.checkMessageForCollapsing(finalMessageGroupElement);
                 }
               }, 70);
@@ -22594,11 +22503,9 @@ Summary:`;
             }
           }
         } else {
-          this.plugin.logger.warn(`[handleMessageAdded] Placeholder (ts: ${messageTimestampMs}) or its core elements disconnected before finalization. Adding as new.`);
           await this.addMessageStandard(message);
         }
       } else {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding new standard message (role: ${message.role}, ts: ${messageTimestampMs}).`);
         await this.addMessageStandard(message);
       }
     } catch (outerError) {
@@ -22610,10 +22517,8 @@ Summary:`;
       });
     } finally {
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
-        this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for message (ts: ${messageTimestampForLog}).`);
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
-        this.plugin.logger.debug(`[handleMessageAdded] HMA resolver for message (ts: ${messageTimestampForLog}) was already cleared or never existed.`);
       }
     }
   }
@@ -22867,7 +22772,6 @@ Summary:`;
         this.plugin.logger.error("[_processLlmStream] Received error chunk:", chunk.error);
         throw new Error(`Ollama stream error: ${chunk.error}`);
       } else if ("type" in chunk && chunk.type === "tool_calls" && "calls" in chunk) {
-        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
         if (!parsedToolCalls)
           parsedToolCalls = [];
         for (const call of chunk.calls) {

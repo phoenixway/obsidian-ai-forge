@@ -270,7 +270,7 @@ private speechWorkerUrl: string | null = null;
 
     try {
       this.vadWorkletJs = await this.app.vault.adapter.read(workletPath);
-      this.plugin.logger.debug("VAD worklet JS loaded successfully.");
+      
     } catch (e) {
       this.plugin.logger.error(`Failed to load VAD worklet JS from ${workletPath}:`, e);
       new Notice("VAD worklet could not be loaded. Voice detection might be unstable or not work.");
@@ -278,7 +278,7 @@ private speechWorkerUrl: string | null = null;
 
     try {
       this.vadModelArrayBuffer = await this.app.vault.adapter.readBinary(modelPath);
-      this.plugin.logger.debug("VAD ONNX model loaded successfully.");
+      
     } catch (e) {
       this.plugin.logger.error(`Failed to load VAD ONNX model from ${modelPath}:`, e);
       new Notice("VAD ONNX model could not be loaded. Voice detection might be unstable or not work.");
@@ -303,7 +303,7 @@ private speechWorkerUrl: string | null = null;
       if (this.speechWorkerUrl) {
     URL.revokeObjectURL(this.speechWorkerUrl); // ВІДКЛИКАЄМО ТУТ
     this.speechWorkerUrl = null;
-    this.plugin.logger.debug("Revoked inline SpeechWorker Object URL.");
+    
   }
     this.revokeVadObjectUrls();
     if (this.vad) {
@@ -1716,7 +1716,7 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
             // Після цієї перевірки, TypeScript знає, що data.transcript - це string
             const receivedTranscript: string = data.transcript; // Тепер receivedTranscript - це гарантовано string
 
-            this.plugin.logger.info("Received transcript from inline worker:", receivedTranscript);
+            
             
             const currentText = this.inputEl.value;
             const selectionStart = this.inputEl.selectionStart;
@@ -1737,7 +1737,7 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
 
         } else if (data.success && (typeof data.transcript !== 'string' || data.transcript.trim() === "")) {
             // Обробляємо випадок, коли транскрипція успішна, але порожня або не рядок
-            this.plugin.logger.info("Received successful but empty or non-string transcript. Nothing to insert.");
+            
         }
         else if (!data.success) { // Явно обробляємо випадок помилки
             this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
@@ -1800,20 +1800,20 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
 
      private async startVoiceRecognition(): Promise<void> {
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
-      this.plugin.logger.debug("VAD: Recording already in progress.");
+      
       return;
     }
 
     if (!this.speechWorker) {
       new Notice("Speech recognition feature not available (worker not initialized).");
-      this.plugin.logger.warn("Speech worker not initialized, aborting voice recognition.");
+      
       return;
     }
 
     const speechApiKey = this.plugin.settings.googleApiKey;
     if (!speechApiKey) {
       new Notice("Google API Key for speech recognition not configured. Please add it in plugin settings.");
-      this.plugin.logger.warn("Google API Key not configured, aborting voice recognition.");
+      
       return;
     }
     
@@ -1822,7 +1822,7 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
     const needLocalWorklet = this.plugin.settings.vadUseLocalWorkletIfAvailable; // Або якщо CDN для ворклету теж не варіант
 
     if ((needLocalModel && !this.vadModelArrayBuffer) || (needLocalWorklet && !this.vadWorkletJs)) {
-        this.plugin.logger.debug("Attempting to load VAD assets as they are missing or preferred locally.");
+        
         await this.loadVadAssets();
     }
 
@@ -1845,12 +1845,12 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
         const audioTracks = this.audioStream.getAudioTracks();
         if (audioTracks.length > 0) {
           const settings = audioTracks[0].getSettings();
-          this.plugin.logger.debug("AudioTrack settings from getUserMedia:", JSON.stringify(settings));
+          
           if (settings.sampleRate) {
-            this.plugin.logger.debug(`AudioStream sample rate: ${settings.sampleRate} Hz`);
+            
           }
         } else {
-            this.plugin.logger.warn("getUserMedia returned an audioStream with no audio tracks.");
+            
             new Notice("Could not get an audio track from the microphone.");
             return;
         }
@@ -1864,9 +1864,9 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       const preferredMimeType = "audio/webm;codecs=opus";
       if (MediaRecorder.isTypeSupported(preferredMimeType)) {
         recorderOptions = { mimeType: preferredMimeType };
-        this.plugin.logger.debug("Using preferred MIME type for MediaRecorder:", preferredMimeType);
+        
       } else {
-        this.plugin.logger.debug("Preferred MIME type not supported, using default for MediaRecorder.");
+        
       }
 
       this.mediaRecorder = new MediaRecorder(this.audioStream, recorderOptions);
@@ -1886,10 +1886,10 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       };
 
       this.mediaRecorder.onstop = () => {
-        this.plugin.logger.debug(`MediaRecorder stopped. Audio chunks count: ${audioChunks.length}. isVadSpeechDetected: ${this.isVadSpeechDetected}`);
+        
         if (this.vad) {
           this.vad.pause(); // Пауза VAD, щоб він не обробляв далі, коли запис зупинено
-          this.plugin.logger.debug("VAD paused on MediaRecorder stop.");
+          
         }
         if (this.vadSilenceTimer) {
           clearTimeout(this.vadSilenceTimer);
@@ -1901,14 +1901,14 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
             type: this.mediaRecorder?.mimeType || "audio/webm",
           });
           this.inputEl.placeholder = "Processing speech...";
-          this.plugin.logger.debug("Sending audioBlob to speech worker for processing.");
+          
           this.speechWorker.postMessage({
             apiKey: speechApiKey,
             audioBlob,
             languageCode: this.plugin.settings.speechLanguage || "uk-UA",
           });
         } else {
-          this.plugin.logger.debug(`Not sending to worker. audioChunks.length: ${audioChunks.length}, isVadSpeechDetected: ${this.isVadSpeechDetected}`);
+          
           this.getCurrentRoleDisplayName().then(roleName => this.updateInputPlaceholder(roleName));
           this.updateSendButtonState(); // Оновлюємо стан кнопки відправки, якщо нічого не розпізнано
         }
@@ -1924,27 +1924,27 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
       };
 
       this.mediaRecorder.start(); // Починаємо запис даних з мікрофону
-      this.plugin.logger.debug("MediaRecorder started.");
+      
 
       try {
         if (this.vad) {
-          this.plugin.logger.debug("Destroying previous VAD instance.");
+          
           await this.vad.destroy();
           this.vad = null;
         }
 
-        this.plugin.logger.debug("Attempting to initialize MicVAD...");
+        
         
         const vadOptions: any = { 
           stream: this.audioStream, // Передаємо аудіопотік в VAD
           ortConfig: (ort: any) => {
-            this.plugin.logger.debug("[VAD ortConfig] Attempting to configure ONNXRuntime-Web instance.");
+            
             if (ort.env && ort.env.wasm) {
-              this.plugin.logger.debug("[VAD ortConfig] WASM config before:", JSON.parse(JSON.stringify(ort.env.wasm)));
+              
               ort.env.wasm.numThreads = 1;
-              this.plugin.logger.debug("[VAD ortConfig] WASM config after (numThreads=1):", JSON.parse(JSON.stringify(ort.env.wasm)));
+              
             } else {
-              this.plugin.logger.warn("[VAD ortConfig] ort.env.wasm is not available for configuration during this call.");
+              
             }
           },
           
@@ -1959,13 +1959,13 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
 
             if (this.frameProcessedCounter % this.FRAME_PROCESSED_LOG_INTERVAL === 0) {
                 if (probValue !== -1) {
-                    this.plugin.logger.debug(`VAD Frame (${this.frameProcessedCounter}): isSpeech probability = ${probValue.toFixed(4)}`);
+                    
                 } else {
-                    this.plugin.logger.debug(`VAD Frame (${this.frameProcessedCounter}): received unexpected probability format:`, probabilities);
+                    
                 }
             }
             if (probValue > 0.9 && !this.isVadSpeechDetected && (this.frameProcessedCounter % Math.floor(this.FRAME_PROCESSED_LOG_INTERVAL / 3) === 0)) { 
-                 this.plugin.logger.warn(`VAD Frame: HIGH speech probability (${probValue.toFixed(4)}) but onSpeechStart not triggered yet. Current threshold: ${vadOptions.positiveSpeechThreshold}, minFrames: ${vadOptions.minSpeechFrames}`);
+                 
             }
           },
 
@@ -1975,20 +1975,20 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
             if (this.vadSilenceTimer) {
               clearTimeout(this.vadSilenceTimer);
               this.vadSilenceTimer = null;
-              this.plugin.logger.debug("VAD EVENT: Cleared vadSilenceTimer on speech start.");
+              
             }
           },
           onSpeechEnd: (/*audioChunk: Float32Array*/) => { 
             this.plugin.logger.error(`VAD EVENT: !!! SPEECH END DETECTED !!! isVadSpeechDetected: ${this.isVadSpeechDetected}`);
             if (this.isVadSpeechDetected && this.mediaRecorder && this.mediaRecorder.state === "recording") {
               if (this.vadSilenceTimer) clearTimeout(this.vadSilenceTimer);
-              this.plugin.logger.debug("VAD EVENT: Setting vadSilenceTimer on speech end.");
+              
               this.vadSilenceTimer = setTimeout(() => {
-                this.plugin.logger.debug("VAD EVENT: vadSilenceTimer expired. Stopping voice recording.");
+                
                 this.stopVoiceRecording(true); 
               }, this.VAD_SILENCE_TIMEOUT_MS);
             } else {
-                this.plugin.logger.debug("VAD EVENT: Speech ended, but not processing (isVadSpeechDetected false or recorder not recording).");
+                
             }
           },
           // --- Параметри VAD для тестування (можеш змінювати) ---
@@ -2005,7 +2005,7 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
                 const modelBlob = new Blob([this.vadModelArrayBuffer], { type: 'application/octet-stream' });
                 this.vadObjectUrls.model = URL.createObjectURL(modelBlob);
                 vadOptions.modelURL = this.vadObjectUrls.model; 
-                this.plugin.logger.debug("Using local VAD ONNX model via Object URL:", this.vadObjectUrls.model);
+                
             } catch(e) {
                 this.plugin.logger.error("Error creating Object URL for local VAD model:", e);
             }
@@ -2017,25 +2017,25 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
                 const workletBlob = new Blob([this.vadWorkletJs], { type: 'application/javascript' });
                 this.vadObjectUrls.worklet = URL.createObjectURL(workletBlob);
                 vadOptions.workletURL = this.vadObjectUrls.worklet; 
-                this.plugin.logger.debug("Using local VAD worklet via Object URL:", this.vadObjectUrls.worklet);
+                
              } catch(e) {
                 this.plugin.logger.error("Error creating Object URL for local VAD worklet:", e);
              }
         }
 
         this.vad = await MicVAD.new(vadOptions);
-        this.plugin.logger.debug("VAD initialized (MicVAD.new called).");
+        
 
          if (this.vad) {
-            this.plugin.logger.debug("Attempting to explicitly call this.vad.start()...");
+            
             this.vad.start(); // MicVAD.new має викликати це, якщо startImmediately:true (дефолт), але для певності.
                            // Це також має викликати audioContext.resume(), якщо він suspended.
-            this.plugin.logger.debug("this.vad.start() called.");
+            
 
             // Прямий доступ до audioContext або audioNode неможливий згідно з типами.
             // Ми не можемо надійно перевірити стан AudioContext ззовні.
             // Покладаємося на те, що this.vad.start() зробив свою роботу.
-            this.plugin.logger.debug("Cannot directly check VAD AudioContext state due to encapsulation. Assuming start() handled it.");
+            
         }
 
       } catch (vadError: any) {
@@ -2063,12 +2063,12 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
  private revokeVadObjectUrls() {
     if (this.vadObjectUrls.model) {
       URL.revokeObjectURL(this.vadObjectUrls.model);
-      this.plugin.logger.debug("Revoked VAD model Object URL:", this.vadObjectUrls.model);
+      
       delete this.vadObjectUrls.model;
     }
     if (this.vadObjectUrls.worklet) {
       URL.revokeObjectURL(this.vadObjectUrls.worklet);
-      this.plugin.logger.debug("Revoked VAD worklet Object URL:", this.vadObjectUrls.worklet);
+      
       delete this.vadObjectUrls.worklet;
     }
   }
@@ -2076,7 +2076,7 @@ const workerBlob = new Blob([workerCode], { type: "application/javascript" });
 
 
   private stopVoiceRecording(processAudio: boolean): void {
-    this.plugin.logger.debug(`Stopping voice recording. Process audio: ${processAudio}`);
+    
 this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вони були створені
     if (this.vad) {
       this.vad.pause(); // Зупиняємо VAD від обробки нових даних
@@ -2090,9 +2090,9 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
     if (this.mediaRecorder && this.mediaRecorder.state === "recording") {
       this.mediaRecorder.stop(); // Це викличе onstop, де буде обробка audioChunks
-      this.plugin.logger.debug("MediaRecorder.stop() called.");
+      
     } else if (this.mediaRecorder && this.mediaRecorder.state === "inactive") {
-      this.plugin.logger.debug("MediaRecorder was already inactive.");
+      
       // Якщо не processAudio, а ми тут, значить, можливо, VAD не спрацював або була помилка
       // і потрібно просто оновити UI
       if (!processAudio) {
@@ -2115,20 +2115,20 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     if (this.audioStream) {
       this.audioStream.getTracks().forEach(track => track.stop());
       this.audioStream = null;
-      this.plugin.logger.debug("Audio stream tracks stopped.");
+      
     }
     // this.mediaRecorder = null; // Не скидаємо тут, onstop може ще ним користуватися
   }
 
     public checkAllMessagesForCollapsing(): void {
-    this.plugin.logger.debug("[checkAllMessagesForCollapsing] Starting scan for messages to collapse/expand.");
+    
     const messageGroups = this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`);
     
     if (!messageGroups || messageGroups.length === 0) {
-        this.plugin.logger.debug("[checkAllMessagesForCollapsing] No message groups found in chat container.");
+        
         return;
     }
-    this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Found ${messageGroups.length} message groups.`);
+    
 
     messageGroups.forEach((msgGroupEl, index) => {
       const groupTimestampAttr = msgGroupEl.getAttribute("data-timestamp");
@@ -2147,17 +2147,17 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
                                      this.isProcessing; 
 
       if (isStreamingPlaceholder) {
-        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} IS an active streaming placeholder. Hiding toggle button if exists.`);
+        
         const toggleButton = msgGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
         if (toggleButton) {
             toggleButton.hide();
-            this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1}: Streaming placeholder toggle button hidden.`);
+            
         }
         const contentCollapsible = msgGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
         if (contentCollapsible) {
           contentCollapsible.style.maxHeight = ""; 
           contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-          this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1}: Streaming placeholder content uncollapsed.`);
+          
         }
         return; 
       }
@@ -2169,11 +2169,11 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       const shouldProcess = hasTimestamp || (isPlaceholder && processingComplete);
       
       if (shouldProcess) {
-        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} should be processed for collapsing. HasTimestamp: ${hasTimestamp}, IsPlaceholder: ${isPlaceholder}, ProcessingComplete: ${processingComplete}`);
+        
         
         const messageElementExists = !!msgGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
         if (messageElementExists) {
-            this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} has a .message element. Calling checkMessageForCollapsing.`);
+            
             this.checkMessageForCollapsing(msgGroupEl);
         } else {
             this.plugin.logger.warn(`[checkAllMessagesForCollapsing] Group ${index + 1} SKIPPED (shouldProcess=true, but NO .message element).`, {
@@ -2183,10 +2183,10 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
             });
         }
       } else {
-        this.plugin.logger.debug(`[checkAllMessagesForCollapsing] Group ${index + 1} will NOT be processed for collapsing. HasTimestamp: ${hasTimestamp}, IsPlaceholder: ${isPlaceholder}, ProcessingComplete: ${processingComplete}`);
+        
       }
     });
-    this.plugin.logger.debug("[checkAllMessagesForCollapsing] Finished scan.");
+    
   }
 
   // src/OllamaView.ts
@@ -2898,10 +2898,10 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
     public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
     const groupTimestampAttr = messageGroupEl.getAttribute("data-timestamp") || messageGroupEl.getAttribute("data-placeholder-timestamp");
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Entered for group with effective timestamp: ${groupTimestampAttr}.`);
+    
 
     if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
-        this.plugin.logger.debug(`[checkMessageForCollapsing] Group (ts: ${groupTimestampAttr}) is a placeholder without final timestamp. Hiding toggle button.`);
+        
         const tempToggleButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
         if (tempToggleButton) tempToggleButton.hide();
         return;
@@ -2909,43 +2909,43 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     
     const messageEl = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE}`);
     if (!messageEl) {
-      this.plugin.logger.warn(`[checkMessageForCollapsing] No .message element found in group (ts: ${groupTimestampAttr}). Aborting for this group.`);
+      
       return;
     }
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Found .message element for group (ts: ${groupTimestampAttr}).`);
+    
 
     const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
     const actionsWrapper = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
     const toggleCollapseButton = actionsWrapper?.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
 
     if (!toggleCollapseButton) {
-        this.plugin.logger.debug(`[checkMessageForCollapsing] No TOGGLE_COLLAPSE_BUTTON found for group (ts: ${groupTimestampAttr}). Collapsing logic not applicable.`);
+        
         if (contentCollapsible) {
             contentCollapsible.style.maxHeight = "";
             contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-             this.plugin.logger.debug(`[checkMessageForCollapsing] Ensured contentCollapsible is uncollapsed for group (ts: ${groupTimestampAttr}) as no button found.`);
+             
         }
         return;
     }
-     this.plugin.logger.debug(`[checkMessageForCollapsing] Found TOGGLE_COLLAPSE_BUTTON for group (ts: ${groupTimestampAttr}).`);
+     
 
     if (!contentCollapsible) {
-        this.plugin.logger.warn(`[checkMessageForCollapsing] No CONTENT_COLLAPSIBLE element found for group (ts: ${groupTimestampAttr}), but button exists. Hiding button.`);
+        
         toggleCollapseButton.hide();
         toggleCollapseButton.classList.remove("explicitly-expanded");
         return;
     }
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Found CONTENT_COLLAPSIBLE for group (ts: ${groupTimestampAttr}).`);
+    
     
     const maxH = this.plugin.settings.maxMessageHeight;
-    this.plugin.logger.debug(`[checkMessageForCollapsing] maxMessageHeight setting: ${maxH} for group (ts: ${groupTimestampAttr}).`);
+    
 
     const isStreamingNow = this.isProcessing && 
                            messageGroupEl.classList.contains("placeholder") && 
                            contentCollapsible.classList.contains("streaming-text");
 
     if (isStreamingNow) {
-      this.plugin.logger.debug(`[checkMessageForCollapsing] Group (ts: ${groupTimestampAttr}) IS actively streaming. Hiding button, uncollapsing content.`);
+      
       toggleCollapseButton.hide(); 
       contentCollapsible.style.maxHeight = ""; 
       contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
@@ -2953,7 +2953,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
 
     if (maxH <= 0) { 
-      this.plugin.logger.debug(`[checkMessageForCollapsing] maxMessageHeight <= 0 for group (ts: ${groupTimestampAttr}). Hiding button, uncollapsing content.`);
+      
       toggleCollapseButton.hide();
       toggleCollapseButton.classList.remove("explicitly-expanded");
       contentCollapsible.style.maxHeight = "";
@@ -2961,16 +2961,16 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       return;
     }
 
-    this.plugin.logger.debug(`[checkMessageForCollapsing] Proceeding to rAF for group (ts: ${groupTimestampAttr}).`);
+    
     requestAnimationFrame(() => {
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Entered for group (ts: ${groupTimestampAttr}).`);
+      
       if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected) {
-        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Elements disconnected for group (ts: ${groupTimestampAttr}). Aborting rAF.`);
+        
         return;
       }
 
       const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): wasExplicitlyExpanded = ${wasExplicitlyExpanded}.`);
+      
       
       // Запам'ятовуємо стиль, якщо він був встановлений, ДО того як ми його скинемо
       // Це важливо, якщо rAF викликається кілька разів і вміст не змінився
@@ -2979,36 +2979,36 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
       contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження для вимірювання
       const scrollHeight = contentCollapsible.scrollHeight;
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight = ${scrollHeight}, maxH = ${maxH}.`);
+      
       
       if (scrollHeight > maxH) {
-        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight > maxH. Button should be visible.`);
+        
         toggleCollapseButton.show();
         
         if (wasExplicitlyExpanded) {
-            this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Was explicitly expanded. Uncollapsing.`);
+            
             contentCollapsible.style.maxHeight = ""; 
             contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-up");
             toggleCollapseButton.setAttribute("title", "Show Less");
         } else {
-            this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Not explicitly expanded. Collapsing.`);
+            
             contentCollapsible.style.maxHeight = `${maxH}px`;
             contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-down");
             toggleCollapseButton.setAttribute("title", "Show More");
         }
       } else { 
-        this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): scrollHeight <= maxH. Button should be hidden.`);
+        
         toggleCollapseButton.hide();
         if (wasExplicitlyExpanded) {
             toggleCollapseButton.classList.remove("explicitly-expanded");
-            this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Group (ts: ${groupTimestampAttr}): Removing 'explicitly-expanded' as content is now short.`);
+            
         }
         contentCollapsible.style.maxHeight = ""; 
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
       }
-      this.plugin.logger.debug(`[checkMessageForCollapsing rAF] Finished for group (ts: ${groupTimestampAttr}). Final state: button visible = ${toggleCollapseButton.style.display !== 'none'}, collapsed = ${contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED)}`);
+      
     });
   }
 
@@ -3371,7 +3371,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       try {
         await hmaErrorPromise;
       } catch (e_hma) {
-        this.plugin.logger.warn("[SendMessage] HMA for error display message failed or timed out:", e_hma);
+        
       }
     } finally {
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
@@ -3463,7 +3463,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
     try {
       if (!data || !data.message || !messageForLog || !messageTimestampForLog) {
-        this.plugin.logger.warn("[handleMessageAdded] Invalid data received or message/timestamp missing.", data);
+        
         if (messageTimestampForLog) this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
         return;
       }
@@ -3479,14 +3479,14 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       });
 
       if (!this.chatContainer || !this.plugin.chatManager) {
-        this.plugin.logger.warn("[handleMessageAdded] chatContainer or chatManager not available. Aborting.");
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
 
       const activeChatId = this.plugin.chatManager.getActiveChatId();
       if (eventChatId !== activeChatId) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message for non-active chat (${eventChatId} vs ${activeChatId}). Skipping UI update.`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -3506,7 +3506,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
         );
 
         if (this.activePlaceholder && this.activePlaceholder.timestamp === messageTimestampMs) {
-          this.plugin.logger.debug(`[handleMessageAdded] Removing active placeholder for skipped tool_call assistant message (ts: ${messageTimestampMs})`);
+          
           if (this.activePlaceholder.groupEl.isConnected) {
             this.activePlaceholder.groupEl.remove();
           }
@@ -3520,7 +3520,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
         `.${CSS_CLASSES.MESSAGE_GROUP}:not(.placeholder)[data-timestamp="${messageTimestampMs}"]`
       );
       if (existingRenderedMessage) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message (ts: ${messageTimestampMs}) already rendered. Skipping duplicate render.`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
@@ -3535,18 +3535,18 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
         this.activePlaceholder?.timestamp === messageTimestampMs; 
 
       if (isAlreadyInLogicCache && !isPotentiallyAssistantForPlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Message (ts: ${messageTimestampMs}) already in logic cache and not for placeholder update. Skipping.`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampMs);
         return;
       }
 
       if (!isAlreadyInLogicCache) {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding message (ts: ${messageTimestampMs}) to currentMessages logic cache.`);
+        
         this.currentMessages.push(message); 
       }
 
       if (isPotentiallyAssistantForPlaceholder && this.activePlaceholder) {
-        this.plugin.logger.debug(`[handleMessageAdded] Updating active placeholder for assistant message (ts: ${messageTimestampMs}).`);
+        
         const placeholderToUpdate = this.activePlaceholder; 
         this.activePlaceholder = null; 
 
@@ -3564,7 +3564,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
           ) as HTMLElement | null;
 
           if (!messageDomElement) {
-            this.plugin.logger.warn(`[handleMessageAdded] Placeholder (ts: ${messageTimestampMs}) missing .message element during finalization. Removing placeholder and adding as new.`);
+            
             if (placeholderToUpdate.groupEl.isConnected) placeholderToUpdate.groupEl.remove();
             await this.addMessageStandard(message);
           } else {
@@ -3594,12 +3594,12 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
               let metaActionsWrapper = placeholderToUpdate.messageWrapper.querySelector<HTMLElement>(".message-meta-actions-wrapper");
               if (!metaActionsWrapper) {
                   metaActionsWrapper = placeholderToUpdate.messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-                  this.plugin.logger.debug(`[handleMessageAdded] Created new .message-meta-actions-wrapper for placeholder (ts: ${messageTimestampMs})`);
+                  
               } else {
                   // Clear existing buttons if any, to prevent duplication on potential re-renders/updates
                   const existingActions = metaActionsWrapper.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
                   if (existingActions) {
-                    this.plugin.logger.debug(`[handleMessageAdded] Removing existing .message-actions from meta wrapper for placeholder (ts: ${messageTimestampMs})`);
+                    
                     existingActions.remove();
                   }
               }
@@ -3614,7 +3614,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
                 this,
                 placeholderToUpdate.groupEl // The message group for collapse context
               );
-              this.plugin.logger.debug(`[handleMessageAdded] Called addAssistantActionButtons for finalized placeholder (ts: ${messageTimestampMs}).`);
+              
 
               this.lastMessageElement = placeholderToUpdate.groupEl;
               this.hideEmptyState();
@@ -3622,7 +3622,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
               
               setTimeout(() => {
                 if (finalMessageGroupElement?.isConnected) {
-                    this.plugin.logger.debug(`[handleMessageAdded] Scheduling checkMessageForCollapsing for finalized placeholder (ts: ${messageTimestampMs}).`);
+                    
                     this.checkMessageForCollapsing(finalMessageGroupElement);
                 }
               }, 70);
@@ -3638,11 +3638,11 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
             }
           }
         } else {
-          this.plugin.logger.warn(`[handleMessageAdded] Placeholder (ts: ${messageTimestampMs}) or its core elements disconnected before finalization. Adding as new.`);
+          
           await this.addMessageStandard(message);
         }
       } else {
-        this.plugin.logger.debug(`[handleMessageAdded] Adding new standard message (role: ${message.role}, ts: ${messageTimestampMs}).`);
+        
         await this.addMessageStandard(message);
       }
     } catch (outerError: any) {
@@ -3654,10 +3654,10 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       });
     } finally {
       if (messageTimestampForLog && this.plugin.chatManager.messageAddedResolvers.has(messageTimestampForLog)) {
-        this.plugin.logger.debug(`[handleMessageAdded] Invoking HMA resolver for message (ts: ${messageTimestampForLog}).`);
+        
         this.plugin.chatManager.invokeHMAResolver(messageTimestampForLog);
       } else if (messageTimestampForLog) {
-        this.plugin.logger.debug(`[handleMessageAdded] HMA resolver for message (ts: ${messageTimestampForLog}) was already cleared or never existed.`);
+        
       }
     }
   }
@@ -4061,7 +4061,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     const toolCallEndTag = "</tool_call>";
 
     for await (const chunk of llmStream) {
-      // this.plugin.logger.debug("[_processLlmStream] Received chunk:", chunk);
+      // 
 
       let isLastChunk = false;
 
@@ -4075,7 +4075,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       // або додати 'type: "content"' до OllamaGenerateChunk
       else if ("type" in chunk && chunk.type === "tool_calls" && "calls" in chunk) {
         // OllamaToolCallsChunk
-        this.plugin.logger.debug("[_processLlmStream] Received structured tool_calls chunk:", chunk.calls);
+        
         if (!parsedToolCalls) parsedToolCalls = [];
 
         for (const call of chunk.calls) {
