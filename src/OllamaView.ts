@@ -2120,15 +2120,12 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     // this.mediaRecorder = null; // Не скидаємо тут, onstop може ще ним користуватися
   }
 
-  // src/OllamaView.ts
-
-  public checkAllMessagesForCollapsing(): void {
+    public checkAllMessagesForCollapsing(): void {
     this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach(msgGroupEl => {
-      // Перевіряємо, чи це не активний плейсхолдер для стрімінгу,
-      // для якого checkMessageForCollapsing не має виконуватися або має особливу логіку
+      // Перевіряємо, чи це не активний плейсхолдер для стрімінгу
       const isStreamingPlaceholder = msgGroupEl.classList.contains("placeholder") && 
                                      msgGroupEl.hasAttribute("data-placeholder-timestamp") && 
-                                     this.isProcessing; // Тільки якщо йде обробка
+                                     this.isProcessing; 
 
       if (isStreamingPlaceholder) {
         // Для активних стрімінг-плейсхолдерів кнопка згортання не потрібна
@@ -2144,15 +2141,24 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
       // Викликаємо checkMessageForCollapsing тільки для "фіналізованих" груп повідомлень
       // або для плейсхолдерів, які вже отримали свій data-timestamp (тобто стали повідомленнями)
+      // або для "залишених" плейсхолдерів (обробка завершена)
       if (msgGroupEl.hasAttribute("data-timestamp") || 
-          (msgGroupEl.classList.contains("placeholder") && !this.isProcessing)) { // Плейсхолдер, але обробка завершена
-        this.checkMessageForCollapsing(msgGroupEl);
+          (msgGroupEl.classList.contains("placeholder") && !this.isProcessing)) {
+            // Додаткова перевірка: викликаємо checkMessageForCollapsing, тільки якщо є базовий елемент .message,
+            // щоб уникнути попереджень для повністю порожніх або некоректних груп.
+            if (msgGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`)) {
+                 this.checkMessageForCollapsing(msgGroupEl);
+            } else if (msgGroupEl.classList.contains("placeholder")) {
+                // Це "залишений" плейсхолдер без внутрішньої структури .message.
+                // Ймовірно, його слід ігнорувати або він має бути видалений іншою логікою.
+                this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping abandoned placeholder without .message structure:", { classList: Array.from(msgGroupEl.classList) });
+            } else if (!msgGroupEl.hasAttribute("data-timestamp")) {
+                 // Це не плейсхолдер, не має timestamp, і немає .message. Можливо, якась інша група елементів.
+                 this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping group without timestamp, not a placeholder, and missing .message structure:", { classList: Array.from(msgGroupEl.classList) });
+            }
       } else if (msgGroupEl.classList.contains("placeholder")) {
-        // this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping placeholder without data-timestamp during processing:", msgGroupEl);
-      } else {
-        // this.plugin.logger.warn("[checkAllMessagesForCollapsing] Found message group without data-timestamp and not a placeholder:", msgGroupEl);
-        // Можливо, тут теж варто викликати, якщо це якась непередбачена ситуація
-        // this.checkMessageForCollapsing(msgGroupEl); 
+        // Це активний плейсхолдер (this.isProcessing is true), вже оброблений логікою isStreamingPlaceholder.
+        // Або це плейсхолдер без timestamp під час обробки.
       }
     });
   }
@@ -2864,10 +2870,9 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
   }
 
-  // src/OllamaView.ts
-
-  public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
-    // Переконуємося, що ми працюємо з реальною групою повідомлення, а не з плейсхолдером, який ще не фіналізований
+   public checkMessageForCollapsing(messageGroupEl: HTMLElement): void {
+    // Попередня перевірка на активний плейсхолдер вже є в checkAllMessagesForCollapsing,
+    // але для безпеки можна залишити і тут, якщо метод викликається з інших місць.
     if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
         const tempToggleButton = messageGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
         tempToggleButton?.hide();
@@ -2875,24 +2880,33 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
     
     const messageEl = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE}`);
+    // Якщо немає елемента .message, то це не стандартна структура повідомлення, виходимо.
+    // Попередження про це вже обробляється в checkAllMessagesForCollapsing, якщо це там виявлено.
     if (!messageEl) {
-      this.plugin.logger.warn("[checkMsgCollapse] No .message element found in group", messageGroupEl);
+      // Можна додати тут лог, якщо цей метод викликається напряму і messageEl відсутній.
+      // this.plugin.logger.warn("[checkMsgCollapseDirect] No .message element in group.", { classList: Array.from(messageGroupEl.classList) });
       return;
     }
 
     const contentCollapsible = messageEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-    if (!contentCollapsible) {
-      this.plugin.logger.warn("[checkMsgCollapse] No .content-collapsible element found in message", messageEl);
-      return;
-    }
     
     const actionsWrapper = messageGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
     const toggleCollapseButton = actionsWrapper?.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
 
-    if (!actionsWrapper || !toggleCollapseButton) {
-      contentCollapsible.style.maxHeight = "";
-      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-      return;
+    // Якщо немає кнопки згортання АБО немає елемента для згортання, то ця логіка не застосовується.
+    // Це нормально для системних повідомлень, повідомлень про помилки тощо.
+    if (!toggleCollapseButton || !contentCollapsible) {
+      // Якщо є contentCollapsible, але немає кнопки, переконуємося, що воно не згорнуте.
+      if (contentCollapsible) {
+        contentCollapsible.style.maxHeight = "";
+        contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+      }
+      // Якщо є кнопка, але немає contentCollapsible (малоймовірно, але можливо), ховаємо кнопку.
+      if (toggleCollapseButton && !contentCollapsible) {
+        toggleCollapseButton.hide();
+        toggleCollapseButton.classList.remove("explicitly-expanded");
+      }
+      return; // Виходимо, оскільки згортання не передбачено для цього типу повідомлення.
     }
     
     const maxH = this.plugin.settings.maxMessageHeight;
@@ -2921,11 +2935,6 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
       const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
       
-      // Зберігаємо поточний стан згортання перед вимірюванням
-      const initialWasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
-      const initialMaxHeightStyle = contentCollapsible.style.maxHeight;
-
-      // Тимчасово знімаємо обмеження для вимірювання реальної висоти
       contentCollapsible.style.maxHeight = ""; 
       const scrollHeight = contentCollapsible.scrollHeight;
       
@@ -2933,22 +2942,18 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
         toggleCollapseButton.show();
         
         if (wasExplicitlyExpanded) {
-            // Користувач явно розгорнув, залишаємо розгорнутим
             contentCollapsible.style.maxHeight = ""; 
             contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-up");
             toggleCollapseButton.setAttribute("title", "Show Less");
         } else {
-            // Повинно бути згорнуте за замовчуванням або якщо користувач згорнув
             contentCollapsible.style.maxHeight = `${maxH}px`;
             contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
             setIcon(toggleCollapseButton, "chevron-down");
             toggleCollapseButton.setAttribute("title", "Show More");
         }
       } else { 
-        // scrollHeight <= maxH, згортання не потрібне
         toggleCollapseButton.hide();
-        // Скидаємо стан, якщо воно було згорнуте або явно розгорнуте, але тепер вміст малий
         if (wasExplicitlyExpanded) toggleCollapseButton.classList.remove("explicitly-expanded");
         contentCollapsible.style.maxHeight = ""; 
         contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);

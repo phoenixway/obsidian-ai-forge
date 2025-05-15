@@ -21496,7 +21496,6 @@ This action cannot be undone.`,
       this.plugin.logger.debug("Audio stream tracks stopped.");
     }
   }
-  // src/OllamaView.ts
   checkAllMessagesForCollapsing() {
     this.chatContainer?.querySelectorAll(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach((msgGroupEl) => {
       const isStreamingPlaceholder = msgGroupEl.classList.contains("placeholder") && msgGroupEl.hasAttribute("data-placeholder-timestamp") && this.isProcessing;
@@ -21511,9 +21510,14 @@ This action cannot be undone.`,
         return;
       }
       if (msgGroupEl.hasAttribute("data-timestamp") || msgGroupEl.classList.contains("placeholder") && !this.isProcessing) {
-        this.checkMessageForCollapsing(msgGroupEl);
+        if (msgGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`)) {
+          this.checkMessageForCollapsing(msgGroupEl);
+        } else if (msgGroupEl.classList.contains("placeholder")) {
+          this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping abandoned placeholder without .message structure:", { classList: Array.from(msgGroupEl.classList) });
+        } else if (!msgGroupEl.hasAttribute("data-timestamp")) {
+          this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping group without timestamp, not a placeholder, and missing .message structure:", { classList: Array.from(msgGroupEl.classList) });
+        }
       } else if (msgGroupEl.classList.contains("placeholder")) {
-      } else {
       }
     });
   }
@@ -21947,7 +21951,6 @@ This action cannot be undone.`,
       this.newMessagesIndicatorEl?.classList.remove(CSS_CLASS_VISIBLE);
     }
   }
-  // src/OllamaView.ts
   checkMessageForCollapsing(messageGroupEl) {
     if (messageGroupEl.classList.contains("placeholder") && !messageGroupEl.hasAttribute("data-timestamp")) {
       const tempToggleButton = messageGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
@@ -21956,19 +21959,20 @@ This action cannot be undone.`,
     }
     const messageEl = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE}`);
     if (!messageEl) {
-      this.plugin.logger.warn("[checkMsgCollapse] No .message element found in group", messageGroupEl);
       return;
     }
     const contentCollapsible = messageEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-    if (!contentCollapsible) {
-      this.plugin.logger.warn("[checkMsgCollapse] No .content-collapsible element found in message", messageEl);
-      return;
-    }
     const actionsWrapper = messageGroupEl.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`);
     const toggleCollapseButton = actionsWrapper?.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
-    if (!actionsWrapper || !toggleCollapseButton) {
-      contentCollapsible.style.maxHeight = "";
-      contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+    if (!toggleCollapseButton || !contentCollapsible) {
+      if (contentCollapsible) {
+        contentCollapsible.style.maxHeight = "";
+        contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
+      }
+      if (toggleCollapseButton && !contentCollapsible) {
+        toggleCollapseButton.hide();
+        toggleCollapseButton.classList.remove("explicitly-expanded");
+      }
       return;
     }
     const maxH = this.plugin.settings.maxMessageHeight;
@@ -21990,8 +21994,6 @@ This action cannot be undone.`,
       if (!contentCollapsible.isConnected || !toggleCollapseButton.isConnected)
         return;
       const wasExplicitlyExpanded = toggleCollapseButton.classList.contains("explicitly-expanded");
-      const initialWasCollapsed = contentCollapsible.classList.contains(CSS_CLASSES.CONTENT_COLLAPSED);
-      const initialMaxHeightStyle = contentCollapsible.style.maxHeight;
       contentCollapsible.style.maxHeight = "";
       const scrollHeight = contentCollapsible.scrollHeight;
       if (scrollHeight > maxH) {
