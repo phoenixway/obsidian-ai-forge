@@ -263,9 +263,11 @@ $avatar-icon-size-factor: 0.65;
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
-    justify-content: flex-start; // Явно, щоб margin-left: auto спрацював
+    justify-content: flex-start; 
     
-    // .message-actions-wrapper залишається зліва за замовчуванням
+    .message-actions-wrapper { 
+      // Залишається зліва за замовчуванням
+    }
     .message-timestamp {
       margin-left: auto; // Відштовхує час вправо
     }
@@ -273,14 +275,22 @@ $avatar-icon-size-factor: 0.65;
 
   // Для повідомлень користувача (бульбашка справа): час зліва, кнопки справа
   .user-message-group .message-wrapper & {
-    justify-content: space-between; // Явно встановлюємо space-between
-    // DOM порядок (з UserMessageRenderer.ts): timestamp (перший), потім actions-wrapper (другий)
-    // space-between розмістить timestamp зліва, actions-wrapper справа
+    justify-content: flex-start; // Починаємо все зліва
+
+    .message-timestamp { 
+      order: 1; // Час - перший візуально
+      margin-left: 0; // Скидаємо будь-які автоматичні відступи
+    }
+    .message-actions-wrapper {
+      order: 2; // Кнопки - другі візуально
+      margin-left: auto; // Відштовхуємо блок кнопок вправо
+    }
   }
 
   .system-message-group .message-wrapper & { 
     justify-content: center; 
     .message-actions-wrapper { display: none; } 
+    // .message-timestamp { order: 1; } // Якщо тут потрібен order, додайте
   }
 }
 
@@ -294,12 +304,13 @@ $avatar-icon-size-factor: 0.65;
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
     opacity: 0.75;
-    margin-left: 0; // Важливо: скидаємо margin-left, щоб не було конфлікту з space-between
+    // margin-left: 0; // Вже встановлено вище в специфічному блоці для .user-message-group
   }
   
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
       color: var(--text-faint);
-      margin-left: 0; // Скидаємо margin-left
+      margin-left: 0; // Скидаємо margin-left для системних, якщо він не потрібен
+      // order: 1; // Якщо тут потрібен order, додайте
   }
   // Для AI/Tool/Error .message-timestamp вже має margin-left: auto з попереднього блоку
 }
@@ -317,6 +328,7 @@ $avatar-icon-size-factor: 0.65;
 
   // Стилі для кнопок всередині повідомлень користувача
   .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+     // margin-left: auto; // Вже встановлено вище в специфічному блоці для .user-message-group
      button.message-action-button {
         color: rgba(255, 255, 255, 0.8); 
         &:hover { 
@@ -324,17 +336,16 @@ $avatar-icon-size-factor: 0.65;
             color: white; 
         }
      }
-     .delete-message-button.danger-option { // Більш специфічний селектор для кнопки видалення в user-message
-        color: rgba(255, 150, 150, 0.8) !important;  // !important для перекриття, якщо потрібно
+     .delete-message-button.danger-option {
+        color: rgba(255, 150, 150, 0.8) !important;
         &:hover { 
             background-color: rgba(200, 50, 50, 0.5) !important; 
             color: white !important; 
         } 
      }
   }
-  // Загальні стилі для кнопки видалення (якщо вона НЕ в повідомленні користувача)
+  // Загальні стилі для кнопки видалення (застосуються, якщо більш специфічні не перекриють)
   .delete-message-button.danger-option { 
-    // Цей стиль застосується, якщо попередній, більш специфічний, не спрацює
     color: var(--text-error); 
     &:hover { 
         color: var(--text-on-accent); 
