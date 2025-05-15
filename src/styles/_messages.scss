@@ -59,7 +59,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 %base-action-button {
-  background: transparent !important; // !important залишаємо для плейсхолдера, якщо він десь критично використовується
+  background: transparent !important; // Залишаємо, якщо є залежності
   border: none;
   box-shadow: none;
   padding: 1px;
@@ -70,7 +70,7 @@ $avatar-icon-size-factor: 0.65;
   @include flex-layout($align: center, $justify: center);
   box-sizing: border-box;
   margin-left: 0;
-  position: relative !important; // ДІАГНОСТИКА: Гарантуємо, що кнопки не absolute
+  position: relative; // Важливо: щоб кнопки були у потоці
 
   .svg-icon {
     width: 14px;
@@ -78,30 +78,14 @@ $avatar-icon-size-factor: 0.65;
   }
 
   &:hover {
-    background: var(--background-modifier-hover) !important;
+    background: var(--background-modifier-hover) !important; // Залишаємо, якщо є залежності
     color: var(--text-normal);
     transform: scale(1.05);
   }
 }
 
 %button-like-text {
-  display: inline-block;
-  padding: calc(var(--chat-spacing-unit, 5px) * 0.5) calc(var(--chat-spacing-unit, 5px) * 1.5);
-  font-size: var(--font-ui-small, 0.8em);
-  color: var(--text-muted);
-  background-color: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-m, 12px);
-  cursor: pointer;
-  text-align: center;
-  @include transition((color, background-color, border-color));
-  box-sizing: border-box;
-
-  &:hover {
-    color: var(--text-accent-hover);
-    background-color: var(--background-modifier-hover);
-    border-color: var(--background-modifier-border-hover);
-  }
+  // ... (без змін) ...
 }
 
 // --- Початок стилів ---
@@ -139,61 +123,61 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-meta-actions-wrapper {
-  display: flex !important; 
-  align-items: center !important; 
+  display: flex; 
+  align-items: center; 
   width: 100%;                  
   margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); 
   padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5); 
   box-sizing: border-box;
   min-height: 20px; 
-  position: relative !important; // ДІАГНОСТИКА: Щоб діти не позиціонувалися відносно чогось іншого
+  position: relative; // Щоб діти з position:absolute (якщо такі будуть для інших цілей) позиціонувалися відносно цього блоку
 
   // Для AI-подібних повідомлень (бульбашка зліва): кнопки зліва, час справа
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
-    justify-content: flex-start !important; 
+    justify-content: flex-start; 
     
     .message-actions-wrapper { 
-      order: 1 !important; 
-      margin-left: 0 !important;
-      margin-right: 0 !important;
-      position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
+      order: 1; 
+      margin-left: 0;
+      margin-right: 0; // Додатково для чистоти
+      position: relative; // Гарантуємо, що у потоці
     }
     .message-timestamp {
-      order: 2 !important; 
-      margin-left: auto !important; 
-      margin-right: 0 !important;
-      position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
+      order: 2; 
+      margin-left: auto; 
+      margin-right: 0; // Додатково для чистоти
+      position: relative; // Гарантуємо, що у потоці
     }
   }
 
   // Для повідомлень користувача (бульбашка справа): час зліва, кнопки справа
   .user-message-group .message-wrapper & {
-    justify-content: flex-start !important; 
+    justify-content: flex-start; 
 
     .message-timestamp { 
-      order: 1 !important; 
-      margin-left: 0 !important; 
-      margin-right: 0 !important;
-      position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
+      order: 1; 
+      margin-left: 0; 
+      margin-right: 0; // Додатково для чистоти
+      position: relative; // Гарантуємо, що у потоці
     }
     .message-actions-wrapper {
-      order: 2 !important; 
-      margin-left: auto !important; 
-      margin-right: 0 !important;
-      position: relative !important; // ДІАГНОСТИКА: ЯВНО СКИДАЄМО ABSOLUTE
+      order: 2; 
+      margin-left: auto; 
+      margin-right: 0; // Додатково для чистоти
+      position: relative; // Гарантуємо, що у потоці
     }
   }
 
   .system-message-group .message-wrapper & { 
-    justify-content: center !important; 
-    .message-actions-wrapper { display: none !important; } 
+    justify-content: center; 
+    .message-actions-wrapper { display: none; } 
     .message-timestamp {
-        order: 1 !important; 
-        margin-left: 0 !important; 
-        margin-right: 0 !important;
-        position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
+        order: 1; 
+        margin-left: 0; 
+        margin-right: 0; // Додатково для чистоти
+        position: relative; // Гарантуємо, що у потоці
     }
   }
 }
@@ -201,15 +185,15 @@ $avatar-icon-size-factor: 0.65;
 .message-timestamp { 
   font-size: var(--font-ui-smaller, 0.75em); 
   color: var(--text-faint);
-  opacity: 1 !important; // ДІАГНОСТИКА: Завжди видимий
-  visibility: visible !important; // ДІАГНОСТИКА: Завжди видимий
+  opacity: 0.9; // Повертаємо стандартну прозорість
+  visibility: visible; // Завжди видимий
   box-sizing: border-box;
   flex-shrink: 0; 
-  position: relative !important; // ДІАГНОСТИКА: Гарантуємо, що не absolute
+  position: relative; // Гарантуємо, що у потоці
 
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
-    opacity: 0.75 !important; // Трохи прозорості для акценту, але все ще видимий
+    opacity: 0.75; 
   }
   
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
@@ -218,51 +202,57 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .message-actions-wrapper { 
-  display: flex !important; 
-  align-items: center !important; 
-  gap: calc(var(--chat-spacing-unit, 5px) * 1.0) !important; 
+  display: flex; 
+  align-items: center; 
+  gap: calc(var(--chat-spacing-unit, 5px) * 1.0); 
   
-  opacity: 1 !important; 
-  visibility: visible !important; 
-  position: relative !important; // ДУЖЕ ВАЖЛИВО: Скидаємо будь-який absolute
-  z-index: 1 !important; // ДІАГНОСТИКА: Спробуємо витягнути на передній план
-  background-color: rgba(255, 0, 0, 0.2) !important; // ДІАГНОСТИКА: Червонуватий фон, щоб бачити блок
+  // Повертаємо логіку показу при наведенні
+  opacity: 0; 
+  visibility: hidden; 
+  @include transition( (opacity, visibility), 0.2s, ease-in-out );
+  
+  position: relative; // ДУЖЕ ВАЖЛИВО: Гарантуємо, що у потоці
+  z-index: 1; // Можна залишити, якщо немає негативних ефектів
   
   box-sizing: border-box;
-  min-width: 50px; // ДІАГНОСТИКА: Мінімальна ширина, щоб точно було видно
-  min-height: 20px; // ДІАГНОСТИКА: Мінімальна висота
+  // min-width та min-height можна прибрати, якщо вони не потрібні
+  // background-color також прибираємо
 
   button.message-action-button { 
-    @extend %base-action-button; // Плейсхолдер вже має position: relative !important
-    display: flex !important; // Діагностика
-    opacity: 1 !important; // Діагностика
-    visibility: visible !important; // Діагностика
-    width: auto !important; // Діагностика: Автоматична ширина для вмісту
-    height: auto !important; // Діагностика: Автоматична висота
-    padding: 2px 4px !important; // Діагностика: Невеликий відступ
-    background-color: rgba(0, 255, 0, 0.3) !important; // ДІАГНОСТИКА: Зеленуватий фон для кнопок
-    color: black !important; // ДІАГНОСТИКА: Чорний текст на кнопках
+    @extend %base-action-button; // Плейсхолдер вже має position: relative
+    // Прибираємо діагностичні фони та розміри, якщо вони не потрібні
+    // Повертаємо стандартні кольори
   }
 
   .user-message-group .message-wrapper .message-meta-actions-wrapper & {
      button.message-action-button {
-        color: black !important; // Перебиваємо на чорний для діагностики
+        color: rgba(255, 255, 255, 0.8); 
         &:hover { 
-            background: rgba(0, 255, 0, 0.5) !important; 
-            color: black !important; 
+            background: rgba(255, 255, 255, 0.25) !important; // !important тут може бути потрібен для перекриття плейсхолдера
+            color: white; 
         }
      }
      .delete-message-button.danger-option {
-        // Стилі для кнопки видалення користувача (вже мають !important)
+        color: rgba(255, 150, 150, 0.8) !important;
+        &:hover { 
+            background-color: rgba(200, 50, 50, 0.5) !important; 
+            color: white !important; 
+        } 
      }
   }
-  // Загальні стилі для delete-button, якщо вони застосовуються
   .delete-message-button.danger-option { 
-    // ...
+    color: var(--text-error); 
+    &:hover { 
+        color: var(--text-on-accent); 
+        background-color: var(--background-modifier-error-hover) !important; // !important тут може бути потрібен для перекриття плейсхолдера
+    } 
   }
 }
 
-// Прибираємо ховер-ефект на час діагностики
-// .message-wrapper:hover .message-actions-wrapper { opacity: 1; visibility: visible; } 
+// Повертаємо ховер-ефект
+.message-wrapper:hover .message-actions-wrapper { 
+  opacity: 1; 
+  visibility: visible; 
+} 
 
 // --- ... (решта файлу без змін) ...
