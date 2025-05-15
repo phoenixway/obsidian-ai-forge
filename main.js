@@ -17229,15 +17229,19 @@ var BaseMessageRenderer = class {
     this.message = message;
     this.view = view;
   }
+  /**
+   * Створює зовнішню обгортку для групи повідомлень (.message-group).
+   * @param groupClasses Додаткові класи для .message-group.
+   * @returns Створений HTMLElement.
+   */
   createMessageGroupWrapper(groupClasses = []) {
     const messageGroup = document.createElement("div");
     messageGroup.classList.add(CSS_CLASSES.MESSAGE_GROUP, ...groupClasses);
     messageGroup.setAttribute("data-timestamp", this.message.timestamp.getTime().toString());
     return messageGroup;
   }
-  // --- ЗРОБЛЕНО СТАТИЧНИМ ---
   /**
-   * Створює та додає елемент мітки часу до вказаного батьківського елемента.
+   * Створює та додає елемент мітки часу до вказаного батьківського елемента (зазвичай .message).
    * @param parentElement - Елемент, куди додати мітку часу.
    * @param timestamp - Об'єкт Date для форматування.
    * @param view - Екземпляр OllamaView для доступу до форматера.
@@ -17249,31 +17253,63 @@ var BaseMessageRenderer = class {
     parentElement.createDiv({
       cls: CSS_CLASSES.TIMESTAMP,
       text: view.formatTime(timestamp)
-      // Використовуємо view для форматування
     });
   }
-  // --- КІНЕЦЬ ЗМІНИ ---
+  /**
+   * Допоміжний метод для рендерингу аватара.
+   * @param messageGroup Елемент .message-group, куди буде додано аватар.
+   * @param isUser Прапорець, чи це повідомлення користувача.
+   */
   addAvatar(messageGroup, isUser) {
     renderAvatar(this.app, this.plugin, messageGroup, isUser, this.message.role);
   }
-  // addBaseActionButtons залишається методом екземпляра, бо залежить від this.message та this.view
-  addBaseActionButtons(messageWrapper, contentToCopy) {
-    const buttonsWrapper = messageWrapper.createDiv({ cls: "message-actions-wrapper" });
-    const copyBtn = buttonsWrapper.createEl("button", { cls: CSS_CLASSES.COPY_BUTTON, attr: { "aria-label": "Copy", title: "Copy" } });
+  /**
+   * Додає базовий набір кнопок дій (Копіювати, Видалити) до вказаного батьківського елемента.
+   * Цей метод призначений для використання в рендерерах, де потрібен лише базовий набір.
+   * @param parentElementForActions Елемент (зазвичай .message-wrapper), куди будуть додані кнопки.
+   * @param contentToCopy Текст, який буде копіюватися.
+   * @param messageForContext Повідомлення, до якого відносяться ці кнопки (для видалення).
+   */
+  addBaseActionButtons(parentElementForActions, contentToCopy, messageForContext) {
+    const messageTimestamp = messageForContext.timestamp.getTime().toString();
+    const existingActions = parentElementForActions.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
+    if (existingActions) {
+      return;
+    }
+    const actionsWrapperClass = CSS_CLASSES.MESSAGE_ACTIONS || "message-actions-wrapper";
+    const buttonsWrapper = parentElementForActions.createDiv({ cls: actionsWrapperClass });
+    buttonsWrapper.setAttribute("data-message-timestamp", messageTimestamp);
+    const copyButtonClass = CSS_CLASSES.COPY_BUTTON || "copy-button";
+    const actionButtonBaseClass = CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button";
+    const deleteButtonClass = CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button";
+    const dangerOptionClass = CSS_CLASSES.DANGER_OPTION || "danger-option";
+    const copyBtn = buttonsWrapper.createEl("button", {
+      cls: [copyButtonClass, actionButtonBaseClass],
+      attr: { "aria-label": "Copy", title: "Copy" }
+    });
     (0, import_obsidian7.setIcon)(copyBtn, "copy");
     this.view.registerDomEvent(copyBtn, "click", (e) => {
       e.stopPropagation();
       this.view.handleCopyClick(contentToCopy, copyBtn);
     });
-    const deleteBtn = buttonsWrapper.createEl("button", { cls: [CSS_CLASSES.DELETE_MESSAGE_BUTTON, CSS_CLASSES.DANGER_OPTION], attr: { "aria-label": "Delete message", title: "Delete Message" } });
+    const deleteBtn = buttonsWrapper.createEl("button", {
+      cls: [deleteButtonClass, dangerOptionClass, actionButtonBaseClass],
+      attr: { "aria-label": "Delete message", title: "Delete Message" }
+    });
     (0, import_obsidian7.setIcon)(deleteBtn, "trash");
     this.view.registerDomEvent(deleteBtn, "click", (e) => {
       e.stopPropagation();
-      this.view.handleDeleteMessageClick(this.message);
+      this.view.handleDeleteMessageClick(messageForContext);
     });
   }
-  createMessageBubble(messageWrapper, messageClasses = []) {
-    const messageEl = messageWrapper.createDiv({ cls: [CSS_CLASSES.MESSAGE, ...messageClasses] });
+  /**
+   * Створює бульбашку повідомлення (.message) та її внутрішні контейнери для контенту.
+   * @param messageWrapperEl Елемент-обгортка (.message-wrapper), куди буде додано .message.
+   * @param messageClasses Додаткові класи для .message.
+   * @returns Об'єкт з посиланнями на створені елементи: messageEl, contentContainer, contentEl.
+   */
+  createMessageBubble(messageWrapperEl, messageClasses = []) {
+    const messageEl = messageWrapperEl.createDiv({ cls: [CSS_CLASSES.MESSAGE, ...messageClasses] });
     const contentContainer = messageEl.createDiv({ cls: CSS_CLASSES.CONTENT_CONTAINER });
     const contentEl = contentContainer.createDiv({ cls: CSS_CLASSES.CONTENT });
     return { messageEl, contentContainer, contentEl };
@@ -17399,11 +17435,7 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
     }
   }
   static prepareDisplayContent(originalContent, assistantMessage, plugin, view) {
-    const messageTimestampLog = assistantMessage.timestamp.getTime();
-    let toolUsagePrefix = "\u2192 ";
-    let toolMessageAction = "";
     const logger = plugin.logger;
-    const ts = assistantMessage.timestamp.getTime();
     const decodedContent = decodeHtmlEntities(originalContent);
     const thinkDetection = detectThinkingTags(decodedContent);
     let contentAfterThinkStripping = thinkDetection.contentWithoutTags;
@@ -17417,13 +17449,15 @@ var AssistantMessageRenderer = class extends BaseMessageRenderer {
       if (hasNativeToolCalls && assistantMessage.tool_calls) {
         assistantMessage.tool_calls.forEach((tc) => toolNamesExtracted.push(tc.function.name));
       } else if (hasTextualToolCallTagsInProcessedContent) {
-        const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, logger);
-        parsedTextualCalls.forEach((ptc) => toolNamesExtracted.push(ptc.name));
-        accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
-        if (toolNamesExtracted.length === 0 && (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>"))) {
-          let tempText = accompanyingText;
-          tempText = tempText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
-          accompanyingText = tempText;
+        try {
+          const parsedTextualCalls = parseAllTextualToolCalls(contentAfterThinkStripping, logger);
+          parsedTextualCalls.forEach((ptc) => toolNamesExtracted.push(ptc.name));
+          accompanyingText = contentAfterThinkStripping.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "").trim();
+          if (toolNamesExtracted.length === 0 && (accompanyingText.includes("<tool_call>") || accompanyingText.includes("</tool_call>"))) {
+            accompanyingText = accompanyingText.replace(/<tool_call>/g, "").replace(/<\/tool_call>/g, "").trim();
+          }
+        } catch (parseError) {
+          logger.error("Error parsing textual tool calls in prepareDisplayContent:", parseError);
         }
       }
       if (toolNamesExtracted.length > 0) {
@@ -17443,15 +17477,12 @@ ${accompanyingText.trim()}`;
     return finalDisplayContent;
   }
   async render() {
-    const messageTimestampLog = this.message.timestamp.getTime();
-    const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP || "ollama-message-group"]);
+    const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.OLLAMA_GROUP]);
     renderAvatar(this.app, this.plugin, messageGroup, false, "assistant");
-    const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER || "message-wrapper" });
+    const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
     messageWrapper.style.order = "2";
-    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [
-      CSS_CLASSES.OLLAMA_MESSAGE || "ollama-message"
-    ]);
-    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE || "message-content-collapsible");
+    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.OLLAMA_MESSAGE]);
+    contentEl.addClass(CSS_CLASSES.CONTENT_COLLAPSIBLE);
     const assistantMessage = this.message;
     const displayContent = AssistantMessageRenderer.prepareDisplayContent(
       this.message.content || "",
@@ -17462,27 +17493,36 @@ ${accompanyingText.trim()}`;
     try {
       await renderMarkdownContent(this.app, this.view, this.plugin, contentEl, displayContent);
     } catch (error) {
-      contentEl.setText(
-        `[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`
-      );
+      contentEl.setText(`[Error rendering assistant content: ${error instanceof Error ? error.message : String(error)}]`);
     }
-    AssistantMessageRenderer.addAssistantActionButtons(messageEl, contentEl, assistantMessage, this.plugin, this.view);
+    AssistantMessageRenderer.addAssistantActionButtons(
+      messageWrapper,
+      // Тепер це messageWrapper
+      contentEl,
+      // contentEl все ще потрібен для handleTranslateClick
+      assistantMessage,
+      this.plugin,
+      this.view
+    );
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
     setTimeout(() => {
-      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP || "message-group"}`)) {
+      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
         this.view.checkMessageForCollapsing(messageEl);
       }
     }, 70);
     return messageGroup;
   }
-  static addAssistantActionButtons(messageElement, contentEl, message, plugin, view) {
-    if (messageElement.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}`)) {
+  static addAssistantActionButtons(parentElementForActions, contentElForTranslationContext, message, plugin, view) {
+    const messageTimestamp = message.timestamp.getTime().toString();
+    const existingActions = parentElementForActions.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
+    if (existingActions) {
       return;
     }
-    const buttonsWrapper = messageElement.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+    const buttonsWrapper = parentElementForActions.createDiv({ cls: CSS_CLASSES.MESSAGE_ACTIONS });
+    buttonsWrapper.setAttribute("data-message-timestamp", messageTimestamp);
     const originalLlMRawContent = message.content || "";
     const copyBtn = buttonsWrapper.createEl("button", {
-      cls: [CSS_CLASSES.COPY_BUTTON || "copy-button", CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"],
+      cls: [CSS_CLASSES.COPY_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
       attr: { "aria-label": "Copy", title: "Copy" }
     });
     (0, import_obsidian9.setIcon)(copyBtn, "copy");
@@ -17492,17 +17532,14 @@ ${accompanyingText.trim()}`;
     });
     if (plugin.settings.enableTranslation && (plugin.settings.translationProvider === "google" && plugin.settings.googleTranslationApiKey || plugin.settings.translationProvider === "ollama" && plugin.settings.ollamaTranslationModel) && originalLlMRawContent && originalLlMRawContent.trim()) {
       const translateBtn = buttonsWrapper.createEl("button", {
-        cls: [
-          CSS_CLASSES.TRANSLATE_BUTTON || "translate-button",
-          CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
-        ],
+        cls: [CSS_CLASSES.TRANSLATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { "aria-label": "Translate", title: "Translate" }
       });
       (0, import_obsidian9.setIcon)(translateBtn, "languages");
       view.registerDomEvent(translateBtn, "click", (e) => {
         e.stopPropagation();
-        if (contentEl.isConnected) {
-          view.handleTranslateClick(originalLlMRawContent, contentEl, translateBtn);
+        if (contentElForTranslationContext.isConnected) {
+          view.handleTranslateClick(originalLlMRawContent, contentElForTranslationContext, translateBtn);
         } else {
           new import_obsidian9.Notice("Cannot translate: message content element not found.");
         }
@@ -17510,10 +17547,7 @@ ${accompanyingText.trim()}`;
     }
     if (plugin.settings.enableSummarization && plugin.settings.summarizationModelName && originalLlMRawContent && originalLlMRawContent.trim()) {
       const summarizeBtn = buttonsWrapper.createEl("button", {
-        cls: [
-          CSS_CLASSES.SUMMARIZE_BUTTON || "summarize-button",
-          CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
-        ],
+        cls: [CSS_CLASSES.SUMMARIZE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { title: "Summarize message" }
       });
       (0, import_obsidian9.setIcon)(summarizeBtn, "scroll-text");
@@ -17525,10 +17559,7 @@ ${accompanyingText.trim()}`;
     const originalContentContainsTextualToolCall = typeof originalLlMRawContent === "string" && originalLlMRawContent.includes("<tool_call>");
     if ((!message.tool_calls || message.tool_calls.length === 0) && !originalContentContainsTextualToolCall) {
       const regenerateBtn = buttonsWrapper.createEl("button", {
-        cls: [
-          CSS_CLASSES.REGENERATE_BUTTON || "regenerate-button",
-          CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
-        ],
+        cls: [CSS_CLASSES.REGENERATE_BUTTON, CSS_CLASSES.MESSAGE_ACTION_BUTTON],
         attr: { "aria-label": "Regenerate response", title: "Regenerate Response" }
       });
       (0, import_obsidian9.setIcon)(regenerateBtn, "refresh-cw");
@@ -17539,9 +17570,9 @@ ${accompanyingText.trim()}`;
     }
     const deleteBtn = buttonsWrapper.createEl("button", {
       cls: [
-        CSS_CLASSES.DELETE_MESSAGE_BUTTON || "delete-message-button",
-        CSS_CLASSES.DANGER_OPTION || "danger-option",
-        CSS_CLASSES.MESSAGE_ACTION_BUTTON || "message-action-button"
+        CSS_CLASSES.DELETE_MESSAGE_BUTTON,
+        CSS_CLASSES.DANGER_OPTION,
+        CSS_CLASSES.MESSAGE_ACTION_BUTTON
       ],
       attr: { "aria-label": "Delete message", title: "Delete Message" }
     });
@@ -19382,7 +19413,7 @@ var ToolMessageRenderer = class extends BaseMessageRenderer {
     );
     this.renderToolSpecificContent(contentEl, this.message.content);
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
-    this.addBaseActionButtons(messageEl, this.message.content);
+    this.addBaseActionButtons(messageEl, this.message.content, this.message);
     return messageGroupEl;
   }
   renderToolSpecificContent(contentEl, rawContentWithMarkers) {

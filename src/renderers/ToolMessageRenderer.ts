@@ -25,7 +25,8 @@ export class ToolMessageRenderer extends BaseMessageRenderer implements IMessage
     this.renderToolSpecificContent(contentEl, this.message.content);
 
     BaseMessageRenderer.addTimestamp(messageEl, this.message.timestamp, this.view);
-    this.addBaseActionButtons(messageEl, this.message.content); // Передаємо оригінальний контент з маркерами, якщо кнопки копіювання мають копіювати саме його
+    this.addBaseActionButtons(messageEl, this.message.content, this.message); // Передаємо оригінальний контент з маркерами, якщо кнопки копіювання мають копіювати саме його
+    //fixme
 
     return messageGroupEl;
   }
