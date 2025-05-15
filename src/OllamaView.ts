@@ -2124,22 +2124,36 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
   public checkAllMessagesForCollapsing(): void {
     this.chatContainer?.querySelectorAll<HTMLElement>(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach(msgGroupEl => {
-      // Пропускаємо плейсхолдери, якщо вони не є фіналізованими повідомленнями
-      // і якщо йде активна обробка (щоб не ховати кнопку для стрімінгу)
-      if (msgGroupEl.classList.contains("placeholder") && this.isProcessing) {
-        const streamingContent = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}.streaming-text`);
-        if (streamingContent) { // Якщо це активний стрімінг-плейсхолдер
-          const toggleButton = msgGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
-          toggleButton?.hide(); // Приховуємо кнопку для активного стрімінгу
-          const contentCollapsible = msgGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-          if (contentCollapsible) {
-            contentCollapsible.style.maxHeight = "";
-            contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-          }
-          return; // Не перевіряємо далі для активного стрімінгу
+      // Перевіряємо, чи це не активний плейсхолдер для стрімінгу,
+      // для якого checkMessageForCollapsing не має виконуватися або має особливу логіку
+      const isStreamingPlaceholder = msgGroupEl.classList.contains("placeholder") && 
+                                     msgGroupEl.hasAttribute("data-placeholder-timestamp") && 
+                                     this.isProcessing; // Тільки якщо йде обробка
+
+      if (isStreamingPlaceholder) {
+        // Для активних стрімінг-плейсхолдерів кнопка згортання не потрібна
+        const toggleButton = msgGroupEl.querySelector<HTMLButtonElement>(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+        toggleButton?.hide();
+        const contentCollapsible = msgGroupEl.querySelector<HTMLElement>(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+        if (contentCollapsible) {
+          contentCollapsible.style.maxHeight = ""; // Знімаємо обмеження для стрімінгу
+          contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
         }
+        return; // Не викликаємо checkMessageForCollapsing для активних стрімінг-плейсхолдерів
       }
-      this.checkMessageForCollapsing(msgGroupEl);
+
+      // Викликаємо checkMessageForCollapsing тільки для "фіналізованих" груп повідомлень
+      // або для плейсхолдерів, які вже отримали свій data-timestamp (тобто стали повідомленнями)
+      if (msgGroupEl.hasAttribute("data-timestamp") || 
+          (msgGroupEl.classList.contains("placeholder") && !this.isProcessing)) { // Плейсхолдер, але обробка завершена
+        this.checkMessageForCollapsing(msgGroupEl);
+      } else if (msgGroupEl.classList.contains("placeholder")) {
+        // this.plugin.logger.debug("[checkAllMessagesForCollapsing] Skipping placeholder without data-timestamp during processing:", msgGroupEl);
+      } else {
+        // this.plugin.logger.warn("[checkAllMessagesForCollapsing] Found message group without data-timestamp and not a placeholder:", msgGroupEl);
+        // Можливо, тут теж варто викликати, якщо це якась непередбачена ситуація
+        // this.checkMessageForCollapsing(msgGroupEl); 
+      }
     });
   }
 

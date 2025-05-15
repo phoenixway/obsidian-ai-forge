@@ -21499,20 +21499,22 @@ This action cannot be undone.`,
   // src/OllamaView.ts
   checkAllMessagesForCollapsing() {
     this.chatContainer?.querySelectorAll(`.${CSS_CLASSES.MESSAGE_GROUP}`).forEach((msgGroupEl) => {
-      if (msgGroupEl.classList.contains("placeholder") && this.isProcessing) {
-        const streamingContent = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}.streaming-text`);
-        if (streamingContent) {
-          const toggleButton = msgGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
-          toggleButton?.hide();
-          const contentCollapsible = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
-          if (contentCollapsible) {
-            contentCollapsible.style.maxHeight = "";
-            contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-          }
-          return;
+      const isStreamingPlaceholder = msgGroupEl.classList.contains("placeholder") && msgGroupEl.hasAttribute("data-placeholder-timestamp") && this.isProcessing;
+      if (isStreamingPlaceholder) {
+        const toggleButton = msgGroupEl.querySelector(`.${CSS_CLASSES.TOGGLE_COLLAPSE_BUTTON}`);
+        toggleButton?.hide();
+        const contentCollapsible = msgGroupEl.querySelector(`.${CSS_CLASSES.CONTENT_COLLAPSIBLE}`);
+        if (contentCollapsible) {
+          contentCollapsible.style.maxHeight = "";
+          contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
         }
+        return;
       }
-      this.checkMessageForCollapsing(msgGroupEl);
+      if (msgGroupEl.hasAttribute("data-timestamp") || msgGroupEl.classList.contains("placeholder") && !this.isProcessing) {
+        this.checkMessageForCollapsing(msgGroupEl);
+      } else if (msgGroupEl.classList.contains("placeholder")) {
+      } else {
+      }
     });
   }
   // src/OllamaView.ts
