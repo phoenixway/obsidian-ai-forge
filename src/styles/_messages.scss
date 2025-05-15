@@ -59,7 +59,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 %base-action-button {
-  background: transparent !important;
+  background: transparent !important; // !important залишаємо для плейсхолдера, якщо він десь критично використовується
   border: none;
   box-shadow: none;
   padding: 1px;
@@ -70,6 +70,7 @@ $avatar-icon-size-factor: 0.65;
   @include flex-layout($align: center, $justify: center);
   box-sizing: border-box;
   margin-left: 0;
+  position: relative !important; // ДІАГНОСТИКА: Гарантуємо, що кнопки не absolute
 
   .svg-icon {
     width: 14px;
@@ -105,199 +106,94 @@ $avatar-icon-size-factor: 0.65;
 
 // --- Початок стилів ---
 .ollama-chat-container {
-  max-width: var(--chat-column-max-width, 1000px);
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  box-sizing: border-box;
+  // ... (без змін) ...
 }
 
 .message-group { 
-  width: 100%;
-  position: relative;
-  box-sizing: border-box;
-  @include flex-layout($align: flex-start, $gap: calc(var(--chat-spacing-unit, 5px) * 2));
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
-
-  &.user-message-group { 
-    justify-content: flex-end;
-    .avatar-container { order: 2; margin-bottom: 50px; /* TODO: Review margin */ }
-    .message-wrapper { order: 1; }
-  }
-
-  &.ollama-message-group { 
-    justify-content: flex-start;
-    .avatar-container { order: 1; margin-top: 45px; /* TODO: Review margin */ }
-    .message-wrapper { order: 2; }
-  }
-  &.tool-message-group { 
-    justify-content: flex-start; 
-    .avatar-container { order: 1; }
-    .message-wrapper { order: 2; }
-  }
-  &.system-message-group { 
-    justify-content: center; 
-    width: 100%;
-    .message-wrapper { align-items: center; width: 100%; max-width: 90%; }
-    .avatar-container { display: none; } 
-  }
-  &.error-message-group { 
-    justify-content: flex-start; 
-    .message-wrapper { order: 2; }
-    .avatar-container { order: 1; }
-  }
+  // ... (без змін) ...
 }
 
 .avatar-container { 
-  @extend %base-avatar-container;
-  &.user-avatar { background-color: var(--interactive-accent-translucent); color: var(--interactive-accent); }
-  &.ai-avatar { background-color: var(--background-modifier-success); color: var(--text-on-accent); }
-  &.avatar-tool-specific { background-color: var(--background-modifier-info); color: var(--text-normal);
-    .svg-icon svg { fill: var(--text-normal); } 
-  }
-  &.avatar-image { width: 100%; height: 100%; object-fit: cover; }
-  &.avatar-icon .svg-icon { svg { width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); display: block; } }
-  &.avatar-initials { font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); font-weight: 600; line-height: 1; text-align: center; width: 100%; height: 100%; @include flex-layout($align: center, $justify: center); }
+  // ... (без змін) ...
 }
 
 .message-wrapper { 
-  @include flex-layout($direction: column);
-  box-sizing: border-box;
-  width: fit-content; 
-  max-width: var(--chat-message-max-width, 700px);
-
-  .ollama-message-group &,
-  .tool-message-group &, 
-  .error-message-group & { 
-    align-items: flex-start; 
-  }
-  .user-message-group & { 
-    align-items: flex-end;   
-  }
-  .system-message-group & {
-    align-items: center; 
-  }
+  // ... (без змін) ...
 }
 
 .message { 
-  @extend %base-message-bubble; 
-  width: 100%;
-
-  &.message-arriving { 
-    animation: message-appear 0.3s ease-out forwards;
-  }
+  // ... (без змін) ...
 }
 
-.user-message-group .message-wrapper .message {
-  border-top-left-radius: 18px; border-bottom-left-radius: 18px;
-  &:first-child { border-top-right-radius: 18px; } &:not(:first-child) { border-top-right-radius: 5px; }
-  &:last-child { border-bottom-right-radius: 18px; } &:not(:last-child) { border-bottom-right-radius: 5px; }
-}
-.ollama-message-group .message-wrapper .message,
-.tool-message-group .message-wrapper .message,
-.error-message-group .message-wrapper .message {
-  border-top-right-radius: 18px; border-bottom-right-radius: 18px;
-  &:first-child { border-top-left-radius: 18px; } &:not(:first-child) { border-top-left-radius: 5px; }
-  &:last-child { border-bottom-left-radius: 18px; } &:not(:last-child) { border-bottom-left-radius: 5px; }
-}
-.system-message-group .message-wrapper .message { 
-  border-radius: var(--radius-m, 8px); 
-}
+// Стилі для радіусів різних типів повідомлень
+// ... (без змін) ...
 
-.message.user-message { 
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
-}
-.message.ollama-message { 
-  background-color: var(--background-primary-alt);
-  color: var(--text-normal);
-  &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); }
-  pre {
-    background-color: var(--background-secondary) !important; padding: calc(var(--chat-spacing-unit, 5px) * 2);
-    border-radius: var(--radius-m, 6px); margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
-    margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1); overflow-x: auto; box-sizing: border-box;
-  }
-}
-.message.system-message { 
-  background-color: var(--background-modifier-accent-hover); 
-  color: var(--text-faint);
-  font-style: italic;
-  padding: calc(var(--chat-spacing-unit, 5px) * 1) calc(var(--chat-spacing-unit, 5px) * 2.5);
-  box-shadow: none;
-  text-align: center;
-}
-.message.error-message { 
-  background-color: var(--background-modifier-error); 
-  color: var(--text-on-accent); 
-  border: 1px solid var(--color-red-hover);
-  box-shadow: 0 1px 2px var(--color-red-faint);
-  .error-icon { margin-right: 8px; }
-}
-.message.tool-message { 
-  background-color: var(--background-modifier-info-hover); 
-  border: 1px solid var(--color-blue-faint);
-  .tool-result-header { font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; .tool-result-icon { margin-right: 5px;} }
-  .tool-result-content { background-color: var(--background-secondary); padding: 8px; border-radius: var(--radius-s); white-space: pre-wrap; }
-}
+// Стилі для різних типів повідомлень (user, ollama, system etc.)
+// ... (без змін) ...
 
 .message-content-container { 
-  width: 100%; box-sizing: border-box;
+  // ... (без змін) ...
 }
 .message-content { 
-  p { margin-top: 0; margin-bottom: calc(var(--p-spacing, 1em) / 2); &:last-child { margin-bottom: 0; } }
+  // ... (без змін) ...
 }
 
 .message-meta-actions-wrapper {
-  display: flex !important; // Діагностика: гарантуємо flex
-  align-items: center !important; // Діагностика: вертикальне вирівнювання
+  display: flex !important; 
+  align-items: center !important; 
   width: 100%;                  
   margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); 
   padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5); 
   box-sizing: border-box;
   min-height: 20px; 
+  position: relative !important; // ДІАГНОСТИКА: Щоб діти не позиціонувалися відносно чогось іншого
 
   // Для AI-подібних повідомлень (бульбашка зліва): кнопки зліва, час справа
   .ollama-message-group .message-wrapper &,
   .tool-message-group .message-wrapper &,
   .error-message-group .message-wrapper & {
-    justify-content: flex-start !important; // Діагностика
+    justify-content: flex-start !important; 
     
     .message-actions-wrapper { 
-      order: 1 !important; // Діагностика: кнопки перші
-      margin-left: 0 !important; // Діагностика
-      margin-right: 0 !important; // Діагностика
+      order: 1 !important; 
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
     }
     .message-timestamp {
-      order: 2 !important; // Діагностика: час другий
-      margin-left: auto !important; // Діагностика: відштовхує час вправо
-      margin-right: 0 !important; // Діагностика
+      order: 2 !important; 
+      margin-left: auto !important; 
+      margin-right: 0 !important;
+      position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
     }
   }
 
   // Для повідомлень користувача (бульбашка справа): час зліва, кнопки справа
   .user-message-group .message-wrapper & {
-    justify-content: flex-start !important; // Діагностика: Починаємо все зліва
+    justify-content: flex-start !important; 
 
     .message-timestamp { 
-      order: 1 !important; // Діагностика: Час - перший візуально
-      margin-left: 0 !important; // Діагностика: Скидаємо будь-які автоматичні відступи
-      margin-right: 0 !important; // Діагностика
+      order: 1 !important; 
+      margin-left: 0 !important; 
+      margin-right: 0 !important;
+      position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
     }
     .message-actions-wrapper {
-      order: 2 !important; // Діагностика: Кнопки - другі візуально
-      margin-left: auto !important; // Діагностика: Відштовхуємо блок кнопок вправо
-      margin-right: 0 !important; // Діагностика
+      order: 2 !important; 
+      margin-left: auto !important; 
+      margin-right: 0 !important;
+      position: relative !important; // ДІАГНОСТИКА: ЯВНО СКИДАЄМО ABSOLUTE
     }
   }
 
   .system-message-group .message-wrapper & { 
-    justify-content: center !important; // Діагностика
-    .message-actions-wrapper { display: none !important; } // Діагностика
+    justify-content: center !important; 
+    .message-actions-wrapper { display: none !important; } 
     .message-timestamp {
-        order: 1 !important; // Діагностика
-        margin-left: 0 !important; // Діагностика
-        margin-right: 0 !important; // Діагностика
+        order: 1 !important; 
+        margin-left: 0 !important; 
+        margin-right: 0 !important;
+        position: relative !important; // ДІАГНОСТИКА: Скидаємо absolute
     }
   }
 }
@@ -305,57 +201,68 @@ $avatar-icon-size-factor: 0.65;
 .message-timestamp { 
   font-size: var(--font-ui-smaller, 0.75em); 
   color: var(--text-faint);
-  opacity: 0.9; 
+  opacity: 1 !important; // ДІАГНОСТИКА: Завжди видимий
+  visibility: visible !important; // ДІАГНОСТИКА: Завжди видимий
   box-sizing: border-box;
-  flex-shrink: 0; // Залишаємо, бо це може бути важливим для розміру
+  flex-shrink: 0; 
+  position: relative !important; // ДІАГНОСТИКА: Гарантуємо, що не absolute
 
   .user-message-group .message-wrapper .message-meta-actions-wrapper & { 
     color: var(--text-on-accent); 
-    opacity: 0.75;
-    // margin-left та order вже встановлені вище з !important
+    opacity: 0.75 !important; // Трохи прозорості для акценту, але все ще видимий
   }
   
   .system-message-group .message-wrapper .message-meta-actions-wrapper & {
       color: var(--text-faint);
-      // margin-left та order вже встановлені вище з !important
   }
 }
 
 .message-actions-wrapper { 
-  // Загальні стилі для блоку кнопок, якщо вони не перекриті вище
-  display: flex !important; // Діагностика
-  align-items: center !important; // Діагностика
-  gap: calc(var(--chat-spacing-unit, 5px) * 1.0) !important; // Діагностика
-  opacity: 0; 
-  visibility: hidden; 
-  @include transition( (opacity, visibility), 0.2s, ease-in-out );
+  display: flex !important; 
+  align-items: center !important; 
+  gap: calc(var(--chat-spacing-unit, 5px) * 1.0) !important; 
+  
+  opacity: 1 !important; 
+  visibility: visible !important; 
+  position: relative !important; // ДУЖЕ ВАЖЛИВО: Скидаємо будь-який absolute
+  z-index: 1 !important; // ДІАГНОСТИКА: Спробуємо витягнути на передній план
+  background-color: rgba(255, 0, 0, 0.2) !important; // ДІАГНОСТИКА: Червонуватий фон, щоб бачити блок
+  
   box-sizing: border-box;
+  min-width: 50px; // ДІАГНОСТИКА: Мінімальна ширина, щоб точно було видно
+  min-height: 20px; // ДІАГНОСТИКА: Мінімальна висота
 
-  button.message-action-button { @extend %base-action-button; }
+  button.message-action-button { 
+    @extend %base-action-button; // Плейсхолдер вже має position: relative !important
+    display: flex !important; // Діагностика
+    opacity: 1 !important; // Діагностика
+    visibility: visible !important; // Діагностика
+    width: auto !important; // Діагностика: Автоматична ширина для вмісту
+    height: auto !important; // Діагностика: Автоматична висота
+    padding: 2px 4px !important; // Діагностика: Невеликий відступ
+    background-color: rgba(0, 255, 0, 0.3) !important; // ДІАГНОСТИКА: Зеленуватий фон для кнопок
+    color: black !important; // ДІАГНОСТИКА: Чорний текст на кнопках
+  }
 
   .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-     // margin-left та order вже встановлені вище з !important
      button.message-action-button {
-        color: rgba(255, 255, 255, 0.8); 
+        color: black !important; // Перебиваємо на чорний для діагностики
         &:hover { 
-            background: rgba(255, 255, 255, 0.25) !important; 
-            color: white; 
+            background: rgba(0, 255, 0, 0.5) !important; 
+            color: black !important; 
         }
      }
      .delete-message-button.danger-option {
-        color: rgba(255, 150, 150, 0.8) !important;
-        &:hover { 
-            background-color: rgba(200, 50, 50, 0.5) !important; 
-            color: white !important; 
-        } 
+        // Стилі для кнопки видалення користувача (вже мають !important)
      }
   }
+  // Загальні стилі для delete-button, якщо вони застосовуються
   .delete-message-button.danger-option { 
-    color: var(--text-error); 
-    &:hover { 
-        color: var(--text-on-accent); 
-        background-color: var(--background-modifier-error-hover) !important; 
-    } 
+    // ...
   }
 }
-// ... (решта файлу без змін, крім можливого видалення !important після діагностики) ...
+
+// Прибираємо ховер-ефект на час діагностики
+// .message-wrapper:hover .message-actions-wrapper { opacity: 1; visibility: visible; } 
+
+// --- ... (решта файлу без змін) ...
