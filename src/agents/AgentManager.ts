@@ -5,6 +5,7 @@ import { SimpleFileAgent } from "@/examples/SimpleFileAgent"; // Приклад 
 import { WeatherAgent } from "@/examples/WeatherAgent";
 
 import { TimeAgent } from "@/examples/TimeAgent";
+import { MusicControlAgent } from "@/examples/MusicControlAgent";
 
 export class AgentManager {
   private agents: Map<string, IAgent> = new Map();
@@ -22,6 +23,8 @@ export class AgentManager {
     this.registerAgent(weatherAgent);
     const timeAgent = new TimeAgent(); // Приклад агента
     this.registerAgent(timeAgent);
+    const musicAgent = new MusicControlAgent();
+    this.registerAgent(musicAgent);
     // тут можна додати інших агентів
   }
 
