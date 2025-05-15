@@ -353,7 +353,7 @@ $avatar-icon-size-factor: 0.65;
 .message-meta-actions-wrapper {
   @include flex-layout($align: center);
   width: 100%;
-  margin-top: calc(var(--chat-spacing-unit, 50px) * 10.0);
+  margin-top: calc(var(--chat-spacing-unit, 10px) * 5.0);
   // padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5);
   box-sizing: border-box;
   min-height: 20px;
