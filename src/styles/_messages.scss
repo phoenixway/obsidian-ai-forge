@@ -359,12 +359,13 @@ $avatar-icon-size-factor: 0.65;
 
 .show-more-button { 
   @extend %button-like-text;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); width: fit-content;
-  .ollama-message-group .message-wrapper &, 
-  .tool-message-group .message-wrapper &, 
-  .error-message-group .message-wrapper & { align-self: center; }
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); 
+  width: fit-content; // Кнопка не розтягується на всю ширину
+  align-self: center; // Горизонтальне центрування в батьківському flex-column (.message-wrapper)
+
+  // Специфічні стилі для кнопки в повідомленнях користувача (якщо потрібен інший вигляд)
   .user-message-group .message-wrapper & { 
-    align-self: center; 
+    // align-self: center; // Вже встановлено вище
     color: rgba(255, 255, 255, 0.7); 
     &:hover { 
         color: white; 
@@ -372,7 +373,11 @@ $avatar-icon-size-factor: 0.65;
         border-color: transparent; 
     }
   }
-  .system-message-group .message-wrapper & { display: none; }
+
+  // Приховуємо кнопку для системних повідомлень
+  .system-message-group .message-wrapper & { 
+    display: none; 
+  }
 }
 
 .message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
