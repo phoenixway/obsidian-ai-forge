@@ -6,19 +6,19 @@ import { normalizePath, TFile, Notice, TFolder } from "obsidian";
 export class SimpleFileAgent implements IAgent {
   id = "simple-file-agent";
   name = "Simple File Agent";
-  description = "An agent that can read and list files in the vault.";
+  description = "An agent designed to interact with the user's Obsidian vault file system. It can read content from specific files if the user provides the path, and list files/folders in specified locations within the vault. This agent helps with accessing and navigating *existing user notes and files*.";
 
   getTools(): IToolFunction[] {
     return [
       {
         name: "readFileContent",
-        description: "Reads the content of a specified file in the Obsidian vault.",
+        description: "Reads the content of a *specific, user-mentioned* file path within the Obsidian vault. Use this tool ONLY when the user explicitly provides a file path or asks to read a specific document they have saved. Do not use this to guess file paths for general information like recipes.",
         parameters: {
           type: "object",
           properties: {
             filePath: {
               type: "string",
-              description: "The full path to the file within the Obsidian vault (e.g., 'Notes/MyFile.md').",
+              description: "The *exact and full* path to the file within the Obsidian vault (e.g., 'Recipes/ChickenCurry.md', 'Meeting Notes/2024-05-16.md'). This path should typically be provided by the user or a previous tool call.",
             },
           },
           required: ["filePath"],
@@ -26,13 +26,13 @@ export class SimpleFileAgent implements IAgent {
       },
       {
         name: "listFiles",
-        description: "Lists files in a specified folder of the Obsidian vault. Lists root if no path specified.",
+        description: "Lists files and folders within a *specific, user-mentioned folder path* in the Obsidian vault. If no folder path is provided by the user, it lists items in the vault's root. Use this to help the user navigate their vault structure or find files when they are unsure of the exact name but know the location. Do not use this for broad, unguided searches for general information.",
         parameters: {
             type: "object",
             properties: {
                 folderPath: {
                     type: "string",
-                    description: "Optional. The path to the folder (e.g., 'Attachments/Images'). If omitted, lists root."
+                    description: "Optional. The path to the folder (e.g., 'Projects/Alpha', 'Personal/Journal'). This path should ideally be based on user input or to explore a known section of their vault. If omitted, lists contents of the vault root."
                 }
             }
         }
