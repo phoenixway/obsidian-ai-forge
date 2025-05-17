@@ -16203,8 +16203,12 @@ var DEFAULT_SETTINGS = {
   // За замовчуванням дозволяємо завантаження моделі VAD з CDN
   vadUseLocalModelIfAvailable: true,
   // Але якщо локальна модель є, пріоритет їй
-  vadUseLocalWorkletIfAvailable: true
+  vadUseLocalWorkletIfAvailable: true,
   // Аналогічно для локального ворклету VAD
+  systemPromptBaseTokenBuffer: 250,
+  // <--- ЗНАЧЕННЯ ЗА ЗАМОВЧУВАННЯМ
+  summarizationContextWindow: 2048
+  // <--- ЗНАЧЕННЯ ЗА ЗАМОВЧУВАННЯМ (якщо потрібно)
 };
 var OllamaSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
@@ -23888,7 +23892,6 @@ var PromptService = class {
     }
     if (normalizedPath !== this.currentRolePath) {
       if (this.currentRolePath && this.roleCache[this.currentRolePath]) {
-        delete this.roleCache[this.currentRolePath];
       }
       this.currentRolePath = normalizedPath;
       this.currentSystemPrompt = null;
@@ -23897,6 +23900,9 @@ var PromptService = class {
       const definition = {
         systemPrompt: null,
         isProductivityPersona: false
+        // Якщо додали нові поля, тут теж треба вказати їх значення за замовчуванням
+        // ragInstructionOverride: null,
+        // ragBehaviorMode: "base",
       };
       return definition;
     }
@@ -23915,11 +23921,13 @@ var PromptService = class {
         const definition = {
           systemPrompt: systemPromptBody || null,
           isProductivityPersona: isProductivity
+          // Тут можна буде зчитувати rag_instruction_override та rag_behavior_mode з frontmatter
         };
         this.roleCache[normalizedPath] = definition;
         this.currentSystemPrompt = definition.systemPrompt;
         return definition;
       } catch (error) {
+        this.plugin.logger.error(`Error loading role: ${file.basename}. Check console.`, error);
         new import_obsidian17.Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
         return { systemPrompt: null, isProductivityPersona: false };
@@ -23944,31 +23952,43 @@ var PromptService = class {
       roleDefinition = await this.getRoleDefinition(selectedRolePath);
     }
     const roleSystemPrompt = roleDefinition?.systemPrompt || null;
-    const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
-    const ragInstructions = `
---- RAG Data Interpretation Rules ---
-You will be provided context from the user's notes, potentially split into two sections:
-1.  '### Personal Focus Context (User's Life State & Goals)':
-    * This section contains HIGH-PRIORITY information reflecting the user's current situation, desired state, goals, priorities, and actions they believe they should take.
-    * TREAT THIS SECTION AS THE PRIMARY SOURCE for understanding the user's core objectives and current life context.
-    * Use this to align your suggestions, track progress on stated goals/priorities, and provide strategic guidance.
-2.  '### General Context from User Notes':
-    * This section contains potentially relevant background information from the user's general notes, identified based on semantic similarity to the current query.
-    * Use this for supplementary details and broader context.
-
-General Rules for BOTH Context Sections:
-* Each context chunk originates from a specific file indicated in its header (e.g., "--- Chunk 1 from Personal Focus Note: My Goals.md ..."). You can refer to source files by name.
-* Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of life situation of user, personal activities, achievements, progress, state, mood, energy.
-* Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) represents a potential user goal, task, objective, idea, or key point. **Pay special attention to categorizing these:**
-    * **Critical Goals/Tasks:** Identify these if the line contains tags like #critical, #critical\u{1F198} or keywords like "\u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E", "critical", "\u0442\u0435\u0440\u043C\u0456\u043D\u043E\u0432\u043E", "urgent". **Prioritize discussing these items, potential blockers, and progress.**
-    * **Weekly Goals/Tasks:** Identify these if the line contains tags like #week, #weekly or keywords like "weekly", "\u0442\u0438\u0436\u043D\u0435\u0432\u0430", "\u0442\u0438\u0436\u043D\u0435\u0432\u0438\u0439". Consider their relevance for the current or upcoming week's planning.
-    * Use the surrounding text and the source document name for context for all identified items.
-* If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context (both Personal Focus and General Context sections). Analyze themes across different chunks and documents.
---- End RAG Data Interpretation Rules ---
-        `.trim();
+    const isProductivityRoleActive = roleDefinition?.isProductivityPersona ?? false;
+    const baseRagInstructions = `
+--- RAG Data Interpretation Rules (Base) ---
+You may be provided context from the user's notes. This context is split into chunks, each from a specific file.
+*   '### Personal Focus Context (User's Life State & Goals)': This section contains information the user has marked as high-priority for understanding their current situation, desired state, and goals. Use this information to better understand the user's overall direction and motivations when answering questions or providing suggestions.
+*   '### General Context from User Notes': This section contains general background information from user notes, semantically similar to the current query. Use this for supplementary details and broader context.
+*   Your primary goal is to directly and accurately answer the user's current question based on the provided context.
+*   After providing a direct answer, you may briefly (1-2 sentences) and if relevant, connect the information to the user's broader goals from the 'Personal Focus Context', but only if this adds clear value and doesn't overshadow the direct answer.
+*   Pay attention to the source file mentioned in each chunk's header.
+*   Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress, especially if the question relates to these aspects.
+*   Bullet points (lines starting with '-', '*', '+') or lines with hash tags (#tag) can represent user goals, tasks, ideas, or key points.
+*   If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context. Analyze themes across different chunks and documents.
+--- End RAG Data Interpretation Rules (Base) ---
+    `.trim();
+    const productivityRagInstructions = `
+--- RAG Data Interpretation Rules (Productivity Focus Augmentation) ---
+When 'Personal Focus Context' is provided and you are in a productivity-focused role:
+*   TREAT THIS SECTION AS THE PRIMARY SOURCE for understanding the user's core objectives and current life context.
+*   Actively use this context to help the user:
+    *   Align your suggestions with their stated goals.
+    *   Track progress on their priorities.
+    *   Provide strategic guidance towards achieving their objectives.
+    *   Identify potential blockers or areas needing attention related to these goals.
+When analyzing any RAG context (Personal Focus or General) in a productivity-focused role:
+*   **Critical Goals/Tasks:** (Identified by tags like #critical, #critical\u{1F198} or keywords like "\u043A\u0440\u0438\u0442\u0438\u0447\u043D\u043E", "critical", "\u0442\u0435\u0440\u043C\u0456\u043D\u043E\u0432\u043E", "urgent"). **Prioritize discussing these items, potential blockers, and progress.**
+*   **Weekly Goals/Tasks:** (Identified by tags like #week, #weekly or keywords like "weekly", "\u0442\u0438\u0436\u043D\u0435\u0432\u0430", "\u0442\u0438\u0436\u043D\u0435\u0432\u0438\u0439"). Consider their relevance for current/upcoming week's planning.
+--- End RAG Data Interpretation Rules (Productivity Focus Augmentation) ---
+    `.trim();
     let systemPromptParts = [];
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-      systemPromptParts.push(ragInstructions);
+      systemPromptParts.push(baseRagInstructions);
+      if (isProductivityRoleActive && settings.enableProductivityFeatures) {
+        systemPromptParts.push(productivityRagInstructions);
+        this.plugin.logger.debug("[PromptService] Added PRODUCTIVITY RAG instructions.");
+      } else {
+        this.plugin.logger.debug("[PromptService] Added BASE RAG instructions only.");
+      }
     }
     if (roleSystemPrompt) {
       systemPromptParts.push(roleSystemPrompt.trim());
@@ -24024,14 +24044,14 @@ Tool Name: "${tool.name}"
       } else {
         toolUsageInstructions = "\n\n--- Tool Usage Guidelines ---\nNo tools are currently available.\n--- End Tool Usage Guidelines ---";
       }
-      if (combinedBasePrompt.length === 0) {
+      if (combinedBasePrompt.length === 0 && toolUsageInstructions.length > 0) {
         combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
-      } else {
+      } else if (toolUsageInstructions.length > 0) {
         combinedBasePrompt += toolUsageInstructions;
       }
     } else if (combinedBasePrompt.length === 0) {
     }
-    if (isProductivityActive && combinedBasePrompt && settings.enableProductivityFeatures) {
+    if (isProductivityRoleActive && combinedBasePrompt && settings.enableProductivityFeatures) {
       const now = new Date();
       const formattedDate = now.toLocaleDateString(void 0, {
         weekday: "long",
@@ -24049,9 +24069,9 @@ Tool Name: "${tool.name}"
   async preparePromptBody(history, chatMetadata) {
     const settings = this.plugin.settings;
     const selectedRolePath = chatMetadata.selectedRolePath !== void 0 && chatMetadata.selectedRolePath !== null ? chatMetadata.selectedRolePath : settings.selectedRolePath;
-    const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
+    const isProductivityActiveForHistory = await this._isProductivityPersonaActive(selectedRolePath);
     let taskContext = "";
-    if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
+    if (isProductivityActiveForHistory && settings.enableProductivityFeatures && this.plugin.chatManager) {
       await this.plugin.checkAndProcessTaskUpdate?.();
       const taskState = this.plugin.chatManager.getCurrentTaskState();
       if (taskState && taskState.hasContent) {
@@ -24065,9 +24085,9 @@ Tool Name: "${tool.name}"
     }
     const approxTaskTokens = this._countTokens(taskContext);
     const maxRagTokens = settings.ragEnabled ? settings.ragTopK * settings.ragChunkSize / 4 * 1.8 : 0;
-    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250;
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - (settings.systemPromptBaseTokenBuffer || 250);
     let processedHistoryString = "";
-    if (isProductivityActive && settings.useAdvancedContextStrategy) {
+    if (isProductivityActiveForHistory && settings.useAdvancedContextStrategy) {
       processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
     } else {
       processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
@@ -24092,13 +24112,11 @@ ${processedHistoryString}`);
     }
     const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
     if (!finalPromptBody) {
+      this.plugin.logger.debug("[PromptService] preparePromptBody resulted in an empty body.");
       return null;
     }
     return finalPromptBody;
   }
-  // _buildSimpleContext та _buildAdvancedContext тепер мають отримувати повідомлення
-  // з role: "tool", які вже відформатовані з маркерами [TOOL_RESULT] або [TOOL_ERROR]
-  // з методу OllamaView._executeAndRenderToolCycle
   _buildSimpleContext(history, maxTokens) {
     let context = "";
     let currentTokens = 0;
@@ -24112,16 +24130,14 @@ ${processedHistoryString}`);
       } else if (message.role === "assistant") {
         if (message.tool_calls && message.tool_calls.length > 0) {
           const toolCallsString = JSON.stringify(message.tool_calls);
-          formattedMessage = `Assistant:
-<tool_calls>
-${toolCallsString}
-</tool_calls>`;
+          let contentPart = "";
           if (message.content && message.content.trim() !== "") {
-            formattedMessage = `Assistant: ${message.content.trim()}
-<tool_calls>
+            contentPart = `${message.content.trim()}
+`;
+          }
+          formattedMessage = `Assistant: ${contentPart}<tool_calls>
 ${toolCallsString}
 </tool_calls>`;
-          }
         } else {
           formattedMessage = `Assistant: ${message.content.trim()}`;
         }
@@ -24135,6 +24151,7 @@ ${message.content.trim()}
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
       } else {
+        this.plugin.logger.debug(`[PromptService] Max tokens for simple history reached. Added ${currentTokens} tokens. Stopped before message ${i}.`);
         break;
       }
     }
@@ -24147,7 +24164,7 @@ ${message.content.trim()}
     const keepN = Math.max(0, settings.keepLastNMessagesBeforeSummary || 3);
     const actualKeepN = Math.min(history.length, keepN);
     const messagesToKeep = history.slice(-actualKeepN);
-    const messagesToProcess = history.slice(0, -actualKeepN);
+    const messagesToProcess = history.slice(0, history.length - actualKeepN);
     if (messagesToProcess.length > 0) {
       let olderContextTokens = 0;
       let olderContextContent = "";
@@ -24161,6 +24178,7 @@ ${summary}`;
       }
       if (!olderContextContent) {
         let includedOlderCount = 0;
+        let tempOlderContent = "";
         for (let i = messagesToProcess.length - 1; i >= 0; i--) {
           const message = messagesToProcess[i];
           if (message.role === "system" || message.role === "error")
@@ -24171,16 +24189,11 @@ ${summary}`;
           } else if (message.role === "assistant") {
             if (message.tool_calls && message.tool_calls.length > 0) {
               const toolCallsString = JSON.stringify(message.tool_calls);
-              formattedMessage = `Assistant:
-<tool_calls>
+              let contentPart = message.content && message.content.trim() !== "" ? `${message.content.trim()}
+` : "";
+              formattedMessage = `Assistant: ${contentPart}<tool_calls>
 ${toolCallsString}
 </tool_calls>`;
-              if (message.content && message.content.trim() !== "") {
-                formattedMessage = `Assistant: ${message.content.trim()}
-<tool_calls>
-${toolCallsString}
-</tool_calls>`;
-              }
             } else {
               formattedMessage = `Assistant: ${message.content.trim()}`;
             }
@@ -24191,23 +24204,28 @@ ${message.content.trim()}
           }
           const messageTokens = this._countTokens(formattedMessage) + 5;
           if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
-            olderContextContent = formattedMessage + "\n\n" + olderContextContent;
+            tempOlderContent = formattedMessage + "\n\n" + tempOlderContent;
             olderContextTokens += messageTokens;
             includedOlderCount++;
           } else {
+            this.plugin.logger.debug(`[PromptService] Max tokens for older part of advanced history reached. Added ${olderContextTokens} tokens from ${includedOlderCount} older messages. Stopped before message ${i} of older part.`);
             break;
           }
         }
         if (includedOlderCount > 0) {
           olderContextContent = `[Start of older messages directly included]:
-${olderContextContent.trim()}
+${tempOlderContent.trim()}
 [End of older messages]`;
-          olderContextTokens += 10;
+          olderContextTokens += this._countTokens(olderContextContent) - this._countTokens(tempOlderContent.trim());
         }
       }
-      if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
-        processedParts.push(olderContextContent);
-        currentTokens += olderContextTokens;
+      if (olderContextContent) {
+        if (currentTokens + olderContextTokens <= maxTokens) {
+          processedParts.push(olderContextContent);
+          currentTokens += olderContextTokens;
+        } else {
+          this.plugin.logger.warn(`[PromptService] Summarized/older context too large (${olderContextTokens} tokens) to fit with remaining ${maxTokens - currentTokens} tokens. Skipping older context.`);
+        }
       }
     }
     let keptMessagesString = "";
@@ -24222,16 +24240,11 @@ ${olderContextContent.trim()}
       } else if (message.role === "assistant") {
         if (message.tool_calls && message.tool_calls.length > 0) {
           const toolCallsString = JSON.stringify(message.tool_calls);
-          formattedMessage = `Assistant:
-<tool_calls>
+          let contentPart = message.content && message.content.trim() !== "" ? `${message.content.trim()}
+` : "";
+          formattedMessage = `Assistant: ${contentPart}<tool_calls>
 ${toolCallsString}
 </tool_calls>`;
-          if (message.content && message.content.trim() !== "") {
-            formattedMessage = `Assistant: ${message.content.trim()}
-<tool_calls>
-${toolCallsString}
-</tool_calls>`;
-          }
         } else {
           formattedMessage = `Assistant: ${message.content.trim()}`;
         }
@@ -24245,6 +24258,7 @@ ${message.content.trim()}
         keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
         keptMessagesTokens += messageTokens;
       } else {
+        this.plugin.logger.debug(`[PromptService] Max tokens for kept part of advanced history reached. Added ${keptMessagesTokens} tokens from kept messages. Stopped before message ${i} of kept part.`);
         break;
       }
     }
@@ -24252,6 +24266,7 @@ ${message.content.trim()}
       processedParts.push(keptMessagesString.trim());
       currentTokens += keptMessagesTokens;
     }
+    this.plugin.logger.debug(`[PromptService] Advanced context built with ${currentTokens} tokens. Max allowed: ${maxTokens}`);
     return processedParts.join("\n\n").trim();
   }
   async _summarizeMessages(messagesToSummarize, chatMetadata) {
@@ -24279,29 +24294,39 @@ ${m.content.trim()}
       return "";
     }).filter(Boolean).join("\n");
     if (!textToSummarize.trim()) {
+      this.plugin.logger.debug("[PromptService] Nothing to summarize after formatting messages.");
       return null;
     }
     const summarizationPromptTemplate = this.plugin.settings.summarizationPrompt || "Summarize the following conversation concisely, preserving key information and tool usage context:\n\n{text_to_summarize}";
     const summarizationFullPrompt = summarizationPromptTemplate.replace("{text_to_summarize}", textToSummarize);
     const summarizationModelName = this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
-    const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
+    const summarizationContextWindow = Math.min(this.plugin.settings.summarizationContextWindow || 2048, 4096);
     const requestBody = {
       model: summarizationModelName,
       prompt: summarizationFullPrompt,
       stream: false,
       temperature: 0.3,
+      // Нижча температура для більш фактичної сумаризації
       options: { num_ctx: summarizationContextWindow },
-      system: "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, unresolved questions, and the context of any tool calls and their results."
+      system: (
+        // Більш конкретний системний промпт для сумаризатора
+        "You are an AI assistant that specializes in creating concise and accurate summaries of conversation excerpts. Focus on key decisions, questions, outcomes of tool usage, and important facts. Preserve the chronological order of events if possible. Be brief and to the point."
+      )
     };
     try {
-      if (!this.plugin.ollamaService)
+      if (!this.plugin.ollamaService) {
+        this.plugin.logger.error("[PromptService] OllamaService not available for summarization.");
         return null;
+      }
       const responseData = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
+        this.plugin.logger.debug(`[PromptService] Summarization successful. Summary length: ${responseData.response.trim().length}`);
         return responseData.response.trim();
       }
+      this.plugin.logger.warn("[PromptService] Summarization did not return a valid response.", responseData);
       return null;
     } catch (error) {
+      this.plugin.logger.error("[PromptService] Error during summarization:", error);
       return null;
     }
   }

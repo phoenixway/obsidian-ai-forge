@@ -41,16 +41,21 @@ export class PromptService {
 
     if (normalizedPath !== this.currentRolePath) {
       if (this.currentRolePath && this.roleCache[this.currentRolePath]) {
-        delete this.roleCache[this.currentRolePath];
+        // Не видаляємо з кешу, щоб уникнути повторного читання файлу, якщо роль знову стане активною
+        // Якщо потрібно строго економити пам'ять, можна розкоментувати:
+        // delete this.roleCache[this.currentRolePath];
       }
       this.currentRolePath = normalizedPath;
-      this.currentSystemPrompt = null;
+      this.currentSystemPrompt = null; // Скидаємо кешований системний промпт, бо роль змінилася
     }
 
     if (!normalizedPath || !this.plugin.settings.followRole) {
       const definition: RoleDefinition = {
         systemPrompt: null,
         isProductivityPersona: false,
+        // Якщо додали нові поля, тут теж треба вказати їх значення за замовчуванням
+        // ragInstructionOverride: null,
+        // ragBehaviorMode: "base",
       };
       return definition;
     }
@@ -77,12 +82,14 @@ export class PromptService {
         const definition: RoleDefinition = {
           systemPrompt: systemPromptBody || null,
           isProductivityPersona: isProductivity,
+          // Тут можна буде зчитувати rag_instruction_override та rag_behavior_mode з frontmatter
         };
 
         this.roleCache[normalizedPath] = definition;
         this.currentSystemPrompt = definition.systemPrompt;
         return definition;
       } catch (error) {
+        this.plugin.logger.error(`Error loading role: ${file.basename}. Check console.`, error);
         new Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
         return { systemPrompt: null, isProductivityPersona: false };
@@ -115,37 +122,59 @@ export class PromptService {
     }
 
     const roleSystemPrompt = roleDefinition?.systemPrompt || null;
-    const isProductivityActive = roleDefinition?.isProductivityPersona ?? false;
+    const isProductivityRoleActive = roleDefinition?.isProductivityPersona ?? false;
 
-    const ragInstructions = `
---- RAG Data Interpretation Rules ---
-You will be provided context from the user's notes, potentially split into two sections:
-1.  '### Personal Focus Context (User's Life State & Goals)':
-    * This section contains HIGH-PRIORITY information reflecting the user's current situation, desired state, goals, priorities, and actions they believe they should take.
-    * TREAT THIS SECTION AS THE PRIMARY SOURCE for understanding the user's core objectives and current life context.
-    * Use this to align your suggestions, track progress on stated goals/priorities, and provide strategic guidance.
-2.  '### General Context from User Notes':
-    * This section contains potentially relevant background information from the user's general notes, identified based on semantic similarity to the current query.
-    * Use this for supplementary details and broader context.
+    // --- БАЗОВІ RAG ІНСТРУКЦІЇ ---
+    const baseRagInstructions = `
+--- RAG Data Interpretation Rules (Base) ---
+You may be provided context from the user's notes. This context is split into chunks, each from a specific file.
+*   '### Personal Focus Context (User's Life State & Goals)': This section contains information the user has marked as high-priority for understanding their current situation, desired state, and goals. Use this information to better understand the user's overall direction and motivations when answering questions or providing suggestions.
+*   '### General Context from User Notes': This section contains general background information from user notes, semantically similar to the current query. Use this for supplementary details and broader context.
+*   Your primary goal is to directly and accurately answer the user's current question based on the provided context.
+*   After providing a direct answer, you may briefly (1-2 sentences) and if relevant, connect the information to the user's broader goals from the 'Personal Focus Context', but only if this adds clear value and doesn't overshadow the direct answer.
+*   Pay attention to the source file mentioned in each chunk's header.
+*   Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of personal state, mood, energy, and progress, especially if the question relates to these aspects.
+*   Bullet points (lines starting with '-', '*', '+') or lines with hash tags (#tag) can represent user goals, tasks, ideas, or key points.
+*   If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context. Analyze themes across different chunks and documents.
+--- End RAG Data Interpretation Rules (Base) ---
+    `.trim();
 
-General Rules for BOTH Context Sections:
-* Each context chunk originates from a specific file indicated in its header (e.g., "--- Chunk 1 from Personal Focus Note: My Goals.md ..."). You can refer to source files by name.
-* Context from files/chunks marked with "[Type: Personal Log]" contains personal reflections, activities, or logs. Use this for analysis of life situation of user, personal activities, achievements, progress, state, mood, energy.
-* Assume ANY bullet point item (lines starting with '-', '*', '+') OR any line containing one or more hash tags (#tag) represents a potential user goal, task, objective, idea, or key point. **Pay special attention to categorizing these:**
-    * **Critical Goals/Tasks:** Identify these if the line contains tags like #critical, #critical🆘 or keywords like "критично", "critical", "терміново", "urgent". **Prioritize discussing these items, potential blockers, and progress.**
-    * **Weekly Goals/Tasks:** Identify these if the line contains tags like #week, #weekly or keywords like "weekly", "тижнева", "тижневий". Consider their relevance for the current or upcoming week's planning.
-    * Use the surrounding text and the source document name for context for all identified items.
-* If the user asks about "available data", "all my notes", "summarize my RAG data", or similar general terms, base your answer on the ENTIRE provided context (both Personal Focus and General Context sections). Analyze themes across different chunks and documents.
---- End RAG Data Interpretation Rules ---
-        `.trim();
+    // --- РОЗШИРЕНІ RAG ІНСТРУКЦІЇ (для продуктивності/цілей) ---
+    const productivityRagInstructions = `
+--- RAG Data Interpretation Rules (Productivity Focus Augmentation) ---
+When 'Personal Focus Context' is provided and you are in a productivity-focused role:
+*   TREAT THIS SECTION AS THE PRIMARY SOURCE for understanding the user's core objectives and current life context.
+*   Actively use this context to help the user:
+    *   Align your suggestions with their stated goals.
+    *   Track progress on their priorities.
+    *   Provide strategic guidance towards achieving their objectives.
+    *   Identify potential blockers or areas needing attention related to these goals.
+When analyzing any RAG context (Personal Focus or General) in a productivity-focused role:
+*   **Critical Goals/Tasks:** (Identified by tags like #critical, #critical🆘 or keywords like "критично", "critical", "терміново", "urgent"). **Prioritize discussing these items, potential blockers, and progress.**
+*   **Weekly Goals/Tasks:** (Identified by tags like #week, #weekly or keywords like "weekly", "тижнева", "тижневий"). Consider their relevance for current/upcoming week's planning.
+--- End RAG Data Interpretation Rules (Productivity Focus Augmentation) ---
+    `.trim();
 
     let systemPromptParts: string[] = [];
 
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
-      systemPromptParts.push(ragInstructions);
+      systemPromptParts.push(baseRagInstructions); // Завжди додаємо базові
+      if (isProductivityRoleActive && settings.enableProductivityFeatures) {
+        systemPromptParts.push(productivityRagInstructions);
+        this.plugin.logger.debug("[PromptService] Added PRODUCTIVITY RAG instructions.");
+      } else {
+        this.plugin.logger.debug("[PromptService] Added BASE RAG instructions only.");
+      }
     }
 
     if (roleSystemPrompt) {
+      // TODO: Тут в майбутньому можна додати логіку, якщо сама роль
+      // через frontmatter (наприклад, rag_instruction_override або rag_behavior_mode)
+      // захоче повністю замінити або модифікувати RAG інструкції.
+      // Наприклад, якщо `roleDefinition.ragInstructionOverride` існує, використати його замість
+      // `baseRagInstructions` та `productivityRagInstructions`.
+      // Або якщо `roleDefinition.ragBehaviorMode === 'custom'` і є `roleDefinition.customRagPrompt`.
+      // Поки що, просто додаємо системний промпт ролі як є.
       systemPromptParts.push(roleSystemPrompt.trim());
     }
 
@@ -201,9 +230,9 @@ General Rules for BOTH Context Sections:
           "\n\n--- Tool Usage Guidelines ---\nNo tools are currently available.\n--- End Tool Usage Guidelines ---";
       }
 
-      if (combinedBasePrompt.length === 0) {
+      if (combinedBasePrompt.length === 0 && toolUsageInstructions.length > 0) { // Додаємо дефолтний, тільки якщо є інструкції для інструментів
         combinedBasePrompt = "You are a helpful AI assistant." + toolUsageInstructions;
-      } else {
+      } else if (toolUsageInstructions.length > 0) {
         combinedBasePrompt += toolUsageInstructions;
       }
     } else if (combinedBasePrompt.length === 0) {
@@ -211,7 +240,7 @@ General Rules for BOTH Context Sections:
       // combinedBasePrompt = "You are a helpful AI assistant."; // Можна залишити порожнім, якщо не хочемо дефолтного
     }
 
-    if (isProductivityActive && combinedBasePrompt && settings.enableProductivityFeatures) {
+    if (isProductivityRoleActive && combinedBasePrompt && settings.enableProductivityFeatures) {
       const now = new Date();
       const formattedDate = now.toLocaleDateString(undefined, {
         weekday: "long",
@@ -234,11 +263,16 @@ General Rules for BOTH Context Sections:
       chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
         ? chatMetadata.selectedRolePath
         : settings.selectedRolePath;
-    const isProductivityActive = await this._isProductivityPersonaActive(selectedRolePath);
+    
+    // Використовуємо _isProductivityPersonaActive, а не isProductivityRoleActive з getSystemPromptForAPI,
+    // бо нам потрібна ця інформація ДО того, як ми вирішимо, як будувати історію.
+    const isProductivityActiveForHistory = await this._isProductivityPersonaActive(selectedRolePath);
 
     let taskContext = "";
-    if (isProductivityActive && settings.enableProductivityFeatures && this.plugin.chatManager) {
-      await this.plugin.checkAndProcessTaskUpdate?.();
+    if (isProductivityActiveForHistory && settings.enableProductivityFeatures && this.plugin.chatManager) {
+      // `checkAndProcessTaskUpdate` та `getCurrentTaskState` повинні бути доступні в `this.plugin`
+      // або потрібно передавати `this.plugin.chatManager`
+      await this.plugin.checkAndProcessTaskUpdate?.(); 
       const taskState = this.plugin.chatManager.getCurrentTaskState();
 
       if (taskState && taskState.hasContent) {
@@ -250,11 +284,15 @@ General Rules for BOTH Context Sections:
     }
 
     const approxTaskTokens = this._countTokens(taskContext);
+    // Приблизний розрахунок токенів для RAG-контексту. 
+    // 1.8 - коефіцієнт, що враховує додаткові метадані, заголовки секцій тощо.
+    // 250 - буфер для системного промпту та інших неврахованих елементів.
     const maxRagTokens = settings.ragEnabled ? ((settings.ragTopK * settings.ragChunkSize) / 4) * 1.8 : 0; 
-    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - 250;
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - (settings.systemPromptBaseTokenBuffer || 250);
+
 
     let processedHistoryString = "";
-    if (isProductivityActive && settings.useAdvancedContextStrategy) {
+    if (isProductivityActiveForHistory && settings.useAdvancedContextStrategy) {
       processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
     } else {
       processedHistoryString = this._buildSimpleContext(history, maxHistoryTokens);
@@ -269,6 +307,8 @@ General Rules for BOTH Context Sections:
     }
 
     let finalPromptBodyParts: string[] = [];
+    // Порядок: RAG, потім Задачі, потім Історія. 
+    // Це дозволяє LLM спочатку отримати свіжий контекст з нотаток, потім актуальні задачі, а потім історію розмови.
     if (ragContext) {
       finalPromptBodyParts.push(ragContext);
     }
@@ -276,57 +316,52 @@ General Rules for BOTH Context Sections:
       finalPromptBodyParts.push(taskContext);
     }
     if (processedHistoryString) {
-      // Тепер історія вже містить відформатовані повідомлення з role: "tool" (з маркерами)
       finalPromptBodyParts.push(`### Conversation History:\n${processedHistoryString}`);
     }
 
     const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
 
     if (!finalPromptBody) {
+      this.plugin.logger.debug("[PromptService] preparePromptBody resulted in an empty body.");
       return null;
     }
-
+    
+    // this.plugin.logger.debug(`[PromptService] Final prompt body prepared:\n${finalPromptBody.substring(0, 500)}...`);
     return finalPromptBody;
   }
 
-  // _buildSimpleContext та _buildAdvancedContext тепер мають отримувати повідомлення
-  // з role: "tool", які вже відформатовані з маркерами [TOOL_RESULT] або [TOOL_ERROR]
-  // з методу OllamaView._executeAndRenderToolCycle
   private _buildSimpleContext(history: Message[], maxTokens: number): string {
     let context = "";
     let currentTokens = 0;
     for (let i = history.length - 1; i >= 0; i--) {
       const message = history[i];
 
-      if (message.role === "system" || message.role === "error") continue; // error тут - це помилка рендерингу, а не TOOL_ERROR
+      if (message.role === "system" || message.role === "error") continue;
 
       let formattedMessage = "";
       if (message.role === "user") {
         formattedMessage = `User: ${message.content.trim()}`;
       } else if (message.role === "assistant") {
-        // Якщо це повідомлення асистента з tool_calls, воно має бути відформатоване для LLM
-        // Відповідно до документації Ollama для tool use
         if (message.tool_calls && message.tool_calls.length > 0) {
-            const toolCallsString = JSON.stringify(message.tool_calls); // Або інший формат, який очікує модель
-            formattedMessage = `Assistant:\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+            const toolCallsString = JSON.stringify(message.tool_calls);
+            let contentPart = "";
             if (message.content && message.content.trim() !== "") {
-                 // Додаємо текстовий контент, якщо він є разом з tool_calls
-                 formattedMessage = `Assistant: ${message.content.trim()}\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+                 contentPart = `${message.content.trim()}\n`;
             }
+            formattedMessage = `Assistant: ${contentPart}<tool_calls>\n${toolCallsString}\n</tool_calls>`;
         } else {
             formattedMessage = `Assistant: ${message.content.trim()}`;
         }
       } else if (message.role === "tool") {
-        // Повідомлення 'tool' вже має містити маркери [TOOL_RESULT] або [TOOL_ERROR]
-        // у своєму message.content, додані в OllamaView
         formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">\n${message.content.trim()}\n</message>`;
       }
       
-      const messageTokens = this._countTokens(formattedMessage) + 5; // +5 для приблизних токенів на роль/нову лінію
+      const messageTokens = this._countTokens(formattedMessage) + 5; 
       if (currentTokens + messageTokens <= maxTokens) {
         context = formattedMessage + "\n\n" + context;
         currentTokens += messageTokens;
       } else {
+        this.plugin.logger.debug(`[PromptService] Max tokens for simple history reached. Added ${currentTokens} tokens. Stopped before message ${i}.`);
         break;
       }
     }
@@ -344,8 +379,12 @@ General Rules for BOTH Context Sections:
 
     const keepN = Math.max(0, settings.keepLastNMessagesBeforeSummary || 3);
     const actualKeepN = Math.min(history.length, keepN);
-    const messagesToKeep = history.slice(-actualKeepN);
-    const messagesToProcess = history.slice(0, -actualKeepN);
+    
+    // Важливо: messagesToKeep мають бути останніми N повідомленнями
+    const messagesToKeep = history.slice(-actualKeepN); 
+    // messagesToProcess - це все, що було ДО цих останніх N
+    const messagesToProcess = history.slice(0, history.length - actualKeepN);
+
 
     if (messagesToProcess.length > 0) {
       let olderContextTokens = 0;
@@ -359,71 +398,74 @@ General Rules for BOTH Context Sections:
         }
       }
 
-      if (!olderContextContent) {
+      if (!olderContextContent) { // Якщо сумаризація вимкнена або не дала результату
         let includedOlderCount = 0;
-        // Використовуємо ту ж логіку форматування, що й у _buildSimpleContext
+        let tempOlderContent = "";
         for (let i = messagesToProcess.length - 1; i >= 0; i--) {
           const message = messagesToProcess[i];
           if (message.role === "system" || message.role === "error") continue;
           
           let formattedMessage = "";
-          // ... (така ж логіка форматування user/assistant/tool, як у _buildSimpleContext) ...
-            if (message.role === "user") {
-                formattedMessage = `User: ${message.content.trim()}`;
-            } else if (message.role === "assistant") {
-                if (message.tool_calls && message.tool_calls.length > 0) {
-                    const toolCallsString = JSON.stringify(message.tool_calls);
-                    formattedMessage = `Assistant:\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
-                    if (message.content && message.content.trim() !== "") {
-                        formattedMessage = `Assistant: ${message.content.trim()}\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
-                    }
-                } else {
-                    formattedMessage = `Assistant: ${message.content.trim()}`;
-                }
-            } else if (message.role === "tool") {
-                formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">\n${message.content.trim()}\n</message>`;
-            }
+          if (message.role === "user") {
+              formattedMessage = `User: ${message.content.trim()}`;
+          } else if (message.role === "assistant") {
+              if (message.tool_calls && message.tool_calls.length > 0) {
+                  const toolCallsString = JSON.stringify(message.tool_calls);
+                  let contentPart = message.content && message.content.trim() !== "" ? `${message.content.trim()}\n` : "";
+                  formattedMessage = `Assistant: ${contentPart}<tool_calls>\n${toolCallsString}\n</tool_calls>`;
+              } else {
+                  formattedMessage = `Assistant: ${message.content.trim()}`;
+              }
+          } else if (message.role === "tool") {
+              formattedMessage = `<message role="tool" tool_call_id="${message.tool_call_id}" name="${message.name}">\n${message.content.trim()}\n</message>`;
+          }
 
           const messageTokens = this._countTokens(formattedMessage) + 5;
 
+          // Перевіряємо, чи вміщається цей "старий" шматок разом з тим, що вже є, 
+          // і залишаємо місце для messagesToKeep
           if (currentTokens + olderContextTokens + messageTokens <= maxTokens) {
-            olderContextContent = formattedMessage + "\n\n" + olderContextContent;
+            tempOlderContent = formattedMessage + "\n\n" + tempOlderContent;
             olderContextTokens += messageTokens;
             includedOlderCount++;
           } else {
+            this.plugin.logger.debug(`[PromptService] Max tokens for older part of advanced history reached. Added ${olderContextTokens} tokens from ${includedOlderCount} older messages. Stopped before message ${i} of older part.`);
             break;
           }
         }
         if (includedOlderCount > 0) {
-          olderContextContent = `[Start of older messages directly included]:\n${olderContextContent.trim()}\n[End of older messages]`;
-          olderContextTokens += 10; 
+          olderContextContent = `[Start of older messages directly included]:\n${tempOlderContent.trim()}\n[End of older messages]`;
+          // olderContextTokens вже розраховані, але якщо додали обгортку, можемо додати ще кілька токенів
+          olderContextTokens += this._countTokens(olderContextContent) - this._countTokens(tempOlderContent.trim()); 
         }
       }
 
-      if (olderContextContent && currentTokens + olderContextTokens <= maxTokens) {
-        processedParts.push(olderContextContent);
-        currentTokens += olderContextTokens;
+      if (olderContextContent) { // Додаємо, тільки якщо вміст є
+        // Перевіряємо знову, чи вміщається ВЕСЬ olderContextContent
+        if (currentTokens + olderContextTokens <= maxTokens) {
+            processedParts.push(olderContextContent);
+            currentTokens += olderContextTokens;
+        } else {
+            this.plugin.logger.warn(`[PromptService] Summarized/older context too large (${olderContextTokens} tokens) to fit with remaining ${maxTokens - currentTokens} tokens. Skipping older context.`);
+        }
       }
     }
 
+    // Тепер додаємо останні N повідомлень (messagesToKeep)
     let keptMessagesString = "";
     let keptMessagesTokens = 0;
-    // Використовуємо ту ж логіку форматування, що й у _buildSimpleContext
-    for (let i = messagesToKeep.length - 1; i >= 0; i--) {
+    for (let i = messagesToKeep.length - 1; i >= 0; i--) { // Ітеруємо з кінця messagesToKeep, щоб зібрати в правильному порядку
         const message = messagesToKeep[i];
         if (message.role === "system" || message.role === "error") continue;
         
         let formattedMessage = "";
-        // ... (така ж логіка форматування user/assistant/tool, як у _buildSimpleContext) ...
         if (message.role === "user") {
             formattedMessage = `User: ${message.content.trim()}`;
         } else if (message.role === "assistant") {
             if (message.tool_calls && message.tool_calls.length > 0) {
                 const toolCallsString = JSON.stringify(message.tool_calls);
-                formattedMessage = `Assistant:\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
-                if (message.content && message.content.trim() !== "") {
-                    formattedMessage = `Assistant: ${message.content.trim()}\n<tool_calls>\n${toolCallsString}\n</tool_calls>`;
-                }
+                let contentPart = message.content && message.content.trim() !== "" ? `${message.content.trim()}\n` : "";
+                formattedMessage = `Assistant: ${contentPart}<tool_calls>\n${toolCallsString}\n</tool_calls>`;
             } else {
                 formattedMessage = `Assistant: ${message.content.trim()}`;
             }
@@ -433,10 +475,11 @@ General Rules for BOTH Context Sections:
 
         const messageTokens = this._countTokens(formattedMessage) + 5;
 
-        if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) {
-            keptMessagesString = formattedMessage + "\n\n" + keptMessagesString;
+        if (currentTokens + keptMessagesTokens + messageTokens <= maxTokens) { // Перевіряємо проти ЗАЛИШКОВИХ токенів
+            keptMessagesString = formattedMessage + "\n\n" + keptMessagesString; // Збираємо з початку
             keptMessagesTokens += messageTokens;
         } else {
+            this.plugin.logger.debug(`[PromptService] Max tokens for kept part of advanced history reached. Added ${keptMessagesTokens} tokens from kept messages. Stopped before message ${i} of kept part.`);
             break;
         }
     }
@@ -444,9 +487,10 @@ General Rules for BOTH Context Sections:
 
     if (keptMessagesString) {
       processedParts.push(keptMessagesString.trim());
-      currentTokens += keptMessagesTokens;
+      currentTokens += keptMessagesTokens; // Оновлюємо загальну кількість токенів
     }
-
+    
+    this.plugin.logger.debug(`[PromptService] Advanced context built with ${currentTokens} tokens. Max allowed: ${maxTokens}`);
     return processedParts.join("\n\n").trim();
   }
 
@@ -454,8 +498,7 @@ General Rules for BOTH Context Sections:
     if (!this.plugin.settings.enableSummarization || messagesToSummarize.length === 0) {
       return null;
     }
-
-    // Форматуємо історію для сумаризації так само, як для основного контексту
+    
     const textToSummarize = messagesToSummarize
       .filter(m => m.role === "user" || m.role === "assistant" || m.role === "tool")
       .map(m => {
@@ -469,15 +512,15 @@ General Rules for BOTH Context Sections:
             }
             return `Assistant: ${m.content.trim()}`;
         } else if (m.role === "tool") {
-            // Повідомлення 'tool' вже мають маркери
             return `<message role="tool" tool_call_id="${m.tool_call_id}" name="${m.name}">\n${m.content.trim()}\n</message>`;
         }
-        return ""; // На випадок непередбачених ролей
+        return ""; 
       })
       .filter(Boolean)
       .join("\n");
 
     if (!textToSummarize.trim()) {
+      this.plugin.logger.debug("[PromptService] Nothing to summarize after formatting messages.");
       return null;
     }
 
@@ -488,26 +531,35 @@ General Rules for BOTH Context Sections:
 
     const summarizationModelName =
       this.plugin.settings.summarizationModelName || chatMetadata.modelName || this.plugin.settings.modelName;
-    const summarizationContextWindow = Math.min(this.plugin.settings.contextWindow || 4096, 4096);
+    
+    // Для сумаризації використовуємо окреме, менше вікно, щоб не перевищити ліміти моделі для сумаризації
+    const summarizationContextWindow = Math.min(this.plugin.settings.summarizationContextWindow || 2048, 4096);
+
 
     const requestBody = {
       model: summarizationModelName,
       prompt: summarizationFullPrompt,
       stream: false,
-      temperature: 0.3,
-      options: { num_ctx: summarizationContextWindow, },
-      system:
-        "You are a helpful assistant specializing in concisely summarizing conversation history. Focus on extracting key points, decisions, unresolved questions, and the context of any tool calls and their results.",
+      temperature: 0.3, // Нижча температура для більш фактичної сумаризації
+      options: { num_ctx: summarizationContextWindow },
+      system: // Більш конкретний системний промпт для сумаризатора
+        "You are an AI assistant that specializes in creating concise and accurate summaries of conversation excerpts. Focus on key decisions, questions, outcomes of tool usage, and important facts. Preserve the chronological order of events if possible. Be brief and to the point.",
     };
 
     try {
-      if (!this.plugin.ollamaService) return null;
+      if (!this.plugin.ollamaService) {
+        this.plugin.logger.error("[PromptService] OllamaService not available for summarization.");
+        return null;
+      }
       const responseData: OllamaGenerateResponse = await this.plugin.ollamaService.generateRaw(requestBody);
       if (responseData && typeof responseData.response === "string") {
+        this.plugin.logger.debug(`[PromptService] Summarization successful. Summary length: ${responseData.response.trim().length}`);
         return responseData.response.trim();
       }
+      this.plugin.logger.warn("[PromptService] Summarization did not return a valid response.", responseData);
       return null;
     } catch (error) {
+      this.plugin.logger.error("[PromptService] Error during summarization:", error);
       return null;
     }
   }

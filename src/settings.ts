@@ -203,6 +203,8 @@ export interface OllamaPluginSettings extends LoggerSettings {
   allowVadMicVadModelFromCDN: boolean;
   vadUseLocalModelIfAvailable: boolean;
   vadUseLocalWorkletIfAvailable: boolean;
+   systemPromptBaseTokenBuffer: number; // <--- НОВЕ ПОЛЕ
+  summarizationContextWindow: number; 
 }
 
 
@@ -287,6 +289,9 @@ export const DEFAULT_SETTINGS: OllamaPluginSettings = {
   allowVadMicVadModelFromCDN: true,    // За замовчуванням дозволяємо завантаження моделі VAD з CDN
   vadUseLocalModelIfAvailable: true,   // Але якщо локальна модель є, пріоритет їй
   vadUseLocalWorkletIfAvailable: true, // Аналогічно для локального ворклету VAD
+
+    systemPromptBaseTokenBuffer: 250, // <--- ЗНАЧЕННЯ ЗА ЗАМОВЧУВАННЯМ
+  summarizationContextWindow: 2048, // <--- ЗНАЧЕННЯ ЗА ЗАМОВЧУВАННЯМ (якщо потрібно)
 
 
 };
