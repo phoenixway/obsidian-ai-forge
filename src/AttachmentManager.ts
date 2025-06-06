@@ -496,12 +496,18 @@ class AttachmentModal extends Modal {
     }
   }
 
-  private createClearAllButton(container: HTMLElement, text: string, onClear: () => void): void {
-    const clearAllContainer = container.createDiv({ cls: CSS_ATTACHMENT_CLEAR_ALL_CONTAINER }); // Use constant
-    const clearButton = clearAllContainer.createEl("button", { text: text, cls: "mod-danger" });
-    setIcon(clearButton, "trash-2");
-    clearButton.onClickEvent(onClear);
-  }
+  // Всередині класу AttachmentModal
+
+    // ++ HELPER for Clear All Button
+    private createClearAllButton(container: HTMLElement, text: string, onClear: () => void): void {
+        const clearAllContainer = container.createDiv({cls: CSS_ATTACHMENT_CLEAR_ALL_CONTAINER}); 
+        const clearButton = clearAllContainer.createEl('button', { text: text, cls: "mod-danger" });
+        setIcon(clearButton, "trash-2");
+        clearButton.onClickEvent((event: MouseEvent) => { // <-- Додаємо event
+            event.stopPropagation(); // <-- ОСНОВНА ЗМІНА: Зупиняємо спливання
+            onClear();
+        });
+    }
 
   // Всередині класу AttachmentModal
 

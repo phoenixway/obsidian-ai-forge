@@ -19886,11 +19886,16 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       });
     }
   }
+  // Всередині класу AttachmentModal
+  // ++ HELPER for Clear All Button
   createClearAllButton(container, text, onClear) {
     const clearAllContainer = container.createDiv({ cls: CSS_ATTACHMENT_CLEAR_ALL_CONTAINER });
     const clearButton = clearAllContainer.createEl("button", { text, cls: "mod-danger" });
     (0, import_obsidian15.setIcon)(clearButton, "trash-2");
-    clearButton.onClickEvent(onClear);
+    clearButton.onClickEvent((event) => {
+      event.stopPropagation();
+      onClear();
+    });
   }
   // Всередині класу AttachmentModal
   renderLinksTabContent(container) {
