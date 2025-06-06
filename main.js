@@ -20883,18 +20883,18 @@ This action cannot be undone.`,
     });
     const controlsContainer = inputContainer.createDiv({ cls: "input-controls-container" });
     const leftControls = controlsContainer.createDiv({ cls: "input-controls-left" });
-    this.attachmentButton = leftControls.createEl("button", {
-      cls: "attachment-button",
-      attr: { "aria-label": "Manage Attachments" }
-    });
-    (0, import_obsidian16.setIcon)(this.attachmentButton, "paperclip");
-    this.attachmentButton.title = "Manage Attachments";
     this.translateInputButton = leftControls.createEl("button", {
       cls: "translate-input-button",
       attr: { "aria-label": "Translate input to English" }
     });
     (0, import_obsidian16.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
+    this.attachmentButton = leftControls.createEl("button", {
+      cls: "attachment-button",
+      attr: { "aria-label": "Manage Attachments" }
+    });
+    (0, import_obsidian16.setIcon)(this.attachmentButton, "paperclip");
+    this.attachmentButton.title = "Manage Attachments";
     this.modelDisplayEl = leftControls.createDiv({ cls: "model-display" });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";

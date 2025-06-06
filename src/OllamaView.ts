@@ -368,13 +368,6 @@ private speechWorkerUrl: string | null = null;
     });
     const controlsContainer = inputContainer.createDiv({ cls: "input-controls-container" });
     const leftControls = controlsContainer.createDiv({ cls: "input-controls-left" });
-
-    this.attachmentButton = leftControls.createEl("button", {
-        cls: "attachment-button",
-        attr: { "aria-label": "Manage Attachments" },
-    });
-    setIcon(this.attachmentButton, "paperclip"); 
-    this.attachmentButton.title = "Manage Attachments";
     
     this.translateInputButton = leftControls.createEl("button", {
       cls: "translate-input-button",
@@ -382,7 +375,14 @@ private speechWorkerUrl: string | null = null;
     });
     setIcon(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
-    
+
+    this.attachmentButton = leftControls.createEl("button", {
+        cls: "attachment-button",
+        attr: { "aria-label": "Manage Attachments" },
+    });
+    setIcon(this.attachmentButton, "paperclip"); 
+    this.attachmentButton.title = "Manage Attachments";    
+
     this.modelDisplayEl = leftControls.createDiv({ cls: "model-display" });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
