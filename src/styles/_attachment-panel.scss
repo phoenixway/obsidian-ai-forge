@@ -1,0 +1,214 @@
+/* src/styles/attachment-panel.scss */
+
+// Приклад змінних SCSS, якщо потрібні специфічні для цієї панелі
+// $attachment-panel-border-color: var(--background-modifier-border);
+// $attachment-panel-bg-color: var(--background-secondary);
+
+.ollama-attachment-manager-modal {
+  background-color: var(--background-secondary); // $attachment-panel-bg-color;
+  border: 1px solid var(--background-modifier-border); // $attachment-panel-border-color;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: var(--radius-m);
+  z-index: var(--layer-modal);
+  padding: 0;
+  overflow: hidden;
+
+  // Якщо containerEl потрібен тут, хоча він зазвичай на рівні вище
+  // .ollama-attachment-modal-container { ... }
+}
+
+// Цей селектор важливий для перевизначення стилів Obsidian
+.ollama-attachment-modal-container .modal-content {
+  padding: 0 !important;
+}
+
+.ollama-attachment-modal-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 380px;
+}
+
+.ollama-attachment-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: var(--size-2-2) var(--size-4-2);
+  gap: var(--size-4-1);
+  flex-shrink: 0;
+
+  .ollama-attachment-tab {
+    background-color: transparent;
+    border: none;
+    padding: var(--size-2-2) var(--size-4-2);
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    border-radius: var(--radius-s);
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+
+    &:hover {
+      background-color: var(--background-modifier-hover);
+      color: var(--text-normal);
+    }
+
+    &.is-active {
+      background-color: var(--background-modifier-active);
+      color: var(--text-normal);
+      font-weight: var(--font-semibold);
+    }
+  }
+}
+
+.ollama-attachment-content-container {
+  padding: var(--size-4-3);
+  overflow-y: auto;
+  flex-grow: 1;
+  min-height: 150px;
+
+  .ollama-attachment-content {
+    display: none;
+
+    &.is-active {
+      display: block;
+    }
+  }
+}
+
+/* Styles for Links Tab */
+.ollama-links-container { // Цей клас додається до .ollama-attachment-content.is-active, коли активна вкладка 'links'
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-3);
+
+  .ollama-link-input-area {
+    display: flex;
+    gap: var(--size-4-2);
+
+    input[type="text"] {
+      flex-grow: 1;
+      min-width: 0;
+    }
+
+    button {
+      flex-shrink: 0;
+    }
+  }
+
+  .ollama-link-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--background-modifier-border-hover);
+    padding: var(--size-4-2);
+    border-radius: var(--radius-s);
+    background-color: var(--background-primary-alt);
+
+    .ollama-link-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--size-2-1) var(--size-4-1);
+      background-color: var(--background-secondary);
+      border-radius: var(--radius-s);
+      font-size: var(--font-ui-smaller);
+
+      .ollama-link-item-text {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex-grow: 1;
+        margin-right: var(--size-4-1);
+      }
+
+      .ollama-link-item-remove {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        padding: var(--size-2-1);
+
+        .svg-icon {
+          width: var(--icon-xs);
+          height: var(--icon-xs);
+        }
+
+        &:hover {
+          color: var(--text-error);
+        }
+      }
+    }
+  }
+
+  .ollama-attachment-empty-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--size-4-4);
+    text-align: center;
+    color: var(--text-faint);
+
+    .ollama-attachment-empty-icon .svg-icon {
+      width: var(--icon-l);
+      height: var(--icon-l);
+      margin-bottom: var(--size-4-2);
+    }
+    .ollama-attachment-empty-hint {
+      font-size: var(--font-ui-smaller);
+      color: var(--text-muted);
+    }
+  }
+
+  .ollama-attachment-clear-all-container {
+    margin-top: var(--size-4-2);
+    display: flex;
+    justify-content: flex-end;
+
+    button.mod-danger {
+      font-size: var(--font-ui-smaller);
+    }
+  }
+}
+
+.ollama-attachment-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--size-4-4);
+  text-align: center;
+  color: var(--text-faint);
+  height: 100%;
+
+  .ollama-attachment-placeholder-icon .svg-icon {
+    width: var(--icon-xl);
+    height: var(--icon-xl);
+    margin-bottom: var(--size-4-3);
+  }
+}
+
+/* Стилі для кнопки Attachment в панелі вводу */
+// Ці стилі стосуються кнопки, яка *викликає* панель,
+// тому їх можна залишити тут або перенести в input-controls.scss.
+// Для чистоти, я б залишив їх в input-controls.scss, але для повноти прикладу покажу тут.
+// Якщо переносиш, то цей блок можна видалити звідси.
+.chat-input-container .input-controls-left .attachment-button {
+  padding: var(--size-2-2);
+  border-radius: var(--radius-s);
+
+  &:hover {
+    background-color: var(--background-modifier-hover);
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    &:hover {
+      background-color: transparent;
+    }
+  }
+}
