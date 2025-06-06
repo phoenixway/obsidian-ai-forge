@@ -219,3 +219,106 @@
     }
   }
 }
+
+// ... (попередні стилі) ...
+
+// Стилі для інпута файлів та списку файлів
+.ollama-attachment-file-input-label {
+  // Це буде виглядати як кнопка
+  display: inline-block; // Або flex, якщо потрібно більше контролю над вмістом
+  padding: var(--size-4-2) var(--size-4-3);
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  text-align: center;
+  margin-bottom: var(--size-4-3); // Відступ знизу
+
+  &:hover {
+    background-color: var(--interactive-accent-hover);
+  }
+
+  .svg-icon {
+    margin-right: var(--size-4-1);
+  }
+}
+
+.ollama-attachment-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2);
+  max-height: 180px; // Обмеження висоти списку файлів
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border-hover);
+  padding: var(--size-4-2);
+  border-radius: var(--radius-s);
+  background-color: var(--background-primary-alt);
+
+  .ollama-attachment-file-item {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-2-1) var(--size-4-1);
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smaller);
+
+    .ollama-attachment-file-item-preview {
+      width: 32px; // Розмір мініатюри
+      height: 32px;
+      flex-shrink: 0;
+      border-radius: var(--radius-s);
+      overflow: hidden;
+      background-color: var(--background-modifier-hover); // Фон для порожніх прев'ю
+
+      img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover; // Щоб зображення заповнювало мініатюру
+      }
+    }
+    
+    .ollama-attachment-file-item-doc-icon .svg-icon {
+        width: var(--icon-m); // Розмір іконки документа
+        height: var(--icon-m);
+        color: var(--text-muted);
+    }
+
+    .ollama-attachment-file-item-details {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        min-width: 0; // Для правильного перенесення тексту, якщо ім'я довге
+    }
+
+    .ollama-attachment-file-item-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ollama-attachment-file-item-size {
+        color: var(--text-faint);
+        font-size: var(--font-ui-smallest);
+    }
+
+    .ollama-attachment-file-item-remove { // Може бути таким же, як .ollama-link-item-remove
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: var(--size-2-1);
+      margin-left: auto; // Щоб кнопка видалення була справа
+
+      .svg-icon {
+        width: var(--icon-xs);
+        height: var(--icon-xs);
+      }
+
+      &:hover {
+        color: var(--text-error);
+      }
+    }
+  }
+}
+
+// ... (стилі для .ollama-attachment-clear-all-container і т.д. залишаються) ...
