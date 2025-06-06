@@ -7,7 +7,7 @@
 .ollama-attachment-manager-modal {
   background-color: var(--background-secondary); // $attachment-panel-bg-color;
   border: 1px solid var(--background-modifier-border); // $attachment-panel-border-color;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border-radius: var(--radius-m);
   z-index: var(--layer-modal);
   padding: 0;
@@ -77,7 +77,8 @@
 }
 
 /* Styles for Links Tab */
-.ollama-links-container { // Цей клас додається до .ollama-attachment-content.is-active, коли активна вкладка 'links'
+.ollama-links-container {
+  // Цей клас додається до .ollama-attachment-content.is-active, коли активна вкладка 'links'
   display: flex;
   flex-direction: column;
   gap: var(--size-4-3);
@@ -199,6 +200,8 @@
 .chat-input-container .input-controls-left .attachment-button {
   padding: var(--size-2-2);
   border-radius: var(--radius-s);
+  background-color: transparent;
+  color: var(--text-muted);
 
   &:hover {
     background-color: var(--background-modifier-hover);
