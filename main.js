@@ -19734,17 +19734,18 @@ var AttachmentModal = class extends import_obsidian15.Modal {
     this.createTabButton("Documents", "documents", "file-text");
     this.createTabButton("Links", "links", "link");
   }
+  // Всередині класу AttachmentModal
   createTabButton(label, tabId, iconName) {
     const tabButton = this.tabsEl.createEl("button", {
       cls: [CSS_ATTACHMENT_TAB, `ollama-attachment-tab-${tabId}`]
-      // Use constant
     });
     (0, import_obsidian15.setIcon)(tabButton, iconName);
     tabButton.appendText(label);
     if (this.activeTab === tabId) {
       tabButton.addClass(CSS_ATTACHMENT_TAB_ACTIVE);
     }
-    tabButton.onClickEvent(() => {
+    tabButton.onClickEvent((event) => {
+      event.stopPropagation();
       if (this.activeTab === tabId)
         return;
       this.activeTab = tabId;

@@ -308,21 +308,24 @@ class AttachmentModal extends Modal {
         this.createTabButton("Links", "links", "link");
     }
     
+    // Всередині класу AttachmentModal
     private createTabButton(label: string, tabId: 'images' | 'documents' | 'links', iconName: string): void {
         const tabButton = this.tabsEl.createEl('button', {
-            cls: [CSS_ATTACHMENT_TAB, `ollama-attachment-tab-${tabId}`], // Use constant
+            cls: [CSS_ATTACHMENT_TAB, `ollama-attachment-tab-${tabId}`],
         });
         setIcon(tabButton, iconName);
-        tabButton.appendText(label); 
+        tabButton.appendText(label);
         if (this.activeTab === tabId) {
-            tabButton.addClass(CSS_ATTACHMENT_TAB_ACTIVE); // Use constant
+            tabButton.addClass(CSS_ATTACHMENT_TAB_ACTIVE);
         }
-        tabButton.onClickEvent(() => {
-            if (this.activeTab === tabId) return; 
+        tabButton.onClickEvent((event: MouseEvent) => { // Додаємо event як параметр
+            event.stopPropagation(); // <-- ОСНОВНА ЗМІНА: Зупиняємо спливання події
+            
+            if (this.activeTab === tabId) return;
             this.activeTab = tabId;
-            this.renderTabs(); 
-            this.renderContent(); 
-            this.positionModal(); 
+            this.renderTabs();
+            this.renderContent();
+            this.positionModal();
         });
     }
 
