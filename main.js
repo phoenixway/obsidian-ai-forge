@@ -19532,12 +19532,22 @@ var AttachmentManager = class {
   constructor(plugin, app, view) {
     this.modal = null;
     this.attachmentButtonElement = null;
+    this.activeTabId = "links";
+    // Зберігаємо ID активної вкладки тут, 'links' за замовчуванням
     this.currentLinks = [];
     this.currentImages = [];
     this.currentDocuments = [];
     this.plugin = plugin;
     this.app = app;
     this.view = view;
+  }
+  setActiveTabId(tabId) {
+    this.activeTabId = tabId;
+    this.plugin.logger.debug(`AttachmentManager: Active tab set to ${tabId}`);
+  }
+  // Метод для отримання поточної активної вкладки (для AttachmentModal)
+  getActiveTabId() {
+    return this.activeTabId;
   }
   setAttachmentButtonElement(buttonEl) {
     this.attachmentButtonElement = buttonEl;
@@ -19549,11 +19559,20 @@ var AttachmentManager = class {
       this.show();
     }
   }
+  // Всередині класу AttachmentManager
   show() {
     if (this.modal && this.modal.isCurrentlyOpen) {
       return;
     }
-    this.modal = new AttachmentModal(this.app, this.plugin, this, this.attachmentButtonElement);
+    this.modal = new AttachmentModal(
+      this.app,
+      this.plugin,
+      this,
+      // передаємо сам менеджер
+      this.attachmentButtonElement,
+      this.getActiveTabId()
+      // <-- Передаємо ID активної вкладки
+    );
     this.modal.open();
   }
   hide() {
@@ -19679,7 +19698,7 @@ var AttachmentManager = class {
   }
 };
 var AttachmentModal = class extends import_obsidian15.Modal {
-  constructor(app, plugin, manager, triggerElement) {
+  constructor(app, plugin, manager, triggerElement, initialActiveTabId) {
     super(app);
     this.activeTab = "links";
     this.isCurrentlyOpen = false;
@@ -19700,6 +19719,7 @@ var AttachmentModal = class extends import_obsidian15.Modal {
     this.plugin = plugin;
     this.manager = manager;
     this.triggerElement = triggerElement;
+    this.activeTab = initialActiveTabId;
     this.modalEl.addClass(CSS_ATTACHMENT_MANAGER_MODAL);
     this.containerEl.addClass("ollama-attachment-modal-container");
     if (this.triggerElement) {
@@ -19734,7 +19754,6 @@ var AttachmentModal = class extends import_obsidian15.Modal {
     this.createTabButton("Documents", "documents", "file-text");
     this.createTabButton("Links", "links", "link");
   }
-  // Всередині класу AttachmentModal
   createTabButton(label, tabId, iconName) {
     const tabButton = this.tabsEl.createEl("button", {
       cls: [CSS_ATTACHMENT_TAB, `ollama-attachment-tab-${tabId}`]
@@ -19749,6 +19768,7 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       if (this.activeTab === tabId)
         return;
       this.activeTab = tabId;
+      this.manager.setActiveTabId(tabId);
       this.renderTabs();
       this.renderContent();
       this.positionModal();
@@ -19852,7 +19872,10 @@ var AttachmentModal = class extends import_obsidian15.Modal {
         }
         const nameSizeWrapper = fileItemEl.createDiv({ cls: "ollama-attachment-file-item-details" });
         nameSizeWrapper.createSpan({ cls: CSS_ATTACHMENT_FILE_ITEM_NAME, text: item.file.name, title: item.file.name });
-        nameSizeWrapper.createSpan({ cls: CSS_ATTACHMENT_FILE_ITEM_SIZE, text: `(${(item.file.size / 1024).toFixed(1)} KB)` });
+        nameSizeWrapper.createSpan({
+          cls: CSS_ATTACHMENT_FILE_ITEM_SIZE,
+          text: `(${(item.file.size / 1024).toFixed(1)} KB)`
+        });
         const removeButton = fileItemEl.createEl("button", { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE });
         (0, import_obsidian15.setIcon)(removeButton, "x-circle");
         removeButton.title = "Remove file";
@@ -19901,7 +19924,10 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       const emptyState = linkListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST });
       (0, import_obsidian15.setIcon)(emptyState.createSpan({ cls: CSS_ATTACHMENT_EMPTY_ICON }), "link-2-off");
       emptyState.createEl("p", { text: "No links added yet." });
-      emptyState.createEl("p", { cls: CSS_ATTACHMENT_EMPTY_HINT, text: 'Paste a URL above and click "Add" or press Enter.' });
+      emptyState.createEl("p", {
+        cls: CSS_ATTACHMENT_EMPTY_HINT,
+        text: 'Paste a URL above and click "Add" or press Enter.'
+      });
     } else {
       links.forEach((link) => {
         const linkItemEl = linkListEl.createDiv({ cls: CSS_ATTACHMENT_LINK_ITEM });
