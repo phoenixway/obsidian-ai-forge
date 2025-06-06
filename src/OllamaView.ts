@@ -36,6 +36,7 @@ import { ToolMessageRenderer } from "./renderers/ToolMessageRenderer";
 import { StreamChunk } from "./OllamaService";
 import { parseAllTextualToolCalls } from "./utils/toolParser";
 import { Logger } from "./Logger";
+import { AttachmentManager } from "./AttachmentManager";
 
 export const VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 
@@ -73,6 +74,7 @@ export type MessageRole = "user" | "assistant" | "system" | "error" | "tool";
 export class OllamaView extends ItemView {
   private sidebarManager!: SidebarManager;
   private dropdownMenuManager!: DropdownMenuManager;
+  private attachmentManager!: AttachmentManager; // ++ NEW PROPERTY
 
   private vad: MicVAD | null = null; // <--- ВЛАСТИВІСТЬ ДЛЯ VAD
   private vadSilenceTimer: NodeJS.Timeout | null = null; // <--- ТАЙМЕР ДЛЯ ТИШІ
@@ -143,6 +145,7 @@ private speechWorkerUrl: string | null = null;
 
   private isChatListUpdateScheduled = false;
   private chatListUpdateTimeoutId: NodeJS.Timeout | null = null;
+  private attachmentButton!: HTMLButtonElement; // ++ NEW BUTTON PROPERTY
 
   private activePlaceholder: {
     timestamp: number;
@@ -160,10 +163,12 @@ private speechWorkerUrl: string | null = null;
   private boundOnDragEnd: (event: MouseEvent) => void;
   private saveWidthDebounced: () => void;
 
-  constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
+    constructor(leaf: WorkspaceLeaf, plugin: OllamaPlugin) {
     super(leaf);
     this.plugin = plugin;
     this.app = plugin.app;
+
+    this.attachmentManager = new AttachmentManager(this.plugin, this.app, this); // ++ INITIALIZE
 
     this.initSpeechWorker();
 
@@ -175,15 +180,13 @@ private speechWorkerUrl: string | null = null;
     );
     this.boundOnDragMove = this.onDragMove.bind(this);
     this.boundOnDragEnd = this.onDragEnd.bind(this);
-    this.DEFAULT_PLACEHOLDER = "Type your message or use the voice input..."; // Або будь-яке інше значення
+    this.DEFAULT_PLACEHOLDER = "Type your message or use the voice input..."; 
 
     this.saveWidthDebounced = debounce(() => {
       if (this.sidebarRootEl) {
         const newWidth = this.sidebarRootEl.offsetWidth;
-
         if (newWidth > 0 && newWidth !== this.plugin.settings.sidebarWidth) {
           this.plugin.settings.sidebarWidth = newWidth;
-
           this.plugin.saveSettings();
         }
       }
@@ -200,7 +203,7 @@ private speechWorkerUrl: string | null = null;
     return "brain-circuit";
   }
 
-  async onOpen(): Promise<void> {
+    async onOpen(): Promise<void> {
     this.createUIElements();
 
     const savedWidth = this.plugin.settings.sidebarWidth;
@@ -220,8 +223,6 @@ private speechWorkerUrl: string | null = null;
       } catch (e) {}
       this.sidebarRootEl.style.width = `${defaultWidth}px`;
       this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
-      if (!savedWidth) {
-      }
     }
 
     try {
@@ -237,6 +238,7 @@ private speechWorkerUrl: string | null = null;
     } catch (error) {}
 
     this.attachEventListeners();
+    this.attachmentManager.setAttachmentButtonElement(this.attachmentButton); // ++ SET BUTTON FOR MANAGER
 
     this.autoResizeTextarea();
     this.updateSendButtonState();
@@ -251,7 +253,6 @@ private speechWorkerUrl: string | null = null;
     setTimeout(() => {
       if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
         this.inputEl.focus();
-      } else {
       }
     }, 150);
 
@@ -285,7 +286,9 @@ private speechWorkerUrl: string | null = null;
     }
   }
 
-  async onClose(): Promise<void> {
+    async onClose(): Promise<void> {
+    this.attachmentManager?.destroy(); // ++ DESTROY ATTACHMENT MANAGER
+
     document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });
     document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
 
@@ -299,11 +302,10 @@ private speechWorkerUrl: string | null = null;
       this.speechWorker.terminate();
       this.speechWorker = null;
     }
-    this.stopVoiceRecording(false); // Переконайся, що VAD також зупиняється
+    this.stopVoiceRecording(false); 
       if (this.speechWorkerUrl) {
-    URL.revokeObjectURL(this.speechWorkerUrl); // ВІДКЛИКАЄМО ТУТ
+    URL.revokeObjectURL(this.speechWorkerUrl); 
     this.speechWorkerUrl = null;
-    
   }
     this.revokeVadObjectUrls();
     if (this.vad) {
@@ -328,9 +330,8 @@ private speechWorkerUrl: string | null = null;
     this.dropdownMenuManager?.destroy();
   }
 
-  private createUIElements(): void {
+    private createUIElements(): void {
     this.contentEl.empty();
-
     const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" });
 
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
@@ -342,16 +343,13 @@ private speechWorkerUrl: string | null = null;
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (this.sidebarRootEl) {
       this.sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-    } else {
     }
 
     this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
     this.resizerEl.title = "Drag to resize sidebar";
-
     this.resizerEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
 
     this.mainChatAreaEl = flexContainer.createDiv({ cls: "ollama-main-chat-area" });
-
     this.mainChatAreaEl.classList.toggle("full-width", !shouldShowInternalSidebar);
 
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
@@ -366,16 +364,25 @@ private speechWorkerUrl: string | null = null;
     setIcon(this.scrollToBottomButton, "arrow-down");
     const inputContainer = this.mainChatAreaEl.createDiv({ cls: "chat-input-container" });
     this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Enter message text here...`, rows: 1 },
+      attr: { placeholder: this.DEFAULT_PLACEHOLDER, rows: 1 },
     });
     const controlsContainer = inputContainer.createDiv({ cls: "input-controls-container" });
     const leftControls = controlsContainer.createDiv({ cls: "input-controls-left" });
+
+    this.attachmentButton = leftControls.createEl("button", {
+        cls: "attachment-button",
+        attr: { "aria-label": "Manage Attachments" },
+    });
+    setIcon(this.attachmentButton, "paperclip"); 
+    this.attachmentButton.title = "Manage Attachments";
+    
     this.translateInputButton = leftControls.createEl("button", {
       cls: "translate-input-button",
       attr: { "aria-label": "Translate input to English" },
     });
     setIcon(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
+    
     this.modelDisplayEl = leftControls.createDiv({ cls: "model-display" });
     this.modelDisplayEl.setText("...");
     this.modelDisplayEl.title = "Click to select model";
@@ -385,6 +392,7 @@ private speechWorkerUrl: string | null = null;
     this.temperatureIndicatorEl = leftControls.createDiv({ cls: "temperature-indicator" });
     this.temperatureIndicatorEl.setText("?");
     this.temperatureIndicatorEl.title = "Click to set temperature";
+    
     this.buttonsContainer = controlsContainer.createDiv({ cls: `buttons-container input-controls-right` });
     this.stopGeneratingButton = this.buttonsContainer.createEl("button", {
       cls: ["stop-generating-button", "danger-option"],
@@ -417,10 +425,9 @@ private speechWorkerUrl: string | null = null;
     this.dropdownMenuManager.createMenuUI();
   }
 
-  private attachEventListeners(): void {
+    private attachEventListeners(): void {
     if (this.resizerEl) {
       this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
-    } else {
     }
 
     if (this.inputEl) {
@@ -438,6 +445,9 @@ private speechWorkerUrl: string | null = null;
     }
     if (this.translateInputButton) {
       this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
+    }
+    if (this.attachmentButton) {
+        this.registerDomEvent(this.attachmentButton, "click", this.handleAttachmentClick);
     }
     if (this.menuButton) {
       this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick);
@@ -464,7 +474,7 @@ private speechWorkerUrl: string | null = null;
       this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
     }
     this.registerDomEvent(window, "resize", this.handleWindowResize);
-    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
+    this.registerDomEvent(document, "click", this.handleDocumentClick); 
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
     this.dropdownMenuManager?.attachEventListeners();
@@ -1339,28 +1349,30 @@ private speechWorkerUrl: string | null = null;
     }
   }
 
-  // ... (решта класу) ...
-
-  public setLoadingState(isLoading: boolean): void {
+    public setLoadingState(isLoading: boolean): void {
     this.isProcessing = isLoading;
-
     if (this.inputEl) this.inputEl.disabled = isLoading;
-
     this.updateSendButtonState();
 
     if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
-      this.voiceButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+      this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
     if (this.translateInputButton) {
       this.translateInputButton.disabled = isLoading;
-      this.translateInputButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    }
+    if (this.attachmentButton) {
+        this.attachmentButton.disabled = isLoading;
+        this.attachmentButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+        if (isLoading && this.attachmentManager.isVisible()) {
+            this.attachmentManager.hide();
+        }
     }
     if (this.menuButton) {
       this.menuButton.disabled = isLoading;
-      this.menuButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+      this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
-
     if (this.chatContainer) {
       if (isLoading) {
         this.chatContainer.querySelectorAll<HTMLButtonElement>(`.${CSS_CLASSES.SHOW_MORE_BUTTON}`).forEach(button => {
@@ -4591,4 +4603,19 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       throw error;
     }
   }
+
+    private handleAttachmentClick = (event: MouseEvent): void => {
+    event.stopPropagation(); 
+    this.attachmentManager.toggleVisibility();
+  };
+
+    private handleDocumentClick = (e: MouseEvent): void => {
+    if (this.dropdownMenuManager && this.menuButton) {
+        this.dropdownMenuManager.handleDocumentClick(e, this.menuButton);
+    }
+    if (this.attachmentManager && this.attachmentButton) {
+        this.attachmentManager.handleDocumentClick(e, this.attachmentButton);
+    }
+  };
+
 }

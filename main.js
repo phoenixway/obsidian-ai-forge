@@ -15810,10 +15810,10 @@ __export(main_exports, {
   default: () => OllamaPlugin2
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian25 = require("obsidian");
+var import_obsidian26 = require("obsidian");
 
 // src/OllamaView.ts
-var import_obsidian15 = require("obsidian");
+var import_obsidian16 = require("obsidian");
 var import_vad_web = __toESM(require_dist());
 
 // src/ConfirmModal.ts
@@ -19502,6 +19502,283 @@ var ToolMessageRenderer = class extends BaseMessageRenderer {
   }
 };
 
+// src/AttachmentManager.ts
+var import_obsidian15 = require("obsidian");
+var CSS_ATTACHMENT_MANAGER_MODAL = "ollama-attachment-manager-modal";
+var CSS_ATTACHMENT_MODAL_CONTENT_WRAPPER = "ollama-attachment-modal-content-wrapper";
+var CSS_ATTACHMENT_TABS = "ollama-attachment-tabs";
+var CSS_ATTACHMENT_TAB = "ollama-attachment-tab";
+var CSS_ATTACHMENT_TAB_ACTIVE = "is-active";
+var CSS_ATTACHMENT_CONTENT_CONTAINER = "ollama-attachment-content-container";
+var CSS_ATTACHMENT_CONTENT = "ollama-attachment-content";
+var CSS_ATTACHMENT_CONTENT_ACTIVE = "is-active";
+var CSS_ATTACHMENT_LINKS_CONTAINER = "ollama-links-container";
+var CSS_ATTACHMENT_LINK_INPUT_AREA = "ollama-link-input-area";
+var CSS_ATTACHMENT_LINK_LIST = "ollama-link-list";
+var CSS_ATTACHMENT_LINK_ITEM = "ollama-link-item";
+var CSS_ATTACHMENT_LINK_ITEM_TEXT = "ollama-link-item-text";
+var CSS_ATTACHMENT_LINK_ITEM_REMOVE = "ollama-link-item-remove";
+var CSS_ATTACHMENT_EMPTY_LIST = "ollama-attachment-empty-list";
+var CSS_ATTACHMENT_EMPTY_ICON = "ollama-attachment-empty-icon";
+var CSS_ATTACHMENT_EMPTY_HINT = "ollama-attachment-empty-hint";
+var CSS_ATTACHMENT_PLACEHOLDER = "ollama-attachment-placeholder";
+var CSS_ATTACHMENT_PLACEHOLDER_ICON = "ollama-attachment-placeholder-icon";
+var CSS_ATTACHMENT_CLEAR_ALL_CONTAINER = "ollama-attachment-clear-all-container";
+var AttachmentManager = class {
+  constructor(plugin, app, view) {
+    this.modal = null;
+    this.attachmentButtonElement = null;
+    this.currentLinks = [];
+    this.plugin = plugin;
+    this.app = app;
+    this.view = view;
+  }
+  setAttachmentButtonElement(buttonEl) {
+    this.attachmentButtonElement = buttonEl;
+  }
+  toggleVisibility() {
+    if (this.modal && this.modal.isCurrentlyOpen) {
+      this.hide();
+    } else {
+      this.show();
+    }
+  }
+  show() {
+    if (this.modal && this.modal.isCurrentlyOpen) {
+      return;
+    }
+    this.modal = new AttachmentModal(this.app, this.plugin, this, this.attachmentButtonElement);
+    this.modal.open();
+  }
+  hide() {
+    if (this.modal && this.modal.isCurrentlyOpen) {
+      this.modal.close();
+    }
+  }
+  addLink(url) {
+    const trimmedUrl = url.trim();
+    if (trimmedUrl && !this.currentLinks.some((link) => link.url === trimmedUrl)) {
+      try {
+        new URL(trimmedUrl);
+      } catch (_) {
+        this.plugin.logger.warn("Attempted to add invalid URL:", trimmedUrl);
+        new import_obsidian15.Notice("Invalid URL format. Please enter a valid URL.", 3e3);
+        return;
+      }
+      this.currentLinks.push({ id: `link-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, url: trimmedUrl });
+      this.modal?.renderLinksTabContent();
+      this.plugin.logger.debug("Added link:", trimmedUrl);
+    } else if (this.currentLinks.some((link) => link.url === trimmedUrl)) {
+      new import_obsidian15.Notice("This link has already been added.", 3e3);
+    }
+  }
+  removeLink(linkId) {
+    this.currentLinks = this.currentLinks.filter((link) => link.id !== linkId);
+    this.modal?.renderLinksTabContent();
+    this.plugin.logger.debug("Removed link:", linkId);
+  }
+  getLinks() {
+    return [...this.currentLinks];
+  }
+  getActiveLinksForApi() {
+    return this.currentLinks.map((link) => link.url);
+  }
+  clearAllLinks() {
+    if (this.currentLinks.length > 0) {
+      this.currentLinks = [];
+      this.modal?.renderLinksTabContent();
+      this.plugin.logger.debug("Cleared all links");
+    }
+  }
+  isVisible() {
+    return !!(this.modal && this.modal.isCurrentlyOpen);
+  }
+  handleDocumentClick(event, attachmentButtonTrigger) {
+    if (this.modal && this.modal.isCurrentlyOpen && this.modal.containerEl) {
+      const targetEl = event.target;
+      if (!attachmentButtonTrigger.contains(targetEl) && !this.modal.containerEl.contains(targetEl)) {
+        this.hide();
+      }
+    }
+  }
+  onModalClose(modalInstance) {
+    if (this.modal === modalInstance) {
+      this.modal = null;
+    }
+  }
+  destroy() {
+    this.hide();
+    this.plugin.logger.debug("AttachmentManager destroyed");
+  }
+};
+var AttachmentModal = class extends import_obsidian15.Modal {
+  // ++ NEW PROPERTY
+  constructor(app, plugin, manager, triggerElement) {
+    super(app);
+    this.activeTab = "links";
+    this.isCurrentlyOpen = false;
+    this.positionModal = () => {
+      if (!this.triggerElement || !this.isCurrentlyOpen)
+        return;
+      const triggerRect = this.triggerElement.getBoundingClientRect();
+      const modalHeight = this.modalEl.offsetHeight;
+      let top = triggerRect.bottom + 5;
+      let left = triggerRect.left;
+      if (top + modalHeight > window.innerHeight) {
+        top = triggerRect.top - modalHeight - 5;
+      }
+      this.modalEl.style.top = `${top}px`;
+      this.modalEl.style.left = `${left}px`;
+    };
+    this.positionModalDebounced = (0, import_obsidian15.debounce)(this.positionModal, 50, true);
+    this.plugin = plugin;
+    this.manager = manager;
+    this.triggerElement = triggerElement;
+    this.modalEl.addClass(CSS_ATTACHMENT_MANAGER_MODAL);
+    this.containerEl.addClass("ollama-attachment-modal-container");
+    if (this.triggerElement) {
+      this.modalEl.style.position = "absolute";
+      this.modalEl.style.width = "350px";
+      this.modalEl.style.maxHeight = "400px";
+    }
+  }
+  onOpen() {
+    this.isCurrentlyOpen = true;
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass(CSS_ATTACHMENT_MODAL_CONTENT_WRAPPER);
+    this.tabsEl = contentEl.createDiv({ cls: CSS_ATTACHMENT_TABS });
+    this.contentContainerEl = contentEl.createDiv({ cls: CSS_ATTACHMENT_CONTENT_CONTAINER });
+    this.renderTabs();
+    this.renderContent();
+    if (this.triggerElement) {
+      this.positionModal();
+      window.addEventListener("resize", this.positionModalDebounced);
+    }
+  }
+  // debounce should be available
+  renderTabs() {
+    this.tabsEl.empty();
+    this.createTabButton("Images", "images", "image-file");
+    this.createTabButton("Documents", "documents", "file-text");
+    this.createTabButton("Links", "links", "link");
+  }
+  createTabButton(label, tabId, iconName) {
+    const tabButton = this.tabsEl.createEl("button", {
+      cls: [CSS_ATTACHMENT_TAB, `ollama-attachment-tab-${tabId}`]
+    });
+    (0, import_obsidian15.setIcon)(tabButton, iconName);
+    tabButton.appendText(label);
+    if (this.activeTab === tabId) {
+      tabButton.addClass(CSS_ATTACHMENT_TAB_ACTIVE);
+    }
+    tabButton.onClickEvent(() => {
+      if (this.activeTab === tabId)
+        return;
+      this.activeTab = tabId;
+      this.renderTabs();
+      this.renderContent();
+      this.positionModal();
+    });
+  }
+  renderContent() {
+    this.contentContainerEl.empty();
+    const activeContentEl = this.contentContainerEl.createDiv({
+      cls: [CSS_ATTACHMENT_CONTENT, `ollama-attachment-content-${this.activeTab}`, CSS_ATTACHMENT_CONTENT_ACTIVE]
+    });
+    switch (this.activeTab) {
+      case "images":
+        this.renderPlaceholderContent(activeContentEl, "Image attachments are not yet implemented.", "image-off");
+        break;
+      case "documents":
+        this.renderPlaceholderContent(activeContentEl, "Document attachments are not yet implemented.", "file-question");
+        break;
+      case "links":
+        this.linksTabContentEl = activeContentEl;
+        this.renderLinksTabContent();
+        break;
+    }
+  }
+  renderLinksTabContent() {
+    if (!this.linksTabContentEl || this.activeTab !== "links") {
+      if (this.activeTab === "links" && this.contentContainerEl) {
+        this.renderContent();
+      }
+      return;
+    }
+    this.linksTabContentEl.empty();
+    this.linksTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
+    const inputArea = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_LINK_INPUT_AREA });
+    this.linkInputEl = inputArea.createEl("input", {
+      type: "text",
+      placeholder: "Enter URL and press Enter or click Add"
+    });
+    const addButton = inputArea.createEl("button", { text: "Add" });
+    (0, import_obsidian15.setIcon)(addButton, "plus-circle");
+    const addCurrentLink = () => {
+      const url = this.linkInputEl.value;
+      if (url) {
+        this.manager.addLink(url);
+        this.linkInputEl.value = "";
+        this.linkInputEl.focus();
+      }
+    };
+    this.linkInputEl.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addCurrentLink();
+      }
+    });
+    addButton.addEventListener("click", addCurrentLink);
+    this.linkListEl = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_LINK_LIST });
+    const links = this.manager.getLinks();
+    if (links.length === 0) {
+      const emptyState = this.linkListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST });
+      (0, import_obsidian15.setIcon)(emptyState.createSpan({ cls: CSS_ATTACHMENT_EMPTY_ICON }), "link-2-off");
+      emptyState.createEl("p", { text: "No links added yet." });
+      emptyState.createEl("p", { cls: CSS_ATTACHMENT_EMPTY_HINT, text: 'Paste a URL above and click "Add" or press Enter.' });
+    } else {
+      links.forEach((link) => {
+        const linkItemEl = this.linkListEl.createDiv({ cls: CSS_ATTACHMENT_LINK_ITEM });
+        linkItemEl.createSpan({ cls: CSS_ATTACHMENT_LINK_ITEM_TEXT, text: link.url, title: link.url });
+        const removeButton = linkItemEl.createEl("button", { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE });
+        (0, import_obsidian15.setIcon)(removeButton, "x-circle");
+        removeButton.title = "Remove link";
+        removeButton.onClickEvent(() => {
+          this.manager.removeLink(link.id);
+        });
+      });
+      const clearAllButtonContainer = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_CLEAR_ALL_CONTAINER });
+      const clearAllButton = clearAllButtonContainer.createEl("button", {
+        text: "Clear All Links",
+        cls: "mod-danger"
+      });
+      (0, import_obsidian15.setIcon)(clearAllButton, "trash-2");
+      clearAllButton.onClickEvent(() => {
+        this.manager.clearAllLinks();
+      });
+    }
+    if (this.triggerElement) {
+      this.positionModal();
+    }
+  }
+  renderPlaceholderContent(container, text, icon) {
+    container.empty();
+    const placeholder = container.createDiv({ cls: CSS_ATTACHMENT_PLACEHOLDER });
+    (0, import_obsidian15.setIcon)(placeholder.createSpan({ cls: CSS_ATTACHMENT_PLACEHOLDER_ICON }), icon);
+    placeholder.createEl("p", { text });
+  }
+  onClose() {
+    this.isCurrentlyOpen = false;
+    const { contentEl } = this;
+    contentEl.empty();
+    this.manager.onModalClose(this);
+    if (this.triggerElement) {
+      window.removeEventListener("resize", this.positionModalDebounced);
+    }
+  }
+};
+
 // src/OllamaView.ts
 var VIEW_TYPE_OLLAMA_PERSONAS = "ollama-personas-chat-view";
 var SCROLL_THRESHOLD = 150;
@@ -19526,9 +19803,10 @@ var CSS_CHAT_ITEM_OPTIONS = "ollama-chat-item-options";
 var CSS_CLASS_CHAT_LIST_ITEM2 = "ollama-chat-list-item";
 var CSS_CLASS_RESIZER_HANDLE = "ollama-resizer-handle";
 var CSS_CLASS_RESIZING = "is-resizing";
-var OllamaView = class extends import_obsidian15.ItemView {
+var OllamaView = class extends import_obsidian16.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
+    // ++ NEW PROPERTY
     this.vad = null;
     // <--- ВЛАСТИВІСТЬ ДЛЯ VAD
     this.vadSilenceTimer = null;
@@ -19569,6 +19847,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
     this.messageAddedResolvers = /* @__PURE__ */ new Map();
     this.isChatListUpdateScheduled = false;
     this.chatListUpdateTimeoutId = null;
+    // ++ NEW BUTTON PROPERTY
     this.activePlaceholder = null;
     this.isResizing = false;
     this.initialMouseX = 0;
@@ -19631,9 +19910,9 @@ var OllamaView = class extends import_obsidian15.ItemView {
         noneOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_TEXT2, "menu-option-text"], text: "None" });
         if (!currentRolePath) {
           noneOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE2);
-          (0, import_obsidian15.setIcon)(noneIconSpan, "check");
+          (0, import_obsidian16.setIcon)(noneIconSpan, "check");
         } else {
-          (0, import_obsidian15.setIcon)(noneIconSpan, "slash");
+          (0, import_obsidian16.setIcon)(noneIconSpan, "slash");
         }
         this.registerDomEvent(noneOptionEl, "click", () => this.handleRolePanelItemClick(null, currentRolePath));
         roles.forEach((roleInfo) => {
@@ -19645,9 +19924,9 @@ var OllamaView = class extends import_obsidian15.ItemView {
           }
           if (roleInfo.path === currentRolePath) {
             roleOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE2);
-            (0, import_obsidian15.setIcon)(iconSpan, "check");
+            (0, import_obsidian16.setIcon)(iconSpan, "check");
           } else {
-            (0, import_obsidian15.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "file-text");
+            (0, import_obsidian16.setIcon)(iconSpan, roleInfo.isCustom ? "user" : "file-text");
           }
           this.registerDomEvent(roleOptionEl, "click", () => this.handleRolePanelItemClick(roleInfo, currentRolePath));
         });
@@ -19677,15 +19956,15 @@ var OllamaView = class extends import_obsidian15.ItemView {
             this.plugin.promptService?.clearRoleCache?.();
           }
         } catch (error) {
-          new import_obsidian15.Notice("Failed to set the role.");
+          new import_obsidian16.Notice("Failed to set the role.");
         }
       } else {
       }
     };
     this.handleModelDisplayClick = async (event) => {
-      const menu = new import_obsidian15.Menu();
+      const menu = new import_obsidian16.Menu();
       let itemsAdded = false;
-      const loadingNotice = new import_obsidian15.Notice("Loading models...", 0);
+      const loadingNotice = new import_obsidian16.Notice("Loading models...", 0);
       try {
         const models = await this.plugin.ollamaService.getModels();
         const activeChat = await this.plugin.chatManager?.getActiveChat();
@@ -19706,7 +19985,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
                       modelName
                     });
                   } else {
-                    new import_obsidian15.Notice("Cannot set model: No active chat.");
+                    new import_obsidian16.Notice("Cannot set model: No active chat.");
                   }
                 }
               })
@@ -19719,7 +19998,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
         console.error("Error loading models for model selection menu:", error);
         menu.addItem((item) => item.setTitle("Error loading models").setDisabled(true));
         itemsAdded = true;
-        new import_obsidian15.Notice("Failed to load models. Check Ollama connection.");
+        new import_obsidian16.Notice("Failed to load models. Check Ollama connection.");
       } finally {
         if (itemsAdded) {
           menu.showAtMouseEvent(event);
@@ -19755,18 +20034,18 @@ var OllamaView = class extends import_obsidian15.ItemView {
       const currentText = this.inputEl.value;
       const targetLang = this.plugin.settings.translationTargetLanguage;
       if (!currentText.trim()) {
-        new import_obsidian15.Notice("Input is empty, nothing to translate.");
+        new import_obsidian16.Notice("Input is empty, nothing to translate.");
         return;
       }
       if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === "none") {
-        new import_obsidian15.Notice("Translation disabled or provider not selected in settings.");
+        new import_obsidian16.Notice("Translation disabled or provider not selected in settings.");
         return;
       }
       if (!targetLang) {
-        new import_obsidian15.Notice("Target language for translation is not set in settings.");
+        new import_obsidian16.Notice("Target language for translation is not set in settings.");
         return;
       }
-      (0, import_obsidian15.setIcon)(this.translateInputButton, "loader");
+      (0, import_obsidian16.setIcon)(this.translateInputButton, "loader");
       this.translateInputButton.disabled = true;
       this.translateInputButton.classList.add(CSS_CLASS_TRANSLATING_INPUT);
       this.translateInputButton.title = "Translating...";
@@ -19783,9 +20062,9 @@ var OllamaView = class extends import_obsidian15.ItemView {
         } else {
         }
       } catch (error) {
-        new import_obsidian15.Notice("Input translation encountered an unexpected error.");
+        new import_obsidian16.Notice("Input translation encountered an unexpected error.");
       } finally {
-        (0, import_obsidian15.setIcon)(this.translateInputButton, "languages");
+        (0, import_obsidian16.setIcon)(this.translateInputButton, "languages");
         this.translateInputButton.disabled = this.isProcessing;
         this.translateInputButton.classList.remove(CSS_CLASS_TRANSLATING_INPUT);
         this.translateInputButton.title = `Translate input to ${LANGUAGES[targetLang] || targetLang}`;
@@ -19796,13 +20075,13 @@ var OllamaView = class extends import_obsidian15.ItemView {
       try {
         const newChat = await this.plugin.chatManager.createNewChat();
         if (newChat) {
-          new import_obsidian15.Notice(`Created new chat: ${newChat.metadata.name}`);
+          new import_obsidian16.Notice(`Created new chat: ${newChat.metadata.name}`);
           this.focusInput();
         } else {
-          new import_obsidian15.Notice("Failed to create new chat.");
+          new import_obsidian16.Notice("Failed to create new chat.");
         }
       } catch (error) {
-        new import_obsidian15.Notice("Error creating new chat.");
+        new import_obsidian16.Notice("Error creating new chat.");
       }
     };
     this.handleRenameChatClick = async (chatIdToRename, currentChatName) => {
@@ -19811,7 +20090,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
       if (!chatId || !currentName) {
         const activeChat = await this.plugin.chatManager?.getActiveChat();
         if (!activeChat) {
-          new import_obsidian15.Notice("No active chat to rename.");
+          new import_obsidian16.Notice("No active chat to rename.");
           return;
         }
         chatId = activeChat.metadata.id;
@@ -19819,7 +20098,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
       }
       this.dropdownMenuManager?.closeMenu();
       if (!chatId || currentName === null) {
-        new import_obsidian15.Notice("Could not initiate rename process.");
+        new import_obsidian16.Notice("Could not initiate rename process.");
         return;
       }
       new PromptModal(this.app, "Rename Chat", `Enter new name for "${currentName}":`, currentName, async (newName) => {
@@ -19837,7 +20116,7 @@ var OllamaView = class extends import_obsidian15.ItemView {
         } else if (newName === null || trimmedName === "") {
           noticeMessage = "Rename cancelled or invalid name entered.";
         }
-        new import_obsidian15.Notice(noticeMessage);
+        new import_obsidian16.Notice(noticeMessage);
         this.focusInput();
       }).open();
     };
@@ -19845,19 +20124,19 @@ var OllamaView = class extends import_obsidian15.ItemView {
       this.dropdownMenuManager?.closeMenu();
       const activeChat = await this.plugin.chatManager?.getActiveChat();
       if (!activeChat) {
-        new import_obsidian15.Notice("No active chat to clone.");
+        new import_obsidian16.Notice("No active chat to clone.");
         return;
       }
-      const cloningNotice = new import_obsidian15.Notice("Cloning chat...", 0);
+      const cloningNotice = new import_obsidian16.Notice("Cloning chat...", 0);
       try {
         const clonedChat = await this.plugin.chatManager.cloneChat(activeChat.metadata.id);
         if (clonedChat) {
-          new import_obsidian15.Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
+          new import_obsidian16.Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
         } else {
-          new import_obsidian15.Notice("Failed to clone chat.");
+          new import_obsidian16.Notice("Failed to clone chat.");
         }
       } catch (error) {
-        new import_obsidian15.Notice("An error occurred while cloning the chat.");
+        new import_obsidian16.Notice("An error occurred while cloning the chat.");
       } finally {
         cloningNotice.hide();
       }
@@ -19877,7 +20156,7 @@ This action cannot be undone.`,
           }
         ).open();
       } else {
-        new import_obsidian15.Notice("No active chat to clear.");
+        new import_obsidian16.Notice("No active chat to clear.");
       }
     };
     this.handleDeleteChatClick = async () => {
@@ -19893,21 +20172,21 @@ This action cannot be undone.`,
           async () => {
             const success = await this.plugin.chatManager.deleteChat(activeChat.metadata.id);
             if (success) {
-              new import_obsidian15.Notice(`Chat "${chatName}" deleted.`);
+              new import_obsidian16.Notice(`Chat "${chatName}" deleted.`);
             } else {
-              new import_obsidian15.Notice(`Failed to delete chat "${chatName}".`);
+              new import_obsidian16.Notice(`Failed to delete chat "${chatName}".`);
             }
           }
         ).open();
       } else {
-        new import_obsidian15.Notice("No active chat to delete.");
+        new import_obsidian16.Notice("No active chat to delete.");
       }
     };
     this.handleExportChatClick = async () => {
       this.dropdownMenuManager?.closeMenu();
       const activeChat = await this.plugin.chatManager?.getActiveChat();
       if (!activeChat || activeChat.messages.length === 0) {
-        new import_obsidian15.Notice("Chat empty, nothing to export.");
+        new import_obsidian16.Notice("Chat empty, nothing to export.");
         return;
       }
       try {
@@ -19918,46 +20197,46 @@ This action cannot be undone.`,
         let targetFolderPath = this.plugin.settings.chatExportFolderPath?.trim();
         let targetFolder = null;
         if (targetFolderPath) {
-          targetFolderPath = (0, import_obsidian15.normalizePath)(targetFolderPath);
+          targetFolderPath = (0, import_obsidian16.normalizePath)(targetFolderPath);
           const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
           if (!abstractFile) {
             try {
               await this.app.vault.createFolder(targetFolderPath);
               targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath);
               if (targetFolder) {
-                new import_obsidian15.Notice(`Created export folder: ${targetFolderPath}`);
+                new import_obsidian16.Notice(`Created export folder: ${targetFolderPath}`);
               } else {
-                new import_obsidian15.Notice(`Error creating export folder. Saving to vault root.`);
+                new import_obsidian16.Notice(`Error creating export folder. Saving to vault root.`);
                 targetFolder = this.app.vault.getRoot();
               }
             } catch (err) {
-              new import_obsidian15.Notice(`Error creating export folder. Saving to vault root.`);
+              new import_obsidian16.Notice(`Error creating export folder. Saving to vault root.`);
               targetFolder = this.app.vault.getRoot();
             }
-          } else if (abstractFile instanceof import_obsidian15.TFolder) {
+          } else if (abstractFile instanceof import_obsidian16.TFolder) {
             targetFolder = abstractFile;
           } else {
-            new import_obsidian15.Notice(`Error: Export path is not a folder. Saving to vault root.`);
+            new import_obsidian16.Notice(`Error: Export path is not a folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
         } else {
           targetFolder = this.app.vault.getRoot();
         }
         if (!targetFolder) {
-          new import_obsidian15.Notice("Error determining export folder. Cannot save file.");
+          new import_obsidian16.Notice("Error determining export folder. Cannot save file.");
           return;
         }
-        const filePath = (0, import_obsidian15.normalizePath)(`${targetFolder.path}/${filename}`);
+        const filePath = (0, import_obsidian16.normalizePath)(`${targetFolder.path}/${filename}`);
         const existingFile = this.app.vault.getAbstractFileByPath(filePath);
         if (existingFile) {
         }
         const file = await this.app.vault.create(filePath, markdownContent);
-        new import_obsidian15.Notice(`Chat exported to ${file.path}`);
+        new import_obsidian16.Notice(`Chat exported to ${file.path}`);
       } catch (error) {
         if (error instanceof Error && error.message.includes("File already exists")) {
-          new import_obsidian15.Notice("Error exporting chat: File already exists.");
+          new import_obsidian16.Notice("Error exporting chat: File already exists.");
         } else {
-          new import_obsidian15.Notice("An unexpected error occurred during chat export.");
+          new import_obsidian16.Notice("An unexpected error occurred during chat export.");
         }
       }
     };
@@ -19990,10 +20269,10 @@ This action cannot be undone.`,
         if (chat && this.currentMessages.length > 0) {
           await this.plugin.chatManager?.addMessageToActiveChat("system", `Role changed to: ${displayRole}`, new Date());
         } else {
-          new import_obsidian15.Notice(`Role set to: ${displayRole}`);
+          new import_obsidian16.Notice(`Role set to: ${displayRole}`);
         }
       } catch (error) {
-        new import_obsidian15.Notice(`Role set to: ${displayRole}`);
+        new import_obsidian16.Notice(`Role set to: ${displayRole}`);
       }
     };
     this.handleRolesUpdated = () => {
@@ -20021,12 +20300,12 @@ This action cannot be undone.`,
               await this.plugin.chatManager.clearActiveChatMessages();
             } catch (error) {
               this.plugin.logger.error("Error clearing current chat from menu:", error);
-              new import_obsidian15.Notice(`Failed to clear messages for chat "${chatName}".`);
+              new import_obsidian16.Notice(`Failed to clear messages for chat "${chatName}".`);
             }
           }
         ).open();
       } else {
-        new import_obsidian15.Notice("No active chat to clear.");
+        new import_obsidian16.Notice("No active chat to clear.");
       }
     };
     this.handleMessagesCleared = (chatId) => {
@@ -20139,7 +20418,7 @@ This action cannot be undone.`,
       }
     };
     this.handleRoleDisplayClick = async (event) => {
-      const menu = new import_obsidian15.Menu();
+      const menu = new import_obsidian16.Menu();
       let itemsAdded = false;
       try {
         const roles = await this.plugin.listRoleFiles(true);
@@ -20193,7 +20472,7 @@ This action cannot be undone.`,
           menu.addItem((item) => item.setTitle("Error loading roles").setDisabled(true));
           itemsAdded = true;
         }
-        new import_obsidian15.Notice("Failed to load roles.");
+        new import_obsidian16.Notice("Failed to load roles.");
       } finally {
         if (itemsAdded) {
           menu.showAtMouseEvent(event);
@@ -20204,7 +20483,7 @@ This action cannot be undone.`,
     this.handleTemperatureClick = async () => {
       const activeChat = await this.plugin.chatManager?.getActiveChat();
       if (!activeChat) {
-        new import_obsidian15.Notice("Select or create a chat to change temperature.");
+        new import_obsidian16.Notice("Select or create a chat to change temperature.");
         return;
       }
       const currentTemp = activeChat.metadata.temperature ?? this.plugin.settings.temperature;
@@ -20216,12 +20495,12 @@ This action cannot be undone.`,
         currentTempString,
         async (newValue) => {
           if (newValue === null || newValue.trim() === "") {
-            new import_obsidian15.Notice("Temperature change cancelled.");
+            new import_obsidian16.Notice("Temperature change cancelled.");
             return;
           }
           const newTemp = parseFloat(newValue.trim());
           if (isNaN(newTemp) || newTemp < 0 || newTemp > 2) {
-            new import_obsidian15.Notice("Invalid temperature. Please enter a number between 0.0 and 2.0.", 4e3);
+            new import_obsidian16.Notice("Invalid temperature. Please enter a number between 0.0 and 2.0.", 4e3);
             return;
           }
           try {
@@ -20229,9 +20508,9 @@ This action cannot be undone.`,
               temperature: newTemp
             });
             this.updateTemperatureIndicator(newTemp);
-            new import_obsidian15.Notice(`Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`);
+            new import_obsidian16.Notice(`Temperature set to ${newTemp} for chat "${activeChat.metadata.name}".`);
           } catch (error) {
-            new import_obsidian15.Notice("Error setting temperature.");
+            new import_obsidian16.Notice("Error setting temperature.");
           }
         }
       ).open();
@@ -20269,10 +20548,10 @@ This action cannot be undone.`,
             });
             const iconSpan = chatOptionEl.createSpan({ cls: [CSS_ROLE_PANEL_ITEM_ICON2, "menu-option-icon"] });
             if (chatMeta.id === currentActiveId) {
-              (0, import_obsidian15.setIcon)(iconSpan, "check");
+              (0, import_obsidian16.setIcon)(iconSpan, "check");
               chatOptionEl.addClass(CSS_ROLE_PANEL_ITEM_ACTIVE2);
             } else {
-              (0, import_obsidian15.setIcon)(iconSpan, "message-square");
+              (0, import_obsidian16.setIcon)(iconSpan, "message-square");
             }
             const textWrapper = chatOptionEl.createDiv({ cls: "ollama-chat-item-text-wrapper" });
             textWrapper.createDiv({ cls: "chat-panel-item-name", text: chatMeta.name });
@@ -20285,7 +20564,7 @@ This action cannot be undone.`,
               cls: [CSS_CHAT_ITEM_OPTIONS, "clickable-icon"],
               attr: { "aria-label": "Chat options", title: "More options" }
             });
-            (0, import_obsidian15.setIcon)(optionsBtn, "lucide-more-horizontal");
+            (0, import_obsidian16.setIcon)(optionsBtn, "lucide-more-horizontal");
             this.registerDomEvent(chatOptionEl, "click", async (e) => {
               if (!(e.target instanceof Element && e.target.closest(`.${CSS_CHAT_ITEM_OPTIONS}`))) {
                 if (chatMeta.id !== this.plugin.chatManager?.getActiveChatId()) {
@@ -20417,10 +20696,23 @@ This action cannot be undone.`,
         this.dropdownMenuManager.updateRoleListIfVisible().catch((e) => this.plugin.logger.error("Error updating role dropdown list in handleActiveChatChanged:", e));
       }
     };
+    this.handleAttachmentClick = (event) => {
+      event.stopPropagation();
+      this.attachmentManager.toggleVisibility();
+    };
+    this.handleDocumentClick = (e) => {
+      if (this.dropdownMenuManager && this.menuButton) {
+        this.dropdownMenuManager.handleDocumentClick(e, this.menuButton);
+      }
+      if (this.attachmentManager && this.attachmentButton) {
+        this.attachmentManager.handleDocumentClick(e, this.attachmentButton);
+      }
+    };
     this.plugin = plugin;
     this.app = plugin.app;
+    this.attachmentManager = new AttachmentManager(this.plugin, this.app, this);
     this.initSpeechWorker();
-    this.scrollListenerDebounced = (0, import_obsidian15.debounce)(this.handleScroll, 150, true);
+    this.scrollListenerDebounced = (0, import_obsidian16.debounce)(this.handleScroll, 150, true);
     this.register(
       this.plugin.on("focus-input-request", () => {
         this.focusInput();
@@ -20429,7 +20721,7 @@ This action cannot be undone.`,
     this.boundOnDragMove = this.onDragMove.bind(this);
     this.boundOnDragEnd = this.onDragEnd.bind(this);
     this.DEFAULT_PLACEHOLDER = "Type your message or use the voice input...";
-    this.saveWidthDebounced = (0, import_obsidian15.debounce)(() => {
+    this.saveWidthDebounced = (0, import_obsidian16.debounce)(() => {
       if (this.sidebarRootEl) {
         const newWidth = this.sidebarRootEl.offsetWidth;
         if (newWidth > 0 && newWidth !== this.plugin.settings.sidebarWidth) {
@@ -20468,8 +20760,6 @@ This action cannot be undone.`,
       }
       this.sidebarRootEl.style.width = `${defaultWidth}px`;
       this.sidebarRootEl.style.minWidth = `${defaultWidth}px`;
-      if (!savedWidth) {
-      }
     }
     try {
       const initialRolePath = this.plugin.settings.selectedRolePath;
@@ -20483,6 +20773,7 @@ This action cannot be undone.`,
     } catch (error) {
     }
     this.attachEventListeners();
+    this.attachmentManager.setAttachmentButtonElement(this.attachmentButton);
     this.autoResizeTextarea();
     this.updateSendButtonState();
     try {
@@ -20494,7 +20785,6 @@ This action cannot be undone.`,
     setTimeout(() => {
       if (this.inputEl && this.leaf.view === this && document.body.contains(this.inputEl)) {
         this.inputEl.focus();
-      } else {
       }
     }, 150);
     if (this.inputEl) {
@@ -20504,22 +20794,23 @@ This action cannot be undone.`,
   async loadVadAssets() {
     const workletFileName = "vad.worklet.bundle.min.js";
     const modelFileName = "silero_vad.onnx";
-    const workletPath = (0, import_obsidian15.normalizePath)(`${this.plugin.manifest.dir}/assets/${workletFileName}`);
-    const modelPath = (0, import_obsidian15.normalizePath)(`${this.plugin.manifest.dir}/assets/${modelFileName}`);
+    const workletPath = (0, import_obsidian16.normalizePath)(`${this.plugin.manifest.dir}/assets/${workletFileName}`);
+    const modelPath = (0, import_obsidian16.normalizePath)(`${this.plugin.manifest.dir}/assets/${modelFileName}`);
     try {
       this.vadWorkletJs = await this.app.vault.adapter.read(workletPath);
     } catch (e) {
       this.plugin.logger.error(`Failed to load VAD worklet JS from ${workletPath}:`, e);
-      new import_obsidian15.Notice("VAD worklet could not be loaded. Voice detection might be unstable or not work.");
+      new import_obsidian16.Notice("VAD worklet could not be loaded. Voice detection might be unstable or not work.");
     }
     try {
       this.vadModelArrayBuffer = await this.app.vault.adapter.readBinary(modelPath);
     } catch (e) {
       this.plugin.logger.error(`Failed to load VAD ONNX model from ${modelPath}:`, e);
-      new import_obsidian15.Notice("VAD ONNX model could not be loaded. Voice detection might be unstable or not work.");
+      new import_obsidian16.Notice("VAD ONNX model could not be loaded. Voice detection might be unstable or not work.");
     }
   }
   async onClose() {
+    this.attachmentManager?.destroy();
     document.removeEventListener("mousemove", this.boundOnDragMove, { capture: true });
     document.removeEventListener("mouseup", this.boundOnDragEnd, { capture: true });
     if (document.body.classList.contains(CSS_CLASS_RESIZING)) {
@@ -20564,13 +20855,12 @@ This action cannot be undone.`,
     this.contentEl.empty();
     const flexContainer = this.contentEl.createDiv({ cls: "ollama-container" });
     const isSidebarLocation = !this.plugin.settings.openChatInTab;
-    const isDesktop = import_obsidian15.Platform.isDesktop;
+    const isDesktop = import_obsidian16.Platform.isDesktop;
     this.sidebarManager = new SidebarManager(this.plugin, this.app, this);
     this.sidebarRootEl = this.sidebarManager.createSidebarUI(flexContainer);
     const shouldShowInternalSidebar = isDesktop && !isSidebarLocation;
     if (this.sidebarRootEl) {
       this.sidebarRootEl.classList.toggle("internal-sidebar-hidden", !shouldShowInternalSidebar);
-    } else {
     }
     this.resizerEl = flexContainer.createDiv({ cls: CSS_CLASS_RESIZER_HANDLE });
     this.resizerEl.title = "Drag to resize sidebar";
@@ -20580,24 +20870,30 @@ This action cannot be undone.`,
     this.chatContainerEl = this.mainChatAreaEl.createDiv({ cls: "ollama-chat-area-content" });
     this.chatContainer = this.chatContainerEl.createDiv({ cls: "ollama-chat-container" });
     this.newMessagesIndicatorEl = this.chatContainerEl.createDiv({ cls: "new-message-indicator" });
-    (0, import_obsidian15.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
+    (0, import_obsidian16.setIcon)(this.newMessagesIndicatorEl.createSpan({ cls: "indicator-icon" }), "arrow-down");
     this.newMessagesIndicatorEl.createSpan({ text: " New Messages" });
     this.scrollToBottomButton = this.chatContainerEl.createEl("button", {
       cls: ["scroll-to-bottom-button", "clickable-icon"],
       attr: { "aria-label": "Scroll to bottom", title: "Scroll to bottom" }
     });
-    (0, import_obsidian15.setIcon)(this.scrollToBottomButton, "arrow-down");
+    (0, import_obsidian16.setIcon)(this.scrollToBottomButton, "arrow-down");
     const inputContainer = this.mainChatAreaEl.createDiv({ cls: "chat-input-container" });
     this.inputEl = inputContainer.createEl("textarea", {
-      attr: { placeholder: `Enter message text here...`, rows: 1 }
+      attr: { placeholder: this.DEFAULT_PLACEHOLDER, rows: 1 }
     });
     const controlsContainer = inputContainer.createDiv({ cls: "input-controls-container" });
     const leftControls = controlsContainer.createDiv({ cls: "input-controls-left" });
+    this.attachmentButton = leftControls.createEl("button", {
+      cls: "attachment-button",
+      attr: { "aria-label": "Manage Attachments" }
+    });
+    (0, import_obsidian16.setIcon)(this.attachmentButton, "paperclip");
+    this.attachmentButton.title = "Manage Attachments";
     this.translateInputButton = leftControls.createEl("button", {
       cls: "translate-input-button",
       attr: { "aria-label": "Translate input to English" }
     });
-    (0, import_obsidian15.setIcon)(this.translateInputButton, "languages");
+    (0, import_obsidian16.setIcon)(this.translateInputButton, "languages");
     this.translateInputButton.title = "Translate input to English";
     this.modelDisplayEl = leftControls.createDiv({ cls: "model-display" });
     this.modelDisplayEl.setText("...");
@@ -20613,21 +20909,21 @@ This action cannot be undone.`,
       cls: ["stop-generating-button", "danger-option"],
       attr: { "aria-label": "Stop Generation", title: "Stop Generation" }
     });
-    (0, import_obsidian15.setIcon)(this.stopGeneratingButton, "square");
+    (0, import_obsidian16.setIcon)(this.stopGeneratingButton, "square");
     this.stopGeneratingButton.hide();
     this.sendButton = this.buttonsContainer.createEl("button", { cls: "send-button", attr: { "aria-label": "Send" } });
-    (0, import_obsidian15.setIcon)(this.sendButton, "send");
+    (0, import_obsidian16.setIcon)(this.sendButton, "send");
     this.voiceButton = this.buttonsContainer.createEl("button", {
       cls: "voice-button",
       attr: { "aria-label": "Voice Input" }
     });
-    (0, import_obsidian15.setIcon)(this.voiceButton, "mic");
+    (0, import_obsidian16.setIcon)(this.voiceButton, "mic");
     this.toggleLocationButton = this.buttonsContainer.createEl("button", {
       cls: "toggle-location-button",
       attr: { "aria-label": "Toggle View Location" }
     });
     this.menuButton = this.buttonsContainer.createEl("button", { cls: "menu-button", attr: { "aria-label": "Menu" } });
-    (0, import_obsidian15.setIcon)(this.menuButton, "more-vertical");
+    (0, import_obsidian16.setIcon)(this.menuButton, "more-vertical");
     this.updateToggleLocationButton();
     this.dropdownMenuManager = new DropdownMenuManager(
       this.plugin,
@@ -20642,7 +20938,6 @@ This action cannot be undone.`,
   attachEventListeners() {
     if (this.resizerEl) {
       this.registerDomEvent(this.resizerEl, "mousedown", this.onDragStart);
-    } else {
     }
     if (this.inputEl) {
       this.registerDomEvent(this.inputEl, "keydown", this.handleKeyDown);
@@ -20659,6 +20954,9 @@ This action cannot be undone.`,
     }
     if (this.translateInputButton) {
       this.registerDomEvent(this.translateInputButton, "click", this.handleTranslateInputClick);
+    }
+    if (this.attachmentButton) {
+      this.registerDomEvent(this.attachmentButton, "click", this.handleAttachmentClick);
     }
     if (this.menuButton) {
       this.registerDomEvent(this.menuButton, "click", this.handleMenuButtonClick);
@@ -20685,7 +20983,7 @@ This action cannot be undone.`,
       this.registerDomEvent(this.scrollToBottomButton, "click", this.handleScrollToBottomClick);
     }
     this.registerDomEvent(window, "resize", this.handleWindowResize);
-    this.registerDomEvent(document, "click", this.handleDocumentClickForMenu);
+    this.registerDomEvent(document, "click", this.handleDocumentClick);
     this.registerDomEvent(document, "visibilitychange", this.handleVisibilityChange);
     this.registerEvent(this.app.workspace.on("active-leaf-change", this.handleActiveLeafChange));
     this.dropdownMenuManager?.attachEventListeners();
@@ -20713,7 +21011,7 @@ This action cannot be undone.`,
       iconName = "layout-list";
       titleText = "Move to Tab";
     }
-    (0, import_obsidian15.setIcon)(this.toggleLocationButton, iconName);
+    (0, import_obsidian16.setIcon)(this.toggleLocationButton, iconName);
     this.toggleLocationButton.setAttribute("aria-label", titleText);
     this.toggleLocationButton.title = titleText;
   }
@@ -20816,7 +21114,7 @@ This action cannot be undone.`,
         };
         this.handleErrorMessage(errorMsgObject);
       } catch (criticalError) {
-        new import_obsidian15.Notice("Critical error displaying message. Check console.");
+        new import_obsidian16.Notice("Critical error displaying message. Check console.");
       }
     }
   }
@@ -20885,7 +21183,6 @@ This action cannot be undone.`,
       this.emptyStateEl = null;
     }
   }
-  // ... (решта класу) ...
   setLoadingState(isLoading) {
     this.isProcessing = isLoading;
     if (this.inputEl)
@@ -20893,15 +21190,22 @@ This action cannot be undone.`,
     this.updateSendButtonState();
     if (this.voiceButton) {
       this.voiceButton.disabled = isLoading;
-      this.voiceButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+      this.voiceButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
     if (this.translateInputButton) {
       this.translateInputButton.disabled = isLoading;
-      this.translateInputButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+      this.translateInputButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+    }
+    if (this.attachmentButton) {
+      this.attachmentButton.disabled = isLoading;
+      this.attachmentButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
+      if (isLoading && this.attachmentManager.isVisible()) {
+        this.attachmentManager.hide();
+      }
     }
     if (this.menuButton) {
       this.menuButton.disabled = isLoading;
-      this.menuButton.classList.toggle(CSS_CLASSES.DISABLED, isLoading);
+      this.menuButton.classList.toggle(CSS_CLASS_DISABLED, isLoading);
     }
     if (this.chatContainer) {
       if (isLoading) {
@@ -20916,7 +21220,7 @@ This action cannot be undone.`,
   async handleDeleteMessageClick(messageToDelete) {
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat) {
-      new import_obsidian15.Notice("Cannot delete message: No active chat.");
+      new import_obsidian16.Notice("Cannot delete message: No active chat.");
       return;
     }
     new ConfirmModal(
@@ -20933,12 +21237,12 @@ This action cannot be undone.`,
             messageToDelete.timestamp
           );
           if (deleteSuccess) {
-            new import_obsidian15.Notice("Message deleted.");
+            new import_obsidian16.Notice("Message deleted.");
           } else {
-            new import_obsidian15.Notice("Failed to delete message.");
+            new import_obsidian16.Notice("Failed to delete message.");
           }
         } catch (error) {
-          new import_obsidian15.Notice("An error occurred while deleting the message.");
+          new import_obsidian16.Notice("An error occurred while deleting the message.");
         }
       }
     ).open();
@@ -20949,25 +21253,25 @@ This action cannot be undone.`,
       textToCopy = decodeHtmlEntities(content).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     }
     navigator.clipboard.writeText(textToCopy).then(() => {
-      (0, import_obsidian15.setIcon)(buttonEl, "check");
+      (0, import_obsidian16.setIcon)(buttonEl, "check");
       buttonEl.setAttribute("title", "Copied!");
       setTimeout(() => {
-        (0, import_obsidian15.setIcon)(buttonEl, "copy");
+        (0, import_obsidian16.setIcon)(buttonEl, "copy");
         buttonEl.setAttribute("title", "Copy");
       }, 2e3);
     }).catch((err) => {
       console.error("Copy failed:", err);
-      new import_obsidian15.Notice("Failed to copy text.");
+      new import_obsidian16.Notice("Failed to copy text.");
     });
   }
   async handleTranslateClick(originalContent, contentEl, buttonEl) {
     const targetLang = this.plugin.settings.translationTargetLanguage;
     if (!this.plugin.settings.enableTranslation || this.plugin.settings.translationProvider === "none") {
-      new import_obsidian15.Notice("Translation disabled or provider not selected in settings.");
+      new import_obsidian16.Notice("Translation disabled or provider not selected in settings.");
       return;
     }
     if (!targetLang) {
-      new import_obsidian15.Notice("Target language for translation is not set in settings.");
+      new import_obsidian16.Notice("Target language for translation is not set in settings.");
       return;
     }
     let textToTranslate = "";
@@ -20979,16 +21283,16 @@ This action cannot be undone.`,
         textToTranslate = decodedContent.trim();
       }
       if (!textToTranslate) {
-        new import_obsidian15.Notice("Nothing to translate (content might be empty after removing internal tags).");
+        new import_obsidian16.Notice("Nothing to translate (content might be empty after removing internal tags).");
         return;
       }
     } catch (error) {
-      new import_obsidian15.Notice("Failed to prepare text for translation.");
+      new import_obsidian16.Notice("Failed to prepare text for translation.");
       return;
     }
     contentEl.querySelector(`.${CSS_CLASS_TRANSLATION_CONTAINER}`)?.remove();
     const originalIcon = buttonEl.querySelector(".svg-icon")?.getAttribute("icon-name") || "languages";
-    (0, import_obsidian15.setIcon)(buttonEl, "loader");
+    (0, import_obsidian16.setIcon)(buttonEl, "loader");
     buttonEl.disabled = true;
     buttonEl.classList.add(CSS_CLASS_TRANSLATION_PENDING);
     const originalTitle = buttonEl.title;
@@ -21002,7 +21306,7 @@ This action cannot be undone.`,
       if (translatedText !== null) {
         const translationContainer = contentEl.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTAINER });
         const translationContentEl = translationContainer.createDiv({ cls: CSS_CLASS_TRANSLATION_CONTENT });
-        await import_obsidian15.MarkdownRenderer.render(
+        await import_obsidian16.MarkdownRenderer.render(
           this.app,
           translatedText,
           translationContentEl,
@@ -21020,7 +21324,7 @@ This action cannot be undone.`,
     } catch (error) {
     } finally {
       if (buttonEl?.isConnected) {
-        (0, import_obsidian15.setIcon)(buttonEl, originalIcon);
+        (0, import_obsidian16.setIcon)(buttonEl, originalIcon);
         buttonEl.disabled = false;
         buttonEl.classList.remove(CSS_CLASS_TRANSLATION_PENDING);
         buttonEl.setAttribute("title", originalTitle);
@@ -21154,7 +21458,7 @@ This action cannot be undone.`,
       this.speechWorker = new Worker(this.speechWorkerUrl);
       this.setupSpeechWorkerHandlers();
     } catch (error) {
-      new import_obsidian15.Notice("Speech recognition feature failed to initialize.");
+      new import_obsidian16.Notice("Speech recognition feature failed to initialize.");
       this.speechWorker = null;
     }
   }
@@ -21182,12 +21486,12 @@ This action cannot be undone.`,
       } else if (data.success && (typeof data.transcript !== "string" || data.transcript.trim() === "")) {
       } else if (!data.success) {
         this.plugin.logger.error("Error from inline speech worker:", data.error, data.details);
-        new import_obsidian15.Notice(`Speech recognition error: ${data.error || "Unknown error"}`);
+        new import_obsidian16.Notice(`Speech recognition error: ${data.error || "Unknown error"}`);
       }
     };
     this.speechWorker.onerror = (error) => {
       this.plugin.logger.error("Unhandled error in inline speech worker:", error.message, error);
-      new import_obsidian15.Notice(`Speech recognition worker failed: ${error.message}`);
+      new import_obsidian16.Notice(`Speech recognition worker failed: ${error.message}`);
       this.inputEl.placeholder = this.DEFAULT_PLACEHOLDER;
       this.updateSendButtonState();
       if (this.speechWorker) {
@@ -21235,12 +21539,12 @@ This action cannot be undone.`,
       return;
     }
     if (!this.speechWorker) {
-      new import_obsidian15.Notice("Speech recognition feature not available (worker not initialized).");
+      new import_obsidian16.Notice("Speech recognition feature not available (worker not initialized).");
       return;
     }
     const speechApiKey = this.plugin.settings.googleApiKey;
     if (!speechApiKey) {
-      new import_obsidian15.Notice("Google API Key for speech recognition not configured. Please add it in plugin settings.");
+      new import_obsidian16.Notice("Google API Key for speech recognition not configured. Please add it in plugin settings.");
       return;
     }
     const needLocalModel = this.plugin.settings.vadUseLocalModelIfAvailable || !this.plugin.settings.allowVadMicVadModelFromCDN;
@@ -21249,12 +21553,12 @@ This action cannot be undone.`,
       await this.loadVadAssets();
     }
     if (needLocalModel && !this.vadModelArrayBuffer) {
-      new import_obsidian15.Notice("Required local VAD ONNX model not loaded. Voice detection cannot start.");
+      new import_obsidian16.Notice("Required local VAD ONNX model not loaded. Voice detection cannot start.");
       this.plugin.logger.error("Local VAD ONNX model required but not available. Aborting voice recognition start.");
       return;
     }
     if (needLocalWorklet && !this.vadWorkletJs && !this.plugin.settings.allowVadMicVadModelFromCDN) {
-      new import_obsidian15.Notice("Required local VAD worklet not loaded, and CDN fallback disabled. Voice detection cannot start.");
+      new import_obsidian16.Notice("Required local VAD worklet not loaded, and CDN fallback disabled. Voice detection cannot start.");
       this.plugin.logger.error("Local VAD worklet required but not available, and CDN fallback for worklet disabled. Aborting voice recognition start.");
       return;
     }
@@ -21267,12 +21571,12 @@ This action cannot be undone.`,
           if (settings.sampleRate) {
           }
         } else {
-          new import_obsidian15.Notice("Could not get an audio track from the microphone.");
+          new import_obsidian16.Notice("Could not get an audio track from the microphone.");
           return;
         }
       } else {
         this.plugin.logger.error("getUserMedia did not return an audioStream.");
-        new import_obsidian15.Notice("Could not access the microphone stream.");
+        new import_obsidian16.Notice("Could not access the microphone stream.");
         return;
       }
       let recorderOptions;
@@ -21285,7 +21589,7 @@ This action cannot be undone.`,
       const audioChunks = [];
       this.voiceButton?.classList.add(CSS_CLASS_RECORDING);
       if (this.voiceButton)
-        (0, import_obsidian15.setIcon)(this.voiceButton, "stop-circle");
+        (0, import_obsidian16.setIcon)(this.voiceButton, "stop-circle");
       this.inputEl.placeholder = "Listening... Speak now.";
       this.isVadSpeechDetected = false;
       this.frameProcessedCounter = 0;
@@ -21329,7 +21633,7 @@ This action cannot be undone.`,
         } else {
           this.plugin.logger.error("MediaRecorder unknown error event type:", event);
         }
-        new import_obsidian15.Notice(`An error occurred during recording: ${errorMessage}`);
+        new import_obsidian16.Notice(`An error occurred during recording: ${errorMessage}`);
         this.stopVoiceRecording(false);
       };
       this.mediaRecorder.start();
@@ -21414,24 +21718,24 @@ This action cannot be undone.`,
       } catch (vadError) {
         this.plugin.logger.error("Failed to initialize VAD (MicVAD.new error):", vadError, vadError.stack);
         if (vadError.message && vadError.message.includes("Worker is not a constructor")) {
-          new import_obsidian15.Notice("Voice activity detection failed: Web Worker environment issue.");
+          new import_obsidian16.Notice("Voice activity detection failed: Web Worker environment issue.");
         } else if (vadError.message && (vadError.message.includes("ORT Session") || vadError.message.includes("ONNX"))) {
-          new import_obsidian15.Notice("Voice activity detection failed: Could not initialize ONNX model. Check console for details.");
+          new import_obsidian16.Notice("Voice activity detection failed: Could not initialize ONNX model. Check console for details.");
         } else if (vadError.message && (vadError.message.includes("fetch") || vadError.message.includes("network error") || vadError.message.includes("load model"))) {
-          new import_obsidian15.Notice("VAD Error: Could not load model or worklet. Check network or CDN/local file availability.");
+          new import_obsidian16.Notice("VAD Error: Could not load model or worklet. Check network or CDN/local file availability.");
         } else {
-          new import_obsidian15.Notice(`Voice activity detection failed to start: ${vadError.message}`);
+          new import_obsidian16.Notice(`Voice activity detection failed to start: ${vadError.message}`);
         }
         this.vad = null;
         this.revokeVadObjectUrls();
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "NotAllowedError") {
-        new import_obsidian15.Notice("Microphone access denied. Please grant permission.");
+        new import_obsidian16.Notice("Microphone access denied. Please grant permission.");
       } else if (error instanceof DOMException && error.name === "NotFoundError") {
-        new import_obsidian15.Notice("Microphone not found. Please ensure it's connected and enabled.");
+        new import_obsidian16.Notice("Microphone not found. Please ensure it's connected and enabled.");
       } else {
-        new import_obsidian15.Notice("Could not start voice recording.");
+        new import_obsidian16.Notice("Could not start voice recording.");
         this.plugin.logger.error("Error starting voice recognition (getUserMedia or MediaRecorder):", error);
       }
       this.stopVoiceRecording(false);
@@ -21466,7 +21770,7 @@ This action cannot be undone.`,
     }
     this.voiceButton?.classList.remove(CSS_CLASS_RECORDING);
     if (this.voiceButton)
-      (0, import_obsidian15.setIcon)(this.voiceButton, "mic");
+      (0, import_obsidian16.setIcon)(this.voiceButton, "mic");
     if (this.mediaRecorder?.state !== "recording" && !processAudio) {
       this.getCurrentRoleDisplayName().then((roleName) => this.updateInputPlaceholder(roleName));
     }
@@ -21532,13 +21836,13 @@ This action cannot be undone.`,
     if (isCollapsed) {
       contentEl.style.maxHeight = "";
       contentEl.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-      (0, import_obsidian15.setIcon)(buttonEl, "chevron-up");
+      (0, import_obsidian16.setIcon)(buttonEl, "chevron-up");
       buttonEl.setAttribute("title", "Show Less");
       buttonEl.classList.add("explicitly-expanded");
     } else {
       contentEl.style.maxHeight = `${maxHeightLimit}px`;
       contentEl.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
-      (0, import_obsidian15.setIcon)(buttonEl, "chevron-down");
+      (0, import_obsidian16.setIcon)(buttonEl, "chevron-down");
       buttonEl.setAttribute("title", "Show More");
       buttonEl.classList.remove("explicitly-expanded");
       setTimeout(() => {
@@ -21794,7 +22098,7 @@ This action cannot be undone.`,
   }
   showChatContextMenu(event, chatMeta) {
     event.preventDefault();
-    const menu = new import_obsidian15.Menu();
+    const menu = new import_obsidian16.Menu();
     menu.addItem(
       (item) => item.setTitle("Clone Chat").setIcon("lucide-copy-plus").onClick(() => this.handleContextMenuClone(chatMeta.id))
     );
@@ -21822,25 +22126,25 @@ This action cannot be undone.`,
     menu.showAtMouseEvent(event);
   }
   async handleContextMenuClone(chatId) {
-    const cloningNotice = new import_obsidian15.Notice("Cloning chat...", 0);
+    const cloningNotice = new import_obsidian16.Notice("Cloning chat...", 0);
     try {
       const clonedChat = await this.plugin.chatManager.cloneChat(chatId);
       if (clonedChat) {
-        new import_obsidian15.Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
+        new import_obsidian16.Notice(`Chat cloned as "${clonedChat.metadata.name}" and activated.`);
       } else {
       }
     } catch (error) {
-      new import_obsidian15.Notice("Error cloning chat.");
+      new import_obsidian16.Notice("Error cloning chat.");
     } finally {
       cloningNotice.hide();
     }
   }
   async exportSpecificChat(chatId) {
-    const exportingNotice = new import_obsidian15.Notice(`Exporting chat...`, 0);
+    const exportingNotice = new import_obsidian16.Notice(`Exporting chat...`, 0);
     try {
       const chat = await this.plugin.chatManager.getChat(chatId);
       if (!chat || chat.messages.length === 0) {
-        new import_obsidian15.Notice("Chat is empty or not found, nothing to export.");
+        new import_obsidian16.Notice("Chat is empty or not found, nothing to export.");
         exportingNotice.hide();
         return;
       }
@@ -21851,40 +22155,40 @@ This action cannot be undone.`,
       let targetFolderPath = this.plugin.settings.chatExportFolderPath?.trim();
       let targetFolder = null;
       if (targetFolderPath) {
-        targetFolderPath = (0, import_obsidian15.normalizePath)(targetFolderPath);
+        targetFolderPath = (0, import_obsidian16.normalizePath)(targetFolderPath);
         const abstractFile = this.app.vault.getAbstractFileByPath(targetFolderPath);
         if (!abstractFile) {
           try {
             await this.app.vault.createFolder(targetFolderPath);
             targetFolder = this.app.vault.getAbstractFileByPath(targetFolderPath);
             if (targetFolder)
-              new import_obsidian15.Notice(`Created export folder: ${targetFolderPath}`);
+              new import_obsidian16.Notice(`Created export folder: ${targetFolderPath}`);
           } catch (err) {
-            new import_obsidian15.Notice(`Error creating export folder. Saving to vault root.`);
+            new import_obsidian16.Notice(`Error creating export folder. Saving to vault root.`);
             targetFolder = this.app.vault.getRoot();
           }
-        } else if (abstractFile instanceof import_obsidian15.TFolder) {
+        } else if (abstractFile instanceof import_obsidian16.TFolder) {
           targetFolder = abstractFile;
         } else {
-          new import_obsidian15.Notice(`Error: Export path is not a folder. Saving to vault root.`);
+          new import_obsidian16.Notice(`Error: Export path is not a folder. Saving to vault root.`);
           targetFolder = this.app.vault.getRoot();
         }
       } else {
         targetFolder = this.app.vault.getRoot();
       }
       if (!targetFolder) {
-        new import_obsidian15.Notice("Error determining export folder.");
+        new import_obsidian16.Notice("Error determining export folder.");
         exportingNotice.hide();
         return;
       }
-      const filePath = (0, import_obsidian15.normalizePath)(`${targetFolder.path}/${filename}`);
+      const filePath = (0, import_obsidian16.normalizePath)(`${targetFolder.path}/${filename}`);
       const existingFile = this.app.vault.getAbstractFileByPath(filePath);
       if (existingFile) {
       }
       const file = await this.app.vault.create(filePath, markdownContent);
-      new import_obsidian15.Notice(`Chat exported to ${file.path}`);
+      new import_obsidian16.Notice(`Chat exported to ${file.path}`);
     } catch (error) {
-      new import_obsidian15.Notice("An error occurred during chat export.");
+      new import_obsidian16.Notice("An error occurred during chat export.");
     } finally {
       exportingNotice.hide();
     }
@@ -21896,16 +22200,16 @@ This action cannot be undone.`,
       `Are you sure you want to clear all messages in chat "${chatName}"?
 This action cannot be undone.`,
       async () => {
-        const clearingNotice = new import_obsidian15.Notice("Clearing messages...", 0);
+        const clearingNotice = new import_obsidian16.Notice("Clearing messages...", 0);
         try {
           const success = await this.plugin.chatManager.clearChatMessagesById(chatId);
           if (success) {
-            new import_obsidian15.Notice(`Messages cleared for chat "${chatName}".`);
+            new import_obsidian16.Notice(`Messages cleared for chat "${chatName}".`);
           } else {
-            new import_obsidian15.Notice(`Failed to clear messages for chat "${chatName}".`);
+            new import_obsidian16.Notice(`Failed to clear messages for chat "${chatName}".`);
           }
         } catch (error) {
-          new import_obsidian15.Notice("Error clearing messages.");
+          new import_obsidian16.Notice("Error clearing messages.");
         } finally {
           clearingNotice.hide();
         }
@@ -21919,15 +22223,15 @@ This action cannot be undone.`,
       `Are you sure you want to delete chat "${chatName}"?
 This action cannot be undone.`,
       async () => {
-        const deletingNotice = new import_obsidian15.Notice("Deleting chat...", 0);
+        const deletingNotice = new import_obsidian16.Notice("Deleting chat...", 0);
         try {
           const success = await this.plugin.chatManager.deleteChat(chatId);
           if (success) {
-            new import_obsidian15.Notice(`Chat "${chatName}" deleted.`);
+            new import_obsidian16.Notice(`Chat "${chatName}" deleted.`);
           } else {
           }
         } catch (error) {
-          new import_obsidian15.Notice("Error deleting chat.");
+          new import_obsidian16.Notice("Error deleting chat.");
         } finally {
           deletingNotice.hide();
         }
@@ -22009,12 +22313,12 @@ This action cannot be undone.`,
         if (wasExplicitlyExpanded) {
           contentCollapsible.style.maxHeight = "";
           contentCollapsible.classList.remove(CSS_CLASSES.CONTENT_COLLAPSED);
-          (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-up");
+          (0, import_obsidian16.setIcon)(toggleCollapseButton, "chevron-up");
           toggleCollapseButton.setAttribute("title", "Show Less");
         } else {
           contentCollapsible.style.maxHeight = `${maxH}px`;
           contentCollapsible.classList.add(CSS_CLASSES.CONTENT_COLLAPSED);
-          (0, import_obsidian15.setIcon)(toggleCollapseButton, "chevron-down");
+          (0, import_obsidian16.setIcon)(toggleCollapseButton, "chevron-down");
           toggleCollapseButton.setAttribute("title", "Show More");
         }
       } else {
@@ -22030,7 +22334,7 @@ This action cannot be undone.`,
   async handleSummarizeClick(originalContent, buttonEl) {
     const summarizationModel = this.plugin.settings.summarizationModelName;
     if (!summarizationModel) {
-      new import_obsidian15.Notice("Please select a summarization model in AI Forge settings (Productivity section).");
+      new import_obsidian16.Notice("Please select a summarization model in AI Forge settings (Productivity section).");
       return;
     }
     let textToSummarize = originalContent;
@@ -22038,11 +22342,11 @@ This action cannot be undone.`,
       textToSummarize = decodeHtmlEntities(originalContent).replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     }
     if (!textToSummarize || textToSummarize.length < 50) {
-      new import_obsidian15.Notice("Message is too short to summarize meaningfully.");
+      new import_obsidian16.Notice("Message is too short to summarize meaningfully.");
       return;
     }
     const originalIcon = buttonEl.querySelector(".svg-icon")?.getAttribute("icon-name") || "scroll-text";
-    (0, import_obsidian15.setIcon)(buttonEl, "loader");
+    (0, import_obsidian16.setIcon)(buttonEl, "loader");
     buttonEl.disabled = true;
     const originalTitle = buttonEl.title;
     buttonEl.title = "Summarizing...";
@@ -22084,9 +22388,9 @@ Summary:`;
       } else {
         userMessage += "Unknown error occurred.";
       }
-      new import_obsidian15.Notice(userMessage, 6e3);
+      new import_obsidian16.Notice(userMessage, 6e3);
     } finally {
-      (0, import_obsidian15.setIcon)(buttonEl, originalIcon);
+      (0, import_obsidian16.setIcon)(buttonEl, originalIcon);
       buttonEl.disabled = false;
       buttonEl.title = originalTitle;
       buttonEl.removeClass(CSS_CLASS_DISABLED);
@@ -22266,18 +22570,18 @@ Summary:`;
     const requestTimestampId = Date.now();
     if (!userInputText || this.isProcessing || this.currentAbortController) {
       if (this.isProcessing || this.currentAbortController)
-        new import_obsidian15.Notice("Please wait or cancel current operation.", 3e3);
+        new import_obsidian16.Notice("Please wait or cancel current operation.", 3e3);
       return;
     }
     let activeChat = await this.plugin.chatManager.getActiveChat();
     if (!activeChat) {
       activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
-        new import_obsidian15.Notice("Error: No active chat and could not create one.");
+        new import_obsidian16.Notice("Error: No active chat and could not create one.");
         this.setLoadingState(false);
         return;
       }
-      new import_obsidian15.Notice(`Started new chat: ${activeChat.metadata.name}`);
+      new import_obsidian16.Notice(`Started new chat: ${activeChat.metadata.name}`);
     }
     const userMessageTimestamp = new Date();
     this.clearInputField();
@@ -22322,7 +22626,7 @@ Summary:`;
         errorMsgRole = "system";
       } else {
         errorMsgForChat = `Error: ${error.message || "Unknown error during processing."}`;
-        new import_obsidian15.Notice(errorMsgForChat, 7e3);
+        new import_obsidian16.Notice(errorMsgForChat, 7e3);
       }
       const errorDisplayTimestamp = new Date();
       const errorDisplayMsg = {
@@ -22554,7 +22858,7 @@ Summary:`;
         finalRolePath = activeChat?.metadata?.selectedRolePath !== void 0 ? activeChat.metadata.selectedRolePath : this.plugin.settings.selectedRolePath;
         finalRoleName = await this.findRoleNameByPath(finalRolePath);
       } catch (error) {
-        new import_obsidian15.Notice("Error connecting to Ollama or loading chat data.", 5e3);
+        new import_obsidian16.Notice("Error connecting to Ollama or loading chat data.", 5e3);
         errorOccurredLoadingData = true;
         availableModels = availableModels || [];
         finalModelName = availableModels.includes(this.plugin.settings.modelName) ? this.plugin.settings.modelName : availableModels[0] ?? null;
@@ -22991,16 +23295,16 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
   }
   async handleRegenerateClick(messageToRegenerateFrom) {
     if (this.isRegenerating) {
-      new import_obsidian15.Notice("Regeneration is already in progress. Please wait.", 3e3);
+      new import_obsidian16.Notice("Regeneration is already in progress. Please wait.", 3e3);
       return;
     }
     if (this.currentAbortController) {
-      new import_obsidian15.Notice("Another generation process is currently active. Please wait or cancel it first.", 4e3);
+      new import_obsidian16.Notice("Another generation process is currently active. Please wait or cancel it first.", 4e3);
       return;
     }
     const activeChat = await this.plugin.chatManager?.getActiveChat();
     if (!activeChat) {
-      new import_obsidian15.Notice("Cannot regenerate: No active chat found.");
+      new import_obsidian16.Notice("Cannot regenerate: No active chat found.");
       return;
     }
     const chatId = activeChat.metadata.id;
@@ -23008,7 +23312,7 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
       (msg) => msg.timestamp.getTime() === messageToRegenerateFrom.timestamp.getTime() && msg.role === messageToRegenerateFrom.role
     );
     if (anchorMessageIndex === -1) {
-      new import_obsidian15.Notice("Error: Could not find the message to regenerate from in the current chat history.");
+      new import_obsidian16.Notice("Error: Could not find the message to regenerate from in the current chat history.");
       this.plugin.logger.warn("Regeneration failed: Anchor message not found for regeneration.", {
         targetTimestamp: messageToRegenerateFrom.timestamp.getTime(),
         targetRole: messageToRegenerateFrom.role,
@@ -23072,7 +23376,7 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
             errorMsgRole = "system";
           } else {
             errorMsgForChat = `Regeneration failed: ${error.message || "An unknown error occurred during processing."}`;
-            new import_obsidian15.Notice(errorMsgForChat, 7e3);
+            new import_obsidian16.Notice(errorMsgForChat, 7e3);
           }
           const errorDisplayTimestamp = new Date();
           const errorDisplayMsg = {
@@ -23211,7 +23515,7 @@ Error executing tool ${toolName}: ${execResult.error || "Unknown tool error"}
 };
 
 // src/ragService.ts
-var import_obsidian16 = require("obsidian");
+var import_obsidian17 = require("obsidian");
 var RagService = class {
   constructor(plugin) {
     this.chunkEmbeddings = [];
@@ -23358,8 +23662,8 @@ var RagService = class {
       this.plugin.logger.warn("[RagService] RAG folder path is not set.");
       return files;
     }
-    const folder = vault.getAbstractFileByPath((0, import_obsidian16.normalizePath)(folderPath));
-    if (!(folder instanceof import_obsidian16.TFolder)) {
+    const folder = vault.getAbstractFileByPath((0, import_obsidian17.normalizePath)(folderPath));
+    if (!(folder instanceof import_obsidian17.TFolder)) {
       this.plugin.logger.warn(`[RagService] RAG folder path "${folderPath}" not found or is not a folder.`);
       return files;
     }
@@ -23862,7 +24166,7 @@ var OllamaService = class {
 };
 
 // src/PromptService.ts
-var import_obsidian17 = require("obsidian");
+var import_obsidian18 = require("obsidian");
 var PromptService = class {
   constructor(plugin) {
     this.currentSystemPrompt = null;
@@ -23886,7 +24190,7 @@ var PromptService = class {
     this.modelDetailsCache = {};
   }
   async getRoleDefinition(rolePath) {
-    const normalizedPath = rolePath ? (0, import_obsidian17.normalizePath)(rolePath) : null;
+    const normalizedPath = rolePath ? (0, import_obsidian18.normalizePath)(rolePath) : null;
     if (normalizedPath === this.currentRolePath && normalizedPath && this.roleCache[normalizedPath]) {
       return this.roleCache[normalizedPath];
     }
@@ -23911,7 +24215,7 @@ var PromptService = class {
       return this.roleCache[normalizedPath];
     }
     const file = this.app.vault.getAbstractFileByPath(normalizedPath);
-    if (file instanceof import_obsidian17.TFile) {
+    if (file instanceof import_obsidian18.TFile) {
       try {
         const fileCache = this.app.metadataCache.getFileCache(file);
         const frontmatter = fileCache?.frontmatter;
@@ -23928,7 +24232,7 @@ var PromptService = class {
         return definition;
       } catch (error) {
         this.plugin.logger.error(`Error loading role: ${file.basename}. Check console.`, error);
-        new import_obsidian17.Notice(`Error loading role: ${file.basename}. Check console.`);
+        new import_obsidian18.Notice(`Error loading role: ${file.basename}. Check console.`);
         this.currentSystemPrompt = null;
         return { systemPrompt: null, isProductivityPersona: false };
       }
@@ -24333,15 +24637,15 @@ ${m.content.trim()}
 };
 
 // src/ChatManager.ts
-var import_obsidian19 = require("obsidian");
+var import_obsidian20 = require("obsidian");
 
 // src/Chat.ts
-var import_obsidian18 = require("obsidian");
+var import_obsidian19 = require("obsidian");
 var Chat = class {
   constructor(adapter, settings, data, filePath, logger) {
     this.adapter = adapter;
     this.pluginSettings = settings;
-    this.filePath = (0, import_obsidian18.normalizePath)(filePath);
+    this.filePath = (0, import_obsidian19.normalizePath)(filePath);
     this.metadata = data.metadata;
     this.messages = data.messages.map((msgData) => {
       const messageWithDate = {
@@ -24353,7 +24657,7 @@ var Chat = class {
       return messageWithDate;
     });
     this.logger = logger;
-    this.debouncedSave = (0, import_obsidian18.debounce)(this._saveToFile.bind(this), 1500, true);
+    this.debouncedSave = (0, import_obsidian19.debounce)(this._saveToFile.bind(this), 1500, true);
   }
   addMessage(role, content, timestamp = new Date()) {
     const newMessage = { role, content, timestamp };
@@ -24452,12 +24756,12 @@ var Chat = class {
       return true;
     } catch (error) {
       this.logger.error(`[Chat ${this.metadata.id}] Error saving chat to ${this.filePath}:`, error);
-      new import_obsidian18.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
+      new import_obsidian19.Notice(`Error saving chat: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
   static async loadFromFile(filePath, adapter, settings, logger) {
-    const normPath = (0, import_obsidian18.normalizePath)(filePath);
+    const normPath = (0, import_obsidian19.normalizePath)(filePath);
     try {
       if (!await adapter.exists(normPath)) {
         return null;
@@ -24483,12 +24787,12 @@ var Chat = class {
         return new Chat(adapter, settings, dataForConstructor, normPath, logger);
       } else {
         logger.error(`[Chat LOAD] Invalid data structure in ${normPath}`, rawDataFromFile);
-        new import_obsidian18.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
+        new import_obsidian19.Notice(`Error loading chat: Invalid data structure in ${filePath}`);
         return null;
       }
     } catch (e) {
       logger.error(`[Chat LOAD] Error loading or parsing file: ${normPath}`, e);
-      new import_obsidian18.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
+      new import_obsidian19.Notice(`Error loading chat file: ${filePath}. ${e.message}`);
       return null;
     }
   }
@@ -24501,7 +24805,7 @@ var Chat = class {
       return true;
     } catch (e) {
       this.logger.error(`[Chat ${this.metadata.id}] Error deleting file ${this.filePath}:`, e);
-      new import_obsidian18.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
+      new import_obsidian19.Notice(`Error deleting chat file: ${this.metadata.name}. Check console.`);
       return false;
     }
   }
@@ -24627,7 +24931,7 @@ var ChatManager = class {
   }
   updateChatsFolderPath() {
     const settingsPath = this.plugin.settings.chatHistoryFolderPath?.trim();
-    this.chatsFolderPath = settingsPath ? (0, import_obsidian19.normalizePath)(settingsPath) : "/";
+    this.chatsFolderPath = settingsPath ? (0, import_obsidian20.normalizePath)(settingsPath) : "/";
     if (this.chatsFolderPath !== "/" && this.chatsFolderPath.endsWith("/")) {
       this.chatsFolderPath = this.chatsFolderPath.slice(0, -1);
     }
@@ -24647,9 +24951,9 @@ var ChatManager = class {
     const checkAndCreate = async (folderPath, folderDesc) => {
       if (!folderPath || folderPath === "/")
         return;
-      const normalized = (0, import_obsidian19.normalizePath)(folderPath);
+      const normalized = (0, import_obsidian20.normalizePath)(folderPath);
       if (normalized.startsWith("..") || normalized.includes("\0")) {
-        new import_obsidian19.Notice(`Error: Invalid path for ${folderDesc}.`);
+        new import_obsidian20.Notice(`Error: Invalid path for ${folderDesc}.`);
         return;
       }
       try {
@@ -24659,12 +24963,12 @@ var ChatManager = class {
         } else {
           const stat = await this.adapter.stat(normalized);
           if (stat?.type !== "folder") {
-            new import_obsidian19.Notice(`Error: Path for ${folderDesc} is not a folder.`);
+            new import_obsidian20.Notice(`Error: Path for ${folderDesc} is not a folder.`);
           } else {
           }
         }
       } catch (error) {
-        new import_obsidian19.Notice(`Error accessing folder for ${folderDesc}. Check permissions.`);
+        new import_obsidian20.Notice(`Error accessing folder for ${folderDesc}. Check permissions.`);
       }
     };
     await checkAndCreate(historyPath, "Chat History");
@@ -24673,7 +24977,7 @@ var ChatManager = class {
   async loadChatIndex(forceScan = false) {
     const storedIndex = await this.plugin.loadDataKey(CHAT_INDEX_KEY);
     const settingsPath = this.plugin.settings.chatHistoryFolderPath?.trim();
-    const currentPath = settingsPath && settingsPath !== "/" ? (0, import_obsidian19.normalizePath)(settingsPath) : "/";
+    const currentPath = settingsPath && settingsPath !== "/" ? (0, import_obsidian20.normalizePath)(settingsPath) : "/";
     if (currentPath !== this.chatsFolderPath) {
       this.updateChatsFolderPath();
       forceScan = true;
@@ -24714,7 +25018,7 @@ var ChatManager = class {
         } else {
           const stat = await this.adapter.stat(this.chatsFolderPath);
           if (stat?.type !== "folder") {
-            new import_obsidian19.Notice(`Error: Chat history path '${this.chatsFolderPath}' is not a folder.`);
+            new import_obsidian20.Notice(`Error: Chat history path '${this.chatsFolderPath}' is not a folder.`);
             this.chatIndex = {};
             await this.saveChatIndex();
             return;
@@ -24777,11 +25081,11 @@ var ChatManager = class {
       await this.saveChatIndex();
     } catch (error) {
       if (error.code === "ENOENT") {
-        new import_obsidian19.Notice(`Error: Chat history folder '${this.chatsFolderPath}' not found.`);
+        new import_obsidian20.Notice(`Error: Chat history folder '${this.chatsFolderPath}' not found.`);
       } else if (error.code === "EPERM" || error.code === "EACCES") {
-        new import_obsidian19.Notice("Permission error accessing chat history folder.");
+        new import_obsidian20.Notice("Permission error accessing chat history folder.");
       } else {
-        new import_obsidian19.Notice("Error rebuilding chat index. Check console.");
+        new import_obsidian20.Notice("Error rebuilding chat index. Check console.");
       }
       this.chatIndex = {};
       await this.saveChatIndex();
@@ -24791,16 +25095,16 @@ var ChatManager = class {
     try {
       await this.plugin.saveDataKey(CHAT_INDEX_KEY, this.chatIndex);
     } catch (error) {
-      new import_obsidian19.Notice("Error saving chat index. Changes might be lost.");
+      new import_obsidian20.Notice("Error saving chat index. Changes might be lost.");
     }
   }
   getChatFilePath(id, folderPath) {
     const fileName = `${id}.json`;
-    const targetFolder = (0, import_obsidian19.normalizePath)(folderPath);
+    const targetFolder = (0, import_obsidian20.normalizePath)(folderPath);
     if (targetFolder === "/" || targetFolder === "") {
-      return (0, import_obsidian19.normalizePath)(fileName);
+      return (0, import_obsidian20.normalizePath)(fileName);
     } else {
-      return (0, import_obsidian19.normalizePath)(`${targetFolder}/${fileName}`);
+      return (0, import_obsidian20.normalizePath)(`${targetFolder}/${fileName}`);
     }
   }
   async _scanFolderRecursive(folderPath) {
@@ -24818,7 +25122,7 @@ var ChatManager = class {
       listResult = await this.adapter.list(folderPath);
     } catch (error) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        new import_obsidian19.Notice(`Permission error reading folder: ${folderPath}`);
+        new import_obsidian20.Notice(`Permission error reading folder: ${folderPath}`);
       } else {
       }
       return [];
@@ -24928,12 +25232,12 @@ var ChatManager = class {
     }
   }
   async createNewChat(name2, folderPath) {
-    const targetFolder = folderPath ? (0, import_obsidian19.normalizePath)(folderPath) : this.chatsFolderPath;
+    const targetFolder = folderPath ? (0, import_obsidian20.normalizePath)(folderPath) : this.chatsFolderPath;
     const finalFolderPath = targetFolder === "" || targetFolder === "." ? "/" : targetFolder;
     try {
       await this.ensureSpecificFolderExists(finalFolderPath);
     } catch (folderError) {
-      new import_obsidian19.Notice(`Failed to ensure target folder exists: ${finalFolderPath}`);
+      new import_obsidian20.Notice(`Failed to ensure target folder exists: ${finalFolderPath}`);
       return null;
     }
     try {
@@ -24969,21 +25273,21 @@ var ChatManager = class {
         delete this.chatIndex[newId];
         await this.saveChatIndex();
         this.plugin.emit("chat-list-updated");
-        new import_obsidian19.Notice("Error: Failed to save new chat file.");
+        new import_obsidian20.Notice("Error: Failed to save new chat file.");
         return null;
       }
       this.loadedChats[newId] = newChat;
       await this.setActiveChat(newId);
       return newChat;
     } catch (error) {
-      new import_obsidian19.Notice("Error creating new chat session.");
+      new import_obsidian20.Notice("Error creating new chat session.");
       return null;
     }
   }
   async ensureSpecificFolderExists(folderPath) {
     if (!folderPath || folderPath === "/" || folderPath === ".")
       return;
-    const normalized = (0, import_obsidian19.normalizePath)(folderPath);
+    const normalized = (0, import_obsidian20.normalizePath)(folderPath);
     if (normalized.startsWith("..") || normalized.includes("\0")) {
       throw new Error("Invalid folder path specified.");
     }
@@ -25172,7 +25476,7 @@ var ChatManager = class {
     if (id && !this.chatIndex[id]) {
       await this.rebuildIndexFromFiles();
       if (!this.chatIndex[id]) {
-        new import_obsidian19.Notice(`Error: Chat with ID ${id} not found. Cannot activate.`);
+        new import_obsidian20.Notice(`Error: Chat with ID ${id} not found. Cannot activate.`);
         return;
       }
     }
@@ -25226,7 +25530,7 @@ var ChatManager = class {
   async updateActiveChatMetadata(metadataUpdate) {
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
-      new import_obsidian19.Notice("No active chat to update metadata for.");
+      new import_obsidian20.Notice("No active chat to update metadata for.");
       return false;
     }
     if (Object.keys(metadataUpdate).length === 0) {
@@ -25295,7 +25599,7 @@ var ChatManager = class {
         } else {
         }
       } catch (e) {
-        new import_obsidian19.Notice(`Error deleting file: ${filePath.split("/").pop()}`);
+        new import_obsidian20.Notice(`Error deleting file: ${filePath.split("/").pop()}`);
       }
     } else if (deleteFile && filePath) {
     }
@@ -25331,7 +25635,7 @@ var ChatManager = class {
         eventToEmit = { name: "chat-list-updated", data: void 0 };
       }
     } catch (error) {
-      new import_obsidian19.Notice(`Error deleting chat ${id}. Check console.`);
+      new import_obsidian20.Notice(`Error deleting chat ${id}. Check console.`);
       success = false;
       await this.rebuildIndexFromFiles();
       eventToEmit = { name: "chat-list-updated", data: void 0 };
@@ -25342,7 +25646,7 @@ var ChatManager = class {
       } else {
       }
       if (success && chatExistedInIndex) {
-        new import_obsidian19.Notice(`Chat deleted.`);
+        new import_obsidian20.Notice(`Chat deleted.`);
       } else if (!chatExistedInIndex) {
       }
     }
@@ -25354,16 +25658,16 @@ var ChatManager = class {
       const hierarchy = await this.getChatHierarchy();
       originalFilePath = this.findChatPathInHierarchy(chatIdToClone, hierarchy);
     } catch (hierarchyError) {
-      new import_obsidian19.Notice("Error finding original chat for cloning.");
+      new import_obsidian20.Notice("Error finding original chat for cloning.");
       return null;
     }
     if (!originalFilePath) {
-      new import_obsidian19.Notice("Original chat file path not found.");
+      new import_obsidian20.Notice("Original chat file path not found.");
       return null;
     }
     const originalChat = await this.getChat(chatIdToClone, originalFilePath);
     if (!originalChat) {
-      new import_obsidian19.Notice("Original chat could not be loaded.");
+      new import_obsidian20.Notice("Original chat could not be loaded.");
       return null;
     }
     const targetFolder = originalFilePath.substring(0, originalFilePath.lastIndexOf("/")) || "/";
@@ -25371,7 +25675,7 @@ var ChatManager = class {
     try {
       await this.ensureSpecificFolderExists(finalFolderPath);
     } catch (folderError) {
-      new import_obsidian19.Notice(`Failed to ensure target folder for clone: ${finalFolderPath}`);
+      new import_obsidian20.Notice(`Failed to ensure target folder for clone: ${finalFolderPath}`);
       return null;
     }
     try {
@@ -25405,14 +25709,14 @@ var ChatManager = class {
         delete this.chatIndex[newId];
         await this.saveChatIndex();
         this.plugin.emit("chat-list-updated");
-        new import_obsidian19.Notice("Error: Failed to save the cloned chat file.");
+        new import_obsidian20.Notice("Error: Failed to save the cloned chat file.");
         return null;
       }
       this.loadedChats[newId] = clonedChat;
       await this.setActiveChat(newId);
       return clonedChat;
     } catch (error) {
-      new import_obsidian19.Notice("An error occurred while cloning the chat.");
+      new import_obsidian20.Notice("An error occurred while cloning the chat.");
       return null;
     }
   }
@@ -25441,7 +25745,7 @@ var ChatManager = class {
   async deleteMessageByTimestamp(chatId, timestampToDelete) {
     const chat = await this.getChat(chatId);
     if (!chat) {
-      new import_obsidian19.Notice(`Error: Chat ${chatId} not found.`);
+      new import_obsidian20.Notice(`Error: Chat ${chatId} not found.`);
       return false;
     }
     const timeTarget = timestampToDelete.getTime();
@@ -25456,7 +25760,7 @@ var ChatManager = class {
       }
     }
     if (messageIndex === -1) {
-      new import_obsidian19.Notice("Message not found.");
+      new import_obsidian20.Notice("Message not found.");
       return false;
     }
     return await this._performDeleteMessageByIndex(chat, messageIndex);
@@ -25479,14 +25783,14 @@ var ChatManager = class {
       }
       return true;
     } catch (error) {
-      new import_obsidian19.Notice("Error deleting message.");
+      new import_obsidian20.Notice("Error deleting message.");
       return false;
     }
   }
   async clearChatMessagesById(chatId) {
     const chat = await this.getChat(chatId);
     if (!chat) {
-      new import_obsidian19.Notice(`Error: Chat ${chatId} not found.`);
+      new import_obsidian20.Notice(`Error: Chat ${chatId} not found.`);
       return false;
     }
     if (chat.messages.length === 0) {
@@ -25500,26 +25804,26 @@ var ChatManager = class {
         this.activeChat = chat;
         this.plugin.emit("messages-cleared", chatId);
       }
-      new import_obsidian19.Notice(`Messages cleared for chat "${chat.metadata.name}".`);
+      new import_obsidian20.Notice(`Messages cleared for chat "${chat.metadata.name}".`);
       return true;
     } catch (error) {
-      new import_obsidian19.Notice("Error clearing messages.");
+      new import_obsidian20.Notice("Error clearing messages.");
       return false;
     }
   }
   async renameChat(chatId, newName) {
     const trimmedName = newName.trim();
     if (!trimmedName) {
-      new import_obsidian19.Notice("Chat name cannot be empty.");
+      new import_obsidian20.Notice("Chat name cannot be empty.");
       return false;
     }
     if (/[\\/?:*"<>|]/.test(trimmedName)) {
-      new import_obsidian19.Notice("Chat name contains invalid characters.");
+      new import_obsidian20.Notice("Chat name contains invalid characters.");
       return false;
     }
     const chat = await this.getChat(chatId);
     if (!chat) {
-      new import_obsidian19.Notice("Chat not found.");
+      new import_obsidian20.Notice("Chat not found.");
       return false;
     }
     if (chat.metadata.name === trimmedName) {
@@ -25533,13 +25837,13 @@ var ChatManager = class {
           this.activeChat = chat;
           this.plugin.emit("active-chat-changed", { chatId, chat });
         }
-        new import_obsidian19.Notice(`Chat renamed to "${trimmedName}".`);
+        new import_obsidian20.Notice(`Chat renamed to "${trimmedName}".`);
         return true;
       } else {
         return false;
       }
     } catch (error) {
-      new import_obsidian19.Notice("An error occurred while renaming the chat.");
+      new import_obsidian20.Notice("An error occurred while renaming the chat.");
       return false;
     }
   }
@@ -25549,19 +25853,19 @@ var ChatManager = class {
    * @returns true, якщо папка успішно створена, false в іншому випадку.
    */
   async createFolder(folderPath) {
-    const normalizedPath = (0, import_obsidian19.normalizePath)(folderPath);
+    const normalizedPath = (0, import_obsidian20.normalizePath)(folderPath);
     if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
-      new import_obsidian19.Notice("Invalid folder path.");
+      new import_obsidian20.Notice("Invalid folder path.");
       return false;
     }
     if (normalizedPath.startsWith("..") || normalizedPath.includes("\0")) {
-      new import_obsidian19.Notice("Invalid characters or path traversal detected.");
+      new import_obsidian20.Notice("Invalid characters or path traversal detected.");
       return false;
     }
     try {
       const exists = await this.adapter.exists(normalizedPath);
       if (exists) {
-        new import_obsidian19.Notice(`"${normalizedPath.split("/").pop()}" already exists.`);
+        new import_obsidian20.Notice(`"${normalizedPath.split("/").pop()}" already exists.`);
         return false;
       }
       await this.adapter.mkdir(normalizedPath);
@@ -25569,9 +25873,9 @@ var ChatManager = class {
       return true;
     } catch (error) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        new import_obsidian19.Notice(`Permission error creating folder.`);
+        new import_obsidian20.Notice(`Permission error creating folder.`);
       } else {
-        new import_obsidian19.Notice(`Failed to create folder: ${error.message || "Unknown error"}`);
+        new import_obsidian20.Notice(`Failed to create folder: ${error.message || "Unknown error"}`);
       }
       return false;
     }
@@ -25586,40 +25890,40 @@ var ChatManager = class {
    * @returns true, якщо перейменування/переміщення успішне, false в іншому випадку.
    */
   async renameFolder(oldPath, newPath) {
-    const normOldPath = (0, import_obsidian19.normalizePath)(oldPath);
-    const normNewPath = (0, import_obsidian19.normalizePath)(newPath);
+    const normOldPath = (0, import_obsidian20.normalizePath)(oldPath);
+    const normNewPath = (0, import_obsidian20.normalizePath)(newPath);
     if (!normOldPath || normOldPath === "/" || !normNewPath || normNewPath === "/") {
-      new import_obsidian19.Notice("Cannot rename root folder or use empty path.");
+      new import_obsidian20.Notice("Cannot rename root folder or use empty path.");
       return false;
     }
     if (normOldPath === normNewPath) {
       return true;
     }
     if (normNewPath.startsWith(normOldPath + "/")) {
-      new import_obsidian19.Notice("Cannot move a folder inside itself.");
+      new import_obsidian20.Notice("Cannot move a folder inside itself.");
       return false;
     }
     try {
       const oldExists = await this.adapter.exists(normOldPath);
       if (!oldExists) {
-        new import_obsidian19.Notice("Folder to rename not found.");
+        new import_obsidian20.Notice("Folder to rename not found.");
         return false;
       }
       const oldStat = await this.adapter.stat(normOldPath);
       if (oldStat?.type !== "folder") {
-        new import_obsidian19.Notice("Item to rename is not a folder.");
+        new import_obsidian20.Notice("Item to rename is not a folder.");
         return false;
       }
       const newExists = await this.adapter.exists(normNewPath);
       if (newExists) {
-        new import_obsidian19.Notice(`"${normNewPath.split("/").pop()}" already exists.`);
+        new import_obsidian20.Notice(`"${normNewPath.split("/").pop()}" already exists.`);
         return false;
       }
       await this.adapter.rename(normOldPath, normNewPath);
       Object.values(this.loadedChats).forEach((chat) => {
         if (chat.filePath.startsWith(normOldPath + "/")) {
           const relativePath = chat.filePath.substring(normOldPath.length);
-          const updatedPath = (0, import_obsidian19.normalizePath)(normNewPath + relativePath);
+          const updatedPath = (0, import_obsidian20.normalizePath)(normNewPath + relativePath);
           chat.filePath = updatedPath;
         }
       });
@@ -25627,9 +25931,9 @@ var ChatManager = class {
       return true;
     } catch (error) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        new import_obsidian19.Notice(`Permission error renaming folder.`);
+        new import_obsidian20.Notice(`Permission error renaming folder.`);
       } else {
-        new import_obsidian19.Notice(`Failed to rename folder: ${error.message || "Unknown error"}`);
+        new import_obsidian20.Notice(`Failed to rename folder: ${error.message || "Unknown error"}`);
       }
       return false;
     }
@@ -25640,13 +25944,13 @@ var ChatManager = class {
    * @returns true, якщо папка та її вміст успішно видалені, false в іншому випадку.
    */
   async deleteFolder(folderPath) {
-    const normalizedPath = (0, import_obsidian19.normalizePath)(folderPath);
+    const normalizedPath = (0, import_obsidian20.normalizePath)(folderPath);
     if (!normalizedPath || normalizedPath === "/" || normalizedPath === ".") {
-      new import_obsidian19.Notice("Cannot delete this folder.");
+      new import_obsidian20.Notice("Cannot delete this folder.");
       return false;
     }
     if (normalizedPath === this.chatsFolderPath) {
-      new import_obsidian19.Notice("Cannot delete the main chat history folder set in settings.");
+      new import_obsidian20.Notice("Cannot delete the main chat history folder set in settings.");
       return false;
     }
     try {
@@ -25656,7 +25960,7 @@ var ChatManager = class {
       }
       const stat = await this.adapter.stat(normalizedPath);
       if (stat?.type !== "folder") {
-        new import_obsidian19.Notice("Item to delete is not a folder.");
+        new import_obsidian20.Notice("Item to delete is not a folder.");
         return false;
       }
       const chatIdsToDelete = [];
@@ -25705,50 +26009,50 @@ var ChatManager = class {
       return true;
     } catch (error) {
       if (error.code === "EPERM" || error.code === "EACCES") {
-        new import_obsidian19.Notice(`Permission error deleting folder.`);
+        new import_obsidian20.Notice(`Permission error deleting folder.`);
       } else {
-        new import_obsidian19.Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
+        new import_obsidian20.Notice(`Failed to delete folder: ${error.message || "Unknown error"}`);
       }
       await this.rebuildIndexFromFiles();
       return false;
     }
   }
   async moveChat(chatId, oldFilePath, newFolderPath) {
-    const normOldPath = (0, import_obsidian19.normalizePath)(oldFilePath);
-    const normNewFolderPath = (0, import_obsidian19.normalizePath)(newFolderPath);
+    const normOldPath = (0, import_obsidian20.normalizePath)(oldFilePath);
+    const normNewFolderPath = (0, import_obsidian20.normalizePath)(newFolderPath);
     let newFilePath = null;
     if (!chatId || !oldFilePath || !newFolderPath) {
-      new import_obsidian19.Notice("Move chat failed: Invalid data.");
+      new import_obsidian20.Notice("Move chat failed: Invalid data.");
       return false;
     }
     try {
       if (!await this.adapter.exists(normOldPath)) {
-        new import_obsidian19.Notice("Move chat failed: Source file not found.");
+        new import_obsidian20.Notice("Move chat failed: Source file not found.");
         await this.rebuildIndexFromFiles();
         this.plugin.emit("chat-list-updated");
         return false;
       }
       const oldStat = await this.adapter.stat(normOldPath);
       if (oldStat?.type !== "file") {
-        new import_obsidian19.Notice("Move chat failed: Source is not a file.");
+        new import_obsidian20.Notice("Move chat failed: Source is not a file.");
         return false;
       }
       if (!await this.adapter.exists(normNewFolderPath)) {
-        new import_obsidian19.Notice("Move chat failed: Target folder not found.");
+        new import_obsidian20.Notice("Move chat failed: Target folder not found.");
         return false;
       }
       const newStat = await this.adapter.stat(normNewFolderPath);
       if (newStat?.type !== "folder") {
-        new import_obsidian19.Notice("Move chat failed: Target is not a folder.");
+        new import_obsidian20.Notice("Move chat failed: Target is not a folder.");
         return false;
       }
       const fileName = oldFilePath.substring(oldFilePath.lastIndexOf("/") + 1);
-      newFilePath = (0, import_obsidian19.normalizePath)(`${normNewFolderPath}/${fileName}`);
+      newFilePath = (0, import_obsidian20.normalizePath)(`${normNewFolderPath}/${fileName}`);
       if (normOldPath === newFilePath) {
         return true;
       }
       if (await this.adapter.exists(newFilePath)) {
-        new import_obsidian19.Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
+        new import_obsidian20.Notice(`Move chat failed: A file named "${fileName}" already exists in the target folder.`);
         return false;
       }
       await this.adapter.rename(normOldPath, newFilePath);
@@ -25760,9 +26064,9 @@ var ChatManager = class {
     } catch (error) {
       const targetPathDesc = newFilePath ?? normNewFolderPath;
       if (error.code === "EPERM" || error.code === "EACCES") {
-        new import_obsidian19.Notice(`Permission error moving chat file.`);
+        new import_obsidian20.Notice(`Permission error moving chat file.`);
       } else {
-        new import_obsidian19.Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
+        new import_obsidian20.Notice(`Failed to move chat: ${error.message || "Unknown error"}`);
       }
       await this.rebuildIndexFromFiles();
       this.plugin.emit("chat-list-updated");
@@ -25844,7 +26148,7 @@ var ChatManager = class {
 var import_child_process = require("child_process");
 
 // src/TranslationService.ts
-var import_obsidian20 = require("obsidian");
+var import_obsidian21 = require("obsidian");
 var GOOGLE_TRANSLATE_API_URL = "https://translation.googleapis.com/language/translate/v2";
 var TranslationService = class {
   constructor(plugin) {
@@ -25869,7 +26173,7 @@ var TranslationService = class {
     }
     if (!finalTargetLang) {
       this.plugin.logger.error("[TranslationService] Target language is not defined.");
-      new import_obsidian20.Notice("Translation Error: Target language not configured.");
+      new import_obsidian21.Notice("Translation Error: Target language not configured.");
       return null;
     }
     this.plugin.logger.info(`[TranslationService] Requesting translation via '${provider}' to '${finalTargetLang}'.`);
@@ -25878,7 +26182,7 @@ var TranslationService = class {
         case "google":
           const apiKey = this.plugin.settings.googleTranslationApiKey;
           if (!apiKey) {
-            new import_obsidian20.Notice("Google Translation API Key is not configured.");
+            new import_obsidian21.Notice("Google Translation API Key is not configured.");
             this.plugin.logger.error("[TranslationService] Google API Key missing.");
             return null;
           }
@@ -25886,7 +26190,7 @@ var TranslationService = class {
         case "ollama":
           const model = this.plugin.settings.ollamaTranslationModel;
           if (!model) {
-            new import_obsidian20.Notice("Ollama translation model is not selected in settings.");
+            new import_obsidian21.Notice("Ollama translation model is not selected in settings.");
             this.plugin.logger.error("[TranslationService] Ollama translation model missing.");
             return null;
           }
@@ -25897,7 +26201,7 @@ var TranslationService = class {
       }
     } catch (error) {
       this.plugin.logger.error(`[TranslationService] General translation error for provider ${provider}:`, error);
-      new import_obsidian20.Notice(`Translation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      new import_obsidian21.Notice(`Translation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
       return null;
     }
   }
@@ -25989,24 +26293,24 @@ Translated Text:`;
 };
 
 // src/examples/SimpleFileAgent.ts
-var import_obsidian21 = require("obsidian");
+var import_obsidian22 = require("obsidian");
 var SimpleFileAgent = class {
   constructor() {
     this.id = "simple-file-agent";
     this.name = "Simple File Agent";
-    this.description = "An agent that can read and list files in the vault.";
+    this.description = "An agent designed to interact with the user's Obsidian vault file system. It can read content from specific files if the user provides the path, and list files/folders in specified locations within the vault. This agent helps with accessing and navigating *existing user notes and files*.";
   }
   getTools() {
     return [
       {
         name: "readFileContent",
-        description: "Reads the content of a specified file in the Obsidian vault.",
+        description: "Reads the content of a *specific, user-mentioned* file path within the Obsidian vault. Use this tool ONLY when the user explicitly provides a file path or asks to read a specific document they have saved. Do not use this to guess file paths for general information like recipes.",
         parameters: {
           type: "object",
           properties: {
             filePath: {
               type: "string",
-              description: "The full path to the file within the Obsidian vault (e.g., 'Notes/MyFile.md')."
+              description: "The *exact and full* path to the file within the Obsidian vault (e.g., 'Recipes/ChickenCurry.md', 'Meeting Notes/2024-05-16.md'). This path should typically be provided by the user or a previous tool call."
             }
           },
           required: ["filePath"]
@@ -26014,13 +26318,13 @@ var SimpleFileAgent = class {
       },
       {
         name: "listFiles",
-        description: "Lists files in a specified folder of the Obsidian vault. Lists root if no path specified.",
+        description: "Lists files and folders within a *specific, user-mentioned folder path* in the Obsidian vault. If no folder path is provided by the user, it lists items in the vault's root. Use this to help the user navigate their vault structure or find files when they are unsure of the exact name but know the location. Do not use this for broad, unguided searches for general information.",
         parameters: {
           type: "object",
           properties: {
             folderPath: {
               type: "string",
-              description: "Optional. The path to the folder (e.g., 'Attachments/Images'). If omitted, lists root."
+              description: "Optional. The path to the folder (e.g., 'Projects/Alpha', 'Personal/Journal'). This path should ideally be based on user input or to explore a known section of their vault. If omitted, lists contents of the vault root."
             }
           }
         }
@@ -26034,11 +26338,11 @@ var SimpleFileAgent = class {
           return "Error: 'filePath' argument is missing or not a string.";
         }
         try {
-          const normalized = (0, import_obsidian21.normalizePath)(args.filePath);
+          const normalized = (0, import_obsidian22.normalizePath)(args.filePath);
           const file = plugin.app.vault.getAbstractFileByPath(normalized);
-          if (file instanceof import_obsidian21.TFile) {
+          if (file instanceof import_obsidian22.TFile) {
             const content = await plugin.app.vault.read(file);
-            new import_obsidian21.Notice(`Agent read file: ${file.basename}`);
+            new import_obsidian22.Notice(`Agent read file: ${file.basename}`);
             return `Content of "${args.filePath}":
 ${content}`;
           } else {
@@ -26050,10 +26354,10 @@ ${content}`;
         }
       case "listFiles":
         try {
-          const pathToList = args.folderPath ? (0, import_obsidian21.normalizePath)(args.folderPath) : "/";
+          const pathToList = args.folderPath ? (0, import_obsidian22.normalizePath)(args.folderPath) : "/";
           const folder = plugin.app.vault.getAbstractFileByPath(pathToList);
-          if (folder && folder instanceof import_obsidian21.TFolder) {
-            const files = folder.children.filter((f) => f instanceof import_obsidian21.TFile).map((f) => f.name);
+          if (folder && folder instanceof import_obsidian22.TFolder) {
+            const files = folder.children.filter((f) => f instanceof import_obsidian22.TFile).map((f) => f.name);
             return `Files in "${pathToList}":
 ${files.join("\n")}`;
           } else if (pathToList === "/") {
@@ -26074,7 +26378,7 @@ ${files.join("\n")}`;
 };
 
 // src/examples/WeatherAgent.ts
-var import_obsidian22 = require("obsidian");
+var import_obsidian23 = require("obsidian");
 var OPENWEATHERMAP_BASE_URL = "https://api.openweathermap.org/data/2.5";
 var WeatherAgent = class {
   constructor() {
@@ -26140,7 +26444,7 @@ var WeatherAgent = class {
       if (!locationToUse || locationToUse.trim() === "") {
         return "\u041F\u043E\u043C\u0438\u043B\u043A\u0430: \u041B\u043E\u043A\u0430\u0446\u0456\u044F \u043D\u0435 \u0432\u043A\u0430\u0437\u0430\u043D\u0430 \u0456 \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C \u043D\u0435 \u0432\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u0432 \u043D\u0430\u043B\u0430\u0448\u0442\u0443\u0432\u0430\u043D\u043D\u044F\u0445.";
       }
-      new import_obsidian22.Notice(`\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C: ${locationToUse}`);
+      new import_obsidian23.Notice(`\u0412\u0438\u043A\u043E\u0440\u0438\u0441\u0442\u043E\u0432\u0443\u0454\u0442\u044C\u0441\u044F \u043B\u043E\u043A\u0430\u0446\u0456\u044F \u0437\u0430 \u0437\u0430\u043C\u043E\u0432\u0447\u0443\u0432\u0430\u043D\u043D\u044F\u043C: ${locationToUse}`);
     }
     try {
       let url = "";
@@ -26258,7 +26562,7 @@ var WeatherAgent = class {
 };
 
 // src/examples/TimeAgent.ts
-var import_obsidian23 = require("obsidian");
+var import_obsidian24 = require("obsidian");
 var TimeAgent = class {
   constructor() {
     this.id = "time-agent";
@@ -26327,17 +26631,17 @@ var TimeAgent = class {
         try {
           switch (formatOption) {
             case "dateonly":
-              new import_obsidian23.Notice("Time Agent: Provided current date.");
+              new import_obsidian24.Notice("Time Agent: Provided current date.");
               return `\u041F\u043E\u0442\u043E\u0447\u043D\u0430 \u0434\u0430\u0442\u0430: ${now.toLocaleDateString(userLocale, dateOnlyOptions)}`;
             case "timeonly":
-              new import_obsidian23.Notice("Time Agent: Provided current time.");
+              new import_obsidian24.Notice("Time Agent: Provided current time.");
               return `\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 \u0447\u0430\u0441: ${now.toLocaleTimeString(userLocale, timeOnlyOptions)}`;
             case "iso":
-              new import_obsidian23.Notice("Time Agent: Provided ISO date-time.");
+              new import_obsidian24.Notice("Time Agent: Provided ISO date-time.");
               return `\u041F\u043E\u0442\u043E\u0447\u043D\u0430 \u0434\u0430\u0442\u0430 \u0442\u0430 \u0447\u0430\u0441 (ISO 8601): ${now.toISOString()}`;
             case "full":
             default:
-              new import_obsidian23.Notice("Time Agent: Provided current full date and time.");
+              new import_obsidian24.Notice("Time Agent: Provided current full date and time.");
               return `\u041F\u043E\u0442\u043E\u0447\u043D\u0430 \u0434\u0430\u0442\u0430 \u0442\u0430 \u0447\u0430\u0441: ${now.toLocaleString(userLocale, fullDateTimeOptions)}`;
           }
         } catch (e) {
@@ -26357,10 +26661,10 @@ var TimeAgent = class {
       case "getCurrentTimestamp":
         const timestampType = args?.type || "unix";
         if (timestampType === "iso") {
-          new import_obsidian23.Notice("Time Agent: Provided ISO timestamp.");
+          new import_obsidian24.Notice("Time Agent: Provided ISO timestamp.");
           return `\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 ISO 8601 Timestamp: ${now.toISOString()}`;
         } else {
-          new import_obsidian23.Notice("Time Agent: Provided Unix timestamp.");
+          new import_obsidian24.Notice("Time Agent: Provided Unix timestamp.");
           return `\u041F\u043E\u0442\u043E\u0447\u043D\u0438\u0439 Unix Timestamp (\u0441\u0435\u043A\u0443\u043D\u0434\u0438): ${Math.floor(now.getTime() / 1e3)}`;
         }
       default:
@@ -26370,7 +26674,7 @@ var TimeAgent = class {
 };
 
 // src/examples/MusicControlAgent.ts
-var import_obsidian24 = require("obsidian");
+var import_obsidian25 = require("obsidian");
 var LOCAL_MUSIC_SERVER_URL = "http://127.0.0.1:5678/control";
 var MusicControlAgent = class {
   constructor() {
@@ -26388,7 +26692,7 @@ var MusicControlAgent = class {
         body: JSON.stringify(payload)
       };
       plugin?.logger.debug(`[PythonServerMusicAgent] Sending command: ${JSON.stringify(payload)}`);
-      const response = await (0, import_obsidian24.requestUrl)(requestParams);
+      const response = await (0, import_obsidian25.requestUrl)(requestParams);
       plugin?.logger.debug(`[PythonServerMusicAgent] Received response: ${response.text}`);
       const responseData = response.json;
       if (response.status >= 200 && response.status < 300) {
@@ -26409,18 +26713,18 @@ Errors: ${responseData.errors.join(", ")}`;
           message = `Available players:
 ${responseData.output}`;
         }
-        new import_obsidian24.Notice(message.substring(0, 150));
+        new import_obsidian25.Notice(message.substring(0, 150));
         return message;
       } else {
         const errorMsg = responseData.error || responseData.stderr || `Server responded with status ${response.status}`;
         plugin?.logger.error(`[PythonServerMusicAgent] Error from server: ${errorMsg}`);
-        new import_obsidian24.Notice(`Music control error: ${errorMsg}`, 7e3);
+        new import_obsidian25.Notice(`Music control error: ${errorMsg}`, 7e3);
         return `Error: ${errorMsg}`;
       }
     } catch (error) {
       plugin?.logger.error(`[PythonServerMusicAgent] Network or parsing error:`, error);
       const errorMessage = error.message || "Failed to connect to the local music server. Is it running?";
-      new import_obsidian24.Notice(errorMessage, 7e3);
+      new import_obsidian25.Notice(errorMessage, 7e3);
       return `Error: ${errorMessage}`;
     }
   }
@@ -26613,7 +26917,7 @@ var AgentManager = class {
 var SESSIONS_INDEX_KEY = "chatIndex_v2";
 var ACTIVE_CHAT_ID_KEY = "activeChatId_v2";
 var CHAT_INDEX_KEY = "chatIndex_v2";
-var OllamaPlugin2 = class extends import_obsidian25.Plugin {
+var OllamaPlugin2 = class extends import_obsidian26.Plugin {
   constructor() {
     super(...arguments);
     this.view = null;
@@ -26626,7 +26930,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
     this.taskFileNeedsUpdate = false;
     this.taskCheckInterval = null;
     // Debounced функція оновлення для Vault Events
-    this.debouncedIndexAndUIRebuild = (0, import_obsidian25.debounce)(
+    this.debouncedIndexAndUIRebuild = (0, import_obsidian26.debounce)(
       async () => {
         if (this.chatManager) {
           await this.chatManager.rebuildIndexFromFiles();
@@ -26705,7 +27009,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
         if (this.chatManager) {
           await this.chatManager.addMessageToActiveChat("error", `Ollama Connection Error: ${message}`, new Date());
         } else {
-          new import_obsidian25.Notice(`Ollama Connection Error: ${message}`);
+          new import_obsidian26.Notice(`Ollama Connection Error: ${message}`);
         }
       })
     );
@@ -26746,7 +27050,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
         if (this.settings.ragEnabled) {
           await this.ragService.indexDocuments();
         } else {
-          new import_obsidian25.Notice("RAG is disabled in settings.");
+          new import_obsidian26.Notice("RAG is disabled in settings.");
         }
       }
     });
@@ -26763,7 +27067,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
       callback: async () => {
         await this.listRoleFiles(true);
         this.emit("roles-updated");
-        new import_obsidian25.Notice("Role list refreshed.");
+        new import_obsidian26.Notice("Role list refreshed.");
       }
     });
     this.addCommand({
@@ -26772,9 +27076,9 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
       callback: async () => {
         const newChat = await this.chatManager.createNewChat();
         if (newChat) {
-          new import_obsidian25.Notice(`Created new chat: ${newChat.metadata.name}`);
+          new import_obsidian26.Notice(`Created new chat: ${newChat.metadata.name}`);
         } else {
-          new import_obsidian25.Notice("Failed to create new chat.");
+          new import_obsidian26.Notice("Failed to create new chat.");
         }
       }
     });
@@ -26809,13 +27113,13 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
       }
     });
     this.registerVaultListeners();
-    const debouncedRoleClear = (0, import_obsidian25.debounce)(() => {
+    const debouncedRoleClear = (0, import_obsidian26.debounce)(() => {
       this.roleListCache = null;
       this.promptService?.clearRoleCache?.();
       this.emit("roles-updated");
     }, 1500, true);
     const handleModifyEvent = (file) => {
-      if (file instanceof import_obsidian25.TFile) {
+      if (file instanceof import_obsidian26.TFile) {
         this.handleRoleOrRagFileChange(file.path, debouncedRoleClear, false);
         this.handleTaskFileModify(file);
       }
@@ -26865,15 +27169,15 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
     const handleFileCreateDelete = (file) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
-      const historyPath = (0, import_obsidian25.normalizePath)(this.settings.chatHistoryFolderPath);
-      if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian25.TFolder)) {
+      const historyPath = (0, import_obsidian26.normalizePath)(this.settings.chatHistoryFolderPath);
+      if (file.path.startsWith(historyPath + "/") && (file.path.toLowerCase().endsWith(".json") || file instanceof import_obsidian26.TFolder)) {
         this.debouncedIndexAndUIRebuild();
       }
     };
     const handleFileRename = (file, oldPath) => {
       if (!file || !this.chatManager || !this.settings.chatHistoryFolderPath)
         return;
-      const historyPath = (0, import_obsidian25.normalizePath)(this.settings.chatHistoryFolderPath);
+      const historyPath = (0, import_obsidian26.normalizePath)(this.settings.chatHistoryFolderPath);
       const isInHistoryNew = file.path.startsWith(historyPath + "/");
       const isInHistoryOld = oldPath.startsWith(historyPath + "/");
       if ((isInHistoryNew || isInHistoryOld) && file.path !== historyPath && oldPath !== historyPath) {
@@ -26888,7 +27192,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
   updateDailyTaskFilePath() {
     const folderPath = this.settings.ragFolderPath?.trim();
     const fileName = this.settings.dailyTaskFileName?.trim();
-    const newPath = folderPath && fileName ? (0, import_obsidian25.normalizePath)(`${folderPath}/${fileName}`) : null;
+    const newPath = folderPath && fileName ? (0, import_obsidian26.normalizePath)(`${folderPath}/${fileName}`) : null;
     if (newPath !== this.dailyTaskFilePath) {
       this.dailyTaskFilePath = newPath;
       this.taskFileContentCache = null;
@@ -26986,9 +27290,9 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
   // --- Кінець логіки файлу завдань ---
   // Обробник змін для ролей та RAG
   handleRoleOrRagFileChange(changedPath, debouncedRoleClear, isDeletion = false) {
-    const normPath = (0, import_obsidian25.normalizePath)(changedPath);
-    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian25.normalizePath)(this.settings.userRolesFolderPath) : null;
-    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian25.normalizePath)(`${this.manifest.dir}/roles`) : null;
+    const normPath = (0, import_obsidian26.normalizePath)(changedPath);
+    const userRolesPath = this.settings.userRolesFolderPath ? (0, import_obsidian26.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const builtInRolesPath = this.manifest.dir ? (0, import_obsidian26.normalizePath)(`${this.manifest.dir}/roles`) : null;
     let isRoleFile = false;
     if (normPath.toLowerCase().endsWith(".md")) {
       if (userRolesPath && normPath.startsWith(userRolesPath + "/")) {
@@ -27007,7 +27311,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
     if (isRoleFile) {
       debouncedRoleClear();
     }
-    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian25.normalizePath)(this.settings.ragFolderPath) : null;
+    const ragFolderPath = this.settings.ragFolderPath ? (0, import_obsidian26.normalizePath)(this.settings.ragFolderPath) : null;
     if (this.settings.ragEnabled && ragFolderPath && (normPath.startsWith(ragFolderPath + "/") || normPath === ragFolderPath)) {
       if (normPath !== this.dailyTaskFilePath) {
         this.debounceIndexUpdate();
@@ -27076,11 +27380,11 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
         try {
           await leaf.setViewState({ type: viewType, active: true });
         } catch (e) {
-          new import_obsidian25.Notice("Error opening AI Forge view.");
+          new import_obsidian26.Notice("Error opening AI Forge view.");
           return;
         }
       } else {
-        new import_obsidian25.Notice("Could not open AI Forge view.");
+        new import_obsidian26.Notice("Could not open AI Forge view.");
         return;
       }
     }
@@ -27125,19 +27429,19 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
   }
   async clearMessageHistoryWithConfirmation() {
     if (!this.chatManager) {
-      new import_obsidian25.Notice("Error: Chat Manager not ready.");
+      new import_obsidian26.Notice("Error: Chat Manager not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (activeChat && activeChat.messages.length > 0) {
       new ConfirmModal(this.app, "Clear History", `Clear messages in "${activeChat.metadata.name}"?`, async () => {
         await this.chatManager.clearActiveChatMessages();
-        new import_obsidian25.Notice(`History cleared for "${activeChat.metadata.name}".`);
+        new import_obsidian26.Notice(`History cleared for "${activeChat.metadata.name}".`);
       }).open();
     } else if (activeChat) {
-      new import_obsidian25.Notice("Chat history is already empty.");
+      new import_obsidian26.Notice("Chat history is already empty.");
     } else {
-      new import_obsidian25.Notice("No active chat to clear.");
+      new import_obsidian26.Notice("No active chat to clear.");
     }
   }
   async listRoleFiles(forceRefresh = false) {
@@ -27152,7 +27456,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
     const builtInRoleFileName = "Productivity_Assistant.md";
     let builtInRolePath = null;
     if (pluginDir) {
-      builtInRolePath = (0, import_obsidian25.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
+      builtInRolePath = (0, import_obsidian26.normalizePath)(`${pluginDir}/roles/${builtInRoleFileName}`);
       try {
         if (await adapter.exists(builtInRolePath)) {
           const stat = await adapter.stat(builtInRolePath);
@@ -27164,7 +27468,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
       } catch (error) {
       }
     }
-    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian25.normalizePath)(this.settings.userRolesFolderPath) : null;
+    const userRolesFolderPath = this.settings.userRolesFolderPath ? (0, import_obsidian26.normalizePath)(this.settings.userRolesFolderPath) : null;
     if (userRolesFolderPath && userRolesFolderPath !== "/") {
       try {
         const folderExists = await adapter.exists(userRolesFolderPath);
@@ -27195,7 +27499,7 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
       return { stdout: "", stderr: "Empty command.", error: new Error("Empty command.") };
     }
     if (typeof process === "undefined" || !process?.versions?.node) {
-      new import_obsidian25.Notice("Cannot execute system command: Node.js environment is required.");
+      new import_obsidian26.Notice("Cannot execute system command: Node.js environment is required.");
       return { stdout: "", stderr: "Node.js required.", error: new Error("Node.js required.") };
     }
     return new Promise((resolve) => {
@@ -27208,16 +27512,16 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
     });
   }
   async showChatSwitcher() {
-    new import_obsidian25.Notice("Switch Chat UI not implemented yet.");
+    new import_obsidian26.Notice("Switch Chat UI not implemented yet.");
   }
   async renameActiveChat() {
     if (!this.chatManager) {
-      new import_obsidian25.Notice("Error: Chat manager is not ready.");
+      new import_obsidian26.Notice("Error: Chat manager is not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      new import_obsidian25.Notice("No active chat to rename.");
+      new import_obsidian26.Notice("No active chat to rename.");
       return;
     }
     const currentName = activeChat.metadata.name;
@@ -27229,20 +27533,20 @@ var OllamaPlugin2 = class extends import_obsidian25.Plugin {
         if (!success) {
         }
       } else if (newName === null || trimmedName === "") {
-        new import_obsidian25.Notice("Rename cancelled or invalid name entered.");
+        new import_obsidian26.Notice("Rename cancelled or invalid name entered.");
       } else {
-        new import_obsidian25.Notice("Name unchanged.");
+        new import_obsidian26.Notice("Name unchanged.");
       }
     }).open();
   }
   async deleteActiveChatWithConfirmation() {
     if (!this.chatManager) {
-      new import_obsidian25.Notice("Error: Chat manager is not ready.");
+      new import_obsidian26.Notice("Error: Chat manager is not ready.");
       return;
     }
     const activeChat = await this.chatManager.getActiveChat();
     if (!activeChat) {
-      new import_obsidian25.Notice("No active chat to delete.");
+      new import_obsidian26.Notice("No active chat to delete.");
       return;
     }
     const chatName = activeChat.metadata.name;
