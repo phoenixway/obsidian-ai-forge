@@ -19572,7 +19572,7 @@ var AttachmentManager = class {
         return;
       }
       this.currentLinks.push({ id: `link-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, url: trimmedUrl });
-      this.modal?.renderLinksTabContent();
+      this.modal?.refreshCurrentTabContent();
       this.plugin.logger.debug("Added link:", trimmedUrl);
     } else if (this.currentLinks.some((link) => link.url === trimmedUrl)) {
       new import_obsidian15.Notice("This link has already been added.", 3e3);
@@ -19580,7 +19580,7 @@ var AttachmentManager = class {
   }
   removeLink(linkId) {
     this.currentLinks = this.currentLinks.filter((link) => link.id !== linkId);
-    this.modal?.renderLinksTabContent();
+    this.modal?.refreshCurrentTabContent();
     this.plugin.logger.debug("Removed link:", linkId);
   }
   getLinks() {
@@ -19589,7 +19589,7 @@ var AttachmentManager = class {
   clearAllLinks() {
     if (this.currentLinks.length > 0) {
       this.currentLinks = [];
-      this.modal?.renderLinksTabContent();
+      this.modal?.refreshCurrentTabContent();
       this.plugin.logger.debug("Cleared all links");
     }
   }
@@ -19600,8 +19600,11 @@ var AttachmentManager = class {
     };
     newImage.previewUrl = URL.createObjectURL(file);
     this.currentImages.push(newImage);
-    this.modal?.renderImagesTabContent();
+    this.modal?.refreshCurrentTabContent();
     this.plugin.logger.debug("Added image:", file.name);
+  }
+  getImages() {
+    return [...this.currentImages];
   }
   removeImage(imageId) {
     const imageToRemove = this.currentImages.find((img) => img.id === imageId);
@@ -19609,11 +19612,8 @@ var AttachmentManager = class {
       URL.revokeObjectURL(imageToRemove.previewUrl);
     }
     this.currentImages = this.currentImages.filter((img) => img.id !== imageId);
-    this.modal?.renderImagesTabContent();
+    this.modal?.refreshCurrentTabContent();
     this.plugin.logger.debug("Removed image:", imageId);
-  }
-  getImages() {
-    return [...this.currentImages];
   }
   clearAllImages() {
     if (this.currentImages.length > 0) {
@@ -19622,7 +19622,7 @@ var AttachmentManager = class {
           URL.revokeObjectURL(img.previewUrl);
       });
       this.currentImages = [];
-      this.modal?.renderImagesTabContent();
+      this.modal?.refreshCurrentTabContent();
       this.plugin.logger.debug("Cleared all images");
     }
   }
@@ -19631,12 +19631,12 @@ var AttachmentManager = class {
       id: `doc-${Date.now()}-${file.name}-${Math.random().toString(36).substr(2, 9)}`,
       file
     });
-    this.modal?.renderDocumentsTabContent();
+    this.modal?.refreshCurrentTabContent();
     this.plugin.logger.debug("Added document:", file.name);
   }
   removeDocument(docId) {
     this.currentDocuments = this.currentDocuments.filter((doc) => doc.id !== docId);
-    this.modal?.renderDocumentsTabContent();
+    this.modal?.refreshCurrentTabContent();
     this.plugin.logger.debug("Removed document:", docId);
   }
   getDocuments() {
@@ -19645,7 +19645,7 @@ var AttachmentManager = class {
   clearAllDocuments() {
     if (this.currentDocuments.length > 0) {
       this.currentDocuments = [];
-      this.modal?.renderDocumentsTabContent();
+      this.modal?.refreshCurrentTabContent();
       this.plugin.logger.debug("Cleared all documents");
     }
   }
@@ -19722,6 +19722,12 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       window.addEventListener("resize", this.positionModalDebounced);
     }
   }
+  refreshCurrentTabContent() {
+    if (this.isCurrentlyOpen && this.contentContainerEl) {
+      this.renderContent();
+      this.positionModal();
+    }
+  }
   renderTabs() {
     this.tabsEl.empty();
     this.createTabButton("Images", "images", "image-file");
@@ -19751,33 +19757,25 @@ var AttachmentModal = class extends import_obsidian15.Modal {
     this.contentContainerEl.empty();
     const activeContentEl = this.contentContainerEl.createDiv({
       cls: [CSS_ATTACHMENT_CONTENT, `ollama-attachment-content-${this.activeTab}`, CSS_ATTACHMENT_CONTENT_ACTIVE]
-      // Use constants
     });
     switch (this.activeTab) {
       case "images":
-        this.imagesTabContentEl = activeContentEl;
-        this.renderImagesTabContent();
+        this.renderImagesTabContent(activeContentEl);
         break;
       case "documents":
-        this.documentsTabContentEl = activeContentEl;
-        this.renderDocumentsTabContent();
+        this.renderDocumentsTabContent(activeContentEl);
         break;
       case "links":
-        this.linksTabContentEl = activeContentEl;
-        this.renderLinksTabContent();
+        this.renderLinksTabContent(activeContentEl);
         break;
     }
   }
-  renderImagesTabContent() {
-    if (!this.imagesTabContentEl || this.activeTab !== "images") {
-      if (this.activeTab === "images" && this.contentContainerEl)
-        this.renderContent();
-      return;
-    }
-    this.imagesTabContentEl.empty();
-    this.imagesTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
+  renderImagesTabContent(container) {
+    container.empty();
+    container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
     this.createFileInputSection(
-      this.imagesTabContentEl,
+      container,
+      // Використовуємо переданий контейнер
       "Add Images",
       "image",
       "image/*",
@@ -19785,23 +19783,18 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       this.manager.addImage.bind(this.manager)
     );
     const images = this.manager.getImages();
-    this.createFileListDisplay(this.imagesTabContentEl, images, this.manager.removeImage.bind(this.manager), true);
+    this.createFileListDisplay(container, images, this.manager.removeImage.bind(this.manager), true);
     if (images.length > 0) {
-      this.createClearAllButton(this.imagesTabContentEl, "Clear All Images", this.manager.clearAllImages.bind(this.manager));
+      this.createClearAllButton(container, "Clear All Images", this.manager.clearAllImages.bind(this.manager));
     }
     if (this.triggerElement)
       this.positionModal();
   }
-  renderDocumentsTabContent() {
-    if (!this.documentsTabContentEl || this.activeTab !== "documents") {
-      if (this.activeTab === "documents" && this.contentContainerEl)
-        this.renderContent();
-      return;
-    }
-    this.documentsTabContentEl.empty();
-    this.documentsTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
+  renderDocumentsTabContent(container) {
+    container.empty();
+    container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
     this.createFileInputSection(
-      this.documentsTabContentEl,
+      container,
       "Add Documents",
       "file-plus-2",
       ".pdf,.doc,.docx,.txt,.md,.csv,.json,.jsonl,.epub,.js,.ts,.tsx,.vue",
@@ -19809,9 +19802,9 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       this.manager.addDocument.bind(this.manager)
     );
     const documents = this.manager.getDocuments();
-    this.createFileListDisplay(this.documentsTabContentEl, documents, this.manager.removeDocument.bind(this.manager), false);
+    this.createFileListDisplay(container, documents, this.manager.removeDocument.bind(this.manager), false);
     if (documents.length > 0) {
-      this.createClearAllButton(this.documentsTabContentEl, "Clear All Documents", this.manager.clearAllDocuments.bind(this.manager));
+      this.createClearAllButton(container, "Clear All Documents", this.manager.clearAllDocuments.bind(this.manager));
     }
     if (this.triggerElement)
       this.positionModal();
@@ -19870,15 +19863,10 @@ var AttachmentModal = class extends import_obsidian15.Modal {
     (0, import_obsidian15.setIcon)(clearButton, "trash-2");
     clearButton.onClickEvent(onClear);
   }
-  renderLinksTabContent() {
-    if (!this.linksTabContentEl || this.activeTab !== "links") {
-      if (this.activeTab === "links" && this.contentContainerEl)
-        this.renderContent();
-      return;
-    }
-    this.linksTabContentEl.empty();
-    this.linksTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
-    const inputArea = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_LINK_INPUT_AREA });
+  renderLinksTabContent(container) {
+    container.empty();
+    container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
+    const inputArea = container.createDiv({ cls: CSS_ATTACHMENT_LINK_INPUT_AREA });
     const linkInputEl = inputArea.createEl("input", {
       type: "text",
       placeholder: "Enter URL and press Enter or click Add"
@@ -19900,7 +19888,7 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       }
     });
     addButton.addEventListener("click", addCurrentLink);
-    const linkListEl = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_LINK_LIST });
+    const linkListEl = container.createDiv({ cls: CSS_ATTACHMENT_LINK_LIST });
     const links = this.manager.getLinks();
     if (links.length === 0) {
       const emptyState = linkListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST });
@@ -19916,7 +19904,9 @@ var AttachmentModal = class extends import_obsidian15.Modal {
         removeButton.title = "Remove link";
         removeButton.onClickEvent(() => this.manager.removeLink(link.id));
       });
-      this.createClearAllButton(this.linksTabContentEl, "Clear All Links", this.manager.clearAllLinks.bind(this.manager));
+      if (links.length > 0) {
+        this.createClearAllButton(container, "Clear All Links", this.manager.clearAllLinks.bind(this.manager));
+      }
     }
     if (this.triggerElement)
       this.positionModal();

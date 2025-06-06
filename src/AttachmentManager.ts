@@ -89,7 +89,7 @@ export class AttachmentManager {
         }
     }
 
-    public addLink(url: string): void {
+        public addLink(url: string): void {
         const trimmedUrl = url.trim();
         if (trimmedUrl && !this.currentLinks.some(link => link.url === trimmedUrl)) {
             try {
@@ -100,16 +100,16 @@ export class AttachmentManager {
                 return;
             }
             this.currentLinks.push({ id: `link-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, url: trimmedUrl });
-            this.modal?.renderLinksTabContent();
+            this.modal?.refreshCurrentTabContent(); 
             this.plugin.logger.debug("Added link:", trimmedUrl);
         } else if (this.currentLinks.some(link => link.url === trimmedUrl)) {
              new Notice("This link has already been added.", 3000);
         }
     }
 
-    public removeLink(linkId: string): void {
+        public removeLink(linkId: string): void {
         this.currentLinks = this.currentLinks.filter(link => link.id !== linkId);
-        this.modal?.renderLinksTabContent();
+        this.modal?.refreshCurrentTabContent(); 
         this.plugin.logger.debug("Removed link:", linkId);
     }
 
@@ -117,62 +117,64 @@ export class AttachmentManager {
         return [...this.currentLinks];
     }
 
-    public clearAllLinks(): void {
+        public clearAllLinks(): void {
         if (this.currentLinks.length > 0) {
             this.currentLinks = [];
-            this.modal?.renderLinksTabContent();
+            this.modal?.refreshCurrentTabContent(); 
             this.plugin.logger.debug("Cleared all links");
         }
     }
 
-    public addImage(file: File): void {
+        public addImage(file: File): void {
         const newImage: AttachmentFile = {
             id: `image-${Date.now()}-${file.name}-${Math.random().toString(36).substr(2, 9)}`,
             file: file,
         };
+        // Створення URL для попереднього перегляду
         newImage.previewUrl = URL.createObjectURL(file);
         this.currentImages.push(newImage);
-        this.modal?.renderImagesTabContent();
+        this.modal?.refreshCurrentTabContent(); 
         this.plugin.logger.debug("Added image:", file.name);
     }
 
-    public removeImage(imageId: string): void {
-        const imageToRemove = this.currentImages.find(img => img.id === imageId);
-        if (imageToRemove && imageToRemove.previewUrl) {
-            URL.revokeObjectURL(imageToRemove.previewUrl); 
-        }
-        this.currentImages = this.currentImages.filter(img => img.id !== imageId);
-        this.modal?.renderImagesTabContent();
-        this.plugin.logger.debug("Removed image:", imageId);
-    }
+    
 
     public getImages(): AttachmentFile[] {
         return [...this.currentImages];
     }
-
-    public clearAllImages(): void {
+    public removeImage(imageId: string): void {
+        const imageToRemove = this.currentImages.find(img => img.id === imageId);
+        if (imageToRemove && imageToRemove.previewUrl) {
+            URL.revokeObjectURL(imageToRemove.previewUrl); // Важливо звільнити пам'ять
+        }
+        this.currentImages = this.currentImages.filter(img => img.id !== imageId);
+        this.modal?.refreshCurrentTabContent(); 
+        this.plugin.logger.debug("Removed image:", imageId);
+    }
+    
+        public clearAllImages(): void {
         if (this.currentImages.length > 0) {
             this.currentImages.forEach(img => {
                 if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
             });
             this.currentImages = [];
-            this.modal?.renderImagesTabContent();
+            this.modal?.refreshCurrentTabContent(); 
             this.plugin.logger.debug("Cleared all images");
         }
     }
 
-    public addDocument(file: File): void {
+        public addDocument(file: File): void {
         this.currentDocuments.push({
             id: `doc-${Date.now()}-${file.name}-${Math.random().toString(36).substr(2, 9)}`,
             file: file,
         });
-        this.modal?.renderDocumentsTabContent();
+        this.modal?.refreshCurrentTabContent(); 
         this.plugin.logger.debug("Added document:", file.name);
     }
 
-    public removeDocument(docId: string): void {
+        public removeDocument(docId: string): void {
         this.currentDocuments = this.currentDocuments.filter(doc => doc.id !== docId);
-        this.modal?.renderDocumentsTabContent();
+        this.modal?.refreshCurrentTabContent(); 
         this.plugin.logger.debug("Removed document:", docId);
     }
 
@@ -180,10 +182,10 @@ export class AttachmentManager {
         return [...this.currentDocuments];
     }
 
-    public clearAllDocuments(): void {
+        public clearAllDocuments(): void {
         if (this.currentDocuments.length > 0) {
             this.currentDocuments = [];
-            this.modal?.renderDocumentsTabContent();
+            this.modal?.refreshCurrentTabContent(); 
             this.plugin.logger.debug("Cleared all documents");
         }
     }
@@ -289,6 +291,15 @@ class AttachmentModal extends Modal {
     
     private positionModalDebounced = debounce(this.positionModal, 50, true);
 
+    public refreshCurrentTabContent(): void {
+        // Цей метод просто викликає renderContent, який вже знає, яка вкладка активна
+        // і передасть правильний, щойно створений контейнер у відповідний метод рендерингу.
+        if (this.isCurrentlyOpen && this.contentContainerEl) { // Перевірка, що модалка відкрита і контейнер існує
+            this.renderContent();
+            this.positionModal(); // Перерахувати позицію, оскільки вміст міг змінити висоту
+        }
+    }
+
 
     private renderTabs(): void {
         this.tabsEl.empty();
@@ -315,80 +326,72 @@ class AttachmentModal extends Modal {
         });
     }
 
-    private renderContent(): void {
-        this.contentContainerEl.empty(); 
-        
-        const activeContentEl = this.contentContainerEl.createDiv({ 
-            cls: [CSS_ATTACHMENT_CONTENT, `ollama-attachment-content-${this.activeTab}`, CSS_ATTACHMENT_CONTENT_ACTIVE] // Use constants
+       private renderContent(): void {
+        this.contentContainerEl.empty(); // Очищаємо весь контейнер вмісту при кожному виклику
+
+        const activeContentEl = this.contentContainerEl.createDiv({
+            cls: [CSS_ATTACHMENT_CONTENT, `ollama-attachment-content-${this.activeTab}`, CSS_ATTACHMENT_CONTENT_ACTIVE]
         });
 
         switch (this.activeTab) {
             case 'images':
-                this.imagesTabContentEl = activeContentEl;
-                this.renderImagesTabContent();
+                this.renderImagesTabContent(activeContentEl); // Передаємо актуальний контейнер
                 break;
             case 'documents':
-                this.documentsTabContentEl = activeContentEl;
-                this.renderDocumentsTabContent();
+                this.renderDocumentsTabContent(activeContentEl); // Передаємо актуальний контейнер
                 break;
             case 'links':
-                this.linksTabContentEl = activeContentEl;
-                this.renderLinksTabContent();
+                this.renderLinksTabContent(activeContentEl); // Передаємо актуальний контейнер
                 break;
         }
     }
 
-    public renderImagesTabContent(): void {
-        if (!this.imagesTabContentEl || this.activeTab !== 'images') {
-            if (this.activeTab === 'images' && this.contentContainerEl) this.renderContent();
-            return;
-        }
-        this.imagesTabContentEl.empty();
-        this.imagesTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER); // Re-use or new class
+        public renderImagesTabContent(container: HTMLElement): void {
+        // container - це вже очищений і підготовлений div для цієї вкладки
+        container.empty(); // Додатково очищаємо, щоб бути впевненим
+        container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER); // Можна використовувати спільний клас для базової структури
 
         this.createFileInputSection(
-            this.imagesTabContentEl,
+            container, // Використовуємо переданий контейнер
             "Add Images",
             "image",
-            "image/*", 
-            true, 
-            this.manager.addImage.bind(this.manager) 
+            "image/*",
+            true,
+            this.manager.addImage.bind(this.manager)
         );
 
         const images = this.manager.getImages();
-        this.createFileListDisplay(this.imagesTabContentEl, images, this.manager.removeImage.bind(this.manager), true);
+        this.createFileListDisplay(container, images, this.manager.removeImage.bind(this.manager), true);
 
         if (images.length > 0) {
-            this.createClearAllButton(this.imagesTabContentEl, "Clear All Images", this.manager.clearAllImages.bind(this.manager));
+            this.createClearAllButton(container, "Clear All Images", this.manager.clearAllImages.bind(this.manager));
         }
-         if (this.triggerElement) this.positionModal();
+        if (this.triggerElement) this.positionModal(); // Оновлюємо позицію модалки
     }
 
-    public renderDocumentsTabContent(): void {
-        if (!this.documentsTabContentEl || this.activeTab !== 'documents') {
-            if (this.activeTab === 'documents' && this.contentContainerEl) this.renderContent();
-            return;
-        }
-        this.documentsTabContentEl.empty();
-        this.documentsTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER); // Re-use or new class
+
+  public renderDocumentsTabContent(container: HTMLElement): void {
+        container.empty();
+        container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
 
         this.createFileInputSection(
-            this.documentsTabContentEl,
+            container,
             "Add Documents",
             "file-plus-2",
-            ".pdf,.doc,.docx,.txt,.md,.csv,.json,.jsonl,.epub,.js,.ts,.tsx,.vue", 
+            ".pdf,.doc,.docx,.txt,.md,.csv,.json,.jsonl,.epub,.js,.ts,.tsx,.vue",
             true,
             this.manager.addDocument.bind(this.manager)
         );
-        
+
         const documents = this.manager.getDocuments();
-        this.createFileListDisplay(this.documentsTabContentEl, documents, this.manager.removeDocument.bind(this.manager), false);
+        this.createFileListDisplay(container, documents, this.manager.removeDocument.bind(this.manager), false);
 
         if (documents.length > 0) {
-            this.createClearAllButton(this.documentsTabContentEl, "Clear All Documents", this.manager.clearAllDocuments.bind(this.manager));
+            this.createClearAllButton(container, "Clear All Documents", this.manager.clearAllDocuments.bind(this.manager));
         }
-         if (this.triggerElement) this.positionModal();
+        if (this.triggerElement) this.positionModal();
     }
+    
     
     private createFileInputSection(
         container: HTMLElement,
@@ -463,15 +466,11 @@ class AttachmentModal extends Modal {
         clearButton.onClickEvent(onClear);
     }
 
-    public renderLinksTabContent(): void {
-        if (!this.linksTabContentEl || this.activeTab !== 'links') {
-            if (this.activeTab === 'links' && this.contentContainerEl) this.renderContent();
-            return;
-        }
-        this.linksTabContentEl.empty();
-        this.linksTabContentEl.addClass(CSS_ATTACHMENT_LINKS_CONTAINER); // Use constant
+     public renderLinksTabContent(container: HTMLElement): void {
+        container.empty();
+        container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
 
-        const inputArea = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_LINK_INPUT_AREA }); // Use constant
+        const inputArea = container.createDiv({ cls: CSS_ATTACHMENT_LINK_INPUT_AREA });
         const linkInputEl = inputArea.createEl('input', {
             type: 'text',
             placeholder: 'Enter URL and press Enter or click Add',
@@ -482,8 +481,8 @@ class AttachmentModal extends Modal {
         const addCurrentLink = () => {
             const url = linkInputEl.value;
             if (url) {
-                this.manager.addLink(url);
-                linkInputEl.value = ''; 
+                this.manager.addLink(url); // Менеджер викличе відповідний render...TabContent, передавши новий контейнер
+                linkInputEl.value = '';
                 linkInputEl.focus();
             }
         };
@@ -492,26 +491,28 @@ class AttachmentModal extends Modal {
         });
         addButton.addEventListener('click', addCurrentLink);
 
-        const linkListEl = this.linksTabContentEl.createDiv({ cls: CSS_ATTACHMENT_LINK_LIST }); // Use constant
+        const linkListEl = container.createDiv({ cls: CSS_ATTACHMENT_LINK_LIST });
         const links = this.manager.getLinks();
 
         if (links.length === 0) {
-            const emptyState = linkListEl.createDiv({cls: CSS_ATTACHMENT_EMPTY_LIST}); // Use constant
-            setIcon(emptyState.createSpan({cls: CSS_ATTACHMENT_EMPTY_ICON}), "link-2-off"); // Use constant
+            const emptyState = linkListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST });
+            setIcon(emptyState.createSpan({ cls: CSS_ATTACHMENT_EMPTY_ICON }), "link-2-off");
             emptyState.createEl('p', { text: 'No links added yet.' });
-            emptyState.createEl('p', { cls: CSS_ATTACHMENT_EMPTY_HINT, text: 'Paste a URL above and click "Add" or press Enter.' }); // Use constant
+            emptyState.createEl('p', { cls: CSS_ATTACHMENT_EMPTY_HINT, text: 'Paste a URL above and click "Add" or press Enter.' });
         } else {
             links.forEach(link => {
-                const linkItemEl = linkListEl.createDiv({ cls: CSS_ATTACHMENT_LINK_ITEM }); // Use constant
-                linkItemEl.createSpan({ cls: CSS_ATTACHMENT_LINK_ITEM_TEXT, text: link.url, title: link.url }); // Use constant
-                const removeButton = linkItemEl.createEl('button', { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE }); // Use constant
+                const linkItemEl = linkListEl.createDiv({ cls: CSS_ATTACHMENT_LINK_ITEM });
+                linkItemEl.createSpan({ cls: CSS_ATTACHMENT_LINK_ITEM_TEXT, text: link.url, title: link.url });
+                const removeButton = linkItemEl.createEl('button', { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE });
                 setIcon(removeButton, "x-circle");
                 removeButton.title = "Remove link";
-                removeButton.onClickEvent(() => this.manager.removeLink(link.id));
+                removeButton.onClickEvent(() => this.manager.removeLink(link.id)); // Менеджер викличе відповідний render...TabContent
             });
-            this.createClearAllButton(this.linksTabContentEl, "Clear All Links", this.manager.clearAllLinks.bind(this.manager));
+            if (links.length > 0) { // Додаємо кнопку очищення, якщо є посилання
+                 this.createClearAllButton(container, "Clear All Links", this.manager.clearAllLinks.bind(this.manager));
+            }
         }
-         if (this.triggerElement) this.positionModal();
+        if (this.triggerElement) this.positionModal();
     }
     
     onClose() {
