@@ -428,36 +428,42 @@ class AttachmentModal extends Modal {
         });
     }
 
+    // Всередині класу AttachmentModal
+
+    // ++ HELPER for File List Display
     private createFileListDisplay(
         container: HTMLElement,
         files: AttachmentFile[],
         onRemove: (fileId: string) => void,
         showPreview: boolean
     ): void {
-        const fileListEl = container.createDiv({ cls: CSS_ATTACHMENT_FILE_LIST }); // Use constant
+        const fileListEl = container.createDiv({ cls: CSS_ATTACHMENT_FILE_LIST }); 
         if (files.length === 0) {
-            const emptyState = fileListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST }); // Use constant
-            setIcon(emptyState.createSpan({cls: CSS_ATTACHMENT_EMPTY_ICON}), "files"); // Use constant
+            const emptyState = fileListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST }); 
+            setIcon(emptyState.createSpan({cls: CSS_ATTACHMENT_EMPTY_ICON}), "files"); 
             emptyState.createEl('p', { text: `No ${showPreview ? 'images' : 'documents'} added yet.` });
         } else {
             files.forEach(item => {
-                const fileItemEl = fileListEl.createDiv({ cls: CSS_ATTACHMENT_FILE_ITEM }); // Use constant
+                const fileItemEl = fileListEl.createDiv({ cls: CSS_ATTACHMENT_FILE_ITEM }); 
                 
                 if (showPreview && item.previewUrl) {
-                    const previewEl = fileItemEl.createDiv({ cls: CSS_ATTACHMENT_FILE_ITEM_PREVIEW }); // Use constant
+                    const previewEl = fileItemEl.createDiv({ cls: CSS_ATTACHMENT_FILE_ITEM_PREVIEW }); 
                     previewEl.createEl('img', { attr: { src: item.previewUrl } });
                 } else if (!showPreview) { 
                     setIcon(fileItemEl.createSpan({cls: "ollama-attachment-file-item-doc-icon"}), "file-text");
                 }
 
                 const nameSizeWrapper = fileItemEl.createDiv({cls: "ollama-attachment-file-item-details"});
-                nameSizeWrapper.createSpan({ cls: CSS_ATTACHMENT_FILE_ITEM_NAME, text: item.file.name, title: item.file.name }); // Use constant
-                nameSizeWrapper.createSpan({ cls: CSS_ATTACHMENT_FILE_ITEM_SIZE, text: `(${(item.file.size / 1024).toFixed(1)} KB)` }); // Use constant
+                nameSizeWrapper.createSpan({ cls: CSS_ATTACHMENT_FILE_ITEM_NAME, text: item.file.name, title: item.file.name }); 
+                nameSizeWrapper.createSpan({ cls: CSS_ATTACHMENT_FILE_ITEM_SIZE, text: `(${(item.file.size / 1024).toFixed(1)} KB)` }); 
 
-                const removeButton = fileItemEl.createEl('button', { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE }); // Use constant (shared)
+                const removeButton = fileItemEl.createEl('button', { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE }); 
                 setIcon(removeButton, "x-circle");
                 removeButton.title = "Remove file";
-                removeButton.onClickEvent(() => onRemove(item.id));
+                removeButton.onClickEvent((event: MouseEvent) => { // <-- Додаємо event
+                    event.stopPropagation(); // <-- ОСНОВНА ЗМІНА: Зупиняємо спливання
+                    onRemove(item.id);
+                });
             });
         }
     }
@@ -469,7 +475,9 @@ class AttachmentModal extends Modal {
         clearButton.onClickEvent(onClear);
     }
 
-     public renderLinksTabContent(container: HTMLElement): void {
+     // Всередині класу AttachmentModal
+
+    public renderLinksTabContent(container: HTMLElement): void {
         container.empty();
         container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
 
@@ -484,7 +492,7 @@ class AttachmentModal extends Modal {
         const addCurrentLink = () => {
             const url = linkInputEl.value;
             if (url) {
-                this.manager.addLink(url); // Менеджер викличе відповідний render...TabContent, передавши новий контейнер
+                this.manager.addLink(url);
                 linkInputEl.value = '';
                 linkInputEl.focus();
             }
@@ -498,6 +506,7 @@ class AttachmentModal extends Modal {
         const links = this.manager.getLinks();
 
         if (links.length === 0) {
+            // ... (код для порожнього стану) ...
             const emptyState = linkListEl.createDiv({ cls: CSS_ATTACHMENT_EMPTY_LIST });
             setIcon(emptyState.createSpan({ cls: CSS_ATTACHMENT_EMPTY_ICON }), "link-2-off");
             emptyState.createEl('p', { text: 'No links added yet.' });
@@ -509,9 +518,12 @@ class AttachmentModal extends Modal {
                 const removeButton = linkItemEl.createEl('button', { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE });
                 setIcon(removeButton, "x-circle");
                 removeButton.title = "Remove link";
-                removeButton.onClickEvent(() => this.manager.removeLink(link.id)); // Менеджер викличе відповідний render...TabContent
+                removeButton.onClickEvent((event: MouseEvent) => { // <-- Додаємо event
+                    event.stopPropagation(); // <-- ОСНОВНА ЗМІНА: Зупиняємо спливання
+                    this.manager.removeLink(link.id);
+                });
             });
-            if (links.length > 0) { // Додаємо кнопку очищення, якщо є посилання
+            if (links.length > 0) {
                  this.createClearAllButton(container, "Clear All Links", this.manager.clearAllLinks.bind(this.manager));
             }
         }

@@ -19833,6 +19833,8 @@ var AttachmentModal = class extends import_obsidian15.Modal {
       }
     });
   }
+  // Всередині класу AttachmentModal
+  // ++ HELPER for File List Display
   createFileListDisplay(container, files, onRemove, showPreview) {
     const fileListEl = container.createDiv({ cls: CSS_ATTACHMENT_FILE_LIST });
     if (files.length === 0) {
@@ -19854,7 +19856,10 @@ var AttachmentModal = class extends import_obsidian15.Modal {
         const removeButton = fileItemEl.createEl("button", { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE });
         (0, import_obsidian15.setIcon)(removeButton, "x-circle");
         removeButton.title = "Remove file";
-        removeButton.onClickEvent(() => onRemove(item.id));
+        removeButton.onClickEvent((event) => {
+          event.stopPropagation();
+          onRemove(item.id);
+        });
       });
     }
   }
@@ -19864,6 +19869,7 @@ var AttachmentModal = class extends import_obsidian15.Modal {
     (0, import_obsidian15.setIcon)(clearButton, "trash-2");
     clearButton.onClickEvent(onClear);
   }
+  // Всередині класу AttachmentModal
   renderLinksTabContent(container) {
     container.empty();
     container.addClass(CSS_ATTACHMENT_LINKS_CONTAINER);
@@ -19903,7 +19909,10 @@ var AttachmentModal = class extends import_obsidian15.Modal {
         const removeButton = linkItemEl.createEl("button", { cls: CSS_ATTACHMENT_LINK_ITEM_REMOVE });
         (0, import_obsidian15.setIcon)(removeButton, "x-circle");
         removeButton.title = "Remove link";
-        removeButton.onClickEvent(() => this.manager.removeLink(link.id));
+        removeButton.onClickEvent((event) => {
+          event.stopPropagation();
+          this.manager.removeLink(link.id);
+        });
       });
       if (links.length > 0) {
         this.createClearAllButton(container, "Clear All Links", this.manager.clearAllLinks.bind(this.manager));
