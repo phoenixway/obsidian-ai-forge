@@ -5,7 +5,7 @@ import { Chat, ChatMetadata, ChatDataInMemory, ChatDataForStorage, ChatConstruct
 import { MessageRole } from "./OllamaView"; 
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "./Logger";
-import { ToolCall, Message, MessageRole as MessageRoleTypeFromTypes } from "./types"; 
+import { ToolCall, Message, MessageRole as MessageRoleTypeFromTypes, AttachedDocumentInfo } from "./types"; 
 
 export type HMACompletionCallback = (messageTimestampMs: number) => void;
 export type HMAResolverRegistration = (timestampMs: number, resolve: () => void, reject: (reason?: any) => void) => void;
@@ -1629,11 +1629,12 @@ async deleteChat(id: string): Promise<boolean> {
     }
   }
 
-    public async addUserMessageAndAwaitRender(
+      public async addUserMessageAndAwaitRender(
     content: string,
     timestamp: Date,
     requestTimestampId: number,
-    images?: string[] // <-- НОВИЙ ОПЦІОНАЛЬНИЙ ПАРАМЕТР
+    images?: string[],
+    attachedDocuments?: AttachedDocumentInfo[] // <--- НОВИЙ ОПЦІОНАЛЬНИЙ ПАРАМЕТР
   ): Promise<Message | null> {
     const activeChat = await this.getActiveChat(); 
     if (!activeChat) {
@@ -1646,9 +1647,9 @@ async deleteChat(id: string): Promise<boolean> {
       role: "user" as MessageRoleTypeFromTypes, 
       content,
       timestamp,
-      ...(images && images.length > 0 && { images: images }) // <-- ДОДАЄМО ЗОБРАЖЕННЯ ДО ОБ'ЄКТУ ПОВІДОМЛЕННЯ
+      ...(images && images.length > 0 && { images: images }),
+      ...(attachedDocuments && attachedDocuments.length > 0 && { attachedDocuments: attachedDocuments }) // <--- ДОДАЄМО ДОКУМЕНТИ ДО ОБ'ЄКТУ ПОВІДОМЛЕННЯ
     };
-
         
     const hmaPromise = new Promise<void>((resolve, reject) => {
       this.logger.debug(`[ChatManager] Registering HMA resolver for user message (ts: ${messageTimestampMs})`);
@@ -1662,9 +1663,8 @@ async deleteChat(id: string): Promise<boolean> {
         }
       }, 10000); 
     });
-
     
-    this.logger.debug(`[ChatManager] Adding user message payload (ts: ${messageTimestampMs})`, {content: userMessage.content.substring(0,50), imagesCount: userMessage.images?.length});
+    this.logger.debug(`[ChatManager] Adding user message payload (ts: ${messageTimestampMs})`, {content: userMessage.content.substring(0,50), imagesCount: userMessage.images?.length, docsCount: userMessage.attachedDocuments?.length});
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
         this.logger.warn(`[ChatManager] Failed to add user message payload (ts: ${messageTimestampMs}). Rejecting HMA.`);

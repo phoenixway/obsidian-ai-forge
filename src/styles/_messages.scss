@@ -451,3 +451,110 @@ button.summarize-button { @extend %base-action-button; }
   max-height: 200px;
 }
 // (Примітка: :has() може не підтримуватися в дуже старих браузерах, але для Electron/Obsidian має бути ок)
+// ... (існуючі стилі) ...
+
+// --- Стилі для прикріплених документів у повідомленнях ---
+.message-attached-documents-container {
+  width: 100%; // Займає всю ширину бульбашки повідомлення
+  margin-top: 10px; // Відступ, якщо є інший контент перед документами
+}
+
+.attached-document-block {
+  background-color: var(--background-secondary); // Трохи інший фон для виділення
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 6px);
+  padding: calc(var(--chat-spacing-unit, 5px) * 1.5) calc(var(--chat-spacing-unit, 5px) * 2);
+  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 2); // Відступ між кількома документами
+  box-sizing: border-box;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.attached-document-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1.5);
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.attached-document-icon {
+  margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
+  color: var(--text-muted); // Колір іконки
+  .svg-icon { // Розмір іконки
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.attached-document-name {
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; // Додає "..." якщо назва занадто довга
+}
+
+.attached-document-content-wrapper {
+  // Може знадобитися для додаткового контролю, поки що простий
+}
+
+.attached-document-content {
+  font-size: var(--font-ui-small); // Розмір тексту вмісту
+  line-height: 1.5;
+  color: var(--text-normal);
+  max-height: 150px; // Обмежуємо висоту для прев'ю
+  overflow: hidden;
+  position: relative; // Для кнопки "Show More" та градієнту
+
+  &.truncated {
+    // Плавний перехід до прозорості знизу, якщо текст обрізаний
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px; // Висота градієнту
+      background: linear-gradient(to bottom, transparent, var(--background-secondary));
+      pointer-events: none; // Щоб не заважало клікам
+    }
+  }
+  
+  // Стилі для <pre> всередині .attached-document-content, якщо це не Markdown
+  pre {
+    white-space: pre-wrap; // Переносити довгі рядки
+    word-break: break-all; // Переносити дуже довгі слова без пробілів
+    margin: 0; // Забрати дефолтні відступи <pre>
+    padding: 0;
+    background-color: transparent; // Фон вже на .attached-document-block
+    border: none;
+    font-family: var(--font-monospace);
+  }
+
+  // Стилі для Markdown вмісту
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 0.5em;
+    margin-bottom: 0.25em;
+    font-size: 1.1em; // Трохи менші заголовки всередині блоку
+    &:first-child {
+        margin-top: 0;
+    }
+  }
+  p {
+    margin-bottom: 0.5em;
+     &:last-child {
+        margin-bottom: 0;
+    }
+  }
+  ul, ol {
+    padding-left: 20px;
+    margin-bottom: 0.5em;
+  }
+  blockquote {
+    margin-left: 10px;
+    padding-left: 10px;
+    border-left: 3px solid var(--background-modifier-border-hover);
+  }
+}

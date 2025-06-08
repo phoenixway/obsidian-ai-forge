@@ -17359,14 +17359,8 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     messageWrapper.style.order = "1";
     const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
     const contentToRender = this.message.content || "";
-    if (contentToRender.includes("\n")) {
-      contentToRender.split("\n").forEach((line, i, arr) => {
-        contentEl.appendText(line);
-        if (i < arr.length - 1)
-          contentEl.createEl("br");
-      });
-    } else if (contentToRender) {
-      contentEl.setText(contentToRender);
+    if (contentToRender.trim() !== "") {
+      renderMarkdownContent(this.app, this.view, this.plugin, contentEl, contentToRender);
     }
     if (this.message.images && this.message.images.length > 0) {
       const imagesContainer = contentEl.createDiv({ cls: "message-images-container" });
@@ -17389,9 +17383,79 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
           }
         });
       });
-      if (contentToRender) {
+      if (contentToRender.trim() !== "") {
         imagesContainer.style.marginTop = "10px";
       }
+    }
+    if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
+      const documentsContainer = contentEl.createDiv({ cls: "message-attached-documents-container" });
+      if (contentToRender.trim() !== "" || this.message.images && this.message.images.length > 0) {
+        documentsContainer.style.marginTop = "15px";
+      }
+      this.message.attachedDocuments.forEach((docInfo) => {
+        const wasContentInlinedInPrompt = docInfo.content && (docInfo.previewType === "text" || docInfo.previewType === "markdown");
+        if (!wasContentInlinedInPrompt || docInfo.previewType === "generic_file") {
+          const docBlock = documentsContainer.createDiv({ cls: "attached-document-block" });
+          const docHeader = docBlock.createDiv({ cls: "attached-document-header" });
+          let iconName = "file";
+          if (docInfo.previewType === "markdown")
+            iconName = "file-text";
+          else if (docInfo.previewType === "text")
+            iconName = "file-code";
+          else if (docInfo.type.includes("pdf"))
+            iconName = "file-type-pdf";
+          (0, import_obsidian8.setIcon)(docHeader.createSpan({ cls: "attached-document-icon" }), iconName);
+          docHeader.createSpan({ cls: "attached-document-name", text: docInfo.name });
+          docHeader.createSpan({ cls: "attached-document-size", text: `(${(docInfo.size / 1024).toFixed(1)} KB)` });
+          if (docInfo.previewType !== "generic_file" && docInfo.content) {
+            const docContentWrapper = docBlock.createDiv({ cls: "attached-document-content-wrapper" });
+            const docContentEl = docContentWrapper.createDiv({ cls: "attached-document-content" });
+            const maxPreviewLength = 300;
+            const needsTruncation = docInfo.content.length > maxPreviewLength;
+            if (docInfo.previewType === "markdown") {
+              const mdToRender = needsTruncation ? docInfo.content.substring(0, maxPreviewLength) + "..." : docInfo.content;
+              import_obsidian8.MarkdownRenderer.render(this.app, mdToRender, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+            } else if (docInfo.previewType === "text") {
+              const pre = docContentEl.createEl("pre");
+              pre.setText(needsTruncation ? docInfo.content.substring(0, maxPreviewLength) + "..." : docInfo.content);
+            }
+            fixBrokenTwemojiImages(docContentEl);
+            if (needsTruncation) {
+              docContentEl.addClass("truncated");
+              const showMoreBtn = docBlock.createEl("button", { cls: "attached-document-show-more", text: "Show More" });
+              showMoreBtn.onClickEvent(async (e) => {
+                e.stopPropagation();
+                if (docContentEl.hasClass("truncated")) {
+                  docContentEl.empty();
+                  if (docInfo.previewType === "markdown") {
+                    await import_obsidian8.MarkdownRenderer.render(this.app, docInfo.content, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                  } else {
+                    docContentEl.createEl("pre").setText(docInfo.content);
+                  }
+                  fixBrokenTwemojiImages(docContentEl);
+                  docContentEl.removeClass("truncated");
+                  showMoreBtn.setText("Show Less");
+                } else {
+                  docContentEl.empty();
+                  if (docInfo.previewType === "markdown") {
+                    const previewMd = docInfo.content.substring(0, maxPreviewLength) + "...";
+                    await import_obsidian8.MarkdownRenderer.render(this.app, previewMd, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                  } else {
+                    docContentEl.createEl("pre").setText(docInfo.content.substring(0, maxPreviewLength) + "...");
+                  }
+                  fixBrokenTwemojiImages(docContentEl);
+                  docContentEl.addClass("truncated");
+                  showMoreBtn.setText("Show More");
+                }
+                this.view.guaranteedScrollToBottom(50, false);
+              });
+            }
+          } else if (docInfo.previewType === "generic_file") {
+            const genericInfo = docBlock.createDiv({ cls: "attached-document-generic-info" });
+            genericInfo.setText(`This is a ${docInfo.type} file. Its content is not displayed directly here.`);
+          }
+        }
+      });
     }
     const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
     BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
@@ -22794,12 +22858,12 @@ Summary:`;
       if (this.isProcessing || this.currentAbortController) {
         new import_obsidian16.Notice("Please wait or cancel current operation.", 3e3);
       }
-      fileToText;
       return;
     }
     const attachmentsData = this.attachmentManager.getActiveAttachmentsForApi();
     let finalUserInputText = userInputText;
     const imageDataUrls = [];
+    const documentInfos = [];
     let hasContentToSend = userInputText.length > 0;
     if (attachmentsData.links.length > 0) {
       const linksText = attachmentsData.links.map((link) => `- ${link}`).join("\n");
@@ -22810,23 +22874,66 @@ ${linksText}`;
       hasContentToSend = true;
     }
     if (attachmentsData.documents.length > 0) {
-      let documentsContentInfo = "\n\nAttached documents:\n";
+      let documentPlaceholdersText = "\n\n--- Attached Documents Context ---\n";
       for (const docFile of attachmentsData.documents) {
+        let docContent = null;
+        let previewType = "generic_file";
+        const fileExtension = docFile.name.split(".").pop()?.toLowerCase() || "";
         try {
-          const textContent = await fileToText(docFile);
-          documentsContentInfo += `--- Start of ${docFile.name} ---
-${textContent}
---- End of ${docFile.name} ---
+          if (["txt", "log", "csv", "json", "js", "ts", "py", "html", "css", "xml", "yaml", "ini", "sql", "java", "c", "cpp", "h", "cs", "go", "php", "rb", "swift", "kt", "dart", "rs", "sh", "ps1", "bat"].includes(fileExtension)) {
+            docContent = await fileToText(docFile);
+            previewType = "text";
+          } else if (fileExtension === "md") {
+            docContent = await fileToText(docFile);
+            previewType = "markdown";
+          } else if (["pdf"].includes(fileExtension)) {
+            previewType = "generic_file";
+            docContent = null;
+            this.plugin.logger.info(`PDF attached: ${docFile.name}. Content extraction not yet implemented for direct LLM input.`);
+          } else {
+            previewType = "generic_file";
+            docContent = null;
+            this.plugin.logger.info(`Generic file attached: ${docFile.name}. Type: ${docFile.type || fileExtension}`);
+          }
+          documentInfos.push({
+            name: docFile.name,
+            type: docFile.type || fileExtension,
+            content: docContent,
+            // Може бути null
+            previewType,
+            size: docFile.size
+          });
+          documentPlaceholdersText += `- File: ${docFile.name} (Type: ${previewType}, Size: ${(docFile.size / 1024).toFixed(1)} KB)
+`;
+          if (docContent && (previewType === "text" || previewType === "markdown")) {
+            const maxContentLengthForPrompt = 2e3;
+            let contentForPrompt = docContent;
+            if (docContent.length > maxContentLengthForPrompt) {
+              contentForPrompt = docContent.substring(0, maxContentLengthForPrompt) + "\n... (content truncated in prompt) ...";
+              documentPlaceholdersText += `  (Content preview included in prompt, full content available to renderer)
+`;
+            } else {
+              documentPlaceholdersText += `  (Full content included in prompt)
+`;
+            }
+            documentPlaceholdersText += `
+\`\`\`${fileExtension || "text"}
+${contentForPrompt}
+\`\`\`
 
 `;
+          }
         } catch (error) {
-          this.plugin.logger.error(`Error reading document ${docFile.name} as text:`, error);
-          documentsContentInfo += `[Could not read content of ${docFile.name}]
+          this.plugin.logger.error(`Error processing document ${docFile.name}:`, error);
+          documentPlaceholdersText += `[Could not process document: ${docFile.name}]
 `;
         }
       }
-      finalUserInputText += documentsContentInfo;
-      hasContentToSend = true;
+      documentPlaceholdersText += "--- End Attached Documents Context ---\n";
+      finalUserInputText += documentPlaceholdersText;
+      if (documentInfos.length > 0) {
+        hasContentToSend = true;
+      }
     }
     if (attachmentsData.images.length > 0) {
       for (const imgFile of attachmentsData.images) {
@@ -22866,15 +22973,18 @@ ${textContent}
     try {
       const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
         finalUserInputText,
-        // Use the text potentially modified with links and doc content
         userMessageTimestamp,
         requestTimestampId,
-        imageDataUrls.length > 0 ? imageDataUrls : void 0
-        // Pass base64 image data
+        imageDataUrls.length > 0 ? imageDataUrls : void 0,
+        documentInfos.length > 0 ? documentInfos : void 0
       );
       if (!userMessageAdded) {
         throw new Error("User message processing failed in ChatManager.");
       }
+      this.attachmentManager.clearAllLinks();
+      this.attachmentManager.clearAllImages();
+      this.attachmentManager.clearAllDocuments();
+      this.attachmentManager.hide();
       const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
       if (!this.currentAbortController) {
         this.plugin.logger.error(
@@ -22929,10 +23039,6 @@ ${textContent}
         this.plugin.logger.warn(`[sendMessage] HMA timeout/rejection for error display message: ${errorDisplayMsg.content.substring(0, 50)}`);
       }
     } finally {
-      this.attachmentManager.clearAllLinks();
-      this.attachmentManager.clearAllImages();
-      this.attachmentManager.clearAllDocuments();
-      this.attachmentManager.hide();
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected)
           this.activePlaceholder.groupEl.remove();
@@ -26430,7 +26536,7 @@ var ChatManager = class {
       this.messageAddedResolvers.delete(timestampMs);
     }
   }
-  async addUserMessageAndAwaitRender(content, timestamp, requestTimestampId, images) {
+  async addUserMessageAndAwaitRender(content, timestamp, requestTimestampId, images, attachedDocuments) {
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
       this.logger.warn("[ChatManager] addUserMessageAndAwaitRender: No active chat found.");
@@ -26441,8 +26547,9 @@ var ChatManager = class {
       role: "user",
       content,
       timestamp,
-      ...images && images.length > 0 && { images }
-      // <-- ДОДАЄМО ЗОБРАЖЕННЯ ДО ОБ'ЄКТУ ПОВІДОМЛЕННЯ
+      ...images && images.length > 0 && { images },
+      ...attachedDocuments && attachedDocuments.length > 0 && { attachedDocuments }
+      // <--- ДОДАЄМО ДОКУМЕНТИ ДО ОБ'ЄКТУ ПОВІДОМЛЕННЯ
     };
     const hmaPromise = new Promise((resolve, reject) => {
       this.logger.debug(`[ChatManager] Registering HMA resolver for user message (ts: ${messageTimestampMs})`);
@@ -26455,7 +26562,7 @@ var ChatManager = class {
         }
       }, 1e4);
     });
-    this.logger.debug(`[ChatManager] Adding user message payload (ts: ${messageTimestampMs})`, { content: userMessage.content.substring(0, 50), imagesCount: userMessage.images?.length });
+    this.logger.debug(`[ChatManager] Adding user message payload (ts: ${messageTimestampMs})`, { content: userMessage.content.substring(0, 50), imagesCount: userMessage.images?.length, docsCount: userMessage.attachedDocuments?.length });
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
       this.logger.warn(`[ChatManager] Failed to add user message payload (ts: ${messageTimestampMs}). Rejecting HMA.`);

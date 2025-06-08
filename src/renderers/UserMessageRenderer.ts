@@ -1,7 +1,7 @@
 // src/renderers/UserMessageRenderer.ts
 import { BaseMessageRenderer } from "./BaseMessageRenderer";
 import { CSS_CLASSES } from "../constants";
-import { App, setIcon, Notice } from "obsidian"; // <--- ДОДАЙ Notice ДО ІМПОРТІВ
+import { App, setIcon, Notice, MarkdownRenderer } from "obsidian"; // <--- ДОДАЙ Notice ДО ІМПОРТІВ
 import { Message } from "../types";
 import OllamaPlugin from "../main";
 import { OllamaView } from "../OllamaView";
@@ -16,7 +16,7 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		}
 	}
 
-	public render(): HTMLElement {
+			public render(): HTMLElement {
 		const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
 
 		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, true, "user");
@@ -26,25 +26,21 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 
         const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
 
+        // Рендеринг основного текстового контенту
+        // Плейсхолдери для документів та посилань вже включені в message.content на етапі sendMessage
 		const contentToRender = this.message.content || "";
-		if (contentToRender.includes("\n")) {
-			contentToRender.split("\n").forEach((line, i, arr) => {
-				contentEl.appendText(line);
-				if (i < arr.length - 1) contentEl.createEl("br");
-			});
-		} else if (contentToRender) {
-			contentEl.setText(contentToRender);
-		}
+		if (contentToRender.trim() !== "") {
+            RendererUtils.renderMarkdownContent(this.app, this.view, this.plugin, contentEl, contentToRender);
+        }
 
+        // Рендеринг прикріплених зображень (якщо є)
         if (this.message.images && this.message.images.length > 0) {
-            const imagesContainer = contentEl.createDiv({ cls: "message-images-container" }); 
-
+            const imagesContainer = contentEl.createDiv({ cls: "message-images-container" });
             this.message.images.forEach(imageDataUrl => {
                 const imgEl = imagesContainer.createEl("img", {
                     attr: { src: imageDataUrl },
-                    cls: "message-attached-image" 
+                    cls: "message-attached-image"
                 });
-
                 imgEl.addEventListener('click', () => {
                     const newTab = window.open();
                     if (newTab) {
@@ -55,20 +51,107 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                         `);
                         newTab.document.title = "Attached Image";
                     } else {
-                        // Виправлення тут: створюємо новий екземпляр Notice
                         new Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
                     }
                 });
             });
-            if (contentToRender) {
+            if (contentToRender.trim() !== "") {
                  imagesContainer.style.marginTop = "10px";
             }
         }
+
+        // Рендеринг блоків прикріплених документів (які НЕ були вставлені в основний контент)
+        if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
+            const documentsContainer = contentEl.createDiv({ cls: "message-attached-documents-container" });
+            if (contentToRender.trim() !== "" || (this.message.images && this.message.images.length > 0)) {
+                 documentsContainer.style.marginTop = "15px";
+            }
+
+            this.message.attachedDocuments.forEach(docInfo => {
+                // Відображаємо блок документа, тільки якщо його вміст НЕ було повністю вставлено в prompt
+                // Або якщо це generic_file (наприклад, PDF), для якого ми хочемо показати блок
+                const wasContentInlinedInPrompt = docInfo.content && (docInfo.previewType === 'text' || docInfo.previewType === 'markdown');
+                
+                if (!wasContentInlinedInPrompt || docInfo.previewType === 'generic_file') {
+                    // Якщо вміст не було вбудовано в промпт, АБО це 'generic_file', то показуємо блок
+                    const docBlock = documentsContainer.createDiv({ cls: "attached-document-block" });
+                    
+                    const docHeader = docBlock.createDiv({ cls: "attached-document-header" });
+                    
+                    let iconName = "file";
+                    if (docInfo.previewType === 'markdown') iconName = "file-text";
+                    else if (docInfo.previewType === 'text') iconName = "file-code"; // Або інша іконка для тексту
+                    else if (docInfo.type.includes("pdf")) iconName = "file-type-pdf"; // Потрібна іконка pdf
+                    // ... додати інші іконки для популярних типів ...
+                    setIcon(docHeader.createSpan({cls: "attached-document-icon"}), iconName);
+                    docHeader.createSpan({ cls: "attached-document-name", text: docInfo.name });
+                    docHeader.createSpan({ cls: "attached-document-size", text: `(${(docInfo.size / 1024).toFixed(1)} KB)` });
+
+
+                    // Для generic_file, ми можемо не показувати вміст, а лише інформацію
+                    if (docInfo.previewType !== 'generic_file' && docInfo.content) {
+                        const docContentWrapper = docBlock.createDiv({ cls: "attached-document-content-wrapper" });
+                        const docContentEl = docContentWrapper.createDiv({ cls: "attached-document-content" });
+                        
+                        const maxPreviewLength = 300;
+                        const needsTruncation = docInfo.content.length > maxPreviewLength;
+
+                        if (docInfo.previewType === 'markdown') {
+                            const mdToRender = needsTruncation ? docInfo.content.substring(0, maxPreviewLength) + "..." : docInfo.content;
+                            MarkdownRenderer.render(this.app, mdToRender, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                        } else if (docInfo.previewType === 'text') {
+                            const pre = docContentEl.createEl("pre");
+                            pre.setText(needsTruncation ? docInfo.content.substring(0, maxPreviewLength) + "..." : docInfo.content);
+                        }
+                        RendererUtils.fixBrokenTwemojiImages(docContentEl);
+
+                        if (needsTruncation) {
+                            docContentEl.addClass("truncated");
+                            const showMoreBtn = docBlock.createEl("button", { cls: "attached-document-show-more", text: "Show More" });
+                            showMoreBtn.onClickEvent(async (e) => {
+                                e.stopPropagation();
+                                if (docContentEl.hasClass("truncated")) {
+                                    docContentEl.empty();
+                                    if (docInfo.previewType === 'markdown') {
+                                        await MarkdownRenderer.render(this.app, docInfo.content!, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                                    } else {
+                                        docContentEl.createEl("pre").setText(docInfo.content!);
+                                    }
+                                    RendererUtils.fixBrokenTwemojiImages(docContentEl);
+                                    docContentEl.removeClass("truncated");
+                                    showMoreBtn.setText("Show Less");
+                                } else {
+                                    docContentEl.empty();
+                                    if (docInfo.previewType === 'markdown') {
+                                        const previewMd = docInfo.content!.substring(0, maxPreviewLength) + "...";
+                                        await MarkdownRenderer.render(this.app, previewMd, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                                    } else {
+                                        docContentEl.createEl("pre").setText(docInfo.content!.substring(0, maxPreviewLength) + "...");
+                                    }
+                                    RendererUtils.fixBrokenTwemojiImages(docContentEl);
+                                    docContentEl.addClass("truncated");
+                                    showMoreBtn.setText("Show More");
+                                }
+                                this.view.guaranteedScrollToBottom(50, false);
+                            });
+                        }
+                    } else if (docInfo.previewType === 'generic_file') {
+                        // Можна додати кнопку "Download" або "Open externally"
+                        // якщо ми зберігаємо rawFile в AttachedDocumentInfo
+                        // Наприклад:
+                        // if (docInfo.rawFile) {
+                        // const downloadBtn = docBlock.createEl('button', {text: "Download"});
+                        // downloadBtn.onClickEvent(() => { /* логіка завантаження */ });
+                        // }
+                        const genericInfo = docBlock.createDiv({cls: "attached-document-generic-info"});
+                        genericInfo.setText(`This is a ${docInfo.type} file. Its content is not displayed directly here.`);
+                    }
+                }
+            });
+        }
 		
 		const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-		
 		BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
-		
 		this.addUserActionButtons(metaActionsWrapper);
 
 		setTimeout(() => {

@@ -185,3 +185,27 @@ export interface ToolCallFunction {
     id?: string;     // ID для зіставлення з відповіддю інструмента (не завжди є в Ollama)
     function: ToolCallFunction;
   }
+
+  export type DocumentPreviewType = 'text' | 'markdown' | 'generic_file'; // Поки що три типи для простоти
+
+export interface AttachedDocumentInfo {
+  name: string;
+  type: string; // MIME type or file extension (e.g., "text/plain", "application/pdf", "md")
+  content: string | null; // Текстовий вміст (може бути null для бінарних файлів, де ми не витягуємо текст)
+  previewType: DocumentPreviewType;
+  size: number; // Розмір файлу в байтах
+  // rawFile?: File; // Опціонально, якщо хочемо зберігати оригінал для майбутнього
+}
+
+export interface Message {
+    role: MessageRole;
+    content: string; // Основний текст повідомлення користувача
+    timestamp: Date;
+    type?: 'warning' | 'error' | 'info';
+
+    images?: string[];
+    tool_call_id?: string;
+    name?: string;
+    tool_calls?: ToolCall[];
+    attachedDocuments?: AttachedDocumentInfo[];
+}
