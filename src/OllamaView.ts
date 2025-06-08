@@ -3286,7 +3286,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
   }
 
-        async sendMessage(): Promise<void> {
+    async sendMessage(): Promise<void> {
     const userInputText = this.inputEl.value.trim();
     const requestTimestampId = Date.now();
 

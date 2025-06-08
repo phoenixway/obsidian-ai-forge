@@ -16,7 +16,7 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		}
 	}
 
-			public render(): HTMLElement {
+		public render(): HTMLElement {
 		const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
 
 		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, true, "user");
