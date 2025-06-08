@@ -1629,24 +1629,16 @@ async deleteChat(id: string): Promise<boolean> {
     }
   }
 
-
-  /**
-   * Додає повідомлення користувача до активного чату, зберігає його,
-   * генерує подію "message-added" (для OllamaView.handleMessageAdded)
-   * та повертає проміс, який вирішується, коли handleMessageAdded завершить рендеринг.
-   * @param content Вміст повідомлення користувача.
-   * @param timestamp Мітка часу повідомлення.
-   * @param requestTimestampId Унікальний ID запиту для логування.
-   * @returns Проміс, що вирішується після рендерингу, або null, якщо сталася помилка.
-   */
-  public async addUserMessageAndAwaitRender(
+    public async addUserMessageAndAwaitRender(
     content: string,
     timestamp: Date,
-    requestTimestampId: number 
+    requestTimestampId: number,
+    images?: string[] // <-- НОВИЙ ОПЦІОНАЛЬНИЙ ПАРАМЕТР
   ): Promise<Message | null> {
     const activeChat = await this.getActiveChat(); 
     if (!activeChat) {
-            return null;
+      this.logger.warn("[ChatManager] addUserMessageAndAwaitRender: No active chat found.");
+      return null;
     }
 
     const messageTimestampMs = timestamp.getTime();
@@ -1654,38 +1646,44 @@ async deleteChat(id: string): Promise<boolean> {
       role: "user" as MessageRoleTypeFromTypes, 
       content,
       timestamp,
+      ...(images && images.length > 0 && { images: images }) // <-- ДОДАЄМО ЗОБРАЖЕННЯ ДО ОБ'ЄКТУ ПОВІДОМЛЕННЯ
     };
 
         
     const hmaPromise = new Promise<void>((resolve, reject) => {
-      
+      this.logger.debug(`[ChatManager] Registering HMA resolver for user message (ts: ${messageTimestampMs})`);
       this.registerHMAResolver(messageTimestampMs, resolve, reject);
       
       setTimeout(() => {
         if (this.messageAddedResolvers.has(messageTimestampMs)) { 
             const reason = `HMA Timeout for UserMessage (ts: ${messageTimestampMs}) in ChatManager.`;
-                        this.rejectAndClearHMAResolver(messageTimestampMs, reason);
+            this.logger.warn(`[ChatManager] ${reason}`);
+            this.rejectAndClearHMAResolver(messageTimestampMs, reason);
         }
       }, 10000); 
     });
 
     
-    
+    this.logger.debug(`[ChatManager] Adding user message payload (ts: ${messageTimestampMs})`, {content: userMessage.content.substring(0,50), imagesCount: userMessage.images?.length});
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
-                this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
+        this.logger.warn(`[ChatManager] Failed to add user message payload (ts: ${messageTimestampMs}). Rejecting HMA.`);
+        this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
         return null;
     }
     
+    this.logger.debug(`[ChatManager] User message payload added (ts: ${messageTimestampMs}). Awaiting HMA promise.`);
         
     try {
         await hmaPromise;
-                return userMessage;
+        this.logger.debug(`[ChatManager] HMA promise resolved for user message (ts: ${messageTimestampMs}).`);
+        return userMessage;
     } catch (error) {
-                
+        this.logger.error(`[ChatManager] HMA promise rejected for user message (ts: ${messageTimestampMs}):`, error);
         return null; 
     }
   }
+  
   
 } 
 //End of ChatManager.ts

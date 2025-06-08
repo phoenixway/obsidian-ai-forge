@@ -17347,24 +17347,44 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         if (i < arr.length - 1)
           contentEl.createEl("br");
       });
-    } else {
+    } else if (contentToRender) {
       contentEl.setText(contentToRender);
+    }
+    if (this.message.images && this.message.images.length > 0) {
+      const imagesContainer = contentEl.createDiv({ cls: "message-images-container" });
+      this.message.images.forEach((imageDataUrl) => {
+        const imgEl = imagesContainer.createEl("img", {
+          attr: { src: imageDataUrl },
+          cls: "message-attached-image"
+        });
+        imgEl.addEventListener("click", () => {
+          const newTab = window.open();
+          if (newTab) {
+            newTab.document.write(`
+                            <body style="margin: 0; background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+                                <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
+                            </body>
+                        `);
+            newTab.document.title = "Attached Image";
+          } else {
+            new import_obsidian8.Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
+          }
+        });
+      });
+      if (contentToRender) {
+        imagesContainer.style.marginTop = "10px";
+      }
     }
     const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
     BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     this.addUserActionButtons(metaActionsWrapper);
     setTimeout(() => {
-      if (messageEl.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
-        this.view.checkMessageForCollapsing(messageEl);
+      if (messageGroup.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
+        this.view.checkMessageForCollapsing(messageGroup);
       }
     }, 70);
     return messageGroup;
   }
-  /**
-   * Додає кнопки дій, специфічні для повідомлення користувача (Regenerate, Copy, Delete).
-   * Кнопки додаються до .message-actions-wrapper, який створюється всередині parentElementForActionsContainer.
-   * @param parentElementForActionsContainer - Обгортка, куди буде додано .message-actions-wrapper (це .message-meta-actions-wrapper).
-   */
   addUserActionButtons(parentElementForActionsContainer) {
     const messageTimestamp = this.message.timestamp.getTime().toString();
     let actionsWrapperActual = parentElementForActionsContainer.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);
@@ -22752,9 +22772,60 @@ Summary:`;
   async sendMessage() {
     const userInputText = this.inputEl.value.trim();
     const requestTimestampId = Date.now();
-    if (!userInputText || this.isProcessing || this.currentAbortController) {
-      if (this.isProcessing || this.currentAbortController)
+    if (this.isProcessing || this.currentAbortController) {
+      if (this.isProcessing || this.currentAbortController) {
         new import_obsidian16.Notice("Please wait or cancel current operation.", 3e3);
+      }
+      return;
+    }
+    const attachmentsData = this.attachmentManager.getActiveAttachmentsForApi();
+    let finalUserInputText = userInputText;
+    const imageDataUrls = [];
+    let hasContentToSend = userInputText.length > 0;
+    if (attachmentsData.links.length > 0) {
+      const linksText = attachmentsData.links.map((link) => `- ${link}`).join("\n");
+      finalUserInputText += `
+
+Attached links:
+${linksText}`;
+      hasContentToSend = true;
+    }
+    if (attachmentsData.documents.length > 0) {
+      let documentsContentInfo = "\n\nAttached documents:\n";
+      for (const docFile of attachmentsData.documents) {
+        try {
+          const textContent = await fileToText(docFile);
+          documentsContentInfo += `--- Start of ${docFile.name} ---
+${textContent}
+--- End of ${docFile.name} ---
+
+`;
+        } catch (error) {
+          this.plugin.logger.error(`Error reading document ${docFile.name} as text:`, error);
+          documentsContentInfo += `[Could not read content of ${docFile.name}]
+`;
+        }
+      }
+      finalUserInputText += documentsContentInfo;
+      hasContentToSend = true;
+    }
+    if (attachmentsData.images.length > 0) {
+      for (const imgFile of attachmentsData.images) {
+        try {
+          const base64DataUrl = await fileToBase64(imgFile);
+          imageDataUrls.push(base64DataUrl);
+        } catch (error) {
+          this.plugin.logger.error(`Error converting image ${imgFile.name} to base64:`, error);
+          finalUserInputText += `
+[Failed to attach image: ${imgFile.name}]`;
+        }
+      }
+      if (imageDataUrls.length > 0) {
+        hasContentToSend = true;
+      }
+    }
+    if (!hasContentToSend) {
+      new import_obsidian16.Notice("Message and attachments are empty.", 3e3);
       return;
     }
     let activeChat = await this.plugin.chatManager.getActiveChat();
@@ -22775,9 +22846,12 @@ Summary:`;
     const initialLlmResponsePlaceholderTs = Date.now();
     try {
       const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
-        userInputText,
+        finalUserInputText,
+        // Use the text potentially modified with links and doc content
         userMessageTimestamp,
-        requestTimestampId
+        requestTimestampId,
+        imageDataUrls.length > 0 ? imageDataUrls : void 0
+        // Pass base64 image data
       );
       if (!userMessageAdded) {
         throw new Error("User message processing failed in ChatManager.");
@@ -22833,8 +22907,13 @@ Summary:`;
       try {
         await hmaErrorPromise;
       } catch (e_hma) {
+        this.plugin.logger.warn(`[sendMessage] HMA timeout/rejection for error display message: ${errorDisplayMsg.content.substring(0, 50)}`);
       }
     } finally {
+      this.attachmentManager.clearAllLinks();
+      this.attachmentManager.clearAllImages();
+      this.attachmentManager.clearAllDocuments();
+      this.attachmentManager.hide();
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected)
           this.activePlaceholder.groupEl.remove();
@@ -24015,12 +24094,6 @@ var OllamaService = class {
         }
       });
   }
-  /**
-   * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
-   * @param chat Поточний об'єкт чату.
-   * @param signal AbortSignal для можливості переривання запиту.
-   * @returns Асинхронний ітератор, що видає StreamChunk.
-   */
   async *generateChatResponseStream(chat, signal) {
     const requestTimestampId = Date.now();
     if (!chat) {
@@ -24045,17 +24118,33 @@ var OllamaService = class {
       const systemPrompt = await this.promptService.getSystemPromptForAPI(chat.metadata);
       const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
       if (promptBody === null || promptBody === void 0) {
-        yield { type: "error", error: "Could not generate prompt body.", done: true };
-        return;
+        const lastUserMessageForCheck = history.filter((m) => m.role === "user").pop();
+        if (!(lastUserMessageForCheck && lastUserMessageForCheck.images && lastUserMessageForCheck.images.length > 0)) {
+          yield { type: "error", error: "Could not generate prompt body.", done: true };
+          return;
+        }
       }
       const requestBody = {
         model: modelName,
-        prompt: promptBody,
+        prompt: promptBody || "",
+        // Надсилаємо порожній рядок, якщо promptBody null, але є зображення
         stream: true,
         temperature,
         options: { num_ctx: currentSettings.contextWindow },
         ...systemPrompt && { system: systemPrompt }
       };
+      const lastUserMessage = history.filter((m) => m.role === "user").pop();
+      if (lastUserMessage && lastUserMessage.images && lastUserMessage.images.length > 0) {
+        requestBody.images = lastUserMessage.images.map((imageDataUrl) => {
+          const base64Part = imageDataUrl.split(",")[1];
+          return base64Part || "";
+        }).filter((base64) => base64 !== "");
+        if (requestBody.images.length === 0) {
+          delete requestBody.images;
+        } else {
+          this.logger.debug(`[OllamaService] Attaching ${requestBody.images.length} image(s) to the request.`);
+        }
+      }
       if (this.plugin.agentManager && this.plugin.settings.enableToolUse) {
         const agentTools = this.plugin.agentManager.getAllToolDefinitions();
         if (agentTools && agentTools.length > 0) {
@@ -24064,8 +24153,13 @@ var OllamaService = class {
           if (seemsToSupportTools) {
             requestBody.tools = agentTools.map((tool) => ({ type: "function", function: tool }));
           } else {
+            this.plugin.logger.debug(`[OllamaService] Model ${modelName} does not seem to support tools, not adding tools to request.`);
           }
         }
+      }
+      if (!requestBody.prompt && (!requestBody.images || requestBody.images.length === 0)) {
+        yield { type: "error", error: "Cannot send request: No text prompt and no images.", done: true };
+        return;
       }
       const response = await fetch(url, {
         method: "POST",
@@ -24082,10 +24176,12 @@ var OllamaService = class {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
         this.emit("connection-error", new Error(errorText));
+        this.logger.error(`[OllamaService] API Error: ${errorText}. Request body (prompt and system only):`, { prompt: requestBody.prompt, system: requestBody.system, model: requestBody.model });
         yield { type: "error", error: errorText, done: true };
         return;
       }
       if (!response.body) {
+        this.logger.error("[OllamaService] Response body is null.");
         yield { type: "error", error: "Response body is null.", done: true };
         return;
       }
@@ -24093,20 +24189,24 @@ var OllamaService = class {
       const decoder = new TextDecoder();
       let buffer = "";
       let rawResponseAccumulator = "";
+      this.logger.debug("[OllamaService] Started reading stream response...");
       while (true) {
         const { done, value } = await reader.read();
         if (signal?.aborted) {
           reader.cancel("Aborted by user");
+          this.logger.info("[OllamaService] Stream generation aborted by user.");
           yield { type: "error", error: "Generation aborted by user.", done: true };
           return;
         }
         const decodedChunk = decoder.decode(value, { stream: !done });
         rawResponseAccumulator += decodedChunk;
         if (done) {
+          this.logger.debug("[OllamaService] Stream finished (done=true). Final buffer:", buffer.trim());
           buffer += decodedChunk;
           if (buffer.trim()) {
             try {
               const jsonChunk = JSON.parse(buffer.trim());
+              this.logger.debug("[OllamaService] Parsed final JSON chunk:", jsonChunk);
               if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
                 yield {
                   type: "tool_calls",
@@ -24120,18 +24220,34 @@ var OllamaService = class {
                   type: "content",
                   response: jsonChunk.response,
                   done: jsonChunk.done || false,
+                  // `done` тут може бути true
                   model: jsonChunk.model,
                   created_at: jsonChunk.created_at
                 };
               } else if (jsonChunk.error) {
                 yield { type: "error", error: jsonChunk.error, done: true };
               }
+              if (jsonChunk.done === true) {
+                yield {
+                  type: "done",
+                  model: jsonChunk.model,
+                  created_at: jsonChunk.created_at,
+                  context: jsonChunk.context,
+                  total_duration: jsonChunk.total_duration,
+                  load_duration: jsonChunk.load_duration,
+                  prompt_eval_count: jsonChunk.prompt_eval_count,
+                  prompt_eval_duration: jsonChunk.prompt_eval_duration,
+                  eval_count: jsonChunk.eval_count,
+                  eval_duration: jsonChunk.eval_duration
+                };
+              }
             } catch (e) {
+              this.logger.error("[OllamaService] Error parsing final JSON from stream buffer:", e, "Buffer content:", buffer.trim());
             }
           }
           break;
         }
-        buffer += decoder.decode(value, { stream: true });
+        buffer += decodedChunk;
         let eolIndex;
         while ((eolIndex = buffer.indexOf("\n")) >= 0) {
           const line = buffer.substring(0, eolIndex).trim();
@@ -24141,6 +24257,7 @@ var OllamaService = class {
           try {
             const jsonChunk = JSON.parse(line);
             if (jsonChunk.error) {
+              this.logger.error("[OllamaService] Error in JSON chunk:", jsonChunk.error);
               yield { type: "error", error: jsonChunk.error, done: true };
               reader.cancel("Error received from Ollama stream");
               return;
@@ -24154,6 +24271,7 @@ var OllamaService = class {
                 created_at: jsonChunk.created_at
               };
               if (jsonChunk.done === true) {
+                this.logger.debug("[OllamaService] Stream done (with tool calls).");
                 yield {
                   type: "done",
                   model: jsonChunk.model,
@@ -24173,12 +24291,15 @@ var OllamaService = class {
                 type: "content",
                 response: jsonChunk.response,
                 done: jsonChunk.done || false,
+                // `done` може бути true тут
                 model: jsonChunk.model,
                 created_at: jsonChunk.created_at
               };
               if (jsonChunk.done === true) {
+                this.logger.debug("[OllamaService] Content chunk with done=true, but continuing for potential summary chunk.");
               }
             } else if (jsonChunk.done === true) {
+              this.logger.debug("[OllamaService] Stream done (summary chunk).");
               yield {
                 type: "done",
                 model: jsonChunk.model,
@@ -24193,13 +24314,16 @@ var OllamaService = class {
               };
               return;
             } else if (jsonChunk.message && (jsonChunk.message.content === null || jsonChunk.message.content === "") && !jsonChunk.message.tool_calls) {
+              this.logger.debug("[OllamaService] Received empty assistant message chunk without tool calls. Ignoring.", jsonChunk);
             }
           } catch (e) {
+            this.logger.error("[OllamaService] Error parsing JSON line from stream:", e, "Line content:", line);
           }
         }
       }
     } catch (error) {
       if (error.name === "AbortError") {
+        this.logger.info("[OllamaService] Stream generation aborted by user (outer catch).");
         yield { type: "error", error: "Generation aborted by user.", done: true };
       } else {
         let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
@@ -24207,9 +24331,11 @@ var OllamaService = class {
           errorMessage = `Connection Error: Failed to reach Ollama at ${this.plugin.settings.ollamaServerUrl}. Is it running?`;
           this.emit("connection-error", new Error(errorMessage));
         }
+        this.logger.error(`[OllamaService] Error in generateChatResponseStream (outer catch): ${errorMessage}`, error);
         yield { type: "error", error: errorMessage, done: true };
       }
     } finally {
+      this.logger.debug("[OllamaService] generateChatResponseStream finished.");
     }
   }
   async generateRaw(requestBody) {
@@ -26285,44 +26411,45 @@ var ChatManager = class {
       this.messageAddedResolvers.delete(timestampMs);
     }
   }
-  /**
-   * Додає повідомлення користувача до активного чату, зберігає його,
-   * генерує подію "message-added" (для OllamaView.handleMessageAdded)
-   * та повертає проміс, який вирішується, коли handleMessageAdded завершить рендеринг.
-   * @param content Вміст повідомлення користувача.
-   * @param timestamp Мітка часу повідомлення.
-   * @param requestTimestampId Унікальний ID запиту для логування.
-   * @returns Проміс, що вирішується після рендерингу, або null, якщо сталася помилка.
-   */
-  async addUserMessageAndAwaitRender(content, timestamp, requestTimestampId) {
+  async addUserMessageAndAwaitRender(content, timestamp, requestTimestampId, images) {
     const activeChat = await this.getActiveChat();
     if (!activeChat) {
+      this.logger.warn("[ChatManager] addUserMessageAndAwaitRender: No active chat found.");
       return null;
     }
     const messageTimestampMs = timestamp.getTime();
     const userMessage = {
       role: "user",
       content,
-      timestamp
+      timestamp,
+      ...images && images.length > 0 && { images }
+      // <-- ДОДАЄМО ЗОБРАЖЕННЯ ДО ОБ'ЄКТУ ПОВІДОМЛЕННЯ
     };
     const hmaPromise = new Promise((resolve, reject) => {
+      this.logger.debug(`[ChatManager] Registering HMA resolver for user message (ts: ${messageTimestampMs})`);
       this.registerHMAResolver(messageTimestampMs, resolve, reject);
       setTimeout(() => {
         if (this.messageAddedResolvers.has(messageTimestampMs)) {
           const reason = `HMA Timeout for UserMessage (ts: ${messageTimestampMs}) in ChatManager.`;
+          this.logger.warn(`[ChatManager] ${reason}`);
           this.rejectAndClearHMAResolver(messageTimestampMs, reason);
         }
       }, 1e4);
     });
+    this.logger.debug(`[ChatManager] Adding user message payload (ts: ${messageTimestampMs})`, { content: userMessage.content.substring(0, 50), imagesCount: userMessage.images?.length });
     const addedMessage = await this.addMessageToActiveChatPayload(userMessage, true);
     if (!addedMessage) {
+      this.logger.warn(`[ChatManager] Failed to add user message payload (ts: ${messageTimestampMs}). Rejecting HMA.`);
       this.rejectAndClearHMAResolver(messageTimestampMs, "Failed to add message payload to ChatManager.");
       return null;
     }
+    this.logger.debug(`[ChatManager] User message payload added (ts: ${messageTimestampMs}). Awaiting HMA promise.`);
     try {
       await hmaPromise;
+      this.logger.debug(`[ChatManager] HMA promise resolved for user message (ts: ${messageTimestampMs}).`);
       return userMessage;
     } catch (error) {
+      this.logger.error(`[ChatManager] HMA promise rejected for user message (ts: ${messageTimestampMs}):`, error);
       return null;
     }
   }

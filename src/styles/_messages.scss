@@ -417,3 +417,37 @@ button.summarize-button { @extend %base-action-button; }
 .error-icon { /* width: 16px; height: 16px; fill: currentColor; */ }
 .system-icon { /* width: 16px; height: 16px; fill: currentColor; */ }
 .tool-result-icon { /* width: 14px; height: 14px; fill: currentColor; */ }
+// ... (існуючі стилі) ...
+
+// --- Стилі для вкладених зображень у повідомленнях ---
+.message-images-container {
+  display: flex;
+  flex-wrap: wrap; // Дозволяє зображенням переноситися на новий рядок
+  gap: 8px;        // Відстань між зображеннями
+  // margin-top: 10px; // Вже встановлюється динамічно в UserMessageRenderer, якщо є текст
+}
+
+.message-attached-image {
+  max-width: 100px; // Зменшив максимальну ширину для кращого вигляду кількох зображень
+  max-height: 100px;// Зменшив максимальну висоту
+  height: auto;
+  width: auto;
+  border-radius: var(--radius-s, 4px); // Використовуємо змінну Obsidian або дефолт
+  object-fit: cover; // Обрізає зображення, щоб воно заповнило контейнер, зберігаючи пропорції
+  cursor: pointer;
+  border: 1px solid var(--background-modifier-border); // Тонка рамка
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  }
+}
+
+// Якщо ви хочете, щоб одне зображення було більшим, а кілька меншими,
+// можна додати специфічні стилі, наприклад, коли є тільки одне зображення:
+.message-images-container:has(> .message-attached-image:only-child) .message-attached-image {
+  max-width: 200px;
+  max-height: 200px;
+}
+// (Примітка: :has() може не підтримуватися в дуже старих браузерах, але для Electron/Obsidian має бути ок)

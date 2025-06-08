@@ -3285,14 +3285,72 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
   }
 
-  async sendMessage(): Promise<void> {
+    async sendMessage(): Promise<void> {
     const userInputText = this.inputEl.value.trim();
     const requestTimestampId = Date.now();
 
-    if (!userInputText || this.isProcessing || this.currentAbortController) {
-      if (this.isProcessing || this.currentAbortController)
+    if (this.isProcessing || this.currentAbortController) {
+      if (this.isProcessing || this.currentAbortController) {
         new Notice("Please wait or cancel current operation.", 3000);
+      }
       return;
+    }
+
+    // Get attachments BEFORE checking if userInputText is empty,
+    // as user might want to send only attachments.
+    const attachmentsData = this.attachmentManager.getActiveAttachmentsForApi();
+    let finalUserInputText = userInputText;
+    const imageDataUrls: string[] = [];
+    let hasContentToSend = userInputText.length > 0;
+
+    // Process links: add them to the text content
+    if (attachmentsData.links.length > 0) {
+      const linksText = attachmentsData.links.map(link => `- ${link}`).join("\n");
+      finalUserInputText += `\n\nAttached links:\n${linksText}`;
+      hasContentToSend = true;
+    }
+
+    // Process documents: read text content and add to the text content
+    // This is asynchronous
+    if (attachmentsData.documents.length > 0) {
+      let documentsContentInfo = "\n\nAttached documents:\n";
+      for (const docFile of attachmentsData.documents) {
+        try {
+          // Consider limiting file size for text extraction or providing only summaries for very large files
+          const textContent = await fileToText(docFile); // fileToText is a new helper
+          documentsContentInfo += `--- Start of ${docFile.name} ---\n${textContent}\n--- End of ${docFile.name} ---\n\n`;
+        } catch (error) {
+          this.plugin.logger.error(`Error reading document ${docFile.name} as text:`, error);
+          documentsContentInfo += `[Could not read content of ${docFile.name}]\n`;
+        }
+      }
+      finalUserInputText += documentsContentInfo;
+      hasContentToSend = true;
+    }
+
+    // Process images: convert to base64
+    // This is asynchronous
+    if (attachmentsData.images.length > 0) {
+      for (const imgFile of attachmentsData.images) {
+        try {
+          const base64DataUrl = await fileToBase64(imgFile); // fileToBase64 is a new helper
+          imageDataUrls.push(base64DataUrl);
+        } catch (error) {
+          this.plugin.logger.error(`Error converting image ${imgFile.name} to base64:`, error);
+          // Optionally, notify the user or add a placeholder text for the failed image
+          finalUserInputText += `\n[Failed to attach image: ${imgFile.name}]`;
+        }
+      }
+      // If images are successfully processed, it means there's content to send
+      if (imageDataUrls.length > 0) {
+        hasContentToSend = true;
+      }
+    }
+    
+    // Check if there's anything to send after processing attachments
+    if (!hasContentToSend) {
+        new Notice("Message and attachments are empty.", 3000);
+        return;
     }
 
     let activeChat = await this.plugin.chatManager.getActiveChat();
@@ -3300,7 +3358,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       activeChat = await this.plugin.chatManager.createNewChat();
       if (!activeChat) {
         new Notice("Error: No active chat and could not create one.");
-        this.setLoadingState(false); // Важливо скинути стан, якщо чат не створено
+        this.setLoadingState(false);
         return;
       }
       new Notice(`Started new chat: ${activeChat.metadata.name}`);
@@ -3316,9 +3374,10 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
     try {
       const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
-        userInputText,
+        finalUserInputText, // Use the text potentially modified with links and doc content
         userMessageTimestamp,
-        requestTimestampId
+        requestTimestampId,
+        imageDataUrls.length > 0 ? imageDataUrls : undefined // Pass base64 image data
       );
       if (!userMessageAdded) {
         throw new Error("User message processing failed in ChatManager.");
@@ -3327,7 +3386,6 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
 
       if (!this.currentAbortController) {
-        // Ця помилка не має виникати, якщо AbortController створюється вище
         this.plugin.logger.error(
           "CRITICAL: AbortController not initialized in sendMessage before LlmInteractionCycle call."
         );
@@ -3383,9 +3441,16 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       try {
         await hmaErrorPromise;
       } catch (e_hma) {
-        
+        this.plugin.logger.warn(`[sendMessage] HMA timeout/rejection for error display message: ${errorDisplayMsg.content.substring(0,50)}`);
       }
     } finally {
+      // Clear attachments from the manager after the message attempt (success or fail)
+      this.attachmentManager.clearAllLinks();
+      this.attachmentManager.clearAllImages();
+      this.attachmentManager.clearAllDocuments();
+      // Make sure the attachment panel UI is also updated if it's open
+      this.attachmentManager.hide(); // Or refresh if you want it to stay open but empty
+
       if (this.activePlaceholder && this.activePlaceholder.groupEl.classList.contains("placeholder")) {
         if (this.activePlaceholder.groupEl.isConnected) this.activePlaceholder.groupEl.remove();
       }

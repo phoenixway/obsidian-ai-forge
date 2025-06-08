@@ -72,13 +72,7 @@ export class OllamaService {
       });
   }
 
-  /**
-   * Відправляє запит на генерацію відповіді Ollama і повертає асинхронний ітератор для отримання частин відповіді.
-   * @param chat Поточний об'єкт чату.
-   * @param signal AbortSignal для можливості переривання запиту.
-   * @returns Асинхронний ітератор, що видає StreamChunk.
-   */
-  async *generateChatResponseStream(chat: Chat, signal?: AbortSignal): AsyncIterableIterator<StreamChunk> {
+    async *generateChatResponseStream(chat: Chat, signal?: AbortSignal): AsyncIterableIterator<StreamChunk> {
     const requestTimestampId = Date.now();
     if (!chat) {
       yield { type: "error", error: "Chat object is null.", done: true };
@@ -107,18 +101,44 @@ export class OllamaService {
       const promptBody = await this.promptService.preparePromptBody(history, chat.metadata);
 
       if (promptBody === null || promptBody === undefined) {
-        yield { type: "error", error: "Could not generate prompt body.", done: true };
-        return;
+        // Якщо promptBody порожній, але є зображення, ми все одно можемо відправити запит
+        // Однак, логіка preparePromptBody має це враховувати і повертати "" замість null, якщо є зображення.
+        // Для поточного коду, якщо promptBody null, це помилка.
+        const lastUserMessageForCheck = history.filter(m => m.role === 'user').pop();
+        if (!(lastUserMessageForCheck && lastUserMessageForCheck.images && lastUserMessageForCheck.images.length > 0)) {
+           yield { type: "error", error: "Could not generate prompt body.", done: true };
+           return;
+        }
+        // Якщо є зображення, але немає текстового промпту, використовуємо порожній рядок для `prompt`
+        // або спеціальний маркер, якщо модель це підтримує.
       }
-
+      
       const requestBody: any = {
         model: modelName,
-        prompt: promptBody,
+        prompt: promptBody || "", // Надсилаємо порожній рядок, якщо promptBody null, але є зображення
         stream: true,
         temperature: temperature,
         options: { num_ctx: currentSettings.contextWindow },
         ...(systemPrompt && { system: systemPrompt }),
       };
+
+      // --- NEW: Add images to the request body if they exist in the last user message ---
+      const lastUserMessage = history.filter(m => m.role === 'user').pop();
+      if (lastUserMessage && lastUserMessage.images && lastUserMessage.images.length > 0) {
+        // Ollama expects images as an array of base64 encoded strings (without the data:mime/type;base64, prefix)
+        requestBody.images = lastUserMessage.images.map(imageDataUrl => {
+            const base64Part = imageDataUrl.split(',')[1];
+            return base64Part || ""; // Повертаємо порожній рядок, якщо base64 частина відсутня
+        }).filter(base64 => base64 !== ""); // Фільтруємо порожні рядки
+        
+        if (requestBody.images.length === 0) {
+            delete requestBody.images; // Видаляємо поле, якщо після обробки не залишилось валідних зображень
+        } else {
+             this.logger.debug(`[OllamaService] Attaching ${requestBody.images.length} image(s) to the request.`);
+        }
+      }
+      // --- END NEW ---
+
 
       if (this.plugin.agentManager && this.plugin.settings.enableToolUse) {
         const agentTools: IToolFunction[] = this.plugin.agentManager.getAllToolDefinitions();
@@ -133,8 +153,15 @@ export class OllamaService {
           if (seemsToSupportTools) {
             requestBody.tools = agentTools.map(tool => ({ type: "function", function: tool }));
           } else {
+            this.plugin.logger.debug(`[OllamaService] Model ${modelName} does not seem to support tools, not adding tools to request.`);
           }
         }
+      }
+
+      // Перевірка, чи є що відправляти
+      if (!requestBody.prompt && (!requestBody.images || requestBody.images.length === 0)) {
+          yield { type: "error", error: "Cannot send request: No text prompt and no images.", done: true };
+          return;
       }
 
       const response = await fetch(url, {
@@ -153,11 +180,13 @@ export class OllamaService {
           errorText += `: ${response.statusText || "Could not parse error details"}`;
         }
         this.emit("connection-error", new Error(errorText));
+        this.logger.error(`[OllamaService] API Error: ${errorText}. Request body (prompt and system only):`, {prompt: requestBody.prompt, system: requestBody.system, model: requestBody.model});
         yield { type: "error", error: errorText, done: true };
         return;
       }
 
       if (!response.body) {
+        this.logger.error("[OllamaService] Response body is null.");
         yield { type: "error", error: "Response body is null.", done: true };
         return;
       }
@@ -165,25 +194,30 @@ export class OllamaService {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let rawResponseAccumulator = "";
+      let rawResponseAccumulator = ""; // For debugging
+      this.logger.debug("[OllamaService] Started reading stream response...");
       while (true) {
         const { done, value } = await reader.read();
 
         if (signal?.aborted) {
           reader.cancel("Aborted by user");
+          this.logger.info("[OllamaService] Stream generation aborted by user.");
           yield { type: "error", error: "Generation aborted by user.", done: true };
           return;
         }
         const decodedChunk = decoder.decode(value, { stream: !done });
+        // this.logger.debug(`[OllamaService] Decoded chunk (raw): ${decodedChunk.substring(0,100)}`); // Log raw chunk for debugging
 
         rawResponseAccumulator += decodedChunk;
 
         if (done) {
-          buffer += decodedChunk;
+          this.logger.debug("[OllamaService] Stream finished (done=true). Final buffer:", buffer.trim());
+          buffer += decodedChunk; // Додаємо залишок, якщо він є
 
           if (buffer.trim()) {
             try {
               const jsonChunk = JSON.parse(buffer.trim());
+              this.logger.debug("[OllamaService] Parsed final JSON chunk:", jsonChunk);
 
               if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
                 yield {
@@ -197,34 +231,57 @@ export class OllamaService {
                 yield {
                   type: "content",
                   response: jsonChunk.response,
-                  done: jsonChunk.done || false,
+                  done: jsonChunk.done || false, // `done` тут може бути true
                   model: jsonChunk.model,
                   created_at: jsonChunk.created_at,
                 };
               } else if (jsonChunk.error) {
                 yield { type: "error", error: jsonChunk.error, done: true };
               }
-            } catch (e: any) {}
+               // Додаємо обробку "done" чанка, який може прийти останнім без response/message
+              if (jsonChunk.done === true) {
+                 yield {
+                    type: "done",
+                    model: jsonChunk.model,
+                    created_at: jsonChunk.created_at,
+                    context: jsonChunk.context,
+                    total_duration: jsonChunk.total_duration,
+                    load_duration: jsonChunk.load_duration,
+                    prompt_eval_count: jsonChunk.prompt_eval_count,
+                    prompt_eval_duration: jsonChunk.prompt_eval_duration,
+                    eval_count: jsonChunk.eval_count,
+                    eval_duration: jsonChunk.eval_duration,
+                 };
+              }
+            } catch (e: any) {
+              this.logger.error("[OllamaService] Error parsing final JSON from stream buffer:", e, "Buffer content:", buffer.trim());
+              // Якщо не вдалося розпарсити, але є щось у rawResponseAccumulator, можливо це текстова відповідь без JSON обгортки (малоймовірно для Ollama stream)
+              // Але в цьому випадку, ми вже маємо обробити це як помилку, бо очікуємо JSON.
+            }
           }
-          break;
+          break; // Вихід з циклу while (true)
         }
 
-        buffer += decoder.decode(value, { stream: true });
+        buffer += decodedChunk; // Використовуємо decodedChunk, а не decoder.decode(value, {stream: true})
         let eolIndex;
+        // this.logger.debug(`[OllamaService] Current buffer state: ${buffer.substring(0,100)}`);
 
         while ((eolIndex = buffer.indexOf("\n")) >= 0) {
           const line = buffer.substring(0, eolIndex).trim();
           buffer = buffer.substring(eolIndex + 1);
 
           if (line === "") continue;
+          // this.logger.debug(`[OllamaService] Processing line from buffer: ${line}`);
 
           try {
             const jsonChunk = JSON.parse(line);
+            // this.logger.debug("[OllamaService] Parsed JSON chunk from line:", jsonChunk);
 
             if (jsonChunk.error) {
+              this.logger.error("[OllamaService] Error in JSON chunk:", jsonChunk.error);
               yield { type: "error", error: jsonChunk.error, done: true };
               reader.cancel("Error received from Ollama stream");
-              return;
+              return; // Важливо вийти, якщо отримали помилку
             }
 
             if (jsonChunk.message && jsonChunk.message.tool_calls && jsonChunk.message.tool_calls.length > 0) {
@@ -235,34 +292,39 @@ export class OllamaService {
                 model: jsonChunk.model,
                 created_at: jsonChunk.created_at,
               };
-
+              // Якщо `done: true` приходить разом з tool_calls, потік може завершитися тут
               if (jsonChunk.done === true) {
-                yield {
-                  type: "done",
-                  model: jsonChunk.model,
-                  created_at: jsonChunk.created_at,
-                  context: jsonChunk.context,
-                  total_duration: jsonChunk.total_duration,
-                  load_duration: jsonChunk.load_duration,
-                  prompt_eval_count: jsonChunk.prompt_eval_count,
-                  prompt_eval_duration: jsonChunk.prompt_eval_duration,
-                  eval_count: jsonChunk.eval_count,
-                  eval_duration: jsonChunk.eval_duration,
-                };
-
-                return;
+                 this.logger.debug("[OllamaService] Stream done (with tool calls).");
+                 yield {
+                    type: "done",
+                    model: jsonChunk.model,
+                    created_at: jsonChunk.created_at,
+                    context: jsonChunk.context,
+                    total_duration: jsonChunk.total_duration,
+                    load_duration: jsonChunk.load_duration,
+                    prompt_eval_count: jsonChunk.prompt_eval_count,
+                    prompt_eval_duration: jsonChunk.prompt_eval_duration,
+                    eval_count: jsonChunk.eval_count,
+                    eval_duration: jsonChunk.eval_duration,
+                 };
+                 return; // Завершуємо генератор
               }
             } else if (typeof jsonChunk.response === "string") {
               yield {
                 type: "content",
                 response: jsonChunk.response,
-                done: jsonChunk.done || false,
+                done: jsonChunk.done || false, // `done` може бути true тут
                 model: jsonChunk.model,
                 created_at: jsonChunk.created_at,
               };
               if (jsonChunk.done === true) {
+                // `done: true` з `response` може не бути фінальним чанком,
+                // фінальний може бути окремий "summary" чанк.
+                // Не виходимо звідси, чекаємо на summary chunk або кінець потоку.
+                 this.logger.debug("[OllamaService] Content chunk with done=true, but continuing for potential summary chunk.");
               }
-            } else if (jsonChunk.done === true) {
+            } else if (jsonChunk.done === true) { // Це "summary" чанк без `response` або `message`
+              this.logger.debug("[OllamaService] Stream done (summary chunk).");
               yield {
                 type: "done",
                 model: jsonChunk.model,
@@ -275,18 +337,26 @@ export class OllamaService {
                 eval_count: jsonChunk.eval_count,
                 eval_duration: jsonChunk.eval_duration,
               };
-              return;
+              return; // Завершуємо генератор
             } else if (
               jsonChunk.message &&
               (jsonChunk.message.content === null || jsonChunk.message.content === "") &&
               !jsonChunk.message.tool_calls
             ) {
+              // Це може бути порожнє повідомлення асистента, яке ініціює виклик інструменту (якщо формат Ollama це підтримує)
+              // Або просто порожній чанк, який ігноруємо
+              this.logger.debug("[OllamaService] Received empty assistant message chunk without tool calls. Ignoring.", jsonChunk);
             }
-          } catch (e: any) {}
+          } catch (e: any) {
+            this.logger.error("[OllamaService] Error parsing JSON line from stream:", e, "Line content:", line);
+            // Не кидаємо помилку тут, щоб спробувати обробити наступні рядки,
+            // але це може вказувати на проблему з форматом потоку.
+          }
         }
-      }
+      } // кінець while(true)
     } catch (error: any) {
       if (error.name === "AbortError") {
+        this.logger.info("[OllamaService] Stream generation aborted by user (outer catch).");
         yield { type: "error", error: "Generation aborted by user.", done: true };
       } else {
         let errorMessage = error instanceof Error ? error.message : "Unknown error generating stream.";
@@ -299,9 +369,11 @@ export class OllamaService {
           errorMessage = `Connection Error: Failed to reach Ollama at ${this.plugin.settings.ollamaServerUrl}. Is it running?`;
           this.emit("connection-error", new Error(errorMessage));
         }
+        this.logger.error(`[OllamaService] Error in generateChatResponseStream (outer catch): ${errorMessage}`, error);
         yield { type: "error", error: errorMessage, done: true };
       }
     } finally {
+      this.logger.debug("[OllamaService] generateChatResponseStream finished.");
     }
   }
 
