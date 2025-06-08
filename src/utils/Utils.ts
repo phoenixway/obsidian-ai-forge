@@ -1,5 +1,5 @@
 // Helper function to convert a File object to a base64 data URL
-async function fileToBase64(file: File): Promise<string> {
+export async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);
@@ -9,7 +9,7 @@ async function fileToBase64(file: File): Promise<string> {
 }
 
 // Helper function to read a File object as text
-async function fileToText(file: File): Promise<string> {
+export async function fileToText(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);

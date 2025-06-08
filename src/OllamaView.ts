@@ -21,6 +21,7 @@ import { Chat, ChatMetadata } from "./Chat";
 import { SummaryModal } from "./SummaryModal";
 import { AssistantMessage, Message, OllamaGenerateResponse, OllamaStreamChunk, ToolCall } from "./types";
 import { MessageRole as MessageRoleTypeFromTypes } from "./types";
+import { fileToText, fileToBase64 } from "./utils/Utils";
 
 import { CSS_CLASSES } from "./constants";
 
@@ -3292,7 +3293,7 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     if (this.isProcessing || this.currentAbortController) {
       if (this.isProcessing || this.currentAbortController) {
         new Notice("Please wait or cancel current operation.", 3000);
-      }
+      }fileToText
       return;
     }
 

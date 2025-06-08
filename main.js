@@ -16842,6 +16842,24 @@ var SummaryModal = class extends import_obsidian5.Modal {
   }
 };
 
+// src/utils/Utils.ts
+async function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+async function fileToText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (error) => reject(error);
+    reader.readAsText(file);
+  });
+}
+
 // src/constants.ts
 var CSS_CLASSES = {
   MESSAGE_GROUP: "message-group",
@@ -22776,6 +22794,7 @@ Summary:`;
       if (this.isProcessing || this.currentAbortController) {
         new import_obsidian16.Notice("Please wait or cancel current operation.", 3e3);
       }
+      fileToText;
       return;
     }
     const attachmentsData = this.attachmentManager.getActiveAttachmentsForApi();
