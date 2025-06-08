@@ -358,24 +358,6 @@
 
 // ... (існуючі стилі) ...
 
-// --- Стилі для прикріплених документів у повідомленнях ---
-.message-attached-documents-container {
-  width: 100%; // Займає всю ширину бульбашки повідомлення
-  margin-top: 10px; // Відступ, якщо є інший контент перед документами
-}
-
-.attached-document-block {
-  background-color: var(--background-secondary); // Трохи інший фон для виділення
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m, 6px);
-  padding: calc(var(--chat-spacing-unit, 5px) * 1.5) calc(var(--chat-spacing-unit, 5px) * 2);
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 2); // Відступ між кількома документами
-  box-sizing: border-box;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-}
 
 .attached-document-header {
   display: flex;
@@ -483,4 +465,132 @@
     background-color: var(--interactive-accent-hover);
     color: var(--text-on-accent);
   }
+}
+
+// ... (існуючі стилі) ...
+
+// --- Стилі для нової структури повідомлення користувача ---
+.user-content-attachments-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end; // Вирівнювання по правому краю для користувача
+  width: 100%; // Дозволяє карткам та бульбашці займати доступну ширину
+  max-width: var(--chat-message-max-width, 700px); // Обмежуємо максимальну ширину
+}
+
+.message-attachment-cards-container {
+  display: flex;
+  flex-wrap: wrap; // Дозволяє карткам переноситися
+  gap: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відстань між картками
+  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відстань до бульбашки повідомлення
+  align-self: stretch; // Розтягує контейнер карток на всю ширину user-content-attachments-wrapper
+
+  &.hidden-attachment-cards {
+    display: none; // Повністю ховаємо, якщо немає карток
+  }
+}
+
+.attachment-card {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  padding: calc(var(--chat-spacing-unit, 5px) * 2);
+  min-width: 120px; // Мінімальна ширина картки
+  max-width: 200px; // Максимальна ширина картки
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--chat-spacing-unit, 5px) * 0.5);
+  transition: box-shadow 0.2s ease-out;
+  cursor: default; // Або pointer, якщо буде дія по кліку
+
+  &:hover {
+    box-shadow: var(--shadow-s);
+  }
+}
+
+.attachment-card-name {
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-ui-small);
+}
+
+.attachment-card-meta {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between; // Якщо буде кілька елементів (напр. lines та size)
+}
+
+.attachment-card-lines,
+.attachment-card-size {
+  // Стилі для кількості рядків або розміру
+}
+
+.attachment-card-type {
+  font-size: var(--font-ui-tiny); // Дуже маленький шрифт для типу
+  color: var(--text-faint);
+  background-color: var(--background-modifier-hover);
+  padding: calc(var(--chat-spacing-unit, 5px) * 0.25) calc(var(--chat-spacing-unit, 5px) * 1);
+  border-radius: var(--radius-s);
+  align-self: flex-start; // Розміщуємо зліва
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.attachment-card.image-card {
+  // Спеціальні стилі для картки зображення, якщо потрібно
+  // Наприклад, можна зробити її трохи меншою або іншого розміру
+  padding: calc(var(--chat-spacing-unit, 5px) * 1); // Менший падінг для картки з зображенням
+}
+
+.attachment-card-image-preview {
+  width: 100%; // Займає всю ширину картки
+  max-height: 80px; // Обмежуємо висоту прев'ю
+  object-fit: cover;
+  border-radius: var(--radius-s);
+  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5);
+}
+
+// Обгортка для бульбашки повідомлення, щоб вона була під картками
+.user-message-bubble-wrapper {
+  width: fit-content; // Щоб бульбашка не розтягувалася на всю ширину, якщо текст короткий
+  max-width: 100%; // Але може займати всю доступну ширину
+  align-self: flex-end; // Вирівнювання по правому краю
+  
+  // Цей клас додається, якщо текст користувача порожній, але є вкладення
+  .message.empty-user-text-bubble {
+    // Можна зробити її менш помітною або взагалі невидимою,
+    // якщо вона не містить timestamp/кнопок
+    padding: calc(var(--chat-spacing-unit, 5px) * 1) !important; // Мінімальний падінг
+    min-height: 0 !important;
+    background-color: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
+// Мінімальна обгортка для мета-інформації, якщо немає основної бульбашки
+.minimal-meta-actions-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
+  padding-right: calc(var(--chat-spacing-unit, 5px) * 0.5); // Невеликий відступ справа
+
+  .message-timestamp {
+    font-size: 0.7em;
+    color: var(--text-faint);
+  }
+}
+
+// Прибираємо стару обгортку для документів всередині бульбашки, якщо вона ще десь використовується
+.message-attached-documents-container {
+  // display: none !important; // Або видалити повністю, якщо більше не потрібна
+}
+.attached-document-block {
+  // display: none !important; // Або видалити повністю
 }

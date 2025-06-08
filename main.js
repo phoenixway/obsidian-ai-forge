@@ -17471,22 +17471,36 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
   render() {
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
     renderAvatar(this.app, this.plugin, messageGroup, true, "user");
-    const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
-    messageWrapper.style.order = "1";
-    const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
-    const userTextContent = this.message.content || "";
-    if (userTextContent.trim() !== "") {
-      import_obsidian8.MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-      fixBrokenTwemojiImages(contentEl);
+    const contentAndAttachmentsWrapper = messageGroup.createDiv({ cls: "user-content-attachments-wrapper" });
+    contentAndAttachmentsWrapper.style.order = "1";
+    const attachmentsCardContainer = contentAndAttachmentsWrapper.createDiv({ cls: "message-attachment-cards-container" });
+    let hasAttachmentCards = false;
+    if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
+      hasAttachmentCards = true;
+      this.message.attachedDocuments.forEach((docInfo) => {
+        const docCard = attachmentsCardContainer.createDiv({ cls: "attachment-card document-card" });
+        const nameEl = docCard.createDiv({ cls: "attachment-card-name", text: docInfo.name });
+        nameEl.setAttribute("title", docInfo.name);
+        const metaLine = docCard.createDiv({ cls: "attachment-card-meta" });
+        if (docInfo.content) {
+          const lineCount = (docInfo.content.match(/\n/g) || []).length + 1;
+          metaLine.createSpan({ cls: "attachment-card-lines", text: `${lineCount} lines` });
+        } else {
+          metaLine.createSpan({ cls: "attachment-card-size", text: `${(docInfo.size / 1024).toFixed(1)} KB` });
+        }
+        const typeText = (docInfo.type.split(".").pop() || docInfo.type).toUpperCase();
+        docCard.createDiv({ cls: "attachment-card-type", text: typeText });
+      });
     }
     if (this.message.images && this.message.images.length > 0) {
-      const imagesContainer = contentEl.createDiv({ cls: "message-images-container" });
-      this.message.images.forEach((imageDataUrl) => {
-        const imgEl = imagesContainer.createEl("img", {
-          attr: { src: imageDataUrl },
-          cls: "message-attached-image"
-        });
-        imgEl.addEventListener("click", () => {
+      hasAttachmentCards = true;
+      this.message.images.forEach((imageDataUrl, index) => {
+        const imageName = `Image ${index + 1}`;
+        const imageCard = attachmentsCardContainer.createDiv({ cls: "attachment-card image-card" });
+        const imgPreview = imageCard.createEl("img", { attr: { src: imageDataUrl }, cls: "attachment-card-image-preview" });
+        const nameEl = imageCard.createDiv({ cls: "attachment-card-name", text: imageName });
+        nameEl.setAttribute("title", imageName);
+        imageCard.addEventListener("click", () => {
           const newTab = window.open();
           if (newTab) {
             newTab.document.write(`
@@ -17494,95 +17508,47 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
                                 <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
                             </body>
                         `);
-            newTab.document.title = "Attached Image";
+            newTab.document.title = imageName;
           } else {
             new import_obsidian8.Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
           }
         });
       });
+    }
+    if (!hasAttachmentCards) {
+      attachmentsCardContainer.addClass("hidden-attachment-cards");
+    }
+    const messageBubbleWrapper = contentAndAttachmentsWrapper.createDiv({ cls: "user-message-bubble-wrapper" });
+    const userTextContent = this.message.content || "";
+    if (userTextContent.trim() !== "" || !hasAttachmentCards) {
+      const { messageEl, contentEl } = this.createMessageBubble(messageBubbleWrapper, [CSS_CLASSES.USER_MESSAGE]);
       if (userTextContent.trim() !== "") {
-        imagesContainer.style.marginTop = "10px";
+        import_obsidian8.MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+        fixBrokenTwemojiImages(contentEl);
+      } else {
+        messageEl.addClass("empty-user-text-bubble");
       }
-    }
-    if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
-      const documentsContainer = contentEl.createDiv({ cls: "message-attached-documents-container" });
-      if (userTextContent.trim() !== "" || this.message.images && this.message.images.length > 0) {
-        documentsContainer.style.marginTop = "15px";
-      }
-      this.message.attachedDocuments.forEach((docInfo) => {
-        const docBlock = documentsContainer.createDiv({ cls: "attached-document-block" });
-        const docHeader = docBlock.createDiv({ cls: "attached-document-header" });
-        let iconName = "file";
-        if (docInfo.previewType === "markdown")
-          iconName = "file-text";
-        else if (docInfo.previewType === "text")
-          iconName = "file-code";
-        else if (docInfo.type.includes("pdf"))
-          iconName = "file-type-pdf";
-        (0, import_obsidian8.setIcon)(docHeader.createSpan({ cls: "attached-document-icon" }), iconName);
-        docHeader.createSpan({ cls: "attached-document-name", text: docInfo.name });
-        docHeader.createSpan({ cls: "attached-document-size", text: `(${(docInfo.size / 1024).toFixed(1)} KB)` });
-        if (docInfo.previewType !== "generic_file" && docInfo.content) {
-          const docContentWrapper = docBlock.createDiv({ cls: "attached-document-content-wrapper" });
-          const docContentEl = docContentWrapper.createDiv({ cls: "attached-document-content" });
-          const maxPreviewLength = 300;
-          const needsVisualTruncation = docInfo.content.length > maxPreviewLength;
-          if (docInfo.previewType === "markdown") {
-            const mdToRender = needsVisualTruncation ? docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*" : docInfo.content;
-            import_obsidian8.MarkdownRenderer.render(this.app, mdToRender, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-          } else if (docInfo.previewType === "text") {
-            const pre = docContentEl.createEl("pre");
-            pre.setText(needsVisualTruncation ? docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*" : docInfo.content);
-          }
-          fixBrokenTwemojiImages(docContentEl);
-          if (needsVisualTruncation) {
-            docContentEl.addClass("truncated");
-            const showMoreBtn = docBlock.createEl("button", { cls: "attached-document-show-more", text: "Show Full Content" });
-            showMoreBtn.onClickEvent(async (e) => {
-              e.stopPropagation();
-              if (docContentEl.hasClass("truncated")) {
-                docContentEl.empty();
-                if (docInfo.previewType === "markdown") {
-                  await import_obsidian8.MarkdownRenderer.render(this.app, docInfo.content, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                } else {
-                  docContentEl.createEl("pre").setText(docInfo.content);
-                }
-                fixBrokenTwemojiImages(docContentEl);
-                docContentEl.removeClass("truncated");
-                docContentEl.style.maxHeight = "none";
-                showMoreBtn.setText("Show Less");
-              } else {
-                docContentEl.empty();
-                if (docInfo.previewType === "markdown") {
-                  const previewMd = docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*";
-                  await import_obsidian8.MarkdownRenderer.render(this.app, previewMd, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                } else {
-                  docContentEl.createEl("pre").setText(docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*");
-                }
-                fixBrokenTwemojiImages(docContentEl);
-                docContentEl.addClass("truncated");
-                docContentEl.style.maxHeight = "";
-                showMoreBtn.setText("Show Full Content");
-              }
-              this.view.guaranteedScrollToBottom(50, false);
-            });
-          }
-        } else if (docInfo.previewType === "generic_file") {
-          const genericInfo = docBlock.createDiv({ cls: "attached-document-generic-info" });
-          genericInfo.setText(`This is a ${docInfo.type} file. Its content is not directly sent to the AI unless it's a known text format. You can ask the AI about it based on its name and type.`);
+      const metaActionsWrapper = messageBubbleWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+      BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+      this.addUserActionButtons(metaActionsWrapper);
+      setTimeout(() => {
+        if (messageGroup.isConnected) {
+          this.view.checkMessageForCollapsing(messageGroup);
         }
-      });
+      }, 70);
+    } else {
+      const minimalMetaWrapper = contentAndAttachmentsWrapper.createDiv({ cls: "minimal-meta-actions-wrapper" });
+      BaseMessageRenderer.addTimestampToElement(minimalMetaWrapper, this.message.timestamp, this.view);
     }
-    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
-    this.addUserActionButtons(metaActionsWrapper);
-    setTimeout(() => {
-      if (messageGroup.isConnected) {
-        this.view.checkMessageForCollapsing(messageGroup);
-      }
-    }, 70);
     return messageGroup;
   }
+  // Допоміжна функція для отримання іконки (поки що проста)
+  // private getIconForDocument(docInfo: AttachedDocumentInfo): string {
+  //     if (docInfo.previewType === 'markdown') return "file-text";
+  //     if (docInfo.previewType === 'text') return "file-code";
+  //     if (docInfo.type.includes("pdf")) return "file-type-pdf";
+  //     return "file";
+  // }
   addUserActionButtons(parentElementForActionsContainer) {
     const messageTimestamp = this.message.timestamp.getTime().toString();
     let actionsWrapperActual = parentElementForActionsContainer.querySelector(`.${CSS_CLASSES.MESSAGE_ACTIONS}[data-message-timestamp="${messageTimestamp}"]`);

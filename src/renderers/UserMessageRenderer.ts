@@ -16,35 +16,69 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		}
 	}
 
-		public render(): HTMLElement {
+			public render(): HTMLElement {
+        // Головна обгортка для всього блоку повідомлення користувача (аватар, картки вкладень, бульбашка повідомлення)
 		const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
 
 		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, true, "user");
 
-		const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
-		messageWrapper.style.order = "1";
+        // Обгортка для контенту праворуч від аватара (картки + бульбашка)
+        const contentAndAttachmentsWrapper = messageGroup.createDiv({cls: "user-content-attachments-wrapper"});
+        contentAndAttachmentsWrapper.style.order = "1"; // Розміщуємо праворуч від аватара
 
-        const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
+        // --- NEW: Контейнер для карток вкладень (файли та зображення) ---
+        const attachmentsCardContainer = contentAndAttachmentsWrapper.createDiv({ cls: "message-attachment-cards-container" });
+        let hasAttachmentCards = false;
 
-        // Рендеринг message.content (оригінальний текст користувача + посилання)
-		const userTextContent = this.message.content || "";
-		if (userTextContent.trim() !== "") {
-            // Використовуємо MarkdownRenderer, оскільки message.content може містити посилання,
-            // які ми додали як Markdown
-            MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-            RendererUtils.fixBrokenTwemojiImages(contentEl); // На випадок емодзі в посиланнях/тексті
+        // Рендеринг карток для прикріплених документів
+        if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
+            hasAttachmentCards = true;
+            this.message.attachedDocuments.forEach(docInfo => {
+                const docCard = attachmentsCardContainer.createDiv({ cls: "attachment-card document-card" });
+                // Іконка (якщо потрібна всередині картки, а не тільки текст типу)
+                // setIcon(docCard.createSpan({ cls: "attachment-card-icon" }), this.getIconForDocument(docInfo));
+                
+                const nameEl = docCard.createDiv({ cls: "attachment-card-name", text: docInfo.name });
+                nameEl.setAttribute("title", docInfo.name); // Повна назва при наведенні
+
+                const metaLine = docCard.createDiv({cls: "attachment-card-meta"});
+                if (docInfo.content) {
+                    const lineCount = (docInfo.content.match(/\n/g) || []).length + 1;
+                    metaLine.createSpan({ cls: "attachment-card-lines", text: `${lineCount} lines` });
+                } else {
+                    metaLine.createSpan({ cls: "attachment-card-size", text: `${(docInfo.size / 1024).toFixed(1)} KB` });
+                }
+                
+                const typeText = (docInfo.type.split('.').pop() || docInfo.type).toUpperCase();
+                docCard.createDiv({ cls: "attachment-card-type", text: typeText });
+
+                // Обробник кліку на картку (можна додати пізніше, наприклад, для відкриття файлу)
+                // docCard.addEventListener('click', () => { /* ... */ });
+            });
         }
 
-        // Рендеринг прикріплених зображень (якщо є)
+        // Рендеринг карток для прикріплених зображень
         if (this.message.images && this.message.images.length > 0) {
-            // ... (логіка рендерингу зображень залишається такою ж) ...
-            const imagesContainer = contentEl.createDiv({ cls: "message-images-container" });
-            this.message.images.forEach(imageDataUrl => {
-                const imgEl = imagesContainer.createEl("img", {
-                    attr: { src: imageDataUrl },
-                    cls: "message-attached-image"
-                });
-                imgEl.addEventListener('click', () => {
+            hasAttachmentCards = true;
+            this.message.images.forEach((imageDataUrl, index) => {
+                // Спробуємо отримати назву з даних, якщо вона там є, або генеруємо
+                const imageName = `Image ${index + 1}`; // TODO: Якщо є можливість, передавати сюди реальну назву файлу зображення
+                                                    // Це вимагатиме змін в AttachmentManager та Message для зберігання назв файлів зображень
+
+                const imageCard = attachmentsCardContainer.createDiv({ cls: "attachment-card image-card" });
+                // Можна додати мініатюру зображення всередину картки замість іконки/типу
+                const imgPreview = imageCard.createEl("img", {attr: {src: imageDataUrl}, cls: "attachment-card-image-preview"});
+
+                const nameEl = imageCard.createDiv({ cls: "attachment-card-name", text: imageName });
+                nameEl.setAttribute("title", imageName);
+
+                // Розмір для зображень зазвичай не такий важливий як для документів, але можна додати, якщо є дані
+                // const metaLine = imageCard.createDiv({cls: "attachment-card-meta"});
+                // metaLine.createSpan({ cls: "attachment-card-size", text: `... KB` }); // Потрібно буде передавати розмір
+                
+                // imageCard.createDiv({ cls: "attachment-card-type", text: "IMAGE" }); // Або розширення, якщо відоме
+
+                imageCard.addEventListener('click', () => {
                     const newTab = window.open();
                     if (newTab) {
                         newTab.document.write(`
@@ -52,107 +86,70 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                                 <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
                             </body>
                         `);
-                        newTab.document.title = "Attached Image";
+                        newTab.document.title = imageName;
                     } else {
                         new Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
                     }
                 });
             });
+        }
+        
+        // Сховати контейнер карток, якщо він порожній
+        if (!hasAttachmentCards) {
+            attachmentsCardContainer.addClass("hidden-attachment-cards");
+        }
+        // --- END NEW: Контейнер для карток ---
+
+
+		// Контейнер для самої бульбашки повідомлення користувача
+        const messageBubbleWrapper = contentAndAttachmentsWrapper.createDiv({cls: "user-message-bubble-wrapper"});
+        // Якщо немає тексту від користувача, але є картки, то цю бульбашку можна не створювати або зробити її меншою
+        const userTextContent = this.message.content || "";
+        if (userTextContent.trim() !== "" || !hasAttachmentCards) { // Показуємо бульбашку, якщо є текст АБО якщо немає карток (щоб не було порожньо)
+            const { messageEl, contentEl } = this.createMessageBubble(messageBubbleWrapper, [CSS_CLASSES.USER_MESSAGE]);
+            
             if (userTextContent.trim() !== "") {
-                 imagesContainer.style.marginTop = "10px";
-            }
-        }
-
-        // Рендеринг блоків прикріплених документів
-        if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
-            const documentsContainer = contentEl.createDiv({ cls: "message-attached-documents-container" });
-            // Додаємо відступ, якщо є будь-який інший контент (текст або зображення)
-            if (userTextContent.trim() !== "" || (this.message.images && this.message.images.length > 0)) {
-                 documentsContainer.style.marginTop = "15px";
+                MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                RendererUtils.fixBrokenTwemojiImages(contentEl);
+            } else {
+                // Якщо бульбашка створена, але тексту немає (наприклад, тільки вкладення відправлені),
+                // можна залишити її порожньою або додати плейсхолдер/зробити її меншою
+                // contentEl.setText(" "); // Щоб вона не колапсувала повністю, якщо порожня
+                messageEl.addClass("empty-user-text-bubble"); // Для спеціальних стилів, якщо потрібно
             }
 
-            this.message.attachedDocuments.forEach(docInfo => {
-                // Блок документа тепер завжди відображається, оскільки вміст не вбудовується в message.content
-                const docBlock = documentsContainer.createDiv({ cls: "attached-document-block" });
-                
-                const docHeader = docBlock.createDiv({ cls: "attached-document-header" });
-                
-                let iconName = "file";
-                if (docInfo.previewType === 'markdown') iconName = "file-text";
-                else if (docInfo.previewType === 'text') iconName = "file-code";
-                else if (docInfo.type.includes("pdf")) iconName = "file-type-pdf"; // Потрібна відповідна іконка
-                
-                setIcon(docHeader.createSpan({cls: "attached-document-icon"}), iconName);
-                docHeader.createSpan({ cls: "attached-document-name", text: docInfo.name });
-                docHeader.createSpan({ cls: "attached-document-size", text: `(${(docInfo.size / 1024).toFixed(1)} KB)` });
-
-                if (docInfo.previewType !== 'generic_file' && docInfo.content) {
-                    const docContentWrapper = docBlock.createDiv({ cls: "attached-document-content-wrapper" });
-                    const docContentEl = docContentWrapper.createDiv({ cls: "attached-document-content" });
-                    
-                    const maxPreviewLength = 300; // Цей ліміт тепер лише для візуального прев'ю
-                    const needsVisualTruncation = docInfo.content.length > maxPreviewLength;
-
-                    if (docInfo.previewType === 'markdown') {
-                        const mdToRender = needsVisualTruncation ? docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*" : docInfo.content;
-                        MarkdownRenderer.render(this.app, mdToRender, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                    } else if (docInfo.previewType === 'text') {
-                        const pre = docContentEl.createEl("pre");
-                        pre.setText(needsVisualTruncation ? docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*" : docInfo.content);
-                    }
-                    RendererUtils.fixBrokenTwemojiImages(docContentEl);
-
-                    if (needsVisualTruncation) {
-                        docContentEl.addClass("truncated"); // Для CSS, щоб застосувати градієнт, якщо він є
-                        const showMoreBtn = docBlock.createEl("button", { cls: "attached-document-show-more", text: "Show Full Content" });
-                        showMoreBtn.onClickEvent(async (e) => {
-                            e.stopPropagation();
-                            if (docContentEl.hasClass("truncated")) { // Стан "згорнуто"
-                                docContentEl.empty();
-                                if (docInfo.previewType === 'markdown') {
-                                    await MarkdownRenderer.render(this.app, docInfo.content!, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                                } else { // 'text'
-                                    docContentEl.createEl("pre").setText(docInfo.content!);
-                                }
-                                RendererUtils.fixBrokenTwemojiImages(docContentEl);
-                                docContentEl.removeClass("truncated");
-                                docContentEl.style.maxHeight = "none"; // Зняти обмеження висоти
-                                showMoreBtn.setText("Show Less");
-                            } else { // Стан "розгорнуто"
-                                docContentEl.empty();
-                                if (docInfo.previewType === 'markdown') {
-                                    const previewMd = docInfo.content!.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*";
-                                    await MarkdownRenderer.render(this.app, previewMd, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                                } else { // 'text'
-                                    docContentEl.createEl("pre").setText(docInfo.content!.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*");
-                                }
-                                RendererUtils.fixBrokenTwemojiImages(docContentEl);
-                                docContentEl.addClass("truncated");
-                                docContentEl.style.maxHeight = ""; // Повернути CSS обмеження, якщо воно є
-                                showMoreBtn.setText("Show Full Content");
-                            }
-                            this.view.guaranteedScrollToBottom(50, false);
-                        });
-                    }
-                } else if (docInfo.previewType === 'generic_file') {
-                    const genericInfo = docBlock.createDiv({cls: "attached-document-generic-info"});
-                    genericInfo.setText(`This is a ${docInfo.type} file. Its content is not directly sent to the AI unless it's a known text format. You can ask the AI about it based on its name and type.`);
+            const metaActionsWrapper = messageBubbleWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+            BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+            this.addUserActionButtons(metaActionsWrapper); // addUserActionButtons тепер приймає metaActionsWrapper
+            
+            // Перевірка на згортання основного текстового повідомлення
+            setTimeout(() => {
+                if (messageGroup.isConnected) {
+                    this.view.checkMessageForCollapsing(messageGroup);
                 }
-            });
+            }, 70);
+        } else {
+            // Якщо є картки, але немає тексту, то не створюємо бульбашку для тексту.
+            // Можна додати timestamp та кнопки дій якось інакше, або не додавати, якщо немає основного тексту.
+            // Наприклад, можна додати timestamp під картками, якщо це логічно.
+            // Для простоти, поки що дії та timestamp пов'язані з текстовою бульбашкою.
+            // Альтернатива: створити маленький блок для timestamp/дій під картками.
+            const minimalMetaWrapper = contentAndAttachmentsWrapper.createDiv({ cls: "minimal-meta-actions-wrapper" });
+            BaseMessageRenderer.addTimestampToElement(minimalMetaWrapper, this.message.timestamp, this.view);
+            // Кнопки дій для повідомлення без тексту можуть бути не потрібні, або потрібен інший набір.
+            // this.addUserActionButtons(minimalMetaWrapper); // Поки що не додаємо кнопки, якщо немає тексту.
         }
-		
-		const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-		BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
-		this.addUserActionButtons(metaActionsWrapper);
-
-		setTimeout(() => {
-			if (messageGroup.isConnected) { // Перевіряємо messageGroup замість contentEl
-				this.view.checkMessageForCollapsing(messageGroup);
-			}
-		}, 70);
 
 		return messageGroup;
 	}
+
+    // Допоміжна функція для отримання іконки (поки що проста)
+    // private getIconForDocument(docInfo: AttachedDocumentInfo): string {
+    //     if (docInfo.previewType === 'markdown') return "file-text";
+    //     if (docInfo.previewType === 'text') return "file-code";
+    //     if (docInfo.type.includes("pdf")) return "file-type-pdf";
+    //     return "file";
+    // }
 
     private addUserActionButtons(parentElementForActionsContainer: HTMLElement): void {
 		const messageTimestamp = this.message.timestamp.getTime().toString();
