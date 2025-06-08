@@ -3286,8 +3286,8 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
   }
 
-    async sendMessage(): Promise<void> {
-    const userInputText = this.inputEl.value.trim();
+      async sendMessage(): Promise<void> {
+    const userInputText = this.inputEl.value.trim(); // Оригінальний текст користувача
     const requestTimestampId = Date.now();
 
     if (this.isProcessing || this.currentAbortController) {
@@ -3298,79 +3298,56 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
     }
 
     const attachmentsData = this.attachmentManager.getActiveAttachmentsForApi();
-    let finalUserInputText = userInputText;
+    let textForUserDisplay = userInputText; // Текст, який буде в message.content
     const imageDataUrls: string[] = [];
     const documentInfos: AttachedDocumentInfo[] = [];
-    let hasContentToSend = userInputText.length > 0;
+    let hasContentToSend = userInputText.length > 0; // Чи є що надсилати (текст або вкладення)
 
-    // Обробка посилань
+    // Обробка посилань (додаємо до тексту, який бачить користувач І LLM)
     if (attachmentsData.links.length > 0) {
       const linksText = attachmentsData.links.map(link => `- ${link}`).join("\n");
-      finalUserInputText += `\n\nAttached links:\n${linksText}`;
+      // Додаємо до тексту, який буде збережено в message.content
+      textForUserDisplay += (textForUserDisplay ? "\n\n" : "") + `Attached links:\n${linksText}`;
       hasContentToSend = true;
     }
 
-    // Обробка документів
+    // Обробка документів (збираємо інформацію для Message.attachedDocuments)
+    // Вміст текстових файлів більше не додається до textForUserDisplay,
+    // він буде переданий LLM через PromptService.
     if (attachmentsData.documents.length > 0) {
-      let documentPlaceholdersText = "\n\n--- Attached Documents Context ---\n";
       for (const docFile of attachmentsData.documents) {
         let docContent: string | null = null;
         let previewType: DocumentPreviewType = 'generic_file';
         const fileExtension = docFile.name.split('.').pop()?.toLowerCase() || '';
 
         try {
+          // Визначаємо тип і читаємо вміст, якщо це текстовий файл
           if (['txt', 'log', 'csv', 'json', 'js', 'ts', 'py', 'html', 'css', 'xml', 'yaml', 'ini', 'sql', 'java', 'c', 'cpp', 'h', 'cs', 'go', 'php', 'rb', 'swift', 'kt', 'dart', 'rs', 'sh', 'ps1', 'bat'].includes(fileExtension)) {
             docContent = await fileToText(docFile);
             previewType = 'text';
           } else if (fileExtension === 'md') {
             docContent = await fileToText(docFile);
             previewType = 'markdown';
-          } else if (['pdf'].includes(fileExtension)) {
-            // Для PDF поки що не витягуємо текст автоматично для LLM,
-            // але можемо це зробити для previewContent, якщо потрібно.
-            // Для LLM просто вказуємо назву.
-            // В майбутньому тут може бути логіка витягування тексту з PDF.
-            previewType = 'generic_file'; // або 'pdf_preview', якщо є спеціальний рендеринг
-            docContent = null; // Або текстове прев'ю з перших N символів, якщо витягнуто
-            this.plugin.logger.info(`PDF attached: ${docFile.name}. Content extraction not yet implemented for direct LLM input.`);
-          } else {
-            // Інші типи - вважаємо їх "generic"
+          } else { // Для PDF та інших - поки generic
             previewType = 'generic_file';
-            docContent = null; // Не намагаємося читати бінарні файли як текст
-            this.plugin.logger.info(`Generic file attached: ${docFile.name}. Type: ${docFile.type || fileExtension}`);
+            docContent = null; 
+            this.plugin.logger.info(`[sendMessage] Attachment of type '${fileExtension}' (${docFile.name}) will be listed; content not directly sent to LLM from here.`);
           }
 
           documentInfos.push({
             name: docFile.name,
             type: docFile.type || fileExtension,
-            content: docContent, // Може бути null
+            content: docContent, // Зберігаємо вміст для PromptService та рендерера
             previewType: previewType,
             size: docFile.size,
           });
-          // Додаємо інформацію про файл до тексту для LLM
-          documentPlaceholdersText += `- File: ${docFile.name} (Type: ${previewType}, Size: ${(docFile.size / 1024).toFixed(1)} KB)\n`;
-          if (docContent && (previewType === 'text' || previewType === 'markdown')) {
-            // Для текстових файлів, які модель може зрозуміти, додаємо їх вміст в промпт.
-            // Обмежимо довжину, щоб не перевантажити промпт.
-            const maxContentLengthForPrompt = 2000; // Символів
-            let contentForPrompt = docContent;
-            if (docContent.length > maxContentLengthForPrompt) {
-                contentForPrompt = docContent.substring(0, maxContentLengthForPrompt) + "\n... (content truncated in prompt) ...";
-                 documentPlaceholdersText += `  (Content preview included in prompt, full content available to renderer)\n`;
-            } else {
-                 documentPlaceholdersText += `  (Full content included in prompt)\n`;
-            }
-            documentPlaceholdersText += `\n\`\`\`${fileExtension || 'text'}\n${contentForPrompt}\n\`\`\`\n\n`;
-          }
-
-
         } catch (error) {
-          this.plugin.logger.error(`Error processing document ${docFile.name}:`, error);
-          documentPlaceholdersText += `[Could not process document: ${docFile.name}]\n`;
+          this.plugin.logger.error(`Error processing document ${docFile.name} for attachment:`, error);
+          // Можна додати сповіщення користувачу або спеціальний docInfo про помилку
+          // Наприклад, додати плейсхолдер до textForUserDisplay про невдачу обробки
+           textForUserDisplay += (textForUserDisplay ? "\n" : "") + `[Could not attach document: ${docFile.name}]`;
         }
       }
-      documentPlaceholdersText += "--- End Attached Documents Context ---\n";
-      finalUserInputText += documentPlaceholdersText;
       if (documentInfos.length > 0) {
         hasContentToSend = true;
       }
@@ -3378,14 +3355,13 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
     // Обробка зображень
     if (attachmentsData.images.length > 0) {
-      // ... (логіка для зображень залишається такою ж) ...
       for (const imgFile of attachmentsData.images) {
         try {
           const base64DataUrl = await fileToBase64(imgFile);
           imageDataUrls.push(base64DataUrl);
         } catch (error) {
           this.plugin.logger.error(`Error converting image ${imgFile.name} to base64:`, error);
-          finalUserInputText += `\n[Failed to attach image: ${imgFile.name}]`;
+          textForUserDisplay += (textForUserDisplay ? "\n" : "") + `[Failed to attach image: ${imgFile.name}]`;
         }
       }
       if (imageDataUrls.length > 0) {
@@ -3398,21 +3374,6 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
         return;
     }
 
-    // ... (решта методу sendMessage, як і раніше, але з передачею `documentInfos`) ...
-    // ...
-    // try {
-    //   const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
-    //     finalUserInputText,
-    //     userMessageTimestamp,
-    //     requestTimestampId,
-    //     imageDataUrls.length > 0 ? imageDataUrls : undefined,
-    //     documentInfos.length > 0 ? documentInfos : undefined 
-    //   );
-    // ...
-
-    // Важливо: очищення `AttachmentManager` після успішного `addUserMessageAndAwaitRender`
-    
-    // ... (решта методу sendMessage)
     let activeChat = await this.plugin.chatManager.getActiveChat();
     if (!activeChat) {
       activeChat = await this.plugin.chatManager.createNewChat();
@@ -3434,21 +3395,22 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
 
     try {
       const userMessageAdded = await this.plugin.chatManager.addUserMessageAndAwaitRender(
-        finalUserInputText,
+        textForUserDisplay, 
         userMessageTimestamp,
         requestTimestampId,
         imageDataUrls.length > 0 ? imageDataUrls : undefined,
         documentInfos.length > 0 ? documentInfos : undefined
       );
+
       if (!userMessageAdded) {
         throw new Error("User message processing failed in ChatManager.");
       }
 
+      // Очищуємо вкладення з менеджера ПІСЛЯ успішного додавання повідомлення
       this.attachmentManager.clearAllLinks();
       this.attachmentManager.clearAllImages();
       this.attachmentManager.clearAllDocuments();
-      this.attachmentManager.hide();
-
+      this.attachmentManager.hide(); // або refresh, якщо потрібно оновити UI панелі вкладень
 
       const chatStateForLlm = await this.plugin.chatManager.getActiveChatOrFail();
 
@@ -3520,7 +3482,6 @@ this.revokeVadObjectUrls(); // Звільняємо Object URL, якщо вон�
       requestAnimationFrame(() => this.updateSendButtonState());
       this.focusInput();
     }
-
   }
 
   private handleMenuButtonClick = (e: MouseEvent): void => {

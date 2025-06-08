@@ -257,21 +257,18 @@ When analyzing any RAG context (Personal Focus or General) in a productivity-foc
     return finalTrimmedPrompt.length > 0 ? finalTrimmedPrompt : null;
   }
 
-  async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
+    async preparePromptBody(history: Message[], chatMetadata: ChatMetadata): Promise<string | null> {
     const settings = this.plugin.settings;
     const selectedRolePath =
       chatMetadata.selectedRolePath !== undefined && chatMetadata.selectedRolePath !== null
         ? chatMetadata.selectedRolePath
         : settings.selectedRolePath;
     
-    // Використовуємо _isProductivityPersonaActive, а не isProductivityRoleActive з getSystemPromptForAPI,
-    // бо нам потрібна ця інформація ДО того, як ми вирішимо, як будувати історію.
     const isProductivityActiveForHistory = await this._isProductivityPersonaActive(selectedRolePath);
 
     let taskContext = "";
+    // ... (логіка taskContext залишається) ...
     if (isProductivityActiveForHistory && settings.enableProductivityFeatures && this.plugin.chatManager) {
-      // `checkAndProcessTaskUpdate` та `getCurrentTaskState` повинні бути доступні в `this.plugin`
-      // або потрібно передавати `this.plugin.chatManager`
       await this.plugin.checkAndProcessTaskUpdate?.(); 
       const taskState = this.plugin.chatManager.getCurrentTaskState();
 
@@ -283,15 +280,46 @@ When analyzing any RAG context (Personal Focus or General) in a productivity-foc
       }
     }
 
+
+    // --- NEW: Формування контексту з прикріплених документів ОСТАННЬОГО повідомлення користувача ---
+    let attachedDocumentsContext = "";
+    const lastUserMessageWithAttachments = history.findLast(
+      m => m.role === "user" && m.attachedDocuments && m.attachedDocuments.length > 0
+    );
+
+    if (lastUserMessageWithAttachments && lastUserMessageWithAttachments.attachedDocuments) {
+      attachedDocumentsContext += "\n\n--- User Provided Documents Context ---\n";
+      for (const doc of lastUserMessageWithAttachments.attachedDocuments) {
+        attachedDocumentsContext += `Document: ${doc.name} (Type: ${doc.type}, Size: ${(doc.size / 1024).toFixed(1)} KB)\n`;
+        if (doc.content && (doc.previewType === 'text' || doc.previewType === 'markdown')) {
+          // Обмежимо довжину вмісту, що передається в промпт
+          const maxContentLengthForLlm = settings.maxDocumentContentLengthForLlm || 4000; // Наприклад, 4000 символів
+          let contentForLlm = doc.content;
+          if (doc.content.length > maxContentLengthForLlm) {
+            contentForLlm = doc.content.substring(0, maxContentLengthForLlm) + "\n... (document content truncated for LLM prompt) ...";
+          }
+          const langHint = doc.type.split('.').pop() || 'text'; // Використовуємо розширення як підказку мови для Markdown блоку
+          attachedDocumentsContext += `\n\`\`\`${langHint}\n${contentForLlm}\n\`\`\`\n\n`;
+        } else if (doc.previewType === 'generic_file') {
+          attachedDocumentsContext += "(Content of this file type is not directly included in the prompt. You can ask the user for details if needed.)\n\n";
+        }
+      }
+      attachedDocumentsContext += "--- End User Provided Documents Context ---\n";
+    }
+    // --- END NEW ---
+
+
     const approxTaskTokens = this._countTokens(taskContext);
-    // Приблизний розрахунок токенів для RAG-контексту. 
-    // 1.8 - коефіцієнт, що враховує додаткові метадані, заголовки секцій тощо.
-    // 250 - буфер для системного промпту та інших неврахованих елементів.
+    const approxDocsTokens = this._countTokens(attachedDocumentsContext); // <--- Враховуємо токени документів
     const maxRagTokens = settings.ragEnabled ? ((settings.ragTopK * settings.ragChunkSize) / 4) * 1.8 : 0; 
-    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - maxRagTokens - (settings.systemPromptBaseTokenBuffer || 250);
+    const maxHistoryTokens = settings.contextWindow - approxTaskTokens - approxDocsTokens - maxRagTokens - (settings.systemPromptBaseTokenBuffer || 250);
 
 
     let processedHistoryString = "";
+    // Передаємо історію БЕЗ останнього повідомлення користувача, якщо воно містило документи,
+    // оскільки ми вже сформували context_for_llm_from_attachments з нього.
+    // Або передаємо всю історію, і _buildSimpleContext/_buildAdvancedContext оброблять message.content як є.
+    // Наразі, історія передається як є, а message.content містить лише текст користувача + посилання.
     if (isProductivityActiveForHistory && settings.useAdvancedContextStrategy) {
       processedHistoryString = await this._buildAdvancedContext(history, chatMetadata, maxHistoryTokens);
     } else {
@@ -299,16 +327,21 @@ When analyzing any RAG context (Personal Focus or General) in a productivity-foc
     }
 
     let ragContext = "";
+    // ... (логіка RAG залишається) ...
     if (settings.ragEnabled && this.plugin.ragService && settings.ragEnableSemanticSearch) {
       const lastUserMessage = history.findLast(m => m.role === "user");
-      if (lastUserMessage?.content) {
+      // Для RAG використовуємо оригінальний текст користувача з `lastUserMessage.content`,
+      // а не `finalUserInputText` з `sendMessage`, бо `finalUserInputText` міг бути змінений.
+      if (lastUserMessage?.content) { 
         ragContext = await this.plugin.ragService.prepareContext(lastUserMessage.content);
       }
     }
 
+
     let finalPromptBodyParts: string[] = [];
-    // Порядок: RAG, потім Задачі, потім Історія. 
-    // Це дозволяє LLM спочатку отримати свіжий контекст з нотаток, потім актуальні задачі, а потім історію розмови.
+    // Порядок: RAG, потім Задачі, потім Історія, потім Вкладені Документи (з останнього повідомлення).
+    // Або: RAG, Задачі, Вкладені Документи, Історія.
+    // Я б розмістив вкладені документи БЛИЖЧЕ до останнього запиту користувача, тобто ПІСЛЯ історії.
     if (ragContext) {
       finalPromptBodyParts.push(ragContext);
     }
@@ -318,15 +351,31 @@ When analyzing any RAG context (Personal Focus or General) in a productivity-foc
     if (processedHistoryString) {
       finalPromptBodyParts.push(`### Conversation History:\n${processedHistoryString}`);
     }
+    // ДОДАЄМО КОНТЕКСТ ДОКУМЕНТІВ В КІНЦІ, ПЕРЕД ОСТАННІМ ЗАПИТОМ КОРИСТУВАЧА (який вже є в `processedHistoryString`)
+    // АБО, якщо ми хочемо, щоб він був "над" останнім запитом, то перед ним.
+    // Оскільки `processedHistoryString` вже містить останній запит користувача,
+    // `attachedDocumentsContext` (який стосується цього останнього запиту) має йти ПЕРЕД ним або бути частиною його.
+    // Краще, якщо `_buildSimpleContext` та `_buildAdvancedContext` самі оброблятимуть `message.attachedDocuments`
+    // для останнього повідомлення користувача. Але для швидкого рішення, додамо його тут окремо.
+    // Поточна логіка `_buildSimpleContext` і `_buildAdvancedContext` НЕ обробляє `message.attachedDocuments`.
+    // Тому, `attachedDocumentsContext` потрібно додати.
+    // Якщо `processedHistoryString` вже містить останнє повідомлення користувача, то `attachedDocumentsContext`
+    // має бути частиною цього останнього повідомлення або йти відразу після нього, як додатковий контекст до цього запиту.
+
+    // Переглянутий порядок: RAG, Задачі, Історія (включаючи останній запит користувача), Документи (що стосуються останнього запиту)
+    if (attachedDocumentsContext) {
+      finalPromptBodyParts.push(attachedDocumentsContext);
+    }
+
 
     const finalPromptBody = finalPromptBodyParts.join("\n\n").trim();
 
-    if (!finalPromptBody) {
-      this.plugin.logger.debug("[PromptService] preparePromptBody resulted in an empty body.");
-      return null;
+    if (!finalPromptBody && !(lastUserMessageWithAttachments && lastUserMessageWithAttachments.images && lastUserMessageWithAttachments.images.length > 0)) {
+        this.plugin.logger.debug("[PromptService] preparePromptBody resulted in an empty body and no images.");
+        return null;
     }
     
-    // this.plugin.logger.debug(`[PromptService] Final prompt body prepared:\n${finalPromptBody.substring(0, 500)}...`);
+    // this.plugin.logger.debug(`[PromptService] Final prompt body for LLM prepared (first 500 chars):\n${finalPromptBody.substring(0, 500)}...`);
     return finalPromptBody;
   }
 

@@ -40,18 +40,18 @@ export interface RoleInfo {
     isCustom: boolean;
 }
 
-// export interface Message {
-//     role: MessageRole;
-//     content: string;
-//     timestamp: Date;
-//     type?: 'warning' | 'error' | 'info'; // Це поле вже є у вас
+export interface Message {
+    role: MessageRole;
+    content: string;
+    timestamp: Date;
+    type?: 'warning' | 'error' | 'info'; // Це поле вже є у вас
 
-//     // ---> ДОДАЙТЕ/ОНОВІТЬ ЦІ ОПЦІОНАЛЬНІ ПОЛЯ <---
-//     images?: string[];      // Якщо ви підтримуєте зображення (з вашого коду OllamaView)
-//     tool_call_id?: string;  // Для відповідей від інструментів, зв'язує з ToolCall.id
-//     name?: string;          // Для відповідей від інструментів (ім'я інструменту, що був викликаний)
-//     tool_calls?: ToolCall[];// Для повідомлень асистента, що містять виклики інструментів
-// }
+    // ---> ДОДАЙТЕ/ОНОВІТЬ ЦІ ОПЦІОНАЛЬНІ ПОЛЯ <---
+    images?: string[];      // Якщо ви підтримуєте зображення (з вашого коду OllamaView)
+    tool_call_id?: string;  // Для відповідей від інструментів, зв'язує з ToolCall.id
+    name?: string;          // Для відповідей від інструментів (ім'я інструменту, що був викликаний)
+    tool_calls?: ToolCall[];// Для повідомлень асистента, що містять виклики інструментів
+}
 
 export type MessageRole = "user" | "assistant" | "system" | "error" | "tool"; // "tool" було додано для відповідей інструментів
 export interface ChatMetadata {

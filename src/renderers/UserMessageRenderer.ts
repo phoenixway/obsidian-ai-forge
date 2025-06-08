@@ -26,15 +26,18 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 
         const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
 
-        // Рендеринг основного текстового контенту
-        // Плейсхолдери для документів та посилань вже включені в message.content на етапі sendMessage
-		const contentToRender = this.message.content || "";
-		if (contentToRender.trim() !== "") {
-            RendererUtils.renderMarkdownContent(this.app, this.view, this.plugin, contentEl, contentToRender);
+        // Рендеринг message.content (оригінальний текст користувача + посилання)
+		const userTextContent = this.message.content || "";
+		if (userTextContent.trim() !== "") {
+            // Використовуємо MarkdownRenderer, оскільки message.content може містити посилання,
+            // які ми додали як Markdown
+            MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+            RendererUtils.fixBrokenTwemojiImages(contentEl); // На випадок емодзі в посиланнях/тексті
         }
 
         // Рендеринг прикріплених зображень (якщо є)
         if (this.message.images && this.message.images.length > 0) {
+            // ... (логіка рендерингу зображень залишається такою ж) ...
             const imagesContainer = contentEl.createDiv({ cls: "message-images-container" });
             this.message.images.forEach(imageDataUrl => {
                 const imgEl = imagesContainer.createEl("img", {
@@ -55,97 +58,85 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                     }
                 });
             });
-            if (contentToRender.trim() !== "") {
+            if (userTextContent.trim() !== "") {
                  imagesContainer.style.marginTop = "10px";
             }
         }
 
-        // Рендеринг блоків прикріплених документів (які НЕ були вставлені в основний контент)
+        // Рендеринг блоків прикріплених документів
         if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
             const documentsContainer = contentEl.createDiv({ cls: "message-attached-documents-container" });
-            if (contentToRender.trim() !== "" || (this.message.images && this.message.images.length > 0)) {
+            // Додаємо відступ, якщо є будь-який інший контент (текст або зображення)
+            if (userTextContent.trim() !== "" || (this.message.images && this.message.images.length > 0)) {
                  documentsContainer.style.marginTop = "15px";
             }
 
             this.message.attachedDocuments.forEach(docInfo => {
-                // Відображаємо блок документа, тільки якщо його вміст НЕ було повністю вставлено в prompt
-                // Або якщо це generic_file (наприклад, PDF), для якого ми хочемо показати блок
-                const wasContentInlinedInPrompt = docInfo.content && (docInfo.previewType === 'text' || docInfo.previewType === 'markdown');
+                // Блок документа тепер завжди відображається, оскільки вміст не вбудовується в message.content
+                const docBlock = documentsContainer.createDiv({ cls: "attached-document-block" });
                 
-                if (!wasContentInlinedInPrompt || docInfo.previewType === 'generic_file') {
-                    // Якщо вміст не було вбудовано в промпт, АБО це 'generic_file', то показуємо блок
-                    const docBlock = documentsContainer.createDiv({ cls: "attached-document-block" });
+                const docHeader = docBlock.createDiv({ cls: "attached-document-header" });
+                
+                let iconName = "file";
+                if (docInfo.previewType === 'markdown') iconName = "file-text";
+                else if (docInfo.previewType === 'text') iconName = "file-code";
+                else if (docInfo.type.includes("pdf")) iconName = "file-type-pdf"; // Потрібна відповідна іконка
+                
+                setIcon(docHeader.createSpan({cls: "attached-document-icon"}), iconName);
+                docHeader.createSpan({ cls: "attached-document-name", text: docInfo.name });
+                docHeader.createSpan({ cls: "attached-document-size", text: `(${(docInfo.size / 1024).toFixed(1)} KB)` });
+
+                if (docInfo.previewType !== 'generic_file' && docInfo.content) {
+                    const docContentWrapper = docBlock.createDiv({ cls: "attached-document-content-wrapper" });
+                    const docContentEl = docContentWrapper.createDiv({ cls: "attached-document-content" });
                     
-                    const docHeader = docBlock.createDiv({ cls: "attached-document-header" });
-                    
-                    let iconName = "file";
-                    if (docInfo.previewType === 'markdown') iconName = "file-text";
-                    else if (docInfo.previewType === 'text') iconName = "file-code"; // Або інша іконка для тексту
-                    else if (docInfo.type.includes("pdf")) iconName = "file-type-pdf"; // Потрібна іконка pdf
-                    // ... додати інші іконки для популярних типів ...
-                    setIcon(docHeader.createSpan({cls: "attached-document-icon"}), iconName);
-                    docHeader.createSpan({ cls: "attached-document-name", text: docInfo.name });
-                    docHeader.createSpan({ cls: "attached-document-size", text: `(${(docInfo.size / 1024).toFixed(1)} KB)` });
+                    const maxPreviewLength = 300; // Цей ліміт тепер лише для візуального прев'ю
+                    const needsVisualTruncation = docInfo.content.length > maxPreviewLength;
 
-
-                    // Для generic_file, ми можемо не показувати вміст, а лише інформацію
-                    if (docInfo.previewType !== 'generic_file' && docInfo.content) {
-                        const docContentWrapper = docBlock.createDiv({ cls: "attached-document-content-wrapper" });
-                        const docContentEl = docContentWrapper.createDiv({ cls: "attached-document-content" });
-                        
-                        const maxPreviewLength = 300;
-                        const needsTruncation = docInfo.content.length > maxPreviewLength;
-
-                        if (docInfo.previewType === 'markdown') {
-                            const mdToRender = needsTruncation ? docInfo.content.substring(0, maxPreviewLength) + "..." : docInfo.content;
-                            MarkdownRenderer.render(this.app, mdToRender, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                        } else if (docInfo.previewType === 'text') {
-                            const pre = docContentEl.createEl("pre");
-                            pre.setText(needsTruncation ? docInfo.content.substring(0, maxPreviewLength) + "..." : docInfo.content);
-                        }
-                        RendererUtils.fixBrokenTwemojiImages(docContentEl);
-
-                        if (needsTruncation) {
-                            docContentEl.addClass("truncated");
-                            const showMoreBtn = docBlock.createEl("button", { cls: "attached-document-show-more", text: "Show More" });
-                            showMoreBtn.onClickEvent(async (e) => {
-                                e.stopPropagation();
-                                if (docContentEl.hasClass("truncated")) {
-                                    docContentEl.empty();
-                                    if (docInfo.previewType === 'markdown') {
-                                        await MarkdownRenderer.render(this.app, docInfo.content!, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                                    } else {
-                                        docContentEl.createEl("pre").setText(docInfo.content!);
-                                    }
-                                    RendererUtils.fixBrokenTwemojiImages(docContentEl);
-                                    docContentEl.removeClass("truncated");
-                                    showMoreBtn.setText("Show Less");
-                                } else {
-                                    docContentEl.empty();
-                                    if (docInfo.previewType === 'markdown') {
-                                        const previewMd = docInfo.content!.substring(0, maxPreviewLength) + "...";
-                                        await MarkdownRenderer.render(this.app, previewMd, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-                                    } else {
-                                        docContentEl.createEl("pre").setText(docInfo.content!.substring(0, maxPreviewLength) + "...");
-                                    }
-                                    RendererUtils.fixBrokenTwemojiImages(docContentEl);
-                                    docContentEl.addClass("truncated");
-                                    showMoreBtn.setText("Show More");
-                                }
-                                this.view.guaranteedScrollToBottom(50, false);
-                            });
-                        }
-                    } else if (docInfo.previewType === 'generic_file') {
-                        // Можна додати кнопку "Download" або "Open externally"
-                        // якщо ми зберігаємо rawFile в AttachedDocumentInfo
-                        // Наприклад:
-                        // if (docInfo.rawFile) {
-                        // const downloadBtn = docBlock.createEl('button', {text: "Download"});
-                        // downloadBtn.onClickEvent(() => { /* логіка завантаження */ });
-                        // }
-                        const genericInfo = docBlock.createDiv({cls: "attached-document-generic-info"});
-                        genericInfo.setText(`This is a ${docInfo.type} file. Its content is not displayed directly here.`);
+                    if (docInfo.previewType === 'markdown') {
+                        const mdToRender = needsVisualTruncation ? docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*" : docInfo.content;
+                        MarkdownRenderer.render(this.app, mdToRender, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                    } else if (docInfo.previewType === 'text') {
+                        const pre = docContentEl.createEl("pre");
+                        pre.setText(needsVisualTruncation ? docInfo.content.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*" : docInfo.content);
                     }
+                    RendererUtils.fixBrokenTwemojiImages(docContentEl);
+
+                    if (needsVisualTruncation) {
+                        docContentEl.addClass("truncated"); // Для CSS, щоб застосувати градієнт, якщо він є
+                        const showMoreBtn = docBlock.createEl("button", { cls: "attached-document-show-more", text: "Show Full Content" });
+                        showMoreBtn.onClickEvent(async (e) => {
+                            e.stopPropagation();
+                            if (docContentEl.hasClass("truncated")) { // Стан "згорнуто"
+                                docContentEl.empty();
+                                if (docInfo.previewType === 'markdown') {
+                                    await MarkdownRenderer.render(this.app, docInfo.content!, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                                } else { // 'text'
+                                    docContentEl.createEl("pre").setText(docInfo.content!);
+                                }
+                                RendererUtils.fixBrokenTwemojiImages(docContentEl);
+                                docContentEl.removeClass("truncated");
+                                docContentEl.style.maxHeight = "none"; // Зняти обмеження висоти
+                                showMoreBtn.setText("Show Less");
+                            } else { // Стан "розгорнуто"
+                                docContentEl.empty();
+                                if (docInfo.previewType === 'markdown') {
+                                    const previewMd = docInfo.content!.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*";
+                                    await MarkdownRenderer.render(this.app, previewMd, docContentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+                                } else { // 'text'
+                                    docContentEl.createEl("pre").setText(docInfo.content!.substring(0, maxPreviewLength) + "\n\n*[... content truncated for preview ...]*");
+                                }
+                                RendererUtils.fixBrokenTwemojiImages(docContentEl);
+                                docContentEl.addClass("truncated");
+                                docContentEl.style.maxHeight = ""; // Повернути CSS обмеження, якщо воно є
+                                showMoreBtn.setText("Show Full Content");
+                            }
+                            this.view.guaranteedScrollToBottom(50, false);
+                        });
+                    }
+                } else if (docInfo.previewType === 'generic_file') {
+                    const genericInfo = docBlock.createDiv({cls: "attached-document-generic-info"});
+                    genericInfo.setText(`This is a ${docInfo.type} file. Its content is not directly sent to the AI unless it's a known text format. You can ask the AI about it based on its name and type.`);
                 }
             });
         }
@@ -155,7 +146,7 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		this.addUserActionButtons(metaActionsWrapper);
 
 		setTimeout(() => {
-			if (messageGroup.isConnected && contentEl.closest(`.${CSS_CLASSES.MESSAGE_GROUP}`)) {
+			if (messageGroup.isConnected) { // Перевіряємо messageGroup замість contentEl
 				this.view.checkMessageForCollapsing(messageGroup);
 			}
 		}, 70);
