@@ -370,6 +370,15 @@ $avatar-icon-size-factor: 0.65;
   line-height: 1.2; // Для вирівнювання з кнопками
   white-space: nowrap;
   // Порядок: час буде першим елементом у flex-контейнері .message-meta-actions-wrapper
+
+    .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 2; // Робить час другим елементом у flex-порядку
+  }
+  // Для AI, якщо час теж справа
+  .ollama-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 2; 
+  }
+
 }
 
 // Обгортка для самих кнопок дій - тепер це просто flex-елемент
@@ -384,6 +393,20 @@ $avatar-icon-size-factor: 0.65;
 
   // Для повідомлень AI: відступ справа від кнопок
   .ollama-message-group .message-wrapper & {
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
+  }
+
+    .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 1; // Робить блок кнопок першим елементом у flex-порядку
+    margin-left: 0; // Прибираємо старий відступ, якщо він був
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ між кнопками та часом (якщо потрібно)
+                                                              // Або він не потрібен, якщо space-between працює
+  }
+
+  // Для AI, якщо кнопки теж зліва
+  .ollama-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 1;
+    margin-left: 0;
     margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
   }
 
