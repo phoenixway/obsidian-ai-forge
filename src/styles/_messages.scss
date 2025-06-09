@@ -148,7 +148,7 @@ $avatar-icon-size-factor: 0.65;
   @include flex-layout($direction: column);
   box-sizing: border-box;
   max-width: var(--chat-message-max-width, 700px); 
-  width: 100%; // Займає всю доступну ширину в message-group, щоб align-items працював
+  width: 100%; 
 
   .ollama-message-group &,
   .tool-message-group &, 
@@ -163,18 +163,18 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// --- Стилі для карток вкладень ---
+// Контейнер для карток (якщо є)
 .message-attachment-cards-container {
   display: flex;
   flex-wrap: wrap;
-  gap: calc(var(--chat-spacing-unit, 5px) * 1.25); // Трохи менший gap
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1); 
-  width: 100%; // Займає ширину .message-wrapper
+  gap: calc(var(--chat-spacing-unit, 5px) * 1.25);
+  // margin-bottom не потрібен тут, бо meta-actions-wrapper буде під ним або під бульбашкою
+  width: 100%; 
   
   .user-message-group .message-wrapper & { 
     justify-content: flex-end;
   }
-  .ollama-message-group .message-wrapper & { // Якщо картки будуть і в AI
+  .ollama-message-group .message-wrapper & { 
     justify-content: flex-start;
   }
 
@@ -245,6 +245,11 @@ $avatar-icon-size-factor: 0.65;
   @extend %base-message-bubble; 
   width: fit-content; 
   max-width: 100%;    
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); // Відступ зверху, якщо є картки перед нею
+
+  // Якщо карток немає, то цей margin-top не завадить, але можна його прибрати умовно
+  // Наприклад, якщо .message-attachment-cards-container.hidden-attachment-cards + .message
+  // Але це складніше. Поки що залишимо так.
 
   .user-message-group .message-wrapper & {
     align-self: flex-end;
@@ -258,15 +263,7 @@ $avatar-icon-size-factor: 0.65;
   }
 
   &.empty-user-text-bubble { 
-    // Якщо вирішили не показувати зовсім порожню бульбашку, а лише її обгортку для :hover
     display: none; 
-    // Якщо ж вона все ж потрібна для структури hover:
-    // visibility: hidden;
-    // height: 0;
-    // padding: 0 !important;
-    // margin: 0 !important;
-    // border: none !important;
-    // box-shadow: none !important;
   }
 }
 
@@ -317,47 +314,51 @@ $avatar-icon-size-factor: 0.65;
   p { margin-top: 0; margin-bottom: calc(var(--p-spacing, 1em) / 2); &:last-child { margin-bottom: 0; } }
 }
 
+// Обгортка для timestamp та кнопок дій - ЗАВЖДИ ПІСЛЯ основного контенту
 .message-meta-actions-wrapper {
   display: flex;
-  align-items: center;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); 
+  align-items: center; // Вертикальне вирівнювання часу та кнопок
+  // margin-top встановлюється в JS, якщо потрібно, або тут фіксований невеликий
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); // Невеликий відступ від контенту вище
   padding: 0; 
-  min-height: 18px;
-  width: 100%; // Розтягуємо, щоб justify-content працював на всю ширину message-wrapper
+  min-height: 18px; // Мінімальна висота для вміщення елементів
+  width: 100%; // Займає всю ширину .message-wrapper для правильного justify-content
 
   .user-message-group .message-wrapper & { 
-    justify-content: flex-end; 
-    // align-self: flex-end; // Вже успадковується від message-wrapper
-    padding-right: calc(var(--chat-spacing-unit, 5px) * 0.5); 
+    justify-content: flex-end; // Вирівнює вміст (час + кнопки) вправо
   }
   .ollama-message-group .message-wrapper & { 
-    justify-content: flex-start; 
-    // align-self: flex-start;
-    padding-left: calc(var(--chat-spacing-unit, 5px) * 0.5);
+    justify-content: flex-start; // Вирівнює вміст вліво
   }
+  // Додамо невеликий горизонтальний padding, щоб час/кнопки не прилипали до країв
+  padding-left: calc(var(--chat-spacing-unit, 5px) * 0.5);
+  padding-right: calc(var(--chat-spacing-unit, 5px) * 0.5);
+  box-sizing: border-box; // Враховуємо padding в загальну ширину
 }
 
 .message-timestamp { 
   font-size: 0.7em; 
   color: var(--text-faint); 
   opacity: 0.9; 
-  margin: 0; 
-  line-height: 1.2;
+  margin: 0; // Забираємо зовнішні відступи, використовуємо gap батька
+  line-height: 1; // Для кращого вирівнювання з кнопками
+  white-space: nowrap; // Щоб час не переносився
 }
 
 .message-actions-wrapper { 
   display: flex; 
   align-items: center; 
-  gap: calc(var(--chat-spacing-unit, 5px) * 0.75); // Трохи менший gap
+  gap: calc(var(--chat-spacing-unit, 5px) * 0.75); 
   opacity: 0; 
   visibility: hidden; 
   @include transition( (opacity, visibility), 0.15s, ease-in-out );
   
+  // Додаємо відступ між timestamp та кнопками
   .user-message-group .message-wrapper & {
-    margin-left: calc(var(--chat-spacing-unit, 5px) * 1);
+    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ зліва від кнопок (після часу)
   }
   .ollama-message-group .message-wrapper & {
-    margin-right: calc(var(--chat-spacing-unit, 5px) * 1);
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ справа від кнопок (перед часом, якщо час справа)
   }
 
   button.message-action-button { 
@@ -372,10 +373,15 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
+// Показуємо кнопки при наведенні на весь message-wrapper
 .message-wrapper:hover .message-actions-wrapper { 
   opacity: 1; 
   visibility: visible; 
 }
+
+
+
+
 
 .message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
 .message-content-collapsed { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
