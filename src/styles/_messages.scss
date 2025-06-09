@@ -163,6 +163,14 @@ $avatar-icon-size-factor: 0.65;
   max-width: var(--chat-message-max-width, 700px);
   width: 100%;
   // position: relative; // Для позиціонування дочірніх absolute, якщо вони ще десь є
+
+    // Для повідомлень користувача, сам wrapper вирівнює свій контент (бульбашку та мета) по правому краю.
+  // Це робиться на рівні .message-group justify-content: flex-end;
+  // А всередині .message-wrapper, елементи йдуть один за одним.
+  &.user-message-group & { // Якщо цей селектор потрібен, щоб перевизначити align-items
+     // align-items: flex-end; // Це вже є на .message-content-area та .message-main-content
+  }
+
 }
 
 .message-content-area {
@@ -171,7 +179,9 @@ $avatar-icon-size-factor: 0.65;
   width: 100%;
 
   .user-message-group .message-wrapper & {
-    align-items: flex-end;
+    align-items: flex-end; // Вирівнює .message-main-content (бульбашку і картки) вправо
+    width: fit-content;    // <<<<<<<<<< ВАЖЛИВО: Обмежуємо ширину контентної області по її вмісту
+    margin-left: auto;      // <<<<<<<<<< ВАЖЛИВО: Щоб сама ця область притиснулася вправо в message-wrapper
   }
   .ollama-message-group .message-wrapper & {
     align-items: flex-start;
@@ -344,7 +354,7 @@ $avatar-icon-size-factor: 0.65;
 .message-meta-actions-wrapper {
   display: flex;
   align-items: center;
-  // margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75);
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75);
   padding: 0;
   // justify-content: space-between; // Вирівнювання для timestamp і кнопок
   min-height: 20px; // Висота для timestamp і кнопок
@@ -353,14 +363,25 @@ $avatar-icon-size-factor: 0.65;
 
   .user-message-group .message-wrapper & { 
     justify-content: space-between; // Рознесе кнопки (order: 1) і час (order: 2)
+    width: 100%; // Щоб зайняти всю ширину
   }
 
   // Для повідомлень AI: кнопки зліва, потім час (стандартний потік)
   .ollama-message-group .message-wrapper & { 
     justify-content: flex-start; // Кнопки і час будуть разом зліва
                                 // Простір між ними контролюється margin на .message-actions-wrapper
+                                width: 100%; // Щоб зайняти всю ширину
   }
 }
+
+// Якщо .message-meta-actions-wrapper є прямим нащадком .message-wrapper
+// і йде ПІСЛЯ .message-content-area, тоді для користувача потрібно так:
+.user-message-group .message-wrapper > .message-meta-actions-wrapper {
+    width: fit-content;
+    align-self: flex-end; // Щоб сам блок мета-інформації притиснувся вправо
+    // justify-content: space-between; // Вже є вище, але тепер працюватиме в межах fit-content
+}
+
 
 .message-timestamp {
   font-size: 0.7em;
@@ -378,7 +399,7 @@ $avatar-icon-size-factor: 0.65;
 }
 
 // Обгортка для самих кнопок дій - тепер це просто flex-елемент
-.message-actions-wrapper {
+.message-actions-wrapper {;
   .user-message-group .message-wrapper .message-meta-actions-wrapper & {
     order: 1; // Кнопки будуть першими
     margin-left: 0;  // Немає відступу зліва
@@ -390,7 +411,6 @@ $avatar-icon-size-factor: 0.65;
     // order не потрібен, бо кнопки і так другі в HTML
     margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ від часу
     margin-right: 0;
-    order: 1;
   }
 
 }
