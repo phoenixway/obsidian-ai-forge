@@ -17482,24 +17482,36 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         const nameEl = docCard.createDiv({ cls: "attachment-card-name", text: docInfo.name });
         nameEl.setAttribute("title", docInfo.name);
         const metaLine = docCard.createDiv({ cls: "attachment-card-meta" });
-        if (docInfo.content && typeof docInfo.content === "string") {
-          const lineCount = (docInfo.content.match(/\n/g) || []).length + 1;
-          metaLine.createSpan({ cls: "attachment-card-lines", text: `${lineCount} lines` });
-        } else {
-          metaLine.createSpan({ cls: "attachment-card-size", text: `${(docInfo.size / 1024).toFixed(1)} KB` });
+        metaLine.createSpan({ cls: "attachment-card-size", text: this.formatFileSize(docInfo.size) });
+        let displayType = docInfo.type.split("/").pop() || docInfo.type;
+        if (displayType.includes(".")) {
+          displayType = displayType.substring(displayType.lastIndexOf(".") + 1);
         }
-        let typeText = (docInfo.type.split(".").pop() || docInfo.type).toUpperCase();
-        if (typeText.includes("JSON"))
-          typeText = "JSON";
-        else if (typeText.includes("MARKDOWN") || typeText === "MD")
-          typeText = "MD";
-        else if (typeText.includes("TEXT") || typeText === "TXT")
-          typeText = "TXT";
-        else if (typeText.includes("TYPESCRIPT") || typeText === "TS")
-          typeText = "TS";
-        else if (typeText.includes("JAVASCRIPT") || typeText === "JS")
-          typeText = "JS";
-        docCard.createDiv({ cls: "attachment-card-type", text: typeText });
+        displayType = displayType.toUpperCase();
+        if (displayType.length > 5 && docInfo.name.includes(".")) {
+          const nameExt = docInfo.name.split(".").pop()?.toUpperCase();
+          if (nameExt && nameExt.length <= 5) {
+            displayType = nameExt;
+          }
+        }
+        if (["JSON", "MARKDOWN", "MD", "TEXT", "TXT", "TYPESCRIPT", "TS", "JAVASCRIPT", "JS", "PDF"].includes(displayType)) {
+          if (displayType === "MARKDOWN")
+            displayType = "MD";
+          if (displayType === "TYPESCRIPT")
+            displayType = "TS";
+          if (displayType === "JAVASCRIPT")
+            displayType = "JS";
+          if (displayType === "TEXT")
+            displayType = "TXT";
+        } else if (displayType.length > 4) {
+          const nameExt = docInfo.name.split(".").pop()?.toUpperCase();
+          if (nameExt && nameExt.length <= 4) {
+            displayType = nameExt;
+          } else {
+            displayType = displayType.substring(0, 4);
+          }
+        }
+        docCard.createDiv({ cls: "attachment-card-type", text: displayType });
       });
     }
     if (this.message.images && this.message.images.length > 0) {
@@ -17510,15 +17522,28 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         const imgPreview = imageCard.createEl("img", { attr: { src: imageDataUrl }, cls: "attachment-card-image-preview" });
         const nameEl = imageCard.createDiv({ cls: "attachment-card-name", text: imageName });
         nameEl.setAttribute("title", imageName);
+        let imageType = "IMG";
+        const fileName = this.message.imageNames?.[index];
+        if (fileName && fileName.includes(".")) {
+          const ext = fileName.split(".").pop()?.toUpperCase();
+          if (ext && ["PNG", "JPG", "JPEG", "GIF", "WEBP", "SVG"].includes(ext)) {
+            imageType = ext;
+          } else if (ext) {
+            imageType = ext.substring(0, 4);
+          }
+        }
+        imageCard.createDiv({ cls: "attachment-card-type", text: imageType });
         imageCard.addEventListener("click", () => {
           const newTab = window.open();
           if (newTab) {
-            newTab.document.write(
-              /* ... код для відкриття зображення ... */
-            );
+            newTab.document.write(`
+                            <body style="margin: 0; background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+                                <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
+                            </body>
+                        `);
             newTab.document.title = imageName;
           } else {
-            new import_obsidian8.Notice("Could not open image in a new tab.");
+            new import_obsidian8.Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
           }
         });
       });
@@ -17538,10 +17563,11 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         messageEl.addClass("empty-user-text-bubble");
       }
     }
-    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+    const metaActionsWrapper = createDiv({ cls: "message-meta-actions-wrapper" });
     BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     this.addUserActionButtons(metaActionsWrapper);
-    if (messageBubbleActual) {
+    messageWrapper.appendChild(metaActionsWrapper);
+    if (messageBubbleActual && !messageBubbleActual.classList.contains("empty-user-text-bubble")) {
       setTimeout(() => {
         if (messageGroup.isConnected && messageBubbleActual) {
           this.view.checkMessageForCollapsing(messageBubbleActual);
@@ -17549,6 +17575,16 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
       }, 70);
     }
     return messageGroup;
+  }
+  // --- НОВА ДОПОМІЖНА ФУНКЦІЯ ---
+  formatFileSize(bytes, decimals = 1) {
+    if (bytes === 0)
+      return "0 Bytes";
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
   }
   // Допоміжна функція для отримання іконки (поки що проста)
   // private getIconForDocument(docInfo: AttachedDocumentInfo): string {

@@ -16,7 +16,8 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		}
 	}
 
-				public render(): HTMLElement {
+		public render(): HTMLElement {
+		// Головна обгортка для всього блоку повідомлення користувача (аватар, картки вкладень, бульбашка повідомлення)
 		const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
 		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, true, "user");
 
@@ -38,22 +39,37 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                 nameEl.setAttribute("title", docInfo.name);
 
                 const metaLine = docCard.createDiv({cls: "attachment-card-meta"});
-                if (docInfo.content && typeof docInfo.content === 'string') { // Перевіряємо, що content - рядок
-                    const lineCount = (docInfo.content.match(/\n/g) || []).length + 1;
-                    metaLine.createSpan({ cls: "attachment-card-lines", text: `${lineCount} lines` });
-                } else {
-                    metaLine.createSpan({ cls: "attachment-card-size", text: `${(docInfo.size / 1024).toFixed(1)} KB` });
+                // Показуємо розмір файлу замість рядків
+                metaLine.createSpan({ cls: "attachment-card-size", text: this.formatFileSize(docInfo.size) });
+                
+                // Покращене визначення типу для відображення
+                let displayType = docInfo.type.split('/').pop() || docInfo.type; 
+                if (displayType.includes('.')) { 
+                    displayType = displayType.substring(displayType.lastIndexOf('.') + 1);
+                }
+                displayType = displayType.toUpperCase();
+                if (displayType.length > 5 && docInfo.name.includes('.')) { 
+                    const nameExt = docInfo.name.split('.').pop()?.toUpperCase();
+                    if (nameExt && nameExt.length <= 5) {
+                        displayType = nameExt;
+                    }
                 }
                 
-                let typeText = (docInfo.type.split('.').pop() || docInfo.type).toUpperCase();
-                // Спрощуємо типи для відображення
-                if (typeText.includes('JSON')) typeText = 'JSON';
-                else if (typeText.includes('MARKDOWN') || typeText === 'MD') typeText = 'MD';
-                else if (typeText.includes('TEXT') || typeText === 'TXT') typeText = 'TXT';
-                else if (typeText.includes('TYPESCRIPT') || typeText === 'TS') typeText = 'TS';
-                else if (typeText.includes('JAVASCRIPT') || typeText === 'JS') typeText = 'JS';
-                
-                docCard.createDiv({ cls: "attachment-card-type", text: typeText });
+                if (['JSON', 'MARKDOWN', 'MD', 'TEXT', 'TXT', 'TYPESCRIPT', 'TS', 'JAVASCRIPT', 'JS', 'PDF'].includes(displayType)) {
+                    if (displayType === 'MARKDOWN') displayType = 'MD';
+                    if (displayType === 'TYPESCRIPT') displayType = 'TS';
+                    if (displayType === 'JAVASCRIPT') displayType = 'JS';
+                    if (displayType === 'TEXT') displayType = 'TXT';
+                } else if (displayType.length > 4) { 
+                    // Якщо тип невідомий і довгий, використовуємо розширення з імені файлу, якщо воно коротке
+                    const nameExt = docInfo.name.split('.').pop()?.toUpperCase();
+                    if (nameExt && nameExt.length <= 4) {
+                        displayType = nameExt;
+                    } else {
+                        displayType = displayType.substring(0, 4); // Або обрізаємо MIME тип
+                    }
+                }
+                docCard.createDiv({ cls: "attachment-card-type", text: displayType });
             });
         }
 
@@ -61,10 +77,7 @@ export class UserMessageRenderer extends BaseMessageRenderer {
         if (this.message.images && this.message.images.length > 0) {
             hasAttachmentCards = true;
             this.message.images.forEach((imageDataUrl, index) => {
-                // Спробуємо отримати реальну назву зображення, якщо вона передається
-                // Поки що використовуємо AttachmentFile з AttachmentManager як джерело назви
-                // Це вимагатиме змін в AttachmentManager, OllamaView->sendMessage, ChatManager, Message type
-                // Припустимо, що message.imageNames?: string[] існує і синхронізоване з message.images
+                // Припустимо, що назви зображень зберігаються в message.imageNames
                 const imageName = (this.message as any).imageNames?.[index] || `Image ${index + 1}`;
 
                 const imageCard = attachmentsCardContainer.createDiv({ cls: "attachment-card image-card" });
@@ -73,13 +86,29 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                 const nameEl = imageCard.createDiv({ cls: "attachment-card-name", text: imageName });
                 nameEl.setAttribute("title", imageName);
                 
+                let imageType = "IMG";
+                const fileName = (this.message as any).imageNames?.[index];
+                if (fileName && fileName.includes('.')) {
+                    const ext = fileName.split('.').pop()?.toUpperCase();
+                    if (ext && ['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP', 'SVG'].includes(ext)) { // Відомі розширення зображень
+                        imageType = ext;
+                    } else if (ext) {
+                        imageType = ext.substring(0,4); // Обрізаємо невідомі розширення
+                    }
+                }
+                 imageCard.createDiv({ cls: "attachment-card-type", text: imageType });
+                
                 imageCard.addEventListener('click', () => {
                     const newTab = window.open();
                     if (newTab) {
-                        newTab.document.write(/* ... код для відкриття зображення ... */);
+                        newTab.document.write(`
+                            <body style="margin: 0; background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
+                                <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
+                            </body>
+                        `);
                         newTab.document.title = imageName;
                     } else {
-                        new Notice("Could not open image in a new tab.");
+                        new Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
                     }
                 });
             });
@@ -92,37 +121,50 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 
 		// Бульбашка для тексту повідомлення користувача
         const userTextContent = this.message.content || "";
-        let messageBubbleActual: HTMLElement | null = null;
+        let messageBubbleActual: HTMLElement | null = null; 
 
 		if (userTextContent.trim() !== "" || !hasAttachmentCards) {
-            // Створюємо messageEl (бульбашку) та contentEl всередині messageWrapper
             const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
-            messageBubbleActual = messageEl; // Зберігаємо посилання на бульбашку
+            messageBubbleActual = messageEl;
 
             if (userTextContent.trim() !== "") {
                 MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
                 RendererUtils.fixBrokenTwemojiImages(contentEl);
             } else {
-                messageEl.addClass("empty-user-text-bubble");
+                // Якщо бульбашка створена, але тексту немає (бо є картки, але немає тексту)
+                // то робимо її невидимою, але вона потрібна для правильної роботи :hover для кнопок
+                messageEl.addClass("empty-user-text-bubble"); 
             }
         }
 
-        // Обгортка для timestamp та кнопок дій, розміщується ПІСЛЯ карток та бульбашки, всередині messageWrapper
-		const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+        // Створюємо обгортку для timestamp та кнопок дій
+		const metaActionsWrapper = createDiv({ cls: "message-meta-actions-wrapper" });
 		BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
-		this.addUserActionButtons(metaActionsWrapper); // Передаємо сюди metaActionsWrapper
-
-        // Перевірка на згортання для бульбашки повідомлення, якщо вона існує
-        if (messageBubbleActual) {
+		this.addUserActionButtons(metaActionsWrapper);
+        
+        // Додаємо metaActionsWrapper до messageWrapper, щоб воно було після карток/бульбашки
+        messageWrapper.appendChild(metaActionsWrapper);
+        
+        // Перевірка на згортання для бульбашки повідомлення, якщо вона існує і не порожня
+        if (messageBubbleActual && !messageBubbleActual.classList.contains("empty-user-text-bubble")) {
             setTimeout(() => {
-                if (messageGroup.isConnected && messageBubbleActual) { // Переконуємось, що messageGroup і messageBubbleActual ще в DOM
-                    this.view.checkMessageForCollapsing(messageBubbleActual); // Перевіряємо згортання для messageBubbleActual
+                if (messageGroup.isConnected && messageBubbleActual) { 
+                    this.view.checkMessageForCollapsing(messageBubbleActual);
                 }
             }, 70);
         }
 
 		return messageGroup;
 	}
+    // --- НОВА ДОПОМІЖНА ФУНКЦІЯ ---
+    private formatFileSize(bytes: number, decimals = 1): string {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
 
     // Допоміжна функція для отримання іконки (поки що проста)
     // private getIconForDocument(docInfo: AttachedDocumentInfo): string {

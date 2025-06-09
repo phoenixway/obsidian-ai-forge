@@ -41,7 +41,7 @@ $avatar-icon-size-factor: 0.65;
   flex-shrink: 0;
   @include flex-layout($justify: center, $align: center);
   box-sizing: border-box;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5);
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); 
 }
 
 %base-message-bubble {
@@ -54,33 +54,33 @@ $avatar-icon-size-factor: 0.65;
   font-size: var(--font-ui-small);
   line-height: 1.5;
   @include transition((transform, box-shadow), 0.2s, ease-out);
-  margin-bottom: 0;
+  margin-bottom: 0; // Бульбашка сама по собі не має нижнього відступу, він контролюється .message-wrapper
   box-sizing: border-box;
 }
 
 %base-action-button {
-  background: transparent !important;
+  background: transparent !important; 
   border: none;
   box-shadow: none;
   padding: 1px;
-  color: var(--text-muted);
+  color: var(--text-muted); 
   border-radius: var(--radius-s);
   cursor: pointer;
   @include transition;
-  @include flex-layout($align: center, $justify: center);
+  @include flex-layout($align: center, $justify: center); 
   box-sizing: border-box;
   margin-left: 0;
-  position: relative;
-  line-height: 1;
+  position: relative; 
+  line-height: 1; 
 
   .svg-icon {
-    width: 14px;
-    height: 14px;
+    width: 14px; 
+    height: 14px; 
   }
 
   &:hover {
-    background: var(--background-modifier-hover) !important;
-    color: var(--text-normal);
+    background: var(--background-modifier-hover) !important; 
+    color: var(--text-normal); 
     transform: scale(1.05);
   }
 }
@@ -94,111 +94,72 @@ $avatar-icon-size-factor: 0.65;
   box-sizing: border-box;
 }
 
-.message-group {
+.message-group { 
   width: 100%;
   position: relative;
   box-sizing: border-box;
   @include flex-layout($align: flex-start, $gap: calc(var(--chat-spacing-unit, 5px) * 2));
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 2);
 
-  &.user-message-group {
+  &.user-message-group { 
     justify-content: flex-end;
-    .avatar-container {
-      order: 2;
+    .avatar-container { 
+        order: 2; 
     }
+    // message-wrapper (order: 1) вже визначено в DOM
   }
 
-  &.ollama-message-group {
+  &.ollama-message-group { 
     justify-content: flex-start;
-    .avatar-container {
-      order: 1;
-    }
+    .avatar-container { order: 1; }
+    // message-wrapper (order: 2)
   }
-  &.tool-message-group {
-    justify-content: flex-start;
-    .avatar-container {
-      order: 1;
-    }
+  &.tool-message-group { 
+    justify-content: flex-start; 
+    .avatar-container { order: 1; }
+    // message-wrapper (order: 2)
   }
-  &.system-message-group {
-    justify-content: center;
+  &.system-message-group { 
+    justify-content: center; 
     width: 100%;
-    .message-wrapper {
-      align-items: center;
-      width: 100%;
-      max-width: 90%;
-    }
-    .avatar-container {
-      display: none;
-    }
+    .message-wrapper { align-items: center; width: 100%; max-width: 90%; }
+    .avatar-container { display: none; } 
   }
-  &.error-message-group {
-    justify-content: flex-start;
-    .message-wrapper {
-      order: 2;
-    }
-    .avatar-container {
-      order: 1;
-    }
+  &.error-message-group { 
+    justify-content: flex-start; 
+    .message-wrapper { order: 2; } 
+    .avatar-container { order: 1; }
   }
 }
 
-.avatar-container {
-  @extend %base-avatar-container;
-  &.user-avatar {
-    background-color: var(--interactive-accent-translucent);
-    color: var(--interactive-accent);
+.avatar-container { 
+  @extend %base-avatar-container; 
+  &.user-avatar { background-color: var(--interactive-accent-translucent); color: var(--interactive-accent); }
+  &.ai-avatar { background-color: var(--background-modifier-success); color: var(--text-on-accent); }
+  &.avatar-tool-specific { background-color: var(--background-modifier-info); color: var(--text-normal);
+    .svg-icon svg { fill: var(--text-normal); } 
   }
-  &.ai-avatar {
-    background-color: var(--background-modifier-success);
-    color: var(--text-on-accent);
-  }
-  &.avatar-tool-specific {
-    background-color: var(--background-modifier-info);
-    color: var(--text-normal);
-    .svg-icon svg {
-      fill: var(--text-normal);
-    }
-  }
-  &.avatar-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  &.avatar-icon .svg-icon {
-    svg {
-      width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
-      height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor});
-      display: block;
-    }
-  }
-  &.avatar-initials {
-    font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor});
-    font-weight: 600;
-    line-height: 1;
-    text-align: center;
-    width: 100%;
-    height: 100%;
-    @include flex-layout($align: center, $justify: center);
-  }
+  &.avatar-image { width: 100%; height: 100%; object-fit: cover; }
+  &.avatar-icon .svg-icon { svg { width: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); height: calc(#{$avatar-final-size} * #{$avatar-icon-size-factor}); display: block; } }
+  &.avatar-initials { font-size: calc(#{$avatar-final-size} * #{$avatar-font-size-factor}); font-weight: 600; line-height: 1; text-align: center; width: 100%; height: 100%; @include flex-layout($align: center, $justify: center); }
 }
 
-.message-wrapper {
+.message-wrapper { 
   @include flex-layout($direction: column);
   box-sizing: border-box;
-  max-width: var(--chat-message-max-width, 700px);
-  width: 100%;
+  max-width: var(--chat-message-max-width, 700px); 
+  width: 100%; // Займає всю доступну ширину в message-group, щоб align-items працював
 
   .ollama-message-group &,
-  .tool-message-group &,
-  .error-message-group & {
-    align-items: flex-start;
+  .tool-message-group &, 
+  .error-message-group & { 
+    align-items: flex-start; 
   }
-  .user-message-group & {
-    align-items: flex-end;
+  .user-message-group & { 
+    align-items: flex-end;   
   }
-  .system-message-group & {
-    align-items: center;
+  .system-message-group & { 
+    align-items: center; 
   }
 }
 
@@ -206,14 +167,14 @@ $avatar-icon-size-factor: 0.65;
 .message-attachment-cards-container {
   display: flex;
   flex-wrap: wrap;
-  gap: calc(var(--chat-spacing-unit, 5px) * 1.5);
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
-  width: 100%;
-
-  .user-message-group & {
+  gap: calc(var(--chat-spacing-unit, 5px) * 1.25); // Трохи менший gap
+  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1); 
+  width: 100%; // Займає ширину .message-wrapper
+  
+  .user-message-group .message-wrapper & { 
     justify-content: flex-end;
   }
-  .ollama-message-group & {
+  .ollama-message-group .message-wrapper & { // Якщо картки будуть і в AI
     justify-content: flex-start;
   }
 
@@ -226,13 +187,13 @@ $avatar-icon-size-factor: 0.65;
   background-color: var(--background-secondary);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m, 8px);
-  padding: calc(var(--chat-spacing-unit, 5px) * 1.5) calc(var(--chat-spacing-unit, 5px) * 2);
-  min-width: 100px;
-  max-width: 180px;
+  padding: calc(var(--chat-spacing-unit, 5px) * 1.25) calc(var(--chat-spacing-unit, 5px) * 1.75); // Трохи менші падінги
+  min-width: 90px;  // Менша мінімальна ширина
+  max-width: 170px; // Менша максимальна ширина
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: calc(var(--chat-spacing-unit, 5px) * 0.75);
+  gap: calc(var(--chat-spacing-unit, 5px) * 0.5); // Менший внутрішній gap
   transition: box-shadow 0.2s ease-out;
   cursor: default;
 
@@ -247,19 +208,19 @@ $avatar-icon-size-factor: 0.65;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: calc(var(--font-ui-small) * 0.95);
+  font-size: calc(var(--font-ui-small) * 0.9); 
 }
 
 .attachment-card-meta {
-  font-size: calc(var(--font-ui-smaller) * 0.9);
+  font-size: calc(var(--font-ui-smaller) * 0.85); 
   color: var(--text-muted);
 }
 
 .attachment-card-type {
-  font-size: var(--font-ui-tiny, 0.65em);
+  font-size: var(--font-ui-tiny, 0.6em);
   color: var(--text-faint);
   background-color: var(--background-modifier-hover);
-  padding: calc(var(--chat-spacing-unit, 5px) * 0.25) calc(var(--chat-spacing-unit, 5px) * 0.75);
+  padding: calc(var(--chat-spacing-unit, 5px) * 0.2) calc(var(--chat-spacing-unit, 5px) * 0.6);
   border-radius: var(--radius-s);
   align-self: flex-start;
   text-transform: uppercase;
@@ -268,22 +229,22 @@ $avatar-icon-size-factor: 0.65;
 }
 
 .attachment-card.image-card {
-  padding: calc(var(--chat-spacing-unit, 5px) * 1);
+  padding: calc(var(--chat-spacing-unit, 5px) * 0.75);
 }
 
 .attachment-card-image-preview {
   width: 100%;
-  height: 60px;
+  height: 50px; 
   object-fit: cover;
   border-radius: var(--radius-s);
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5);
+  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.25);
 }
 // --- Кінець стилів для карток ---
 
-.message {
-  @extend %base-message-bubble;
-  width: fit-content;
-  max-width: 100%;
+.message { 
+  @extend %base-message-bubble; 
+  width: fit-content; 
+  max-width: 100%;    
 
   .user-message-group .message-wrapper & {
     align-self: flex-end;
@@ -291,539 +252,192 @@ $avatar-icon-size-factor: 0.65;
   .ollama-message-group .message-wrapper & {
     align-self: flex-start;
   }
-
-  &.message-arriving {
+  
+  &.message-arriving { 
     animation: message-appear 0.3s ease-out forwards;
   }
 
-  &.empty-user-text-bubble {
-    display: none;
+  &.empty-user-text-bubble { 
+    // Якщо вирішили не показувати зовсім порожню бульбашку, а лише її обгортку для :hover
+    display: none; 
+    // Якщо ж вона все ж потрібна для структури hover:
+    // visibility: hidden;
+    // height: 0;
+    // padding: 0 !important;
+    // margin: 0 !important;
+    // border: none !important;
+    // box-shadow: none !important;
   }
 }
 
-.message.user-message {
+.message.user-message { 
   background-color: var(--interactive-accent);
   color: var(--text-on-accent);
   box-shadow: 0 1px 4px rgba(var(--interactive-accent-rgb), 0.2);
 }
-.message.ollama-message {
+.message.ollama-message { 
   background-color: var(--background-primary-alt);
   color: var(--text-normal);
-  &:hover {
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
-  }
+  &:hover { box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1); }
   pre {
     background-color: var(--background-secondary) !important;
     padding: calc(var(--chat-spacing-unit, 5px) * 2);
-    border-radius: var(--radius-m, 6px);
-    margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
-    margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1);
-    overflow-x: auto;
-    box-sizing: border-box;
+    border-radius: var(--radius-m, 6px); margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
+    margin-bottom: calc(var(--chat-spacing-unit, 5px) * 1); overflow-x: auto; box-sizing: border-box;
   }
 }
-.message.system-message {
-  background-color: var(--background-modifier-accent-hover);
+.message.system-message { 
+  background-color: var(--background-modifier-accent-hover); 
   color: var(--text-faint);
   font-style: italic;
   padding: calc(var(--chat-spacing-unit, 5px) * 1) calc(var(--chat-spacing-unit, 5px) * 2.5);
   box-shadow: none;
   text-align: center;
-  align-self: center;
-  width: auto;
+  align-self: center; 
+  width: auto; 
 }
-.message.error-message {
-  background-color: var(--background-modifier-error);
-  color: var(--text-on-accent);
+.message.error-message { 
+  background-color: var(--background-modifier-error); 
+  color: var(--text-on-accent); 
   border: 1px solid var(--color-red-hover);
   box-shadow: 0 1px 2px var(--color-red-faint);
-  .error-icon {
-    margin-right: 8px;
-  }
+  .error-icon { margin-right: 8px; }
 }
-.message.tool-message {
-  background-color: var(--background-modifier-info-hover);
+.message.tool-message { 
+  background-color: var(--background-modifier-info-hover); 
   border: 1px solid var(--color-blue-faint);
-  .tool-result-header {
-    font-weight: bold;
-    margin-bottom: 5px;
-    display: flex;
-    align-items: center;
-    .tool-result-icon {
-      margin-right: 5px;
-    }
-  }
-  .tool-result-content {
-    background-color: var(--background-secondary);
-    padding: 8px;
-    border-radius: var(--radius-s);
-    white-space: pre-wrap;
-  }
+  .tool-result-header { font-weight: bold; margin-bottom: 5px; display: flex; align-items: center; .tool-result-icon { margin-right: 5px;} }
+  .tool-result-content { background-color: var(--background-secondary); padding: 8px; border-radius: var(--radius-s); white-space: pre-wrap; }
 }
 
-.message-content-container {
-  width: 100%;
-  box-sizing: border-box;
+.message-content-container { 
+  width: 100%; box-sizing: border-box;
 }
-.message-content {
-  p {
-    margin-top: 0;
-    margin-bottom: calc(var(--p-spacing, 1em) / 2);
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
+.message-content { 
+  p { margin-top: 0; margin-bottom: calc(var(--p-spacing, 1em) / 2); &:last-child { margin-bottom: 0; } }
 }
 
 .message-meta-actions-wrapper {
   display: flex;
   align-items: center;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75);
-  padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5);
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); 
+  padding: 0; 
   min-height: 18px;
-  width: 100%;
+  width: 100%; // Розтягуємо, щоб justify-content працював на всю ширину message-wrapper
 
-  .user-message-group & {
-    justify-content: flex-end;
+  .user-message-group .message-wrapper & { 
+    justify-content: flex-end; 
+    // align-self: flex-end; // Вже успадковується від message-wrapper
+    padding-right: calc(var(--chat-spacing-unit, 5px) * 0.5); 
   }
-  .ollama-message-group & {
-    justify-content: flex-start;
+  .ollama-message-group .message-wrapper & { 
+    justify-content: flex-start; 
+    // align-self: flex-start;
+    padding-left: calc(var(--chat-spacing-unit, 5px) * 0.5);
   }
 }
 
-.message-timestamp {
-  font-size: 0.7em;
-  color: var(--text-faint);
-  opacity: 0.9;
-  margin: 0 calc(var(--chat-spacing-unit, 5px) * 1);
+.message-timestamp { 
+  font-size: 0.7em; 
+  color: var(--text-faint); 
+  opacity: 0.9; 
+  margin: 0; 
   line-height: 1.2;
 }
 
-.message-actions-wrapper {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--chat-spacing-unit, 5px) * 1);
-  opacity: 0;
-  visibility: hidden;
-  @include transition((opacity, visibility), 0.15s, ease-in-out);
-
-  button.message-action-button {
-    @extend %base-action-button;
+.message-actions-wrapper { 
+  display: flex; 
+  align-items: center; 
+  gap: calc(var(--chat-spacing-unit, 5px) * 0.75); // Трохи менший gap
+  opacity: 0; 
+  visibility: hidden; 
+  @include transition( (opacity, visibility), 0.15s, ease-in-out );
+  
+  .user-message-group .message-wrapper & {
+    margin-left: calc(var(--chat-spacing-unit, 5px) * 1);
   }
-  .delete-message-button.danger-option {
-    color: var(--text-error) !important;
-    &:hover {
-      color: var(--text-on-accent) !important;
-      background-color: var(--background-modifier-error-hover) !important;
-    }
-  }
-}
-
-.message-wrapper:hover .message-actions-wrapper {
-  opacity: 1;
-  visibility: visible;
-}
-
-.minimal-meta-actions-wrapper {
-  display: flex;
-  width: 100%;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5);
-
-  .user-message-group & {
-    justify-content: flex-end;
-  }
-  .ollama-message-group & {
-    justify-content: flex-start;
+  .ollama-message-group .message-wrapper & {
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1);
   }
 
-  .message-timestamp {
-    font-size: 0.7em;
-    color: var(--text-faint);
-    padding: 0 calc(var(--chat-spacing-unit, 5px) * 0.5);
+  button.message-action-button { 
+    @extend %base-action-button; 
+  }
+  .delete-message-button.danger-option { 
+    color: var(--text-error) !important; 
+    &:hover { 
+        color: var(--text-on-accent) !important; 
+        background-color: var(--background-modifier-error-hover) !important; 
+    } 
   }
 }
 
-.message-content-collapsible {
-  overflow: hidden;
-  @include transition(max-height, 0.3s, ease-out);
-  box-sizing: border-box;
-}
-.message-content-collapsed {
-  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+.message-wrapper:hover .message-actions-wrapper { 
+  opacity: 1; 
+  visibility: visible; 
 }
 
-.regenerate-button {
-  @extend %base-action-button;
-}
-button.summarize-button {
-  @extend %base-action-button;
-}
+.message-content-collapsible { overflow: hidden; @include transition(max-height, 0.3s, ease-out); box-sizing: border-box; }
+.message-content-collapsed { mask-image: linear-gradient(to bottom, black 85%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%); }
 
+.regenerate-button { @extend %base-action-button; }
+button.summarize-button { @extend %base-action-button; }
+
+// --- Стилі для старих блоків вкладень (можуть бути не потрібні, якщо повністю перейшли на картки) ---
 .attached-document-size {
   margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5);
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
 }
-
-.attached-document-content {
-  font-size: var(--font-ui-small);
-  line-height: 1.5;
-  color: var(--text-normal);
-  max-height: 150px;
-  overflow: hidden;
-  position: relative;
-
-  &.truncated {
-    &::after {
-      content: "";
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 30px;
-      background: linear-gradient(to bottom, transparent, var(--background-secondary));
-      pointer-events: none;
-    }
-  }
-
-  pre {
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin: 0;
-    padding: 0;
-    background-color: transparent;
-    border: none;
-    font-family: var(--font-monospace);
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    margin-top: 0.5em;
-    margin-bottom: 0.25em;
-    font-size: 1.1em;
-    &:first-child {
-      margin-top: 0;
-    }
-  }
-  p {
-    margin-bottom: 0.5em;
-    &:last-child {
-      margin-bottom: 0;
-    }
-  }
-  ul,
-  ol {
-    padding-left: 20px;
-    margin-bottom: 0.5em;
-  }
-  blockquote {
-    margin-left: 10px;
-    padding-left: 10px;
-    border-left: 3px solid var(--background-modifier-border-hover);
-  }
-}
-
-.attached-document-show-more {
-  display: block;
-  width: fit-content;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5);
-  margin-left: auto;
-  margin-right: auto;
-  padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2);
-  font-size: var(--font-ui-smaller);
-  color: var(--text-accent);
-  background-color: var(--background-primary);
-  border: 1px solid var(--interactive-accent);
-  border-radius: var(--radius-s);
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s;
-
-  &:hover {
-    background-color: var(--interactive-accent-hover);
-    color: var(--text-on-accent);
-  }
-}
-
-.attached-document-generic-info {
-  font-style: italic;
-  color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  padding: calc(var(--chat-spacing-unit, 5px) * 1) 0;
-}
-
+.attached-document-content { /* ... */ }
+.attached-document-show-more { /* ... */ }
+.attached-document-generic-info { /* ... */ }
 .message-content .message-attached-documents-container,
 .message-content .attached-document-block {
-  /* Ці класи більше не повинні бути всередині .message-content, 
-     тому ці правила можуть бути не потрібні або їх можна видалити, 
-     якщо вони не використовуються для чогось іншого. */
+  /* Якщо ці класи ще десь використовуються всередині .message-content, вони можуть бути тут.
+     Але якщо ми повністю перейшли на картки, ці правила можна видалити. */
 }
+// --- Кінець старих стилів ---
 
-@keyframes message-appear {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@media screen and (min-width: 1600px) {
-  .ollama-chat-container {
-    padding-left: 15%;
-    padding-right: 15%;
-    max-width: 3000px;
-  }
-}
 
-.scroll-to-bottom-button {
-  position: absolute;
-  bottom: 15px;
-  right: 20px;
-  z-index: 50;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background-color: var(--background-secondary);
-  color: var(--text-muted);
-  border: 1px solid var(--background-modifier-border);
-  box-shadow: var(--shadow-s);
-  cursor: pointer;
-  @include flex-layout($align: center, $justify: center);
-  padding: 0;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(10px);
-  @include transition((opacity, transform, background-color), 0.2s, ease-out);
-  .svg-icon {
-    width: 20px;
-    height: 20px;
-  }
-  &:hover {
-    background-color: var(--background-modifier-hover);
-    color: var(--text-normal);
-    transform: translateY(8px) scale(1.05);
-  }
-  &:active {
-    transform: translateY(9px) scale(1);
-  }
-  &.visible {
-    opacity: 0.85;
-    visibility: visible;
-    transform: translateY(0);
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-.new-message-indicator.visible {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 10px;
-  background-color: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-radius: var(--radius-l);
-  position: absolute;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: var(--shadow-m);
-  cursor: pointer;
-  opacity: 0.9;
-  @include transition;
-  &:hover {
-    opacity: 1;
-    box-shadow: var(--shadow-l);
-  }
-  .indicator-icon {
-    margin-right: 5px;
-  }
-}
+@keyframes message-appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media screen and (min-width: 1600px) { .ollama-chat-container { padding-left: 15%; padding-right: 15%; max-width: 3000px; } }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-.button-loading .svg-icon {
-  animation: spin 1s linear infinite;
-}
+.scroll-to-bottom-button { position: absolute; bottom: 15px; right: 20px; z-index: 50; width: 36px; height: 36px; border-radius: 50%; background-color: var(--background-secondary); color: var(--text-muted); border: 1px solid var(--background-modifier-border); box-shadow: var(--shadow-s); cursor: pointer; @include flex-layout($align: center, $justify: center); padding: 0; opacity: 0; visibility: hidden; transform: translateY(10px); @include transition((opacity, transform, background-color), 0.2s, ease-out); .svg-icon { width: 20px; height: 20px; } &:hover { background-color: var(--background-modifier-hover); color: var(--text-normal); transform: translateY(8px) scale(1.05); } &:active { transform: translateY(9px) scale(1); } &.visible { opacity: 0.85; visibility: visible; transform: translateY(0); &:hover { opacity: 1; } } }
+.new-message-indicator.visible { display: flex; align-items: center; justify-content: center; padding: 5px 10px; background-color: var(--interactive-accent); color: var(--text-on-accent); border-radius: var(--radius-l); position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); box-shadow: var(--shadow-m); cursor: pointer; opacity: 0.9; @include transition; &:hover { opacity: 1; box-shadow: var(--shadow-l); } .indicator-icon { margin-right: 5px; } }
 
-.chat-date-separator {
-  width: fit-content;
-  max-width: 80%;
-  margin-left: auto;
-  margin-right: auto;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 6);
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 4);
-  padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2.5);
-  font-size: var(--font-ui-smaller, 0.8em);
-  color: var(--text-muted);
-  background-color: var(--background-secondary);
-  border-radius: var(--radius-l, 16px);
-  text-align: center;
-  user-select: none;
-  font-weight: 500;
-  box-sizing: border-box;
-}
-.assistant-tool-usage-indicator {
-  font-style: italic;
-  color: var(--text-faint);
-  font-size: var(--font-ui-smaller, 0.8em);
-  display: block;
-  margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5);
-}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.button-loading .svg-icon { animation: spin 1s linear infinite; }
 
-.system-message-text {
-  font-size: var(--font-ui-small);
-  line-height: 1.4;
-}
-.error-message-text {
-  color: inherit;
-  ul {
-    list-style-type: disc;
-    padding-left: 20px;
-    margin-top: 5px;
-  }
-  .error-summary-header {
-    font-weight: bold;
-    margin-bottom: 5px;
-  }
-}
-.thinking-dots {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 20px;
-  .thinking-dot {
-    width: 6px;
-    height: 6px;
-    margin: 0 2px;
-    background-color: var(--text-faint);
-    border-radius: 50%;
-    display: inline-block;
-    animation: thinking-blink 1.4s infinite both;
-    &:nth-child(1) {
-      animation-delay: -0.32s;
-    }
-    &:nth-child(2) {
-      animation-delay: -0.16s;
-    }
-  }
-}
-@keyframes thinking-blink {
-  0%,
-  80%,
-  100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  40% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
+.chat-date-separator { width: fit-content; max-width: 80%; margin-left: auto; margin-right: auto; margin-top: calc(var(--chat-spacing-unit, 5px) * 6); margin-bottom: calc(var(--chat-spacing-unit, 5px) * 4); padding: calc(var(--chat-spacing-unit, 5px) * 0.75) calc(var(--chat-spacing-unit, 5px) * 2.5); font-size: var(--font-ui-smaller, 0.8em); color: var(--text-muted); background-color: var(--background-secondary); border-radius: var(--radius-l, 16px); text-align: center; user-select: none; font-weight: 500; box-sizing: border-box; }
+.assistant-tool-usage-indicator { font-style: italic; color: var(--text-faint); font-size: var(--font-ui-smaller, 0.8em); display: block; margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.5); }
 
-.submenu-content-hidden {
-  display: none !important;
+.system-message-text { font-size: var(--font-ui-small); line-height: 1.4; }
+.error-message-text { color: inherit; 
+  ul { list-style-type: disc; padding-left: 20px; margin-top: 5px; }
+  .error-summary-header { font-weight: bold; margin-bottom: 5px;}
 }
-.code-block-copy-button {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  opacity: 0;
-  transition: opacity 0.2s;
-  padding: 3px 6px;
-  background-color: var(--background-modifier-hover);
-  border-radius: var(--radius-s);
-  cursor: pointer;
-  &:hover {
-    opacity: 1;
-    background-color: var(--background-modifier-active);
-  }
-  pre:hover & {
-    opacity: 0.7;
+.thinking-dots { display: flex; align-items: center; justify-content: center; height: 20px; 
+  .thinking-dot { width: 6px; height: 6px; margin: 0 2px; background-color: var(--text-faint); border-radius: 50%; display: inline-block; animation: thinking-blink 1.4s infinite both;
+    &:nth-child(1) { animation-delay: -0.32s; }
+    &:nth-child(2) { animation-delay: -0.16s; }
   }
 }
-.code-block-language {
-  position: absolute;
-  top: 5px;
-  left: 10px;
-  font-size: var(--font-ui-smaller);
-  color: var(--text-faint);
-  user-select: none;
-}
+@keyframes thinking-blink { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1); } }
 
-.translation-container {
-  border-top: 1px dashed var(--background-modifier-border);
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 2);
-  padding-top: calc(var(--chat-spacing-unit, 5px) * 1.5);
-  .translation-indicator {
-    font-size: var(--font-ui-smaller);
-    color: var(--text-faint);
-    font-style: italic;
-    margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5);
-  }
-}
-.translation-content {
-  p:last-child {
-    margin-bottom: 0;
-  }
-}
-.translation-pending {
-  /* Стилі для кнопки, коли йде переклад */
-}
-.recording {
-  color: var(--color-red) !important;
-}
+.submenu-content-hidden { display: none !important; }
+.code-block-copy-button { position: absolute; top: 5px; right: 5px; opacity: 0; transition: opacity 0.2s; padding: 3px 6px; background-color: var(--background-modifier-hover); border-radius: var(--radius-s); cursor: pointer; &:hover { opacity: 1; background-color: var(--background-modifier-active); } pre:hover & { opacity: 0.7; } }
+.code-block-language { position: absolute; top: 5px; left: 10px; font-size: var(--font-ui-smaller); color: var(--text-faint); user-select: none; }
 
-.thinking-block {
-  margin-top: 8px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-m);
-  overflow: hidden;
-  .thinking-header {
-    background-color: var(--background-secondary);
-    padding: 6px 10px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    user-select: none;
-    .thinking-title {
-      font-weight: 500;
-      font-size: var(--font-ui-small);
-    }
-    .thinking-toggle {
-      .svg-icon {
-        transition: transform 0.2s;
-      }
-      &.is-collapsed .svg-icon {
-        transform: rotate(-90deg);
-      }
-    }
+.translation-container { border-top: 1px dashed var(--background-modifier-border); margin-top: calc(var(--chat-spacing-unit, 5px) * 2); padding-top: calc(var(--chat-spacing-unit, 5px) * 1.5); .translation-indicator { font-size: var(--font-ui-smaller); color: var(--text-faint); font-style: italic; margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); } }
+.translation-content { p:last-child { margin-bottom: 0; } }
+.translation-pending { /* Стилі для кнопки, коли йде переклад */ }
+.recording { color: var(--color-red) !important; }
+
+.thinking-block { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); overflow: hidden;
+  .thinking-header { background-color: var(--background-secondary); padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;
+    .thinking-title { font-weight: 500; font-size: var(--font-ui-small); }
+    .thinking-toggle { .svg-icon { transition: transform 0.2s; } &.is-collapsed .svg-icon { transform: rotate(-90deg); } }
   }
-  .thinking-content {
-    padding: 10px;
-    background-color: var(--background-primary);
-    font-size: var(--font-ui-smaller);
-    max-height: 200px;
-    overflow-y: auto;
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
-    &.is-collapsed {
-      max-height: 0;
-      padding-top: 0;
-      padding-bottom: 0;
-      overflow: hidden;
-    }
-  }
+  .thinking-content { padding: 10px; background-color: var(--background-primary); font-size: var(--font-ui-smaller); max-height: 200px; overflow-y: auto; transition: max-height 0.3s ease-out, padding 0.3s ease-out; &.is-collapsed { max-height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; } }
 }
