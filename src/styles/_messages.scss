@@ -351,10 +351,14 @@ $avatar-icon-size-factor: 0.65;
   box-sizing: border-box;
 
   .user-message-group .message-wrapper & {
-    justify-content: flex-end; // Час і кнопки разом будуть справа
+    // justify-content: flex-end; // Час і кнопки разом будуть справа
+        justify-content: space-between; // Або інше вирівнювання, якщо для AI має бути інакше
+
   }
   .ollama-message-group .message-wrapper & {
-    justify-content: flex-start; // Час і кнопки разом будуть зліва
+    // justify-content: flex-start; // Час і кнопки разом будуть зліва
+        justify-content: space-between; // Або інше вирівнювання, якщо для AI має бути інакше
+
   }
 }
 
