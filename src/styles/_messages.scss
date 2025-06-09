@@ -161,36 +161,59 @@ $avatar-icon-size-factor: 0.65;
   @include flex-layout($direction: column);
   box-sizing: border-box;
   max-width: var(--chat-message-max-width, 700px);
-  // width: 100%;
-  // position: relative; // Для позиціонування дочірніх absolute, якщо вони ще десь є
 
-    // Для повідомлень користувача, сам wrapper вирівнює свій контент (бульбашку та мета) по правому краю.
-  // Це робиться на рівні .message-group justify-content: flex-end;
-  // А всередині .message-wrapper, елементи йдуть один за одним.
+  // Уніфікуємо поведінку для всіх типів повідомлень, що вирівнюються по лівому краю
+  // та для тих, що вирівнюються по правому
+  &.user-message-group &, // Для користувача (вирівнювання по правому краю групи)
   .user-message-group & {
-    align-items: flex-end; // Вирівнює весь контент (бульбашку, мета) по правому краю всередині message-group
-    width: auto;           // Дозволяємо йому звужуватися до вмісту
-  }
-    .ollama-message-group & {
-    align-items: flex-start;
-    width: 100%; // Для AI залишаємо повну ширину
+    // Більш специфічний селектор, якщо попередній не спрацює
+    align-items: flex-end;
+    width: auto;
   }
 
+  // Для ШІ та інших, що вирівнюються по лівому краю групи
+  &.ollama-message-group &,
+  .ollama-message-group &, // Більш специфічний селектор
+  &.tool-message-group &,
+  .tool-message-group &,
+  &.error-message-group &,
+  .error-message-group & {
+    align-items: flex-start; // Вирівнює контент (бульбашку, мета) по лівому краю
+    width: auto; // Дозволяє звужуватися до вмісту
+  }
+
+  // Для системних повідомлень, які по центру
+  &.system-message-group &,
+  .system-message-group & {
+    align-items: center; // Якщо потрібно, щоб і мета-інформація була по центру
+    width: 100%; // Зазвичай вони займають всю доступну ширину
+  }
 }
 
 .message-content-area {
   display: flex;
   flex-direction: column;
-  // width: 100%;
 
+  // Уніфікуємо вирівнювання всередині content-area
   .user-message-group .message-wrapper & {
-    align-items: flex-end; // Вирівнює .message-main-content (бульбашку і картки) вправо
-    // width: fit-content;    // <<<<<<<<<< ВАЖЛИВО: Обмежуємо ширину контентної області по її вмісту
-    // margin-left: auto;      // <<<<<<<<<< ВАЖЛИВО: Щоб сама ця область притиснулася вправо в message-wrapper
+    align-items: flex-end;
   }
-  .ollama-message-group .message-wrapper & {
+  // Для ШІ та інших лівосторонніх
+  .ollama-message-group .message-wrapper &,
+  .tool-message-group .message-wrapper &,
+  .error-message-group .message-wrapper & {
     align-items: flex-start;
-    width: 100%; // Для AI залишаємо повну ширину
+  }
+
+  // Для всіх, крім системних, ширина контентної області має відповідати вмісту,
+  // якщо сам .message-wrapper вже має width: auto;
+  // Для системних - 100%
+  &:not(.system-message-group .message-wrapper &) {
+    // Не для системних
+    // width: 100%; // Якщо .message-wrapper вже auto, то 100% тут буде від auto, що добре
+  }
+  .system-message-group .message-wrapper & {
+    width: 100%;
   }
 }
 
@@ -356,28 +379,18 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// Обгортка для timestamp та кнопок дій
 .message-meta-actions-wrapper {
   display: flex;
   align-items: center;
+  justify-content: space-between; // Універсально для всіх типів
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75);
   padding: 0;
-  // justify-content: space-between; // Вирівнювання для timestamp і кнопок
-  min-height: 20px; // Висота для timestamp і кнопок
-  width: 100%;
+  min-height: 20px;
   box-sizing: border-box;
+  width: 100%; // 100% від батьківського .message-wrapper (який тепер auto для user/ai)
 
-  .user-message-group .message-wrapper & { 
-    justify-content: space-between; // Рознесе кнопки (order: 1) і час (order: 2)
-    width: 100%; // Щоб зайняти всю ширину
-  }
-
-  // Для повідомлень AI: кнопки зліва, потім час (стандартний потік)
-  .ollama-message-group .message-wrapper & { 
-    justify-content: flex-start; // Кнопки і час будуть разом зліва
-                                // Простір між ними контролюється margin на .message-actions-wrapper
-                                width: 100%; // Щоб зайняти всю ширину
-  }
+  // Видаляємо специфічні justify-content для user-message-group та ollama-message-group,
+  // оскільки тепер поведінка однакова.
 }
 
 // // Якщо .message-meta-actions-wrapper є прямим нащадком .message-wrapper
@@ -388,7 +401,6 @@ $avatar-icon-size-factor: 0.65;
 //     // justify-content: space-between; // Вже є вище, але тепер працюватиме в межах fit-content
 // }
 
-
 .message-timestamp {
   font-size: 0.7em;
   color: var(--text-faint);
@@ -397,28 +409,15 @@ $avatar-icon-size-factor: 0.65;
   line-height: 1.2; // Для вирівнювання з кнопками
   white-space: nowrap;
   // Для повідомлень користувача, час має бути останнім (справа)
-  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-    order: 2; // Час буде другим (після кнопок)
-  }
 
-
+  order: 2; // Час буде другим (після кнопок)
 }
 
 // Обгортка для самих кнопок дій - тепер це просто flex-елемент
-.message-actions-wrapper {;
-  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-    order: 1; // Кнопки будуть першими
-    margin-left: 0;  // Немає відступу зліва
-    margin-right: 0; // Немає відступу справа, space-between має впоратися
-  }
-
-  // Для AI: кнопки йдуть після часу (час перший в HTML), тому потрібен відступ зліва
-  .ollama-message-group .message-wrapper .message-meta-actions-wrapper & {
-    // order не потрібен, бо кнопки і так другі в HTML
-    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ від часу
-    margin-right: 0;
-  }
-
+.message-actions-wrapper {
+  order: 1;
+  margin-left: 0; // Немає відступу зліва
+  margin-right: 0; // Немає відступу справа, space-between має впоратися
 }
 
 // Показуємо кнопки при наведенні на весь .message-wrapper
