@@ -346,14 +346,14 @@ $avatar-icon-size-factor: 0.65;
   align-items: center;
   margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75);
   padding: 0;
-  justify-content: space-between; // Вирівнювання для timestamp і кнопок
+  // justify-content: space-between; // Вирівнювання для timestamp і кнопок
   min-height: 20px; // Висота для timestamp і кнопок
   width: 100%;
   box-sizing: border-box;
 
   .user-message-group .message-wrapper & {
     // justify-content: flex-end; // Час і кнопки разом будуть справа
-        justify-content: space-between; // Або інше вирівнювання, якщо для AI має бути інакше
+        // justify-content: space-between; // Або інше вирівнювання, якщо для AI має бути інакше
 
   }
   .ollama-message-group .message-wrapper & {
@@ -373,7 +373,9 @@ $avatar-icon-size-factor: 0.65;
   // Порядок: час буде першим елементом у flex-контейнері .message-meta-actions-wrapper
 
     .user-message-group .message-wrapper .message-meta-actions-wrapper & {
-    order: 2; // Робить час другим елементом у flex-порядку
+    // order: 2; // Робить час другим елементом у flex-порядку
+        margin-left: auto; // <<<<<<<< ОЦЕ КЛЮЧОВЕ ДЛЯ ВІДСУВАННЯ ВПРАВО
+
   }
   // Для AI, якщо час теж справа
   .ollama-message-group .message-wrapper .message-meta-actions-wrapper & {
@@ -387,15 +389,15 @@ $avatar-icon-size-factor: 0.65;
   // display, align-items, gap, opacity, visibility, transition - ці стилі тепер в _actions.scss
   // Тут лише відступи, якщо потрібні
 
-  // Для повідомлень користувача: відступ зліва від кнопок, щоб відокремити їх від мітки часу
-  .user-message-group .message-wrapper & {
-    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5);
-  }
+  // // Для повідомлень користувача: відступ зліва від кнопок, щоб відокремити їх від мітки часу
+  // .user-message-group .message-wrapper & {
+  //   margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5);
+  // }
 
-  // Для повідомлень AI: відступ справа від кнопок
-  .ollama-message-group .message-wrapper & {
-    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
-  }
+  // // Для повідомлень AI: відступ справа від кнопок
+  // .ollama-message-group .message-wrapper & {
+  //   margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
+  // }
 
     .user-message-group .message-wrapper .message-meta-actions-wrapper & {
     order: 1; // Робить блок кнопок першим елементом у flex-порядку
