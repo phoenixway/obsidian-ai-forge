@@ -31,6 +31,7 @@ $translation-text-line-height: 1.5;
     color: var(--text-muted);
     cursor: pointer;
     display: flex;
+    height: 23px; // Залишаємо, якщо це стандартна висота кнопок
     align-items: center;
     justify-content: center;
     transition: all 0.15s ease;

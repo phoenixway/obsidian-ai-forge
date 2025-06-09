@@ -14,7 +14,7 @@
   button.ollama-refresh-button {
     // Можете використати стандартні стилі кнопок Obsidian або задати свої
     padding: 5px !important; // Може знадобитися !important для перевизначення
-    // height: var(--input-height); // Стандартна висота полів вводу
+    height: var(--input-height); // Стандартна висота полів вводу
     width: var(--input-height);
     min-width: var(--input-height); // Запобігти стисканню
     cursor: pointer;
