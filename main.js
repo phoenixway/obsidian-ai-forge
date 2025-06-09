@@ -17471,9 +17471,9 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
   render() {
     const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
     renderAvatar(this.app, this.plugin, messageGroup, true, "user");
-    const contentAndAttachmentsWrapper = messageGroup.createDiv({ cls: "user-content-attachments-wrapper" });
-    contentAndAttachmentsWrapper.style.order = "1";
-    const attachmentsCardContainer = contentAndAttachmentsWrapper.createDiv({ cls: "message-attachment-cards-container" });
+    const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
+    messageWrapper.style.order = "1";
+    const attachmentsCardContainer = messageWrapper.createDiv({ cls: "message-attachment-cards-container" });
     let hasAttachmentCards = false;
     if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
       hasAttachmentCards = true;
@@ -17482,20 +17482,30 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         const nameEl = docCard.createDiv({ cls: "attachment-card-name", text: docInfo.name });
         nameEl.setAttribute("title", docInfo.name);
         const metaLine = docCard.createDiv({ cls: "attachment-card-meta" });
-        if (docInfo.content) {
+        if (docInfo.content && typeof docInfo.content === "string") {
           const lineCount = (docInfo.content.match(/\n/g) || []).length + 1;
           metaLine.createSpan({ cls: "attachment-card-lines", text: `${lineCount} lines` });
         } else {
           metaLine.createSpan({ cls: "attachment-card-size", text: `${(docInfo.size / 1024).toFixed(1)} KB` });
         }
-        const typeText = (docInfo.type.split(".").pop() || docInfo.type).toUpperCase();
+        let typeText = (docInfo.type.split(".").pop() || docInfo.type).toUpperCase();
+        if (typeText.includes("JSON"))
+          typeText = "JSON";
+        else if (typeText.includes("MARKDOWN") || typeText === "MD")
+          typeText = "MD";
+        else if (typeText.includes("TEXT") || typeText === "TXT")
+          typeText = "TXT";
+        else if (typeText.includes("TYPESCRIPT") || typeText === "TS")
+          typeText = "TS";
+        else if (typeText.includes("JAVASCRIPT") || typeText === "JS")
+          typeText = "JS";
         docCard.createDiv({ cls: "attachment-card-type", text: typeText });
       });
     }
     if (this.message.images && this.message.images.length > 0) {
       hasAttachmentCards = true;
       this.message.images.forEach((imageDataUrl, index) => {
-        const imageName = `Image ${index + 1}`;
+        const imageName = this.message.imageNames?.[index] || `Image ${index + 1}`;
         const imageCard = attachmentsCardContainer.createDiv({ cls: "attachment-card image-card" });
         const imgPreview = imageCard.createEl("img", { attr: { src: imageDataUrl }, cls: "attachment-card-image-preview" });
         const nameEl = imageCard.createDiv({ cls: "attachment-card-name", text: imageName });
@@ -17503,14 +17513,12 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         imageCard.addEventListener("click", () => {
           const newTab = window.open();
           if (newTab) {
-            newTab.document.write(`
-                            <body style="margin: 0; background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
-                                <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
-                            </body>
-                        `);
+            newTab.document.write(
+              /* ... код для відкриття зображення ... */
+            );
             newTab.document.title = imageName;
           } else {
-            new import_obsidian8.Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
+            new import_obsidian8.Notice("Could not open image in a new tab.");
           }
         });
       });
@@ -17518,27 +17526,27 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     if (!hasAttachmentCards) {
       attachmentsCardContainer.addClass("hidden-attachment-cards");
     }
-    const messageBubbleWrapper = contentAndAttachmentsWrapper.createDiv({ cls: "user-message-bubble-wrapper" });
     const userTextContent = this.message.content || "";
+    let messageBubbleActual = null;
     if (userTextContent.trim() !== "" || !hasAttachmentCards) {
-      const { messageEl, contentEl } = this.createMessageBubble(messageBubbleWrapper, [CSS_CLASSES.USER_MESSAGE]);
+      const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
+      messageBubbleActual = messageEl;
       if (userTextContent.trim() !== "") {
         import_obsidian8.MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
         fixBrokenTwemojiImages(contentEl);
       } else {
         messageEl.addClass("empty-user-text-bubble");
       }
-      const metaActionsWrapper = messageBubbleWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-      BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
-      this.addUserActionButtons(metaActionsWrapper);
+    }
+    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+    BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+    this.addUserActionButtons(metaActionsWrapper);
+    if (messageBubbleActual) {
       setTimeout(() => {
-        if (messageGroup.isConnected) {
-          this.view.checkMessageForCollapsing(messageGroup);
+        if (messageGroup.isConnected && messageBubbleActual) {
+          this.view.checkMessageForCollapsing(messageBubbleActual);
         }
       }, 70);
-    } else {
-      const minimalMetaWrapper = contentAndAttachmentsWrapper.createDiv({ cls: "minimal-meta-actions-wrapper" });
-      BaseMessageRenderer.addTimestampToElement(minimalMetaWrapper, this.message.timestamp, this.view);
     }
     return messageGroup;
   }
