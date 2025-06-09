@@ -350,6 +350,16 @@ $avatar-icon-size-factor: 0.65;
   min-height: 20px; // Висота для timestamp і кнопок
   width: 100%;
   box-sizing: border-box;
+
+  .user-message-group .message-wrapper & { 
+    justify-content: space-between; // Рознесе кнопки (order: 1) і час (order: 2)
+  }
+
+  // Для повідомлень AI: кнопки зліва, потім час (стандартний потік)
+  .ollama-message-group .message-wrapper & { 
+    justify-content: flex-start; // Кнопки і час будуть разом зліва
+                                // Простір між ними контролюється margin на .message-actions-wrapper
+  }
 }
 
 .message-timestamp {
@@ -359,15 +369,28 @@ $avatar-icon-size-factor: 0.65;
   margin: 0;
   line-height: 1.2; // Для вирівнювання з кнопками
   white-space: nowrap;
-    order: 2; 
+  // Для повідомлень користувача, час має бути останнім (справа)
+  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 2; // Час буде другим (після кнопок)
+  }
+
 
 }
 
 // Обгортка для самих кнопок дій - тепер це просто flex-елемент
 .message-actions-wrapper {
-  margin-left: 0;  // Забезпечуємо, що немає зайвих відступів зліва
-  margin-right: 0; // Забезпечуємо, що немає зайвих відступів справа, space-between має працювати
-  order: 1; 
+  .user-message-group .message-wrapper .message-meta-actions-wrapper & {
+    order: 1; // Кнопки будуть першими
+    margin-left: 0;  // Немає відступу зліва
+    margin-right: 0; // Немає відступу справа, space-between має впоратися
+  }
+
+  // Для AI: кнопки йдуть після часу (час перший в HTML), тому потрібен відступ зліва
+  .ollama-message-group .message-wrapper .message-meta-actions-wrapper & {
+    // order не потрібен, бо кнопки і так другі в HTML
+    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ від часу
+    margin-right: 0;
+  }
 
 }
 
