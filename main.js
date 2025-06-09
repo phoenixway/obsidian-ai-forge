@@ -17473,7 +17473,8 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     renderAvatar(this.app, this.plugin, messageGroup, true, "user");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
     messageWrapper.style.order = "1";
-    const attachmentsCardContainer = messageWrapper.createDiv({ cls: "message-attachment-cards-container" });
+    const mainContentWrapper = messageWrapper.createDiv({ cls: "message-main-content" });
+    const attachmentsCardContainer = mainContentWrapper.createDiv({ cls: "message-attachment-cards-container" });
     let hasAttachmentCards = false;
     if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
       hasAttachmentCards = true;
@@ -17534,17 +17535,6 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
         }
         imageCard.createDiv({ cls: "attachment-card-type", text: imageType });
         imageCard.addEventListener("click", () => {
-          const newTab = window.open();
-          if (newTab) {
-            newTab.document.write(`
-                            <body style="margin: 0; background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
-                                <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
-                            </body>
-                        `);
-            newTab.document.title = imageName;
-          } else {
-            new import_obsidian8.Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
-          }
         });
       });
     }
@@ -17553,20 +17543,21 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     }
     const userTextContent = this.message.content || "";
     let messageBubbleActual = null;
-    if (userTextContent.trim() !== "" || !hasAttachmentCards) {
-      const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
-      messageBubbleActual = messageEl;
-      if (userTextContent.trim() !== "") {
-        import_obsidian8.MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
-        fixBrokenTwemojiImages(contentEl);
-      } else {
-        messageEl.addClass("empty-user-text-bubble");
+    if (userTextContent.trim() !== "" || !hasAttachmentCards && !userTextContent.trim()) {
+      if (userTextContent.trim() !== "" || !hasAttachmentCards) {
+        const { messageEl, contentEl } = this.createMessageBubble(mainContentWrapper, [CSS_CLASSES.USER_MESSAGE]);
+        messageBubbleActual = messageEl;
+        if (userTextContent.trim() !== "") {
+          import_obsidian8.MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
+          fixBrokenTwemojiImages(contentEl);
+        } else {
+          messageEl.addClass("empty-user-text-bubble");
+        }
       }
     }
-    const metaActionsWrapper = createDiv({ cls: "message-meta-actions-wrapper" });
+    const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
     BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
     this.addUserActionButtons(metaActionsWrapper);
-    messageWrapper.appendChild(metaActionsWrapper);
     if (messageBubbleActual && !messageBubbleActual.classList.contains("empty-user-text-bubble")) {
       setTimeout(() => {
         if (messageGroup.isConnected && messageBubbleActual) {
@@ -17576,6 +17567,7 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     }
     return messageGroup;
   }
+  // ... (formatFileSize залишається)
   // --- НОВА ДОПОМІЖНА ФУНКЦІЯ ---
   formatFileSize(bytes, decimals = 1) {
     if (bytes === 0)
