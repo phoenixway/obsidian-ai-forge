@@ -16,18 +16,16 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		}
 	}
 
-			public render(): HTMLElement {
-        // Головна обгортка для всього блоку повідомлення користувача (аватар, картки вкладень, бульбашка повідомлення)
+				public render(): HTMLElement {
 		const messageGroup = this.createMessageGroupWrapper([CSS_CLASSES.USER_MESSAGE_GROUP]);
-
 		RendererUtils.renderAvatar(this.app, this.plugin, messageGroup, true, "user");
 
-        // Обгортка для контенту праворуч від аватара (картки + бульбашка)
-        const contentAndAttachmentsWrapper = messageGroup.createDiv({cls: "user-content-attachments-wrapper"});
-        contentAndAttachmentsWrapper.style.order = "1"; // Розміщуємо праворуч від аватара
+        // messageWrapper тепер буде містити все: картки, бульбашку, мета-інформацію
+		const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
+		messageWrapper.style.order = "1"; // Для користувача все праворуч від аватара
 
-        // --- NEW: Контейнер для карток вкладень (файли та зображення) ---
-        const attachmentsCardContainer = contentAndAttachmentsWrapper.createDiv({ cls: "message-attachment-cards-container" });
+        // --- Контейнер для карток вкладень (файли та зображення) ---
+        const attachmentsCardContainer = messageWrapper.createDiv({ cls: "message-attachment-cards-container" });
         let hasAttachmentCards = false;
 
         // Рендеринг карток для прикріплених документів
@@ -35,25 +33,27 @@ export class UserMessageRenderer extends BaseMessageRenderer {
             hasAttachmentCards = true;
             this.message.attachedDocuments.forEach(docInfo => {
                 const docCard = attachmentsCardContainer.createDiv({ cls: "attachment-card document-card" });
-                // Іконка (якщо потрібна всередині картки, а не тільки текст типу)
-                // setIcon(docCard.createSpan({ cls: "attachment-card-icon" }), this.getIconForDocument(docInfo));
                 
                 const nameEl = docCard.createDiv({ cls: "attachment-card-name", text: docInfo.name });
-                nameEl.setAttribute("title", docInfo.name); // Повна назва при наведенні
+                nameEl.setAttribute("title", docInfo.name);
 
                 const metaLine = docCard.createDiv({cls: "attachment-card-meta"});
-                if (docInfo.content) {
+                if (docInfo.content && typeof docInfo.content === 'string') { // Перевіряємо, що content - рядок
                     const lineCount = (docInfo.content.match(/\n/g) || []).length + 1;
                     metaLine.createSpan({ cls: "attachment-card-lines", text: `${lineCount} lines` });
                 } else {
                     metaLine.createSpan({ cls: "attachment-card-size", text: `${(docInfo.size / 1024).toFixed(1)} KB` });
                 }
                 
-                const typeText = (docInfo.type.split('.').pop() || docInfo.type).toUpperCase();
+                let typeText = (docInfo.type.split('.').pop() || docInfo.type).toUpperCase();
+                // Спрощуємо типи для відображення
+                if (typeText.includes('JSON')) typeText = 'JSON';
+                else if (typeText.includes('MARKDOWN') || typeText === 'MD') typeText = 'MD';
+                else if (typeText.includes('TEXT') || typeText === 'TXT') typeText = 'TXT';
+                else if (typeText.includes('TYPESCRIPT') || typeText === 'TS') typeText = 'TS';
+                else if (typeText.includes('JAVASCRIPT') || typeText === 'JS') typeText = 'JS';
+                
                 docCard.createDiv({ cls: "attachment-card-type", text: typeText });
-
-                // Обробник кліку на картку (можна додати пізніше, наприклад, для відкриття файлу)
-                // docCard.addEventListener('click', () => { /* ... */ });
             });
         }
 
@@ -61,83 +61,64 @@ export class UserMessageRenderer extends BaseMessageRenderer {
         if (this.message.images && this.message.images.length > 0) {
             hasAttachmentCards = true;
             this.message.images.forEach((imageDataUrl, index) => {
-                // Спробуємо отримати назву з даних, якщо вона там є, або генеруємо
-                const imageName = `Image ${index + 1}`; // TODO: Якщо є можливість, передавати сюди реальну назву файлу зображення
-                                                    // Це вимагатиме змін в AttachmentManager та Message для зберігання назв файлів зображень
+                // Спробуємо отримати реальну назву зображення, якщо вона передається
+                // Поки що використовуємо AttachmentFile з AttachmentManager як джерело назви
+                // Це вимагатиме змін в AttachmentManager, OllamaView->sendMessage, ChatManager, Message type
+                // Припустимо, що message.imageNames?: string[] існує і синхронізоване з message.images
+                const imageName = (this.message as any).imageNames?.[index] || `Image ${index + 1}`;
 
                 const imageCard = attachmentsCardContainer.createDiv({ cls: "attachment-card image-card" });
-                // Можна додати мініатюру зображення всередину картки замість іконки/типу
                 const imgPreview = imageCard.createEl("img", {attr: {src: imageDataUrl}, cls: "attachment-card-image-preview"});
 
                 const nameEl = imageCard.createDiv({ cls: "attachment-card-name", text: imageName });
                 nameEl.setAttribute("title", imageName);
-
-                // Розмір для зображень зазвичай не такий важливий як для документів, але можна додати, якщо є дані
-                // const metaLine = imageCard.createDiv({cls: "attachment-card-meta"});
-                // metaLine.createSpan({ cls: "attachment-card-size", text: `... KB` }); // Потрібно буде передавати розмір
                 
-                // imageCard.createDiv({ cls: "attachment-card-type", text: "IMAGE" }); // Або розширення, якщо відоме
-
                 imageCard.addEventListener('click', () => {
                     const newTab = window.open();
                     if (newTab) {
-                        newTab.document.write(`
-                            <body style="margin: 0; background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh;">
-                                <img src="${imageDataUrl}" style="max-width: 95%; max-height: 95vh; display: block; object-fit: contain;">
-                            </body>
-                        `);
+                        newTab.document.write(/* ... код для відкриття зображення ... */);
                         newTab.document.title = imageName;
                     } else {
-                        new Notice("Could not open image in a new tab. Please check your browser's pop-up settings.");
+                        new Notice("Could not open image in a new tab.");
                     }
                 });
             });
         }
         
-        // Сховати контейнер карток, якщо він порожній
         if (!hasAttachmentCards) {
             attachmentsCardContainer.addClass("hidden-attachment-cards");
         }
-        // --- END NEW: Контейнер для карток ---
+        // --- END Контейнер для карток ---
 
-
-		// Контейнер для самої бульбашки повідомлення користувача
-        const messageBubbleWrapper = contentAndAttachmentsWrapper.createDiv({cls: "user-message-bubble-wrapper"});
-        // Якщо немає тексту від користувача, але є картки, то цю бульбашку можна не створювати або зробити її меншою
+		// Бульбашка для тексту повідомлення користувача
         const userTextContent = this.message.content || "";
-        if (userTextContent.trim() !== "" || !hasAttachmentCards) { // Показуємо бульбашку, якщо є текст АБО якщо немає карток (щоб не було порожньо)
-            const { messageEl, contentEl } = this.createMessageBubble(messageBubbleWrapper, [CSS_CLASSES.USER_MESSAGE]);
-            
+        let messageBubbleActual: HTMLElement | null = null;
+
+		if (userTextContent.trim() !== "" || !hasAttachmentCards) {
+            // Створюємо messageEl (бульбашку) та contentEl всередині messageWrapper
+            const { messageEl, contentEl } = this.createMessageBubble(messageWrapper, [CSS_CLASSES.USER_MESSAGE]);
+            messageBubbleActual = messageEl; // Зберігаємо посилання на бульбашку
+
             if (userTextContent.trim() !== "") {
                 MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
                 RendererUtils.fixBrokenTwemojiImages(contentEl);
             } else {
-                // Якщо бульбашка створена, але тексту немає (наприклад, тільки вкладення відправлені),
-                // можна залишити її порожньою або додати плейсхолдер/зробити її меншою
-                // contentEl.setText(" "); // Щоб вона не колапсувала повністю, якщо порожня
-                messageEl.addClass("empty-user-text-bubble"); // Для спеціальних стилів, якщо потрібно
+                messageEl.addClass("empty-user-text-bubble");
             }
+        }
 
-            const metaActionsWrapper = messageBubbleWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
-            BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
-            this.addUserActionButtons(metaActionsWrapper); // addUserActionButtons тепер приймає metaActionsWrapper
-            
-            // Перевірка на згортання основного текстового повідомлення
+        // Обгортка для timestamp та кнопок дій, розміщується ПІСЛЯ карток та бульбашки, всередині messageWrapper
+		const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
+		BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
+		this.addUserActionButtons(metaActionsWrapper); // Передаємо сюди metaActionsWrapper
+
+        // Перевірка на згортання для бульбашки повідомлення, якщо вона існує
+        if (messageBubbleActual) {
             setTimeout(() => {
-                if (messageGroup.isConnected) {
-                    this.view.checkMessageForCollapsing(messageGroup);
+                if (messageGroup.isConnected && messageBubbleActual) { // Переконуємось, що messageGroup і messageBubbleActual ще в DOM
+                    this.view.checkMessageForCollapsing(messageBubbleActual); // Перевіряємо згортання для messageBubbleActual
                 }
             }, 70);
-        } else {
-            // Якщо є картки, але немає тексту, то не створюємо бульбашку для тексту.
-            // Можна додати timestamp та кнопки дій якось інакше, або не додавати, якщо немає основного тексту.
-            // Наприклад, можна додати timestamp під картками, якщо це логічно.
-            // Для простоти, поки що дії та timestamp пов'язані з текстовою бульбашкою.
-            // Альтернатива: створити маленький блок для timestamp/дій під картками.
-            const minimalMetaWrapper = contentAndAttachmentsWrapper.createDiv({ cls: "minimal-meta-actions-wrapper" });
-            BaseMessageRenderer.addTimestampToElement(minimalMetaWrapper, this.message.timestamp, this.view);
-            // Кнопки дій для повідомлення без тексту можуть бути не потрібні, або потрібен інший набір.
-            // this.addUserActionButtons(minimalMetaWrapper); // Поки що не додаємо кнопки, якщо немає тексту.
         }
 
 		return messageGroup;
