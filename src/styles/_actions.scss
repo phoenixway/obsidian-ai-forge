@@ -52,8 +52,8 @@ $translation-text-line-height: 1.5;
   .user-message-group & button { // Змінено селектор для більшої специфічності, якщо потрібно
                                   // .user-message - це сама бульбашка, а .user-message-group - це батько
     background-color: rgba(255, 255, 255, 0.15);
-    border-color:red;// rgba(255, 255, 255, 0.2);
-    color: var(--text-on-accent); // Використовуємо змінну, якщо є
+    border-color: rgba(255, 255, 255, 0.2);
+    // color: var(--text-on-accent); // Використовуємо змінну, якщо є
                                   // або rgba(255, 255, 255, 0.8);
     opacity: 0.7;
 
@@ -83,7 +83,7 @@ $translation-text-line-height: 1.5;
   margin-top: calc(var(--chat-spacing-unit) * 2);
   padding-top: calc(var(--chat-spacing-unit) * 1.5);
   font-size: 0.95em;
-  color: var(--text-muted);
+  color: var(--text-muted);base-action-button
 
   .user-message & { // Цей селектор може бути змінений на .user-message-group .message-wrapper &
     border-top-color: rgba(255, 255, 255, 0.2);
@@ -107,7 +107,7 @@ $translation-text-line-height: 1.5;
     
     > :last-child {
       margin-bottom: 0;
-    }
+    }base-action-button
     
     > ul, > ol {
       line-height: $translation-list-container-line-height;
