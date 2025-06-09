@@ -307,7 +307,7 @@ $avatar-icon-size-factor: 0.65;
   display: flex;
   align-items: center; 
   // ЗНАЧНО ЗБІЛЬШУЄМО margin-top
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 2.5); // Було * 1.5
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); // Було * 1.5
   padding: 0; 
   min-height: 22px; 
   width: 100%; 
