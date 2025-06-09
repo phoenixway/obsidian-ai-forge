@@ -373,119 +373,69 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
+// Обгортка для timestamp та кнопок дій
 .message-meta-actions-wrapper {
   display: flex;
-  align-items: center;
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1);
-  padding: 0;
-  min-height: 20px;
-  width: 100%;
+  align-items: center; // Вертикальне вирівнювання часу та кнопок
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); // Відступ зверху
+  padding: 0; // Горизонтальні падінги тут не потрібні, якщо вирівнювання йде через justify-content
+  min-height: 20px; 
+  width: 100%; // Займає всю ширину батьківського .message-wrapper
   box-sizing: border-box;
 
-  .user-message-group .message-wrapper & {
-    justify-content: flex-end;
-    padding-right: calc(var(--chat-spacing-unit, 5px) * 1);
+  // Для повідомлень користувача: вирівнюємо вміст (час + кнопки) вправо
+  .user-message-group .message-wrapper & { 
+    justify-content: flex-end; 
+    // padding-right: calc(var(--chat-spacing-unit, 5px) * 1); // Видалено, щоб вирівнювалось по самому краю. Можна повернути, якщо потрібен відступ справа.
   }
-  .ollama-message-group .message-wrapper & {
-    justify-content: flex-start;
-    padding-left: calc(var(--chat-spacing-unit, 5px) * 1);
+
+  // Для повідомлень AI (приклад, якщо потрібно)
+  .ollama-message-group .message-wrapper & { 
+    justify-content: flex-start; 
+    // padding-left: calc(var(--chat-spacing-unit, 5px) * 1); // Аналогічно для AI
   }
 }
 
-.message-timestamp {
-  font-size: 0.7em;
-  color: var(--text-faint);
-  opacity: 0.9;
-  margin: 0;
-  line-height: 1.2;
-  white-space: nowrap;
+// Мітка часу
+.message-timestamp { 
+  font-size: 0.7em; 
+  color: var(--text-faint); 
+  opacity: 0.9; 
+  margin: 0; // Немає зовнішніх відступів, позиціонується як flex-item
+  line-height: 1.2; // Для кращого вертикального вирівнювання з кнопками
+  white-space: nowrap; // Щоб час не переносився
+  // Порядок не змінюємо, він перший у HTML
 }
 
-.message-actions-wrapper {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--chat-spacing-unit, 5px) * 1);
-  opacity: 0;
-  visibility: hidden;
-  @include transition((opacity, visibility), 0.15s, ease-in-out);
-  // Прибираємо position: absolute та пов'язані стилі
-  // position: absolute;
-  position: relative !important; // Встановлюємо position: relative, щоб елементи не перекривалися
-  // bottom: 4px;
-  // z-index: 6;
+// Обгортка для самих кнопок дій
+.message-actions-wrapper { 
+  display: flex; 
+  align-items: center; 
+  gap: calc(var(--chat-spacing-unit, 5px) * 1); // Проміжок між кнопками
+  opacity: 0; 
+  visibility: hidden; 
+  @include transition( (opacity, visibility), 0.15s, ease-in-out );
+  // position, bottom, z-index тут не потрібні, якщо елемент в потоці
 
+  // Для повідомлень користувача: відступ зліва від кнопок, щоб відокремити їх від мітки часу
   .user-message-group .message-wrapper & {
-    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5);
+    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); 
   }
+
+  // Для повідомлень AI (приклад)
   .ollama-message-group .message-wrapper & {
-    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5); 
   }
 
-  button.message-action-button {
-    .ollama-chat-container .message-group .message-wrapper .message-meta-actions-wrapper .message-actions-wrapper {
-      display: flex !important; // Додаємо !important для гарантії, хоча краще уникати
-      align-items: center !important;
-      gap: calc(var(--chat-spacing-unit, 5px) * 1) !important;
-      opacity: 0; // !important для opacity/visibility може бути не потрібен, якщо hover працює
-      visibility: hidden;
-      @include transition((opacity, visibility), 0.15s, ease-in-out);
-
-      // Явно встановлюємо position: static або relative, щоб перебити absolute
-      position: static !important; // Або relative, якщо потрібно для інших цілей, але static краще для потоку
-      // bottom: auto !important; // Скидаємо bottom
-      // z-index: auto !important; // Скидаємо z-index
-
-      .user-message-group .message-wrapper & {
-        // Цей селектор може вже не спрацювати через підвищення специфічності вище
-        margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5);
-      }
-      .ollama-message-group .message-wrapper & {
-        margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5);
-      }
-
-      button.message-action-button {
-        @extend %base-action-button;
-      }
-      .delete-message-button.danger-option {
-        // ...
-      }
-    }
-
-    // Якщо попередній селектор для margin-left/right не спрацював через вкладеність:
-    .ollama-chat-container
-      .message-group.user-message-group
-      .message-wrapper
-      .message-meta-actions-wrapper
-      .message-actions-wrapper {
-      margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5) !important;
-      margin-right: 0 !important; // Скидаємо, якщо не потрібно
-    }
-    .ollama-chat-container
-      .message-group.ollama-message-group
-      .message-wrapper
-      .message-meta-actions-wrapper
-      .message-actions-wrapper {
-      margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5) !important;
-      margin-left: 0 !important; // Скидаємо, якщо не потрібно
-    }
-
-    .message-wrapper:hover
-      .ollama-chat-container
-      .message-group
-      .message-wrapper
-      .message-meta-actions-wrapper
-      .message-actions-wrapper {
-      opacity: 1;
-      visibility: visible;
-    }
-    @extend %base-action-button;
+  button.message-action-button { 
+    @extend %base-action-button; 
   }
-  .delete-message-button.danger-option {
-    color: var(--text-error) !important;
-    &:hover {
-      color: var(--text-on-accent) !important;
-      background-color: var(--background-modifier-error-hover) !important;
-    }
+  .delete-message-button.danger-option { 
+    color: var(--text-error) !important; // !important тут для кольору помилки, це може бути виправдано
+    &:hover { 
+        color: var(--text-on-accent) !important; 
+        background-color: var(--background-modifier-error-hover) !important; 
+    } 
   }
 }
 
