@@ -399,7 +399,7 @@
     // Плавний перехід до прозорості знизу, якщо текст обрізаний
     &::after {
       content: '';
-      position: absolute;
+      // position: absolute; //FIXME
       bottom: 0;
       left: 0;
       right: 0;
