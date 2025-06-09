@@ -594,3 +594,51 @@
 .attached-document-block {
   // display: none !important; // Або видалити повністю
 }
+
+
+
+
+
+.ollama-chat-container .message-group .message-wrapper .message-meta-actions-wrapper .message-actions-wrapper { 
+  display: flex !important; // Додаємо !important для гарантії, хоча краще уникати
+  align-items: center !important; 
+  gap: calc(var(--chat-spacing-unit, 5px) * 1) !important; 
+  opacity: 0; // !important для opacity/visibility може бути не потрібен, якщо hover працює
+  visibility: hidden; 
+  @include transition( (opacity, visibility), 0.15s, ease-in-out );
+  
+  // Явно встановлюємо position: static або relative, щоб перебити absolute
+  position: static !important; // Або relative, якщо потрібно для інших цілей, але static краще для потоку
+  // bottom: auto !important; // Скидаємо bottom
+  // z-index: auto !important; // Скидаємо z-index
+
+  .user-message-group .message-wrapper & { // Цей селектор може вже не спрацювати через підвищення специфічності вище
+    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); 
+  }
+  .ollama-message-group .message-wrapper & {
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5); 
+  }
+
+  button.message-action-button { 
+    @extend %base-action-button; 
+  }
+  .delete-message-button.danger-option { 
+    // ...
+  }
+}
+
+// Якщо попередній селектор для margin-left/right не спрацював через вкладеність:
+.ollama-chat-container .message-group.user-message-group .message-wrapper .message-meta-actions-wrapper .message-actions-wrapper {
+    margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5) !important;
+    margin-right: 0 !important; // Скидаємо, якщо не потрібно
+}
+.ollama-chat-container .message-group.ollama-message-group .message-wrapper .message-meta-actions-wrapper .message-actions-wrapper {
+    margin-right: calc(var(--chat-spacing-unit, 5px) * 1.5) !important;
+    margin-left: 0 !important; // Скидаємо, якщо не потрібно
+}
+
+
+.message-wrapper:hover .ollama-chat-container .message-group .message-wrapper .message-meta-actions-wrapper .message-actions-wrapper { 
+  opacity: 1; 
+  visibility: visible; 
+}
