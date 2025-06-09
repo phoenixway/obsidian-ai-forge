@@ -414,6 +414,7 @@ $avatar-icon-size-factor: 0.65;
   gap: calc(var(--chat-spacing-unit, 5px) * 1); // Проміжок між кнопками
   opacity: 0; 
   visibility: hidden; 
+  position: relative;
   @include transition( (opacity, visibility), 0.15s, ease-in-out );
   // position, bottom, z-index тут не потрібні, якщо елемент в потоці
 
