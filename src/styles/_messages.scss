@@ -161,14 +161,19 @@ $avatar-icon-size-factor: 0.65;
   @include flex-layout($direction: column);
   box-sizing: border-box;
   max-width: var(--chat-message-max-width, 700px);
-  width: 100%;
+  // width: 100%;
   // position: relative; // Для позиціонування дочірніх absolute, якщо вони ще десь є
 
     // Для повідомлень користувача, сам wrapper вирівнює свій контент (бульбашку та мета) по правому краю.
   // Це робиться на рівні .message-group justify-content: flex-end;
   // А всередині .message-wrapper, елементи йдуть один за одним.
-  &.user-message-group & { // Якщо цей селектор потрібен, щоб перевизначити align-items
-     // align-items: flex-end; // Це вже є на .message-content-area та .message-main-content
+  .user-message-group & {
+    align-items: flex-end; // Вирівнює весь контент (бульбашку, мета) по правому краю всередині message-group
+    width: auto;           // Дозволяємо йому звужуватися до вмісту
+  }
+    .ollama-message-group & {
+    align-items: flex-start;
+    width: 100%; // Для AI залишаємо повну ширину
   }
 
 }
@@ -176,15 +181,16 @@ $avatar-icon-size-factor: 0.65;
 .message-content-area {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  // width: 100%;
 
   .user-message-group .message-wrapper & {
     align-items: flex-end; // Вирівнює .message-main-content (бульбашку і картки) вправо
-    width: fit-content;    // <<<<<<<<<< ВАЖЛИВО: Обмежуємо ширину контентної області по її вмісту
-    margin-left: auto;      // <<<<<<<<<< ВАЖЛИВО: Щоб сама ця область притиснулася вправо в message-wrapper
+    // width: fit-content;    // <<<<<<<<<< ВАЖЛИВО: Обмежуємо ширину контентної області по її вмісту
+    // margin-left: auto;      // <<<<<<<<<< ВАЖЛИВО: Щоб сама ця область притиснулася вправо в message-wrapper
   }
   .ollama-message-group .message-wrapper & {
     align-items: flex-start;
+    width: 100%; // Для AI залишаємо повну ширину
   }
 }
 
@@ -374,13 +380,13 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// Якщо .message-meta-actions-wrapper є прямим нащадком .message-wrapper
-// і йде ПІСЛЯ .message-content-area, тоді для користувача потрібно так:
-.user-message-group .message-wrapper > .message-meta-actions-wrapper {
-    width: fit-content;
-    align-self: flex-end; // Щоб сам блок мета-інформації притиснувся вправо
-    // justify-content: space-between; // Вже є вище, але тепер працюватиме в межах fit-content
-}
+// // Якщо .message-meta-actions-wrapper є прямим нащадком .message-wrapper
+// // і йде ПІСЛЯ .message-content-area, тоді для користувача потрібно так:
+// .user-message-group .message-wrapper > .message-meta-actions-wrapper {
+//     width: fit-content;
+//     align-self: flex-end; // Щоб сам блок мета-інформації притиснувся вправо
+//     // justify-content: space-between; // Вже є вище, але тепер працюватиме в межах fit-content
+// }
 
 
 .message-timestamp {
