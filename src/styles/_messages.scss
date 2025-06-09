@@ -306,10 +306,9 @@ $avatar-icon-size-factor: 0.65;
 .message-meta-actions-wrapper {
   display: flex;
   align-items: center; 
-  // ЗНАЧНО ЗБІЛЬШУЄМО margin-top
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); // Було * 1.5
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); 
   padding: 0; 
-  min-height: 22px; 
+  min-height: 20px; 
   width: 100%; 
   box-sizing: border-box;
 
@@ -322,7 +321,6 @@ $avatar-icon-size-factor: 0.65;
     padding-left: calc(var(--chat-spacing-unit, 5px) * 1);
   }
 }
-
 
 .message-timestamp { 
   font-size: 0.7em; 
@@ -340,6 +338,10 @@ $avatar-icon-size-factor: 0.65;
   opacity: 0; 
   visibility: hidden; 
   @include transition( (opacity, visibility), 0.15s, ease-in-out );
+  // Прибираємо position: absolute та пов'язані стилі
+  // position: absolute;
+  // bottom: 4px;
+  // z-index: 6; 
   
   .user-message-group .message-wrapper & {
     margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); 
