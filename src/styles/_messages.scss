@@ -148,13 +148,11 @@ $avatar-icon-size-factor: 0.65;
   width: 100%; 
 }
 
-// --- ОБГОРТКА для контенту (картки + бульбашка), ПЕРЕД мета-інформацією ---
 .message-content-area {
   display: flex;
   flex-direction: column;
-  width: 100%; // Займає всю ширину .message-wrapper
+  width: 100%;
 
-  // Вирівнювання .message-main-content всередині .message-content-area
   .user-message-group .message-wrapper & {
     align-items: flex-end; 
   }
@@ -163,13 +161,11 @@ $avatar-icon-size-factor: 0.65;
   }
 }
 
-// Обгортка для карток та бульбашки, для їх взаємного вирівнювання
 .message-main-content {
   display: flex;
   flex-direction: column;
-  width: 100%; // Або fit-content, якщо потрібно, щоб вона була по ширині найширшого елемента (картки/бульбашки)
+  width: 100%; 
 
-  // Вирівнювання дочірніх елементів (карток та бульбашки)
   .user-message-group .message-wrapper & {
     align-items: flex-end;
   }
@@ -177,14 +173,12 @@ $avatar-icon-size-factor: 0.65;
     align-items: flex-start;
   }
 }
-// --- Кінець нових обгорток ---
 
 .message-attachment-cards-container {
   display: flex;
   flex-wrap: wrap;
   gap: calc(var(--chat-spacing-unit, 5px) * 1.25);
-  width: 100%; // Картки займають всю доступну ширину .message-main-content
-  // justify-content тут не потрібен, якщо вирівнювання йде через align-items батька
+  width: 100%; 
   
   &.hidden-attachment-cards {
     display: none;
@@ -286,8 +280,6 @@ $avatar-icon-size-factor: 0.65;
   padding: calc(var(--chat-spacing-unit, 5px) * 1) calc(var(--chat-spacing-unit, 5px) * 2.5);
   box-shadow: none;
   text-align: center;
-  // Для системних повідомлень, .message-wrapper має align-items: center
-  // Тому сама бульбашка не потребує align-self, якщо .message-wrapper = system-message-group
   width: auto; 
 }
 .message.error-message { 
@@ -311,13 +303,12 @@ $avatar-icon-size-factor: 0.65;
   p { margin-top: 0; margin-bottom: calc(var(--p-spacing, 1em) / 2); &:last-child { margin-bottom: 0; } }
 }
 
-// Обгортка для timestamp та кнопок дій - ПІСЛЯ .message-content-area
 .message-meta-actions-wrapper {
   display: flex;
   align-items: center; 
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); 
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1.5); 
   padding: 0; 
-  min-height: 20px; 
+  min-height: 22px; 
   width: 100%; 
   box-sizing: border-box;
 
