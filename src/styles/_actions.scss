@@ -50,20 +50,20 @@ $translation-text-line-height: 1.5;
   // Специфічні стилі для кнопок на повідомленнях користувача (якщо вони мають відрізнятися ВІД ЗАГАЛЬНИХ)
   // Якщо фон/колір кнопок дійсно залежить від типу повідомлення батька, це можна залишити.
   // Але краще, якщо базові стилі кнопки універсальні, а змінюється лише контейнер.
-  .user-message-group & button { // Змінено селектор для більшої специфічності, якщо потрібно
-                                  // .user-message - це сама бульбашка, а .user-message-group - це батько
-    background-color: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.2);
-    // color: var(--text-on-accent); // Використовуємо змінну, якщо є
-                                  // або rgba(255, 255, 255, 0.8);
-    opacity: 0.7;
+  // .user-message-group & button { // Змінено селектор для більшої специфічності, якщо потрібно
+  //                                 // .user-message - це сама бульбашка, а .user-message-group - це батько
+  //   background-color: rgba(255, 255, 255, 0.15);
+  //   border-color: rgba(255, 255, 255, 0.2);
+  //   // color: var(--text-on-accent); // Використовуємо змінну, якщо є
+  //                                 // або rgba(255, 255, 255, 0.8);
+  //   opacity: 0.7;
 
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.25);
-      border-color: rgba(255, 255, 255, 0.3);
-      opacity: 1;
-    }
-  }
+  //   &:hover {
+  //     background-color: rgba(255, 255, 255, 0.25);
+  //     border-color: rgba(255, 255, 255, 0.3);
+  //     opacity: 1;
+  //   }
+  // }
 
   // Translate button specific states
   .translate-button {
