@@ -17473,7 +17473,8 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     renderAvatar(this.app, this.plugin, messageGroup, true, "user");
     const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
     messageWrapper.style.order = "1";
-    const mainContentWrapper = messageWrapper.createDiv({ cls: "message-main-content" });
+    const contentArea = messageWrapper.createDiv({ cls: "message-content-area" });
+    const mainContentWrapper = contentArea.createDiv({ cls: "message-main-content" });
     const attachmentsCardContainer = mainContentWrapper.createDiv({ cls: "message-attachment-cards-container" });
     let hasAttachmentCards = false;
     if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
@@ -17567,6 +17568,7 @@ var UserMessageRenderer = class extends BaseMessageRenderer {
     }
     return messageGroup;
   }
+  // ... (formatFileSize залишається)
   // ... (formatFileSize залишається)
   // --- НОВА ДОПОМІЖНА ФУНКЦІЯ ---
   formatFileSize(bytes, decimals = 1) {

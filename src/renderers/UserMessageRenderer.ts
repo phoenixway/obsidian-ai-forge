@@ -23,24 +23,25 @@ export class UserMessageRenderer extends BaseMessageRenderer {
 		const messageWrapper = messageGroup.createDiv({ cls: CSS_CLASSES.MESSAGE_WRAPPER });
 		messageWrapper.style.order = "1";
 
-        // --- НОВА ОБГОРТКА для карток та бульбашки ---
-        const mainContentWrapper = messageWrapper.createDiv({ cls: "message-main-content" });
+        // --- НОВА ОБГОРТКА для всього контенту, ОКРІМ мета-інформації ---
+        const contentArea = messageWrapper.createDiv({ cls: "message-content-area" }); 
+        // Налаштуємо вирівнювання для цієї обгортки в CSS
+
+        // .message-main-content тепер всередині .content-area
+        const mainContentWrapper = contentArea.createDiv({ cls: "message-main-content" });
 
         const attachmentsCardContainer = mainContentWrapper.createDiv({ cls: "message-attachment-cards-container" });
         let hasAttachmentCards = false;
 
-        // Рендеринг карток для прикріплених документів
+        // ... (логіка рендерингу .attachment-card для документів, як і раніше)
         if (this.message.attachedDocuments && this.message.attachedDocuments.length > 0) {
             hasAttachmentCards = true;
             this.message.attachedDocuments.forEach(docInfo => {
                 const docCard = attachmentsCardContainer.createDiv({ cls: "attachment-card document-card" });
-                // ... (решта логіки для docCard як і раніше)
                 const nameEl = docCard.createDiv({ cls: "attachment-card-name", text: docInfo.name });
                 nameEl.setAttribute("title", docInfo.name);
-
                 const metaLine = docCard.createDiv({cls: "attachment-card-meta"});
                 metaLine.createSpan({ cls: "attachment-card-size", text: this.formatFileSize(docInfo.size) });
-                
                 let displayType = docInfo.type.split('/').pop() || docInfo.type; 
                 if (displayType.includes('.')) { 
                     displayType = displayType.substring(displayType.lastIndexOf('.') + 1);
@@ -52,7 +53,6 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                         displayType = nameExt;
                     }
                 }
-                
                 if (['JSON', 'MARKDOWN', 'MD', 'TEXT', 'TXT', 'TYPESCRIPT', 'TS', 'JAVASCRIPT', 'JS', 'PDF'].includes(displayType)) {
                     if (displayType === 'MARKDOWN') displayType = 'MD';
                     if (displayType === 'TYPESCRIPT') displayType = 'TS';
@@ -69,12 +69,10 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                 docCard.createDiv({ cls: "attachment-card-type", text: displayType });
             });
         }
-
-        // Рендеринг карток для прикріплених зображень
+        // ... (логіка рендерингу .attachment-card для зображень, як і раніше)
         if (this.message.images && this.message.images.length > 0) {
             hasAttachmentCards = true;
             this.message.images.forEach((imageDataUrl, index) => {
-                // ... (решта логіки для imageCard як і раніше)
                 const imageName = (this.message as any).imageNames?.[index] || `Image ${index + 1}`;
                 const imageCard = attachmentsCardContainer.createDiv({ cls: "attachment-card image-card" });
                 const imgPreview = imageCard.createEl("img", {attr: {src: imageDataUrl}, cls: "attachment-card-image-preview"});
@@ -99,16 +97,14 @@ export class UserMessageRenderer extends BaseMessageRenderer {
             attachmentsCardContainer.addClass("hidden-attachment-cards");
         }
 
-		// Бульбашка для тексту повідомлення користувача - тепер всередині mainContentWrapper
+		// Бульбашка для тексту повідомлення користувача - всередині mainContentWrapper
         const userTextContent = this.message.content || "";
         let messageBubbleActual: HTMLElement | null = null; 
 
-		if (userTextContent.trim() !== "" || (!hasAttachmentCards && !userTextContent.trim())) { // Показуємо бульбашку, якщо є текст, або якщо немає нічого (щоб не було порожньо)
-            // Якщо є картки, але немає тексту, бульбашка не створюється
+		if (userTextContent.trim() !== "" || (!hasAttachmentCards && !userTextContent.trim())) {
             if(userTextContent.trim() !== "" || !hasAttachmentCards) {
                 const { messageEl, contentEl } = this.createMessageBubble(mainContentWrapper, [CSS_CLASSES.USER_MESSAGE]);
                 messageBubbleActual = messageEl;
-
                 if (userTextContent.trim() !== "") {
                     MarkdownRenderer.render(this.app, userTextContent, contentEl, this.view.plugin.app.vault.getRoot()?.path ?? "", this.view);
                     RendererUtils.fixBrokenTwemojiImages(contentEl);
@@ -118,7 +114,7 @@ export class UserMessageRenderer extends BaseMessageRenderer {
             }
         }
 
-        // --- Обгортка для timestamp та кнопок дій - ПІСЛЯ mainContentWrapper ---
+        // --- Обгортка для timestamp та кнопок дій - ПІСЛЯ .content-area, всередині .message-wrapper ---
 		const metaActionsWrapper = messageWrapper.createDiv({ cls: "message-meta-actions-wrapper" });
 		BaseMessageRenderer.addTimestampToElement(metaActionsWrapper, this.message.timestamp, this.view);
 		this.addUserActionButtons(metaActionsWrapper);
@@ -130,9 +126,10 @@ export class UserMessageRenderer extends BaseMessageRenderer {
                 }
             }, 70);
         }
-
 		return messageGroup;
 	}
+
+    // ... (formatFileSize залишається)
 
     // ... (formatFileSize залишається)
     // --- НОВА ДОПОМІЖНА ФУНКЦІЯ ---

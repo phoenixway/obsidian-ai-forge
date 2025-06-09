@@ -146,46 +146,46 @@ $avatar-icon-size-factor: 0.65;
   box-sizing: border-box;
   max-width: var(--chat-message-max-width, 700px); 
   width: 100%; 
-
-  .ollama-message-group &,
-  .tool-message-group &, 
-  .error-message-group & { 
-    align-items: flex-start; 
-  }
-  .user-message-group & { 
-    align-items: flex-end;   
-  }
-  .system-message-group & { 
-    align-items: center; 
-  }
 }
 
-// --- НОВА ОБГОРТКА для основного контенту (картки + бульбашка) ---
-.message-main-content {
+// --- ОБГОРТКА для контенту (картки + бульбашка), ПЕРЕД мета-інформацією ---
+.message-content-area {
   display: flex;
   flex-direction: column;
   width: 100%; // Займає всю ширину .message-wrapper
 
+  // Вирівнювання .message-main-content всередині .message-content-area
   .user-message-group .message-wrapper & {
-    align-items: flex-end; // Вирівнює картки та бульбашку вправо
+    align-items: flex-end; 
   }
-  .ollama-message-group .message-wrapper & { // Якщо для AI
-    align-items: flex-start; // Вирівнює картки та бульбашку вліво
+  .ollama-message-group .message-wrapper & {
+    align-items: flex-start; 
   }
 }
-// --- Кінець нової обгортки ---
 
-// Контейнер для карток вкладень - всередині .message-main-content
+// Обгортка для карток та бульбашки, для їх взаємного вирівнювання
+.message-main-content {
+  display: flex;
+  flex-direction: column;
+  width: 100%; // Або fit-content, якщо потрібно, щоб вона була по ширині найширшого елемента (картки/бульбашки)
+
+  // Вирівнювання дочірніх елементів (карток та бульбашки)
+  .user-message-group .message-wrapper & {
+    align-items: flex-end;
+  }
+  .ollama-message-group .message-wrapper & {
+    align-items: flex-start;
+  }
+}
+// --- Кінець нових обгорток ---
+
 .message-attachment-cards-container {
   display: flex;
   flex-wrap: wrap;
   gap: calc(var(--chat-spacing-unit, 5px) * 1.25);
-  // Немає margin-bottom, бо наступний елемент (бульбашка або meta-actions) матиме свій margin-top
-  width: 100%; 
+  width: 100%; // Картки займають всю доступну ширину .message-main-content
+  // justify-content тут не потрібен, якщо вирівнювання йде через align-items батька
   
-  // justify-content тепер не потрібен тут, бо align-items на .message-main-content (для користувача)
-  // або flex-start на самому .message-main-content (для AI) вже роблять це.
-
   &.hidden-attachment-cards {
     display: none;
   }
@@ -248,14 +248,11 @@ $avatar-icon-size-factor: 0.65;
   margin-bottom: calc(var(--chat-spacing-unit, 5px) * 0.25);
 }
 
-// Бульбашка повідомлення - всередині .message-main-content
 .message { 
   @extend %base-message-bubble; 
   width: fit-content; 
   max-width: 100%;    
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); // Відступ зверху, якщо є картки
-
-  // align-self не потрібен, бо .message-main-content вже вирівнює
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); 
   
   &.message-arriving { 
     animation: message-appear 0.3s ease-out forwards;
@@ -289,7 +286,8 @@ $avatar-icon-size-factor: 0.65;
   padding: calc(var(--chat-spacing-unit, 5px) * 1) calc(var(--chat-spacing-unit, 5px) * 2.5);
   box-shadow: none;
   text-align: center;
-  align-self: center; // Центрування системного повідомлення всередині .message-wrapper
+  // Для системних повідомлень, .message-wrapper має align-items: center
+  // Тому сама бульбашка не потребує align-self, якщо .message-wrapper = system-message-group
   width: auto; 
 }
 .message.error-message { 
@@ -313,25 +311,24 @@ $avatar-icon-size-factor: 0.65;
   p { margin-top: 0; margin-bottom: calc(var(--p-spacing, 1em) / 2); &:last-child { margin-bottom: 0; } }
 }
 
-// Обгортка для timestamp та кнопок дій - ПІСЛЯ .message-main-content
+// Обгортка для timestamp та кнопок дій - ПІСЛЯ .message-content-area
 .message-meta-actions-wrapper {
   display: flex;
   align-items: center; 
-  margin-top: calc(var(--chat-spacing-unit, 5px) * 0.75); 
+  margin-top: calc(var(--chat-spacing-unit, 5px) * 1); 
   padding: 0; 
-  min-height: 18px; 
+  min-height: 20px; 
   width: 100%; 
+  box-sizing: border-box;
 
   .user-message-group .message-wrapper & { 
     justify-content: flex-end; 
+    padding-right: calc(var(--chat-spacing-unit, 5px) * 1); 
   }
   .ollama-message-group .message-wrapper & { 
     justify-content: flex-start; 
+    padding-left: calc(var(--chat-spacing-unit, 5px) * 1);
   }
-  
-  padding-left: calc(var(--chat-spacing-unit, 5px) * 0.5);
-  padding-right: calc(var(--chat-spacing-unit, 5px) * 0.5);
-  box-sizing: border-box;
 }
 
 .message-timestamp { 
@@ -339,14 +336,14 @@ $avatar-icon-size-factor: 0.65;
   color: var(--text-faint); 
   opacity: 0.9; 
   margin: 0; 
-  line-height: 1; 
+  line-height: 1.2; 
   white-space: nowrap; 
 }
 
 .message-actions-wrapper { 
   display: flex; 
   align-items: center; 
-  gap: calc(var(--chat-spacing-unit, 5px) * 0.75); 
+  gap: calc(var(--chat-spacing-unit, 5px) * 1); 
   opacity: 0; 
   visibility: hidden; 
   @include transition( (opacity, visibility), 0.15s, ease-in-out );
@@ -412,7 +409,7 @@ button.summarize-button { @extend %base-action-button; }
 
 .translation-container { border-top: 1px dashed var(--background-modifier-border); margin-top: calc(var(--chat-spacing-unit, 5px) * 2); padding-top: calc(var(--chat-spacing-unit, 5px) * 1.5); .translation-indicator { font-size: var(--font-ui-smaller); color: var(--text-faint); font-style: italic; margin-top: calc(var(--chat-spacing-unit, 5px) * 0.5); } }
 .translation-content { p:last-child { margin-bottom: 0; } }
-.translation-pending { /* Стилі для кнопки, коли йде переклад */ }
+.translation-pending { /* Залишаємо як коментар, якщо тут немає специфічних стилів */ }
 .recording { color: var(--color-red) !important; }
 
 .thinking-block { margin-top: 8px; border: 1px solid var(--background-modifier-border); border-radius: var(--radius-m); overflow: hidden;
