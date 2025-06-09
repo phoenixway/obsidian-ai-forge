@@ -390,6 +390,7 @@ $avatar-icon-size-factor: 0.65;
     // order не потрібен, бо кнопки і так другі в HTML
     margin-left: calc(var(--chat-spacing-unit, 5px) * 1.5); // Відступ від часу
     margin-right: 0;
+    order: 1;
   }
 
 }
